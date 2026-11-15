@@ -161,14 +161,15 @@ h2{font:700 52px/1.05 var(--ow-font-sans);letter-spacing:-.035em}
 .floor .decider{left:45.5%;top:13.5%;width:8%}
 .floor .card{left:4.5%;top:55%;width:5.5%}
 .floor .out{left:87%;top:42%;width:9%}
-.how{display:grid;grid-template-columns:240px 1fr;column-gap:40px;margin-top:40px}
-.how h3{font:650 24px/1.2 var(--ow-font-sans);letter-spacing:-.02em}
-.rows{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(3,1fr);gap:28px}
+.how{margin-top:40px}
+.how h3{margin:0 0 20px;font:650 24px/1.2 var(--ow-font-sans);letter-spacing:-.02em}
+.rows{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:28px}
 .rows li{padding-top:16px;border-top:2px solid var(--navy2);font-size:16.5px;line-height:1.5;color:var(--grey2)}
+.rows .role{display:block;margin-bottom:10px;font:600 12px/1.4 var(--ow-font-sans);letter-spacing:.06em;text-transform:uppercase;color:var(--brass)}
 .rows b{display:block;margin-bottom:6px;font:650 19px/1.3 var(--ow-font-sans);letter-spacing:-.012em;color:var(--ink)}
 .rows a{display:inline-block;padding-block:3px;text-decoration:underline;text-decoration-color:var(--brass);text-decoration-thickness:1.5px;text-underline-offset:4px}
 .rows a:hover{color:var(--brass-hi)}
-.fit{grid-column:2;margin-top:28px;max-width:760px;font-size:20px;line-height:1.45;color:var(--ink)}
+.fit{margin-top:28px;max-width:760px;font-size:20px;line-height:1.45;color:var(--ink)}
 /* Ship log teaser */
 .ship{margin-top:112px}
 .ship h2{font-size:40px}
@@ -349,12 +350,12 @@ h1{white-space:nowrap}
   h2{font-size:34px;max-width:11ch}
   .floor{margin:20px calc(-1 * var(--m)) 0;border-radius:0;aspect-ratio:900/560;box-shadow:none}
   .floor-in{inset:auto auto 0 -76%;width:266.67%;aspect-ratio:2400/820;height:auto}
-  .how{grid-template-columns:1fr;margin-top:28px}
-  .how h3{font-size:20px}
-  .rows{grid-template-columns:1fr;gap:16px;margin-top:14px}
+  .how{margin-top:28px}
+  .how h3{margin-bottom:16px;font-size:20px}
+  .rows{grid-template-columns:1fr;gap:20px}
   .rows li{padding-top:12px;font-size:15.5px}
   .rows b{font-size:17.5px}
-  .fit{grid-column:1;margin-top:20px;font-size:17.5px}
+  .fit{margin-top:20px;font-size:17.5px}
   .ship{margin-top:72px}
   .ship h2{font-size:30px}
   .cols{grid-template-columns:1fr;gap:28px;margin-top:18px}
@@ -374,10 +375,13 @@ h1{white-space:nowrap}
 .shiplog h1{font-size:64px}
 .shiplog .lead{margin-top:16px;max-width:720px;font-size:19px;color:var(--grey2)}
 .shiplog .lead a{color:var(--ink);text-decoration:underline;text-decoration-color:var(--brass);text-underline-offset:4px;white-space:nowrap}
-.shiplog h2{margin-top:64px;font-size:30px}
-.bundle-list{list-style:none;margin:20px 0 0;padding:0;display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
-.bundle-list li{padding:16px 16px 18px;border-radius:14px;box-shadow:inset 0 0 0 1px var(--edge);font-size:15px;line-height:1.45;color:var(--grey2)}
-.bundle-list b{display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:16.5px;color:var(--ink)}
+.shiplog h2{margin-top:56px;font-size:30px}
+/* Being built: one compact strip after Shipped, named bundles only. */
+.being{margin-top:16px}
+.bundle-list{list-style:none;margin:18px 0 0;padding:0;display:grid;grid-template-columns:repeat(4,1fr);border-radius:14px;background:var(--panel);box-shadow:inset 0 0 0 1px var(--edge);overflow:hidden}
+.bundle-list li{display:flex;flex-direction:column;gap:4px;padding:16px 18px 18px;font-size:15px;line-height:1.45;color:var(--grey2)}
+.bundle-list li+li{border-left:1px solid var(--line)}
+.bundle-list b{display:flex;align-items:center;gap:8px;font-size:16px;color:var(--ink)}
 .bundle-list b::before{content:"";width:10px;height:10px;flex:none;border-radius:50%;box-sizing:border-box;border:2px solid var(--navy2);border-top-color:var(--brass)}
 .rel{display:grid;grid-template-columns:200px 1fr;gap:24px;padding:28px 0;border-top:1px solid var(--line)}
 .rel:first-of-type{border-top:0}
@@ -391,20 +395,35 @@ h1{white-space:nowrap}
 .rel code{font-size:.92em;color:#f6dcae}
 .gh{display:inline-flex;align-items:center;min-height:44px;margin-top:6px;font-size:15px;color:var(--grey2);text-decoration:underline;text-decoration-color:var(--brass);text-underline-offset:4px}
 .gh:hover{color:var(--ink)}
+/* Shipped: the latest release leads as a card; earlier releases follow as a dated list. */
+.shipped .rel:first-of-type{grid-template-columns:164px 1fr;margin-top:20px;padding:32px 36px 26px;border-radius:18px;background:linear-gradient(160deg,rgb(18 32 74 / 60%),var(--panel) 55%);box-shadow:inset 0 0 0 1px var(--edge),inset 3px 0 0 var(--brass)}
+.shipped .rel:first-of-type .v{font-size:28px}
+.shipped .rel:first-of-type h3{font-size:34px;line-height:1.15}
+.shipped .rel:first-of-type .main-line{margin-top:12px;font-size:20px;line-height:1.5}
+.latest{width:fit-content;margin-top:6px;padding:4px 10px;border-radius:999px;box-shadow:inset 0 0 0 1px var(--brass);font:600 12px/1 var(--ow-font-sans);letter-spacing:.08em;text-transform:uppercase;color:var(--brass)}
+.earlier{margin-top:40px;padding-bottom:4px;font:600 13px/1 var(--ow-font-sans);letter-spacing:.08em;text-transform:uppercase;color:var(--grey)}
+.earlier+.rel{border-top:0}
 @media (max-width:960px){
   .shiplog{padding-top:32px}
   .shiplog h1{font-size:42px}
   .shiplog .lead{font-size:16.5px}
-  .shiplog h2{margin-top:44px;font-size:24px}
-  .bundle-list{grid-template-columns:1fr 1fr;gap:10px}
-  .bundle-list li{padding:12px 12px 14px;font-size:14px}
-  .bundle-list b{font-size:15px}
+  .shiplog h2{margin-top:40px;font-size:24px}
+  .bundle-list{grid-template-columns:1fr;margin-top:14px}
+  .bundle-list li{gap:2px;padding:12px 16px 13px;font-size:14.5px}
+  .bundle-list li+li{border-left:0;border-top:1px solid var(--line)}
+  .bundle-list b{font-size:15.5px}
   .rel{grid-template-columns:1fr;gap:6px;padding:22px 0}
   .when{flex-direction:row;align-items:baseline;gap:12px}
   .when .v{font-size:19px}
   .rel h3{font-size:20px}
   .main-line{font-size:16.5px}
   .also{font-size:15px}
+  .shipped .rel:first-of-type{grid-template-columns:1fr;margin-top:14px;padding:20px 20px 10px;border-radius:16px}
+  .shipped .rel:first-of-type .v{font-size:22px}
+  .shipped .rel:first-of-type h3{margin-top:4px;font-size:25px}
+  .shipped .rel:first-of-type .main-line{font-size:17px}
+  .latest{margin:0 0 0 auto;align-self:center}
+  .earlier{margin-top:32px}
 }
 
 /* Very narrow windows (and 320 px with a classic scrollbar): stack the buttons, drop the window title. */
