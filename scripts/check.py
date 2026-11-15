@@ -1,5 +1,6 @@
 """Dependency-free checks for this site's literal HTML/CSS and public source."""
 from hashlib import sha256
+from html import unescape
 from html.parser import HTMLParser
 from pathlib import Path
 import re
@@ -16,8 +17,8 @@ ART_HASHES = {
     'art/builder-hammer-down.webp': 'e96666e101dc52d9baa9b0e5191db74d2f88f8e63ced688c6420cb5866c71640',
     'art/builder-hammer-up.webp': '6418007e902d7715fcd6058d6dfce69953e1411adfbf9cbe7d446d195cb3cfd9',
     'art/builder-stand.webp': '8cb63b839e929b1e140ccbff6b540490e105be46b2e1952d9529ed8d2534772c',
+    'art/citadel-dark.webp': '30b6739867202b7a7fcc7127831b37089f6fccc5ebf4ea9eef84c1e153510ccf',
     'art/citadel-lights.webp': '0536adc3168d80c859df1d68ee50fd79d3f3e04df34abf95a6e6d15fd44ced33',
-    'art/citadel.webp': '7af0ca0ed7f84b5da51d42512fc53cb997ff505540bd8f1dc52dc28e36b41eb5',
     'art/decider.webp': 'c5fe96e1ac1fe73ba6533840a499eda28c49d102993f18b3d8fd0a3a73b2560e',
     'art/hall.webp': '81d0c27f1978ed88dd2901d8f03697cf7efb424d891ee38924b8676c6b85c495',
     'art/idea-card.webp': '695e9aefb47bdb69e320f59021d07c7bd1a290737f3fdafa66a088cb1001ca45',
@@ -33,11 +34,12 @@ ART_HASHES = {
 ART = set(ART_HASHES)
 ART_BUDGET = 2_000_000  # bytes, all art together
 RUNTIME = {
-    'index.html', 'changelog/index.html', 'style.css', 'tokens.css', 'script.js',
-    'landing.css', 'landing.js',
+    'index.html', 'changelog/index.html', 'tokens.css', 'landing.css', 'landing.js',
     'fonts/Geist-var.woff2', 'fonts/GeistMono-var.woff2', 'fonts/OFL.txt',
-    'fonts/Virgil.woff2', 'fonts/Virgil-OFL.txt',
 } | ART
+# Owner copy rule (round 8): this word never appears anywhere on the site or in its source.
+# Built from parts so this rule's own text does not contain it.
+BANNED_COPY = ('play' 'book',)
 # Generic private-context markers only; never copy personal literal lists here.
 DENYLIST = ('closedwiz', '/users/', '/home/', 'private/evidence/',
             'docs/grills/', 'thr_', 'cr_sub_')
@@ -45,12 +47,10 @@ FONT_HASHES = {
     'fonts/Geist-var.woff2': '206f01ed08e05c98a51daa7472331c3c71bbb8c1f9d55ea8c70074f3c528a706',
     'fonts/GeistMono-var.woff2': '55419aa06f58adcd7f145c6c920e56936416f17e528f60efc6032ffa4269972b',
     'fonts/OFL.txt': 'c683bfbcc7e087f5d37a54ef628f10387c451a83ddc459b151403a164ac46c90',
-    'fonts/Virgil-OFL.txt': 'a3ac9cdc65ef304ffb095d8cc877ee93bf1bffa88269693cd42ddf001650ffd0',
-    'fonts/Virgil.woff2': '9976295bfe709bdea64839a4d4e9a1d436dd6eb67538399a5a0e8b8fadbcf1cf',
 }
 PAGES = ('index.html', 'changelog/index.html')
-# Release-note text is intentionally retained while navigation follows the new landing.
-CHANGELOG_MAIN = 'c852e0d7a442c1f65b7c663625d38258d23203070b4de80858d226f962b23d1e'
+# The ship log (RD5): release notes kept verbatim, regrouped as main line + Also changed, plus Being built.
+CHANGELOG_MAIN = 'eeb7b4e3bf54baed31fd13a49e30aa31e568404a98d52e45f388fe5bc55f2107'
 
 
 class Page(HTMLParser):
@@ -85,6 +85,33 @@ def check_webp(data):
         assert kind in (b'VP8 ', b'VP8L', b'VP8X', b'ALPH'), f'unexpected WebP chunk {kind!r}'
         at += 8 + size + (size & 1)
     assert at == len(data), 'truncated WebP'
+
+
+class Text(HTMLParser):
+    """Decoded page text (outside script/style) and every attribute value."""
+    def __init__(self, text):
+        super().__init__(convert_charrefs=True)
+        self.parts, self.attrs, self.skip = [], [], 0
+        self.feed(text)
+
+    def handle_starttag(self, tag, attrs):
+        if tag in ('script', 'style'):
+            self.skip += 1
+        self.attrs += [v for _, v in attrs if v]
+
+    def handle_endtag(self, tag):
+        if tag in ('script', 'style') and self.skip:
+            self.skip -= 1
+
+    def handle_data(self, data):
+        if not self.skip:
+            self.parts.append(data)
+
+    def joined(self):
+        return ''.join(self.parts)
+
+    def spaced(self):
+        return ' '.join(self.parts)
 
 
 def check_ref(root, source, ref, pages, favicons=()):
@@ -136,8 +163,6 @@ def check_site(root):
     for path in root.glob('*.css'):
         for ref in css_refs(path.read_text()):
             check_ref(root, path, ref, pages)
-    # JavaScript-created resource: document.fonts.load() uses this CSS face.
-    assert 'fonts/Virgil.woff2' in (root / 'style.css').read_text()
     for name in FONT_HASHES:
         data = (root / name).read_bytes()
         assert sha256(data).hexdigest() == FONT_HASHES[name], 'font or licence changed; review before updating its hash'
@@ -150,15 +175,33 @@ def check_site(root):
     headline = re.sub(r'<[^>]*>', '', re.search(r'<h1>([\s\S]*?)</h1>', landing)[1].replace('<br>', ' '))
     assert headline == 'Build at the speed of ideas.', 'hero headline changed'
     flat = re.sub(r'\s+', ' ', re.sub(r'<br>', ' ', landing))
-    flat = re.sub(r'\s+', ' ', re.sub(r'<[^>]*>', '', flat))
+    flat = re.sub(r'\s+', ' ', unescape(re.sub(r'<[^>]*>', '', flat)))
+    sub = re.search(r'<p class="sub">([\s\S]*?)</p>', landing)
+    assert sub and re.sub(r'\s+', ' ', unescape(re.sub(r'<[^>]*>', ' ', sub[1]))).strip() == 'You make the decisions. The agents run the factory.', 'hero subline changed'
     assert 'You make the decisions. The agents run the factory.' in flat, 'hero subline changed'
-    for text in ('Building in public', 'Star on GitHub', 'Not ready for everyone yet.',
-                 'Illustration, not live data.', 'Idea in. Shipped work out.'):
+    # Rendered text and attribute values (alt, title, meta), decoded, on both pages. Text is read both
+    # joined (inline tags can split a word) and spaced; every attribute value is read on its own.
+    for path in pages:
+        reader = Text(path.read_text())
+        readings = [reader.joined(), reader.spaced()] + reader.attrs
+        for reading in readings:
+            low = re.sub(r'\s+', ' ', reading).lower()
+            assert not any(word in low for word in BANNED_COPY), f'banned word rendered in {path.name}'
+            for text in ('illustration, not live data', 'building in public'):
+                assert text not in low, f'cut copy is back in {path.name}: {text}'
+    for text in ('Star on GitHub', 'Not ready for everyone yet.', 'Idea in. Shipped work out.', 'How it works',
+                 'OpenWiz runs your factory.', 'WizSkills are the skills your agents follow.',
+                 'WizPlugins put the controls in Cloudroom.',
+                 'You decide what gets built. WizSkills tell the agents how. OpenWiz runs the line and shows you every step.',
+                 'Ship log', 'Shipped', 'Being built'):
         assert text in flat, f'missing landing copy: {text}'
+    # Owner cuts (round 6): obvious notes stay off the page.
+    for text in ('Illustration, not live data', 'Building in public'):
+        assert text.lower() not in flat.lower(), f'cut copy is back: {text}'
     # Install stays "coming soon" until a stranger can install (AN8); only these mentions are allowed.
     assert 'Install · coming soon' in flat
     rest = flat
-    for allowed in ('Install · coming soon', 'Install copies this prompt', 'Install OpenWiz from github.com/openwizdev/openwiz'):
+    for allowed in ('Install · coming soon', 'Install will copy one prompt'):
         rest = rest.replace(allowed, '')
     assert not re.search(r'install|paid plans|works today', rest, re.I), 'unsettled landing claim or live install CTA'
     installs = [b for b in pages[root / 'index.html'].buttons if 'install' in (b.get('class') or '').split()]
@@ -170,8 +213,14 @@ def check_site(root):
     assert not re.search(r'\b\d{4}-\d{2}-\d{2}\b', words), 'dated landing promise'
     changelog = (root / 'changelog/index.html').read_text()
     # The teaser shows only versions the changelog publishes.
-    teaser = re.findall(r'<span class="v">(\d+\.\d+\.\d+)</span>', landing)
-    assert teaser and all(f'>{v}<' in changelog for v in teaser), 'changelog teaser version not in the changelog'
+    teaser = re.findall(r'<span class="v">(\d+\.\d+\.\d+)</span><span>([^<]+)</span>', landing)
+    # Each teaser line must match its own release in the ship log (version and headline together).
+    releases = dict(re.findall(r'<article class="rel" id="v[\d.]+"><p class="when"><span class="v">([\d.]+)</span>[\s\S]*?<h3>([\s\S]*?)</h3>', changelog))
+    assert teaser and all(releases.get(v) == h for v, h in teaser), 'ship log teaser line does not match its release'
+    teaser = [v for v, _ in teaser]
+    # "Being built" names bundles, never versions.
+    being = re.search(r'<ul class="bundle-list">([\s\S]*?)</ul>', changelog)
+    assert being and not re.search(r'\d+\.\d+', re.sub(r'<[^>]*>', '', being[1])), 'Being built must not name versions'
     assert len(re.findall(r'(?<![\d.])\d+\.\d+\.\d+(?![\d.])', flat)) == len(teaser), 'version mentioned outside the changelog teaser'
     total = 0
     for name in ART:
@@ -199,6 +248,8 @@ def check_privacy(path, data):
         assert not any(marker.encode() in data.lower() for marker in DENYLIST), f'private marker in {path}'
     binary = path.endswith('.webp') or (font in FONT_HASHES and font.endswith('.woff2'))
     text = path + '\n' + ('' if binary else data.decode('utf-8'))
+    # The owner's copy rule covers every text file, this checker included (it builds the word from parts).
+    assert not any(word in text.lower() for word in BANNED_COPY), f'banned word in {path}'
     # The documented rule definition must name its own markers. No other exemption.
     if path == 'scripts/check.py':
         text = re.sub(r'DENYLIST = \([^)]*\)', '', text)

@@ -33,7 +33,7 @@ class Checks(unittest.TestCase):
             with self.assertRaises(AssertionError):
                 check_site(root)
             licence.write_bytes(original)
-            with (root / 'style.css').open('a') as css:
+            with (root / 'landing.css').open('a') as css:
                 css.write('\np { background: url(/missing.png) }\n')
             with self.assertRaises(AssertionError):
                 check_site(root)
@@ -90,6 +90,35 @@ class Checks(unittest.TestCase):
                 shutil.copytree(ROOT / 'dist', root)
                 with (root / 'landing.css').open('a') as css:
                     css.write(bad)
+                with self.assertRaises(AssertionError):
+                    check_site(root)
+
+    def test_banned_word(self):
+        word = 'play' + 'book'
+        for text in (word, word.title() + 's', 'a ' + word.upper()):
+            with self.subTest(text=text), self.assertRaises(AssertionError):
+                check_privacy('index.html', f'<p>{text}</p>'.encode())
+        with self.assertRaises(AssertionError):
+            check_privacy('README.md', f'skills are {word}s'.encode())
+
+    def test_encoded_copy_and_teaser_pairs(self):
+        for old, new in (('<h2 id="ship-h">Ship log</h2>', '<h2 id="ship-h">Ship log</h2><p>play&#98;ook</p>'),
+                         ('<h2 id="ship-h">Ship log</h2>', '<h2 id="ship-h">Ship log</h2><p>Building in p&#117;blic</p>'),
+                         ('alt="" width="400"', 'alt="Pl&#97;ybook" width="400"'),
+                         ('<h2 id="ship-h">Ship log</h2>', '<h2 id="ship-h">Ship log</h2><p>play<b>bo</b>ok</p>'),
+                         ('alt="" width="400"', 'alt="Illustration, not l&#105;ve data" width="400"'),
+                         ('<h2 id="ship-h">Ship log</h2>', '<h2 id="ship-h">Ship log</h2><p>Building <em>in</em> public</p>'),
+                         ('<p class="sub">You make the decisions.<br>The agents run the factory.</p>', '<p class="sub">You decide.<br>Agents build.</p>'),
+                         ('<p class="sub">You make the decisions.<br>The agents run the factory.</p>', ''),
+                         ('<h1>Build at the<br>speed of<br>ideas.</h1>', '<h1>Build at the<br>speed of<br>thought.</h1>'),
+                         ('<span class="v">0.0.5</span><span>Fleets of agents build for you</span>', '<span class="v">0.0.5</span><span>Message your threads</span>')):
+            with self.subTest(new=new), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp) / 'dist'
+                shutil.copytree(ROOT / 'dist', root)
+                landing = root / 'index.html'
+                text = landing.read_text()
+                self.assertIn(old, text)
+                landing.write_text(text.replace(old, new, 1))
                 with self.assertRaises(AssertionError):
                     check_site(root)
 

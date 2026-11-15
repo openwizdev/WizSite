@@ -28,9 +28,13 @@ Changes merge after green CI and one review from the other model family. No per-
 
 ## Site assets
 
-WizSite owns `tokens.css`; it is a copied foundation, maintained here independently. The landing page (v2) uses `landing.css` and `landing.js`: navy, black and brass, with layered engraved art in `art/` (generated pictures, sliced into separately animated WebP layers). Its ~10 s intro plays once, then rests with ambient motion and a Replay button; under reduced motion, or without JavaScript, every element shows the intro's final frame. The animation is labelled **Illustration, not live data.** Install reads **Install · coming soon**, stays disabled and shows the prompt it will copy, until a stranger can install. The changelog teaser shows only versions the changelog publishes. `/changelog` keeps `style.css`, `script.js` and its command palette; its notes are retained.
+WizSite owns `tokens.css`; it is a copied foundation, maintained here independently. Both pages use `landing.css`; the landing page also uses `landing.js`. The look is navy, black and brass, with layered engraved art in `art/` (generated pictures, sliced into separately animated WebP layers; the lit citadel is a dark base plus its lights layer, shown through a mask of window rectangles).
 
-The Geist and Geist Mono fonts ship unmodified with `fonts/OFL.txt`. Virgil ships unmodified with `fonts/Virgil-OFL.txt` (SIL Open Font License 1.1; Reserved Font Name Virgil). Keep both licences in source and the static export. The build does not fetch fonts from an external service.
+The hero's intro plays once: CSS runs the build beats (the idea, a 3-question grill, a spec of five tickets, Approve, builders, a reviewer, merged), then `landing.js` pulls the camera back from that one bay to the whole citadel. Neighbouring lines light up one at a time, each carrying its own named spec, and then every line carries work. At rest the citadel keeps moving (items on its lines, a train on the ring, windows flipping to brass, smoke), paused off screen. Under reduced motion, or without JavaScript, the page shows one still frame. A Replay button follows the intro. Install reads **Install · coming soon** and stays disabled until a stranger can install.
+
+`/changelog` is the **ship log**: *Being built* (named bundles, never version numbers) and *Shipped* (published releases, newest first, each with its main line and *Also changed*). The landing teaser shows only releases the ship log publishes.
+
+The Geist and Geist Mono fonts ship unmodified with `fonts/OFL.txt`. Keep the licence in source and the static export. The build does not fetch fonts from an external service.
 
 ## Privacy and verification limits
 
@@ -38,4 +42,4 @@ CI uses only Node.js, Python's standard library, Git and the checkout/setup Acti
 
 This denylist is a tripwire, not comprehensive detection of private names or secrets. Independent review must also assess privacy and unsettled claims. External link destinations are constrained to the three public repositories; CI does not make network availability checks or validate remote fragments.
 
-**Named gap — automated browser tests:** layout/overflow, keyboard and touch navigation, command-palette interaction, accessibility/contrast and animation/reduced-motion behavior are not covered by CI. No Playwright, axe or other npm dependency is added. A browser smoke check is useful evidence but does not close this automated-test gap.
+**Named gap — automated browser tests:** layout/overflow, keyboard and touch navigation, accessibility/contrast and animation/reduced-motion behavior are not covered by CI. No Playwright, axe or other npm dependency is added. A browser smoke check is useful evidence but does not close this automated-test gap.
