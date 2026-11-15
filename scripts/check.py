@@ -33,10 +33,25 @@ ART_HASHES = {
 }
 ART = set(ART_HASHES)
 ART_BUDGET = 2_000_000  # bytes, all art together
+# Styles and scripts ship fingerprinted (name.<first 10 hex of sha256>.ext); the pages use only those names.
+HASHED = ('tokens.css', 'site.css', 'site.js')
+
+
+def fingerprint(name, data):
+    return re.sub(r'\.(css|js)$', rf'.{sha256(data).hexdigest()[:10]}.\1', name)
+
+
+def fingerprinted_page(html):
+    for name, hashed in FINGERPRINTS.items():
+        html = html.replace(f'"/{name}"', f'"/{hashed}"')
+    return html
+
+
+FINGERPRINTS = {name: fingerprint(name, (ROOT / name).read_bytes()) for name in HASHED}
 RUNTIME = {
-    'index.html', 'changelog/index.html', 'tokens.css', 'site.css', 'site.js', '_headers',
+    'index.html', 'changelog/index.html', '_headers',
     'fonts/Geist-var.woff2', 'fonts/GeistMono-var.woff2', 'fonts/OFL.txt',
-} | ART
+} | set(FINGERPRINTS.values()) | ART
 # Owner copy rule (round 8): this word never appears anywhere on the site or in its source.
 # Built from parts so this rule's own text does not contain it.
 BANNED_COPY = ('play' 'book',)
@@ -147,7 +162,13 @@ def check_ref(root, source, ref, pages, favicons=()):
 def check_site(root):
     files = {p.relative_to(root).as_posix() for p in root.rglob('*') if p.is_file()}
     assert files == RUNTIME, 'unexpected or missing build output'
+    # Every fingerprint matches its file's content, and the pages never use an unfingerprinted name.
+    for name in FINGERPRINTS.values():
+        assert fingerprint(re.sub(r'\.[0-9a-f]{10}\.', '.', name), (root / name).read_bytes()) == name, f'fingerprint does not match content: {name}'
     pages = {root / f: Page((root / f).read_text()) for f in PAGES}
+    for page in pages.values():
+        assert not set(page.refs) & {f'/{name}' for name in HASHED}, 'a page uses an unfingerprinted style or script'
+        assert {f'/{FINGERPRINTS[n]}' for n in HASHED if n != 'site.js'} <= set(page.refs), 'a page misses a fingerprinted stylesheet'
     def css_refs(text):
         # CSS escapes could hide or split a url(); none are used, so refuse them all, then require
         # that every url( is read whole.
@@ -212,7 +233,7 @@ def check_site(root):
     assert len(installs) == 1, 'exactly one Install button'
     assert 'disabled' in installs[0], 'Install must stay natively disabled'
     assert not any(k.startswith('on') or k in ('form', 'formaction') for k in installs[0]), 'Install must have no activation handler'
-    scripts = (root / 'site.js').read_text()
+    scripts = (root / FINGERPRINTS['site.js']).read_text()
     assert not re.search(r'install|clipboard', scripts, re.I), 'no script may activate Install or copy the prompt yet'
     assert not re.search(r'\b\d{4}-\d{2}-\d{2}\b', words), 'dated landing promise'
     changelog = (root / 'changelog/index.html').read_text()
@@ -263,8 +284,12 @@ def check_privacy(path, data):
 def main():
     output = ROOT / 'dist'
     check_site(output)
-    for name in RUNTIME:
+    for name in RUNTIME - set(FINGERPRINTS.values()) - set(PAGES):
         assert (ROOT / name).read_bytes() == (output / name).read_bytes(), f'export differs: {name}'
+    for name, hashed in FINGERPRINTS.items():
+        assert (ROOT / name).read_bytes() == (output / hashed).read_bytes(), f'export differs: {name}'
+    for name in PAGES:
+        assert fingerprinted_page((ROOT / name).read_text()) == (output / name).read_text(), f'export differs: {name}'
     paths = subprocess.check_output(['git', 'ls-files', '-z', '--cached', '--others', '--exclude-standard'], cwd=ROOT).decode().split('\0')
     for name in set(paths) - {''}:
         path = ROOT / name

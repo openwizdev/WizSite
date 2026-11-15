@@ -4,7 +4,7 @@ import shutil
 import tempfile
 import unittest
 
-from check import ROOT, Page, check_privacy, check_ref, check_site, check_webp
+from check import FINGERPRINTS, ROOT, Page, check_privacy, check_ref, check_site, check_webp
 
 
 class Checks(unittest.TestCase):
@@ -33,7 +33,7 @@ class Checks(unittest.TestCase):
             with self.assertRaises(AssertionError):
                 check_site(root)
             licence.write_bytes(original)
-            with (root / 'site.css').open('a') as css:
+            with (root / FINGERPRINTS['site.css']).open('a') as css:
                 css.write('\np { background: url(/missing.png) }\n')
             with self.assertRaises(AssertionError):
                 check_site(root)
@@ -88,7 +88,7 @@ class Checks(unittest.TestCase):
             with self.subTest(css=bad), tempfile.TemporaryDirectory() as temp:
                 root = Path(temp) / 'dist'
                 shutil.copytree(ROOT / 'dist', root)
-                with (root / 'site.css').open('a') as css:
+                with (root / FINGERPRINTS['site.css']).open('a') as css:
                     css.write(bad)
                 with self.assertRaises(AssertionError):
                     check_site(root)
@@ -122,6 +122,24 @@ class Checks(unittest.TestCase):
                 with self.assertRaises(AssertionError):
                     check_site(root)
 
+    def test_fingerprints(self):
+        css = FINGERPRINTS['site.css']
+        for change in ('stale-name', 'tampered', 'unhashed-ref'):
+            with self.subTest(change=change), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp) / 'dist'
+                shutil.copytree(ROOT / 'dist', root)
+                if change == 'stale-name':
+                    (root / css).rename(root / 'site.0000000000.css')
+                elif change == 'tampered':
+                    with (root / css).open('a') as f:
+                        f.write('\n/* changed */\n')
+                else:
+                    page = root / 'index.html'
+                    page.write_text(page.read_text().replace(f'"/{css}"', '"/site.css"'))
+                    (root / 'site.css').write_bytes((root / css).read_bytes())
+                with self.assertRaises(AssertionError):
+                    check_site(root)
+
     def test_headers_revalidate(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp) / 'dist'
@@ -146,7 +164,7 @@ class Checks(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp) / 'dist'
             shutil.copytree(ROOT / 'dist', root)
-            with (root / 'site.js').open('a') as js:
+            with (root / FINGERPRINTS['site.js']).open('a') as js:
                 js.write("\nnavigator.clipboard.writeText('x');\n")
             with self.assertRaises(AssertionError):
                 check_site(root)
