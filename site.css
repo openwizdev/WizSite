@@ -340,8 +340,8 @@ h1{white-space:nowrap}
   .tap{right:30px}
   .pill{font-size:12px;padding:5px 9px}.pill.ours{font-size:13px;padding:6px 10px}
   .ctas{margin-top:14px;max-width:none}
-  .buttons{flex-wrap:nowrap;gap:10px}
-  .btn{flex:1 1 0;min-height:48px;padding:0 10px;font-size:15px;gap:8px}
+  .buttons{flex-wrap:wrap;gap:10px}
+  .btn{flex:1 1 auto;min-height:48px;padding:0 10px;font-size:15px;gap:8px}
   .install-note{margin-top:10px;font-size:14px}
   .works{margin-top:72px}
   h2{font-size:34px;max-width:11ch}
@@ -406,8 +406,8 @@ h1{white-space:nowrap}
 }
 
 /* Very narrow windows (and 320 px with a classic scrollbar): stack the buttons, drop the window title. */
+/* Phone buttons sit side by side when they fit and wrap to two rows when they don't (narrow windows,
+   classic scrollbars, the fallback font). Very narrow windows also drop the window title. */
 @media (max-width:360px){
-  .buttons{flex-wrap:wrap}
-  .btn{flex:1 1 100%}
   .bar b{display:none}
 }
