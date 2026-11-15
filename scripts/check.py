@@ -48,10 +48,23 @@ def fingerprinted_page(html):
 
 
 FINGERPRINTS = {name: fingerprint(name, (ROOT / name).read_bytes()) for name in HASHED}
-RUNTIME = {
+STATIC = {
     'index.html', 'changelog/index.html', '_headers',
     'fonts/Geist-var.woff2', 'fonts/GeistMono-var.woff2', 'fonts/OFL.txt',
-} | set(FINGERPRINTS.values()) | ART
+} | ART
+RUNTIME = STATIC | set(FINGERPRINTS.values())
+
+
+def built_fingerprints(root):
+    """The fingerprinted names actually in a build: exactly one per source file, each matching its content."""
+    names = {}
+    for name in HASHED:
+        stem, ext = name.rsplit('.', 1)
+        found = [p.name for p in root.glob(f'{stem}.*.{ext}') if re.fullmatch(rf'{re.escape(stem)}\.[0-9a-f]{{10}}\.{ext}', p.name)]
+        assert len(found) == 1, f'expected one fingerprinted {name}, found {found}'
+        assert fingerprint(name, (root / found[0]).read_bytes()) == found[0], f'fingerprint does not match content: {found[0]}'
+        names[name] = found[0]
+    return names
 # Owner copy rule (round 8): this word never appears anywhere on the site or in its source.
 # Built from parts so this rule's own text does not contain it.
 BANNED_COPY = ('play' 'book',)
@@ -75,6 +88,7 @@ class Page(HTMLParser):
         self.refs = []
         self.favicons = set()
         self.buttons = []
+        self.stylesheets, self.scripts = [], []
         self.feed(text)
 
     def handle_starttag(self, tag, attrs):
@@ -87,6 +101,10 @@ class Page(HTMLParser):
                 self.refs.append(attrs[key])
         if tag == 'button':
             self.buttons.append(attrs)
+        if tag == 'link' and attrs.get('rel') == 'stylesheet' and attrs.get('href'):
+            self.stylesheets.append(attrs['href'])
+        if tag == 'script' and attrs.get('src'):
+            self.scripts.append(attrs['src'])
         if tag == 'link' and attrs.get('rel') == 'icon':
             self.favicons.add(attrs.get('href'))
 
@@ -161,14 +179,14 @@ def check_ref(root, source, ref, pages, favicons=()):
 
 def check_site(root):
     files = {p.relative_to(root).as_posix() for p in root.rglob('*') if p.is_file()}
-    assert files == RUNTIME, 'unexpected or missing build output'
-    # Every fingerprint matches its file's content, and the pages never use an unfingerprinted name.
-    for name in FINGERPRINTS.values():
-        assert fingerprint(re.sub(r'\.[0-9a-f]{10}\.', '.', name), (root / name).read_bytes()) == name, f'fingerprint does not match content: {name}'
+    names = built_fingerprints(root)
+    assert files == STATIC | set(names.values()), 'unexpected or missing build output'
     pages = {root / f: Page((root / f).read_text()) for f in PAGES}
     for page in pages.values():
+        # The pages never use an unfingerprinted name, and apply the fingerprinted styles as stylesheets.
         assert not set(page.refs) & {f'/{name}' for name in HASHED}, 'a page uses an unfingerprinted style or script'
-        assert {f'/{FINGERPRINTS[n]}' for n in HASHED if n != 'site.js'} <= set(page.refs), 'a page misses a fingerprinted stylesheet'
+        assert page.stylesheets == [f'/{names["tokens.css"]}', f'/{names["site.css"]}'], 'a page must apply exactly tokens.css then site.css'
+    assert pages[root / 'index.html'].scripts == [f'/{names["site.js"]}'], 'the landing page must load the fingerprinted site.js'
     def css_refs(text):
         # CSS escapes could hide or split a url(); none are used, so refuse them all, then require
         # that every url( is read whole.
@@ -233,7 +251,7 @@ def check_site(root):
     assert len(installs) == 1, 'exactly one Install button'
     assert 'disabled' in installs[0], 'Install must stay natively disabled'
     assert not any(k.startswith('on') or k in ('form', 'formaction') for k in installs[0]), 'Install must have no activation handler'
-    scripts = (root / FINGERPRINTS['site.js']).read_text()
+    scripts = (root / names['site.js']).read_text()
     assert not re.search(r'install|clipboard', scripts, re.I), 'no script may activate Install or copy the prompt yet'
     assert not re.search(r'\b\d{4}-\d{2}-\d{2}\b', words), 'dated landing promise'
     changelog = (root / 'changelog/index.html').read_text()
@@ -286,6 +304,7 @@ def main():
     check_site(output)
     for name in RUNTIME - set(FINGERPRINTS.values()) - set(PAGES):
         assert (ROOT / name).read_bytes() == (output / name).read_bytes(), f'export differs: {name}'
+    assert built_fingerprints(output) == FINGERPRINTS, 'build is stale: rebuild the site'
     for name, hashed in FINGERPRINTS.items():
         assert (ROOT / name).read_bytes() == (output / hashed).read_bytes(), f'export differs: {name}'
     for name in PAGES:

@@ -4,7 +4,20 @@ import shutil
 import tempfile
 import unittest
 
-from check import FINGERPRINTS, ROOT, Page, check_privacy, check_ref, check_site, check_webp
+from check import FINGERPRINTS, HASHED, ROOT, Page, check_privacy, check_ref, check_site, check_webp, fingerprint
+
+
+def edit_built(root, name, change):
+    """Edit a fingerprinted file in a build copy and re-fingerprint it (renaming the file and the pages'
+    references), so a test reaches the gate it targets instead of failing on the stale fingerprint."""
+    old = next(p for p in root.glob(name.rsplit('.', 1)[0] + '.*.' + name.rsplit('.', 1)[1]))
+    data = change(old.read_text()).encode()
+    new = fingerprint(name, data)
+    old.unlink()
+    (root / new).write_bytes(data)
+    for page in ('index.html', 'changelog/index.html'):
+        path = root / page
+        path.write_text(path.read_text().replace(f'"/{old.name}"', f'"/{new}"'))
 
 
 class Checks(unittest.TestCase):
@@ -33,8 +46,7 @@ class Checks(unittest.TestCase):
             with self.assertRaises(AssertionError):
                 check_site(root)
             licence.write_bytes(original)
-            with (root / FINGERPRINTS['site.css']).open('a') as css:
-                css.write('\np { background: url(/missing.png) }\n')
+            edit_built(root, 'site.css', lambda t: t + '\np { background: url(/missing.png) }\n')
             with self.assertRaises(AssertionError):
                 check_site(root)
 
@@ -88,8 +100,7 @@ class Checks(unittest.TestCase):
             with self.subTest(css=bad), tempfile.TemporaryDirectory() as temp:
                 root = Path(temp) / 'dist'
                 shutil.copytree(ROOT / 'dist', root)
-                with (root / FINGERPRINTS['site.css']).open('a') as css:
-                    css.write(bad)
+                edit_built(root, 'site.css', lambda t: t + bad)
                 with self.assertRaises(AssertionError):
                     check_site(root)
 
@@ -140,6 +151,20 @@ class Checks(unittest.TestCase):
                 with self.assertRaises(AssertionError):
                     check_site(root)
 
+    def test_stylesheet_must_apply(self):
+        css = FINGERPRINTS['site.css']
+        for old, new in ((f'<link rel="stylesheet" href="/{css}">', f'<link rel="preload" as="style" href="/{css}">'),
+                         (f'<link rel="stylesheet" href="/{css}">', f'<a href="/{css}">styles</a>')):
+            with self.subTest(new=new), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp) / 'dist'
+                shutil.copytree(ROOT / 'dist', root)
+                page = root / 'index.html'
+                text = page.read_text()
+                self.assertIn(old, text)
+                page.write_text(text.replace(old, new))
+                with self.assertRaises(AssertionError):
+                    check_site(root)
+
     def test_headers_revalidate(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp) / 'dist'
@@ -164,8 +189,7 @@ class Checks(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp) / 'dist'
             shutil.copytree(ROOT / 'dist', root)
-            with (root / FINGERPRINTS['site.js']).open('a') as js:
-                js.write("\nnavigator.clipboard.writeText('x');\n")
+            edit_built(root, 'site.js', lambda t: t + "\nnavigator.clipboard.writeText('x');\n")
             with self.assertRaises(AssertionError):
                 check_site(root)
 
