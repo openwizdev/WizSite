@@ -178,7 +178,8 @@ class Checks(unittest.TestCase):
                 check_site(root)
 
     def test_install_wording_only_on_the_button(self):
-        for extra in ('<a href="/">Install · coming soon</a>', '<p>Install now</p>', '<p>Inst&#97;ll today</p>'):
+        for extra in ('<a href="/">Install · coming soon</a>', '<p>Install now</p>', '<p>Inst&#97;ll today</p>',
+                      '<p>in<b>stall</b> now</p>', '<p>Ins<span>t</span>all</p>', '<img alt="Install now" src="/favicon.svg">'):
             with self.subTest(extra=extra), tempfile.TemporaryDirectory() as temp:
                 root = Path(temp) / 'dist'
                 shutil.copytree(ROOT / 'dist', root)
