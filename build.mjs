@@ -1,4 +1,5 @@
-// A static export: only the reviewed public assets, without a runtime server.
+// A static export: only the reviewed public assets, without a runtime server. The brand files are the
+// logo pack: favicons, the outlined lockup (no live text, no font) and the 1200x630 social card.
 // Styles and scripts are fingerprinted (name.<hash>.ext) and both pages are rewritten to use them, so a
 // change always gets a new URL: no visitor can pair new HTML with an old cached stylesheet or script.
 import { copyFile, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
@@ -9,7 +10,8 @@ const output = new URL('dist/', root);
 const art = (await readdir(new URL('art/', root))).filter(name => name.endsWith('.webp')).sort().map(name => `art/${name}`);
 const pages = ['index.html', 'changelog/index.html'];
 const hashed = ['tokens.css', 'site.css', 'site.js'];
-const files = ['_headers', ...art, 'fonts/Geist-var.woff2', 'fonts/GeistMono-var.woff2', 'fonts/OFL.txt'];
+const brand = ['favicon.ico', 'favicon.svg', 'apple-touch-icon.png', 'brand/openwiz-lockup.svg', 'brand/og.png'];
+const files = ['_headers', ...art, ...brand, 'fonts/Geist-var.woff2', 'fonts/GeistMono-var.woff2', 'fonts/OFL.txt'];
 await rm(output, { recursive: true, force: true });
 const put = async (name, data) => {
   const target = new URL(name, output);
