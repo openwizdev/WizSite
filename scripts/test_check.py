@@ -4,7 +4,7 @@ import shutil
 import tempfile
 import unittest
 
-from check import FINGERPRINTS, HASHED, ROOT, Page, check_privacy, check_ref, check_site, check_webp, fingerprint
+from check import FINGERPRINTS, HASHED, ROOT, Page, check_privacy, check_ref, check_site, check_vector, check_webp, fingerprint
 
 
 def edit_built(root, name, change):
@@ -194,6 +194,35 @@ class Checks(unittest.TestCase):
             root = Path(temp) / 'dist'
             shutil.copytree(ROOT / 'dist', root)
             edit_built(root, 'site.js', lambda t: t + "\nnavigator.clipboard.writeText('x');\n")
+            with self.assertRaises(AssertionError):
+                check_site(root)
+
+    def test_logo_pack(self):
+        # Catches: a lockup that ships live text or a font reference (the wordmark font must never ship),
+        # an unreviewed icon picture, and a social card URL that points off the site or at a missing file.
+        logo = (ROOT / 'brand/openwiz-lockup.svg').read_bytes()
+        check_vector(logo)
+        for bad in (logo.replace(b'</svg>', b'<text x="0" y="0">OpenWiz</text></svg>'),
+                    logo.replace(b'<path ', b'<path font-family="URW Gothic" ', 1),
+                    logo.replace(b'</svg>', b'<style>@font-face{src:url(x.otf)}</style></svg>'),
+                    logo.replace(b'<path ', b'<path onload ="x" ', 1)):
+            with self.subTest(bad=bad[-60:]), self.assertRaises(AssertionError):
+                check_vector(bad)
+        for path in ('favicon.ico', 'brand/new.png'):
+            with self.subTest(path=path), self.assertRaises(AssertionError):
+                check_privacy(path, b'\x89PNG tampered')
+        for new in ('https://example.com/brand/og.png', 'https://openwiz.dev/brand/missing.png'):
+            with self.subTest(new=new), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp) / 'dist'
+                shutil.copytree(ROOT / 'dist', root)
+                landing = root / 'index.html'
+                landing.write_text(landing.read_text().replace('content="https://openwiz.dev/brand/og.png"', f'content="{new}"', 1))
+                with self.assertRaises(AssertionError):
+                    check_site(root)
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / 'dist'
+            shutil.copytree(ROOT / 'dist', root)
+            (root / 'brand/openwiz-lockup.svg').write_bytes(logo.replace(b'</svg>', b'<text>OpenWiz</text></svg>'))
             with self.assertRaises(AssertionError):
                 check_site(root)
 

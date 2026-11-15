@@ -32,6 +32,15 @@ ART_HASHES = {
     'art/seal.webp': '55ec8648490c5d72a592d7aa1271e80b9f954142cffb32f6e9b8fa0e03b60814',
 }
 ART = set(ART_HASHES)
+# Logo pack. Raster icons and the social card are pinned by hash like the art; a new picture needs review.
+ICON_HASHES = {
+    'favicon.ico': '5dc6f058d467f927617e28c10c2764a01e4f1b6e8c1017111920153a9fdf7020',
+    'apple-touch-icon.png': 'ff6e52cd499610049bbb6bf6289c77c99fe45ec667114ebcccab99266a9a09df',
+    'brand/og.png': '8ff8e60f4653d4ed0eb7bf47b81a87810d9a25b002ff796a6268f3f655caf582',
+}
+# Vector logos: the wordmark is outlined (paths), so no font ships and nothing can fall back to another font.
+VECTORS = ('favicon.svg', 'brand/openwiz-lockup.svg')
+SITE_URL = 'https://openwiz.dev/'
 ART_BUDGET = 2_000_000  # bytes, all art together
 # Styles and scripts ship fingerprinted (name.<first 10 hex of sha256>.ext); the pages use only those names.
 HASHED = ('tokens.css', 'site.css', 'site.js')
@@ -51,7 +60,7 @@ FINGERPRINTS = {name: fingerprint(name, (ROOT / name).read_bytes()) for name in 
 STATIC = {
     'index.html', 'changelog/index.html', '_headers',
     'fonts/Geist-var.woff2', 'fonts/GeistMono-var.woff2', 'fonts/OFL.txt',
-} | ART
+} | ART | set(ICON_HASHES) | set(VECTORS)
 RUNTIME = STATIC | set(FINGERPRINTS.values())
 
 
@@ -87,6 +96,7 @@ class Page(HTMLParser):
         self.ids = set()
         self.refs = []
         self.favicons = set()
+        self.social = []
         self.buttons = []
         self.stylesheets, self.scripts = [], []
         self.feed(text)
@@ -110,6 +120,8 @@ class Page(HTMLParser):
             self.scripts.append(attrs['src'])
         if tag == 'link' and attrs.get('rel') == 'icon':
             self.favicons.add(attrs.get('href'))
+        if tag == 'meta' and (attrs.get('property') == 'og:image' or attrs.get('name') == 'twitter:image'):
+            self.social.append(attrs.get('content') or '')
 
 
 def check_webp(data):
@@ -150,6 +162,16 @@ class Text(HTMLParser):
         return ' '.join(self.parts)
 
 
+def check_vector(data):
+    # A plain vector logo: shapes only. No live text or font (the wordmark font must never ship),
+    # no script, no links or embedded images.
+    svg = data.decode('utf-8').lower()
+    assert svg.startswith('<svg xmlns="http://www.w3.org/2000/svg"'), 'unexpected logo SVG'
+    for bad in ('<text', '<tspan', 'font', '@import', '<script', '<style', 'href', '<image', '<foreignobject'):
+        assert bad not in svg, f'logo SVG must be outlined shapes only: {bad}'
+    assert not re.search(r'\son[a-z]+\s*=', svg), 'logo SVG must have no event handlers'
+
+
 def check_ref(root, source, ref, pages, favicons=()):
     if ref.startswith('data:image/svg+xml,') and not favicons:
         # Inert inline CSS icons only: one stroked path, no other elements or attributes.
@@ -157,11 +179,8 @@ def check_ref(root, source, ref, pages, favicons=()):
         assert re.fullmatch(r"<svg xmlns='http://www.w3.org/2000/svg' viewBox='[0-9 ]+'><path d='[A-Za-z0-9 .-]+' fill='none' stroke='#[0-9a-f]{6}' stroke-width='[0-9.]+'/></svg>", svg), 'unexpected inline SVG'
         return
     if ref in favicons:
-        # Only the existing inert inline SVG favicon, with no script or links.
-        assert ref.startswith('data:image/svg+xml,'), 'unexpected favicon'
-        svg = unquote(ref.split(',', 1)[1])
-        assert re.fullmatch(r"<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><path fill='#[0-9a-f]+' d='[A-Za-z0-9 .-]+'/></svg>", svg), 'unexpected favicon SVG'
-        return
+        # Only the reviewed logo-pack favicons (checked as local files below).
+        assert ref in ('/favicon.ico', '/favicon.svg'), 'unexpected favicon'
     url = urlsplit(ref)
     if url.scheme or url.netloc:
         assert url.scheme == 'https' and url.netloc == 'github.com', 'unexpected external URL'
@@ -198,6 +217,8 @@ def check_site(root):
         assert len(found) == len(re.findall(r'url\(', text, re.I)), 'unreadable url()'
         return [ref for _, ref in found]
     for path, page in pages.items():
+        # The social card: an absolute URL on the site that resolves to a built file.
+        assert page.social and all(s.startswith(SITE_URL) and s.removeprefix(SITE_URL) in STATIC for s in page.social), 'social image must be a built file on the site'
         for ref in page.refs:
             check_ref(root, path, ref, pages, page.favicons)
         for ref in css_refs(path.read_text()):
@@ -268,6 +289,8 @@ def check_site(root):
     being = re.search(r'<ul class="bundle-list">([\s\S]*?)</ul>', changelog)
     assert being and not re.search(r'\d+\.\d+', re.sub(r'<[^>]*>', '', being[1])), 'Being built must not name versions'
     assert len(re.findall(r'(?<![\d.])\d+\.\d+\.\d+(?![\d.])', flat)) == len(teaser), 'version mentioned outside the changelog teaser'
+    for name in VECTORS:
+        check_vector((root / name).read_bytes())
     total = 0
     for name in ART:
         data = (root / name).read_bytes()
@@ -292,7 +315,12 @@ def check_privacy(path, data):
         check_webp(data)
         # Pictures are binary, but scan their raw bytes for the same markers (e.g. in metadata).
         assert not any(marker.encode() in data.lower() for marker in DENYLIST), f'private marker in {path}'
-    binary = path.endswith('.webp') or (font in FONT_HASHES and font.endswith('.woff2'))
+    if path.endswith(('.png', '.ico')):
+        assert font in ICON_HASHES and sha256(data).hexdigest() == ICON_HASHES[font], 'unreviewed picture'
+        assert not any(marker.encode() in data.lower() for marker in DENYLIST), f'private marker in {path}'
+    if font in VECTORS:
+        check_vector(data)
+    binary = path.endswith(('.webp', '.png', '.ico')) or (font in FONT_HASHES and font.endswith('.woff2'))
     text = path + '\n' + ('' if binary else data.decode('utf-8'))
     # The owner's copy rule covers every text file, this checker included (it builds the word from parts).
     assert not any(word in text.lower() for word in BANNED_COPY), f'banned word in {path}'
