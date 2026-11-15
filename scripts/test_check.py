@@ -33,7 +33,7 @@ class Checks(unittest.TestCase):
             with self.assertRaises(AssertionError):
                 check_site(root)
             licence.write_bytes(original)
-            with (root / 'landing.css').open('a') as css:
+            with (root / 'site.css').open('a') as css:
                 css.write('\np { background: url(/missing.png) }\n')
             with self.assertRaises(AssertionError):
                 check_site(root)
@@ -88,7 +88,7 @@ class Checks(unittest.TestCase):
             with self.subTest(css=bad), tempfile.TemporaryDirectory() as temp:
                 root = Path(temp) / 'dist'
                 shutil.copytree(ROOT / 'dist', root)
-                with (root / 'landing.css').open('a') as css:
+                with (root / 'site.css').open('a') as css:
                     css.write(bad)
                 with self.assertRaises(AssertionError):
                     check_site(root)
@@ -122,6 +122,14 @@ class Checks(unittest.TestCase):
                 with self.assertRaises(AssertionError):
                     check_site(root)
 
+    def test_headers_revalidate(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / 'dist'
+            shutil.copytree(ROOT / 'dist', root)
+            (root / '_headers').write_text('/*.css\n  Cache-Control: public, max-age=14400\n')
+            with self.assertRaises(AssertionError):
+                check_site(root)
+
     def test_install_stays_disabled(self):
         good = '<button class="btn install" type="button" disabled aria-describedby="install-note">'
         for bad in ('<button class="btn install" type="button" aria-disabled="true">',
@@ -138,7 +146,7 @@ class Checks(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp) / 'dist'
             shutil.copytree(ROOT / 'dist', root)
-            with (root / 'landing.js').open('a') as js:
+            with (root / 'site.js').open('a') as js:
                 js.write("\nnavigator.clipboard.writeText('x');\n")
             with self.assertRaises(AssertionError):
                 check_site(root)

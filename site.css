@@ -1,7 +1,7 @@
 /* openwiz.dev: navy, black and brass. The landing page and the ship log (/changelog).
  * Motion: every element's resting style is the final frame (no JavaScript, reduced motion, after the intro).
- * landing.js sets [data-play] on the stage: CSS runs the build beats (window, bay, crew, about 7 s), then
- * landing.js's conductor runs the camera pull-back from one spec to many and the rest motion. */
+ * site.js sets [data-play] on the stage: CSS runs the build beats (window, bay, crew, about 7 s), then
+ * site.js's conductor runs the camera pull-back from one spec to many and the rest motion. */
 :root{color-scheme:dark;--ground:#07090f;--ink:#f2f2f0;--grey:#9aa0ab;--grey2:#b9bec7;--brass:#e8a849;--brass-hi:#f3c06e;--on-brass:#16110a;--navy:#12204a;--navy2:#2b4a8f;--panel:#0d1119;--line:#232a38;--edge:#3a4458;--m:100px}
 *{box-sizing:border-box}
 html{scroll-behavior:smooth}
@@ -46,8 +46,8 @@ h1{font:700 78px/.98 var(--ow-font-sans);letter-spacing:-.045em}
   --A:1.45;           /* view aspect */
   --cw:1.35;--cl:0;--cy0:-.05; /* citadel width and left (fractions of the view width), and how far it sits below the view (fraction of its height) */
   --bx:.4317;--by:.706;--bw:.08; /* the lit bay window's centre and width, as fractions of the citadel picture */
-  --D:.98;--cx:.55;--cy:.47;     /* read by landing.js: zoomed in, the bay's width and centre as fractions of the view */
-  --F:980;--fy:-10}               /* read by landing.js: world pixels across the view at the floor shot, and how far above the bay it centres */
+  --D:.98;--cx:.55;--cy:.47;     /* read by site.js: zoomed in, the bay's width and centre as fractions of the view */
+  --F:980;--fy:-10}               /* read by site.js: world pixels across the view at the floor shot, and how far above the bay it centres */
 .view{position:absolute;top:-150px;left:-140px;width:calc(100% + var(--m) + 140px);aspect-ratio:var(--A);overflow:hidden;
   --fade:linear-gradient(transparent,#000 14%,#000 72%,transparent 92%),linear-gradient(90deg,transparent,#000 10%);-webkit-mask:var(--fade);-webkit-mask-composite:source-in;mask:var(--fade);mask-composite:intersect}
 .cam{position:absolute;inset:0;transform-origin:0 0}
