@@ -1,5 +1,6 @@
-# Cloudflare Pages: HTML already revalidates on every visit. Make styles and scripts do the same, so a
-# returning visitor never pairs new HTML with an old cached stylesheet or script (ETags keep it cheap).
+# Cloudflare Pages. The build fingerprints styles and scripts (name.<hash>.ext), which is what keeps new HTML
+# from meeting an old cached file. These rules also ask for revalidation; they take effect only if the
+# zone's Browser Cache TTL is set to respect existing headers.
 /*.css
   Cache-Control: public, max-age=0, must-revalidate
 /*.js

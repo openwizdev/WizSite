@@ -12,7 +12,7 @@ npm run check
 npm test
 ```
 
-`npm run build` copies the public runtime files (pages, styles, scripts, fonts and every `art/*.webp` layer) into `dist/`. The checks require that build first. `npm run check` checks JavaScript syntax, exact build contents, local links and fragments, HTML/CSS resources, font signatures and OFL licences, landing copy, the retained changelog content, and private markers. `npm test` exercises those gates with synthetic broken links, missing resources and private markers.
+`npm run build` copies the public runtime files (pages, fingerprinted styles and scripts, fonts and every `art/*.webp` layer) into `dist/`. The checks require that build first. `npm run check` checks JavaScript syntax, exact build contents, local links and fragments, HTML/CSS resources, font signatures and OFL licences, landing copy, the retained changelog content, and private markers. `npm test` exercises those gates with synthetic broken links, missing resources and private markers.
 
 To preview locally:
 
@@ -28,7 +28,7 @@ Changes merge after green CI and one review from the other model family. No per-
 
 ## Site assets
 
-WizSite owns `tokens.css`; it is a copied foundation, maintained here independently. Both pages use `site.css`; the landing page also uses `site.js`. `_headers` makes Cloudflare Pages revalidate styles and scripts on every visit, like the HTML, so new HTML never meets an old cached stylesheet. The look is navy, black and brass, with layered engraved art in `art/` (generated pictures, sliced into separately animated WebP layers; the lit citadel is a dark base plus its lights layer, shown through a mask of window rectangles).
+WizSite owns `tokens.css`; it is a copied foundation, maintained here independently. Both pages use `site.css`; the landing page also uses `site.js`. The build fingerprints `tokens.css`, `site.css` and `site.js` (`name.<hash>.ext` in `dist/`) and rewrites both pages to use those names, so a change always gets a new URL and new HTML never meets an old cached stylesheet or script; `_headers` also asks for revalidation, which applies only if the zone's Browser Cache TTL respects existing headers. The look is navy, black and brass, with layered engraved art in `art/` (generated pictures, sliced into separately animated WebP layers; the lit citadel is a dark base plus its lights layer, shown through a mask of window rectangles).
 
 The hero's intro plays once: CSS runs the build beats (the idea, a 3-question grill, a spec of five tickets, Approve, builders, a reviewer, merged), then `site.js` pulls the camera back from that one bay to the whole citadel. Neighbouring lines light up one at a time, each carrying its own named spec, and then every line carries work. At rest the citadel keeps moving (items on its lines, a train on the ring, windows flipping to brass, smoke), paused off screen. Under reduced motion, or without JavaScript, the page shows one still frame. A Replay button follows the intro. Install reads **Install · coming soon** and stays disabled until a stranger can install.
 
