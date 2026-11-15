@@ -2,6 +2,12 @@
 
 The standalone static site for [OpenWiz](https://github.com/openwizdev/openwiz), with a landing page and `/changelog`. It uses local fonts and has no npm dependencies or runtime server.
 
+## Map
+
+![WizSite's parts: the landing page, the ship log, the art, the brand and fonts, the build and checks, and the deploy](docs/map.png)
+
+WizSite is the factory's site, openwiz.dev. The [org map](https://github.com/openwizdev) shows how it fits with the other repos.
+
 ## Build and check
 
 Use Node.js 24, Python 3.11+ and Git. No package installation is needed.
@@ -35,6 +41,8 @@ The hero's intro plays once: CSS runs the build beats (the idea, a 3-question gr
 `/changelog` is the **ship log**: *Being built* (named bundles, never version numbers) and *Shipped* (published releases, newest first, each with its main line and *Also changed*). The landing teaser shows only releases the ship log publishes.
 
 The logo files are the favicons (`favicon.ico` with 16, 32 and 48 px images, `favicon.svg`, `apple-touch-icon.png`), the header lockup `brand/openwiz-lockup.svg` and the 1200×630 social card `brand/og.png` (the lockup on the site ground, rendered from the SVG). The lockup's wordmark is converted to outlines: the SVG has no text and no font reference, and the check refuses one that does, so the wordmark font never ships.
+
+The README's map, `docs/map.png`, is for GitHub only: the build never copies it, and the check pins it by hash in `DOC_HASHES` like the icons. Its source is `maps/draw.mjs` in `openwizdev/.github`.
 
 The Geist and Geist Mono fonts ship unmodified with `fonts/OFL.txt`. Keep the licence in source and the static export. The build does not fetch fonts from an external service.
 

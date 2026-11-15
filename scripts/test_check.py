@@ -219,9 +219,12 @@ class Checks(unittest.TestCase):
                     logo.replace(b'<path ', b'<path onload ="x" ', 1)):
             with self.subTest(bad=bad[-60:]), self.assertRaises(AssertionError):
                 check_vector(bad)
-        for path in ('favicon.ico', 'brand/new.png'):
+        check_privacy('docs/map.png', (ROOT / 'docs/map.png').read_bytes())
+        for path in ('favicon.ico', 'brand/new.png', 'docs/map.png', 'docs/new.png'):
             with self.subTest(path=path), self.assertRaises(AssertionError):
                 check_privacy(path, b'\x89PNG tampered')
+        with self.assertRaises(AssertionError):  # a README picture is never part of the build
+            check_privacy('dist/docs/map.png', (ROOT / 'docs/map.png').read_bytes())
         for new in ('https://example.com/brand/og.png', 'https://openwiz.dev/brand/missing.png'):
             with self.subTest(new=new), tempfile.TemporaryDirectory() as temp:
                 root = Path(temp) / 'dist'
