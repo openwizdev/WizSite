@@ -413,4 +413,5 @@ h1{white-space:nowrap}
    classic scrollbars, the fallback font). Very narrow windows also drop the window title. */
 @media (max-width:360px){
   .bar b{display:none}
+  .win{margin-top:-34px} /* keep the art's middle clear for the spec labels at narrow widths */
 }
