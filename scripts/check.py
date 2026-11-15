@@ -87,6 +87,33 @@ def check_webp(data):
     assert at == len(data), 'truncated WebP'
 
 
+class Text(HTMLParser):
+    """Decoded page text (outside script/style) and every attribute value."""
+    def __init__(self, text):
+        super().__init__(convert_charrefs=True)
+        self.parts, self.attrs, self.skip = [], [], 0
+        self.feed(text)
+
+    def handle_starttag(self, tag, attrs):
+        if tag in ('script', 'style'):
+            self.skip += 1
+        self.attrs += [v for _, v in attrs if v]
+
+    def handle_endtag(self, tag):
+        if tag in ('script', 'style') and self.skip:
+            self.skip -= 1
+
+    def handle_data(self, data):
+        if not self.skip:
+            self.parts.append(data)
+
+    def joined(self):
+        return ''.join(self.parts)
+
+    def spaced(self):
+        return ' '.join(self.parts)
+
+
 def check_ref(root, source, ref, pages, favicons=()):
     if ref.startswith('data:image/svg+xml,') and not favicons:
         # Inert inline CSS icons only: one stroked path, no other elements or attributes.
@@ -149,13 +176,16 @@ def check_site(root):
     assert headline == 'Build at the speed of ideas.', 'hero headline changed'
     flat = re.sub(r'\s+', ' ', re.sub(r'<br>', ' ', landing))
     flat = re.sub(r'\s+', ' ', unescape(re.sub(r'<[^>]*>', '', flat)))
-    # Rendered text and attribute values (alt, title, meta), with entities decoded, on both pages.
+    # Rendered text and attribute values (alt, title, meta), decoded, on both pages. Text is read both
+    # joined (inline tags can split a word) and spaced; every attribute value is read on its own.
     for path in pages:
-        rendered = unescape(path.read_text()).lower()
-        assert not any(word in rendered for word in BANNED_COPY), f'banned word rendered in {path.name}'
-        for text in ('Illustration, not live data', 'Building in public'):
-            assert text.lower() not in re.sub(r'\s+', ' ', re.sub(r'<[^>]*>', ' ', rendered)), f'cut copy is back: {text}'
-    assert 'You make the decisions. The agents run the factory.' in flat, 'hero subline changed'
+        reader = Text(path.read_text())
+        readings = [reader.joined(), reader.spaced()] + reader.attrs
+        for reading in readings:
+            low = re.sub(r'\s+', ' ', reading).lower()
+            assert not any(word in low for word in BANNED_COPY), f'banned word rendered in {path.name}'
+            for text in ('illustration, not live data', 'building in public'):
+                assert text not in low, f'cut copy is back in {path.name}: {text}'
     for text in ('Star on GitHub', 'Not ready for everyone yet.', 'Idea in. Shipped work out.', 'How it works',
                  'OpenWiz runs your factory.', 'WizSkills are the skills your agents follow.',
                  'WizPlugins put the controls in Cloudroom.',

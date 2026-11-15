@@ -105,6 +105,9 @@ class Checks(unittest.TestCase):
         for old, new in (('<h2 id="ship-h">Ship log</h2>', '<h2 id="ship-h">Ship log</h2><p>play&#98;ook</p>'),
                          ('<h2 id="ship-h">Ship log</h2>', '<h2 id="ship-h">Ship log</h2><p>Building in p&#117;blic</p>'),
                          ('alt="" width="400"', 'alt="Pl&#97;ybook" width="400"'),
+                         ('<h2 id="ship-h">Ship log</h2>', '<h2 id="ship-h">Ship log</h2><p>play<b>bo</b>ok</p>'),
+                         ('alt="" width="400"', 'alt="Illustration, not l&#105;ve data" width="400"'),
+                         ('<h2 id="ship-h">Ship log</h2>', '<h2 id="ship-h">Ship log</h2><p>Building <em>in</em> public</p>'),
                          ('<span class="v">0.0.5</span><span>Fleets of agents build for you</span>', '<span class="v">0.0.5</span><span>Message your threads</span>')):
             with self.subTest(new=new), tempfile.TemporaryDirectory() as temp:
                 root = Path(temp) / 'dist'

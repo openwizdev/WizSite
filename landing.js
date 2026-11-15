@@ -214,10 +214,9 @@ function play() {
   stage.removeAttribute('data-play');
   measure(); sizeLabels();
   if (still.matches) { stop(); return; }
-  setPaused(false);
   void stage.offsetWidth; // restart every CSS animation from the first frame
   stage.setAttribute('data-play', '');
-  playing = true; done = false; t0 = wall();
+  playing = true; done = false; t0 = wall(); pausedAt = t0; // a Pause pressed before startup holds the intro at its start
   setView(G.bay);
   for (const o of groups.values()) for (const r of o.rects) r.setAttribute('fill-opacity', o.t < 0 ? 1 : 0);
   for (const L of lines) { L.path.style.strokeDasharray = '0 1'; for (const it of L.items) it.el.style.opacity = 0; }
@@ -237,9 +236,11 @@ function setPaused(on) {
   kick();
 }
 pauser.addEventListener('click', () => setPaused(!paused));
-replay.addEventListener('click', play);
+replay.addEventListener('click', () => { setPaused(false); play(); });
 // Preference and layout changes never replay the intro: they re-render where it is.
-still.addEventListener('change', () => { if (still.matches) stop(); else kick(); });
+// Back to normal motion: offer Replay again (no autoplay) and resume the rest scene.
+const onMotionPref = () => { if (still.matches) stop(); else { if (done) replay.hidden = false; kick(); } };
+still.addEventListener('change', onMotionPref);
 const relayout = () => {
   const wasPlaying = playing;
   if (wasPlaying) toRest();
@@ -265,6 +266,8 @@ const shown = () => new Promise(resolve => {
 layoutStory();
 Promise.race([loaded, new Promise(resolve => setTimeout(resolve, 3000))]).then(shown).then(() => {
   if (still.matches) { measure(); sizeLabels(); stop(); } else play();
+  // A second list made after startup: some engines skip change events on the first one.
+  matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change', onMotionPref);
   document.querySelector('main').dataset.ready = 'true';
 });
 document.addEventListener('visibilitychange', kick);
