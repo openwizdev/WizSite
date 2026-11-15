@@ -157,7 +157,7 @@ function frame(t, now) {
     setView(t < 1 ? G.bay : t < 2.6 ? mix(G.bay, FL, seg(t, 1, 2.6)) : t < 3.8 ? mix(FL, FL2, (t - 2.6) / 1.2) : mix(FL2, G.rest, seg(t, 3.8, 5.6)));
     bay.style.opacity = (1 - seg(t, 1.4, 2.1)).toFixed(3);
     for (const o of groups.values()) {
-      const k = o.t < 0 ? 1 : seg(t, o.t, o.t + .35);
+      const k = o.t < 0 ? seg(t, 1.5, 2.2) : seg(t, o.t, o.t + .35); // the bay's own windows light as its interior fades (no enlarged smear)
       for (const r of o.rects) r.setAttribute('fill-opacity', k.toFixed(3));
     }
   }
@@ -245,7 +245,7 @@ function play() {
   stage.setAttribute('data-play', '');
   playing = true; done = false; t0 = wall(); pausedAt = t0; // a Pause pressed before startup holds the intro at its start
   setView(G.bay);
-  for (const o of groups.values()) for (const r of o.rects) r.setAttribute('fill-opacity', o.t < 0 ? 1 : 0);
+  for (const o of groups.values()) for (const r of o.rects) r.setAttribute('fill-opacity', 0);
   for (const L of lines) { L.path.style.strokeDasharray = '0 1'; for (const it of L.items) it.el.style.opacity = 0; }
   train.forEach(c => { c.style.opacity = 0; });
   labels.querySelectorAll('.pill').forEach(p => { p.style.opacity = 0; p._o = 0; });
