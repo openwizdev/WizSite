@@ -81,11 +81,24 @@ class Checks(unittest.TestCase):
             with self.subTest(svg=bad), self.assertRaises(AssertionError):
                 check_ref(root, page, 'data:image/svg+xml,' + bad, pages)
 
+    def test_css_escapes_and_unreadable_urls(self):
+        for bad in ('\np { background: url(https://exa\\\nmple.com/x.png) }\n',
+                    '\np { background: u\\72l(https://example.com/x.png) }\n',
+                    '\np { background: url( "https://example.com/x.png ) }\n'):
+            with self.subTest(css=bad), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp) / 'dist'
+                shutil.copytree(ROOT / 'dist', root)
+                with (root / 'landing.css').open('a') as css:
+                    css.write(bad)
+                with self.assertRaises(AssertionError):
+                    check_site(root)
+
     def test_install_stays_disabled(self):
         good = '<button class="btn install" type="button" disabled aria-describedby="install-note">'
         for bad in ('<button class="btn install" type="button" aria-disabled="true">',
                     '<button class="btn install" type="button" disabled onclick="copy()">',
-                    '<button class="btn install" type="button" disabled onclick ="copy()">'):
+                    '<button class="btn install" type="button" disabled onclick ="copy()">',
+                    '<button class="btn install" type="button" title=" disabled ">'):
             with self.subTest(bad=bad), tempfile.TemporaryDirectory() as temp:
                 root = Path(temp) / 'dist'
                 shutil.copytree(ROOT / 'dist', root)

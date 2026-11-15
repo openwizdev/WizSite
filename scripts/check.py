@@ -59,6 +59,7 @@ class Page(HTMLParser):
         self.ids = set()
         self.refs = []
         self.favicons = set()
+        self.buttons = []
         self.feed(text)
 
     def handle_starttag(self, tag, attrs):
@@ -69,6 +70,8 @@ class Page(HTMLParser):
         for key in ('href', 'src', 'poster'):
             if attrs.get(key):
                 self.refs.append(attrs[key])
+        if tag == 'button':
+            self.buttons.append(attrs)
         if tag == 'link' and attrs.get('rel') == 'icon':
             self.favicons.add(attrs.get('href'))
 
@@ -118,13 +121,20 @@ def check_site(root):
     files = {p.relative_to(root).as_posix() for p in root.rglob('*') if p.is_file()}
     assert files == RUNTIME, 'unexpected or missing build output'
     pages = {root / f: Page((root / f).read_text()) for f in PAGES}
+    def css_refs(text):
+        # CSS escapes could hide or split a url(); none are used, so refuse them all, then require
+        # that every url( is read whole.
+        assert '\\' not in text, 'CSS escapes are not allowed'
+        found = re.findall(r'url\(\s*([\'\"]?)(.*?)\1\s*\)', text, re.I | re.S)
+        assert len(found) == len(re.findall(r'url\(', text, re.I)), 'unreadable url()'
+        return [ref for _, ref in found]
     for path, page in pages.items():
         for ref in page.refs:
             check_ref(root, path, ref, pages, page.favicons)
-        for _, ref in re.findall(r'url\(\s*([\'\"]?)(.*?)\1\s*\)', path.read_text()):
+        for ref in css_refs(path.read_text()):
             check_ref(root, path, ref, pages)
     for path in root.glob('*.css'):
-        for _, ref in re.findall(r'url\(\s*([\'\"]?)(.*?)\1\s*\)', path.read_text()):
+        for ref in css_refs(path.read_text()):
             check_ref(root, path, ref, pages)
     # JavaScript-created resource: document.fonts.load() uses this CSS face.
     assert 'fonts/Virgil.woff2' in (root / 'style.css').read_text()
@@ -151,9 +161,10 @@ def check_site(root):
     for allowed in ('Install · coming soon', 'Install copies this prompt', 'Install OpenWiz from github.com/openwizdev/openwiz'):
         rest = rest.replace(allowed, '')
     assert not re.search(r'install|paid plans|works today', rest, re.I), 'unsettled landing claim or live install CTA'
-    install = re.search(r'<button class="btn install"([^>]*)>', landing)
-    assert install and re.search(r'\sdisabled(?=[\s>]|$)', install[1]), 'Install must stay natively disabled'
-    assert not re.search(r'\son\w+\s*=', install[1]), 'Install must have no activation handler'
+    installs = [b for b in pages[root / 'index.html'].buttons if 'install' in (b.get('class') or '').split()]
+    assert len(installs) == 1, 'exactly one Install button'
+    assert 'disabled' in installs[0], 'Install must stay natively disabled'
+    assert not any(k.startswith('on') or k in ('form', 'formaction') for k in installs[0]), 'Install must have no activation handler'
     scripts = (root / 'landing.js').read_text()
     assert not re.search(r'install|clipboard', scripts, re.I), 'no script may activate Install or copy the prompt yet'
     assert not re.search(r'\b\d{4}-\d{2}-\d{2}\b', words), 'dated landing promise'
