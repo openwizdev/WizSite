@@ -266,10 +266,12 @@ def check_site(root):
     for text in ('Illustration, not live data', 'Building in public'):
         assert text.lower() not in flat.lower(), f'cut copy is back: {text}'
     # Install stays "coming soon" until a stranger can install (AN8); only these mentions are allowed.
-    assert 'Install · coming soon' in flat
-    rest = flat
-    for allowed in ('Install · coming soon',):
-        rest = rest.replace(allowed, '')
+    # The one allowed mention is the disabled Install button's own label; any other "install" anywhere in the
+    # rendered page (an extra link with the same words included) fails.
+    button = re.findall(r'<button class="btn install"[^>]*>([\s\S]*?)</button>', landing)
+    assert len(button) == 1 and re.sub(r'\s+', ' ', unescape(re.sub(r'<[^>]*>', '', button[0]))).strip() == 'Install · coming soon', 'Install button must read Install · coming soon'
+    rest = re.sub(r'<button class="btn install"[^>]*>[\s\S]*?</button>', ' ', landing, count=1)
+    rest = re.sub(r'\s+', ' ', unescape(re.sub(r'<[^>]*>', ' ', re.sub(r'<(script|style)\b[\s\S]*?</\1>', ' ', rest))))
     assert not re.search(r'install|paid plans|works today', rest, re.I), 'unsettled landing claim or live install CTA'
     installs = [b for b in pages[root / 'index.html'].buttons if 'install' in (b.get('class') or '').split()]
     assert len(installs) == 1, 'exactly one Install button'
