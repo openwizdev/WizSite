@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prototype · one spec becomes many</title>
+<link rel="stylesheet" href="proto.css"></head>
+<body>
+<header class="top"><b>✦ OpenWiz</b><nav><span>Changelog</span><span>GitHub ↗</span></nav></header>
+<section class="copy"><h1>Build at the<br>speed of<br>ideas.</h1><p>You make the decisions.<br>The agents run the factory.</p></section>
+<div class="stage" id="stage">
+  <svg class="sky" viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid slice"><g fill="#dfe6f5"><circle cx="90" cy="60" r="1.2"/><circle cx="210" cy="140" r=".9"/><circle cx="340" cy="40" r="1.1"/><circle cx="470" cy="110" r=".8"/><circle cx="610" cy="30" r="1.3"/><circle cx="760" cy="90" r=".9"/><circle cx="880" cy="50" r="1.1"/><circle cx="1010" cy="120" r=".8"/><circle cx="1130" cy="70" r="1.2"/><circle cx="150" cy="230" r=".8"/><circle cx="1060" cy="250" r=".9"/><circle cx="540" cy="170" r=".7"/><circle cx="280" cy="90" r="1.4"/><circle cx="700" cy="150" r="1.2"/></g></svg>
+  <div class="world" id="world">
+    <img class="moon" src="art/moon.webp" alt="">
+    <img class="dark" src="citadel-dark.webp" alt="">
+    <div class="lit" id="lit"></div>
+    <div class="bay" id="bay"><img src="art/bay.webp" alt=""><img class="c b1" src="art/builder-stand.webp" alt=""><img class="c b2" src="art/builder-hammer-down.webp" alt=""><img class="c r1" src="art/reviewer-look.webp" alt=""><img class="glowapp" src="art/app.webp" alt=""></div>
+  </div>
+  <div class="tiles" id="tiles"></div>
+  <div class="section" id="section"></div>
+  <div class="pills" id="pills"></div>
+</div>
+<div class="bar" id="bar"><button id="prev">←</button><span id="label"></span><button id="next">→</button><button id="play">↻</button></div>
+<script src="proto.js"></script>
+</body></html>
