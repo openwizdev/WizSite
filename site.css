@@ -297,7 +297,11 @@ h2{font:700 52px/1.05 var(--ow-font-sans);letter-spacing:-.035em}
   h1{font-size:64px}
   .sub{font-size:21px}
   .win{width:min(430px,calc(100% + 12px))}
+  /* Same layout in the fallback font and in Geist, so the font swap reflows nothing. */
+  .buttons{flex-wrap:nowrap}
+  .btn{padding:0 14px;font-size:16px}
 }
+h1{white-space:nowrap}
 
 /* ---------- Phone (designed first at 390 px) ----------
  * First screen: headline, then the animation (art and the window overlapping it), then the two buttons. */
@@ -399,4 +403,11 @@ h2{font:700 52px/1.05 var(--ow-font-sans);letter-spacing:-.035em}
   .rel h3{font-size:20px}
   .main-line{font-size:16.5px}
   .also{font-size:15px}
+}
+
+/* Very narrow windows (and 320 px with a classic scrollbar): stack the buttons, drop the window title. */
+@media (max-width:360px){
+  .buttons{flex-wrap:wrap}
+  .btn{flex:1 1 100%}
+  .bar b{display:none}
 }
