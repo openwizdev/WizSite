@@ -31,6 +31,7 @@ code,.v{font-family:var(--ow-font-mono)}
 .kicker{margin-bottom:14px;font:600 13px/1.4 var(--ow-font-sans);letter-spacing:.04em;color:var(--brass)}
 h1{font:700 78px/.98 var(--ow-font-sans);letter-spacing:-.045em}
 .sub{margin-top:28px;font:400 24px/1.45 var(--ow-font-sans);letter-spacing:-.012em;color:var(--grey2)}
+.intro{margin-top:16px;max-width:470px;font-size:17px;line-height:1.5;color:var(--grey2)}
 .ctas{grid-area:ctas;position:relative;z-index:2;margin-top:40px;max-width:440px}
 .buttons{display:flex;flex-wrap:wrap;gap:12px}
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;min-height:52px;padding:0 20px;border-radius:12px;font:600 17px/1 var(--ow-font-sans);letter-spacing:-.01em;white-space:nowrap}
@@ -311,12 +312,14 @@ h1{white-space:nowrap}
   .brand{font-size:19px}
   .top nav{font-size:16px}
   .top nav a{padding:0 10px}
-  .hero{grid-template-columns:minmax(0,1fr);grid-template-areas:"copy" "stage" "ctas";grid-template-rows:none;padding:20px 0 0;min-height:0}
+  .hero{grid-template-columns:minmax(0,1fr);grid-template-areas:"copy" "stage" "ctas";grid-template-rows:none;padding:8px 0 0;min-height:0}
   h1{font-size:44px}
-  .sub{margin-top:12px;font-size:17px}
+  .kicker{margin-bottom:8px}
+  .sub{margin-top:8px;font-size:17px}
+  .intro{margin-top:8px;font-size:15px;line-height:1.4}
   .stage{margin-top:4px;--A:1.85;--cw:1.75;--cl:-.33;--cy0:.03;--D:1.25;--cx:.5;--cy:.44;--F:620;--fy:110}
   .view{position:relative;top:auto;left:calc(-1 * var(--m));width:calc(100% + 2 * var(--m));-webkit-mask:linear-gradient(transparent,#000 8%,#000 80%,transparent);mask:linear-gradient(transparent,#000 8%,#000 80%,transparent)}
-  .win{position:relative;left:0;top:auto;width:100%;margin-top:-34px;border-radius:14px}
+  .win{position:relative;left:0;top:auto;width:100%;margin-top:-90px;border-radius:14px}
   .bar{height:40px;padding:0 12px;gap:8px;font-size:15px}
   .pause,.replay{padding:0 9px;font-size:13px;gap:5px}
   .panes{height:238px}
@@ -339,7 +342,7 @@ h1{white-space:nowrap}
   .approve,.approved{height:28px;padding:0 11px;font-size:13px}
   .tap{right:30px}
   .pill{font-size:12px;padding:5px 9px}.pill.ours{font-size:13px;padding:6px 10px}
-  .ctas{margin-top:14px;max-width:none}
+  .ctas{margin-top:8px;max-width:none}
   .buttons{flex-wrap:wrap;gap:10px}
   .btn{flex:1 1 auto;min-height:48px;padding:0 10px;font-size:15px;gap:8px}
   .install-note{margin-top:10px;font-size:14px}
