@@ -46,6 +46,18 @@ const gItems = svgEl('g', { class: 'items' }, lit);
 const gRing = lit.querySelector('.ring');
 const pill = (name, cls) => { const p = document.createElement('span'); p.className = 'pill ' + cls; p.innerHTML = `<i></i>${name}` + (cls === 'ours' ? ' <em>shipped</em>' : ''); labels.append(p); return p; };
 const oursPill = pill('Dark mode toggle', 'ours');
+// The finished app glowing out of the bay's gate, drawn at screen size (sharp at any zoom).
+const appOut = document.createElement('img');
+appOut.src = '/art/app.webp'; appOut.alt = ''; appOut.className = 'app-out';
+labels.append(appOut);
+const GATE = [1104, 968]; // the bay's gate, in the citadel picture's pixels
+function showApp(k, o) { // k: 0..1 along its short flight up and out of the gate
+  if (o <= .01) { appOut.style.opacity = 0; return; }
+  const [x, y] = toScreen(GATE[0], GATE[1]), w = appOut._w || 56; // sized once per layout (sizeLabels)
+  appOut.style.opacity = o.toFixed(3);
+  const V2 = G.vis, left = Math.max(V2.l, Math.min(V2.r - w, x - w / 2 + 34 * k)), top = Math.max(V2.t, Math.min(G.win.t - w * .8, y - w * .75 - 46 * k));
+  appOut.style.transform = `translate(${left}px,${top}px) scale(${.6 + .4 * k})`;
+}
 
 const groups = new Map();
 for (const r of lit.querySelectorAll('mask rect')) {
@@ -157,7 +169,7 @@ function frame(t, now) {
     setView(t < 1 ? G.bay : t < 2.6 ? mix(G.bay, FL, seg(t, 1, 2.6)) : t < 3.8 ? mix(FL, FL2, (t - 2.6) / 1.2) : mix(FL2, G.rest, seg(t, 3.8, 5.6)));
     bay.style.opacity = (1 - seg(t, 1.4, 2.1)).toFixed(3);
     for (const o of groups.values()) {
-      const k = o.t < 0 ? 1 : seg(t, o.t, o.t + .35);
+      const k = o.t < 0 ? seg(t, 1.5, 2.2) : seg(t, o.t, o.t + .35); // the bay's own windows light as its interior fades (no enlarged smear)
       for (const r of o.rects) r.setAttribute('fill-opacity', k.toFixed(3));
     }
   }
@@ -192,6 +204,7 @@ function frame(t, now) {
     }
   }
   if (!rest && t < 1) place(oursPill, BX, BY - 30, 1);
+  showApp(1, rest ? 0 : 1 - seg(t, .7, 1.3));
   // The ring's train runs along the front of the ring once the whole citadel is in view.
   const tr = rest ? 1 : seg(t, 4.6, 5.4);
   train.forEach((c, i) => {
@@ -219,6 +232,7 @@ function loop() {
     else if (it < TS) {
       if (V !== G.bay) setView(G.bay);
       place(oursPill, BX, BY - 30, it > 6.9 ? seg(it, 6.9, 7.2) : 0);
+      showApp(seg(it, 6.9, 7.3), seg(it, 6.9, 7.1));
     } else frame((it - TS) / PACE, now);
   }
   if (!playing) frame(null, now);
@@ -245,7 +259,7 @@ function play() {
   stage.setAttribute('data-play', '');
   playing = true; done = false; t0 = wall(); pausedAt = t0; // a Pause pressed before startup holds the intro at its start
   setView(G.bay);
-  for (const o of groups.values()) for (const r of o.rects) r.setAttribute('fill-opacity', o.t < 0 ? 1 : 0);
+  for (const o of groups.values()) for (const r of o.rects) r.setAttribute('fill-opacity', 0);
   for (const L of lines) { L.path.style.strokeDasharray = '0 1'; for (const it of L.items) it.el.style.opacity = 0; }
   train.forEach(c => { c.style.opacity = 0; });
   labels.querySelectorAll('.pill').forEach(p => { p.style.opacity = 0; p._o = 0; });
