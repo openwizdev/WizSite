@@ -4,7 +4,10 @@ The standalone static site for [OpenWiz](https://github.com/openwizdev/openwiz),
 
 ## Map
 
-![WizSite's parts: the landing page, the ship log, the art, the brand and fonts, the build and checks, and the deploy](docs/map.png)
+<picture>
+  <source media="(max-width: 600px)" srcset="docs/map-phone.png">
+  <img alt="WizSite's parts: the landing page, the ship log, the art, the brand and fonts, the build and checks, and the deploy" src="docs/map.png" width="560">
+</picture>
 
 WizSite is the factory's site, openwiz.dev. The [org map](https://github.com/openwizdev) shows how it fits with the other repos.
 
@@ -42,7 +45,7 @@ The hero's intro plays once: CSS runs the build beats (the idea, a 3-question gr
 
 The logo files are the favicons (`favicon.ico` with 16, 32 and 48 px images, `favicon.svg`, `apple-touch-icon.png`), the header lockup `brand/openwiz-lockup.svg` and the 1200×630 social card `brand/og.png` (the lockup on the site ground, rendered from the SVG). The lockup's wordmark is converted to outlines: the SVG has no text and no font reference, and the check refuses one that does, so the wordmark font never ships.
 
-The README's map, `docs/map.png`, is for GitHub only: the build never copies it, and the check pins it by hash in `DOC_HASHES` like the icons. Its source is `maps/draw.mjs` in `openwizdev/.github`.
+The README's map (`docs/map.png`, and `docs/map-phone.png` for narrow screens) is for GitHub only: the build never copies it, and the check pins both by hash in `DOC_HASHES` like the icons. Its source is `maps/draw.mjs` in `openwizdev/.github`.
 
 The Geist and Geist Mono fonts ship unmodified with `fonts/OFL.txt`. Keep the licence in source and the static export. The build does not fetch fonts from an external service.
 

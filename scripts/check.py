@@ -40,7 +40,8 @@ ICON_HASHES = {
 }
 # README pictures: kept in the source for GitHub only, never built or served. Pinned like the icons.
 DOC_HASHES = {
-    'docs/map.png': 'a45199361deff360607733b251bd96264778499aab3531a3633d08f67d435f24',
+    'docs/map.png': '19fc57ff3f588b36e2ca412f5656483eaf873718d0d19a39aceb83e007333e6b',
+    'docs/map-phone.png': 'cdd21a74a880d3adab68ce794de1b18060d916d6df5d00ceb54eb06736cf3fd2',
 }
 # Vector logos: the wordmark is outlined (paths), so no font ships and nothing can fall back to another font.
 VECTORS = ('favicon.svg', 'brand/openwiz-lockup.svg')
