@@ -177,6 +177,17 @@ class Checks(unittest.TestCase):
             with self.assertRaises(AssertionError):
                 check_site(root)
 
+    def test_install_wording_only_on_the_button(self):
+        for extra in ('<a href="/">Install · coming soon</a>', '<p>Install now</p>', '<p>Inst&#97;ll today</p>',
+                      '<p>in<b>stall</b> now</p>', '<p>Ins<span>t</span>all</p>', '<img alt="Install now" src="/favicon.svg">'):
+            with self.subTest(extra=extra), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp) / 'dist'
+                shutil.copytree(ROOT / 'dist', root)
+                page = root / 'index.html'
+                page.write_text(page.read_text().replace('<h2 id="ship-h">Ship log</h2>', '<h2 id="ship-h">Ship log</h2>' + extra, 1))
+                with self.assertRaises(AssertionError):
+                    check_site(root)
+
     def test_install_stays_disabled(self):
         good = '<button class="btn install" type="button" disabled aria-describedby="install-note">'
         for bad in ('<button class="btn install" type="button" aria-disabled="true">',
