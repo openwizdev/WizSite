@@ -103,6 +103,11 @@ function measure() {
     floor: { s: W / (num('--F') * k), p: [bc[0], bc[1] - num('--fy') * k], c: [W / 2, H / 2] },
     rest: { s: 1, p: [W / 2, H / 2], c: [W / 2, H / 2] },
   };
+  // The area where labels may sit: inside the view and the window (viewport), below the header,
+  // above the art's faded bottom, and clear of the product window.
+  const head = document.querySelector('.top').getBoundingClientRect(), w = stage.querySelector('.win').getBoundingClientRect();
+  G.vis = { l: Math.max(6, 6 - v.left), r: Math.min(W, innerWidth - v.left) - 6, t: Math.max(H * .1, head.bottom - v.top + 8), b: H * .8 };
+  G.win = { l: w.left - v.left - 6, r: w.right - v.left + 6, t: w.top - v.top - 6, b: w.bottom - v.top + 6 };
 }
 const mix = (a, b, k) => ({ s: Math.exp(lerp(Math.log(a.s), Math.log(b.s), k)), p: [lerp(a.p[0], b.p[0], k), lerp(a.p[1], b.p[1], k)], c: [lerp(a.c[0], b.c[0], k), lerp(a.c[1], b.c[1], k)] });
 let V = null;
@@ -113,12 +118,33 @@ function setView(v) {
 const toScreen = (x, y) => { const s = V ? V.s : 1, tx = V ? V.c[0] - s * V.p[0] : 0, ty = V ? V.c[1] - s * V.p[1] : 0; return [tx + s * (G.ox + x * G.k), ty + s * (G.oy + y * G.k)]; };
 // Label sizes are read once per layout (sizeLabels), so frames only write.
 function sizeLabels() { for (const p of labels.children) { p._w = p.offsetWidth; p._h = p.offsetHeight; } }
+// place() only queues a label; flushLabels() resolves the frame's labels together (kept inside the
+// visible area, lifted above the product window, stacked when two collide, ours first) and writes once.
+let queue = [];
 function place(p, x, y, o, sc = 1) {
-  if (o <= .01) { if (p._o !== 0) { p.style.opacity = 0; p._o = 0; } return; }
-  const [sx, sy] = toScreen(x, y), hw = p._w * sc / 2 + 6;
-  p._o = o;
-  p.style.opacity = o.toFixed(3);
-  p.style.transform = `translate(${Math.max(hw, Math.min(G.W - hw, sx)) - p._w / 2}px,${sy - p._h - 10}px) scale(${sc})`;
+  const [sx, sy] = toScreen(x, y);
+  queue.push({ p, sx, sy, o, sc });
+}
+function flushLabels() {
+  const done = [], hit = (a, b) => a.l < b.r && b.l < a.r && a.t < b.b && b.t < a.b;
+  queue.sort((a, b) => (b.p === oursPill) - (a.p === oursPill));
+  for (const q of queue) {
+    const { p, o, sc } = q;
+    if (o <= .01) { if (p._o !== 0) { p.style.opacity = 0; p._o = 0; } continue; }
+    const w = p._w * sc, h = p._h * sc, V2 = G.vis;
+    let l = Math.max(V2.l, Math.min(V2.r - w, q.sx - w / 2)), t = q.sy - h - 10;
+    const box = () => ({ l, r: l + w, t, b: t + h });
+    if (hit(box(), G.win)) t = G.win.t - h;
+    for (let k = 0; k < 4 && done.some(d => hit(box(), d)); k++) t = Math.min(...done.filter(d => hit(box(), d)).map(d => d.t)) - h - 4;
+    t = Math.max(V2.t, Math.min(V2.b - h, t));
+    const fade = done.some(d => hit(box(), d)) || hit(box(), G.win) ? 0 : 1; // no room: hide rather than overlap
+    if (fade) done.push(box());
+    const op = o * fade;
+    p._o = op;
+    p.style.opacity = op.toFixed(3);
+    p.style.transform = `translate(${l}px,${t}px) scale(${sc})`;
+  }
+  queue = [];
 }
 const at = (l, u) => [l[0] + (l[2] - l[0]) * u, l[1] + (l[3] - l[1]) * u];
 
@@ -165,7 +191,7 @@ function frame(t, now) {
       if (L.i === OURS) place(oursPill, x, y - 24, rest ? .9 : 1 - .1 * seg(t, 5.2, 5.8), rest ? .9 : 1 - .1 * seg(t, 1.2, 2));
     }
   }
-  if (!rest && t < 1) place(oursPill, BX, BY - 50, 1);
+  if (!rest && t < 1) place(oursPill, BX, BY - 30, 1);
   // The ring's train runs along the front of the ring once the whole citadel is in view.
   const tr = rest ? 1 : seg(t, 4.6, 5.4);
   train.forEach((c, i) => {
@@ -192,10 +218,11 @@ function loop() {
     if (it >= INTRO) { finish(); }
     else if (it < TS) {
       if (V !== G.bay) setView(G.bay);
-      place(oursPill, BX, BY - 50, it > 6.9 ? seg(it, 6.9, 7.2) : 0);
+      place(oursPill, BX, BY - 30, it > 6.9 ? seg(it, 6.9, 7.2) : 0);
     } else frame((it - TS) / PACE, now);
   }
   if (!playing) frame(null, now);
+  flushLabels();
   raf = requestAnimationFrame(loop);
 }
 const kick = () => { if (!raf) raf = requestAnimationFrame(loop); };
@@ -208,7 +235,7 @@ function toRest() {
   labels.querySelectorAll('.pill.near').forEach(p => { p.style.opacity = 0; p._o = 0; });
 }
 function finish() { toRest(); done = true; replay.hidden = false; }
-function stop() { toRest(); done = true; replay.hidden = true; frame(null, 4); } // reduced motion: the still frame
+function stop() { toRest(); done = true; replay.hidden = true; frame(null, 4); flushLabels(); } // reduced motion: the still frame
 function play() {
   replay.hidden = true;
   stage.removeAttribute('data-play');
@@ -247,7 +274,7 @@ const relayout = () => {
   layoutStory(); measure(); sizeLabels();
   setView(G.rest);
   if (wasPlaying) finish();
-  if (still.matches) frame(null, 4); else kick();
+  if (still.matches) { frame(null, 4); flushLabels(); } else kick();
 };
 phone.addEventListener('change', relayout);
 let rz;
