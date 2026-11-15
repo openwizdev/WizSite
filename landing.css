@@ -1,7 +1,7 @@
-/* openwiz.dev v2: navy, black and brass. The landing page only; /changelog keeps style.css.
+/* openwiz.dev: navy, black and brass. The landing page and the ship log (/changelog).
  * Motion: every element's resting style is the final frame (no JavaScript, reduced motion, after the intro).
- * landing.js sets [data-play] on the stage to run the ~10 s intro once; the intro is CSS animations with
- * fill none/backwards, so it ends exactly on the resting style. Ambient loops run only with motion allowed. */
+ * landing.js sets [data-play] on the stage: CSS runs the build beats (window, bay, crew, about 7 s), then
+ * landing.js's conductor runs the camera pull-back from one spec to many and the rest motion. */
 :root{color-scheme:dark;--ground:#07090f;--ink:#f2f2f0;--grey:#9aa0ab;--grey2:#b9bec7;--brass:#e8a849;--brass-hi:#f3c06e;--on-brass:#16110a;--navy:#12204a;--navy2:#2b4a8f;--panel:#0d1119;--line:#232a38;--edge:#3a4458;--m:100px}
 *{box-sizing:border-box}
 html{scroll-behavior:smooth}
@@ -39,24 +39,15 @@ h1{font:700 78px/.98 var(--ow-font-sans);letter-spacing:-.045em}
 .star:hover{background:var(--brass-hi)}
 .install:disabled{opacity:1}
 .install{border:0;background:rgb(242 242 240 / 6%);color:var(--grey2);box-shadow:inset 0 0 0 1px var(--edge);cursor:not-allowed}
-.install svg{fill:none;stroke:currentColor;stroke-width:1.4}
-.install-note{margin-top:18px;font-size:15px;line-height:1.5;color:var(--grey)}
-.prompt{margin-top:10px;padding:12px 14px;border-radius:10px;background:var(--panel);box-shadow:inset 0 0 0 1px var(--line);font-size:14px;line-height:1.4;color:var(--grey2);overflow-wrap:anywhere}
-.live{display:flex;align-items:center;gap:10px;margin-top:22px;font-size:16px;color:var(--grey2)}
-.live i{width:9px;height:9px;border-radius:50%;background:var(--brass);box-shadow:0 0 10px rgb(232 168 73 / 70%)}
+.install-note{margin-top:14px;font-size:15px;line-height:1.5;color:var(--grey)}
 
 /* The stage: a camera over the citadel, a bay inside it, and the product window. */
 .stage{grid-area:stage;position:relative;margin:0;min-width:0;
   --A:1.45;           /* view aspect */
   --cw:1.35;--cl:0;--cy0:-.05; /* citadel width and left (fractions of the view width), and how far it sits below the view (fraction of its height) */
   --bx:.4317;--by:.706;--bw:.08; /* the lit bay window's centre and width, as fractions of the citadel picture */
-  --D:.98;--cx:.55;--cy:.47;     /* zoomed in: the bay's width and centre, as fractions of the view */
-  --S:calc(var(--D) / (var(--bw) * var(--cw)));
-  --ch:calc(var(--cw) * .5625 * var(--A));
-  --px:calc(var(--cl) + var(--cw) * var(--bx));
-  --py:calc(1 - var(--ch) + var(--ch) * (var(--by) + var(--cy0)));
-  --tx:calc((var(--cx) - var(--S) * var(--px)) * 100%);
-  --ty:calc((var(--cy) - var(--S) * var(--py)) * 100%)}
+  --D:.98;--cx:.55;--cy:.47;     /* read by landing.js: zoomed in, the bay's width and centre as fractions of the view */
+  --F:980;--fy:-10}               /* read by landing.js: world pixels across the view at the floor shot, and how far above the bay it centres */
 .view{position:absolute;top:-150px;left:-140px;width:calc(100% + var(--m) + 140px);aspect-ratio:var(--A);overflow:hidden;
   --fade:linear-gradient(transparent,#000 14%,#000 72%,transparent 92%),linear-gradient(90deg,transparent,#000 10%);-webkit-mask:var(--fade);-webkit-mask-composite:source-in;mask:var(--fade);mask-composite:intersect}
 .cam{position:absolute;inset:0;transform-origin:0 0}
@@ -65,11 +56,21 @@ h1{font:700 78px/.98 var(--ow-font-sans);letter-spacing:-.045em}
 .moon{width:9%;height:auto;left:30%;top:12%;opacity:.9}
 .city{position:absolute;left:calc(var(--cl) * 100%);bottom:0;width:calc(var(--cw) * 100%);aspect-ratio:16/9;translate:0 calc(var(--cy0) * 100%)}
 .city>img,.city>svg{position:absolute;inset:0;width:100%;height:100%;display:block}
-.city>:is(.citadel,.lights,.lines){-webkit-mask:linear-gradient(#000 70%,transparent 83%);mask:linear-gradient(#000 70%,transparent 83%)}
-.lines{fill:none;stroke:var(--brass);stroke-width:3;stroke-linecap:round;opacity:.75}
-.lines path{stroke-dasharray:1 0}
-.lines .dot{fill:var(--brass-hi);stroke:none}
+.city>:is(.citadel,.lit){-webkit-mask:linear-gradient(#000 70%,transparent 83%);mask:linear-gradient(#000 70%,transparent 83%)}
+.lit .lines path{fill:none;stroke:var(--brass-hi);stroke-width:4;stroke-linecap:round;opacity:.3}
+.lit .items image,.lit .ring circle{opacity:0}
+.lit .ring path{fill:none}
+.lit .ring circle{fill:var(--brass-hi)}
+.lit .smoke circle{fill:#26314d;opacity:0;transform-box:fill-box;transform-origin:center}
+.labels{position:absolute;inset:0;pointer-events:none}
+.pill{position:absolute;left:0;top:0;display:flex;align-items:center;gap:8px;white-space:nowrap;padding:6px 11px;border-radius:999px;background:rgb(10 13 20 / 93%);box-shadow:inset 0 0 0 1px rgb(242 242 240 / 17%),0 8px 20px -8px #000;font-size:13px;color:var(--ink);opacity:0;transform-origin:50% 100%}
+.pill::after{content:"";position:absolute;left:50%;top:100%;width:1.5px;height:9px;background:rgb(232 168 73 / 60%)}
+.pill i{width:11px;height:11px;border-radius:50%;flex:none;box-sizing:border-box;border:2px solid var(--navy2);border-top-color:var(--brass)}
+.pill.ours{font-size:15px;padding:8px 13px}
+.pill.ours i{border:0;background:var(--brass) url(data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20viewBox=%270%200%2010%2010%27%3E%3Cpath%20d=%27m2.5%205.2%201.7%201.7%203.4-3.8%27%20fill=%27none%27%20stroke=%27%2316110a%27%20stroke-width=%271.5%27/%3E%3C/svg%3E) center/100%}
+.pill em{font-style:normal;font-size:.9em;color:#f6dcae}
 .bay{position:absolute;left:calc((var(--bx) - var(--bw) / 2) * 100%);top:calc(var(--by) * 100%);width:calc(var(--bw) * 100%);aspect-ratio:1.6;translate:0 -50%;opacity:0;overflow:hidden;border-radius:2%}
+.js .stage[data-play] .bay{opacity:1}
 .bay>*{position:absolute}
 .bay .hall{inset:0;width:100%;height:100%}
 .bay .belt{left:4%;right:15%;top:76.4%;height:1.2%;background:repeating-linear-gradient(90deg,rgb(232 168 73 / 0%) 0 6px,rgb(232 168 73 / 35%) 6px 8px);background-size:14px 100%}
@@ -123,12 +124,10 @@ h1{font:700 78px/.98 var(--ow-font-sans);letter-spacing:-.045em}
 .approved{box-shadow:inset 0 0 0 1px rgb(232 168 73 / 55%);color:#f6dcae}
 .approved svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.8}
 .tap{position:absolute;right:38px;bottom:2px;width:22px;height:22px;border-radius:50%;border:2px solid var(--brass-hi);opacity:0;pointer-events:none}
-.replay{margin-left:auto;display:inline-flex;align-items:center;gap:6px;min-height:36px;padding:0 12px;border:0;border-radius:999px;background:rgb(10 13 20 / 80%);box-shadow:inset 0 0 0 1px var(--edge);color:var(--grey2);font:500 14px/1 var(--ow-font-sans);cursor:pointer}
+.replay{margin:0 -8px 0 auto;display:inline-flex;align-items:center;gap:6px;min-height:34px;padding:0 12px;border:0;border-radius:999px;background:rgb(10 13 20 / 80%);box-shadow:inset 0 0 0 1px var(--edge);color:var(--grey2);font:500 14px/1 var(--ow-font-sans);cursor:pointer}
 .replay[hidden],html:not(.js) .replay{display:none}
 .replay:hover{color:var(--ink);box-shadow:inset 0 0 0 1px var(--brass)}
 .replay svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round}
-.stage figcaption{position:absolute;left:-12px;top:722px;width:430px;display:flex;align-items:center;gap:10px;font-size:14px;color:var(--grey)}
-.tag{width:8px;height:8px;border-radius:2px;box-shadow:inset 0 0 0 1.5px var(--grey)}
 
 /* The factory at work */
 .works{margin-top:72px}
@@ -148,16 +147,24 @@ h2{font:700 52px/1.05 var(--ow-font-sans);letter-spacing:-.035em}
 .floor .decider{left:45.5%;top:13.5%;width:8%}
 .floor .card{left:4.5%;top:55%;width:5.5%}
 .floor .out{left:87%;top:42%;width:9%}
-.caption{margin-top:18px;font-size:17px;color:var(--grey2)}
-.caption a{display:inline-flex;align-items:center;min-height:44px;border-radius:6px}
-.caption a:hover{color:var(--ink);text-decoration:underline;text-decoration-color:var(--brass);text-underline-offset:5px}
-.caption span{color:var(--grey);padding:0 10px}
-
-/* Changelog teaser */
-.log{margin-top:64px;padding-top:56px;border-top:1px solid rgb(242 242 240 / 14%)}
-.log h2{font-size:40px}
-.rail{list-style:none;padding:0;margin-top:28px}
-.rail li{position:relative;display:grid;grid-template-columns:120px 1fr;gap:24px;padding:10px 0 10px 40px;font-size:18px;color:var(--grey2)}
+.how{display:grid;grid-template-columns:240px 1fr;column-gap:40px;margin-top:40px}
+.how h3{font:650 24px/1.2 var(--ow-font-sans);letter-spacing:-.02em}
+.rows{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(3,1fr);gap:28px}
+.rows li{padding-top:16px;border-top:2px solid var(--navy2);font-size:16.5px;line-height:1.5;color:var(--grey2)}
+.rows b{display:block;margin-bottom:6px;font:650 19px/1.3 var(--ow-font-sans);letter-spacing:-.012em;color:var(--ink)}
+.rows a{text-decoration:underline;text-decoration-color:var(--brass);text-decoration-thickness:1.5px;text-underline-offset:4px}
+.rows a:hover{color:var(--brass-hi)}
+.fit{grid-column:2;margin-top:28px;max-width:760px;font-size:20px;line-height:1.45;color:var(--ink)}
+/* Ship log teaser */
+.ship{margin-top:112px}
+.ship h2{font-size:40px}
+.cols{display:grid;grid-template-columns:1.3fr 1fr;gap:56px;margin-top:28px}
+.ship h3{font:600 14px/1 var(--ow-font-sans);letter-spacing:.08em;text-transform:uppercase;color:var(--grey)}
+.bundles{list-style:none;margin:20px 0 0;padding:0;display:flex;flex-wrap:wrap;gap:10px}
+.bundles li{display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border-radius:999px;box-shadow:inset 0 0 0 1px var(--edge);font-size:16px;color:var(--grey2)}
+.bundles li::before{content:"";width:10px;height:10px;border-radius:50%;box-sizing:border-box;border:2px solid var(--navy2);border-top-color:var(--brass)}
+.rail{list-style:none;padding:0;margin-top:14px}
+.rail li{position:relative;display:grid;grid-template-columns:96px 1fr;gap:16px;padding:10px 0 10px 40px;font-size:18px;color:var(--grey2)}
 .rail li::before{content:"";position:absolute;left:4px;top:19px;width:11px;height:11px;border-radius:50%;background:var(--ink)}
 .rail li:first-child::before{background:var(--brass);box-shadow:0 0 0 4px rgb(232 168 73 / 20%)}
 .rail li::after{content:"";position:absolute;left:9px;top:30px;bottom:-19px;width:1.5px;background:rgb(242 242 240 / 35%)}
@@ -174,7 +181,6 @@ h2{font:700 52px/1.05 var(--ow-font-sans);letter-spacing:-.035em}
 @keyframes pane{0%{opacity:0;transform:translateY(6px)}10%,88%{opacity:1;transform:none}100%{opacity:0;transform:translateY(-4px)}}
 @keyframes pop{0%{opacity:0;transform:scale(.6)}60%{opacity:1;transform:scale(1.12)}100%{opacity:1;transform:none}}
 @keyframes blink{50%{opacity:0}}
-@keyframes zoom{0%{transform:translate(var(--tx),var(--ty)) scale(var(--S))}100%{transform:none}}
 @keyframes draw{0%{stroke-dasharray:0 1}100%{stroke-dasharray:1 0}}
 @keyframes ride{0%{left:-6%;opacity:0}5%{opacity:1}10.3%,31%{left:19%}41.4%,62%{left:43%}70.7%,87.9%{left:70%;opacity:1}100%{left:86%;opacity:0}}
 @keyframes tapring{0%{opacity:0;transform:scale(.4)}30%{opacity:1}100%{opacity:0;transform:scale(2.2)}}
@@ -184,11 +190,6 @@ h2{font:700 52px/1.05 var(--ow-font-sans);letter-spacing:-.035em}
 @keyframes ff{0%,49.9%{opacity:1}50%,100%{opacity:0}}
 @keyframes fs{0%,49.9%{opacity:0}50%,100%{opacity:1}}
 
-.js .stage[data-play] .bay{animation:bayhold 9s linear}
-@keyframes bayhold{0%,90%{opacity:1}100%{opacity:0}}
-.js .stage[data-play] .cam{animation:zoom 1.7s cubic-bezier(.65,0,.25,1) 7.9s backwards}
-.js .stage[data-play] .lines path{animation:draw 1.2s ease-out 8.6s backwards}
-.js .stage[data-play] .lines .dot{animation:off 9.4s}
 .js .stage[data-play] .win{animation:enter .4s ease-out .1s backwards}
 .js .stage[data-play] .p-idea{animation:pane 1.75s linear .1s}
 .js .stage[data-play] .typed .ch{animation:off calc(.3s + var(--i) * .026s)}
@@ -239,22 +240,20 @@ h2{font:700 52px/1.05 var(--ow-font-sans);letter-spacing:-.035em}
 .js .stage[data-play] .bay .seal{animation:pop .3s 7.2s,on .25s 7.5s}
 .js .stage[data-play] .gate-glow{animation:glow 1.2s 7.5s}
 .js .stage[data-play] .bay .app{animation:appout 1.3s ease-out 7.6s}
-.js .stage[data-play] .replay{opacity:0;pointer-events:none}
 
 /* Ambient (rest) motion: slow, small, only with motion allowed and only while on screen. */
 @keyframes twinkle{50%{opacity:.25}}
-@keyframes flicker{0%,100%{opacity:1}45%{opacity:.82}60%{opacity:.95}}
-@keyframes crawl{to{stroke-dashoffset:-80}}
-@keyframes travel{from{offset-distance:0%}to{offset-distance:100%}}
 @keyframes bob{50%{transform:translateY(-3%)}}
+@keyframes puff{0%{opacity:0;transform:translate(0,0) scale(.6)}20%{opacity:.75}100%{opacity:0;transform:translate(-30px,-110px) scale(2.6)}}
 @keyframes cardin{0%{transform:translateY(-120%) rotate(-8deg);opacity:0}20%{opacity:1}40%,100%{transform:none;opacity:1}}
 @keyframes goods{0%{left:9%;opacity:0}4%{opacity:1}30%,44%{left:32%}70%,80%{left:75%}96%{left:85%;opacity:1}100%{left:88%;opacity:0}}
 @keyframes ship{0%,60%{opacity:0;transform:translateY(10%) scale(.7)}75%{opacity:1;transform:none}95%{opacity:1}100%{opacity:0;transform:translate(10%,-6%)}}
 @media (prefers-reduced-motion:no-preference){
   .js .tw{animation:twinkle 3.2s ease-in-out infinite}
-  .js .lights{animation:flicker 5s ease-in-out infinite}
-  .js .lines .dot{animation:travel var(--t,9s) linear infinite;animation-delay:var(--dl,0s)}
-  .js .stage[data-play] .lines .dot{animation:off 9.4s,travel var(--t,9s) linear var(--dl,0s) infinite}
+  .js .lit .smoke circle{animation:puff 7s ease-out infinite}
+  .js .lit .smoke circle:nth-child(2){animation-delay:-3.5s}
+  .js .lit .smoke circle:nth-child(3){animation-delay:-1.7s}
+  .js .lit .smoke circle:nth-child(4){animation-delay:-5.2s}
   .js .floor .belt{animation:beltmove 3s linear infinite}
   .js .floor .g{animation:goods 6s linear infinite}
   .js .floor .g2{animation-delay:-3s}
@@ -274,41 +273,101 @@ h2{font:700 52px/1.05 var(--ow-font-sans);letter-spacing:-.035em}
 @keyframes gi1{0%{opacity:1}30%{opacity:0}}
 @keyframes gi2{0%{opacity:0}30%{opacity:1}60%{opacity:0}}
 @keyframes gi3{0%{opacity:0}60%{opacity:1}}
-@media (prefers-reduced-motion:reduce){.replay{display:none}}
+@media (prefers-reduced-motion:reduce){.replay{display:none}.stage[data-play] *{animation:none !important}.stage[data-play] .bay{opacity:0}}
 
-/* ---------- Phone ---------- */
+/* ---------- Phone (designed first at 390 px) ----------
+ * First screen: headline, then the animation (art 390 × 300 with the window overlapping it), then the two buttons. */
 @media (max-width:960px){
   :root{--m:20px}
-  .top{height:64px}
+  .top{height:60px}
   .brand{font-size:19px}
   .top nav{font-size:16px}
   .top nav a{padding:0 10px}
-  .hero{grid-template-columns:minmax(0,1fr);grid-template-areas:"copy" "stage" "ctas";grid-template-rows:none;padding:36px 0 0;min-height:0}
-  h1{font-size:46px;max-width:11ch}
-  .sub{margin-top:16px;font-size:18px}
-  .stage{margin-top:8px;--A:.95;--cw:2;--cl:-.45;--cy0:.02;--D:1.3;--cx:.5;--cy:.45}
-  .view{position:relative;top:auto;left:calc(-1 * var(--m));width:calc(100% + 2 * var(--m));-webkit-mask:linear-gradient(transparent,#000 12%,#000 70%,transparent);mask:linear-gradient(transparent,#000 10%,#000 82%,transparent)}
-  .win{position:relative;left:0;top:auto;width:100%;margin-top:-40px}
-  .panes{height:322px}
-  .pane{padding:16px}
-  .tix li{font-size:14.5px}
-  .stage figcaption{position:static;width:auto;margin-top:12px}
-  .ctas{margin-top:28px;max-width:none}
-  .btn{flex:1 1 100%}
-  .works{margin-top:88px}
-  h2{font-size:36px;max-width:11ch}
-  .floor{margin-inline:calc(-1 * var(--m));border-radius:0;aspect-ratio:900/820;box-shadow:none}
-  .floor-in{inset:0 auto 0 -69.3%;width:266.67%}
-  .caption{display:grid;gap:0;margin-top:14px;font-size:16px}
-  .caption span{display:none}
-  .log{margin-top:72px;padding-top:40px}
-  .log h2{font-size:32px}
-  .rail li{grid-template-columns:1fr;gap:2px;padding:8px 0 12px 32px;font-size:16px}
+  .hero{grid-template-columns:minmax(0,1fr);grid-template-areas:"copy" "stage" "ctas";grid-template-rows:none;padding:28px 0 0;min-height:0}
+  h1{font-size:44px}
+  .sub{margin-top:12px;font-size:17px}
+  .stage{margin-top:4px;--A:1.3;--cw:1.75;--cl:-.33;--cy0:.03;--D:1.25;--cx:.5;--cy:.44;--F:620;--fy:110}
+  .view{position:relative;top:auto;left:calc(-1 * var(--m));width:calc(100% + 2 * var(--m));-webkit-mask:linear-gradient(transparent,#000 8%,#000 80%,transparent);mask:linear-gradient(transparent,#000 8%,#000 80%,transparent)}
+  .win{position:relative;left:0;top:auto;width:100%;margin-top:-34px;border-radius:14px}
+  .bar{height:40px;padding:0 14px;font-size:15px}
+  .panes{height:250px}
+  .pane{padding:12px 14px}
+  .field{min-height:46px;font-size:15px;margin-top:10px}
+  .p-grill .lbl{margin-bottom:8px}
+  .q,.a{font-size:14px;padding:5px 10px}
+  .a{margin:4px 0 6px auto}
+  .title{font-size:15.5px}
+  .meta{margin-top:4px;font-size:13px}
+  .plan{width:96px;height:22px}
+  .tix{margin-top:6px}
+  .tix li{height:29px;font-size:14px}
+  .st{font-size:12.5px}
+  .foot{margin-top:2px;padding-top:8px;font-size:13px}
+  .approve,.approved{height:28px;padding:0 11px;font-size:13px}
+  .tap{right:30px}
+  .pill{font-size:12px;padding:5px 9px}.pill.ours{font-size:13px;padding:6px 10px}
+  .ctas{margin-top:20px;max-width:none}
+  .buttons{flex-wrap:nowrap;gap:10px}
+  .btn{flex:1 1 0;min-height:48px;padding:0 10px;font-size:15px;gap:8px}
+  .install-note{margin-top:10px;font-size:14px}
+  .works{margin-top:72px}
+  h2{font-size:34px;max-width:11ch}
+  .floor{margin:20px calc(-1 * var(--m)) 0;border-radius:0;aspect-ratio:900/560;box-shadow:none}
+  .floor-in{inset:auto auto 0 -76%;width:266.67%;aspect-ratio:2400/820;height:auto}
+  .how{grid-template-columns:1fr;margin-top:28px}
+  .how h3{font-size:20px}
+  .rows{grid-template-columns:1fr;gap:16px;margin-top:14px}
+  .rows li{padding-top:12px;font-size:15.5px}
+  .rows b{font-size:17.5px}
+  .fit{grid-column:1;margin-top:20px;font-size:17.5px}
+  .ship{margin-top:72px}
+  .ship h2{font-size:30px}
+  .cols{grid-template-columns:1fr;gap:28px;margin-top:18px}
+  .rail li{grid-template-columns:64px 1fr;gap:10px;padding:8px 0 8px 32px;font-size:16px}
   .rail li::before{top:15px}
   .rail li::after{top:28px}
-  .foot-site{margin-top:80px}
+  .bundles li{font-size:15px;padding:7px 12px}
+  .foot-site{margin-top:72px}
 }
 
 /* Lift the moving parts off the engraved ground: a faint brass rim on the work, a little light on the crew. */
 :is(.bay .item,.floor .g) img{filter:brightness(1.35) drop-shadow(0 0 5px rgb(232 168 73 / 45%))}
 :is(.bay,.floor) .who img{filter:brightness(1.18)}
+
+/* The ship log page (/changelog) */
+.shiplog{padding:64px 0 0}
+.shiplog h1{font-size:64px}
+.shiplog .lead{margin-top:16px;max-width:720px;font-size:19px;color:var(--grey2)}
+.shiplog .lead a{color:var(--ink);text-decoration:underline;text-decoration-color:var(--brass);text-underline-offset:4px;white-space:nowrap}
+.shiplog h2{margin-top:64px;font-size:30px}
+.bundle-list{list-style:none;margin:20px 0 0;padding:0;display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.bundle-list li{padding:16px 16px 18px;border-radius:14px;box-shadow:inset 0 0 0 1px var(--edge);font-size:15px;line-height:1.45;color:var(--grey2)}
+.bundle-list b{display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:16.5px;color:var(--ink)}
+.bundle-list b::before{content:"";width:10px;height:10px;flex:none;border-radius:50%;box-sizing:border-box;border:2px solid var(--navy2);border-top-color:var(--brass)}
+.rel{display:grid;grid-template-columns:200px 1fr;gap:24px;padding:28px 0;border-top:1px solid var(--line)}
+.rel:first-of-type{border-top:0}
+.when{display:flex;flex-direction:column;gap:4px;color:var(--grey)}
+.when .v{font-size:22px;font-weight:600;color:var(--ink)}
+.rel h3{font:650 24px/1.25 var(--ow-font-sans);letter-spacing:-.02em}
+.main-line{margin-top:8px;font-size:18px;color:var(--ink)}
+.also-h{margin-top:16px;font:600 13px/1 var(--ow-font-sans);letter-spacing:.08em;text-transform:uppercase;color:var(--grey)}
+.also{margin:10px 0 0;padding-left:20px;color:var(--grey2);font-size:16px}
+.also li{margin-top:4px}
+.rel code{font-size:.92em;color:#f6dcae}
+.gh{display:inline-flex;align-items:center;min-height:44px;margin-top:6px;font-size:15px;color:var(--grey2);text-decoration:underline;text-decoration-color:var(--brass);text-underline-offset:4px}
+.gh:hover{color:var(--ink)}
+@media (max-width:960px){
+  .shiplog{padding-top:32px}
+  .shiplog h1{font-size:42px}
+  .shiplog .lead{font-size:16.5px}
+  .shiplog h2{margin-top:44px;font-size:24px}
+  .bundle-list{grid-template-columns:1fr 1fr;gap:10px}
+  .bundle-list li{padding:12px 12px 14px;font-size:14px}
+  .bundle-list b{font-size:15px}
+  .rel{grid-template-columns:1fr;gap:6px;padding:22px 0}
+  .when{flex-direction:row;align-items:baseline;gap:12px}
+  .when .v{font-size:19px}
+  .rel h3{font-size:20px}
+  .main-line{font-size:16.5px}
+  .also{font-size:15px}
+}

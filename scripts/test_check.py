@@ -33,7 +33,7 @@ class Checks(unittest.TestCase):
             with self.assertRaises(AssertionError):
                 check_site(root)
             licence.write_bytes(original)
-            with (root / 'style.css').open('a') as css:
+            with (root / 'landing.css').open('a') as css:
                 css.write('\np { background: url(/missing.png) }\n')
             with self.assertRaises(AssertionError):
                 check_site(root)
@@ -92,6 +92,14 @@ class Checks(unittest.TestCase):
                     css.write(bad)
                 with self.assertRaises(AssertionError):
                     check_site(root)
+
+    def test_banned_word(self):
+        word = 'play' + 'book'
+        for text in (word, word.title() + 's', 'a ' + word.upper()):
+            with self.subTest(text=text), self.assertRaises(AssertionError):
+                check_privacy('index.html', f'<p>{text}</p>'.encode())
+        with self.assertRaises(AssertionError):
+            check_privacy('README.md', f'skills are {word}s'.encode())
 
     def test_install_stays_disabled(self):
         good = '<button class="btn install" type="button" disabled aria-describedby="install-note">'
