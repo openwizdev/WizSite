@@ -28,6 +28,7 @@ code,.v{font-family:var(--ow-font-mono)}
 /* Hero: copy and the two calls to action on the left, the animation on the right (phone: below it). */
 .hero{display:grid;grid-template-columns:510px minmax(0,1fr);grid-template-areas:"copy stage" "ctas stage";grid-template-rows:auto 1fr;column-gap:24px;padding:96px 0 40px;min-height:820px}
 .copy{grid-area:copy;position:relative;z-index:2}
+.kicker{margin-bottom:14px;font:600 13px/1.4 var(--ow-font-sans);letter-spacing:.04em;color:var(--brass)}
 h1{font:700 78px/.98 var(--ow-font-sans);letter-spacing:-.045em}
 .sub{margin-top:28px;font:400 24px/1.45 var(--ow-font-sans);letter-spacing:-.012em;color:var(--grey2)}
 .ctas{grid-area:ctas;position:relative;z-index:2;margin-top:40px;max-width:440px}
@@ -288,10 +289,10 @@ h2{font:700 52px/1.05 var(--ow-font-sans);letter-spacing:-.035em}
   .brand{font-size:19px}
   .top nav{font-size:16px}
   .top nav a{padding:0 10px}
-  .hero{grid-template-columns:minmax(0,1fr);grid-template-areas:"copy" "stage" "ctas";grid-template-rows:none;padding:28px 0 0;min-height:0}
+  .hero{grid-template-columns:minmax(0,1fr);grid-template-areas:"copy" "stage" "ctas";grid-template-rows:none;padding:20px 0 0;min-height:0}
   h1{font-size:44px}
   .sub{margin-top:12px;font-size:17px}
-  .stage{margin-top:4px;--A:1.6;--cw:1.75;--cl:-.33;--cy0:.03;--D:1.25;--cx:.5;--cy:.44;--F:620;--fy:110}
+  .stage{margin-top:4px;--A:1.85;--cw:1.75;--cl:-.33;--cy0:.03;--D:1.25;--cx:.5;--cy:.44;--F:620;--fy:110}
   .view{position:relative;top:auto;left:calc(-1 * var(--m));width:calc(100% + 2 * var(--m));-webkit-mask:linear-gradient(transparent,#000 8%,#000 80%,transparent);mask:linear-gradient(transparent,#000 8%,#000 80%,transparent)}
   .win{position:relative;left:0;top:auto;width:100%;margin-top:-34px;border-radius:14px}
   .bar{height:40px;padding:0 12px;gap:8px;font-size:15px}
