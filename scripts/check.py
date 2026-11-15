@@ -268,7 +268,7 @@ def check_site(root):
     # Install stays "coming soon" until a stranger can install (AN8); only these mentions are allowed.
     assert 'Install · coming soon' in flat
     rest = flat
-    for allowed in ('Install · coming soon', 'Install will copy one prompt'):
+    for allowed in ('Install · coming soon',):
         rest = rest.replace(allowed, '')
     assert not re.search(r'install|paid plans|works today', rest, re.I), 'unsettled landing claim or live install CTA'
     installs = [b for b in pages[root / 'index.html'].buttons if 'install' in (b.get('class') or '').split()]
