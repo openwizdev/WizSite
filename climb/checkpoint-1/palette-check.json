@@ -1,0 +1,17 @@
+{
+ "validator": "Machado 2009 CVD simulation (severity 1.0), CIE76 \u0394E between every pair of series colours",
+ "palette": {
+  "best": "#E69F00",
+  "REF-LINEAR": "#56B4E9",
+  "REF-VERCEL": "#009E73",
+  "REF-RESEND": "#0072B2",
+  "REF-WARP": "#D55E00",
+  "REF-CURSOR": "#CC79A7"
+ },
+ "min_pairwise_dE": {
+  "protanopia": 20.7,
+  "deuteranopia": 17.9,
+  "tritanopia": 16.1,
+  "normal": 26.4
+ }
+}
