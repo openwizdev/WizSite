@@ -281,7 +281,7 @@ h2{font:700 52px/1.05 var(--ow-font-sans);letter-spacing:-.035em}
 @media (prefers-reduced-motion:reduce){.replay,.pause{display:none}.stage[data-play] *{animation:none !important}.stage[data-play] .bay{opacity:0}}
 
 /* ---------- Phone (designed first at 390 px) ----------
- * First screen: headline, then the animation (art 390 × 300 with the window overlapping it), then the two buttons. */
+ * First screen: headline, then the animation (art and the window overlapping it), then the two buttons. */
 @media (max-width:960px){
   :root{--m:20px}
   .top{height:60px}
@@ -291,12 +291,12 @@ h2{font:700 52px/1.05 var(--ow-font-sans);letter-spacing:-.035em}
   .hero{grid-template-columns:minmax(0,1fr);grid-template-areas:"copy" "stage" "ctas";grid-template-rows:none;padding:28px 0 0;min-height:0}
   h1{font-size:44px}
   .sub{margin-top:12px;font-size:17px}
-  .stage{margin-top:4px;--A:1.3;--cw:1.75;--cl:-.33;--cy0:.03;--D:1.25;--cx:.5;--cy:.44;--F:620;--fy:110}
+  .stage{margin-top:4px;--A:1.6;--cw:1.75;--cl:-.33;--cy0:.03;--D:1.25;--cx:.5;--cy:.44;--F:620;--fy:110}
   .view{position:relative;top:auto;left:calc(-1 * var(--m));width:calc(100% + 2 * var(--m));-webkit-mask:linear-gradient(transparent,#000 8%,#000 80%,transparent);mask:linear-gradient(transparent,#000 8%,#000 80%,transparent)}
   .win{position:relative;left:0;top:auto;width:100%;margin-top:-34px;border-radius:14px}
   .bar{height:40px;padding:0 12px;gap:8px;font-size:15px}
   .pause,.replay{padding:0 9px;font-size:13px;gap:5px}
-  .panes{height:250px}
+  .panes{height:238px}
   .pane{padding:12px 14px}
   .field{min-height:46px;font-size:15px;margin-top:10px}
   .p-grill .lbl{margin-bottom:8px}
@@ -306,13 +306,13 @@ h2{font:700 52px/1.05 var(--ow-font-sans);letter-spacing:-.035em}
   .meta{margin-top:4px;font-size:13px}
   .plan{width:96px;height:22px}
   .tix{margin-top:6px}
-  .tix li{height:29px;font-size:14px}
+  .tix li{height:27px;font-size:14px}
   .st{font-size:12.5px}
   .foot{margin-top:2px;padding-top:8px;font-size:13px}
   .approve,.approved{height:28px;padding:0 11px;font-size:13px}
   .tap{right:30px}
   .pill{font-size:12px;padding:5px 9px}.pill.ours{font-size:13px;padding:6px 10px}
-  .ctas{margin-top:20px;max-width:none}
+  .ctas{margin-top:14px;max-width:none}
   .buttons{flex-wrap:nowrap;gap:10px}
   .btn{flex:1 1 0;min-height:48px;padding:0 10px;font-size:15px;gap:8px}
   .install-note{margin-top:10px;font-size:14px}
