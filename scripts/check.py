@@ -38,6 +38,11 @@ ICON_HASHES = {
     'apple-touch-icon.png': 'ff6e52cd499610049bbb6bf6289c77c99fe45ec667114ebcccab99266a9a09df',
     'brand/og.png': '8ff8e60f4653d4ed0eb7bf47b81a87810d9a25b002ff796a6268f3f655caf582',
 }
+# README pictures: kept in the source for GitHub only, never built or served. Pinned like the icons.
+DOC_HASHES = {
+    'docs/map.png': '19fc57ff3f588b36e2ca412f5656483eaf873718d0d19a39aceb83e007333e6b',
+    'docs/map-phone.png': 'cdd21a74a880d3adab68ce794de1b18060d916d6df5d00ceb54eb06736cf3fd2',
+}
 # Vector logos: the wordmark is outlined (paths), so no font ships and nothing can fall back to another font.
 VECTORS = ('favicon.svg', 'brand/openwiz-lockup.svg')
 SITE_URL = 'https://openwiz.dev/'
@@ -321,7 +326,8 @@ def check_privacy(path, data):
         # Pictures are binary, but scan their raw bytes for the same markers (e.g. in metadata).
         assert not any(marker.encode() in data.lower() for marker in DENYLIST), f'private marker in {path}'
     if path.endswith(('.png', '.ico')):
-        assert font in ICON_HASHES and sha256(data).hexdigest() == ICON_HASHES[font], 'unreviewed picture'
+        pinned = DOC_HASHES.get(path) or ICON_HASHES.get(font)
+        assert pinned and sha256(data).hexdigest() == pinned, 'unreviewed picture'
         assert not any(marker.encode() in data.lower() for marker in DENYLIST), f'private marker in {path}'
     if font in VECTORS:
         check_vector(data)
