@@ -1,9 +1,10 @@
 // A static export: only the reviewed public assets, without a runtime server.
-import { copyFile, mkdir, rm } from 'node:fs/promises';
+import { copyFile, mkdir, readdir, rm } from 'node:fs/promises';
 
 const root = new URL('./', import.meta.url);
 const output = new URL('dist/', root);
-const files = ['index.html', 'changelog/index.html', 'tokens.css', 'style.css', 'script.js', 'fonts/Virgil.woff2', 'fonts/Virgil-OFL.txt', 'fonts/Geist-var.woff2', 'fonts/GeistMono-var.woff2', 'fonts/OFL.txt'];
+const art = (await readdir(new URL('art/', root))).filter(name => name.endsWith('.webp')).sort().map(name => `art/${name}`);
+const files = ['index.html', 'changelog/index.html', 'tokens.css', 'style.css', 'script.js', 'landing.css', 'landing.js', ...art, 'fonts/Virgil.woff2', 'fonts/Virgil-OFL.txt', 'fonts/Geist-var.woff2', 'fonts/GeistMono-var.woff2', 'fonts/OFL.txt'];
 await rm(output, { recursive: true, force: true });
 for (const file of files) {
   const target = new URL(file, output);
