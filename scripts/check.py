@@ -7,11 +7,15 @@ import subprocess
 from urllib.parse import unquote, urlsplit
 
 ROOT = Path(__file__).resolve().parents[1]
+# Layered art: generated WebP pictures, reviewed and listed by the build from art/.
+ART = {p.relative_to(ROOT).as_posix() for p in (ROOT / 'art').glob('*.webp')}
+ART_BUDGET = 2_000_000  # bytes, all art together
 RUNTIME = {
     'index.html', 'changelog/index.html', 'style.css', 'tokens.css', 'script.js',
+    'landing.css', 'landing.js',
     'fonts/Geist-var.woff2', 'fonts/GeistMono-var.woff2', 'fonts/OFL.txt',
     'fonts/Virgil.woff2', 'fonts/Virgil-OFL.txt',
-}
+} | ART
 # Generic private-context markers only; never copy personal literal lists here.
 DENYLIST = ('closedwiz', '/users/', '/home/', 'private/evidence/',
             'docs/grills/', 'thr_', 'cr_sub_')
@@ -47,7 +51,23 @@ class Page(HTMLParser):
             self.favicons.add(attrs.get('href'))
 
 
+def check_webp(data):
+    # A plain WebP image: no EXIF or XMP metadata chunks, which could carry private details.
+    assert data[:4] == b'RIFF' and data[8:12] == b'WEBP', 'invalid WebP signature'
+    at = 12
+    while at + 8 <= len(data):
+        kind, size = data[at:at + 4], int.from_bytes(data[at + 4:at + 8], 'little')
+        assert kind in (b'VP8 ', b'VP8L', b'VP8X', b'ALPH'), f'unexpected WebP chunk {kind!r}'
+        at += 8 + size + (size & 1)
+    assert at == len(data), 'truncated WebP'
+
+
 def check_ref(root, source, ref, pages, favicons=()):
+    if ref.startswith('data:image/svg+xml,') and not favicons:
+        # Inert inline CSS icons only: no script, links or nested resources.
+        svg = unquote(ref.split(',', 1)[1]).lower()
+        assert not re.search(r'script|href|url\(|foreignobject|on\w+=', svg), 'unexpected inline SVG'
+        return
     if ref in favicons:
         # Only the existing inert inline SVG favicon, with no script or links.
         assert ref.startswith('data:image/svg+xml,'), 'unexpected favicon'
@@ -97,12 +117,31 @@ def check_site(root):
     words = re.sub(r'<[^>]*>', '', landing)
     headline = re.sub(r'<[^>]*>', '', re.search(r'<h1>([\s\S]*?)</h1>', landing)[1].replace('<br>', ' '))
     assert headline == 'Build at the speed of ideas.', 'hero headline changed'
-    assert 'You make the decisions.The agents run the factory.' in words, 'hero subline changed'
-    assert 'Building in public' in words and 'Star on GitHub' in words
-    assert 'OpenWiz has no published release yet.' in words
-    assert not re.search(r'install|copy the prompt|paid plans|works today|0\.\d+\.\d+', landing, re.I), 'unsettled landing claim or install CTA'
+    flat = re.sub(r'\s+', ' ', re.sub(r'<br>', ' ', landing))
+    flat = re.sub(r'\s+', ' ', re.sub(r'<[^>]*>', '', flat))
+    assert 'You make the decisions. The agents run the factory.' in flat, 'hero subline changed'
+    for text in ('Building in public', 'Star on GitHub', 'OpenWiz has no published release yet.',
+                 'Illustration, not live data.', 'Idea in. Shipped work out.'):
+        assert text in flat, f'missing landing copy: {text}'
+    # Install stays "coming soon" until a stranger can install (AN8); only these mentions are allowed.
+    assert 'Install · coming soon' in flat
+    rest = flat
+    for allowed in ('Install · coming soon', 'Install copies this prompt', 'Install OpenWiz from github.com/openwizdev/openwiz'):
+        rest = rest.replace(allowed, '')
+    assert not re.search(r'install|paid plans|works today', rest, re.I), 'unsettled landing claim or live install CTA'
+    assert re.search(r'<button class="btn install"[^>]*aria-disabled="true"', landing), 'Install must stay disabled'
     assert not re.search(r'\b\d{4}-\d{2}-\d{2}\b', words), 'dated landing promise'
     changelog = (root / 'changelog/index.html').read_text()
+    # The teaser shows only versions the changelog publishes.
+    teaser = re.findall(r'<span class="v">(\d+\.\d+\.\d+)</span>', landing)
+    assert teaser and all(f'>{v}<' in changelog for v in teaser), 'changelog teaser version not in the changelog'
+    assert len(re.findall(r'(?<![\d.])\d+\.\d+\.\d+(?![\d.])', flat)) == len(teaser), 'version mentioned outside the changelog teaser'
+    total = 0
+    for name in ART:
+        data = (root / name).read_bytes()
+        check_webp(data)
+        total += len(data)
+    assert total <= ART_BUDGET, f'art is {total} bytes, over the {ART_BUDGET} budget'
     main = re.search(r'<main\b[^>]*>[\s\S]*?</main>', changelog)
     assert main and sha256(main[0].encode()).hexdigest() == CHANGELOG_MAIN, 'changelog content changed; review explicitly before updating its snapshot'
 
@@ -115,7 +154,11 @@ def check_privacy(path, data):
         assert sha256(data).hexdigest() == FONT_HASHES[font], 'unreviewed font or licence'
     if path.endswith('.woff2'):
         assert font in FONT_HASHES, 'unreviewed binary font'
-    text = path + '\n' + ('' if font in FONT_HASHES and font.endswith('.woff2') else data.decode('utf-8'))
+    if path.endswith('.webp'):
+        assert font.startswith('art/'), 'pictures belong in art/'
+        check_webp(data)
+    binary = path.endswith('.webp') or (font in FONT_HASHES and font.endswith('.woff2'))
+    text = path + '\n' + ('' if binary else data.decode('utf-8'))
     # The documented rule definition must name its own markers. No other exemption.
     if path == 'scripts/check.py':
         text = re.sub(r'DENYLIST = \([^)]*\)', '', text)
@@ -134,6 +177,7 @@ def main():
         check_privacy(name, path.read_bytes())
     for name in RUNTIME:
         check_privacy('dist/' + name, (output / name).read_bytes())
+    print('PASS: art is plain WebP with no metadata chunks, within budget')
     print('PASS: exact export, local links/fragments, CSS resources, fonts/licences, copy and privacy')
     print('GAP: automated browser tests (layout, keyboard, accessibility and animation) are not installed')
     print('LIMIT: external URL destinations are constrained; remote availability is not checked')

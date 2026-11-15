@@ -4,7 +4,7 @@ import shutil
 import tempfile
 import unittest
 
-from check import ROOT, Page, check_privacy, check_ref, check_site
+from check import ROOT, Page, check_privacy, check_ref, check_site, check_webp
 
 
 class Checks(unittest.TestCase):
@@ -57,6 +57,24 @@ class Checks(unittest.TestCase):
             check_privacy('fonts/Virgil.woff2', b'wOF2tampered')
         with self.assertRaises(UnicodeDecodeError):
             check_privacy('unknown.bin', b'\xff')
+
+
+    def test_webp_metadata_and_inline_svg(self):
+        def webp(*chunks):
+            body = b'WEBP' + b''.join(k + len(v).to_bytes(4, 'little') + v + b'\0' * (len(v) & 1) for k, v in chunks)
+            return b'RIFF' + len(body).to_bytes(4, 'little') + body
+        check_webp(webp((b'VP8L', b'xyz')))
+        for bad in (webp((b'VP8L', b'xyz'), (b'EXIF', b'name')), webp((b'XMP ', b'x')), b'GIF89a' + b'\0' * 8):
+            with self.subTest(bad=bad[:16]), self.assertRaises(AssertionError):
+                check_webp(bad)
+        with self.assertRaises(AssertionError):
+            check_privacy('elsewhere/x.webp', webp((b'VP8L', b'xyz')))
+        root = ROOT / 'dist'
+        page = root / 'index.html'
+        pages = {page: Page(page.read_text())}
+        check_ref(root, page, "data:image/svg+xml,%3Csvg%3E%3Cpath d='M0 0'/%3E%3C/svg%3E", pages)
+        with self.assertRaises(AssertionError):
+            check_ref(root, page, "data:image/svg+xml,%3Csvg onload='x'%3E%3C/svg%3E", pages)
 
 
 if __name__ == '__main__':
