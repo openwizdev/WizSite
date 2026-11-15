@@ -86,8 +86,8 @@ FONT_HASHES = {
     'fonts/OFL.txt': 'c683bfbcc7e087f5d37a54ef628f10387c451a83ddc459b151403a164ac46c90',
 }
 PAGES = ('index.html', 'changelog/index.html')
-# The ship log (RD5): release notes kept verbatim, regrouped as main line + Also changed, plus Being built.
-CHANGELOG_MAIN = '09331302c5b2ef7f7e4505d670254a8c32b4524438e326d2015448c8cd7c56a9'
+# The ship log: the approved VS9 changelog text (What's new for you, tested line, Under the hood), plus Being built.
+CHANGELOG_MAIN = 'ee3c7a96a3971528b818eb40b12e51de785280c521cd02b731bfc583010ddeb1'
 
 
 class Page(HTMLParser):
@@ -186,7 +186,7 @@ def check_ref(root, source, ref, pages, favicons=()):
     url = urlsplit(ref)
     if url.scheme or url.netloc:
         assert url.scheme == 'https' and url.netloc == 'github.com', 'unexpected external URL'
-        assert re.match(r'^/openwizdev/(?:openwiz|WizSkills|WizPlugins)(?:/|$)', url.path), 'unexpected repository link'
+        assert re.match(r'^/openwizdev/(?:openwiz|OpenWiz|WizSkills|WizPlugins)(?:/|$)', url.path), 'unexpected repository link'
         assert not url.username and not url.password and not url.query, 'unexpected external URL parts'
         return
     assert not url.query, 'unexpected local query'
