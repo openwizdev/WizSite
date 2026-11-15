@@ -9,6 +9,7 @@ const bay = stage.querySelector('.bay');
 const lit = stage.querySelector('.lit');
 const labels = stage.querySelector('.labels');
 const replay = stage.querySelector('.replay');
+const pauser = stage.querySelector('.pause');
 const still = matchMedia('(prefers-reduced-motion: reduce)');
 const phone = matchMedia('(max-width: 960px)');
 const NS = 'http://www.w3.org/2000/svg';
@@ -49,7 +50,7 @@ const oursPill = pill('Dark mode toggle', 'ours');
 const groups = new Map();
 for (const r of lit.querySelectorAll('mask rect')) {
   const g = +r.dataset.g;
-  if (!groups.has(g)) groups.set(g, { rects: [], strip: 'S' in r.dataset, x: 0, y: 0, n: 0 });
+  if (!groups.has(g)) groups.set(g, { rects: [], strip: 's' in r.dataset, x: 0, y: 0, n: 0 });
   const o = groups.get(g), x = +r.getAttribute('x') + r.getAttribute('width') / 2, y = +r.getAttribute('y') + r.getAttribute('height') / 2;
   o.rects.push(r); o.x += x; o.y += y; o.n++;
 }
@@ -65,6 +66,7 @@ const lines = LINES.map((l, i) => {
   return { l, i, path, ang, items, rank: order.findIndex(o => o.i === i) };
 });
 const train = [0, 1, 2].map(() => svgEl('circle', { r: 5 }, gRing));
+const bloom = svgEl('circle', { r: 46, fill: 'url(#bloom)', opacity: 0 }, gBlooms);
 
 function layoutStory() {
   // Named lines nearest the bay (fewer on the phone); everything else lights later, outward.
@@ -109,11 +111,14 @@ function setView(v) {
   cam.style.transform = v.s === 1 && v.p[0] === v.c[0] && v.p[1] === v.c[1] ? '' : `translate(${v.c[0] - v.s * v.p[0]}px,${v.c[1] - v.s * v.p[1]}px) scale(${v.s})`;
 }
 const toScreen = (x, y) => { const s = V ? V.s : 1, tx = V ? V.c[0] - s * V.p[0] : 0, ty = V ? V.c[1] - s * V.p[1] : 0; return [tx + s * (G.ox + x * G.k), ty + s * (G.oy + y * G.k)]; };
+// Label sizes are read once per layout (sizeLabels), so frames only write.
+function sizeLabels() { for (const p of labels.children) { p._w = p.offsetWidth; p._h = p.offsetHeight; } }
 function place(p, x, y, o, sc = 1) {
-  if (o <= .01) { p.style.opacity = 0; return; }
-  const [sx, sy] = toScreen(x, y), hw = p.offsetWidth * sc / 2 + 6;
+  if (o <= .01) { if (p._o !== 0) { p.style.opacity = 0; p._o = 0; } return; }
+  const [sx, sy] = toScreen(x, y), hw = p._w * sc / 2 + 6;
+  p._o = o;
   p.style.opacity = o.toFixed(3);
-  p.style.transform = `translate(${Math.max(hw, Math.min(G.W - hw, sx)) - p.offsetWidth / 2}px,${sy - p.offsetHeight - 10}px) scale(${sc})`;
+  p.style.transform = `translate(${Math.max(hw, Math.min(G.W - hw, sx)) - p._w / 2}px,${sy - p._h - 10}px) scale(${sc})`;
 }
 const at = (l, u) => [l[0] + (l[2] - l[0]) * u, l[1] + (l[3] - l[1]) * u];
 
@@ -136,11 +141,10 @@ function frame(t, now) {
       if (flip) for (const r of flip.o.rects) r.removeAttribute('fill-opacity');
       const pool = [...groups.values()].filter(o => !o.strip && o.t > 0);
       flip = { o: pool[Math.floor(Math.random() * pool.length)], at: now };
-      if (!flip.bloom) flip.bloom = svgEl('circle', { r: 46, fill: 'url(#bloom)', opacity: 0 }, gBlooms);
     }
     const a = now - flip.at, k = a < .5 ? 0 : seg(a, .5, 1.1);
     for (const r of flip.o.rects) r.setAttribute('fill-opacity', k.toFixed(3));
-    const bl = gBlooms.lastChild;
+    const bl = bloom;
     bl.setAttribute('cx', flip.o.x); bl.setAttribute('cy', flip.o.y);
     bl.setAttribute('opacity', (k * Math.max(0, 1 - (a - 1.1) / .9)).toFixed(3));
   }
@@ -173,51 +177,80 @@ function frame(t, now) {
 }
 
 // ---- Playback ----
-let raf = 0, t0 = 0, playing = false, visible = true, timer;
+// The intro plays once per load (and on Replay); pausing shifts its start, so CSS and JS stay in step.
+// Layout and preference changes only re-render the current state.
+let raf = 0, playing = false, done = false, paused = false, visible = true, t0 = 0, pausedAt = 0;
+const wall = () => performance.now() / 1000;
 function loop() {
   raf = 0;
   if (!G) return;
-  if (still.matches) { if (playing) play(); return; } // settles to the still frame
-  if (!visible || document.hidden) return;
-  const now = performance.now() / 1000, it = playing ? now - t0 : null;
-  if (playing && it < TS) {
-    if (!V || V !== G.bay) setView(G.bay);
-    place(oursPill, BX, BY - 50, it > 6.9 ? seg(it, 6.9, 7.2) : 0);
-  } else frame(playing && it < INTRO ? (it - TS) / PACE : null, now);
+  if (still.matches) { if (playing) stop(); return; } // settles to the still frame
+  if (paused || !visible || document.hidden) return;
+  const now = wall();
+  if (playing) {
+    const it = now - t0;
+    if (it >= INTRO) { finish(); }
+    else if (it < TS) {
+      if (V !== G.bay) setView(G.bay);
+      place(oursPill, BX, BY - 50, it > 6.9 ? seg(it, 6.9, 7.2) : 0);
+    } else frame((it - TS) / PACE, now);
+  }
+  if (!playing) frame(null, now);
   raf = requestAnimationFrame(loop);
 }
 const kick = () => { if (!raf) raf = requestAnimationFrame(loop); };
-function settle() {
+function toRest() {
   playing = false;
   stage.removeAttribute('data-play');
   bay.style.opacity = '';
   setView(G.rest);
   for (const o of groups.values()) for (const r of o.rects) r.removeAttribute('fill-opacity');
-  labels.querySelectorAll('.pill.near').forEach(p => { p.style.opacity = 0; });
+  labels.querySelectorAll('.pill.near').forEach(p => { p.style.opacity = 0; p._o = 0; });
 }
+function finish() { toRest(); done = true; replay.hidden = false; }
+function stop() { toRest(); done = true; replay.hidden = true; frame(null, 4); } // reduced motion: the still frame
 function play() {
-  clearTimeout(timer);
   replay.hidden = true;
   stage.removeAttribute('data-play');
-  measure();
-  if (still.matches) { settle(); frame(null, 4); return; }
+  measure(); sizeLabels();
+  if (still.matches) { stop(); return; }
+  setPaused(false);
   void stage.offsetWidth; // restart every CSS animation from the first frame
   stage.setAttribute('data-play', '');
-  playing = true; t0 = performance.now() / 1000;
+  playing = true; done = false; t0 = wall();
   setView(G.bay);
   for (const o of groups.values()) for (const r of o.rects) r.setAttribute('fill-opacity', o.t < 0 ? 1 : 0);
   for (const L of lines) { L.path.style.strokeDasharray = '0 1'; for (const it of L.items) it.el.style.opacity = 0; }
   train.forEach(c => { c.style.opacity = 0; });
-  labels.querySelectorAll('.pill').forEach(p => { p.style.opacity = 0; });
-  if (flip) { for (const r of flip.o.rects) r.removeAttribute('fill-opacity'); gBlooms.lastChild?.setAttribute('opacity', 0); flip = null; }
+  labels.querySelectorAll('.pill').forEach(p => { p.style.opacity = 0; p._o = 0; });
+  if (flip) { for (const r of flip.o.rects) r.removeAttribute('fill-opacity'); bloom.setAttribute('opacity', 0); flip = null; }
   kick();
-  timer = setTimeout(() => { settle(); replay.hidden = false; kick(); }, INTRO * 1000);
 }
+// Pause motion: one control for the hero's intro and rest motion and the factory loop (CSS and JS).
+function setPaused(on) {
+  if (on === paused) return;
+  const now = wall();
+  if (on) pausedAt = now; else t0 += now - pausedAt;
+  paused = on;
+  document.documentElement.classList.toggle('motion-paused', on);
+  pauser.setAttribute('aria-pressed', String(on));
+  kick();
+}
+pauser.addEventListener('click', () => setPaused(!paused));
 replay.addEventListener('click', play);
-still.addEventListener('change', play);
-phone.addEventListener('change', () => { layoutStory(); play(); });
+// Preference and layout changes never replay the intro: they re-render where it is.
+still.addEventListener('change', () => { if (still.matches) stop(); else kick(); });
+const relayout = () => {
+  const wasPlaying = playing;
+  if (wasPlaying) toRest();
+  layoutStory(); measure(); sizeLabels();
+  setView(G.rest);
+  if (wasPlaying) finish();
+  if (still.matches) frame(null, 4); else kick();
+};
+phone.addEventListener('change', relayout);
 let rz;
-addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { const v = V; measure(); if (!playing) setView(G.rest); else if (v) kick(); }, 150); });
+addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { measure(); sizeLabels(); if (!playing) setView(G.rest); kick(); }, 150); });
 
 // Start once the text fonts and the first-frame art are in (or after 3 s at most), and only
 // while the tab is visible, so the intro is not spent in a background tab.
@@ -231,7 +264,7 @@ const shown = () => new Promise(resolve => {
 });
 layoutStory();
 Promise.race([loaded, new Promise(resolve => setTimeout(resolve, 3000))]).then(shown).then(() => {
-  play();
+  if (still.matches) { measure(); sizeLabels(); stop(); } else play();
   document.querySelector('main').dataset.ready = 'true';
 });
 document.addEventListener('visibilitychange', kick);

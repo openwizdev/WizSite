@@ -1,5 +1,6 @@
 """Dependency-free checks for this site's literal HTML/CSS and public source."""
 from hashlib import sha256
+from html import unescape
 from html.parser import HTMLParser
 from pathlib import Path
 import re
@@ -49,7 +50,7 @@ FONT_HASHES = {
 }
 PAGES = ('index.html', 'changelog/index.html')
 # The ship log (RD5): release notes kept verbatim, regrouped as main line + Also changed, plus Being built.
-CHANGELOG_MAIN = '94bfb6e548d0f02b937455ac7f27df7aa07b6c98832d895c4264085355084fb9'
+CHANGELOG_MAIN = 'eeb7b4e3bf54baed31fd13a49e30aa31e568404a98d52e45f388fe5bc55f2107'
 
 
 class Page(HTMLParser):
@@ -147,7 +148,13 @@ def check_site(root):
     headline = re.sub(r'<[^>]*>', '', re.search(r'<h1>([\s\S]*?)</h1>', landing)[1].replace('<br>', ' '))
     assert headline == 'Build at the speed of ideas.', 'hero headline changed'
     flat = re.sub(r'\s+', ' ', re.sub(r'<br>', ' ', landing))
-    flat = re.sub(r'\s+', ' ', re.sub(r'<[^>]*>', '', flat))
+    flat = re.sub(r'\s+', ' ', unescape(re.sub(r'<[^>]*>', '', flat)))
+    # Rendered text and attribute values (alt, title, meta), with entities decoded, on both pages.
+    for path in pages:
+        rendered = unescape(path.read_text()).lower()
+        assert not any(word in rendered for word in BANNED_COPY), f'banned word rendered in {path.name}'
+        for text in ('Illustration, not live data', 'Building in public'):
+            assert text.lower() not in re.sub(r'\s+', ' ', re.sub(r'<[^>]*>', ' ', rendered)), f'cut copy is back: {text}'
     assert 'You make the decisions. The agents run the factory.' in flat, 'hero subline changed'
     for text in ('Star on GitHub', 'Not ready for everyone yet.', 'Idea in. Shipped work out.', 'How it works',
                  'OpenWiz runs your factory.', 'WizSkills are the skills your agents follow.',
@@ -174,7 +181,9 @@ def check_site(root):
     changelog = (root / 'changelog/index.html').read_text()
     # The teaser shows only versions the changelog publishes.
     teaser = re.findall(r'<span class="v">(\d+\.\d+\.\d+)</span><span>([^<]+)</span>', landing)
-    assert teaser and all(f'>{v}<' in changelog and f'<h3>{h}</h3>' in changelog for v, h in teaser), 'ship log teaser line not in the ship log'
+    # Each teaser line must match its own release in the ship log (version and headline together).
+    releases = dict(re.findall(r'<article class="rel" id="v[\d.]+"><p class="when"><span class="v">([\d.]+)</span>[\s\S]*?<h3>([\s\S]*?)</h3>', changelog))
+    assert teaser and all(releases.get(v) == h for v, h in teaser), 'ship log teaser line does not match its release'
     teaser = [v for v, _ in teaser]
     # "Being built" names bundles, never versions.
     being = re.search(r'<ul class="bundle-list">([\s\S]*?)</ul>', changelog)

@@ -101,6 +101,21 @@ class Checks(unittest.TestCase):
         with self.assertRaises(AssertionError):
             check_privacy('README.md', f'skills are {word}s'.encode())
 
+    def test_encoded_copy_and_teaser_pairs(self):
+        for old, new in (('<h2 id="ship-h">Ship log</h2>', '<h2 id="ship-h">Ship log</h2><p>play&#98;ook</p>'),
+                         ('<h2 id="ship-h">Ship log</h2>', '<h2 id="ship-h">Ship log</h2><p>Building in p&#117;blic</p>'),
+                         ('alt="" width="400"', 'alt="Pl&#97;ybook" width="400"'),
+                         ('<span class="v">0.0.5</span><span>Fleets of agents build for you</span>', '<span class="v">0.0.5</span><span>Message your threads</span>')):
+            with self.subTest(new=new), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp) / 'dist'
+                shutil.copytree(ROOT / 'dist', root)
+                landing = root / 'index.html'
+                text = landing.read_text()
+                self.assertIn(old, text)
+                landing.write_text(text.replace(old, new, 1))
+                with self.assertRaises(AssertionError):
+                    check_site(root)
+
     def test_install_stays_disabled(self):
         good = '<button class="btn install" type="button" disabled aria-describedby="install-note">'
         for bad in ('<button class="btn install" type="button" aria-disabled="true">',
