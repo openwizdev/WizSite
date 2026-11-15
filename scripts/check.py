@@ -101,9 +101,12 @@ class Page(HTMLParser):
                 self.refs.append(attrs[key])
         if tag == 'button':
             self.buttons.append(attrs)
-        if tag == 'link' and attrs.get('rel') == 'stylesheet' and attrs.get('href'):
+        # Only references the browser applies: an enabled stylesheet for all media, a script of a runnable type.
+        if (tag == 'link' and attrs.get('rel') == 'stylesheet' and attrs.get('href') and 'disabled' not in attrs
+                and attrs.get('media', 'all') in ('all', 'screen')):
             self.stylesheets.append(attrs['href'])
-        if tag == 'script' and attrs.get('src'):
+        if (tag == 'script' and attrs.get('src') and attrs.get('type', 'text/javascript') in ('text/javascript', 'module')
+                and 'nomodule' not in attrs):
             self.scripts.append(attrs['src'])
         if tag == 'link' and attrs.get('rel') == 'icon':
             self.favicons.add(attrs.get('href'))

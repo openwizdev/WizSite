@@ -154,7 +154,11 @@ class Checks(unittest.TestCase):
     def test_stylesheet_must_apply(self):
         css = FINGERPRINTS['site.css']
         for old, new in ((f'<link rel="stylesheet" href="/{css}">', f'<link rel="preload" as="style" href="/{css}">'),
-                         (f'<link rel="stylesheet" href="/{css}">', f'<a href="/{css}">styles</a>')):
+                         (f'<link rel="stylesheet" href="/{css}">', f'<a href="/{css}">styles</a>'),
+                         (f'<link rel="stylesheet" href="/{css}">', f'<link rel="stylesheet" href="/{css}" disabled>'),
+                         (f'<link rel="stylesheet" href="/{css}">', f'<link rel="stylesheet" href="/{css}" media="print">'),
+                         (f'<script src="/{FINGERPRINTS["site.js"]}" defer>', f'<script type="text/plain" src="/{FINGERPRINTS["site.js"]}" defer>'),
+                         (f'<script src="/{FINGERPRINTS["site.js"]}" defer>', f'<script nomodule src="/{FINGERPRINTS["site.js"]}" defer>')):
             with self.subTest(new=new), tempfile.TemporaryDirectory() as temp:
                 root = Path(temp) / 'dist'
                 shutil.copytree(ROOT / 'dist', root)
