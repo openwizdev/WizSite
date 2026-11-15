@@ -87,7 +87,7 @@ FONT_HASHES = {
 }
 PAGES = ('index.html', 'changelog/index.html')
 # The ship log: the approved VS9 changelog text (What's new for you, tested line, Under the hood), plus Being built.
-CHANGELOG_MAIN = 'ee3c7a96a3971528b818eb40b12e51de785280c521cd02b731bfc583010ddeb1'
+CHANGELOG_MAIN = '17830d3f9a837a3ec24f2382829093cc941e0d1f5fd873e45e4d3a44c6e897c2'
 
 
 class Page(HTMLParser):
