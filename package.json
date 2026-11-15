@@ -1,0 +1,10 @@
+{
+  "name": "wizsite",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "check": "node --check script.js && python3 -B scripts/check.py",
+    "test": "python3 -B -m unittest discover -s scripts -p 'test_*.py'"
+  }
+}
