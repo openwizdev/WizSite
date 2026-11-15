@@ -87,7 +87,7 @@ FONT_HASHES = {
 }
 PAGES = ('index.html', 'changelog/index.html')
 # The ship log (RD5): release notes kept verbatim, regrouped as main line + Also changed, plus Being built.
-CHANGELOG_MAIN = 'eeb7b4e3bf54baed31fd13a49e30aa31e568404a98d52e45f388fe5bc55f2107'
+CHANGELOG_MAIN = '09331302c5b2ef7f7e4505d670254a8c32b4524438e326d2015448c8cd7c56a9'
 
 
 class Page(HTMLParser):
