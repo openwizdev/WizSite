@@ -7,8 +7,30 @@ import subprocess
 from urllib.parse import unquote, urlsplit
 
 ROOT = Path(__file__).resolve().parents[1]
-# Layered art: generated WebP pictures, reviewed and listed by the build from art/.
-ART = {p.relative_to(ROOT).as_posix() for p in (ROOT / 'art').glob('*.webp')}
+# Layered art: generated WebP pictures, pinned by hash like the fonts. A changed or new picture
+# needs review (including its raw bytes for private markers) before its hash is updated here.
+ART_HASHES = {
+    'art/app.webp': 'ef856bb38e5b28e5128b991c0856b1b70ab387237a05b5673e473a76e888372f',
+    'art/bay.webp': 'b27f9226e583591961b57409dcb8502139405e2aade4a2208bc705840a2ec075',
+    'art/builder-carry.webp': '40ca2b80232d32fdbc5bc2167e3c0be94cdf9043e12b4d7fc9d3e9ea40be114e',
+    'art/builder-hammer-down.webp': 'e96666e101dc52d9baa9b0e5191db74d2f88f8e63ced688c6420cb5866c71640',
+    'art/builder-hammer-up.webp': '6418007e902d7715fcd6058d6dfce69953e1411adfbf9cbe7d446d195cb3cfd9',
+    'art/builder-stand.webp': '8cb63b839e929b1e140ccbff6b540490e105be46b2e1952d9529ed8d2534772c',
+    'art/citadel-lights.webp': '0536adc3168d80c859df1d68ee50fd79d3f3e04df34abf95a6e6d15fd44ced33',
+    'art/citadel.webp': '7af0ca0ed7f84b5da51d42512fc53cb997ff505540bd8f1dc52dc28e36b41eb5',
+    'art/decider.webp': 'c5fe96e1ac1fe73ba6533840a499eda28c49d102993f18b3d8fd0a3a73b2560e',
+    'art/hall.webp': '81d0c27f1978ed88dd2901d8f03697cf7efb424d891ee38924b8676c6b85c495',
+    'art/idea-card.webp': '695e9aefb47bdb69e320f59021d07c7bd1a290737f3fdafa66a088cb1001ca45',
+    'art/item-1.webp': 'bb5c98a3f1bd87c5e5fbd8d0ea660b1b1a074d48e675fa88507c068cc5ea7f0c',
+    'art/item-2.webp': '6adb85a0a5dcf50a47e2746e1cda49b07e5ea5261070147896c9eda5c47b8563',
+    'art/item-3.webp': '3ee213fa10249c9f913690ee0532b0590cdde467c1b4d1d8c2adb28677cce41f',
+    'art/moon.webp': '28d7a2d9b469025c138d4aec6d88a032969d928697013e1afa0e95fc68889c60',
+    'art/reviewer-look.webp': '8ab45fd69d663c530ddc075db2b3a7e027535b85896702dc953e1de4d26b0a6a',
+    'art/reviewer-stamp-down.webp': '5ae4a95e243ab6bc6585ccf9d17772b268aea19786375ac180747ff159dec94c',
+    'art/reviewer-stamp-up.webp': 'e554ceb93b9f166a4894b02b292af40e8ff3da758f0089d43517e166eab24065',
+    'art/seal.webp': '55ec8648490c5d72a592d7aa1271e80b9f954142cffb32f6e9b8fa0e03b60814',
+}
+ART = set(ART_HASHES)
 ART_BUDGET = 2_000_000  # bytes, all art together
 RUNTIME = {
     'index.html', 'changelog/index.html', 'style.css', 'tokens.css', 'script.js',
@@ -64,9 +86,9 @@ def check_webp(data):
 
 def check_ref(root, source, ref, pages, favicons=()):
     if ref.startswith('data:image/svg+xml,') and not favicons:
-        # Inert inline CSS icons only: no script, links or nested resources.
-        svg = unquote(ref.split(',', 1)[1]).lower()
-        assert not re.search(r'script|href|url\(|foreignobject|on\w+=', svg), 'unexpected inline SVG'
+        # Inert inline CSS icons only: one stroked path, no other elements or attributes.
+        svg = unquote(ref.split(',', 1)[1])
+        assert re.fullmatch(r"<svg xmlns='http://www.w3.org/2000/svg' viewBox='[0-9 ]+'><path d='[A-Za-z0-9 .-]+' fill='none' stroke='#[0-9a-f]{6}' stroke-width='[0-9.]+'/></svg>", svg), 'unexpected inline SVG'
         return
     if ref in favicons:
         # Only the existing inert inline SVG favicon, with no script or links.
@@ -99,10 +121,10 @@ def check_site(root):
     for path, page in pages.items():
         for ref in page.refs:
             check_ref(root, path, ref, pages, page.favicons)
-        for ref in re.findall(r'url\(\s*[\'\"]?([^\s)\'\"]+)', path.read_text()):
+        for _, ref in re.findall(r'url\(\s*([\'\"]?)(.*?)\1\s*\)', path.read_text()):
             check_ref(root, path, ref, pages)
     for path in root.glob('*.css'):
-        for ref in re.findall(r'url\(\s*[\'\"]?([^\s)\'\"]+)', path.read_text()):
+        for _, ref in re.findall(r'url\(\s*([\'\"]?)(.*?)\1\s*\)', path.read_text()):
             check_ref(root, path, ref, pages)
     # JavaScript-created resource: document.fonts.load() uses this CSS face.
     assert 'fonts/Virgil.woff2' in (root / 'style.css').read_text()
@@ -120,7 +142,7 @@ def check_site(root):
     flat = re.sub(r'\s+', ' ', re.sub(r'<br>', ' ', landing))
     flat = re.sub(r'\s+', ' ', re.sub(r'<[^>]*>', '', flat))
     assert 'You make the decisions. The agents run the factory.' in flat, 'hero subline changed'
-    for text in ('Building in public', 'Star on GitHub', 'OpenWiz has no published release yet.',
+    for text in ('Building in public', 'Star on GitHub', 'Not ready for everyone yet.',
                  'Illustration, not live data.', 'Idea in. Shipped work out.'):
         assert text in flat, f'missing landing copy: {text}'
     # Install stays "coming soon" until a stranger can install (AN8); only these mentions are allowed.
@@ -129,7 +151,11 @@ def check_site(root):
     for allowed in ('Install · coming soon', 'Install copies this prompt', 'Install OpenWiz from github.com/openwizdev/openwiz'):
         rest = rest.replace(allowed, '')
     assert not re.search(r'install|paid plans|works today', rest, re.I), 'unsettled landing claim or live install CTA'
-    assert re.search(r'<button class="btn install"[^>]*aria-disabled="true"', landing), 'Install must stay disabled'
+    install = re.search(r'<button class="btn install"([^>]*)>', landing)
+    assert install and re.search(r'\sdisabled(?=[\s>]|$)', install[1]), 'Install must stay natively disabled'
+    assert not re.search(r'\son\w+\s*=', install[1]), 'Install must have no activation handler'
+    scripts = (root / 'landing.js').read_text()
+    assert not re.search(r'install|clipboard', scripts, re.I), 'no script may activate Install or copy the prompt yet'
     assert not re.search(r'\b\d{4}-\d{2}-\d{2}\b', words), 'dated landing promise'
     changelog = (root / 'changelog/index.html').read_text()
     # The teaser shows only versions the changelog publishes.
@@ -139,6 +165,7 @@ def check_site(root):
     total = 0
     for name in ART:
         data = (root / name).read_bytes()
+        assert sha256(data).hexdigest() == ART_HASHES[name], f'unreviewed picture {name}; review before updating its hash'
         check_webp(data)
         total += len(data)
     assert total <= ART_BUDGET, f'art is {total} bytes, over the {ART_BUDGET} budget'
@@ -155,8 +182,10 @@ def check_privacy(path, data):
     if path.endswith('.woff2'):
         assert font in FONT_HASHES, 'unreviewed binary font'
     if path.endswith('.webp'):
-        assert font.startswith('art/'), 'pictures belong in art/'
+        assert font in ART_HASHES and sha256(data).hexdigest() == ART_HASHES[font], 'unreviewed picture'
         check_webp(data)
+        # Pictures are binary, but scan their raw bytes for the same markers (e.g. in metadata).
+        assert not any(marker.encode() in data.lower() for marker in DENYLIST), f'private marker in {path}'
     binary = path.endswith('.webp') or (font in FONT_HASHES and font.endswith('.woff2'))
     text = path + '\n' + ('' if binary else data.decode('utf-8'))
     # The documented rule definition must name its own markers. No other exemption.

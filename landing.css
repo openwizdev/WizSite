@@ -37,6 +37,7 @@ h1{font:700 78px/.98 var(--ow-font-sans);letter-spacing:-.045em}
 .star{background:var(--brass);color:var(--on-brass);box-shadow:0 0 0 1px rgb(255 214 140 / 30%) inset,0 8px 28px -12px rgb(232 168 73 / 60%)}
 .star svg{fill:currentColor}
 .star:hover{background:var(--brass-hi)}
+.install:disabled{opacity:1}
 .install{border:0;background:rgb(242 242 240 / 6%);color:var(--grey2);box-shadow:inset 0 0 0 1px var(--edge);cursor:not-allowed}
 .install svg{fill:none;stroke:currentColor;stroke-width:1.4}
 .install-note{margin-top:18px;font-size:15px;line-height:1.5;color:var(--grey)}
@@ -113,7 +114,7 @@ h1{font:700 78px/.98 var(--ow-font-sans);letter-spacing:-.045em}
 .wait::before{border:1.5px dashed #5b6477}
 .build::before{border:2px solid var(--navy2);border-top-color:var(--brass)}
 .rev{color:var(--grey2)}.rev::before{border:2px solid var(--grey2);background:radial-gradient(circle,var(--grey2) 30%,transparent 34%)}
-.done{opacity:1;color:#f6dcae}.done::before{background:var(--brass) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='m2.5 5.2 1.7 1.7 3.4-3.8' fill='none' stroke='%2316110a' stroke-width='1.5'/%3E%3C/svg%3E") center/100%}
+.done{opacity:1;color:#f6dcae}.done::before{background:var(--brass) url(data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20viewBox=%270%200%2010%2010%27%3E%3Cpath%20d=%27m2.5%205.2%201.7%201.7%203.4-3.8%27%20fill=%27none%27%20stroke=%27%2316110a%27%20stroke-width=%271.5%27/%3E%3C/svg%3E) center/100%}
 .foot{position:relative;display:flex;align-items:center;justify-content:space-between;margin-top:6px;padding-top:12px;border-top:1px solid var(--line);font-size:14px;color:var(--grey)}
 .count{display:grid}.k{grid-area:1/1;opacity:0}.k5{opacity:1}
 .approve,.approved{grid-area:1/1;display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 14px;border-radius:999px;font:600 14px/1 var(--ow-font-sans)}
@@ -123,6 +124,7 @@ h1{font:700 78px/.98 var(--ow-font-sans);letter-spacing:-.045em}
 .approved svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.8}
 .tap{position:absolute;right:38px;bottom:2px;width:22px;height:22px;border-radius:50%;border:2px solid var(--brass-hi);opacity:0;pointer-events:none}
 .replay{margin-left:auto;display:inline-flex;align-items:center;gap:6px;min-height:36px;padding:0 12px;border:0;border-radius:999px;background:rgb(10 13 20 / 80%);box-shadow:inset 0 0 0 1px var(--edge);color:var(--grey2);font:500 14px/1 var(--ow-font-sans);cursor:pointer}
+.replay[hidden],html:not(.js) .replay{display:none}
 .replay:hover{color:var(--ink);box-shadow:inset 0 0 0 1px var(--brass)}
 .replay svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round}
 .stage figcaption{position:absolute;left:-12px;top:722px;width:430px;display:flex;align-items:center;gap:10px;font-size:14px;color:var(--grey)}
@@ -249,25 +251,25 @@ h2{font:700 52px/1.05 var(--ow-font-sans);letter-spacing:-.035em}
 @keyframes goods{0%{left:9%;opacity:0}4%{opacity:1}30%,44%{left:32%}70%,80%{left:75%}96%{left:85%;opacity:1}100%{left:88%;opacity:0}}
 @keyframes ship{0%,60%{opacity:0;transform:translateY(10%) scale(.7)}75%{opacity:1;transform:none}95%{opacity:1}100%{opacity:0;transform:translate(10%,-6%)}}
 @media (prefers-reduced-motion:no-preference){
-  .tw{animation:twinkle 3.2s ease-in-out infinite}
-  .lights{animation:flicker 5s ease-in-out infinite}
-  .lines .dot{animation:travel var(--t,9s) linear infinite;animation-delay:var(--dl,0s)}
+  .js .tw{animation:twinkle 3.2s ease-in-out infinite}
+  .js .lights{animation:flicker 5s ease-in-out infinite}
+  .js .lines .dot{animation:travel var(--t,9s) linear infinite;animation-delay:var(--dl,0s)}
   .js .stage[data-play] .lines .dot{animation:off 9.4s,travel var(--t,9s) linear var(--dl,0s) infinite}
-  .floor .belt{animation:beltmove 3s linear infinite}
-  .floor .g{animation:goods 6s linear infinite}
-  .floor .g2{animation-delay:-3s}
-  .floor .g1 .i1,.floor .g2 .i1{animation:gi1 6s steps(1) infinite}
-  .floor .g1 .i2,.floor .g2 .i2{animation:gi2 6s steps(1) infinite}
-  .floor .g1 .i3,.floor .g2 .i3{animation:gi3 6s steps(1) infinite}
-  .floor .g2 img{animation-delay:-3s !important}
-  .floor .who .f0{animation:ff .8s infinite}
-  .floor .who .f1{animation:fs .8s infinite}
-  .floor .w2 img,.floor .w4 img{animation-duration:.6s}
-  .floor .w6 img{animation-duration:3s}
-  .floor .w5{animation:bob 2.4s ease-in-out infinite}
-  .floor .card{animation:cardin 3s ease-out infinite}
-  .floor .out{animation:ship 3s ease-out infinite}
-  .offscreen *,.offscreen{animation-play-state:paused !important}
+  .js .floor .belt{animation:beltmove 3s linear infinite}
+  .js .floor .g{animation:goods 6s linear infinite}
+  .js .floor .g2{animation-delay:-3s}
+  .js .floor .g1 .i1,.js .floor .g2 .i1{animation:gi1 6s steps(1) infinite}
+  .js .floor .g1 .i2,.js .floor .g2 .i2{animation:gi2 6s steps(1) infinite}
+  .js .floor .g1 .i3,.js .floor .g2 .i3{animation:gi3 6s steps(1) infinite}
+  .js .floor .g2 img{animation-delay:-3s !important}
+  .js .floor .who .f0{animation:ff .8s infinite}
+  .js .floor .who .f1{animation:fs .8s infinite}
+  .js .floor .w2 img,.js .floor .w4 img{animation-duration:.6s}
+  .js .floor .w6 img{animation-duration:3s}
+  .js .floor .w5{animation:bob 2.4s ease-in-out infinite}
+  .js .floor .card{animation:cardin 3s ease-out infinite}
+  .js .floor .out{animation:ship 3s ease-out infinite}
+  .floor.offscreen *,.stage:not([data-play]) .view.offscreen *{animation-play-state:paused !important}
 }
 @keyframes gi1{0%{opacity:1}30%{opacity:0}}
 @keyframes gi2{0%{opacity:0}30%{opacity:1}60%{opacity:0}}
