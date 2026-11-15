@@ -176,6 +176,9 @@ def check_site(root):
     assert headline == 'Build at the speed of ideas.', 'hero headline changed'
     flat = re.sub(r'\s+', ' ', re.sub(r'<br>', ' ', landing))
     flat = re.sub(r'\s+', ' ', unescape(re.sub(r'<[^>]*>', '', flat)))
+    sub = re.search(r'<p class="sub">([\s\S]*?)</p>', landing)
+    assert sub and re.sub(r'\s+', ' ', unescape(re.sub(r'<[^>]*>', ' ', sub[1]))).strip() == 'You make the decisions. The agents run the factory.', 'hero subline changed'
+    assert 'You make the decisions. The agents run the factory.' in flat, 'hero subline changed'
     # Rendered text and attribute values (alt, title, meta), decoded, on both pages. Text is read both
     # joined (inline tags can split a word) and spaced; every attribute value is read on its own.
     for path in pages:

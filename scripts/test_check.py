@@ -108,6 +108,9 @@ class Checks(unittest.TestCase):
                          ('<h2 id="ship-h">Ship log</h2>', '<h2 id="ship-h">Ship log</h2><p>play<b>bo</b>ok</p>'),
                          ('alt="" width="400"', 'alt="Illustration, not l&#105;ve data" width="400"'),
                          ('<h2 id="ship-h">Ship log</h2>', '<h2 id="ship-h">Ship log</h2><p>Building <em>in</em> public</p>'),
+                         ('<p class="sub">You make the decisions.<br>The agents run the factory.</p>', '<p class="sub">You decide.<br>Agents build.</p>'),
+                         ('<p class="sub">You make the decisions.<br>The agents run the factory.</p>', ''),
+                         ('<h1>Build at the<br>speed of<br>ideas.</h1>', '<h1>Build at the<br>speed of<br>thought.</h1>'),
                          ('<span class="v">0.0.5</span><span>Fleets of agents build for you</span>', '<span class="v">0.0.5</span><span>Message your threads</span>')):
             with self.subTest(new=new), tempfile.TemporaryDirectory() as temp:
                 root = Path(temp) / 'dist'
