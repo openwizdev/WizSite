@@ -34,7 +34,7 @@ ART_HASHES = {
 ART = set(ART_HASHES)
 ART_BUDGET = 2_000_000  # bytes, all art together
 RUNTIME = {
-    'index.html', 'changelog/index.html', 'tokens.css', 'landing.css', 'landing.js',
+    'index.html', 'changelog/index.html', 'tokens.css', 'site.css', 'site.js', '_headers',
     'fonts/Geist-var.woff2', 'fonts/GeistMono-var.woff2', 'fonts/OFL.txt',
 } | ART
 # Owner copy rule (round 8): this word never appears anywhere on the site or in its source.
@@ -170,6 +170,10 @@ def check_site(root):
             assert data[:4] == b'wOF2', 'invalid WOFF2 signature'
         else:
             assert b'SIL OPEN FONT LICENSE' in data, 'missing OFL licence'
+    # Styles and scripts must revalidate like the HTML (Cloudflare Pages caches them 4 h by default).
+    headers = (root / '_headers').read_text()
+    for kind in ('css', 'js'):
+        assert re.search(rf'^/\*\.{kind}\n  Cache-Control: public, max-age=0, must-revalidate$', headers, re.M), f'_headers must revalidate .{kind}'
     landing = (root / 'index.html').read_text()
     words = re.sub(r'<[^>]*>', '', landing)
     headline = re.sub(r'<[^>]*>', '', re.search(r'<h1>([\s\S]*?)</h1>', landing)[1].replace('<br>', ' '))
@@ -208,7 +212,7 @@ def check_site(root):
     assert len(installs) == 1, 'exactly one Install button'
     assert 'disabled' in installs[0], 'Install must stay natively disabled'
     assert not any(k.startswith('on') or k in ('form', 'formaction') for k in installs[0]), 'Install must have no activation handler'
-    scripts = (root / 'landing.js').read_text()
+    scripts = (root / 'site.js').read_text()
     assert not re.search(r'install|clipboard', scripts, re.I), 'no script may activate Install or copy the prompt yet'
     assert not re.search(r'\b\d{4}-\d{2}-\d{2}\b', words), 'dated landing promise'
     changelog = (root / 'changelog/index.html').read_text()

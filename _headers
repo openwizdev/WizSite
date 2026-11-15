@@ -1,0 +1,6 @@
+# Cloudflare Pages: HTML already revalidates on every visit. Make styles and scripts do the same, so a
+# returning visitor never pairs new HTML with an old cached stylesheet or script (ETags keep it cheap).
+/*.css
+  Cache-Control: public, max-age=0, must-revalidate
+/*.js
+  Cache-Control: public, max-age=0, must-revalidate
