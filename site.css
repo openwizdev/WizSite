@@ -8,7 +8,7 @@ html{scroll-behavior:smooth}
 body{margin:0;background:var(--ground);color:var(--ink);font:400 17px/1.55 var(--ow-font-sans);-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;overflow-x:clip}
 h1,h2,p,ol{margin:0}
 a{color:inherit;text-decoration:none}
-:is(a,button):focus-visible{outline:2px solid var(--brass);outline-offset:3px;border-radius:8px}
+:is(a,button,summary):focus-visible{outline:2px solid var(--brass);outline-offset:3px;border-radius:8px}
 .wrap{width:min(100% - 2 * var(--m),1240px);margin-inline:auto}
 .skip{position:fixed;top:-100px;left:16px;z-index:30;padding:8px 12px;border-radius:8px;background:var(--ink);color:var(--ground);font-weight:600}
 .skip:focus{top:12px}
@@ -374,7 +374,7 @@ h1{white-space:nowrap}
 .shiplog h2{margin-top:56px;font-size:30px}
 /* Being built: one compact strip after Shipped, named bundles only. */
 .being{margin-top:16px}
-.bundle-list{list-style:none;margin:18px 0 0;padding:0;display:grid;grid-template-columns:repeat(4,1fr);border-radius:14px;background:var(--panel);box-shadow:inset 0 0 0 1px var(--edge);overflow:hidden}
+.bundle-list{list-style:none;margin:18px 0 0;padding:0;display:grid;grid-auto-flow:column;grid-auto-columns:1fr;border-radius:14px;background:var(--panel);box-shadow:inset 0 0 0 1px var(--edge);overflow:hidden}
 .bundle-list li{display:flex;flex-direction:column;gap:4px;padding:16px 18px 18px;font-size:15px;line-height:1.45;color:var(--grey2)}
 .bundle-list li+li{border-left:1px solid var(--line)}
 .bundle-list b{display:flex;align-items:center;gap:8px;font-size:16px;color:var(--ink)}
@@ -384,10 +384,20 @@ h1{white-space:nowrap}
 .when{display:flex;flex-direction:column;gap:4px;color:var(--grey)}
 .when .v{font-size:22px;font-weight:600;color:var(--ink)}
 .rel h3{font:650 24px/1.25 var(--ow-font-sans);letter-spacing:-.02em}
-.main-line{margin-top:8px;font-size:18px;color:var(--ink)}
-.also-h{margin-top:16px;font:600 13px/1 var(--ow-font-sans);letter-spacing:.08em;text-transform:uppercase;color:var(--grey)}
 .also{margin:10px 0 0;padding-left:20px;color:var(--grey2);font-size:16px}
 .also li{margin-top:4px}
+/* VS9 entries: What's new for you (the user list), one honest tested line, then Under the hood (folded). */
+.new-h{margin-top:14px;font:600 13px/1 var(--ow-font-sans);letter-spacing:.08em;text-transform:uppercase;color:var(--brass)}
+.new{margin:10px 0 0;padding-left:20px;color:var(--ink);font-size:17px;line-height:1.5}
+.new li{margin-top:6px}
+.tested{margin-top:14px;max-width:680px;padding-left:12px;border-left:2px solid var(--line);font-size:14.5px;line-height:1.5;color:var(--grey)}
+.hood{margin-top:12px}
+.hood summary{display:inline-flex;align-items:center;gap:8px;min-height:44px;cursor:pointer;list-style:none;font:600 13px/1 var(--ow-font-sans);letter-spacing:.08em;text-transform:uppercase;color:var(--grey)}
+.hood summary::-webkit-details-marker{display:none}
+.hood summary::before{content:"";width:7px;height:7px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(-45deg);transition:transform .18s}
+.hood[open] summary::before{transform:rotate(45deg)}
+.hood summary:hover{color:var(--ink)}
+.hood .also{margin-top:2px}
 .rel code{font-size:.92em;color:#f6dcae}
 .gh{display:inline-flex;align-items:center;min-height:44px;margin-top:6px;font-size:15px;color:var(--grey2);text-decoration:underline;text-decoration-color:var(--brass);text-underline-offset:4px}
 .gh:hover{color:var(--ink)}
@@ -395,7 +405,7 @@ h1{white-space:nowrap}
 .shipped .rel:first-of-type{grid-template-columns:164px 1fr;margin-top:20px;padding:32px 36px 26px;border-radius:18px;background:linear-gradient(160deg,rgb(18 32 74 / 60%),var(--panel) 55%);box-shadow:inset 0 0 0 1px var(--edge),inset 3px 0 0 var(--brass)}
 .shipped .rel:first-of-type .v{font-size:28px}
 .shipped .rel:first-of-type h3{font-size:34px;line-height:1.15}
-.shipped .rel:first-of-type .main-line{margin-top:12px;font-size:20px;line-height:1.5}
+.shipped .rel:first-of-type .new{font-size:19px}
 .latest{width:fit-content;margin-top:6px;padding:4px 10px;border-radius:999px;box-shadow:inset 0 0 0 1px var(--brass);font:600 12px/1 var(--ow-font-sans);letter-spacing:.08em;text-transform:uppercase;color:var(--brass)}
 .earlier{margin-top:40px;padding-bottom:4px;font:600 13px/1 var(--ow-font-sans);letter-spacing:.08em;text-transform:uppercase;color:var(--grey)}
 .earlier+.rel{border-top:0}
@@ -404,7 +414,7 @@ h1{white-space:nowrap}
   .shiplog h1{font-size:42px}
   .shiplog .lead{font-size:16.5px}
   .shiplog h2{margin-top:40px;font-size:24px}
-  .bundle-list{grid-template-columns:1fr;margin-top:14px}
+  .bundle-list{grid-auto-flow:row;margin-top:14px}
   .bundle-list li{gap:2px;padding:12px 16px 13px;font-size:14.5px}
   .bundle-list li+li{border-left:0;border-top:1px solid var(--line)}
   .bundle-list b{font-size:15.5px}
@@ -412,12 +422,13 @@ h1{white-space:nowrap}
   .when{flex-direction:row;align-items:baseline;gap:12px}
   .when .v{font-size:19px}
   .rel h3{font-size:20px}
-  .main-line{font-size:16.5px}
   .also{font-size:15px}
+  .new{font-size:16px}
+  .tested{font-size:14px}
   .shipped .rel:first-of-type{grid-template-columns:1fr;margin-top:14px;padding:20px 20px 10px;border-radius:16px}
   .shipped .rel:first-of-type .v{font-size:22px}
   .shipped .rel:first-of-type h3{margin-top:4px;font-size:25px}
-  .shipped .rel:first-of-type .main-line{font-size:17px}
+  .shipped .rel:first-of-type .new{font-size:17px}
   .latest{margin:0 0 0 auto;align-self:center}
   .earlier{margin-top:32px}
 }
