@@ -182,8 +182,25 @@ class Text(HTMLParser):
         return ' '.join(self.parts)
 
 
+def motion_ok(prelude):
+    """A media query that holds only for visitors who have not asked for less motion: MOTION_OK itself, or the
+    same feature joined to others with "and" (#1298: the phone query). A comma ("or"), "or" or "not" fails."""
+    if not prelude.startswith('@media '):
+        return False
+    query = prelude.removeprefix('@media ').lower()
+    parts = [p.strip() for p in query.split(' and ')]
+    return ('(prefers-reduced-motion:no-preference)' in parts and ',' not in query
+            and not re.search(r'\b(not|or|only)\b', query))
+
+
+def positive_time(value):
+    """True unless every comma-separated time in a duration list is a literal zero ('0s, .2s' and var() count)."""
+    return not all(re.fullmatch(r'[+-]?(0*\.?0+|0+\.0*)m?s', part.strip()) for part in value.split(','))
+
+
 def check_motion(css):
-    """Every animation, transition and smooth scroll is inside MOTION_OK (stopping one is always allowed)."""
+    """Every animation, transition and smooth scroll is inside a motion_ok query (stopping one is always allowed).
+    A positive transition-duration counts as a transition: the default transition-property is all (#1298)."""
     stack, at, found = [], 0, []
     for m in re.finditer(r'[{};]', css):
         chunk = css[at:m.start()]
@@ -194,8 +211,9 @@ def check_motion(css):
             name, _, value = decl.partition(':')
             name, value = name.strip(), value.strip().removesuffix('!important').strip()
             moving = ((name in ('animation', 'animation-name', 'transition', 'transition-property') and value != 'none')
+                      or (name == 'transition-duration' and positive_time(value))
                       or (name == 'scroll-behavior' and value == 'smooth'))
-            if moving and not any(p.startswith('@keyframes') for p in stack) and MOTION_OK not in stack:
+            if moving and not any(p.startswith('@keyframes') for p in stack) and not any(map(motion_ok, stack)):
                 found.append(f'{" > ".join(stack)} {{{decl}}}')
             if m[0] == '}' and stack:
                 stack.pop()

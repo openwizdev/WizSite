@@ -208,6 +208,7 @@ class Checks(unittest.TestCase):
         # transition-property is all) for a visitor who asked for reduced motion; and a query that only
         # mentions no-preference beside an "or" (a comma) or under "not" does not keep motion away from them.
         for bad in ('.x{transition-duration:.35s}.x:hover{opacity:.5}', '.x{transition-duration:0s, 200ms}',
+                    '.x{transition-duration:var(--slow)}',
                     '@media (min-width:1px){.x{transition-duration:1s}}',
                     '@media (max-width:960px), (prefers-reduced-motion:no-preference){.a{animation:x 1s}}',
                     '@media not all and (prefers-reduced-motion:no-preference){.a{animation:x 1s}}',
