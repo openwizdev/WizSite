@@ -342,9 +342,11 @@ def check_site(root):
             assert not any(word in low for word in BANNED_COPY), f'banned word rendered in {path.name}'
             for text in ('illustration, not live data', 'building in public'):
                 assert text not in low, f'cut copy is back in {path.name}: {text}'
-    moments = ('Answer a few questions', 'Watch your spec', 'Approve the plan', 'Watch it ship')
+    moments = ('Answer a few questions', 'Watch your spec', 'Watch it ship')
     captions = re.findall(r'<h3>([^<]+)</h3>', landing)
-    assert tuple(captions) == moments, 'the four moments must appear in order'
+    assert tuple(captions) == moments, 'the three moments must appear in order'
+    assert 'Steer the build from the narrated video.' in flat, 'spec video steering copy is missing'
+    assert 'Silent sample' in flat, 'the landing clip must be labeled as a silent sample'
     # Owner cuts (round 6): obvious notes stay off the page.
     for text in ('Illustration, not live data', 'Building in public'):
         assert text.lower() not in flat.lower(), f'cut copy is back: {text}'

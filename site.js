@@ -14,7 +14,7 @@ async function showStars() {
 const scenes = [
   { era: 'cave', label: 'Answering a few questions', states: [0, 0, 0] },
   { era: 'renaissance', label: 'Writing the spec', states: [0, 0, 0] },
-  { era: 'samurai', label: 'Plan approved · agents building', states: [3, 1, 0] },
+  { era: 'samurai', label: 'Agents building the to-do app', states: [3, 1, 0] },
   { era: 'steam', label: 'Reviewing the changes', states: [3, 3, 2] },
   { era: 'astronaut', label: 'Merged · to-do app shipped', states: [3, 3, 3] },
 ];

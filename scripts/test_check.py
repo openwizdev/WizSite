@@ -146,11 +146,14 @@ class Checks(unittest.TestCase):
                     check_site(root)
 
     def test_product_first_landing(self):
-        # Catches: a missing to-do example, a mixed-up product road, a return to the old example,
-        # or the loss of the painting's description for screen-reader visitors.
+        # Catches: a missing to-do example, a wrong step order, the retired approval step, missing
+        # steering or sample copy, a return to the old example, or a missing painting description.
         for change, error in (
                 (lambda t: t.replace('Build a to-do app', 'Build an app'), 'missing landing story copy'),
-                (lambda t: t.replace('<h3>Watch your spec</h3>', '<h3>Watch it ship</h3>'), 'four moments'),
+                (lambda t: t.replace('<h3>Watch your spec</h3>', '<h3>Watch it ship</h3>'), 'three moments'),
+                (lambda t: t.replace('<h3>Watch it ship</h3>', '<h3>Approve the plan</h3><h3>Watch it ship</h3>'), 'three moments'),
+                (lambda t: t.replace('Steer the build from the narrated video.', 'Watch the video.'), 'steering copy'),
+                (lambda t: t.replace('>Silent sample</p>', '>Spec video</p>'), 'labeled as a silent sample'),
                 (lambda t: t.replace('</main>', '<p>Add a dark mode toggle</p></main>'), 'old example'),
                 (lambda t: t.replace('Oil painting of Wiz scholars studying a to-do list', ''), 'painting without a description')):
             with self.subTest(error=error), tempfile.TemporaryDirectory() as temp:
