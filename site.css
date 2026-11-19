@@ -202,7 +202,8 @@ h2{font:700 44px/1.05 var(--ow-font-sans);letter-spacing:-.035em}
   .film-live .s-launch{--fx:.62}
   .film-live .s-lanes{--fx:.40}
   .film-live .s-rooms{--fx:.55}
-  .film-live .in-film{width:92cqw;margin-bottom:20cqh}
+  .film-live .in-film{width:76cqw;margin-bottom:13cqh}
+  .film-live .shots .cap{padding-inline:56px;font-size:24px}
   .story-live .track li{width:62vw;margin-right:10px}
   @keyframes move{0%,18%{left:0}30%,52%{left:calc(50% - 20px)}64%,90%{left:calc(100% - 40px);opacity:1}96%{left:calc(100% - 40px);opacity:0}97%{left:0;opacity:0}100%{left:0;opacity:1}}
 }
