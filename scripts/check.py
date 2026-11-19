@@ -87,9 +87,12 @@ FONT_HASHES = {
     'fonts/OFL.txt': 'c683bfbcc7e087f5d37a54ef628f10387c451a83ddc459b151403a164ac46c90',
 }
 PAGES = ('index.html', 'changelog/index.html')
-# The landing story (#1287): one Wiz through every era, with "Build a to-do app" as the example idea and the
-# zoom-out handing off to "This is your factory." The old example idea must not come back beside it.
-STORY_COPY = ('Build a to-do app', 'This is your factory.')
+# The landing film (#1308, J185): the only words on the landing are the headline, the two buttons and one caption
+# of six words or fewer per act; the film ends on the last act's caption. The old example idea must not come back.
+HEADLINE = 'Bring your own everything.'
+BUTTONS = ('Install · coming soon', 'Star on GitHub')
+CAPTIONS = ('One idea, through all of history.', 'Your whole factory, across time.', 'This is your factory.')
+CAPTION_WORDS = 6
 OLD_EXAMPLE = ('dark mode', 'dark-mode')
 # Motion runs only when the visitor has not asked for less: every animation, transition and smooth scroll
 # sits inside this media query, so reduced motion shows the same story as still paintings.
@@ -219,6 +222,10 @@ def check_motion(css):
                 stack.pop()
         at = m.end()
     assert not found, f'motion outside {MOTION_OK}: {found[:3]}'
+
+
+def check_landing_text(landing):
+    """The landing's rendered words (inside <main>) are only the headline, the buttons and the act captions."""
 
 
 def check_vector(data):

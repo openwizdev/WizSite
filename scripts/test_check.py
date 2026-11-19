@@ -6,7 +6,7 @@ import unittest
 
 import re
 
-from check import FINGERPRINTS, HASHED, ROOT, Page, check_motion, check_privacy, check_ref, check_site, check_vector, check_webp, fingerprint
+from check import FINGERPRINTS, HASHED, ROOT, Page, check_landing_text, check_motion, check_privacy, check_ref, check_site, check_vector, check_webp, fingerprint
 
 
 def edit_built(root, name, change):
@@ -179,6 +179,26 @@ class Checks(unittest.TestCase):
             edit_built(root, 'site.js', lambda t: t.replace("classList.add('story-live')", ''))
             with self.assertRaises(AssertionError):
                 check_site(root)
+
+    def test_landing_words_are_only_headline_buttons_and_captions(self):
+        # Catches (#1308): words creeping back onto the landing beyond the headline, the two buttons and one short
+        # caption per act (a paragraph, a label, an over-long caption), a dropped caption, and a film that no longer
+        # ends on "This is your factory."
+        landing = (ROOT / 'index.html').read_text()
+        check_landing_text(landing)
+        act1 = '<h2 id="act-1">One idea, through all of history.</h2>'
+        cap = '<p class="cap">This is your factory.</p>'
+        for old, new in ((act1, act1 + '<p>Idea in. Shipped work out.</p>'),
+                         (act1, act1 + '<span class="when">The idea</span>'),
+                         (act1, '<h2 id="act-1">One idea, carried through all of history.</h2>'),
+                         (act1, '<h2 id="act-1"></h2>'),
+                         (cap, ''),
+                         (cap, '<p class="cap">This is a factory.</p>'),
+                         ('<h1 id="hero-h">Bring your own everything.</h1>', '<h1 id="hero-h">Bring your own everything.</h1><p>Not ready yet.</p>')):
+            with self.subTest(new=new):
+                self.assertIn(old, landing)
+                with self.assertRaises(AssertionError):
+                    check_landing_text(landing.replace(old, new, 1))
 
     def test_motion_only_without_reduced_motion(self):
         # Catches: an idle move, a transition or smooth scrolling that still runs for a visitor who asked for
