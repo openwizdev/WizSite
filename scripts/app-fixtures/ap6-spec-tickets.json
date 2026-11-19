@@ -198,6 +198,13 @@
                 "nodes": [
                   {
                     "body": "openwiz:status v1\n**Agent status**\n\n- **State:** working\n- **Kind:** builder\n- **Harness:** Synthetic Harness\n- **Model:** Synthetic Model\n- **Last step:** wrote the store\n- **Time:** 2030-01-01T00:00:00Z\n- **Pull request:** none",
+                    "createdAt": "2020-01-01T00:00:00Z",
+                    "updatedAt": "LIVE",
+                    "authorAssociation": "MEMBER"
+                  },
+                  {
+                    "body": "openwiz:status v1\n**Agent status**\n\n- **State:** asking\n- **Kind:** builder\n- **Last step:** a second, later claim",
+                    "createdAt": "LIVE",
                     "updatedAt": "LIVE",
                     "authorAssociation": "MEMBER"
                   }

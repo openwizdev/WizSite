@@ -230,6 +230,13 @@ async function open(browser, world) {
       await writeFile(path, Buffer.from(data, 'base64'));
       await send('Emulation.clearDeviceMetricsOverride');
     },
+    // Press one key as a keyboard does (keyDown, then keyUp): 'Tab', 'Enter', 'Escape' or a digit.
+    async key(key) {
+      const codes = { Tab: ['Tab', 9], Enter: ['Enter', 13, '\r'], Escape: ['Escape', 27] };
+      const [code, vk, text] = codes[key] || [`Digit${key}`, key.charCodeAt(0), key];
+      await send('Input.dispatchKeyEvent', { type: 'keyDown', key, code, windowsVirtualKeyCode: vk, ...(text ? { text } : {}) });
+      await send('Input.dispatchKeyEvent', { type: 'keyUp', key, code, windowsVirtualKeyCode: vk });
+    },
     // Click the visible control (link or button) whose text, without its aria-hidden parts, is exactly this.
     click: text => page.run(`(() => {
       ${LABEL}
@@ -580,6 +587,60 @@ async function main() {
       assert(/This spec.s tickets couldn.t be read/.test(main), 'the failed ticket read is not called unknown');
       assert(!(await page.run(`!!document.querySelector('main .graph')`)), 'an empty graph is drawn for tickets that could not be read');
       assert(/1 of 8 tickets done/.test(main), 'the spec\'s own progress is lost');
+      checkRequestLog(world);
+      await page.close();
+    });
+
+    await check('AP6 keyboard: every page and link is reachable by keyboard, with visible focus, in reading order', async () => {
+      const world = ap6World();
+      const page = await ap6Open(world);
+      await page.until(`document.querySelectorAll('main .cards a.card').length >= 4`, 'the You items');
+      // What has focus: a ticket card's number, a link's address, or the element's tag; and whether its focus shows.
+      const focused = () => page.run(`(() => { const e = document.activeElement; const s = getComputedStyle(e);
+        return { what: e.dataset.ticket || e.getAttribute('href') || e.tagName, shows: s.outlineStyle !== 'none' && s.outlineWidth !== '0px' }; })()`);
+      const tabTo = async (what, most = 60) => {
+        const seen = [];
+        for (let i = 0; i < most; i += 1) {
+          await page.key('Tab');
+          const now = await focused();
+          seen.push(now.what);
+          if (now.what === what) {
+            assert(now.shows, `${what} has focus but no visible focus ring`);
+            return seen;
+          }
+        }
+        throw new Error(`Tab never reached ${what}: ${seen.join(' ')}`);
+      };
+      // You: each item is reached by Tab, newest first.
+      const you = await tabTo('https://github.com/acme/factory/issues/48');
+      const order = ['https://github.com/acme/factory/issues/46', 'https://github.com/acme/factory/issues/60#issuecomment-6001',
+        'https://github.com/acme/factory/issues/50#issuecomment-5002', 'https://github.com/acme/factory/issues/48'];
+      assert(JSON.stringify(you.filter(w => order.includes(w))) === JSON.stringify(order), `You's items in Tab order: ${you.join(' ')}`);
+      // The shell's 2 opens Specs; Tab reaches a spec and Enter opens its page, with focus on its title.
+      await page.key('2');
+      await page.until(`location.hash === '#/specs' && document.querySelector('main a.card[href="#/specs/40"]')`, 'Specs by its key');
+      await tabTo('#/specs/40');
+      await page.key('Enter');
+      await page.until(`location.hash === '#/specs/40' && document.activeElement.classList.contains('spec-title')`, 'focus on the spec page\'s title');
+      // The graph's tickets come in reading order: every ticket after each ticket it waits for.
+      const walk = await tabTo('https://github.com/acme/factory/issues/41', 80);
+      const graph = [];
+      for (let i = 0; i < 12 && graph.length < 8; i += 1) {
+        await page.key('Tab');
+        const now = await focused();
+        assert(now.shows, `${now.what} has focus but no visible focus ring`);
+        if (/^\d+$/.test(now.what)) graph.push(Number(now.what));
+      }
+      const all = [...walk.filter(w => /^\d+$/.test(w)).map(Number), ...graph];
+      assert(new Set(all).size === 8, `not every ticket card is reached by Tab: ${all.join(' ')}`);
+      for (const [blocker, ticket] of [[30, 43], [41, 42], [41, 44], [42, 45], [43, 45], [44, 47]]) {
+        assert(all.indexOf(blocker) < all.indexOf(ticket), `#${ticket} comes before #${blocker}, which it waits for: ${all.join(' ')}`);
+      }
+      // Esc goes back to all specs, with focus on the spec just left; the shell's 1 still opens You.
+      await page.key('Escape');
+      await page.until(`location.hash === '#/specs' && document.activeElement.getAttribute('href') === '#/specs/40'`, 'Esc back to the spec\'s card');
+      await page.key('1');
+      await page.until(`location.hash === '#/you'`, 'You by its key');
       checkRequestLog(world);
       await page.close();
     });
