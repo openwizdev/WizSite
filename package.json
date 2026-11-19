@@ -6,6 +6,7 @@
     "build": "node build.mjs",
     "check": "node --check site.js && python3 -B scripts/check.py",
     "test": "python3 -B -m unittest discover -s scripts -p 'test_*.py'",
-    "test:functions": "node --test tests/sign-in.test.mjs"
+    "test:functions": "node --test tests/sign-in.test.mjs",
+    "test:app": "node scripts/app-check.mjs"
   }
 }
