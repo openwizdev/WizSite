@@ -199,7 +199,9 @@
   };
   const positive = n => Number.isSafeInteger(n) && n > 0;
   const text = v => typeof v === 'string' && v.length > 0;
-  const exactly = (o, keys) => o && typeof o === 'object' && !Array.isArray(o) && Object.keys(o).length === keys.length && keys.every(k => k in o);
+  const exactly = (o, keys) => o && typeof o === 'object' && !Array.isArray(o) && Object.keys(o).length === keys.length && keys.every(k => Object.hasOwn(o, k));
+  // A plain string matching the pattern: never an array or object a lookup or a regex test would turn into one.
+  const matches = (v, pattern) => typeof v === 'string' && pattern.test(v);
   // A JSON text with a repeated key in any object (JSON.parse would keep only the last).
   function repeatsKeys(json) {
     const stack = [];
@@ -227,10 +229,10 @@
     if (!marked) return null;
     if (blocks.length !== 1 || parsed[0] === undefined || repeatsKeys(blocks[0])) return { malformed: true };
     const r = parsed[0];
-    const keys = KEYS[r?.kind];
+    const keys = typeof r?.kind === 'string' && Object.hasOwn(KEYS, r.kind) ? KEYS[r.kind] : null;
     const ok = keys && exactly(r, keys) && r.schema === 'openwiz.decisions.v1'
-      && /^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(r.id) && ['open', 'resolved', 'superseded'].includes(r.status)
-      && /^[0-9a-f]{64}$/.test(r.fingerprint) && ['ordinary', 'live', 'release', 'publish', 'unknown'].includes(r.risk);
+      && matches(r.id, /^[A-Za-z0-9][A-Za-z0-9_-]*$/) && ['open', 'resolved', 'superseded'].includes(r.status)
+      && matches(r.fingerprint, /^[0-9a-f]{64}$/) && ['ordinary', 'live', 'release', 'publish', 'unknown'].includes(r.risk);
     if (!ok) return { malformed: true };
     if (r.kind !== 'spec_confirmation' && r.kind !== 'plan_approval') return { record: r }; // a grill's record: not a spec's
     const summary = Array.isArray(r.summary) && r.summary.length >= 1 && r.summary.length <= 10 && r.summary.every(line => text(line) && !/[\r\n]/.test(line));
@@ -244,14 +246,17 @@
     return { record: r };
   }
   // What a spec's comments ask of the user: [{kind, title, number, url, at}], with unreadable records as 'unreadable'.
+  // The author is checked before the body is read, and a record that can't be read is that record's problem only.
   function decisions(spec, detail, authors) {
     const found = [];
-    for (const comment of detail?.comments?.nodes || []) {
+    const nodes = detail?.comments?.nodes;
+    for (const comment of Array.isArray(nodes) ? nodes : []) {
       if (!comment) continue;
-      const read = readRecord(comment.body, spec.number);
-      if (!read) continue;
       const author = byRecordAuthor(comment, authors);
-      if (author === false) continue; // not the factory's: ordinary discussion
+      if (author === false) continue; // not the factory's: ordinary discussion, never parsed
+      let read;
+      try { read = readRecord(comment.body, spec.number); } catch { read = { malformed: true }; }
+      if (!read) continue;
       const item = { title: spec.title, number: spec.number, url: comment.url, at: Date.parse(comment.createdAt) || 0 };
       if (author === null || read.malformed) found.push({ ...item, kind: 'unreadable' });
       else if (read.record.status === 'open' && (read.record.kind === 'spec_confirmation' || read.record.kind === 'plan_approval')) {
