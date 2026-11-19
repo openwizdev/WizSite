@@ -106,6 +106,9 @@ MOTION_OK = '@media (prefers-reduced-motion:no-preference)'
 # site.js itself, once its handlers are in place: no inline script may set it first, so a failed site.js
 # download leaves the still story fully visible.
 LIVE_CLASS = 'story-live'
+# Every CSS animation (the act loops and the small moves too) also needs .film-live, which site.js adds only once
+# GSAP is running under no-preference: with GSAP blocked the whole page stays still (#1308 R1).
+FILM_CLASS = 'film-live'
 # The ship log: the approved VS9 changelog text (What's new for you, tested line, Under the hood), plus Being built.
 CHANGELOG_MAIN = '17830d3f9a837a3ec24f2382829093cc941e0d1f5fd873e45e4d3a44c6e897c2'
 
@@ -206,6 +209,11 @@ def positive_time(value):
     return not all(re.fullmatch(r'[+-]?(0*\.?0+|0+\.0*)m?s', part.strip()) for part in value.split(','))
 
 
+def gated(selector):
+    """Every comma-separated part of a selector needs the film-live class (#1308 R1)."""
+    return all(f'.{FILM_CLASS}' in part for part in selector.split(','))
+
+
 def check_motion(css):
     """Every animation, transition and smooth scroll is inside a motion_ok query (stopping one is always allowed).
     A positive transition-duration counts as a transition: the default transition-property is all (#1298)."""
@@ -223,10 +231,15 @@ def check_motion(css):
                       or (name == 'scroll-behavior' and value == 'smooth'))
             if moving and not any(p.startswith('@keyframes') for p in stack) and not any(map(motion_ok, stack)):
                 found.append(f'{" > ".join(stack)} {{{decl}}}')
+            # An animation also waits for site.js to have GSAP running (.film-live): with GSAP blocked, as with no
+            # script, every scene stays still. (Transitions and smooth scroll are user-driven, not autoplay.)
+            if (name in ('animation', 'animation-name') and value != 'none' and stack
+                    and not any(p.startswith('@keyframes') for p in stack) and not gated(stack[-1])):
+                found.append(f'{stack[-1]} {{{decl}}} without .{FILM_CLASS}')
             if m[0] == '}' and stack:
                 stack.pop()
         at = m.end()
-    assert not found, f'motion outside {MOTION_OK}: {found[:3]}'
+    assert not found, f'motion outside {MOTION_OK}, or an animation without .{FILM_CLASS}: {found[:3]}'
 
 
 class Words(HTMLParser):

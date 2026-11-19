@@ -232,7 +232,7 @@ class Checks(unittest.TestCase):
     def test_motion_only_without_reduced_motion(self):
         # Catches: an idle move, a transition or smooth scrolling that still runs for a visitor who asked for
         # reduced motion. Stopping motion (animation: none) is allowed anywhere.
-        check_motion('@media (prefers-reduced-motion: no-preference){.a{animation:x 1s}html{scroll-behavior:smooth}'
+        check_motion('@media (prefers-reduced-motion: no-preference){.film-live .a{animation:x 1s}html{scroll-behavior:smooth}'
                      '.b:hover{transition:opacity .2s}}@keyframes x{to{opacity:0}}.c{animation:none !important}')
         for bad in ('.a{animation:x 1s}', 'html{scroll-behavior:smooth}', '.b{transition:transform .2s}',
                     '@media (prefers-reduced-motion:reduce){.a{animation:x 1s}}', '@media (min-width:1px){.a{animation-name:x}}',
@@ -246,10 +246,21 @@ class Checks(unittest.TestCase):
             with self.assertRaises(AssertionError):
                 check_site(root)
 
+    def test_animations_wait_for_gsap(self):
+        # Catches (#1308 R1): a CSS loop or small move that starts while GSAP is blocked (gated on site.js alone, or
+        # on nothing), so the page animates although the film has fallen back to stills.
+        check_motion('@media (prefers-reduced-motion:no-preference){.film-live .a,.film-live .b{animation:x 1s}'
+                     '.c{animation:none}.b:hover{transition:opacity .2s}}')
+        for bad in ('@media (prefers-reduced-motion:no-preference){.story-live .a{animation:x 1s}}',
+                    '@media (prefers-reduced-motion:no-preference){.a{animation-name:x}}',
+                    '@media (prefers-reduced-motion:no-preference){.film-live .a,.b{animation:x 1s}}'):
+            with self.subTest(css=bad), self.assertRaises(AssertionError):
+                check_motion(bad)
+
     def test_motion_combined_phone_query(self):
         # Catches (#1298): the combined phone and no-preference query refused although it only narrows the safe
         # one; a zero transition-duration is no motion.
-        check_motion('@media (max-width:960px) and (prefers-reduced-motion: no-preference){.a{animation:x 1s}'
+        check_motion('@media (max-width:960px) and (prefers-reduced-motion: no-preference){.film-live .a{animation:x 1s}'
                      '.b{transition-duration:.3s}}.c{transition-duration:0s}.d{transition-duration:0s, 0ms}')
 
     def test_motion_transition_duration(self):
