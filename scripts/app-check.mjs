@@ -544,6 +544,38 @@ async function main() {
       await page.close();
     });
 
+    await check('R7: a decision record with the wrong field types is unreadable, never a crash, and the rest still renders', async () => {
+      // Synthetic comments on spec #50: a visitor's record whose kind names an inherited property (read before its
+      // author was checked, it threw), and the record authors' with a kind, id or fingerprint of the wrong JSON type
+      // (coerced to a string, they read as a valid plan approval).
+      const record = fields => '```json\n' + JSON.stringify({ schema: 'openwiz.decisions.v1', kind: 'plan_approval',
+        id: 'r-plan_approval-50-typed', status: 'open', fingerprint: 'a'.repeat(64), risk: 'ordinary', spec: 50,
+        summary: ['Synthetic summary line.'], headline: 'Synthetic headline.', tickets: [], graph: [], ...fields }, null, 2) + '\n```';
+      const comment = (id, login, fields) => ({ databaseId: id, body: record(fields), url: `https://github.com/acme/factory/issues/50#issuecomment-${id}`,
+        createdAt: `2029-12-${id - 9000}T12:00:00Z`, updatedAt: `2029-12-${id - 9000}T12:00:00Z`, author: { login } });
+      const world = ap6World({ tickets: repository => {
+        repository.s50.comments.nodes.push(comment(9020, 'helpful-collaborator', { kind: 'constructor' }),
+          { ...comment(9021, 'helpful-collaborator'), body: 'Not openwiz.decisions.v1:\n\n```json\n{"kind": "constructor"}\n```' },
+          comment(9019, 'factory-bot[bot]', { kind: 'toString' }), comment(9018, 'factory-bot[bot]', { kind: ['plan_approval'] }),
+          comment(9017, 'factory-bot[bot]', { id: ['r-plan_approval-50-typed'] }), comment(9016, 'factory-bot[bot]', { fingerprint: ['a'.repeat(64)] }));
+        repository.s50.comments.totalCount = repository.s50.comments.nodes.length;
+      } });
+      const page = await ap6Open(world);
+      await page.until(`document.querySelectorAll('main .cards a.card').length >= 6`, 'the You items');
+      await settle(page, 600);
+      const items = await youItems(page);
+      const unreadable = id => `A decision record that couldn't be read 50#issuecomment-${id}`;
+      const want = ['Ticket marked for you 46', 'Spec to confirm 60#issuecomment-9001', 'Plan to approve 50#issuecomment-9003',
+        unreadable(9005), 'Ticket marked for you 48', unreadable(9006), unreadable(9019), unreadable(9018), unreadable(9017), unreadable(9016)];
+      assert(JSON.stringify(items) === JSON.stringify(want), `You items: ${JSON.stringify(items)}`);
+      const badge = await page.run(`document.querySelector('nav.main a[href="#/you"] .badge')?.textContent`);
+      assert(badge === '4', `the You badge is ${badge}`);
+      await page.go(`${SITE}/app/#/specs`);
+      await page.until(`document.querySelectorAll('main a.card').length === 3`, 'the spec cards');
+      checkRequestLog(world);
+      await page.close();
+    });
+
     await check('R4: a list GitHub gave only part of says so, never "nothing needs you"', async () => {
       const world = ap6World({
         specs: repository => { repository.youIssues = { totalCount: 1, nodes: [] }; repository.specIssues = { totalCount: 2, nodes: [] }; },
