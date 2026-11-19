@@ -5,3 +5,13 @@
   Cache-Control: public, max-age=0, must-revalidate
 /*.js
   Cache-Control: public, max-age=0, must-revalidate
+# The app (openwiz.dev/app) reads only GitHub's API and this site (its sign-in helper): the browser refuses any
+# other destination, inline script or style, framing, and sending a referrer.
+/app/
+  Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self' https://api.github.com; manifest-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
+  Referrer-Policy: no-referrer
+  X-Content-Type-Options: nosniff
+/app/*
+  Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self' https://api.github.com; manifest-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
+  Referrer-Policy: no-referrer
+  X-Content-Type-Options: nosniff

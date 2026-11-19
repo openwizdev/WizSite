@@ -13,13 +13,14 @@ def edit_built(root, name, change):
     """Edit a fingerprinted file in a build copy and re-fingerprint it (renaming the file and the pages'
     references), so a test reaches the gate it targets instead of failing on the stale fingerprint."""
     old = next(p for p in root.glob(name.rsplit('.', 1)[0] + '.*.' + name.rsplit('.', 1)[1]))
+    was = old.relative_to(root).as_posix()
     data = change(old.read_text()).encode()
     new = fingerprint(name, data)
     old.unlink()
     (root / new).write_bytes(data)
-    for page in ('index.html', 'changelog/index.html'):
+    for page in ('index.html', 'changelog/index.html', 'app/index.html'):
         path = root / page
-        path.write_text(path.read_text().replace(f'"/{old.name}"', f'"/{new}"'))
+        path.write_text(path.read_text().replace(f'"/{was}"', f'"/{new}"'))
 
 
 class Checks(unittest.TestCase):
@@ -271,6 +272,27 @@ class Checks(unittest.TestCase):
             edit_built(root, 'site.js', lambda t: t + "\nnavigator.clipboard.writeText('x');\n")
             with self.assertRaises(AssertionError):
                 check_site(root)
+
+    def test_app_page_policy_and_calm(self):
+        # catches: the app losing the browser-enforced limit to GitHub and this site, loading an unchecked
+        # script, or gaining motion.
+        cases = {
+            'no CSP for /app/*': lambda root: (root / '_headers').write_text(
+                (root / '_headers').read_text().replace("connect-src 'self' https://api.github.com", "connect-src *")),
+            'an inline script': lambda root: (root / 'app/index.html').write_text(
+                (root / 'app/index.html').read_text().replace('</body>', '<script>1</script></body>')),
+            'a missing script': lambda root: (root / 'app/index.html').write_text(
+                re.sub(r'<script src="/app/ui\.[0-9a-f]+\.js" defer></script>', '', (root / 'app/index.html').read_text())),
+            'a transition': lambda root: edit_built(root, 'app/ember.css', lambda t: t + '\na { transition: color 1s }\n'),
+        }
+        for name, spoil in cases.items():
+            with self.subTest(name), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp) / 'dist'
+                shutil.copytree(ROOT / 'dist', root)
+                check_site(root)
+                spoil(root)
+                with self.assertRaises(AssertionError):
+                    check_site(root)
 
     def test_logo_pack(self):
         # Catches: a lockup that ships live text or a font reference (the wordmark font must never ship),

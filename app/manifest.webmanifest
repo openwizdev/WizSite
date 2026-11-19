@@ -1,0 +1,15 @@
+{
+  "name": "OpenWiz",
+  "short_name": "OpenWiz",
+  "description": "What needs you, every spec and the agents at work, read from GitHub.",
+  "id": "/app/",
+  "start_url": "/app/",
+  "scope": "/app/",
+  "display": "standalone",
+  "background_color": "#1c1a17",
+  "theme_color": "#161412",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/apple-touch-icon.png", "sizes": "180x180", "type": "image/png", "purpose": "any" }
+  ]
+}

@@ -6,9 +6,10 @@
 // no write. No npm dependency: Node's own WebSocket talks to the browser.
 //
 //   node scripts/app-check.mjs            (after npm run build; CHROME=/path/to/chrome to pick the browser)
+//   SHOTS=dir node scripts/app-check.mjs  also saves the shell on a laptop and a phone as PNGs, for review
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -67,7 +68,7 @@ async function launch() {
     socket.close();
     child.kill();
     await new Promise(resolve => child.once('exit', resolve));
-    await rm(profile, { recursive: true, force: true });
+    await rm(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }).catch(() => {});
   };
   return { send, on: listener => listeners.push(listener), close };
 }
@@ -126,6 +127,11 @@ class World {
       return { status: file.status, raw: file.body, type: file.type, headers: await siteHeaders(url.pathname) };
     }
     if (url.origin === API) {
+      // The browser's own CORS preflight, answered as GitHub does: it carries no data and changes nothing.
+      if (request.method === 'OPTIONS') {
+        return { status: 204, raw: Buffer.alloc(0), headers: { 'Access-Control-Allow-Methods': 'GET, POST',
+          'Access-Control-Allow-Headers': 'Authorization, Accept, Content-Type' } };
+      }
       if (request.method === 'GET' && url.pathname === '/user/installations') return { status: 200, json: await fixture('installations.json') };
       if (request.method === 'GET' && url.pathname === '/user/installations/1001/repositories') return { status: 200, json: await fixture('repositories.json') };
       if (request.method === 'POST' && url.pathname === '/graphql') {
@@ -140,10 +146,15 @@ class World {
   }
 }
 
+// The text a person reads on a control: without parts hidden from assistive technology (key hints, icons).
+const LABEL = `const label = e => { const c = e.cloneNode(true); c.querySelectorAll('[aria-hidden="true"]').forEach(x => x.remove()); return c.textContent.replace(/\\s+/g, ' ').trim(); };`;
+
 // ---- One page under test --------------------------------------------------------------------------------------
 
 async function open(browser, world) {
-  const { targetId } = await browser.send('Target.createTarget', { url: 'about:blank' });
+  // Each check gets its own browser context: its own storage, so no sign-in or picked repository carries over.
+  const { browserContextId } = await browser.send('Target.createBrowserContext');
+  const { targetId } = await browser.send('Target.createTarget', { url: 'about:blank', browserContextId });
   const { sessionId } = await browser.send('Target.attachToTarget', { targetId, flatten: true });
   const send = (method, params) => browser.send(method, params, sessionId);
   browser.on(async message => {
@@ -191,13 +202,29 @@ async function open(browser, world) {
       throw new Error(`timed out waiting for ${what}; page text: ${(await page.text()).slice(0, 600)}`);
     },
     text: () => page.run('document.body ? document.body.innerText : ""'),
-    // Click the visible control (link or button) whose accessible text is exactly this.
+    async size(width, height, mobile) {
+      if (width === null) return send('Emulation.clearDeviceMetricsOverride');
+      await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: mobile ? 2 : 1, mobile });
+      await new Promise(resolve => setTimeout(resolve, 200));
+    },
+    async shot(path, width, height, mobile) {
+      await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: mobile ? 2 : 1, mobile });
+      await new Promise(resolve => setTimeout(resolve, 400));
+      const { data } = await send('Page.captureScreenshot', { format: 'png' });
+      await writeFile(path, Buffer.from(data, 'base64'));
+      await send('Emulation.clearDeviceMetricsOverride');
+    },
+    // Click the visible control (link or button) whose text, without its aria-hidden parts, is exactly this.
     click: text => page.run(`(() => {
-      const el = [...document.querySelectorAll('a, button')].find(e => e.offsetParent !== null && e.textContent.replace(/\\s+/g, ' ').trim() === ${JSON.stringify(text)});
+      ${LABEL}
+      const el = [...document.querySelectorAll('a, button')].find(e => e.offsetParent !== null && label(e) === ${JSON.stringify(text)});
       if (!el) throw new Error('no visible control: ' + ${JSON.stringify(text)});
       el.click();
     })()`),
-    close: () => browser.send('Target.closeTarget', { targetId }),
+    close: async () => {
+      await browser.send('Target.closeTarget', { targetId });
+      await browser.send('Target.disposeBrowserContext', { browserContextId });
+    },
   };
   return page;
 }
@@ -233,7 +260,8 @@ function checkRequestLog(world) {
       const auth = Object.keys(r.headers).some(key => key.toLowerCase() === 'authorization');
       assert(!auth, `the GitHub token was sent to the site: ${where}`);
     } else {
-      assert(r.method === 'GET' || (r.method === 'POST' && r.path === '/graphql'), `a write to GitHub: ${where}`);
+      const preflight = r.method === 'OPTIONS' && !r.body;
+      assert(r.method === 'GET' || preflight || (r.method === 'POST' && r.path === '/graphql'), `a write to GitHub: ${where}`);
       if (r.method === 'POST') {
         const query = String(JSON.parse(r.body).query);
         assert(/^\s*query\s/.test(query) && !/\bmutation\b|\bsubscription\b/i.test(query), `a GraphQL write: ${query.slice(0, 80)}`);
@@ -276,7 +304,7 @@ async function main() {
       assert(await page.run('document.cookie') === '', 'the app set a cookie');
       const text = await page.text();
       assert(text.includes('acme/factory') && text.includes('acme/site'), 'the picker does not list both repositories');
-      const asked = world.log.filter(r => r.origin === API);
+      const asked = world.log.filter(r => r.origin === API && r.method !== 'OPTIONS');
       assert(asked.length && asked.every(r => r.headers.Authorization === 'Bearer ghu_SYNTHETICaccess0000000000000000000'), 'GitHub reads do not carry the token');
       checkRequestLog(world);
       await page.close();
@@ -290,7 +318,7 @@ async function main() {
       await signIn(page, world);
       await page.click('acme/factory');
       await page.until(`document.querySelector('nav a[aria-current="page"]')`, 'the navigation');
-      const nav = await page.run(`[...document.querySelectorAll('nav.main a')].map(a => a.textContent.replace(/\\s+/g, ' ').trim().split(' ')[0])`);
+      const nav = await page.run(`(() => { ${LABEL} return [...document.querySelectorAll('nav.main a')].map(label); })()`);
       assert(JSON.stringify(nav) === JSON.stringify(['You', 'Specs', 'Agents']), `navigation is ${JSON.stringify(nav)}`);
       await page.click('Specs');
       await page.until(`location.hash === '#/specs' && document.querySelector('h1').textContent.trim() === 'Specs'`, 'the Specs page');
@@ -315,6 +343,18 @@ async function main() {
       const shown = (await page.text()).match(/Specs read (\d\d:\d\d)/)[1];
       const minutes = t => Number(t.slice(0, 2)) * 60 + Number(t.slice(3));
       assert(Math.abs(minutes(shown) - minutes(hhmm)) <= 1, `read time ${shown} is not the time of the read (${hhmm})`);
+      for (const [width, height, mobile] of [[1440, 900, false], [390, 844, true]]) {
+        await page.size(width, height, mobile);
+        const shown = await page.text();
+        const leak = shown.match(/.{0,40}(null|undefined|NaN)/);
+        assert(!leak, `a missing value leaks into the ${mobile ? 'phone' : 'laptop'} page: ${leak?.[0]}`);
+        assert(/Specs read \d\d:\d\d/.test(shown) && /Agents read \d\d:\d\d/.test(shown), `the ${mobile ? 'phone' : 'laptop'} page does not show both read times`);
+      }
+      await page.size(null);
+      if (process.env.SHOTS) {
+        await page.shot(join(process.env.SHOTS, 'shell-laptop.png'), 1440, 900, false);
+        await page.shot(join(process.env.SHOTS, 'shell-phone.png'), 390, 844, true);
+      }
       checkRequestLog(world);
       await page.close();
     });
@@ -331,6 +371,7 @@ async function main() {
       const main = await page.run(`document.querySelector('main').innerText`);
       assert(/unknown/i.test(main), 'the failed read is not called unknown');
       assert(!/\bno specs\b|\bnothing\b|\b0 specs\b/i.test(main), 'the failed read is shown as empty');
+      if (process.env.SHOTS) await page.shot(join(process.env.SHOTS, 'failed-read-laptop.png'), 1440, 900, false);
       checkRequestLog(world);
       await page.close();
     });
@@ -366,6 +407,7 @@ async function main() {
       await page.click('acme/factory');
       await page.until(`/GitHub.s limit is low/.test(document.body.innerText)`, 'the low-limit notice');
       assert(/paused until/i.test(await page.text()), 'the notice does not say when reads resume');
+      if (process.env.SHOTS) await page.shot(join(process.env.SHOTS, 'low-limit-phone.png'), 390, 844, true);
       const before = graphqlCount(world);
       await page.run(`(() => { const b = [...document.querySelectorAll('button')].find(b => /refresh/i.test(b.textContent)); if (b) b.click(); })()`);
       await new Promise(resolve => setTimeout(resolve, 1000));
