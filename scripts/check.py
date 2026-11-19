@@ -39,6 +39,9 @@ ICON_HASHES = {
     'favicon.ico': '5dc6f058d467f927617e28c10c2764a01e4f1b6e8c1017111920153a9fdf7020',
     'apple-touch-icon.png': 'ff6e52cd499610049bbb6bf6289c77c99fe45ec667114ebcccab99266a9a09df',
     'brand/og.png': '8ff8e60f4653d4ed0eb7bf47b81a87810d9a25b002ff796a6268f3f655caf582',
+    # The app's own icons: the new mark, cream on charcoal (J194, #1326).
+    'app/icon.ico': '33a21c61aa051f91475b46678bc0c4f537ab507273c088c4ed016d5ddce2b9cd',
+    'app/icon-180.png': 'deb93ec39812c224c1470e2f1730f7f4ead7be3d27428a20a2a83284b77fbc2f',
 }
 # README pictures: kept in the source for GitHub only, never built or served. Pinned like the icons.
 DOC_HASHES = {
@@ -46,7 +49,7 @@ DOC_HASHES = {
     'docs/map-phone.png': 'cdd21a74a880d3adab68ce794de1b18060d916d6df5d00ceb54eb06736cf3fd2',
 }
 # Vector logos: the wordmark is outlined (paths), so no font ships and nothing can fall back to another font.
-VECTORS = ('favicon.svg', 'brand/openwiz-lockup.svg')
+VECTORS = ('favicon.svg', 'brand/openwiz-lockup.svg', 'app/mark.svg', 'app/icon.svg', 'app/wiz-reviewer.svg')
 SITE_URL = 'https://openwiz.dev/'
 ART_BUDGET = 2_000_000  # bytes, all art together
 # Styles and scripts ship fingerprinted (name.<first 10 hex of sha256>.ext); the pages use only those names.
@@ -269,7 +272,7 @@ def check_ref(root, source, ref, pages, favicons=()):
         return
     if ref in favicons:
         # Only the reviewed logo-pack favicons (checked as local files below).
-        assert ref in ('/favicon.ico', '/favicon.svg'), 'unexpected favicon'
+        assert ref in ('/favicon.ico', '/favicon.svg', '/app/icon.ico', '/app/icon.svg'), 'unexpected favicon'
     url = urlsplit(ref)
     if url.scheme or url.netloc:
         assert url.scheme == 'https' and url.netloc == 'github.com', 'unexpected external URL'

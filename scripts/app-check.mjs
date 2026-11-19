@@ -1074,6 +1074,145 @@ async function main() {
         await page.close();
       }
     });
+    // ---- AP14 (#1326): the new OpenWiz mark and the Wiz family, cream on charcoal; nothing else in the shell moves ----
+
+    const CREAM = '#cfc6b8';
+    const CHARCOAL = '#1b1916';
+    // Where the brand and the page sit, measured on main before the new mark (AP7's shell): the mark must take the old
+    // logo's 28 x 28 place exactly, so nothing else in the layout moves. [x, y, width, height], CSS pixels; a title's
+    // place only, as its width is its words'.
+    const LAYOUT = {
+      laptop: { brand: [12, 20, 239, 34], mark: [22, 23, 28, 28], nav: [12, 142, 239, 152], title: [312, 40] },
+      phone: { top: [0, 0, 390, 65], brand: [14, 18, 28, 28], mark: [14, 18, 28, 28], title: [16, 87] },
+      panel: { brand: [490, 307, 460, 30], mark: [490, 308, 28, 28], title: [490, 360] },
+    };
+    const box = selector => `(() => { const el = [...document.querySelectorAll(${JSON.stringify(selector)})].find(e => e.getClientRects().length);
+      if (!el) return null; const r = el.getBoundingClientRect(); return [r.x, r.y, r.width, r.height].map(Math.round); })()`;
+    // Every brand mark on screen: the new mark file, loaded and drawn at 28 x 28, with no old drawn logo beside it.
+    async function checkMarks(page, where) {
+      const marks = await page.run(`[...document.querySelectorAll('.brand')].filter(b => b.getClientRects().length).map(b => {
+        const img = b.querySelector('img');
+        return { img: img && img.getAttribute('src'), alt: img && img.getAttribute('alt'), loaded: !!img && img.complete && img.naturalWidth > 0,
+          size: img ? [img.width, img.height] : null, oldLogo: !!b.querySelector('svg'), text: b.innerText.trim() };
+      })`);
+      assert(marks.length > 0, `${where}: no brand on screen`);
+      for (const m of marks) {
+        assert(m.img === '/app/mark.svg', `${where}: the brand shows ${m.oldLogo ? 'the old drawn logo' : m.img}, not the new mark /app/mark.svg`);
+        assert(m.loaded, `${where}: the mark did not load`);
+        assert(JSON.stringify(m.size) === '[28,28]', `${where}: the mark is ${JSON.stringify(m.size)}, not 28 x 28`);
+        assert(!m.oldLogo, `${where}: the old logo is still drawn beside the mark`);
+        assert(m.alt === '', `${where}: the mark is not decorative (alt=${JSON.stringify(m.alt)}) next to the OpenWiz name`);
+      }
+    }
+    async function checkLayout(page, where, expected) {
+      for (const [part, want] of Object.entries(expected)) {
+        const selector = { brand: '.brand', mark: '.brand img, .brand svg', nav: 'nav.main', top: 'header.top', title: 'h1' }[part];
+        const got = (await page.run(box(selector)))?.slice(0, want.length);
+        assert(JSON.stringify(got) === JSON.stringify(want), `${where}: the ${part} moved: ${JSON.stringify(got)}, was ${JSON.stringify(want)}`);
+      }
+    }
+    // A served file of the app's, read as the browser gets it.
+    const served = async path => {
+      const file = await staticFile(path);
+      assert(file.status === 200, `${path} is not served (${file.status})`);
+      return file.body;
+    };
+
+    await check('AP14: the new mark, cream on charcoal, is the favicon and the home-screen icon', async () => {
+      const world = new World();
+      const page = await open(browser, world);
+      await page.go(`${SITE}/app/`);
+      await page.until(`document.querySelector('.panel')`, 'the sign-in screen');
+      const icons = await page.run(`[...document.querySelectorAll('link[rel~="icon"], link[rel="apple-touch-icon"]')].map(l => [l.rel, l.getAttribute('href')])`);
+      assert(JSON.stringify(icons) === JSON.stringify([['icon', '/app/icon.svg'], ['icon', '/app/icon.ico'], ['apple-touch-icon', '/app/icon-180.png']]),
+        `the app's icons are ${JSON.stringify(icons)}, not the new mark's`);
+      const svg = String(await served('/app/icon.svg')).toLowerCase();
+      assert(svg.includes(`fill="${CHARCOAL}"`) && svg.includes(`fill="${CREAM}"`), 'the favicon is not the cream mark on charcoal');
+      assert(!/#2b2bff|#e8b46a/.test(svg), 'the favicon still carries an old logo colour');
+      const ico = await served('/app/icon.ico');
+      assert(ico.readUInt16LE(0) === 0 && ico.readUInt16LE(2) === 1, 'icon.ico is not an icon file');
+      const sizes = [...Array(ico.readUInt16LE(4)).keys()].map(i => ico[6 + 16 * i] || 256);
+      assert(JSON.stringify(sizes) === '[16,32,48]', `icon.ico holds ${JSON.stringify(sizes)}, not 16, 32 and 48`);
+      const png = await served('/app/icon-180.png');
+      assert(png.readUInt32BE(16) === 180 && png.readUInt32BE(20) === 180, 'the home-screen icon is not 180 x 180');
+      // The picture itself: drawn in the page, its corner is charcoal and the mark's middle is cream.
+      const pixels = await page.run(`new Promise(resolve => { const img = new Image(); img.onload = () => {
+        const c = document.createElement('canvas'); c.width = c.height = 180; const g = c.getContext('2d'); g.drawImage(img, 0, 0);
+        const at = (x, y) => '#' + [...g.getImageData(x, y, 1, 1).data.slice(0, 3)].map(v => v.toString(16).padStart(2, '0')).join('');
+        resolve([at(90, 8), at(60, 100)]); }; img.src = '/app/icon-180.png'; })`);
+      assert(JSON.stringify(pixels) === JSON.stringify([CHARCOAL, CREAM]), `the home-screen icon reads ${JSON.stringify(pixels)}, not charcoal around a cream mark`);
+      checkRequestLog(world);
+      await page.close();
+    });
+
+    await check('AP14: the brand shows the new mark on the sign-in screen, the picker and the shell, and nothing else moves', async () => {
+      const world = new World();
+      world.graphql.Specs = ok('specs.json');
+      world.graphql.Agents = ok('agents.json');
+      const page = await open(browser, world);
+      await page.size(1440, 900, false);
+      await page.go(`${SITE}/app/`);
+      await page.until(`document.querySelector('.panel')`, 'the sign-in screen');
+      await settle(page);
+      await checkMarks(page, 'sign-in');
+      await checkLayout(page, 'sign-in', LAYOUT.panel);
+      await page.go(`${SITE}/app/?code=c0de&state=${STATE}`);
+      await page.until(`document.body.innerText.includes('acme/factory')`, 'the repository picker');
+      await settle(page);
+      await checkMarks(page, 'picker');
+      await page.click('acme/factory');
+      await page.until(`/Specs read \\d\\d:\\d\\d/.test(document.body.innerText)`, 'the shell');
+      await settle(page);
+      await checkMarks(page, 'shell on a laptop');
+      await checkLayout(page, 'shell on a laptop', LAYOUT.laptop);
+      await page.size(390, 844, true);
+      await checkMarks(page, 'shell on a phone');
+      await checkLayout(page, 'shell on a phone', LAYOUT.phone);
+      await page.size(null);
+      if (process.env.SHOTS) {
+        await page.shot(join(process.env.SHOTS, 'mark-laptop.png'), 1440, 900, false);
+        await page.shot(join(process.env.SHOTS, 'mark-phone.png'), 390, 844, true);
+      }
+      const mark = String(await served('/app/mark.svg')).toLowerCase();
+      assert(mark.includes(`fill="${CREAM}"`) && !/#2b2bff|#e8b46a|#ffffff/.test(mark), 'the header mark is not drawn in cream alone');
+      checkRequestLog(world);
+      await page.close();
+    });
+
+    await check('AP14: a Wiz of the family keeps the picker\'s empty states company, and only them', async () => {
+      const family = () => page.run(`[...document.querySelectorAll('.panel img')].filter(i => !i.closest('.brand')).map(i =>
+        ({ src: i.getAttribute('src'), alt: i.getAttribute('alt'), loaded: i.complete && i.naturalWidth > 0 }))`);
+      let page;
+      for (const [name, rest, shown] of [
+        ['no installation', { '/user/installations': async () => ({ status: 200, json: { total_count: 0, installations: [] } }) }, /one more step/i],
+        ['no readable repository', { '/user/installations/1001/repositories': async () => ({ status: 200, json: { total_count: 0, repositories: [] } }) }, /can.t see any repository yet/i],
+        ['a filled picker', {}, null],
+      ]) {
+        const world = new World();
+        Object.assign(world.rest, rest);
+        page = await open(browser, world);
+        await page.go(`${SITE}/app/?code=c0de&state=${STATE}`);
+        await page.until(shown ? `${shown}.test(document.body.innerText)` : `document.body.innerText.includes('acme/factory')`, `the picker (${name})`);
+        await settle(page);
+        const wizes = await family();
+        if (shown) {
+          assert(wizes.length === 1, `${name}: the empty state shows ${wizes.length} family Wizes, not one`);
+          assert(wizes[0].src === '/app/wiz-reviewer.svg' && wizes[0].loaded, `${name}: the family Wiz is ${JSON.stringify(wizes[0])}`);
+          assert(wizes[0].alt === '', `${name}: the Wiz is announced (alt=${JSON.stringify(wizes[0].alt)}); the sentence beside it already says it all`);
+          const svg = String(await served('/app/wiz-reviewer.svg')).toLowerCase();
+          assert(svg.includes(`fill="${CREAM}"`) && !/#2b2bff|#e8b46a/.test(svg), `${name}: the Wiz is not drawn in cream`);
+          await page.size(320, 640, true);
+          const width = await page.run('document.documentElement.scrollWidth');
+          assert(width <= 320, `${name}: the empty state is ${width} CSS pixels wide on a 320-pixel phone`);
+          await page.size(null);
+          if (process.env.SHOTS) await page.shot(join(process.env.SHOTS, `family-${name.replace(/ /g, '-')}.png`), 390, 844, true);
+        } else {
+          assert(wizes.length === 0, 'a filled picker shows a family Wiz; only the empty states have one');
+        }
+        checkRequestLog(world);
+        await page.close();
+      }
+    });
   } finally {
     await browser.close();
   }
