@@ -1,0 +1,350 @@
+{
+  "data": {
+    "rateLimit": {
+      "limit": 5000,
+      "remaining": 4870,
+      "resetAt": "2099-01-01T00:00:00Z"
+    },
+    "repository": {
+      "issues": {
+        "totalCount": 10,
+        "nodes": [
+          {
+            "number": 70,
+            "title": "Synthetic agents page",
+            "url": "https://github.com/acme/factory/issues/70",
+            "state": "OPEN",
+            "updatedAt": "LIVE-1",
+            "comments": {
+              "totalCount": 3,
+              "nodes": [
+                {
+                  "databaseId": 7005,
+                  "body": "<!-- openwiz:status v1 -->\nagent: builder\nstate: working\nharness: Synthetic Harness\nmodel: Synthetic Model\nskills: build-ticket@0.1.2\nstep: a second builder started late\ntime: LIVE-1",
+                  "createdAt": "2030-01-01T00:00:00Z",
+                  "updatedAt": "LIVE-1",
+                  "author": {
+                    "login": "factory-bot[bot]"
+                  }
+                },
+                {
+                  "databaseId": 7001,
+                  "body": "<!-- openwiz:status v1 -->\nagent: builder\nstate: working\nharness: Synthetic Harness\nmodel: Synthetic Model\nskills: build-ticket@0.1.2\nstep: opened the pull request; CI is running\ntime: LIVE-3\npr: https://github.com/acme/site/pull/12\npreview: https://12.example-site.pages.dev/app/",
+                  "createdAt": "2030-01-01T00:00:00Z",
+                  "updatedAt": "LIVE-3",
+                  "author": {
+                    "login": "factory-bot[bot]"
+                  }
+                },
+                {
+                  "databaseId": 7002,
+                  "body": "An ordinary comment.",
+                  "createdAt": "2030-01-01T00:00:00Z",
+                  "updatedAt": "LIVE-3",
+                  "author": {
+                    "login": "factory-bot[bot]"
+                  }
+                }
+              ]
+            },
+            "closedByPullRequestsReferences": {
+              "totalCount": 1,
+              "nodes": [
+                {
+                  "url": "https://github.com/acme/site/pull/12",
+                  "state": "OPEN",
+                  "isDraft": false,
+                  "reviewDecision": "REVIEW_REQUIRED",
+                  "commits": {
+                    "nodes": [
+                      {
+                        "commit": {
+                          "statusCheckRollup": {
+                            "state": "PENDING"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "number": 71,
+            "title": "Synthetic contract",
+            "url": "https://github.com/acme/factory/issues/71",
+            "state": "OPEN",
+            "updatedAt": "LIVE-1",
+            "comments": {
+              "totalCount": 2,
+              "nodes": [
+                {
+                  "databaseId": 7101,
+                  "body": "<!-- openwiz:status v1 -->\nagent: reviewer\nstate: working\nharness: Synthetic Harness\nmodel: Synthetic Model\nskills: review-ticket@0.1.2\nstep: reviewing the green head\ntime: LIVE-10\npr: https://github.com/acme/site/pull/13",
+                  "createdAt": "2030-01-01T00:00:00Z",
+                  "updatedAt": "LIVE-10",
+                  "author": {
+                    "login": "factory-bot[bot]"
+                  }
+                },
+                {
+                  "databaseId": 7102,
+                  "body": "<!-- openwiz:status v1 -->\nagent: builder\nstate: done\nharness: Synthetic Harness\nmodel: Synthetic Model\nskills: build-ticket@0.1.2\nstep: handed back the green head\ntime: LIVE-120\npr: https://github.com/acme/site/pull/13",
+                  "createdAt": "2030-01-01T00:00:00Z",
+                  "updatedAt": "LIVE-120",
+                  "author": {
+                    "login": "factory-bot[bot]"
+                  }
+                }
+              ]
+            },
+            "closedByPullRequestsReferences": {
+              "totalCount": 1,
+              "nodes": [
+                {
+                  "url": "https://github.com/acme/site/pull/13",
+                  "state": "OPEN",
+                  "isDraft": false,
+                  "reviewDecision": "APPROVED",
+                  "commits": {
+                    "nodes": [
+                      {
+                        "commit": {
+                          "statusCheckRollup": {
+                            "state": "SUCCESS"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "number": 72,
+            "title": "Synthetic pulse",
+            "url": "https://github.com/acme/factory/issues/72",
+            "state": "OPEN",
+            "updatedAt": "LIVE-1",
+            "comments": {
+              "totalCount": 1,
+              "nodes": [
+                {
+                  "databaseId": 7201,
+                  "body": "<!-- openwiz:status v1 -->\nagent: builder\nstate: asking\nharness: Synthetic Harness\nmodel: Synthetic Model\nskills: build-ticket@0.1.2\nstep: asked which path to use\ntime: LIVE-2",
+                  "createdAt": "2030-01-01T00:00:00Z",
+                  "updatedAt": "LIVE-2",
+                  "author": {
+                    "login": "factory-bot[bot]"
+                  }
+                }
+              ]
+            },
+            "closedByPullRequestsReferences": {
+              "totalCount": 0,
+              "nodes": []
+            }
+          },
+          {
+            "number": 73,
+            "title": "Synthetic merged work",
+            "url": "https://github.com/acme/factory/issues/73",
+            "state": "CLOSED",
+            "updatedAt": "LIVE-1",
+            "comments": {
+              "totalCount": 1,
+              "nodes": [
+                {
+                  "databaseId": 7301,
+                  "body": "<!-- openwiz:status v1 -->\nagent: builder\nstate: done\nharness: Synthetic Harness\nmodel: Synthetic Model\nskills: build-ticket@0.1.2\nstep: merged at the approved head\ntime: LIVE-300\npr: https://github.com/acme/site/pull/11",
+                  "createdAt": "2030-01-01T00:00:00Z",
+                  "updatedAt": "LIVE-300",
+                  "author": {
+                    "login": "factory-bot[bot]"
+                  }
+                }
+              ]
+            },
+            "closedByPullRequestsReferences": {
+              "totalCount": 1,
+              "nodes": [
+                {
+                  "url": "https://github.com/acme/site/pull/11",
+                  "state": "MERGED",
+                  "isDraft": false,
+                  "reviewDecision": null,
+                  "commits": {
+                    "nodes": [
+                      {
+                        "commit": {
+                          "statusCheckRollup": {
+                            "state": "SUCCESS"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "number": 74,
+            "title": "Synthetic lapsed claim",
+            "url": "https://github.com/acme/factory/issues/74",
+            "state": "OPEN",
+            "updatedAt": "LIVE-1",
+            "comments": {
+              "totalCount": 1,
+              "nodes": [
+                {
+                  "databaseId": 7401,
+                  "body": "<!-- openwiz:status v1 -->\nagent: builder\nstate: working\nharness: Synthetic Harness\nmodel: Synthetic Model\nskills: build-ticket@0.1.2\nstep: building the slice\ntime: LIVE-45",
+                  "createdAt": "2030-01-01T00:00:00Z",
+                  "updatedAt": "LIVE-45",
+                  "author": {
+                    "login": "factory-bot[bot]"
+                  }
+                }
+              ]
+            },
+            "closedByPullRequestsReferences": {
+              "totalCount": 0,
+              "nodes": []
+            }
+          },
+          {
+            "number": 75,
+            "title": "Synthetic stopped agent",
+            "url": "https://github.com/acme/factory/issues/75",
+            "state": "OPEN",
+            "updatedAt": "LIVE-1",
+            "comments": {
+              "totalCount": 1,
+              "nodes": [
+                {
+                  "databaseId": 7501,
+                  "body": "<!-- openwiz:status v1 -->\nagent: fleet\nstate: stopped (lost claim)\nharness: Synthetic Harness\nmodel: Synthetic Model\nskills: launch-fleet@0.1.2\nstep: stopped\ntime: LIVE-60",
+                  "createdAt": "2030-01-01T00:00:00Z",
+                  "updatedAt": "LIVE-60",
+                  "author": {
+                    "login": "factory-bot[bot]"
+                  }
+                }
+              ]
+            },
+            "closedByPullRequestsReferences": {
+              "totalCount": 0,
+              "nodes": []
+            }
+          },
+          {
+            "number": 76,
+            "title": "Synthetic newer note",
+            "url": "https://github.com/acme/factory/issues/76",
+            "state": "OPEN",
+            "updatedAt": "LIVE-1",
+            "comments": {
+              "totalCount": 1,
+              "nodes": [
+                {
+                  "databaseId": 7601,
+                  "body": "<!-- openwiz:status v2 -->\nagent: builder\nstate: working\nmood: synthetic",
+                  "createdAt": "2030-01-01T00:00:00Z",
+                  "updatedAt": "LIVE-4",
+                  "author": {
+                    "login": "factory-bot[bot]"
+                  }
+                }
+              ]
+            },
+            "closedByPullRequestsReferences": {
+              "totalCount": 0,
+              "nodes": []
+            }
+          },
+          {
+            "number": 77,
+            "title": "Synthetic old work",
+            "url": "https://github.com/acme/factory/issues/77",
+            "state": "OPEN",
+            "updatedAt": "LIVE-1",
+            "comments": {
+              "totalCount": 1,
+              "nodes": [
+                {
+                  "databaseId": 7701,
+                  "body": "<!-- openwiz:status v1 -->\nagent: builder\nstate: done\nharness: Synthetic Harness\nmodel: Synthetic Model\nskills: build-ticket@0.1.2\nstep: finished long ago\ntime: LIVE-2000",
+                  "createdAt": "2030-01-01T00:00:00Z",
+                  "updatedAt": "LIVE-2000",
+                  "author": {
+                    "login": "factory-bot[bot]"
+                  }
+                }
+              ]
+            },
+            "closedByPullRequestsReferences": {
+              "totalCount": 0,
+              "nodes": []
+            }
+          },
+          {
+            "number": 78,
+            "title": "Synthetic visitor",
+            "url": "https://github.com/acme/factory/issues/78",
+            "state": "OPEN",
+            "updatedAt": "LIVE-1",
+            "comments": {
+              "totalCount": 1,
+              "nodes": [
+                {
+                  "databaseId": 7801,
+                  "body": "<!-- openwiz:status v1 -->\nagent: builder\nstate: working\nharness: Synthetic Harness\nmodel: Synthetic Model\nskills: build-ticket@0.1.2\nstep: a visitor's copy of the marker\ntime: LIVE-2",
+                  "createdAt": "2030-01-01T00:00:00Z",
+                  "updatedAt": "LIVE-2",
+                  "author": {
+                    "login": "helpful-collaborator"
+                  }
+                }
+              ]
+            },
+            "closedByPullRequestsReferences": {
+              "totalCount": 0,
+              "nodes": []
+            }
+          },
+          {
+            "number": 79,
+            "title": "Synthetic broken note",
+            "url": "https://github.com/acme/factory/issues/79",
+            "state": "OPEN",
+            "updatedAt": "LIVE-1",
+            "comments": {
+              "totalCount": 1,
+              "nodes": [
+                {
+                  "databaseId": 7901,
+                  "body": "<!-- openwiz:status v1 -->\nagent: builder\nstate: working\nharness: Synthetic Harness\nmodel: Synthetic Model\nstep: no skills line\ntime: LIVE-6",
+                  "createdAt": "2030-01-01T00:00:00Z",
+                  "updatedAt": "LIVE-6",
+                  "author": {
+                    "login": "factory-bot[bot]"
+                  }
+                }
+              ]
+            },
+            "closedByPullRequestsReferences": {
+              "totalCount": 0,
+              "nodes": []
+            }
+          }
+        ]
+      },
+      "fleet": {
+        "text": "# Fleet\n\n## GitHub identity\n\n| What | Who |\n| --- | --- |\n| Record authors | `factory-bot[bot]` |\n"
+      }
+    }
+  }
+}
