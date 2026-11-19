@@ -108,7 +108,9 @@ class World {
   constructor() {
     this.log = [];
     this.violations = [];
-    this.graphql = {}; // operation name -> answer function (body) => {status, json, headers}
+    // operation name -> answer function (body) => {status, json, headers}. The Specs feed's second read (each running
+    // spec's tickets) answers with no spec by default, so those specs' tickets show as unknown.
+    this.graphql = { SpecTickets: async () => ({ status: 200, json: { data: { rateLimit: { limit: 5000, remaining: 4800, resetAt: '2099-01-01T00:00:00Z' }, repository: {} } } }) };
     this.rest = {}; // GitHub REST path -> answer function (url) => {status, json, headers}
     this.helper = {}; // helper path -> answer function (body) => {status, json} (may wait, to hold a response)
     this.done = []; // paths answered so far
@@ -266,7 +268,11 @@ async function waitFor(test, what, ms = 8000) {
   }
 }
 
-const graphqlCount = world => world.log.filter(r => r.origin === API && r.path === '/graphql' && r.method === 'POST').length;
+const operation = r => (String(JSON.parse(r.body || '{}').query).match(/^\s*query\s+(\w+)/) || [])[1];
+// GraphQL reads sent, or only those of the named operations (the first read of each feed: Specs, Agents).
+const graphqlCount = (world, names) => world.log.filter(r => r.origin === API && r.path === '/graphql' && r.method === 'POST'
+  && (!names || names.includes(operation(r)))).length;
+const settle = (page, ms = 300) => page.run(`new Promise(resolve => setTimeout(resolve, ${ms}))`);
 const ok = name => async () => ({ status: 200, json: await fixture(name) });
 
 // Every logged request: only the site (static reads and the helper) and GitHub's API, and nothing that writes.
@@ -433,8 +439,10 @@ async function main() {
       await page.until(`/GitHub.s limit is low/.test(document.body.innerText)`, 'the low-limit notice');
       assert(/paused until/i.test(await page.text()), 'the notice does not say when reads resume');
       if (process.env.SHOTS) await page.shot(join(process.env.SHOTS, 'low-limit-phone.png'), 390, 844, true);
+      await settle(page);
+      const first = graphqlCount(world, ['Specs', 'Agents']);
+      assert(first === 2, `expected one read per feed before the back-off, saw ${first}`);
       const before = graphqlCount(world);
-      assert(before === 2, `expected one read per feed before the back-off, saw ${before}`);
       const disabled = await page.run(`[...document.querySelectorAll('button')].filter(b => /refresh now/i.test(b.textContent)).map(b => b.disabled)`);
       assert(disabled.length === 2 && disabled.every(Boolean), `Refresh now is not disabled while backing off: ${JSON.stringify(disabled)}`);
       // Even forced, a refresh reads nothing while the limit is low (the data layer's own guard, not the button).
@@ -456,6 +464,123 @@ async function main() {
       const end = Date.now() + 5000;
       while (!world.violations.some(text => /Content Security Policy/.test(text)) && Date.now() < end) await new Promise(r => setTimeout(r, 50));
       assert(world.violations.some(text => /Content Security Policy/.test(text)), 'no Content Security Policy refused it');
+      await page.close();
+    });
+
+    // ---- AP6 (#1259): You, Specs and a spec's page, against recorded answers (ap6-*.json) ----
+    // The tickets' state comes from GitHub and the agents' openwiz:status v1 notes, never from a state label.
+
+    const ap6World = () => {
+      const world = new World();
+      world.graphql.Specs = ok('ap6-specs.json');
+      world.graphql.Agents = ok('agents.json');
+      // The building ticket's note was edited just now, so its claim is live (a claim lapses after 30 minutes).
+      world.graphql.SpecTickets = async () => ({ status: 200,
+        json: JSON.parse(JSON.stringify(await fixture('ap6-spec-tickets.json')).replaceAll('"LIVE"', JSON.stringify(new Date().toISOString()))) });
+      return world;
+    };
+    const ap6Open = async (world, route) => {
+      const page = await open(browser, world);
+      await signIn(page, world);
+      await page.click('acme/factory');
+      await page.until(`document.querySelector('nav a[aria-current="page"]')`, 'the shell');
+      if (route) await page.go(`${SITE}/app/${route}`);
+      return page;
+    };
+
+    await check('AP6 You: the counts, then what needs you, newest first, each linked to GitHub', async () => {
+      const world = ap6World();
+      const page = await ap6Open(world);
+      await page.until(`document.querySelectorAll('main .cards a.card').length >= 4`, 'the You items');
+      const tiles = await page.run(`[...document.querySelectorAll('main .tile')].map(t => t.querySelector('.k').textContent + '=' + t.querySelector('.v').textContent)`);
+      assert(JSON.stringify(tiles) === JSON.stringify(['Needs you=4', 'Building=1', 'In review=1', 'Merged=3']), `tiles: ${JSON.stringify(tiles)}`);
+      const items = await page.run(`[...document.querySelectorAll('main .cards a.card')].map(a => [a.querySelector('h3').textContent, a.getAttribute('href')])`);
+      const want = [
+        ['Pick the release name', 'https://github.com/acme/factory/issues/46'],
+        ['Spec: dark mode', 'https://github.com/acme/factory/issues/60#issuecomment-6001'],
+        ['Spec: search', 'https://github.com/acme/factory/issues/50#issuecomment-5002'],
+        ['Register the notes domain', 'https://github.com/acme/factory/issues/48'],
+      ];
+      assert(JSON.stringify(items) === JSON.stringify(want), `You items: ${JSON.stringify(items)}`);
+      const text = await page.run(`document.querySelector('main').innerText`);
+      assert(/Ticket marked for you/.test(text) && /Spec to confirm/.test(text) && /Plan to approve/.test(text), 'the items do not say what each one is');
+      assert(!text.includes('Question from a visitor'), 'a visitor\'s decision record shows as needing you');
+      const badge = await page.run(`document.querySelector('nav.main a[href="#/you"] .badge').textContent`);
+      assert(badge === '4', `the You badge is ${badge}`);
+      if (process.env.SHOTS) {
+        await page.shot(join(process.env.SHOTS, 'you-laptop.png'), 1440, 900, false);
+        await page.shot(join(process.env.SHOTS, 'you-phone.png'), 390, 844, true);
+      }
+      checkRequestLog(world);
+      await page.close();
+    });
+
+    await check('AP6 Specs: every running spec with how many of its tickets are done', async () => {
+      const world = ap6World();
+      const page = await ap6Open(world, '#/specs');
+      await page.until(`document.querySelectorAll('main a.card').length === 2`, 'the spec cards');
+      const cards = await page.run(`[...document.querySelectorAll('main a.card')].map(a => [a.getAttribute('href'), a.querySelector('h3').textContent, [...a.querySelectorAll('p')].map(p => p.textContent).join('|')])`);
+      assert(JSON.stringify(cards.map(c => c[0])) === JSON.stringify(['#/specs/50', '#/specs/40']), `spec links: ${JSON.stringify(cards)}`);
+      assert(cards[0][2].includes('2 of 3 tickets done') && cards[1][2].includes('1 of 8 tickets done'), `progress: ${JSON.stringify(cards)}`);
+      const bar = await page.run(`document.querySelector('main a.card[href="#/specs/40"] .bar').getAttribute('aria-label')`);
+      assert(bar === '1 merged, 1 in review, 1 building, 1 ready, 1 waiting, 1 needs you, 1 held, 1 unknown', `spec #40's bar: ${bar}`);
+      if (process.env.SHOTS) await page.shot(join(process.env.SHOTS, 'specs-laptop.png'), 1440, 900, false);
+      checkRequestLog(world);
+      await page.close();
+    });
+
+    await check('AP6 spec page: the blocking arrows and one colour per state, from GitHub and the status notes', async () => {
+      const world = ap6World();
+      const page = await ap6Open(world, '#/specs');
+      await page.until(`document.querySelector('main a.card[href="#/specs/40"]')`, 'the spec card');
+      await page.run(`document.querySelector('main a.card[href="#/specs/40"]').click()`);
+      await page.until(`document.querySelectorAll('main .graph [data-ticket]').length === 8`, 'the ticket graph');
+      assert(await page.run(`document.querySelector('h1').textContent.trim()`) === 'Specs', 'the spec page is not inside the Specs page');
+      assert(await page.run(`document.querySelector('nav.main a[aria-current="page"]').getAttribute('href')`) === '#/specs', 'Specs is not the current page');
+      const states = await page.run(`Object.fromEntries([...document.querySelectorAll('main .graph [data-ticket]')].map(c => [c.dataset.ticket, c.dataset.state]))`);
+      const want = { 41: 'merged', 42: 'review', 43: 'building', 44: 'ready', 45: 'waiting', 46: 'you', 47: 'held', 30: 'merged' };
+      assert(JSON.stringify(states) === JSON.stringify(want), `states: ${JSON.stringify(states)}`);
+      // Each state's card is drawn in that state's Ember colour, and the seven states are seven colours.
+      const colours = await page.run(`(() => {
+        const root = getComputedStyle(document.documentElement);
+        const token = { merged: '--em-merged', review: '--em-review', building: '--em-building', ready: '--em-ready', waiting: '--em-waiting', you: '--em-you', held: '--em-held' };
+        return [...document.querySelectorAll('main .graph [data-ticket]')].map(c => [c.dataset.state, getComputedStyle(c, '::before').backgroundColor,
+          (() => { const probe = document.createElement('i'); probe.style.color = root.getPropertyValue(token[c.dataset.state]).trim(); document.body.append(probe); const v = getComputedStyle(probe).color; probe.remove(); return v; })()]);
+      })()`);
+      for (const [state, shown, token] of colours) assert(shown === token, `a ${state} ticket is drawn ${shown}, not its colour ${token}`);
+      assert(new Set(colours.map(c => c[1])).size === 7, `the seven states are not seven colours: ${JSON.stringify(colours)}`);
+      const arrows = await page.run(`[...document.querySelectorAll('main .graph path.arrow')].map(p => p.dataset.from.split('#')[1] + '>' + p.dataset.to.split('#')[1]).sort()`);
+      assert(JSON.stringify(arrows) === JSON.stringify(['30>43', '41>42', '41>44', '42>45', '43>45', '44>47']), `arrows: ${JSON.stringify(arrows)}`);
+      if (process.env.SHOTS) {
+        await page.shot(join(process.env.SHOTS, 'spec-laptop.png'), 1440, 900, false);
+        await page.shot(join(process.env.SHOTS, 'spec-phone.png'), 390, 844, true);
+      }
+      checkRequestLog(world);
+      await page.close();
+    });
+
+    await check('AP6 spec page: a ticket GitHub could not read shows as unknown', async () => {
+      const world = ap6World();
+      const page = await ap6Open(world, '#/specs/40');
+      await page.until(`document.querySelector('main .graph')`, 'the ticket graph');
+      const main = await page.run(`document.querySelector('main').innerText`);
+      assert(/1 of this spec.s tickets couldn.t be read/.test(main), 'the unreadable ticket is not called out');
+      assert(/A ticket GitHub couldn.t read\s*Unknown/.test(main), 'the unreadable ticket is not listed as unknown');
+      assert(/1 unknown/.test(main), 'the legend does not count the unknown ticket');
+      checkRequestLog(world);
+      await page.close();
+    });
+
+    await check('AP6 spec page: a failed read of the tickets is unknown, never an empty graph', async () => {
+      const world = ap6World();
+      world.graphql.SpecTickets = async () => ({ status: 502, json: { message: 'Bad Gateway' } });
+      const page = await ap6Open(world, '#/specs/40');
+      await page.until(`/couldn.t be read/.test(document.querySelector('main').innerText)`, 'the unknown tickets');
+      const main = await page.run(`document.querySelector('main').innerText`);
+      assert(/This spec.s tickets couldn.t be read/.test(main), 'the failed ticket read is not called unknown');
+      assert(!(await page.run(`!!document.querySelector('main .graph')`)), 'an empty graph is drawn for tickets that could not be read');
+      assert(/1 of 8 tickets done/.test(main), 'the spec\'s own progress is lost');
+      checkRequestLog(world);
       await page.close();
     });
 
