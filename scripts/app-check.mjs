@@ -64,13 +64,33 @@ async function launch() {
     waiting.set(id, { resolve, reject });
     socket.send(JSON.stringify({ id, method, params, ...(sessionId ? { sessionId } : {}) }));
   });
+  // Every new tab or window is attached paused, before it loads anything. One the app opens (it has an opener) has its
+  // first request handed to its opener's check (popups) and refused, and is closed: it never reaches the network.
+  const popups = new Map(); // opener target id -> (request) => void
+  const opened = new Map(); // popup session id -> opener target id
+  listeners.push(async message => {
+    if (message.method === 'Target.attachedToTarget' && !message.sessionId) {
+      const { sessionId, targetInfo } = message.params;
+      if (targetInfo.openerId) {
+        opened.set(sessionId, targetInfo.openerId);
+        await send('Fetch.enable', { patterns: [{ urlPattern: '*', requestStage: 'Request' }] }, sessionId).catch(() => {});
+      }
+      await send('Runtime.runIfWaitingForDebugger', {}, sessionId).catch(() => {});
+    }
+    if (message.method === 'Fetch.requestPaused' && opened.has(message.sessionId)) {
+      popups.get(opened.get(message.sessionId))?.(message.params.request);
+      await send('Fetch.failRequest', { requestId: message.params.requestId, errorReason: 'BlockedByClient' }, message.sessionId).catch(() => {});
+      await send('Target.closeTarget', { targetId: message.params.frameId }).catch(() => {});
+    }
+  });
+  await send('Target.setAutoAttach', { autoAttach: true, waitForDebuggerOnStart: true, flatten: true });
   const close = async () => {
     socket.close();
     child.kill();
     await new Promise(resolve => child.once('exit', resolve));
     await rm(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }).catch(() => {});
   };
-  return { send, on: listener => listeners.push(listener), close };
+  return { send, on: listener => listeners.push(listener), popups, close };
 }
 
 // ---- The recorded world ---------------------------------------------------------------------------------------
@@ -114,6 +134,7 @@ class World {
     this.rest = {}; // GitHub REST path -> answer function (url) => {status, json, headers}
     this.helper = {}; // helper path -> answer function (body) => {status, json} (may wait, to hold a response)
     this.done = []; // paths answered so far
+    this.opened = []; // tabs the page opened (a link to GitHub), by their first request: never answered
   }
 
   answered(path) {
@@ -197,6 +218,10 @@ async function open(browser, world) {
       world.violations.push(`exception: ${message.params.exceptionDetails.exception?.description || message.params.exceptionDetails.text}`);
     }
   });
+  // A tab the page opens (a link to GitHub) is noted in world.opened by its first request, which is refused (launch).
+  browser.popups.set(targetId, request => world.opened.push({ method: request.method, url: request.url }));
+  await browser.send('Browser.grantPermissions', { origin: SITE, browserContextId, permissions: ['clipboardReadWrite', 'clipboardSanitizedWrite'] });
+  await send('Emulation.setFocusEmulationEnabled', { enabled: true });
   await send('Fetch.enable', { patterns: [{ urlPattern: '*', requestStage: 'Request' }] });
   await send('Log.enable');
   await send('Runtime.enable');
@@ -231,13 +256,23 @@ async function open(browser, world) {
       await writeFile(path, Buffer.from(data, 'base64'));
       await send('Emulation.clearDeviceMetricsOverride');
     },
-    // Press one key as a keyboard does (keyDown, then keyUp): 'Tab', 'Enter', 'Escape' or a digit.
-    async key(key) {
-      const codes = { Tab: ['Tab', 9], Enter: ['Enter', 13, '\r'], Escape: ['Escape', 27] };
-      const [code, vk, text] = codes[key] || [`Digit${key}`, key.charCodeAt(0), key];
-      await send('Input.dispatchKeyEvent', { type: 'keyDown', key, code, windowsVirtualKeyCode: vk, ...(text ? { text } : {}) });
-      await send('Input.dispatchKeyEvent', { type: 'keyUp', key, code, windowsVirtualKeyCode: vk });
+    // Press one key as a keyboard does (keyDown, then keyUp): 'Tab', 'Enter', 'Escape', an arrow, 'Backspace', '?',
+    // a digit or a letter, with any of the modifiers Alt, Ctrl, Meta and Shift held.
+    async key(key, ...held) {
+      const codes = { Tab: ['Tab', 9], Enter: ['Enter', 13, '\r'], Escape: ['Escape', 27], ArrowDown: ['ArrowDown', 40], ArrowUp: ['ArrowUp', 38],
+        Backspace: ['Backspace', 8], '?': ['Slash', 191, '?'] };
+      const letter = /^[a-z]$/i.test(key) ? [`Key${key.toUpperCase()}`, key.toUpperCase().charCodeAt(0), key] : null;
+      const [code, vk, typed] = codes[key] || letter || [`Digit${key}`, key.charCodeAt(0), key];
+      const modifiers = held.reduce((m, name) => m | { Alt: 1, Ctrl: 2, Meta: 4, Shift: 8 }[name], 0);
+      // A key pressed with Ctrl, Alt or Meta types nothing.
+      const text = typed && !(modifiers & 7) ? typed : undefined;
+      await send('Input.dispatchKeyEvent', { type: 'keyDown', key, code, windowsVirtualKeyCode: vk, modifiers, ...(text ? { text } : {}) });
+      await send('Input.dispatchKeyEvent', { type: 'keyUp', key, code, windowsVirtualKeyCode: vk, modifiers });
     },
+    // Type text into the focused field, as a keyboard's input does.
+    type: text => send('Input.insertText', { text }),
+    // What the app put on the clipboard, read as this site.
+    clipboard: () => page.run('navigator.clipboard.readText()'),
     // Click the visible control (link or button) whose text, without its aria-hidden parts, is exactly this.
     click: text => page.run(`(() => {
       ${LABEL}
@@ -1212,6 +1247,248 @@ async function main() {
         checkRequestLog(world);
         await page.close();
       }
+    });
+
+    // ---- AP15 (#1327): Cmd-K, a keyboard-first command palette, and `?` for every shortcut ----
+    // The palette is a modal dialog: a search field (a combobox) over a list of results (a listbox). It finds every page,
+    // spec, ticket and agent the app shows, and runs the app's view actions. It never writes to GitHub: anything that
+    // changes work is something an agent does through GitHub, and the palette only links to it.
+
+    const palette = page => page.run(`(() => { const d = document.querySelector('dialog[open]'); if (!d) return null;
+      const input = d.querySelector('input'); const active = d.querySelector('[role="option"][aria-selected="true"]');
+      return { label: d.getAttribute('aria-label') || d.querySelector('h2')?.textContent || '', typing: document.activeElement === input,
+        inside: d.contains(document.activeElement), value: input?.value ?? null,
+        active: active ? active.innerText.replace(/\\s+/g, ' ').trim() : null,
+        options: [...d.querySelectorAll('[role="option"]')].map(o => o.innerText.replace(/\\s+/g, ' ').trim()) }; })()`);
+    const paletteOpen = async (page, ...held) => {
+      await page.key('k', ...(held.length ? held : ['Ctrl']));
+      await page.until(`document.querySelector('dialog[open] input') === document.activeElement`, 'the palette, with the search field focused');
+    };
+    // Type into the palette and wait until the first result is the one wanted.
+    const find = async (page, text, first) => {
+      await page.type(text);
+      await page.until(`(document.querySelector('dialog[open] [role="option"][aria-selected="true"]')?.innerText || '').replace(/\\s+/g, ' ').includes(${JSON.stringify(first)})`,
+        `"${first}" as the palette's first result for "${text}"`, 4000);
+    };
+    const visibleFocus = page => page.run(`(() => { const e = document.activeElement; const s = getComputedStyle(e);
+      return s.outlineStyle !== 'none' && s.outlineWidth !== '0px'; })()`);
+
+    await check('AP15 palette: Cmd-K and Ctrl-K open it; typing finds any page, spec, ticket or agent, and Enter goes there', async () => {
+      const world = ap7World();
+      const page = await ap6Open(world);
+      await page.until(`document.querySelectorAll('main .cards a.card').length >= 6`, 'the You page');
+      await page.until(`/Agents read \\d\\d:\\d\\d/.test(document.body.innerText) && OW.data.feeds.specs.data?.specs`, 'both feeds read');
+      // Ctrl-K opens it with the search field focused; Esc closes it and gives focus back; Cmd-K (Meta) opens it too.
+      await page.run(`document.querySelector('main .cards a.card').focus()`);
+      await paletteOpen(page, 'Ctrl');
+      assert(/command/i.test((await palette(page)).label), 'the palette has no accessible name');
+      await page.key('Escape');
+      await page.until(`!document.querySelector('dialog[open]')`, 'Esc to close the palette');
+      assert(await page.run(`document.activeElement === document.querySelector('main .cards a.card')`), 'closing the palette lost the focused card');
+      assert(await page.run(`location.hash`) === '#/you', 'Esc in the palette left the page');
+      await paletteOpen(page, 'Meta');
+      // A page, by its name.
+      await find(page, 'agents', 'Agents');
+      await page.key('Enter');
+      await page.until(`location.hash === '#/agents' && !document.querySelector('dialog[open]')`, 'Enter on a page to go there');
+      // A spec, by its number: its page, with focus on its title.
+      await paletteOpen(page);
+      await find(page, '#40', 'Spec: shipping notes');
+      await page.key('Enter');
+      await page.until(`location.hash === '#/specs/40' && document.activeElement.classList.contains('spec-title')`, 'Enter on a spec to open its page');
+      // A ticket, by words of its title: its spec's page, with focus on its card in the graph.
+      await paletteOpen(page);
+      await find(page, 'notes search', '#45 Notes search');
+      await page.key('Enter');
+      await page.until(`location.hash === '#/specs/40' && document.activeElement.dataset.ticket === '45'`, 'Enter on a ticket to focus its card');
+      // A ticket on another spec, from another page.
+      await page.key('1');
+      await page.until(`location.hash === '#/you'`, 'You by its key');
+      await paletteOpen(page);
+      await find(page, 'results page', '#53 Results page');
+      await page.key('Enter');
+      await page.until(`location.hash === '#/specs/50' && document.activeElement.dataset.ticket === '53'`, 'Enter on a ticket of spec 50');
+      // An agent, by its ticket: the Agents page, with focus on its card's ticket.
+      await paletteOpen(page);
+      await find(page, 'synthetic contract', 'Reviewer');
+      await page.key('Enter');
+      await page.until(`location.hash === '#/agents' && document.activeElement.closest('article.card')?.dataset.note === '7101'`, 'Enter on an agent to focus its card');
+      // Nothing found says so, never an empty box.
+      await paletteOpen(page);
+      await page.type('zzqx nothing like this');
+      await page.until(`/no match/i.test(document.querySelector('dialog[open]').innerText)`, 'the no-match line');
+      await page.key('Escape');
+      checkRequestLog(world);
+      assert(world.opened.length === 0, `going somewhere in the app opened a tab: ${JSON.stringify(world.opened)}`);
+      await page.close();
+    });
+
+    await check('AP15 palette: its view actions (open on GitHub, copy a link, filter, refresh) work, and nothing writes to GitHub', async () => {
+      const world = ap7World();
+      const page = await ap6Open(world, '#/specs/40');
+      await page.until(`document.querySelectorAll('main .graph [data-ticket]').length === 10`, 'the ticket graph');
+      await page.until(`/Agents read \\d\\d:\\d\\d/.test(document.body.innerText)`, 'the Agents read');
+      // Copy a link: this page's own address.
+      await paletteOpen(page);
+      await find(page, 'copy link', 'Copy a link to this page');
+      await page.key('Enter');
+      await page.until(`/copied/i.test(document.querySelector('dialog[open]')?.innerText || '')`, 'the copied line');
+      assert(await page.clipboard() === `${SITE}/app/#/specs/40`, `the copied link is ${await page.clipboard()}`);
+      await page.key('Escape');
+      // Alt+Enter copies the chosen result's GitHub link.
+      await paletteOpen(page);
+      await find(page, 'notes export', '#47 Notes export');
+      await page.key('Enter', 'Alt');
+      await page.until(`/copied/i.test(document.querySelector('dialog[open]')?.innerText || '')`, 'the copied line');
+      assert(await page.clipboard() === 'https://github.com/acme/factory/issues/47', `Alt+Enter copied ${await page.clipboard()}`);
+      await page.key('Escape');
+      // Open on GitHub: this page's spec, and a chosen result with Shift+Enter, each in a new tab; the app stays.
+      await paletteOpen(page);
+      await find(page, 'open on github', 'Open this page on GitHub');
+      await page.key('Enter');
+      await waitFor(() => world.opened.length >= 1, 'the spec opened on GitHub');
+      await paletteOpen(page);
+      await find(page, 'notes feed', '#44 Notes feed');
+      await page.key('Enter', 'Shift');
+      await waitFor(() => world.opened.length >= 2, 'the ticket opened on GitHub');
+      assert(JSON.stringify(world.opened.map(o => `${o.method} ${o.url}`)) === JSON.stringify(['GET https://github.com/acme/factory/issues/40',
+        'GET https://github.com/acme/factory/issues/44']), `opened: ${JSON.stringify(world.opened)}`);
+      assert(await page.run(`location.href`) === `${SITE}/app/#/specs/40`, 'opening on GitHub moved the app');
+      // Filter: only one kind of result, until Backspace in the empty field shows everything again.
+      await paletteOpen(page);
+      await find(page, 'only tickets', 'Show only tickets');
+      await page.key('Enter');
+      await page.until(`document.querySelector('dialog[open] input').value === '' && document.querySelectorAll('dialog[open] [role="option"]').length > 3`, 'the filtered list');
+      let shown = await palette(page);
+      assert(shown.options.every(o => /^Ticket\b/.test(o)), `the ticket filter shows: ${shown.options.slice(0, 6).join(' | ')}`);
+      assert(shown.options.some(o => o.includes('#53 Results page')) && shown.options.some(o => o.includes('#48 Register the notes domain')), 'the ticket filter misses tickets');
+      await page.type('agents');
+      await page.until(`!document.querySelector('dialog[open] [role="option"]')`, 'no ticket matching "agents"');
+      for (let i = 0; i < 'agents'.length + 1; i += 1) await page.key('Backspace');
+      await page.until(`[...document.querySelectorAll('dialog[open] [role="option"]')].some(o => /^Page\\b/.test(o.innerText.trim()))`, 'everything back after Backspace');
+      await page.key('Escape');
+      // Refresh: every feed is read again.
+      const before = graphqlCount(world);
+      await paletteOpen(page);
+      await find(page, 'refresh', 'Refresh now');
+      await page.key('Enter');
+      await waitFor(() => graphqlCount(world) >= before + 3, 'both feeds read again');
+      // Every result that would change work only links to GitHub; no request the app sent writes anything.
+      checkRequestLog(world);
+      assert(world.opened.every(o => o.method === 'GET' && o.url.startsWith('https://github.com/')), 'a tab opened somewhere other than GitHub');
+      await page.close();
+    });
+
+    // Every key the app answers to, as the `?` list must name it: [keys, what they do].
+    const SHORTCUTS = [/Ctrl K|⌘ K/, /\b1\b[^\n]*You/, /\b2\b[^\n]*Specs/, /\b3\b[^\n]*Agents/, /\?[^\n]*shortcuts/i, /Esc/, /↑ ↓|Up|Down/,
+      /Enter[^\n]*go/i, /Shift Enter[^\n]*GitHub/i, /Alt Enter[^\n]*cop/i, /Backspace[^\n]*filter/i, /Tab/];
+
+    await check('AP15 shortcuts: ? lists every shortcut, the number keys still work, and neither fires while typing', async () => {
+      const world = ap7World();
+      const page = await ap6Open(world);
+      await page.until(`document.querySelectorAll('main .cards a.card').length >= 6`, 'the You page');
+      await page.key('?');
+      await page.until(`document.querySelector('dialog[open]') && /keyboard shortcuts/i.test(document.querySelector('dialog[open]').innerText)`, '? to list the shortcuts');
+      const list = await page.run(`document.querySelector('dialog[open]').innerText`);
+      for (const want of SHORTCUTS) assert(want.test(list), `the shortcut list misses ${want}: ${list.replace(/\s+/g, ' ')}`);
+      assert((await palette(page)).inside, 'focus is not inside the shortcut list');
+      // A number key while the list is open doesn't move the page behind it.
+      await page.key('2');
+      assert(await page.run(`location.hash`) === '#/you', 'a number key moved the page behind the shortcut list');
+      await page.key('Escape');
+      await page.until(`!document.querySelector('dialog[open]')`, 'Esc to close the list');
+      for (const [key, hash] of [['2', '#/specs'], ['3', '#/agents'], ['1', '#/you']]) {
+        await page.key(key);
+        await page.until(`location.hash === '${hash}'`, `${key} to open ${hash}`);
+      }
+      // Typing ? or a digit in the palette's field types it: no list opens, and the page stays.
+      await paletteOpen(page);
+      await page.key('2');
+      await page.key('?');
+      const typed = await palette(page);
+      assert(typed.value === '2?' && typed.typing, `typing in the palette gave ${JSON.stringify(typed.value)}`);
+      assert(await page.run(`location.hash`) === '#/you', 'a digit typed in the palette moved the page');
+      assert(await page.run(`document.querySelectorAll('dialog[open]').length`) === 1, 'a ? typed in the palette opened the shortcut list');
+      // The palette offers the shortcut list too.
+      await page.key('Backspace');
+      await page.key('Backspace');
+      await find(page, 'shortcuts', 'Show keyboard shortcuts');
+      await page.key('Enter');
+      await page.until(`/keyboard shortcuts/i.test(document.querySelector('dialog[open]')?.innerText || '')`, 'the list from the palette');
+      await page.key('Escape');
+      checkRequestLog(world);
+      await page.close();
+    });
+
+    await check('AP15 keyboard: the palette and the shortcut list are used without a mouse, with visible focus that stays inside and comes back', async () => {
+      const world = ap7World();
+      const page = await ap6Open(world);
+      await page.until(`document.querySelectorAll('main .cards a.card').length >= 6`, 'the You page');
+      await page.until(`OW.data.feeds.specs.data?.specs`, 'the spec tickets');
+      await page.key('Tab');
+      await page.key('Tab');
+      const before = await page.run(`document.activeElement.getAttribute('href')`);
+      await paletteOpen(page);
+      assert(await visibleFocus(page), "the palette's search field has focus but no visible focus ring");
+      // Down and Up move the chosen result, which shows as chosen and is announced (aria-activedescendant).
+      await page.type('notes');
+      await page.until(`document.querySelectorAll('dialog[open] [role="option"]').length >= 3`, 'several results');
+      const first = (await palette(page)).active;
+      await page.key('ArrowDown');
+      await page.key('ArrowDown');
+      await page.key('ArrowUp');
+      const chosen = await page.run(`(() => { const d = document.querySelector('dialog[open]'); const o = d.querySelector('[role="option"][aria-selected="true"]');
+        const s = getComputedStyle(o); return { id: o.id, text: o.innerText.replace(/\\s+/g, ' ').trim(), second: o === d.querySelectorAll('[role="option"]')[1],
+        announced: d.querySelector('input').getAttribute('aria-activedescendant') === o.id, marked: s.boxShadow !== 'none' || (s.outlineStyle !== 'none' && s.outlineWidth !== '0px') }; })()`);
+      assert(chosen.second && chosen.text !== first, `Down, Down, Up did not choose the second result: ${chosen.text}`);
+      assert(chosen.announced, "the chosen result is not the field's aria-activedescendant");
+      assert(chosen.marked, 'the chosen result is not visibly marked');
+      // Tab and Shift+Tab keep focus inside the open palette.
+      for (const held of [[], ['Shift']]) {
+        await page.key('Tab', ...held);
+        assert((await palette(page)).inside, `${held.length ? 'Shift+Tab' : 'Tab'} took focus out of the open palette`);
+      }
+      // Esc gives focus back to where it was.
+      await page.key('Escape');
+      await page.until(`!document.querySelector('dialog[open]')`, 'Esc to close');
+      assert(await page.run(`document.activeElement.getAttribute('href')`) === before, 'closing the palette did not give focus back');
+      assert(await visibleFocus(page), 'focus came back without a visible focus ring');
+      // The shortcut list: focus inside on a visible control, Tab stays inside, Esc gives focus back.
+      await page.key('?');
+      await page.until(`document.querySelector('dialog[open]')?.contains(document.activeElement)`, 'focus inside the shortcut list');
+      assert(await visibleFocus(page), "the shortcut list's focused control has no visible focus ring");
+      await page.key('Tab');
+      assert((await palette(page)).inside, 'Tab took focus out of the shortcut list');
+      await page.key('Escape');
+      await page.until(`!document.querySelector('dialog[open]') && document.activeElement.getAttribute('href') === ${JSON.stringify(before)}`, 'focus back after the list');
+      // A whole trip without a mouse: open, find, go, and land with visible focus on the ticket's card.
+      await paletteOpen(page);
+      await find(page, '43', '#43 Store the notes');
+      await page.key('Enter');
+      await page.until(`document.activeElement.dataset.ticket === '43'`, 'focus on ticket 43');
+      assert(await visibleFocus(page), 'the ticket the palette went to has focus but no visible focus ring');
+      // The palette opens on a phone too, inside the screen.
+      await page.size(390, 844, true);
+      await paletteOpen(page);
+      const box = await page.run(`(() => { const r = document.querySelector('dialog[open]').getBoundingClientRect(); return [r.left, r.right, r.top]; })()`);
+      assert(box[0] >= 0 && box[1] <= 390 && box[2] >= 0, `the palette is off a 390-pixel phone screen: ${JSON.stringify(box)}`);
+      if (process.env.SHOTS) {
+        await page.type('notes');
+        await page.shot(join(process.env.SHOTS, 'palette-phone.png'), 390, 844, true);
+      }
+      await page.key('Escape');
+      await page.size(null);
+      if (process.env.SHOTS) {
+        await paletteOpen(page);
+        await page.type('notes');
+        await page.shot(join(process.env.SHOTS, 'palette-laptop.png'), 1440, 900, false);
+        await page.key('Escape');
+        await page.key('?');
+        await page.shot(join(process.env.SHOTS, 'shortcuts-laptop.png'), 1440, 900, false);
+        await page.key('Escape');
+      }
+      checkRequestLog(world);
+      await page.close();
     });
   } finally {
     await browser.close();
