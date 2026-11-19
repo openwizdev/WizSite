@@ -6,7 +6,7 @@ import unittest
 
 import re
 
-from check import FINGERPRINTS, HASHED, ROOT, Page, check_landing_text, check_motion, check_privacy, check_ref, check_site, check_vector, check_webp, fingerprint
+from check import FINGERPRINTS, HASHED, ROOT, Page, check_film_script, check_landing_text, check_motion, check_privacy, check_ref, check_site, check_vector, check_webp, fingerprint
 
 
 def edit_built(root, name, change):
@@ -196,6 +196,38 @@ class Checks(unittest.TestCase):
                 self.assertIn(old, landing)
                 with self.assertRaises(AssertionError):
                     check_landing_text(landing.replace(old, new, 1))
+
+    def test_film_starts_only_without_reduced_motion(self):
+        # Catches (#1308): the GSAP film (which the CSS motion check cannot see) built or switched on outside
+        # gsap.matchMedia's no-preference query, so it would play for a visitor who asked for reduced motion;
+        # or GSAP used for some other motion outside that query.
+        js = (ROOT / 'site.js').read_text()
+        check_film_script(js)
+        entry = "gsap.matchMedia().add('(prefers-reduced-motion: no-preference)', () => {"
+        for change in (lambda t: t.replace(entry, "gsap.matchMedia().add('(min-width: 0px)', () => {"),
+                       lambda t: t.replace("  root.classList.add('story-live');", "  root.classList.add('story-live');\n  buildFilm(window.gsap);"),
+                       lambda t: t.replace("  root.classList.add('story-live');", "  root.classList.add('story-live', 'film-live');\n  root.classList.add('film-live');"),
+                       lambda t: t.replace("  root.classList.add('story-live');", "  root.classList.add('story-live');\n  window.gsap?.to('.l-rocket', { y: -40, repeat: -1 });")):
+            with self.subTest(change=change):
+                changed = change(js)
+                self.assertNotEqual(changed, js)
+                with self.assertRaises(AssertionError):
+                    check_film_script(changed)
+
+    def test_vendored_gsap_is_pinned(self):
+        # Catches (#1308, J187): a changed or swapped vendored GSAP (or its licence notice) shipping unreviewed,
+        # in source or in the build.
+        data = (ROOT / 'vendor/gsap-3.15.1.min.js').read_bytes()
+        check_privacy('vendor/gsap-3.15.1.min.js', data)
+        for path in ('vendor/gsap-3.15.1.min.js', 'dist/vendor/gsap-3.15.1.min.js', 'vendor/other.js'):
+            with self.subTest(path=path), self.assertRaises(AssertionError):
+                check_privacy(path, data + b'\n;fetch("/x")')
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / 'dist'
+            shutil.copytree(ROOT / 'dist', root)
+            (root / 'vendor/GSAP-NOTICE.txt').write_text('removed')
+            with self.assertRaises(AssertionError):
+                check_site(root)
 
     def test_motion_only_without_reduced_motion(self):
         # Catches: an idle move, a transition or smooth scrolling that still runs for a visitor who asked for
