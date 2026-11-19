@@ -105,7 +105,7 @@ MOTION_OK = '@media (prefers-reduced-motion:no-preference)'
 # The animated layout (sticky zoom-out, hidden-until-scrolled hand-off, Pause motion) is switched on only by
 # site.js itself, once its handlers are in place: no inline script may set it first, so a failed site.js
 # download leaves the still story fully visible.
-LIVE_CLASS = 'story-live'
+LIVE_CLASS = 'film-live'
 # Every CSS animation (the act loops and the small moves too) also needs .film-live, which site.js adds only once
 # GSAP is running under no-preference: with GSAP blocked the whole page stays still (#1308 R1).
 FILM_CLASS = 'film-live'

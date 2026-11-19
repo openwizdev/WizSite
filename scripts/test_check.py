@@ -158,7 +158,7 @@ class Checks(unittest.TestCase):
         # Catches: an inline script that switches on the animated story (sticky zoom-out with its hand-off hidden
         # until scrolled, Pause motion) before site.js loads; if site.js then fails to download, the last painting
         # and "This is your factory." never show and Pause does nothing.
-        for change in ((lambda t: t.replace('</head>', "<script>document.documentElement.classList.add('story-live')</script></head>", 1)),
+        for change in ((lambda t: t.replace('</head>', "<script>document.documentElement.classList.add('film-live')</script></head>", 1)),
                        (lambda t: t.replace('<body>', '<body><script type="module">document.body.dataset.x = 1</script>', 1))):
             with self.subTest(change=change), tempfile.TemporaryDirectory() as temp:
                 root = Path(temp) / 'dist'
@@ -173,7 +173,7 @@ class Checks(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp) / 'dist'
             shutil.copytree(ROOT / 'dist', root)
-            edit_built(root, 'site.js', lambda t: t.replace("classList.add('story-live')", ''))
+            edit_built(root, 'site.js', lambda t: t.replace("classList.add('film-live')", ''))
             with self.assertRaises(AssertionError):
                 check_site(root)
 
@@ -205,9 +205,9 @@ class Checks(unittest.TestCase):
         check_film_script(js)
         entry = "gsap.matchMedia().add('(prefers-reduced-motion: no-preference)', () => {"
         for change in (lambda t: t.replace(entry, "gsap.matchMedia().add('(min-width: 0px)', () => {"),
-                       lambda t: t.replace("  root.classList.add('story-live');", "  root.classList.add('story-live');\n  buildFilm(window.gsap);"),
-                       lambda t: t.replace("  root.classList.add('story-live');", "  root.classList.add('story-live', 'film-live');\n  root.classList.add('film-live');"),
-                       lambda t: t.replace("  root.classList.add('story-live');", "  root.classList.add('story-live');\n  window.gsap?.to('.l-rocket', { y: -40, repeat: -1 });")):
+                       lambda t: t.replace("  const gsap = window.gsap;", "  const gsap = window.gsap;\n  buildFilm(window.gsap);"),
+                       lambda t: t.replace("  const gsap = window.gsap;", "  const gsap = window.gsap;\n  root.classList.add('film-live');"),
+                       lambda t: t.replace("  const gsap = window.gsap;", "  const gsap = window.gsap;\n  window.gsap?.to('.l-rocket', { y: -40, repeat: -1 });")):
             with self.subTest(change=change):
                 changed = change(js)
                 self.assertNotEqual(changed, js)

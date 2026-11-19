@@ -3,11 +3,11 @@
  * The landing is one film (J185): the hero plays all three acts in about 40 s and loops (the cave idea, the grill,
  * the forge, the mill's review, the launch, the pull-back through the lines into the lattice of every era, then
  * the app and "This is your factory.") on one GSAP timeline in site.js; below it, one short CSS loop per act. The only words are the headline, the
- * two buttons and one caption per act. Every scene's resting state is a still: without JavaScript, if site.js
- * fails to load, or with reduced motion, the page shows every painting. Only site.js adds .story-live to <html>,
- * after its handlers are in place, and .film-live only while the film's timeline runs (never under reduced
- * motion); every CSS animation, and the stacked film stage itself, is inside (prefers-reduced-motion:no-preference),
- * which the site check enforces. */
+ * two buttons and one caption per act. Every scene's resting state is a still: without JavaScript, if site.js or
+ * GSAP fails to load, or with reduced motion, the page shows every painting. Only site.js adds .film-live to <html>,
+ * and only while the film's GSAP timeline runs (never under reduced motion). Every CSS animation (the act loops and
+ * the small moves too) needs .film-live and sits inside (prefers-reduced-motion:no-preference), and so does the
+ * stacked film stage; the site check enforces both. */
 :root{color-scheme:dark;--ground:#1b1916;--ink:#f3eee8;--grey:#aaa197;--grey2:#c8c0b8;--brass:#ff8f80;--brass-hi:#ffb3a8;--on-brass:#1b1916;--sea:#83d7bd;--orchid:#d9afe8;--navy:#2a2520;--navy2:#5a4f46;--panel:#221f1b;--line:#3a342e;--edge:#5a5048;--m:100px;--round:16px}
 *{box-sizing:border-box}
 body{margin:0;background:var(--ground);color:var(--ink);font:400 17px/1.55 var(--ow-font-sans);-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;overflow-x:clip}
@@ -115,13 +115,13 @@ h2{font:700 44px/1.05 var(--ow-font-sans);letter-spacing:-.035em}
 @media (prefers-reduced-motion:no-preference){
   html{scroll-behavior:smooth}
   .hood summary::before{transition:transform .18s}
-  .story-live .pause{display:grid}
-  .story-live .l-hammer{animation:hammer 2.6s ease-in-out infinite}
-  .story-live .f-forge{animation:forge 2.6s ease-out infinite}
-  .story-live .l-stamp{animation:stamp 3.2s ease-in-out infinite}
-  .story-live .f-stamp{animation:approve 3.2s ease-out infinite}
-  .story-live .l-rocket{animation:shake .42s linear infinite}
-  .story-live .glint{animation:glint 3.4s ease-out infinite}
+  .film-live .pause{display:grid}
+  .film-live .l-hammer{animation:hammer 2.6s ease-in-out infinite}
+  .film-live .f-forge{animation:forge 2.6s ease-out infinite}
+  .film-live .l-stamp{animation:stamp 3.2s ease-in-out infinite}
+  .film-live .f-stamp{animation:approve 3.2s ease-out infinite}
+  .film-live .l-rocket{animation:shake .42s linear infinite}
+  .film-live .glint{animation:glint 3.4s ease-out infinite}
   .motion-paused .loop *,.loop.offscreen *{animation-play-state:paused !important}
 
   /* The film (site.js adds .film-live only while its GSAP timeline runs): every shot stacked on one stage; each
@@ -142,22 +142,22 @@ h2{font:700 44px/1.05 var(--ow-font-sans);letter-spacing:-.035em}
   .film-live .shots .cap{position:absolute;left:0;right:0;bottom:5cqh;margin:0;text-align:center;font-size:clamp(26px,6cqh,52px);text-shadow:0 2px 24px #000;opacity:0}
 
   /* Act 1: the five eras roll past in one endless strip (site.js adds a hidden copy of the five to close the loop). */
-  .story-live .strip{overflow:hidden;-webkit-mask:linear-gradient(90deg,transparent,#000 8%,#000 92%,transparent);mask:linear-gradient(90deg,transparent,#000 8%,#000 92%,transparent)}
-  .story-live .track{display:flex;width:max-content;gap:0;animation:roll 45s linear infinite}
-  .story-live .track .copy{display:block}
-  .story-live .track li{flex:none;width:clamp(240px,30vw,400px);margin-right:14px}
-  .story-live .strip .pause{right:calc(8% + 6px)}
+  .film-live .strip{overflow:hidden;-webkit-mask:linear-gradient(90deg,transparent,#000 8%,#000 92%,transparent);mask:linear-gradient(90deg,transparent,#000 8%,#000 92%,transparent)}
+  .film-live .track{display:flex;width:max-content;gap:0;animation:roll 45s linear infinite}
+  .film-live .track .copy{display:block}
+  .film-live .track li{flex:none;width:clamp(240px,30vw,400px);margin-right:14px}
+  .film-live .strip .pause{right:calc(8% + 6px)}
   /* Act 2: one stage; the lines pull back, the lattice opens over them, then fades back to the lines. */
-  .story-live .pull{display:block;position:relative;aspect-ratio:1672/941;overflow:hidden;border-radius:var(--round);background:#000;box-shadow:inset 0 0 0 1px var(--line)}
-  .story-live .pull .shot{position:absolute;inset:0;border:0;border-radius:0}
-  .story-live .pull .cam{transform-origin:var(--ox,50%) var(--oy,50%);animation:p-lanes 16s infinite;will-change:transform}
-  .story-live .pull .s-rooms{animation:p-rooms 16s infinite}
-  .story-live .pull .s-rooms .cam{animation:none}
+  .film-live .pull{display:block;position:relative;aspect-ratio:1672/941;overflow:hidden;border-radius:var(--round);background:#000;box-shadow:inset 0 0 0 1px var(--line)}
+  .film-live .pull .shot{position:absolute;inset:0;border:0;border-radius:0}
+  .film-live .pull .cam{transform-origin:var(--ox,50%) var(--oy,50%);animation:p-lanes 16s infinite;will-change:transform}
+  .film-live .pull .s-rooms{animation:p-rooms 16s infinite}
+  .film-live .pull .s-rooms .cam{animation:none}
   /* Act 3 (and the film's app): each line carries its ticket from build to review to merged, a beat apart. */
-  .story-live .card{left:0;animation:move 9s cubic-bezier(.5,0,.3,1) infinite;animation-delay:var(--d,0s)}
-  .story-live .stop.done{opacity:0;animation:merged 9s infinite;animation-delay:var(--d,0s)}
-  .story-live .lane:nth-child(2){--d:-3s}
-  .story-live .lane:nth-child(3){--d:-6s}
+  .film-live .card{left:0;animation:move 9s cubic-bezier(.5,0,.3,1) infinite;animation-delay:var(--d,0s)}
+  .film-live .stop.done{opacity:0;animation:merged 9s infinite;animation-delay:var(--d,0s)}
+  .film-live .lane:nth-child(2){--d:-3s}
+  .film-live .lane:nth-child(3){--d:-6s}
 }
 
 /* ---------- Small desktop and tablet landscape (961-1279 px) ---------- */
@@ -204,7 +204,7 @@ h2{font:700 44px/1.05 var(--ow-font-sans);letter-spacing:-.035em}
   .film-live .s-rooms{--fx:.55}
   .film-live .in-film{width:76cqw;margin-bottom:13cqh}
   .film-live .shots .cap{padding-inline:56px;font-size:24px}
-  .story-live .track li{width:62vw;margin-right:10px}
+  .film-live .track li{width:62vw;margin-right:10px}
   @keyframes move{0%,18%{left:0}30%,52%{left:calc(50% - 20px)}64%,90%{left:calc(100% - 40px);opacity:1}96%{left:calc(100% - 40px);opacity:0}97%{left:0;opacity:0}100%{left:0;opacity:1}}
 }
 

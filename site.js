@@ -1,7 +1,7 @@
 // The landing film (J185). The hero's 40 s film runs on one GSAP timeline (J187: GSAP 3.15.1, vendored), built
 // only under gsap.matchMedia's no-preference query: with reduced motion it is never built (and is reverted, inline
 // styles and all, if the setting changes), so every scene stays a still painting. The act loops and the small moves
-// are CSS animations under the same query. If this file or GSAP never loads, the page keeps its still layout.
+// are CSS animations that also wait for .film-live. If this file or GSAP never loads, the whole page stays still.
 (() => {
   const root = document.documentElement;
   const loops = [...document.querySelectorAll('.loop')];
@@ -81,8 +81,8 @@
     return tl;
   }
 
-  // Only now, with every handler in place, switch on the animated page. Without this the page stays a set of stills.
-  root.classList.add('story-live');
+  // Only now, with every handler in place, switch on the film and every loop (.film-live), and only while GSAP runs
+  // under no-preference. Without GSAP, or with reduced motion, nothing moves and every scene stays a still.
   const gsap = window.gsap;
   if (gsap && film) {
     gsap.matchMedia().add('(prefers-reduced-motion: no-preference)', () => {
