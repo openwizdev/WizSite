@@ -2,7 +2,11 @@
 // failed, partial and paused reads). Pages register with OW.page (pages/*.js); the shell routes by #/<page>.
 'use strict';
 (() => {
-  const { h, icon, logo, time } = OW.ui;
+  const { h, icon, time } = OW.ui;
+  // The OpenWiz mark, cream on charcoal (J194), in the old logo's 28 x 28 place; the name beside it says what it is.
+  const logo = () => h('img', { src: '/app/mark.svg', alt: '', width: 28, height: 28 });
+  // A Wiz of the family keeps an empty state company; its sentence says it all, so the picture is decorative.
+  const wiz = () => h('p', {}, h('img', { src: '/app/wiz-reviewer.svg', alt: '', width: 96, height: 105 }));
   const data = OW.data;
   const root = document.getElementById('app');
   const ROUTES = () => OW.pages.map(page => page.id);
@@ -23,6 +27,7 @@
 
   function screen(...children) {
     built = null;
+    OW.palette.close(); // the palette and the shortcut list belong to the shell
     root.replaceChildren(h('div', { class: 'center' }, h('div', { class: 'panel' }, h('div', { class: 'brand' }, logo(), h('span', {}, 'OpenWiz')), ...children)));
     document.title = 'OpenWiz';
   }
@@ -62,6 +67,7 @@
     if (found.complete && found.installations === 0) {
       return screen(
         h('h1', {}, 'Pick a repository'),
+        wiz(),
         h('p', {}, 'One more step: let OpenWiz Viewer read your repositories.'),
         h('a', { class: 'btn primary', href: INSTALL, rel: 'noreferrer' }, 'Install OpenWiz Viewer'),
         h('p', { class: 'small' }, 'On GitHub, pick the repositories it may read. GitHub brings you back here.'),
@@ -76,6 +82,7 @@
       found.complete ? null : h('div', { class: 'notices' }, h('div', { class: 'notice bad', role: 'alert' }, icon('warn'),
         h('span', {}, h('b', {}, 'Only part of your repositories could be read, '), 'so some may be missing. '),
         h('button', { class: 'btn', type: 'button', onclick: picker }, 'Try again'))),
+      !repos.length && found.complete ? wiz() : null,
       h('p', {}, repos.length ? 'The app opens straight to it on this device next time.' : found.complete ? 'The app can\'t see any repository yet.' : 'None could be read.'),
       repos.length ? list : null,
       h('p', { class: 'small' }, 'Missing one? ', h('a', { href: 'https://github.com/settings/installations', rel: 'noreferrer' }, 'Choose repositories on GitHub'), ', then come back.'),
@@ -200,9 +207,19 @@
   data.onChange(update);
   OW.onSignedOut = () => signedOut('Your sign-in ended. Sign in again.');
   window.addEventListener('hashchange', () => (built ? update() : null));
-  // Super easy navigation: 1, 2, 3 jump to the pages (not while typing or with a modifier).
+  // Super easy navigation: Cmd-K (Ctrl-K elsewhere) opens the command palette (palette.js), even while typing; 1, 2, 3
+  // jump to the pages and ? lists every shortcut (not while typing, with a modifier, or while a dialog is open).
   document.addEventListener('keydown', event => {
-    if (!built || event.altKey || event.ctrlKey || event.metaKey || /input|textarea|select/i.test(event.target.tagName)) return;
+    if (!built) return;
+    if ((event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'k') {
+      event.preventDefault();
+      return OW.palette.toggle();
+    }
+    if (OW.palette.shown() || event.altKey || event.ctrlKey || event.metaKey || /input|textarea|select/i.test(event.target.tagName)) return;
+    if (event.key === '?') {
+      event.preventDefault();
+      return OW.palette.shortcuts();
+    }
     const page = OW.pages[Number(event.key) - 1];
     if (page) location.hash = `#/${page.id}`;
   });

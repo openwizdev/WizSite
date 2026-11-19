@@ -12,13 +12,15 @@ const vendor = ['vendor/gsap-3.15.1.min.js', 'vendor/GSAP-LICENSE.txt', 'vendor/
 const art = (await readdir(new URL('art/', root))).filter(name => name.endsWith('.webp')).sort().map(name => `art/${name}`);
 const pages = ['index.html', 'changelog/index.html', 'app/index.html'];
 // The app (openwiz.dev/app): its design system, data layer, page modules and shell, fingerprinted like the site's.
-const app = ['app/ember.css', 'app/data.js', 'app/ui.js', 'app/pages/you.js', 'app/pages/specs.js', 'app/pages/spec.js', 'app/pages/agents.js', 'app/shell.js'];
+const app = ['app/ember.css', 'app/data.js', 'app/ui.js', 'app/pages/you.js', 'app/pages/specs.js', 'app/pages/spec.js', 'app/pages/agents.js', 'app/palette.js', 'app/shell.js'];
 // Pinned npm dependencies (package.json, exact version), copied from node_modules with their licence; the version is in
 // the name, so a new version always gets a new URL. Dagre lays out a spec's ticket graph (AP6).
 const npmVendor = { 'app/vendor/dagre-3.1.3.min.js': 'node_modules/@dagrejs/dagre/dist/dagre.min.js', 'app/vendor/dagre-LICENSE.txt': 'node_modules/@dagrejs/dagre/LICENSE' };
 const hashed = ['tokens.css', 'site.css', 'site.js', vendor[0], ...app];
 const brand = ['favicon.ico', 'favicon.svg', 'apple-touch-icon.png', 'brand/openwiz-lockup.svg', 'brand/og.png'];
-const files = ['_headers', 'app/manifest.webmanifest', ...art, 'art/spec-demo.webm', ...vendor.slice(1), ...brand, 'fonts/Geist-var.woff2', 'fonts/GeistMono-var.woff2', 'fonts/OFL.txt'];
+// The app's own mark and icons, cream on charcoal (J194, #1326): the brand mark, its favicons and a Wiz of the family.
+const appBrand = ['app/mark.svg', 'app/icon.svg', 'app/icon.ico', 'app/icon-180.png', 'app/wiz-reviewer.svg'];
+const files = ['_headers', 'app/manifest.webmanifest', ...appBrand, ...art, 'art/spec-demo.webm', ...vendor.slice(1), ...brand, 'fonts/Geist-var.woff2', 'fonts/GeistMono-var.woff2', 'fonts/OFL.txt'];
 // The Changelog's release parts (#1364), generated from each release's published notes on GitHub at this build.
 // A failed read shows its part as missing; the build never fails on it.
 const releases = await readAll();

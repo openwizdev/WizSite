@@ -39,6 +39,9 @@ ICON_HASHES = {
     'favicon.ico': '7b1652147d449f4003ce051d157fc9db68ae69d596b3b38f426be71efcca04b4',
     'apple-touch-icon.png': '018b3717f5aa73ce2a9ef62e97db778b002ef9b30aa50dd9213d72160c8182be',
     'brand/og.png': '90b0b7eb0de9e30e0586e77f9491abd14c0d803ae937ab4cf6103223ea481d9b',
+    # The app's own icons: the new mark, cream on charcoal (J194, #1326).
+    'app/icon.ico': '33a21c61aa051f91475b46678bc0c4f537ab507273c088c4ed016d5ddce2b9cd',
+    'app/icon-180.png': 'deb93ec39812c224c1470e2f1730f7f4ead7be3d27428a20a2a83284b77fbc2f',
 }
 # README pictures: kept in the source for GitHub only, never built or served. Pinned like the icons.
 DOC_HASHES = {
@@ -46,7 +49,7 @@ DOC_HASHES = {
     'docs/map-phone.png': 'cdd21a74a880d3adab68ce794de1b18060d916d6df5d00ceb54eb06736cf3fd2',
 }
 # Vector logos: the wordmark is outlined (paths), so no font ships and nothing can fall back to another font.
-VECTORS = ('favicon.svg', 'brand/openwiz-lockup.svg')
+VECTORS = ('favicon.svg', 'brand/openwiz-lockup.svg', 'app/mark.svg', 'app/icon.svg', 'app/wiz-reviewer.svg')
 MARK, OLD_MARK = '#cfc6b8', '#2b2bff'  # the new mark's dark cream, and the earlier blue it replaced
 SITE_URL = 'https://openwiz.dev/'
 ART_BUDGET = 2_000_000  # bytes, all art together
@@ -63,7 +66,7 @@ HASHED = ('tokens.css', 'site.css', GSAP, 'site.js')
 # The page applies only ember.css and loads exactly these scripts, in this order, all fingerprinted.
 APP_PAGE = 'app/index.html'
 APP_STYLE = 'app/ember.css'
-APP_SCRIPTS = ('app/data.js', 'app/ui.js', 'app/pages/you.js', 'app/pages/specs.js', 'app/pages/spec.js', 'app/pages/agents.js', 'app/shell.js')
+APP_SCRIPTS = ('app/data.js', 'app/ui.js', 'app/pages/you.js', 'app/pages/specs.js', 'app/pages/spec.js', 'app/pages/agents.js', 'app/palette.js', 'app/shell.js')
 # Pinned npm files (package.json, exact versions): export name -> (its source after npm ci, the app script it loads before).
 APP_VENDOR = {'app/vendor/dagre-3.1.3.min.js': ('node_modules/@dagrejs/dagre/dist/dagre.min.js', 'app/pages/spec.js'),
               'app/vendor/dagre-LICENSE.txt': ('node_modules/@dagrejs/dagre/LICENSE', None)}
@@ -272,7 +275,7 @@ def check_ref(root, source, ref, pages, favicons=()):
         return
     if ref in favicons:
         # Only the reviewed logo-pack favicons (checked as local files below).
-        assert ref in ('/favicon.ico', '/favicon.svg'), 'unexpected favicon'
+        assert ref in ('/favicon.ico', '/favicon.svg', '/app/icon.ico', '/app/icon.svg'), 'unexpected favicon'
     url = urlsplit(ref)
     if url.scheme or url.netloc:
         assert url.scheme == 'https' and url.netloc == 'github.com', 'unexpected external URL'
