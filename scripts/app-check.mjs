@@ -64,13 +64,33 @@ async function launch() {
     waiting.set(id, { resolve, reject });
     socket.send(JSON.stringify({ id, method, params, ...(sessionId ? { sessionId } : {}) }));
   });
+  // Every new tab or window is attached paused, before it loads anything. One the app opens (it has an opener) has its
+  // first request handed to its opener's check (popups) and refused, and is closed: it never reaches the network.
+  const popups = new Map(); // opener target id -> (request) => void
+  const opened = new Map(); // popup session id -> opener target id
+  listeners.push(async message => {
+    if (message.method === 'Target.attachedToTarget' && !message.sessionId) {
+      const { sessionId, targetInfo } = message.params;
+      if (targetInfo.openerId) {
+        opened.set(sessionId, targetInfo.openerId);
+        await send('Fetch.enable', { patterns: [{ urlPattern: '*', requestStage: 'Request' }] }, sessionId).catch(() => {});
+      }
+      await send('Runtime.runIfWaitingForDebugger', {}, sessionId).catch(() => {});
+    }
+    if (message.method === 'Fetch.requestPaused' && opened.has(message.sessionId)) {
+      popups.get(opened.get(message.sessionId))?.(message.params.request);
+      await send('Fetch.failRequest', { requestId: message.params.requestId, errorReason: 'BlockedByClient' }, message.sessionId).catch(() => {});
+      await send('Target.closeTarget', { targetId: message.params.frameId }).catch(() => {});
+    }
+  });
+  await send('Target.setAutoAttach', { autoAttach: true, waitForDebuggerOnStart: true, flatten: true });
   const close = async () => {
     socket.close();
     child.kill();
     await new Promise(resolve => child.once('exit', resolve));
     await rm(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }).catch(() => {});
   };
-  return { send, on: listener => listeners.push(listener), close };
+  return { send, on: listener => listeners.push(listener), popups, close };
 }
 
 // ---- The recorded world ---------------------------------------------------------------------------------------
@@ -198,23 +218,8 @@ async function open(browser, world) {
       world.violations.push(`exception: ${message.params.exceptionDetails.exception?.description || message.params.exceptionDetails.text}`);
     }
   });
-  // A tab or window the page opens (a link to GitHub) is held before it loads anything: its address is noted in
-  // world.opened, its request refused and the tab closed. It is never part of the app's own request log.
-  browser.on(async message => {
-    if (message.method === 'Target.attachedToTarget' && message.sessionId === sessionId) {
-      const child = message.params.sessionId;
-      opened.add(child);
-      await browser.send('Fetch.enable', { patterns: [{ urlPattern: '*', requestStage: 'Request' }] }, child).catch(() => {});
-      await browser.send('Runtime.runIfWaitingForDebugger', {}, child).catch(() => {});
-    }
-    if (message.method === 'Fetch.requestPaused' && opened.has(message.sessionId)) {
-      world.opened.push({ method: message.params.request.method, url: message.params.request.url });
-      await browser.send('Fetch.failRequest', { requestId: message.params.requestId, errorReason: 'BlockedByClient' }, message.sessionId).catch(() => {});
-      await browser.send('Target.closeTarget', { targetId: message.params.frameId }).catch(() => {});
-    }
-  });
-  const opened = new Set();
-  await send('Target.setAutoAttach', { autoAttach: true, waitForDebuggerOnStart: true, flatten: true });
+  // A tab the page opens (a link to GitHub) is noted in world.opened by its first request, which is refused (launch).
+  browser.popups.set(targetId, request => world.opened.push({ method: request.method, url: request.url }));
   await browser.send('Browser.grantPermissions', { origin: SITE, browserContextId, permissions: ['clipboardReadWrite', 'clipboardSanitizedWrite'] });
   await send('Emulation.setFocusEmulationEnabled', { enabled: true });
   await send('Fetch.enable', { patterns: [{ urlPattern: '*', requestStage: 'Request' }] });

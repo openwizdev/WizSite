@@ -27,6 +27,7 @@
 
   function screen(...children) {
     built = null;
+    OW.palette.close(); // the palette and the shortcut list belong to the shell
     root.replaceChildren(h('div', { class: 'center' }, h('div', { class: 'panel' }, h('div', { class: 'brand' }, logo(), h('span', {}, 'OpenWiz')), ...children)));
     document.title = 'OpenWiz';
   }
@@ -206,9 +207,19 @@
   data.onChange(update);
   OW.onSignedOut = () => signedOut('Your sign-in ended. Sign in again.');
   window.addEventListener('hashchange', () => (built ? update() : null));
-  // Super easy navigation: 1, 2, 3 jump to the pages (not while typing or with a modifier).
+  // Super easy navigation: Cmd-K (Ctrl-K elsewhere) opens the command palette (palette.js), even while typing; 1, 2, 3
+  // jump to the pages and ? lists every shortcut (not while typing, with a modifier, or while a dialog is open).
   document.addEventListener('keydown', event => {
-    if (!built || event.altKey || event.ctrlKey || event.metaKey || /input|textarea|select/i.test(event.target.tagName)) return;
+    if (!built) return;
+    if ((event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'k') {
+      event.preventDefault();
+      return OW.palette.toggle();
+    }
+    if (OW.palette.shown() || event.altKey || event.ctrlKey || event.metaKey || /input|textarea|select/i.test(event.target.tagName)) return;
+    if (event.key === '?') {
+      event.preventDefault();
+      return OW.palette.shortcuts();
+    }
     const page = OW.pages[Number(event.key) - 1];
     if (page) location.hash = `#/${page.id}`;
   });
