@@ -227,9 +227,11 @@ function enableMotion(gsap) {
     if (!preference.matches) return;
     controller = new AbortController();
     const { signal } = controller;
-    const isPaused = () => pause.getAttribute('aria-pressed') === 'true';
-    const updateHero = showHero(gsap, isPaused, signal);
+    const isPaused = () => pause?.getAttribute('aria-pressed') === 'true';
+    // Every site page shares the footer's eyes; only the landing has the hero demo and its Pause motion.
     const updateEyes = followPointer(gsap, isPaused, signal);
+    if (!pause) return;
+    const updateHero = showHero(gsap, isPaused, signal);
     pause.hidden = false;
     pause.addEventListener('click', () => {
       const paused = !isPaused();
@@ -259,7 +261,7 @@ function enableFamily(gsap) {
   const wizes = [...family.children];
   const preference = matchMedia('(prefers-reduced-motion: no-preference)');
   const pause = document.querySelector('.demo-pause');
-  const moving = () => !!gsap && preference.matches && pause.getAttribute('aria-pressed') !== 'true';
+  const moving = () => !!gsap && preference.matches && pause?.getAttribute('aria-pressed') !== 'true';
   const line = document.createElement('span');
   line.className = 'wiz-line';
   line.setAttribute('role', 'status');
@@ -410,6 +412,6 @@ function enableVideo() {
 }
 
 showStars().catch(() => {});
-enableVideo();
+if (document.querySelector('.spec-play')) enableVideo();
 enableFamily(window.gsap);
 if (window.gsap) enableMotion(window.gsap);
