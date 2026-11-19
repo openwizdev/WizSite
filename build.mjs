@@ -11,7 +11,9 @@ const art = (await readdir(new URL('art/', root))).filter(name => name.endsWith(
 const pages = ['index.html', 'changelog/index.html'];
 const hashed = ['tokens.css', 'site.css', 'site.js'];
 const brand = ['favicon.ico', 'favicon.svg', 'apple-touch-icon.png', 'brand/openwiz-lockup.svg', 'brand/og.png'];
-const files = ['_headers', ...art, ...brand, 'fonts/Geist-var.woff2', 'fonts/GeistMono-var.woff2', 'fonts/OFL.txt'];
+// The vendored film timeline (J187): GSAP, pinned by version and hash, with its licence notice beside it.
+const vendor = ['vendor/gsap-3.15.1.min.js', 'vendor/GSAP-NOTICE.txt'];
+const files = ['_headers', ...art, ...brand, ...vendor, 'fonts/Geist-var.woff2', 'fonts/GeistMono-var.woff2', 'fonts/OFL.txt'];
 await rm(output, { recursive: true, force: true });
 const put = async (name, data) => {
   const target = new URL(name, output);

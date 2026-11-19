@@ -2,11 +2,12 @@
  * and shipping). The landing page and the ship log (/changelog).
  * The landing is one film (J185): the hero plays all three acts in about 40 s and loops (the cave idea, the grill,
  * the forge, the mill's review, the launch, the pull-back through the lines into the lattice of every era, then
- * the app and "This is your factory."); below it, one short loop per act. The only words are the headline, the
+ * the app and "This is your factory.") on one GSAP timeline in site.js; below it, one short CSS loop per act. The only words are the headline, the
  * two buttons and one caption per act. Every scene's resting state is a still: without JavaScript, if site.js
  * fails to load, or with reduced motion, the page shows every painting. Only site.js adds .story-live to <html>,
- * after its handlers are in place; everything that moves, and the stacked film stage itself, is inside
- * (prefers-reduced-motion:no-preference), which the site check enforces. */
+ * after its handlers are in place, and .film-live only while the film's timeline runs (never under reduced
+ * motion); every CSS animation, and the stacked film stage itself, is inside (prefers-reduced-motion:no-preference),
+ * which the site check enforces. */
 :root{color-scheme:dark;--ground:#1b1916;--ink:#f3eee8;--grey:#aaa197;--grey2:#c8c0b8;--brass:#ff8f80;--brass-hi:#ffb3a8;--on-brass:#1b1916;--sea:#83d7bd;--orchid:#d9afe8;--navy:#2a2520;--navy2:#5a4f46;--panel:#221f1b;--line:#3a342e;--edge:#5a5048;--m:100px;--round:16px}
 *{box-sizing:border-box}
 body{margin:0;background:var(--ground);color:var(--ink);font:400 17px/1.55 var(--ow-font-sans);-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;overflow-x:clip}
@@ -105,29 +106,6 @@ h2{font:700 44px/1.05 var(--ow-font-sans);letter-spacing:-.035em}
 @keyframes approve{0%,62%{opacity:0}65%{opacity:.9}88%,100%{opacity:0}}
 @keyframes shake{0%{translate:0 0;rotate:0deg}20%{translate:.25% -.35%;rotate:.3deg}40%{translate:-.2% .25%;rotate:-.2deg}60%{translate:.3% .2%;rotate:.25deg}80%{translate:-.25% -.25%;rotate:-.3deg}100%{translate:0 0;rotate:0deg}}
 @keyframes glint{0%,55%{opacity:0;scale:.6}65%{opacity:1;scale:1}80%,100%{opacity:0;scale:1.2}}
-/* The film, 40 s: each shot's visibility (a later shot fades or cuts in over the one before), then its camera. */
-@keyframes v-cave{0%{opacity:0}2%,17%{opacity:1}17.01%,100%{opacity:0}}
-@keyframes v-grill{0%,14.9%{opacity:0}15%,29.5%{opacity:1}29.51%,100%{opacity:0}}
-@keyframes v-forge{0%,29.4%{opacity:0}29.5%,45%{opacity:1}45.01%,100%{opacity:0}}
-@keyframes v-mill{0%,42.9%{opacity:0}43%,58.5%{opacity:1}58.51%,100%{opacity:0}}
-@keyframes v-launch{0%,58.4%{opacity:0}58.5%,72%{opacity:1}72.01%,100%{opacity:0}}
-@keyframes v-lanes{0%,69.9%{opacity:0}70%,82%{opacity:1}82.01%,100%{opacity:0}}
-@keyframes v-rooms{0%,80%{opacity:0}82%,88%{opacity:1}88.01%,100%{opacity:0}}
-@keyframes v-app{0%,86%{opacity:0}88%,98%{opacity:1}100%{opacity:0}}
-@keyframes v-cap{0%,91%{opacity:0;translate:0 12px}93.5%,98%{opacity:1;translate:0 0}100%{opacity:0}}
-/* Brush wipes between styles (cave to grill, forge to mill, launch to the lines): a soft edge sweeps across, its
-   leading band broken into bristle streaks. Three mask layers: the wide band, the streaks, the solid paint. */
-@keyframes w-grill{0%,15%{mask-position:100% 0,0 0,100% 0}17.5%,100%{mask-position:0% 0,0 0,0% 0}}
-@keyframes w-mill{0%,43%{mask-position:100% 0,0 0,100% 0}45.5%,100%{mask-position:0% 0,0 0,0% 0}}
-@keyframes w-lanes{0%,70%{mask-position:100% 0,0 0,100% 0}72.5%,100%{mask-position:0% 0,0 0,0% 0}}
-@keyframes c-cave{0%{transform:scale(1.8);animation-timing-function:cubic-bezier(.3,0,.2,1)}17%,100%{transform:scale(1.04)}}
-@keyframes c-grill{0%,15%{transform:scale(1.16) translateX(5%);animation-timing-function:ease-in-out}29.5%,100%{transform:scale(1.16) translateX(-5%)}}
-@keyframes c-forge{0%,29.5%{transform:scale(1.04);animation-timing-function:ease-out}45%,100%{transform:scale(1.32)}}
-@keyframes c-mill{0%,43%{transform:scale(1.22) translateX(6%);animation-timing-function:ease-in-out}58.5%,100%{transform:scale(1.22) translateX(-6%)}}
-@keyframes c-launch{0%,58.5%{transform:scale(1.06) translateY(3%);animation-timing-function:ease-in-out}72%,100%{transform:scale(1.3) translateY(-2%)}}
-@keyframes c-lanes{0%,70%{transform:scale(2.3);animation-timing-function:cubic-bezier(.4,0,.2,1)}82%,100%{transform:scale(1)}}
-@keyframes c-rooms{0%,80%{transform:scale(2.5);animation-timing-function:cubic-bezier(.4,0,.2,1)}88%,100%{transform:scale(1.02)}}
-@keyframes c-app{0%,86%{transform:scale(1.75);animation-timing-function:cubic-bezier(.5,0,.2,1)}91.5%,100%{transform:scale(1)}}
 /* Act 1: the five eras roll past; Act 2: the lines pull back into the lattice and back again; Act 3: the board. */
 @keyframes roll{to{transform:translateX(-50%)}}
 @keyframes p-lanes{0%{transform:scale(2.3);animation-timing-function:cubic-bezier(.4,0,.2,1)}45%,55%{transform:scale(1)}55.01%,100%{transform:scale(2.3)}}
@@ -146,31 +124,22 @@ h2{font:700 44px/1.05 var(--ow-font-sans);letter-spacing:-.035em}
   .story-live .glint{animation:glint 3.4s ease-out infinite}
   .motion-paused .loop *,.loop.offscreen *{animation-play-state:paused !important}
 
-  /* The film: every shot stacked on one stage; each camera is the painting's own box, covering the stage, with
-     --fx/--fy the point of the painting at the stage's centre (phones pick their own) and --ox/--oy its focus. */
-  .story-live .shots{display:block;position:relative;width:100%;aspect-ratio:1672/941;max-height:calc(100svh - 230px);min-height:320px;overflow:hidden;container-type:size;border-radius:var(--round);background:#000;box-shadow:inset 0 0 0 1px var(--line)}
-  .story-live .shots .shot{position:absolute;inset:0;aspect-ratio:auto;border:0;border-radius:0;background:none;opacity:0;animation:40s linear infinite}
-  .story-live .shots .cam{inset:auto;left:50%;top:50%;width:max(100cqw,100cqh * 1672 / 941);aspect-ratio:1672/941;translate:calc(-1 * var(--fx,50%)) calc(-1 * var(--fy,50%));transform-origin:var(--ox,50%) var(--oy,50%);animation:40s infinite;will-change:transform}
-  .story-live .shots .s-cave{animation-name:v-cave;--ox:46%;--oy:72%}
-  .story-live .shots .s-forge{animation-name:v-forge;--ox:42%;--oy:66%}
-  .story-live .shots .s-mill{animation-name:v-mill}
-  .story-live .shots .s-launch{animation-name:v-launch;--ox:70%;--oy:35%}
-  .story-live .shots .s-lanes{animation-name:v-lanes;--ox:22%;--oy:72%}
-  .story-live .shots .s-rooms{animation-name:v-rooms;--ox:66%;--oy:62%}
-  .story-live .shots :is(.s-grill,.s-mill,.s-lanes){mask-image:linear-gradient(90deg,#000 44%,transparent 50%),repeating-linear-gradient(0deg,#000 0 9px,transparent 9px 13px,#000 13px 27px,transparent 27px 30px,#000 30px 34px,transparent 34px 46px),linear-gradient(90deg,#000 41%,transparent 44.5%);mask-size:260% 100%,auto,260% 100%;mask-repeat:no-repeat,repeat,no-repeat;mask-composite:intersect,add,add;mask-position:100% 0,0 0,100% 0}
-  .story-live .shots .s-grill{animation-name:v-grill,w-grill}
-  .story-live .shots .s-mill{animation-name:v-mill,w-mill}
-  .story-live .shots .s-lanes{animation-name:v-lanes,w-lanes}
-  .story-live .shots .s-cave .cam{animation-name:c-cave}
-  .story-live .shots .s-grill .cam{animation-name:c-grill}
-  .story-live .shots .s-forge .cam{animation-name:c-forge}
-  .story-live .shots .s-mill .cam{animation-name:c-mill}
-  .story-live .shots .s-launch .cam{animation-name:c-launch}
-  .story-live .shots .s-lanes .cam{animation-name:c-lanes}
-  .story-live .shots .s-rooms .cam{animation-name:c-rooms}
-  .story-live .shots .s-app{display:grid;place-items:center;overflow:hidden;animation-name:v-app;background:radial-gradient(ellipse at 50% 40%,#2a2420,#0d0c0b 75%)}
-  .story-live .in-film{width:min(86cqw,150cqh);margin-bottom:9cqh;transform-origin:42% 55%;animation:c-app 40s infinite}
-  .story-live .shots .cap{position:absolute;left:0;right:0;bottom:5cqh;margin:0;text-align:center;font-size:clamp(26px,6cqh,52px);text-shadow:0 2px 24px #000;animation:v-cap 40s linear infinite}
+  /* The film (site.js adds .film-live only while its GSAP timeline runs): every shot stacked on one stage; each
+     camera is the painting's own box covering the stage, with --fx/--fy the point of the painting at the stage's
+     centre (phones pick their own) and --ox/--oy the focus it pushes into. The timeline sets opacity, the cameras'
+     transforms and --w, the brush wipe's position (cave to grill, forge to mill, launch to the lines). */
+  .film-live .shots{display:block;position:relative;width:100%;aspect-ratio:1672/941;max-height:calc(100svh - 230px);min-height:320px;overflow:hidden;container-type:size;border-radius:var(--round);background:#000;box-shadow:inset 0 0 0 1px var(--line)}
+  .film-live .shots .shot{position:absolute;inset:0;aspect-ratio:auto;border:0;border-radius:0;background:none;opacity:0}
+  .film-live .shots .cam{inset:auto;left:50%;top:50%;width:max(100cqw,100cqh * 1672 / 941);aspect-ratio:1672/941;translate:calc(-1 * var(--fx,50%)) calc(-1 * var(--fy,50%));transform-origin:var(--ox,50%) var(--oy,50%);will-change:transform}
+  .film-live .shots :is(.s-grill,.s-mill,.s-lanes){mask-image:linear-gradient(90deg,#000 44%,transparent 50%),repeating-linear-gradient(0deg,#000 0 9px,transparent 9px 13px,#000 13px 27px,transparent 27px 30px,#000 30px 34px,transparent 34px 46px),linear-gradient(90deg,#000 41%,transparent 44.5%);mask-size:260% 100%,auto,260% 100%;mask-repeat:no-repeat,repeat,no-repeat;mask-composite:intersect,add,add;mask-position:var(--w,100%) 0,0 0,var(--w,100%) 0}
+  .film-live .s-cave{--ox:46%;--oy:72%}
+  .film-live .s-forge{--ox:42%;--oy:66%}
+  .film-live .s-launch{--ox:70%;--oy:35%}
+  .film-live .s-lanes{--ox:22%;--oy:72%}
+  .film-live .s-rooms{--ox:66%;--oy:62%}
+  .film-live .shots .s-app{display:grid;place-items:center;overflow:hidden;background:radial-gradient(ellipse at 50% 40%,#2a2420,#0d0c0b 75%)}
+  .film-live .in-film{width:min(86cqw,150cqh);margin-bottom:9cqh;transform-origin:42% 55%}
+  .film-live .shots .cap{position:absolute;left:0;right:0;bottom:5cqh;margin:0;text-align:center;font-size:clamp(26px,6cqh,52px);text-shadow:0 2px 24px #000;opacity:0}
 
   /* Act 1: the five eras roll past in one endless strip (site.js adds a hidden copy of the five to close the loop). */
   .story-live .strip{overflow:hidden;-webkit-mask:linear-gradient(90deg,transparent,#000 8%,#000 92%,transparent);mask:linear-gradient(90deg,transparent,#000 8%,#000 92%,transparent)}
@@ -225,15 +194,15 @@ h2{font:700 44px/1.05 var(--ow-font-sans);letter-spacing:-.035em}
   .foot-site{margin-top:72px}
 }
 @media (max-width:960px) and (prefers-reduced-motion:no-preference){
-  .story-live .shots{aspect-ratio:4/5;max-height:none}
-  .story-live .s-cave{--fx:66%}
-  .story-live .s-grill{--fx:56%}
-  .story-live .s-forge{--fx:40%}
-  .story-live .s-mill{--fx:60%}
-  .story-live .s-launch{--fx:62%}
-  .story-live .s-lanes{--fx:40%}
-  .story-live .s-rooms{--fx:55%}
-  .story-live .in-film{width:92cqw;margin-bottom:20cqh}
+  .film-live .shots{aspect-ratio:4/5;max-height:none}
+  .film-live .s-cave{--fx:66%}
+  .film-live .s-grill{--fx:56%}
+  .film-live .s-forge{--fx:40%}
+  .film-live .s-mill{--fx:60%}
+  .film-live .s-launch{--fx:62%}
+  .film-live .s-lanes{--fx:40%}
+  .film-live .s-rooms{--fx:55%}
+  .film-live .in-film{width:92cqw;margin-bottom:20cqh}
   .story-live .track li{width:62vw;margin-right:10px}
   @keyframes move{0%,18%{left:0}30%,52%{left:calc(50% - 20px)}64%,90%{left:calc(100% - 40px);opacity:1}96%{left:calc(100% - 40px);opacity:0}97%{left:0;opacity:0}100%{left:0;opacity:1}}
 }

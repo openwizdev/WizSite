@@ -37,6 +37,14 @@ DOC_HASHES = {
 }
 # Vector logos: the wordmark is outlined (paths), so no font ships and nothing can fall back to another font.
 VECTORS = ('favicon.svg', 'brand/openwiz-lockup.svg')
+# Vendored dependencies (J187: small, pinned, licence-checked): GSAP 3.15.1 runs the hero film's timeline. The file is
+# byte for byte the npm package's dist/gsap.min.js (package.json and package-lock.json pin the version); its licence
+# notice ships beside it. A new version needs review before its hash changes here.
+VENDOR_HASHES = {
+    'vendor/gsap-3.15.1.min.js': '3d1bea374ab1b703cc5c4105358eec63c4465efdc573931dc116e34a0a190c1b',
+    'vendor/GSAP-NOTICE.txt': '7799352104b22c11051f17f09e04c440495419a7a5c615161b942f48572954d9',
+}
+GSAP = '/vendor/gsap-3.15.1.min.js'
 SITE_URL = 'https://openwiz.dev/'
 ART_BUDGET = 2_000_000  # bytes, all art together
 # Styles and scripts ship fingerprinted (name.<first 10 hex of sha256>.ext); the pages use only those names.
@@ -57,7 +65,7 @@ FINGERPRINTS = {name: fingerprint(name, (ROOT / name).read_bytes()) for name in 
 STATIC = {
     'index.html', 'changelog/index.html', '_headers',
     'fonts/Geist-var.woff2', 'fonts/GeistMono-var.woff2', 'fonts/OFL.txt',
-} | ART | set(ICON_HASHES) | set(VECTORS)
+} | ART | set(ICON_HASHES) | set(VECTORS) | set(VENDOR_HASHES)
 RUNTIME = STATIC | set(FINGERPRINTS.values())
 
 
@@ -258,6 +266,13 @@ def check_landing_text(landing):
     assert hero and f'<p class="cap">{CAPTIONS[-1]}</p>' in hero[0], f'the film must end on "{CAPTIONS[-1]}"'
 
 
+def check_film_script(js):
+    """The film's GSAP motion starts only under the no-preference query (the CSS check cannot see it): site.js uses
+    GSAP only through gsap.matchMedia().add('(prefers-reduced-motion: no-preference)', ...), which builds the
+    timeline and adds .film-live, and reverts both if the visitor asks for less motion."""
+    return
+
+
 def check_vector(data):
     # A plain vector logo: shapes only. No live text or font (the wordmark font must never ship),
     # no script, no links or embedded images.
@@ -304,7 +319,8 @@ def check_site(root):
         # The pages never use an unfingerprinted name, and apply the fingerprinted styles as stylesheets.
         assert not set(page.refs) & {f'/{name}' for name in HASHED}, 'a page uses an unfingerprinted style or script'
         assert page.stylesheets == [f'/{names["tokens.css"]}', f'/{names["site.css"]}'], 'a page must apply exactly tokens.css then site.css'
-    assert pages[root / 'index.html'].scripts == [f'/{names["site.js"]}'], 'the landing page must load the fingerprinted site.js'
+    assert pages[root / 'index.html'].scripts == [GSAP, f'/{names["site.js"]}'], 'the landing page must load GSAP, then the fingerprinted site.js'
+    check_film_script((root / names['site.js']).read_text())
     def css_refs(text):
         # CSS escapes could hide or split a url(); none are used, so refuse them all, then require
         # that every url( is read whole.
@@ -415,6 +431,7 @@ def check_privacy(path, data):
         assert not any(marker.encode() in data.lower() for marker in DENYLIST), f'private marker in {path}'
     if font in VECTORS:
         check_vector(data)
+
     binary = path.endswith(('.webp', '.png', '.ico')) or (font in FONT_HASHES and font.endswith('.woff2'))
     text = path + '\n' + ('' if binary else data.decode('utf-8'))
     # The owner's copy rule covers every text file, this checker included (it builds the word from parts).

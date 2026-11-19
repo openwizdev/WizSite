@@ -1,0 +1,7 @@
+gsap-3.15.1.min.js is GSAP 3.15.1, copied byte for byte from the npm package gsap@3.15.1 (dist/gsap.min.js).
+Copyright GreenSock / Webflow. Its own header notice is kept unaltered, as the licence requires.
+
+It is used under the GSAP Standard "No Charge" License: https://gsap.com/standard-license
+That licence is free for commercial and non-commercial sites whose end users are not charged a fee. It is not an
+OSI-approved open-source licence; it forbids use in tools that compete with Webflow's visual animation builder.
+The OpenWiz site is free to visit and is not such a tool. The owner approved this dependency (J187).
