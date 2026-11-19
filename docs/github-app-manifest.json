@@ -1,5 +1,5 @@
 {
-  "name": "OpenWiz app",
+  "name": "OpenWiz Viewer",
   "url": "https://openwiz.dev/",
   "description": "Shows your OpenWiz factory at openwiz.dev/app: what needs you, every spec's ticket graph and the agents at work. Read-only, on the repositories you pick.",
   "public": true,
