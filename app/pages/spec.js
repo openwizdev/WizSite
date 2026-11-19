@@ -157,8 +157,9 @@
     const dot = css(h('span', { 'aria-hidden': 'true' }), { width: '8px', height: '8px', 'border-radius': '50%', background: 'var(--em-building)',
       'box-shadow': '0 0 0 3px color-mix(in srgb, var(--em-building) 30%, transparent)' });
     el.setAttribute('data-pulse', '');
-    el.lastElementChild.append(css(h('span', { class: 'pulse' }, dot, 'Agent working'),
-      { display: 'inline-flex', 'align-items': 'center', gap: '8px', 'margin-left': '10px', 'font-size': '14px', color: 'var(--em-text-2)' }));
+    // On the card's number line: the graph's cards have a fixed height, and the state pill's line has no room.
+    el.firstElementChild.append(' · ', css(h('span', { class: 'pulse' }, dot, 'Agent working'),
+      { display: 'inline-flex', 'align-items': 'center', gap: '7px', color: 'var(--em-text-2)' }));
   }
 
   OW.specPage = { render, pulse, shown: null };
