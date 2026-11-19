@@ -270,7 +270,12 @@ def check_film_script(js):
     """The film's GSAP motion starts only under the no-preference query (the CSS check cannot see it): site.js uses
     GSAP only through gsap.matchMedia().add('(prefers-reduced-motion: no-preference)', ...), which builds the
     timeline and adds .film-live, and reverts both if the visitor asks for less motion."""
-    return
+    entry = "gsap.matchMedia().add('(prefers-reduced-motion: no-preference)', () => {"
+    assert js.count(entry) == 1, 'the film must start only under gsap.matchMedia no-preference'
+    at = js.index(entry)
+    assert set(re.findall(r'\bgsap\.(\w+)', js)) <= {'matchMedia', 'timeline'}, 'GSAP used outside the film timeline'
+    assert js.count('buildFilm(') == 2 and js.rindex('buildFilm(') > at, 'the film timeline is built outside matchMedia'
+    assert js.count("classList.add('film-live')") == 1 and js.index("classList.add('film-live')") > at, '.film-live added outside matchMedia'
 
 
 def check_vector(data):
@@ -320,6 +325,8 @@ def check_site(root):
         assert not set(page.refs) & {f'/{name}' for name in HASHED}, 'a page uses an unfingerprinted style or script'
         assert page.stylesheets == [f'/{names["tokens.css"]}', f'/{names["site.css"]}'], 'a page must apply exactly tokens.css then site.css'
     assert pages[root / 'index.html'].scripts == [GSAP, f'/{names["site.js"]}'], 'the landing page must load GSAP, then the fingerprinted site.js'
+    for name, pinned in VENDOR_HASHES.items():
+        assert sha256((root / name).read_bytes()).hexdigest() == pinned, f'unreviewed vendored file {name}'
     check_film_script((root / names['site.js']).read_text())
     def css_refs(text):
         # CSS escapes could hide or split a url(); none are used, so refuse them all, then require
@@ -431,7 +438,8 @@ def check_privacy(path, data):
         assert not any(marker.encode() in data.lower() for marker in DENYLIST), f'private marker in {path}'
     if font in VECTORS:
         check_vector(data)
-
+    if path.startswith(('vendor/', 'dist/vendor/')):
+        assert font in VENDOR_HASHES and sha256(data).hexdigest() == VENDOR_HASHES[font], 'unreviewed vendored file'
     binary = path.endswith(('.webp', '.png', '.ico')) or (font in FONT_HASHES and font.endswith('.woff2'))
     text = path + '\n' + ('' if binary else data.decode('utf-8'))
     # The owner's copy rule covers every text file, this checker included (it builds the word from parts).
