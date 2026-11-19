@@ -91,6 +91,13 @@ FONT_HASHES = {
     'fonts/OFL.txt': 'c683bfbcc7e087f5d37a54ef628f10387c451a83ddc459b151403a164ac46c90',
 }
 PAGES = ('index.html', 'changelog/index.html')
+# The landing story (#1287): one Wiz through every era, with "Build a to-do app" as the example idea and the
+# zoom-out handing off to "This is your factory." The old example idea must not come back beside it.
+STORY_COPY = ('Build a to-do app', 'This is your factory.')
+OLD_EXAMPLE = ('dark mode', 'dark-mode')
+# Motion runs only when the visitor has not asked for less: every animation, transition and smooth scroll
+# sits inside this media query, so reduced motion shows the same story as still paintings.
+MOTION_OK = '@media (prefers-reduced-motion:no-preference)'
 # The ship log: the approved VS9 changelog text (What's new for you, tested line, Under the hood), plus Being built.
 CHANGELOG_MAIN = '17830d3f9a837a3ec24f2382829093cc941e0d1f5fd873e45e4d3a44c6e897c2'
 
@@ -103,6 +110,7 @@ class Page(HTMLParser):
         self.favicons = set()
         self.social = []
         self.buttons = []
+        self.images = []
         self.stylesheets, self.scripts = [], []
         self.feed(text)
 
@@ -116,6 +124,8 @@ class Page(HTMLParser):
                 self.refs.append(attrs[key])
         if tag == 'button':
             self.buttons.append(attrs)
+        if tag == 'img':
+            self.images.append(attrs)
         # Only references the browser applies: an enabled stylesheet for all media, a script of a runnable type.
         if (tag == 'link' and attrs.get('rel') == 'stylesheet' and attrs.get('href') and 'disabled' not in attrs
                 and attrs.get('media', 'all') in ('all', 'screen')):
@@ -167,6 +177,27 @@ class Text(HTMLParser):
 
     def spaced(self):
         return ' '.join(self.parts)
+
+
+def check_motion(css):
+    """Every animation, transition and smooth scroll is inside MOTION_OK (stopping one is always allowed)."""
+    stack, at, found = [], 0, []
+    for m in re.finditer(r'[{};]', css):
+        chunk = css[at:m.start()]
+        if m[0] == '{':
+            stack.append(re.sub(r'\s+', ' ', re.sub(r'/\*[\s\S]*?\*/', '', chunk)).strip().replace(': ', ':'))
+        else:
+            decl = re.sub(r'/\*[\s\S]*?\*/', '', chunk).strip().lower()
+            name, _, value = decl.partition(':')
+            name, value = name.strip(), value.strip().removesuffix('!important').strip()
+            moving = ((name in ('animation', 'animation-name', 'transition', 'transition-property') and value != 'none')
+                      or (name == 'scroll-behavior' and value == 'smooth'))
+            if moving and not any(p.startswith('@keyframes') for p in stack) and MOTION_OK not in stack:
+                found.append(f'{" > ".join(stack)} {{{decl}}}')
+            if m[0] == '}' and stack:
+                stack.pop()
+        at = m.end()
+    assert not found, f'motion outside {MOTION_OK}: {found[:3]}'
 
 
 def check_vector(data):
@@ -272,6 +303,15 @@ def check_site(root):
     # Owner cuts (round 6): obvious notes stay off the page.
     for text in ('Illustration, not live data', 'Building in public'):
         assert text.lower() not in flat.lower(), f'cut copy is back: {text}'
+    for text in STORY_COPY:
+        assert text in flat, f'missing landing story copy: {text}'
+    for reading in [Text(landing).spaced()] + Text(landing).shown:
+        assert not any(old in reading.lower() for old in OLD_EXAMPLE), 'the old example idea is back on the landing'
+    # Every era painting and How it works square says what it shows; only the idle-move layers are decorative.
+    for attrs in pages[root / 'index.html'].images:
+        if re.match(r'/art/(era|step)-', attrs.get('src') or ''):
+            assert (attrs.get('alt') or '').strip(), f'painting without a description: {attrs.get("src")}'
+    check_motion((root / names['site.css']).read_text())
     # Install stays "coming soon" until a stranger can install (AN8); only these mentions are allowed.
     # The one allowed mention is the disabled Install button's own label; any other "install" anywhere in the
     # rendered page (an extra link with the same words included) fails.
