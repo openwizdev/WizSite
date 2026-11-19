@@ -4,6 +4,7 @@
 // change always gets a new URL: no visitor can pair new HTML with an old cached stylesheet or script.
 import { copyFile, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
+import { readAll, render, summary, withReleases } from './scripts/changelog.mjs';
 
 const root = new URL('./', import.meta.url);
 const output = new URL('dist/', root);
@@ -18,6 +19,10 @@ const npmVendor = { 'app/vendor/dagre-3.1.3.min.js': 'node_modules/@dagrejs/dagr
 const hashed = ['tokens.css', 'site.css', 'site.js', vendor[0], ...app];
 const brand = ['favicon.ico', 'favicon.svg', 'apple-touch-icon.png', 'brand/openwiz-lockup.svg', 'brand/og.png'];
 const files = ['_headers', 'app/manifest.webmanifest', ...art, 'art/spec-demo.webm', ...vendor.slice(1), ...brand, 'fonts/Geist-var.woff2', 'fonts/GeistMono-var.woff2', 'fonts/OFL.txt'];
+// The Changelog's release parts (#1364), generated from each release's published notes on GitHub at this build.
+// A failed read shows its part as missing; the build never fails on it.
+const releases = await readAll();
+console.log(`Changelog releases: ${summary(releases)}`);
 await rm(output, { recursive: true, force: true });
 const put = async (name, data) => {
   const target = new URL(name, output);
@@ -34,6 +39,7 @@ for (const file of hashed) {
 for (const page of pages) {
   let html = await readFile(new URL(page, root), 'utf8');
   for (const [file, name] of Object.entries(names)) html = html.replaceAll(`"/${file}"`, `"/${name}"`);
+  if (page === 'changelog/index.html') html = withReleases(html, render(releases));
   await put(page, html);
 }
 for (const [file, source] of Object.entries(npmVendor)) await put(file, await readFile(new URL(source, root)));

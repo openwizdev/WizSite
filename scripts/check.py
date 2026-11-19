@@ -129,6 +129,11 @@ CHANGELOG_LINKS = ('/changelog/', '/changelog')
 PUBLIC_REPOS = ('OpenWiz', 'WizSkills', 'WizLoops', 'WizPlugins', 'WizSite')
 PUBLIC_WIZ_NAMES = set(PUBLIC_REPOS) | {'WizBar'}  # WizBar is WizPlugins' plugin, not a repository
 TODAY = 'What exists today'
+# The generated Releases section (#1364): build.mjs adds it last in the Changelog's main, between these markers, from
+# each versioned repository's published release notes. The page's reviewed rules and pin apply without it; the
+# section has its own rules (check_releases), one part per versioned repository, in this order.
+RELEASES = ('<!-- releases:start -->', '<!-- releases:end -->')
+RELEASE_REPOS = ('OpenWiz', 'WizSkills', 'WizLoops')
 
 
 class Page(HTMLParser):
@@ -395,7 +400,7 @@ def check_site(root):
     scripts = (root / names['site.js']).read_text()
     assert not re.search(r'install|clipboard', scripts, re.I), 'no script may activate Install or copy the prompt yet'
     assert not re.search(r'\b\d{4}-\d{2}-\d{2}\b', words), 'dated landing promise'
-    changelog = (root / 'changelog/index.html').read_text()
+    changelog, releases = split_releases((root / 'changelog/index.html').read_text())
     assert not re.search(r'(?<![\d.])\d+\.\d+\.\d+(?![\d.])', flat), 'release version mentioned on the landing'
     for name in VECTORS:
         check_vector((root / name).read_bytes())
@@ -406,6 +411,7 @@ def check_site(root):
         total += len(data)
     assert total <= ART_BUDGET, f'art is {total} bytes, over the {ART_BUDGET} budget'
     check_changelog(landing, changelog)
+    check_releases(releases)
     main = re.search(r'<main\b[^>]*>[\s\S]*?</main>', changelog)
     assert main and sha256(main[0].encode()).hexdigest() == CHANGELOG_MAIN, 'changelog content changed; review explicitly before updating its snapshot'
 
@@ -518,6 +524,67 @@ def check_changelog(landing, changelog):
         check_motion(style)
 
 
+def split_releases(built):
+    """A built Changelog as (the page without its generated section, the section): exactly one, last in main."""
+    start, end = RELEASES
+    assert built.count(start) == 1 and built.count(end) == 1, 'the built Changelog has one generated Releases section'
+    before, rest = built.split(start)
+    section, after = rest.split(end)
+    assert after.startswith('</main>'), 'the generated Releases section closes the Changelog\'s main'
+    return before + after, section
+
+
+class ReleaseOutline(HTMLParser):
+    """The generated section's tags, heading, and each part's repository, entry titles and state."""
+    def __init__(self, text):
+        super().__init__(convert_charrefs=True)
+        self.tags, self.h2, self.parts, self.reading = [], [], [], None
+        self.feed(text)
+
+    def handle_starttag(self, tag, attrs):
+        attrs = dict(attrs)
+        classes = (attrs.get('class') or '').split()
+        self.tags.append((tag, attrs))
+        if 'release-part' in classes:
+            self.parts.append({'repo': attrs.get('data-repo'), 'titles': [], 'states': []})
+        elif self.parts and tag == 'p' and ({'no-release', 'read'} & set(classes)):
+            self.parts[-1]['states'].append('no-release' if 'no-release' in classes else 'missing')
+        if tag in ('h2', 'h4'):
+            self.reading = [tag, '']
+
+    def handle_data(self, data):
+        if self.reading:
+            self.reading[1] += data
+
+    def handle_endtag(self, tag):
+        if self.reading and self.reading[0] == tag:
+            text = re.sub(r'\s+', ' ', self.reading[1]).strip()
+            (self.h2 if tag == 'h2' else self.parts[-1]['titles'] if self.parts else self.h2).append(text)
+            self.reading = None
+
+
+def check_releases(section):
+    """The generated Releases section: one part per versioned repository in order, each with its releases newest
+    first or exactly one of "no release yet" and missing; release notes are text only."""
+    outline = ReleaseOutline(section)
+    assert outline.h2 == ['Releases'], 'the generated section is headed Releases'
+    assert [p['repo'] for p in outline.parts] == list(RELEASE_REPOS), f'one release part per versioned repository: {[p["repo"] for p in outline.parts]}'
+    allowed = {'section', 'h2', 'h3', 'h4', 'span', 'p', 'article', 'time', 'div', 'ul', 'li', 'code', 'strong'}
+    for tag, attrs in outline.tags:
+        assert tag in allowed, f'unexpected element in the generated releases: {tag}'
+        assert set(attrs) <= {'class', 'id', 'data-repo', 'aria-labelledby', 'datetime'}, f'unexpected attribute in the generated releases: {sorted(attrs)}'
+    for part in outline.parts:
+        repo, titles, states = part['repo'], part['titles'], part['states']
+        assert bool(titles) != bool(states) and len(states) <= 1, f'{repo}: releases, or one of no release yet and missing'
+        versions = []
+        for title in titles:
+            found = re.fullmatch(rf'{repo} (\d+)\.(\d+)\.(\d+)', title)
+            assert found, f'{repo}: unexpected release title {title!r}'
+            versions.append(tuple(map(int, found.groups())))
+        assert versions == sorted(versions, reverse=True) and len(set(versions)) == len(versions), f'{repo}: releases newest first, each once'
+        assert all(v >= (0, 1, 0) for v in versions), f'{repo}: releases from 0.1.0 on'
+
+
 def check_app(root, names, pages):
     """The app's page: fingerprinted Ember and scripts only, no inline script, local links, its manifest, its CSP."""
     page = Page((root / APP_PAGE).read_text())
@@ -588,7 +655,10 @@ def main():
     for name, hashed in FINGERPRINTS.items():
         assert (ROOT / name).read_bytes() == (output / hashed).read_bytes(), f'export differs: {name}'
     for name in ALL_PAGES:
-        assert fingerprinted_page((ROOT / name).read_text()) == (output / name).read_text(), f'export differs: {name}'
+        built = (output / name).read_text()
+        if name == 'changelog/index.html':
+            built = split_releases(built)[0]
+        assert fingerprinted_page((ROOT / name).read_text()) == built, f'export differs: {name}'
     paths = subprocess.check_output(['git', 'ls-files', '-z', '--cached', '--others', '--exclude-standard'], cwd=ROOT).decode().split('\0')
     for name in set(paths) - {''}:
         path = ROOT / name
