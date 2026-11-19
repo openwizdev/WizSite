@@ -6,6 +6,6 @@
   "callback_urls": ["https://openwiz.dev/app"],
   "request_oauth_on_install": true,
   "hook_attributes": { "url": "https://openwiz.dev/", "active": false },
-  "default_permissions": { "metadata": "read", "issues": "read", "pull_requests": "read", "contents": "read" },
+  "default_permissions": { "metadata": "read", "issues": "read", "pull_requests": "read" },
   "default_events": []
 }
