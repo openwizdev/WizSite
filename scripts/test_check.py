@@ -167,6 +167,26 @@ class Checks(unittest.TestCase):
                 with self.assertRaisesRegex(AssertionError, error):
                     check_site(root)
 
+    def test_hero_names_no_approval_step(self):
+        # Catches: an approval step back in the hero (J203: the road is three moments with no approval),
+        # in its copy, its demo window or the demo's step labels.
+        for name, old, new in (
+                ('index.html', 'Turn an idea into a spec and reviewed code.', 'Turn an idea into an approved plan and reviewed code.'),
+                ('index.html', '<p class="demo-status">', '<p class="demo-status">Approve the plan · '),
+                ('site.js', "label: 'Writing the spec'", "label: 'Approving the plan'")):
+            with self.subTest(new=new), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp) / 'dist'
+                shutil.copytree(ROOT / 'dist', root)
+                if name == 'site.js':
+                    edit_built(root, name, lambda t: t.replace(old, new, 1) if old in t else self.fail(old))
+                else:
+                    page = root / name
+                    text = page.read_text()
+                    self.assertIn(old, text)
+                    page.write_text(text.replace(old, new, 1))
+                with self.assertRaisesRegex(AssertionError, 'approval step'):
+                    check_site(root)
+
     def test_landing_starts_in_still_mode(self):
         # Catches: an early inline script, a visible broken motion control or an autoplaying clip.
         for change, error in (
@@ -317,8 +337,12 @@ class Checks(unittest.TestCase):
     def test_logo_pack(self):
         # Catches: a lockup that ships live text or a font reference (the wordmark font must never ship),
         # an unreviewed icon picture, and a social card URL that points off the site or at a missing file.
+        # Catches too (#1350): a vector logo still in the earlier blue mark rather than the dark-cream one.
         logo = (ROOT / 'brand/openwiz-lockup.svg').read_bytes()
-        check_vector(logo)
+        for name in ('favicon.svg', 'brand/openwiz-lockup.svg'):
+            check_vector((ROOT / name).read_bytes())
+        with self.assertRaisesRegex(AssertionError, 'new mark'):
+            check_vector(logo.replace(b'#cfc6b8', b'#2b2bff'))
         for bad in (logo.replace(b'</svg>', b'<text x="0" y="0">OpenWiz</text></svg>'),
                     logo.replace(b'<path ', b'<path font-family="URW Gothic" ', 1),
                     logo.replace(b'</svg>', b'<style>@font-face{src:url(x.otf)}</style></svg>'),
