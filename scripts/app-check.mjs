@@ -244,7 +244,7 @@ function assert(ok, message) {
   if (!ok) throw new Error(message);
 }
 
-const graphqlCount = world => world.log.filter(r => r.origin === API && r.path === '/graphql').length;
+const graphqlCount = world => world.log.filter(r => r.origin === API && r.path === '/graphql' && r.method === 'POST').length;
 const ok = name => async () => ({ status: 200, json: await fixture(name) });
 
 // Every logged request: only the site (static reads and the helper) and GitHub's API, and nothing that writes.
@@ -289,6 +289,7 @@ async function main() {
       const href = await page.run(`[...document.querySelectorAll('a')].find(a => a.textContent.trim() === 'Sign in with GitHub').getAttribute('href')`);
       assert(href === '/api/sign-in/start', `sign-in goes to ${href}, not the helper`);
       assert(graphqlCount(world) === 0, 'GitHub was read before sign-in');
+      if (process.env.SHOTS) await page.shot(join(process.env.SHOTS, 'sign-in-phone.png'), 390, 844, true);
       checkRequestLog(world);
       await page.close();
     });
@@ -304,6 +305,7 @@ async function main() {
       assert(await page.run('document.cookie') === '', 'the app set a cookie');
       const text = await page.text();
       assert(text.includes('acme/factory') && text.includes('acme/site'), 'the picker does not list both repositories');
+      if (process.env.SHOTS) await page.shot(join(process.env.SHOTS, 'picker-laptop.png'), 1440, 900, false);
       const asked = world.log.filter(r => r.origin === API && r.method !== 'OPTIONS');
       assert(asked.length && asked.every(r => r.headers.Authorization === 'Bearer ghu_SYNTHETICaccess0000000000000000000'), 'GitHub reads do not carry the token');
       checkRequestLog(world);
@@ -342,7 +344,8 @@ async function main() {
       const hhmm = `${String(now.getUTCHours()).padStart(2, '0')}:${String(now.getUTCMinutes()).padStart(2, '0')}`;
       const shown = (await page.text()).match(/Specs read (\d\d:\d\d)/)[1];
       const minutes = t => Number(t.slice(0, 2)) * 60 + Number(t.slice(3));
-      assert(Math.abs(minutes(shown) - minutes(hhmm)) <= 1, `read time ${shown} is not the time of the read (${hhmm})`);
+      const apart = Math.abs(minutes(shown) - minutes(hhmm));
+      assert(Math.min(apart, 1440 - apart) <= 1, `read time ${shown} is not the time of the read (${hhmm})`);
       for (const [width, height, mobile] of [[1440, 900, false], [390, 844, true]]) {
         await page.size(width, height, mobile);
         const shown = await page.text();
@@ -409,8 +412,12 @@ async function main() {
       assert(/paused until/i.test(await page.text()), 'the notice does not say when reads resume');
       if (process.env.SHOTS) await page.shot(join(process.env.SHOTS, 'low-limit-phone.png'), 390, 844, true);
       const before = graphqlCount(world);
-      await page.run(`(() => { const b = [...document.querySelectorAll('button')].find(b => /refresh/i.test(b.textContent)); if (b) b.click(); })()`);
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      assert(before === 2, `expected one read per feed before the back-off, saw ${before}`);
+      const disabled = await page.run(`[...document.querySelectorAll('button')].filter(b => /refresh now/i.test(b.textContent)).map(b => b.disabled)`);
+      assert(disabled.length === 2 && disabled.every(Boolean), `Refresh now is not disabled while backing off: ${JSON.stringify(disabled)}`);
+      // Even forced, a refresh reads nothing while the limit is low (the data layer's own guard, not the button).
+      await page.run(`OW.data.refreshAll()`);
+      await page.run(`new Promise(resolve => setTimeout(resolve, 300))`);
       assert(graphqlCount(world) === before, 'the app read GitHub again while backing off');
       checkRequestLog(world);
       await page.close();
@@ -421,8 +428,11 @@ async function main() {
       const page = await open(browser, world);
       await page.go(`${SITE}/app/`);
       await page.until(`document.readyState === 'complete'`, 'the page');
-      await page.run(`fetch('https://example.com/collect').then(() => 'sent', () => 'blocked')`);
+      const outcome = await page.run(`fetch('https://example.com/collect').then(() => 'sent', () => 'blocked')`);
+      assert(outcome === 'blocked', 'the page could send to another server');
       assert(!world.log.some(r => r.url.startsWith('https://example.com')), 'the page could reach another server');
+      const end = Date.now() + 5000;
+      while (!world.violations.some(text => /Content Security Policy/.test(text)) && Date.now() < end) await new Promise(r => setTimeout(r, 50));
       assert(world.violations.some(text => /Content Security Policy/.test(text)), 'no Content Security Policy refused it');
       await page.close();
     });

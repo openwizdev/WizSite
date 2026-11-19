@@ -144,7 +144,8 @@ h1:focus { outline: none; } /* focused after navigation for screen readers; the 
   .top .repo { flex: 1; min-height: 44px; }
   main { padding: 22px 16px 120px; }
   h1 { font-size: 28px; }
-  .page-head { flex-direction: column; align-items: flex-start; gap: 4px; }
+  .page-head { flex-direction: column; align-items: flex-start; gap: 4px; margin-bottom: 8px; }
+  .page-head .read { display: none; } /* the phone shows each feed's read time just below */
   .tabs {
     display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 5;
     background: var(--em-side); border-top: 1px solid var(--em-line);

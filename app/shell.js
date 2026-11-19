@@ -130,7 +130,7 @@
     const mine = page.feeds.map(name => feeds[name]);
     const latest = mine.filter(feed => feed.readAt).map(feed => feed.readAt);
     built.read.textContent = latest.length ? `Read ${time(Math.min(...latest))}` : '';
-    built.phoneReads.replaceChildren(...mine.flatMap((feed, i) => [i ? ' · ' : '', ...readLine(feed)]));
+    built.phoneReads.replaceChildren(...mine.flatMap((feed, i) => [i ? ' · ' : '', ...readLine(feed)]).filter(part => part !== null && part !== ''));
     const notes = [];
     if (data.paused()) {
       notes.push(notice('slow', 'pause', 'GitHub\'s limit is low', `(${limit.remaining ?? 0} left). Reads are paused until ${time(limit.pausedUntil)}, then resume on their own.`));

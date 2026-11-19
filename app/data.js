@@ -161,6 +161,7 @@
   for (const feed of Object.values(feeds)) Object.assign(feed, { state: 'loading', data: null, readAt: null, failedAt: null, timer: null, busy: false });
 
   const limit = { remaining: null, limit: null, pausedUntil: null };
+  let generation = 0; // bumped by stop(): a read started for an earlier sign-in or repository is dropped
   const listeners = new Set();
   const changed = () => listeners.forEach(listener => listener());
   const paused = () => limit.pausedUntil !== null && limit.pausedUntil > Date.now();
@@ -184,10 +185,12 @@
     const feed = feeds[name];
     const picked = repo.get();
     if (!picked || feed.busy || paused()) return;
+    const mine = generation;
     feed.busy = true;
     try {
       const response = await github('POST', '/graphql', { query: feed.query, variables: { owner: picked.owner, name: picked.name } });
       const answer = await response.json().catch(() => null);
+      if (mine !== generation) return;
       noteLimit(answer?.data?.rateLimit, response);
       if (!response.ok || !answer?.data?.repository) throw new Error(`GitHub answered ${response.status}`);
       feed.data = answer.data.repository;
@@ -200,11 +203,14 @@
         OW.onSignedOut?.();
         return;
       }
+      if (mine !== generation) return;
       feed.failedAt = Date.now();
       feed.state = feed.data ? 'stale' : 'unknown';
     } finally {
-      feed.busy = false;
-      changed();
+      if (mine === generation) {
+        feed.busy = false;
+        changed();
+      }
     }
   }
 
@@ -223,9 +229,10 @@
     }
   }
   function stop() {
+    generation += 1;
     for (const feed of Object.values(feeds)) {
       clearTimeout(feed.timer);
-      Object.assign(feed, { state: 'loading', data: null, readAt: null, failedAt: null });
+      Object.assign(feed, { state: 'loading', data: null, readAt: null, failedAt: null, busy: false });
     }
     limit.pausedUntil = null;
   }
