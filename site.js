@@ -34,8 +34,7 @@ function showHero(gsap, paused, signal) {
   const mascot = demo.querySelector('.hero-sprite');
   const smoke = demo.querySelector('.hero-smoke');
   const fleet = [...demo.querySelectorAll('.hero-fleet span')];
-  const pulse = demo.querySelector('.work-pulse');
-  const ring = pulse.querySelector('circle');
+  const builder = demo.querySelector('.ticket-builder');
   const stillStatus = status.textContent;
   const stillTickets = tickets.map(ticket => [ticket.className, ticket.querySelector('small').textContent]);
   const stillNumbers = metrics.map(metric => metric.textContent);
@@ -66,9 +65,8 @@ function showHero(gsap, paused, signal) {
     }
     metrics.forEach((metric, i) => { metric.textContent = counts[i]; });
     steps.forEach((step, i) => step.classList.toggle('active', i <= index));
-    const active = tickets.find(ticket => ticket.matches('.building, .review'));
-    pulse.style.visibility = active ? 'visible' : 'hidden';
-    active?.append(pulse);
+    // Nothing downstream exists before its step: the stylesheet greys out the spec and tickets until then.
+    demo.dataset.scene = index;
     setCrew(index, 0);
   };
 
@@ -103,8 +101,8 @@ function showHero(gsap, paused, signal) {
         setFrame(mascot, sheet, 0);
         setCrew(index, 0);
       }, [], at + 2.19);
-      timeline.fromTo(ring, { scale: .65, opacity: .45 }, {
-        scale: 1.3, opacity: .08, duration: .8, repeat: 2, ease: 'power1.out',
+      timeline.fromTo(builder, { rotation: -10 }, {
+        rotation: 8, duration: .32, repeat: 7, yoyo: true, ease: 'sine.inOut', transformOrigin: '50% 85%',
       }, at + .1);
       // The smoke belongs to the outgoing costume. Hide the mascot only on the occlusion frame.
       timeline.call(() => {
@@ -149,9 +147,8 @@ function showHero(gsap, paused, signal) {
     });
     metrics.forEach((metric, i) => { metric.textContent = stillNumbers[i]; });
     steps.forEach(step => step.classList.remove('active'));
-    tickets[1].append(pulse);
-    pulse.removeAttribute('style');
-    ring.removeAttribute('style');
+    delete demo.dataset.scene;
+    builder.removeAttribute('style');
   }, { once: true });
   return update;
 }
@@ -223,9 +220,6 @@ function followPointer(gsap, paused, signal) {
 function enableMotion(gsap) {
   const preference = matchMedia('(prefers-reduced-motion: no-preference)');
   const pause = document.querySelector('.demo-pause');
-  const play = document.querySelector('.spec-play');
-  const video = document.querySelector('.spec-video');
-  const still = document.querySelector('.spec-screen');
   let controller;
 
   const configure = () => {
@@ -237,7 +231,6 @@ function enableMotion(gsap) {
     const updateHero = showHero(gsap, isPaused, signal);
     const updateEyes = followPointer(gsap, isPaused, signal);
     pause.hidden = false;
-    play.hidden = false;
     pause.addEventListener('click', () => {
       const paused = !isPaused();
       pause.setAttribute('aria-pressed', String(paused));
@@ -245,29 +238,178 @@ function enableMotion(gsap) {
       updateHero();
       updateEyes();
     }, { signal });
-    play.addEventListener('click', async () => {
-      video.hidden = false;
-      still.hidden = true;
-      try {
-        video.currentTime = 0;
-        await video.play();
-        if (!signal.aborted) video.focus();
-      } catch {
-        video.hidden = true;
-        still.hidden = false;
-      }
-    }, { signal });
-    signal.addEventListener('abort', () => {
-      pause.hidden = true;
-      play.hidden = true;
-      video.pause();
-      video.hidden = true;
-      still.hidden = false;
-    }, { once: true });
+    signal.addEventListener('abort', () => { pause.hidden = true; }, { once: true });
   };
   preference.addEventListener('change', configure);
   configure();
 }
 
+// The footer Wizes react, one at a time and briefly; at rest the footer is unchanged. With reduced motion, Pause
+// motion or no GSAP, a click is a still pose change (another costume) and the line, nothing moves.
+const FAMILY = [
+  ['Cave Wiz', 'era', 'thinking…', 'cave'], ['Builder Wiz', 'builder', 'building…'], ['Reviewer Wiz', 'reviewer', 'looks good!'],
+  ['Samurai Wiz', 'era', 'building…', 'samurai'], ['Astronaut Wiz', 'orchestrator', 'shipped!'], ['Reviewer Wiz', 'reviewer', 'looks good!'],
+  ['Orchestrator Wiz', 'orchestrator', 'next ticket!'], ['Builder Wiz', 'builder', 'building…'], ['Orchestrator Wiz', 'orchestrator', 'next ticket!'],
+  ['Reviewer Wiz', 'reviewer', 'looks good!'], ['Builder Wiz', 'builder', 'building…'], ['Orchestrator Wiz', 'orchestrator', 'next ticket!'],
+];
+const POOF = '/art/hero-cave-frames.webp';
+
+function enableFamily(gsap) {
+  const family = document.querySelector('.family');
+  const wizes = [...family.children];
+  const preference = matchMedia('(prefers-reduced-motion: no-preference)');
+  const pause = document.querySelector('.demo-pause');
+  const moving = () => !!gsap && preference.matches && pause.getAttribute('aria-pressed') !== 'true';
+  const line = document.createElement('span');
+  line.className = 'wiz-line';
+  line.setAttribute('role', 'status');
+  let lineTimer;
+  let active; // the one Wiz acting now
+  let near;
+
+  family.removeAttribute('aria-hidden');
+  family.setAttribute('role', 'group');
+  family.setAttribute('aria-label', 'The Wiz family');
+  wizes.forEach((wiz, i) => {
+    wiz.dataset.costume = i;
+    wiz.tabIndex = 0;
+    wiz.setAttribute('role', 'button');
+    wiz.setAttribute('aria-label', FAMILY[i][0]);
+    const sprite = document.createElement('span');
+    sprite.className = 'wiz-sprite';
+    sprite.setAttribute('aria-hidden', 'true');
+    wiz.append(sprite);
+  });
+
+  const costume = wiz => Number(wiz.dataset.costume);
+  const frame = (wiz, sheet, index) => {
+    const sprite = wiz.querySelector('.wiz-sprite');
+    sprite.style.backgroundImage = `url("${sheet}")`;
+    sprite.style.backgroundPositionX = `${index * 100 / 8}%`;
+    sprite.style.display = 'block';
+  };
+  const wear = (wiz, index) => {
+    wiz.dataset.costume = index;
+    wiz.querySelector('img').src = `/art/family-${String(index + 1).padStart(2, '0')}.webp`;
+    wiz.setAttribute('aria-label', FAMILY[index][0]);
+  };
+  const rest = wiz => {
+    if (!wiz) return;
+    gsap?.killTweensOf(wiz);
+    const sprite = wiz.querySelector('.wiz-sprite');
+    gsap?.killTweensOf(sprite);
+    sprite.removeAttribute('style');
+    wiz.classList.remove('is-acting');
+    if (gsap) gsap.set(wiz, { clearProps: 'transform' });
+  };
+  const say = (wiz, text) => {
+    clearTimeout(lineTimer);
+    gsap?.killTweensOf(line);
+    line.textContent = text;
+    line.removeAttribute('style');
+    wiz.append(line);
+    if (moving()) gsap.fromTo(line, { autoAlpha: 1 }, { autoAlpha: 0, delay: .8, duration: .25 });
+    else lineTimer = setTimeout(() => { line.style.visibility = 'hidden'; }, 1200);
+  };
+
+  const act = wiz => {
+    const index = costume(wiz);
+    const [, role, text, era] = FAMILY[index];
+    if (active && active !== wiz) rest(active);
+    active = wiz;
+    if (!moving()) {
+      wear(wiz, (index + 1) % FAMILY.length);
+      say(wiz, FAMILY[costume(wiz)][2]);
+      return;
+    }
+    rest(wiz);
+    const done = () => { rest(wiz); if (active === wiz) active = null; };
+    const timeline = gsap.timeline({ onComplete: done });
+    if (Math.random() < .2) {
+      // Now and then: a poof into another costume, from the hero's own smoke frames.
+      const next = (index + 1 + Math.floor(Math.random() * (FAMILY.length - 1))) % FAMILY.length;
+      timeline.call(() => frame(wiz, POOF, 6))
+        .call(() => { frame(wiz, POOF, 7); wear(wiz, next); }, [], .1)
+        .call(() => frame(wiz, POOF, 8), [], .2)
+        .call(() => {}, [], .32);
+      say(wiz, 'poof!');
+      return;
+    }
+    say(wiz, text);
+    if (role === 'era') {
+      // The era Wizes play their work frames from the hero's sprite sheet.
+      wiz.classList.add('is-acting');
+      [2, 3, 4, 5, 0].forEach((n, i) => timeline.call(() => frame(wiz, `/art/hero-${era}-frames.webp`, n), [], i * .14));
+      timeline.call(() => {}, [], .7);
+    } else if (role === 'builder') {
+      timeline.to(wiz, { rotation: 7, y: 3, duration: .09, yoyo: true, repeat: 5, transformOrigin: '50% 90%', ease: 'power1.in' });
+    } else if (role === 'reviewer') {
+      timeline.to(wiz, { scale: 1.07, rotation: -4, duration: .18, transformOrigin: '50% 90%' })
+        .to(wiz, { rotation: 4, duration: .2 }).to(wiz, { scale: 1, rotation: 0, duration: .16 });
+    } else {
+      timeline.to(wiz, { rotation: -9, duration: .11, yoyo: true, repeat: 5, transformOrigin: '50% 90%', ease: 'sine.inOut' });
+    }
+  };
+  const wave = wiz => {
+    if (!moving() || active) return;
+    gsap.fromTo(wiz, { rotation: 0 }, { rotation: -6, duration: .12, yoyo: true, repeat: 3, transformOrigin: '50% 90%',
+      ease: 'sine.inOut', overwrite: true });
+  };
+
+  for (const wiz of wizes) {
+    wiz.addEventListener('click', () => act(wiz));
+    wiz.addEventListener('keydown', event => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      event.preventDefault();
+      act(wiz);
+    });
+    wiz.addEventListener('pointerenter', event => { if (event.pointerType !== 'touch') wave(wiz); });
+    wiz.addEventListener('focus', () => { if (wiz.matches(':focus-visible')) wave(wiz); });
+  }
+  // Hovering the footer: the Wiz nearest the pointer perks up and leans toward it.
+  const footer = document.querySelector('.landing-footer');
+  const settle = () => {
+    if (near && near !== active) gsap?.to(near, { y: 0, rotation: 0, duration: .2, overwrite: true });
+    near = null;
+  };
+  footer.addEventListener('pointermove', event => {
+    if (event.pointerType === 'touch' || !moving()) return settle();
+    const nearest = wizes.reduce((best, wiz) => {
+      const box = wiz.getBoundingClientRect();
+      const distance = Math.abs(event.clientX - box.left - box.width / 2);
+      return distance < best[1] ? [wiz, distance, box] : best;
+    }, [null, Infinity])[0];
+    if (nearest === near || nearest === active) return;
+    settle();
+    near = nearest;
+    const box = near.getBoundingClientRect();
+    const toward = Math.sign(event.clientX - box.left - box.width / 2);
+    gsap.to(near, { y: -5, rotation: toward * 3, duration: .18, transformOrigin: '50% 90%', ease: 'power2.out', overwrite: true });
+  }, { passive: true });
+  footer.addEventListener('pointerleave', settle);
+}
+
+// The silent spec sample plays only on request, so it stays available with reduced motion on or GSAP blocked.
+function enableVideo() {
+  const play = document.querySelector('.spec-play');
+  const video = document.querySelector('.spec-video');
+  const still = document.querySelector('.spec-screen');
+  play.hidden = false;
+  play.addEventListener('click', async () => {
+    video.hidden = false;
+    still.hidden = true;
+    try {
+      video.currentTime = 0;
+      await video.play();
+      video.focus();
+    } catch {
+      video.hidden = true;
+      still.hidden = false;
+    }
+  });
+}
+
 showStars().catch(() => {});
+enableVideo();
+enableFamily(window.gsap);
 if (window.gsap) enableMotion(window.gsap);

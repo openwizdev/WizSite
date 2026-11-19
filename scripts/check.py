@@ -34,11 +34,11 @@ ART_HASHES = {
     'art/spec-demo.webm': '6619ae77a13229d9056037e5bc793d48f7fc98490d068c2b6e4f58426a8fac22',
 }
 ART = set(ART_HASHES)
-# Logo pack. Raster icons and the social card are pinned by hash like the art; a new picture needs review.
+# Logo pack (#1350: the dark-cream mark). Raster icons and the social card are pinned by hash like the art; a new picture needs review.
 ICON_HASHES = {
-    'favicon.ico': '5dc6f058d467f927617e28c10c2764a01e4f1b6e8c1017111920153a9fdf7020',
-    'apple-touch-icon.png': 'ff6e52cd499610049bbb6bf6289c77c99fe45ec667114ebcccab99266a9a09df',
-    'brand/og.png': '8ff8e60f4653d4ed0eb7bf47b81a87810d9a25b002ff796a6268f3f655caf582',
+    'favicon.ico': '7b1652147d449f4003ce051d157fc9db68ae69d596b3b38f426be71efcca04b4',
+    'apple-touch-icon.png': '018b3717f5aa73ce2a9ef62e97db778b002ef9b30aa50dd9213d72160c8182be',
+    'brand/og.png': '90b0b7eb0de9e30e0586e77f9491abd14c0d803ae937ab4cf6103223ea481d9b',
 }
 # README pictures: kept in the source for GitHub only, never built or served. Pinned like the icons.
 DOC_HASHES = {
@@ -47,6 +47,7 @@ DOC_HASHES = {
 }
 # Vector logos: the wordmark is outlined (paths), so no font ships and nothing can fall back to another font.
 VECTORS = ('favicon.svg', 'brand/openwiz-lockup.svg')
+MARK, OLD_MARK = '#cfc6b8', '#2b2bff'  # the new mark's dark cream, and the earlier blue it replaced
 SITE_URL = 'https://openwiz.dev/'
 ART_BUDGET = 2_000_000  # bytes, all art together
 # Styles and scripts ship fingerprinted (name.<first 10 hex of sha256>.ext); the pages use only those names.
@@ -244,6 +245,8 @@ def check_vector(data):
     for bad in ('<text', '<tspan', 'font', '@import', '<script', '<style', 'href', '<image', '<foreignobject'):
         assert bad not in svg, f'logo SVG must be outlined shapes only: {bad}'
     assert not re.search(r'\son[a-z]+\s*=', svg), 'logo SVG must have no event handlers'
+    # #1350: the logo pack carries the new mark in dark cream, never the earlier blue one.
+    assert MARK in svg and OLD_MARK not in svg, 'logo SVG must use the new mark (dark cream)'
 
 
 def check_ref(root, source, ref, pages, favicons=()):
@@ -342,6 +345,13 @@ def check_site(root):
             assert not any(word in low for word in BANNED_COPY), f'banned word rendered in {path.name}'
             for text in ('illustration, not live data', 'building in public'):
                 assert text not in low, f'cut copy is back in {path.name}: {text}'
+    # J203: the road is three moments with no approval; neither the hero nor its demo's steps name one.
+    hero = re.search(r'<section class="product-hero[\s\S]*?(?=<section class="agent-row)', landing)
+    assert hero, 'missing hero'
+    hero_text = Text(hero[0])
+    labels = re.findall(r"label: '([^']*)'", (root / names['site.js']).read_text())
+    for reading in [hero_text.spaced()] + hero_text.shown + labels:
+        assert not re.search(r'approv', reading, re.I), 'the hero names an approval step'
     moments = ('Answer a few questions', 'Watch your spec', 'Watch it ship')
     captions = re.findall(r'<h3>([^<]+)</h3>', landing)
     assert tuple(captions) == moments, 'the three moments must appear in order'
