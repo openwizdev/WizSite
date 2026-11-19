@@ -8,28 +8,24 @@ import subprocess
 from urllib.parse import unquote, urlsplit
 
 ROOT = Path(__file__).resolve().parents[1]
-# Layered art: generated WebP pictures, pinned by hash like the fonts. A changed or new picture
+# The landing story's art: the approved era paintings and How it works squares, web-sized WebP, plus the
+# cut-out layers for the idle moves (hammer, stamp, rocket). Pinned by hash like the fonts. A changed or new picture
 # needs review (including its raw bytes for private markers) before its hash is updated here.
 ART_HASHES = {
-    'art/app.webp': 'ef856bb38e5b28e5128b991c0856b1b70ab387237a05b5673e473a76e888372f',
-    'art/bay.webp': 'b27f9226e583591961b57409dcb8502139405e2aade4a2208bc705840a2ec075',
-    'art/builder-carry.webp': '40ca2b80232d32fdbc5bc2167e3c0be94cdf9043e12b4d7fc9d3e9ea40be114e',
-    'art/builder-hammer-down.webp': 'e96666e101dc52d9baa9b0e5191db74d2f88f8e63ced688c6420cb5866c71640',
-    'art/builder-hammer-up.webp': '6418007e902d7715fcd6058d6dfce69953e1411adfbf9cbe7d446d195cb3cfd9',
-    'art/builder-stand.webp': '8cb63b839e929b1e140ccbff6b540490e105be46b2e1952d9529ed8d2534772c',
-    'art/citadel-dark.webp': '30b6739867202b7a7fcc7127831b37089f6fccc5ebf4ea9eef84c1e153510ccf',
-    'art/citadel-lights.webp': '0536adc3168d80c859df1d68ee50fd79d3f3e04df34abf95a6e6d15fd44ced33',
-    'art/decider.webp': 'c5fe96e1ac1fe73ba6533840a499eda28c49d102993f18b3d8fd0a3a73b2560e',
-    'art/hall.webp': '81d0c27f1978ed88dd2901d8f03697cf7efb424d891ee38924b8676c6b85c495',
-    'art/idea-card.webp': '695e9aefb47bdb69e320f59021d07c7bd1a290737f3fdafa66a088cb1001ca45',
-    'art/item-1.webp': 'bb5c98a3f1bd87c5e5fbd8d0ea660b1b1a074d48e675fa88507c068cc5ea7f0c',
-    'art/item-2.webp': '6adb85a0a5dcf50a47e2746e1cda49b07e5ea5261070147896c9eda5c47b8563',
-    'art/item-3.webp': '3ee213fa10249c9f913690ee0532b0590cdde467c1b4d1d8c2adb28677cce41f',
-    'art/moon.webp': '28d7a2d9b469025c138d4aec6d88a032969d928697013e1afa0e95fc68889c60',
-    'art/reviewer-look.webp': '8ab45fd69d663c530ddc075db2b3a7e027535b85896702dc953e1de4d26b0a6a',
-    'art/reviewer-stamp-down.webp': '5ae4a95e243ab6bc6585ccf9d17772b268aea19786375ac180747ff159dec94c',
-    'art/reviewer-stamp-up.webp': 'e554ceb93b9f166a4894b02b292af40e8ff3da758f0089d43517e166eab24065',
-    'art/seal.webp': '55ec8648490c5d72a592d7aa1271e80b9f954142cffb32f6e9b8fa0e03b60814',
+    'art/era-1-cave.webp': 'd9c6bf6697489c0970b1aaf0897b4be0cb1c4c1208d8d6ffc0c421c74203d390',
+    'art/era-2-grill.webp': 'efaf213c3f389c8feb2f9d0436e94b1f9241d0ecf3cc3e793385d34f11cd11dd',
+    'art/era-3-forge.webp': 'ec01ffe4207f7b7ca25a56cbca91af898222647f64fd9b60e08654f732136b42',
+    'art/era-4-mill.webp': 'd9974ea70daf8b7864097595ffd137bad22aafc5f6d2be57c6b5398cb6415b4d',
+    'art/era-5-launch.webp': '62e17450559df808a658f6f3320e6da8914dd74974f77e7bbd08f6480dce61cb',
+    'art/era-6-lanes.webp': 'c1534e99ffd4023132c4c331113f87bf61550b5eaabd82909618f9f850debb91',
+    'art/era-7-rooms.webp': '71c2dba4da362472a9f1d07bbf1f206f08078c3222ddb87efce685f062d90476',
+    'art/layer-hammer.webp': '963b036ae6ecb931b646134b2bf1b147778028100c5bafccd0d2f9e696f12c51',
+    'art/layer-rocket.webp': '04297046455e108974d4a152b07dd77c39ab9d28a1fa9b8fef87d2c521dbef1f',
+    'art/layer-stamp.webp': '306522a6cd5952f16e1fe34a2daec89e4861b20f3cc335f0ed6ad8790451d658',
+    'art/step-1-paste.webp': 'c3fbcb016aac4eec3df83ff4f17f2cfafe010b64469055dda85d6c6f26b84cae',
+    'art/step-2-answer.webp': 'f7b8348b5bf393a1c1263383754089d64673f94e12bf21a153559f972e823b24',
+    'art/step-3-approve.webp': '10e5faacc18a392a9de71cc7d68d894ae40a1232c25d8e242390a0466c9805c5',
+    'art/step-4-watch.webp': '34bd4d3371d761403109df430c11155b25ee2f7c77d1d25e89a8d659ee94a2c7',
 }
 ART = set(ART_HASHES)
 # Logo pack. Raster icons and the social card are pinned by hash like the art; a new picture needs review.
@@ -91,6 +87,17 @@ FONT_HASHES = {
     'fonts/OFL.txt': 'c683bfbcc7e087f5d37a54ef628f10387c451a83ddc459b151403a164ac46c90',
 }
 PAGES = ('index.html', 'changelog/index.html')
+# The landing story (#1287): one Wiz through every era, with "Build a to-do app" as the example idea and the
+# zoom-out handing off to "This is your factory." The old example idea must not come back beside it.
+STORY_COPY = ('Build a to-do app', 'This is your factory.')
+OLD_EXAMPLE = ('dark mode', 'dark-mode')
+# Motion runs only when the visitor has not asked for less: every animation, transition and smooth scroll
+# sits inside this media query, so reduced motion shows the same story as still paintings.
+MOTION_OK = '@media (prefers-reduced-motion:no-preference)'
+# The animated layout (sticky zoom-out, hidden-until-scrolled hand-off, Pause motion) is switched on only by
+# site.js itself, once its handlers are in place: no inline script may set it first, so a failed site.js
+# download leaves the still story fully visible.
+LIVE_CLASS = 'story-live'
 # The ship log: the approved VS9 changelog text (What's new for you, tested line, Under the hood), plus Being built.
 CHANGELOG_MAIN = '17830d3f9a837a3ec24f2382829093cc941e0d1f5fd873e45e4d3a44c6e897c2'
 
@@ -103,6 +110,8 @@ class Page(HTMLParser):
         self.favicons = set()
         self.social = []
         self.buttons = []
+        self.images = []
+        self.inline_scripts = 0
         self.stylesheets, self.scripts = [], []
         self.feed(text)
 
@@ -116,6 +125,10 @@ class Page(HTMLParser):
                 self.refs.append(attrs[key])
         if tag == 'button':
             self.buttons.append(attrs)
+        if tag == 'img':
+            self.images.append(attrs)
+        if tag == 'script' and not attrs.get('src'):
+            self.inline_scripts += 1
         # Only references the browser applies: an enabled stylesheet for all media, a script of a runnable type.
         if (tag == 'link' and attrs.get('rel') == 'stylesheet' and attrs.get('href') and 'disabled' not in attrs
                 and attrs.get('media', 'all') in ('all', 'screen')):
@@ -167,6 +180,27 @@ class Text(HTMLParser):
 
     def spaced(self):
         return ' '.join(self.parts)
+
+
+def check_motion(css):
+    """Every animation, transition and smooth scroll is inside MOTION_OK (stopping one is always allowed)."""
+    stack, at, found = [], 0, []
+    for m in re.finditer(r'[{};]', css):
+        chunk = css[at:m.start()]
+        if m[0] == '{':
+            stack.append(re.sub(r'\s+', ' ', re.sub(r'/\*[\s\S]*?\*/', '', chunk)).strip().replace(': ', ':'))
+        else:
+            decl = re.sub(r'/\*[\s\S]*?\*/', '', chunk).strip().lower()
+            name, _, value = decl.partition(':')
+            name, value = name.strip(), value.strip().removesuffix('!important').strip()
+            moving = ((name in ('animation', 'animation-name', 'transition', 'transition-property') and value != 'none')
+                      or (name == 'scroll-behavior' and value == 'smooth'))
+            if moving and not any(p.startswith('@keyframes') for p in stack) and MOTION_OK not in stack:
+                found.append(f'{" > ".join(stack)} {{{decl}}}')
+            if m[0] == '}' and stack:
+                stack.pop()
+        at = m.end()
+    assert not found, f'motion outside {MOTION_OK}: {found[:3]}'
 
 
 def check_vector(data):
@@ -272,6 +306,17 @@ def check_site(root):
     # Owner cuts (round 6): obvious notes stay off the page.
     for text in ('Illustration, not live data', 'Building in public'):
         assert text.lower() not in flat.lower(), f'cut copy is back: {text}'
+    for text in STORY_COPY:
+        assert text in flat, f'missing landing story copy: {text}'
+    for reading in [Text(landing).spaced()] + Text(landing).shown:
+        assert not any(old in reading.lower() for old in OLD_EXAMPLE), 'the old example idea is back on the landing'
+    # Every era painting and How it works square says what it shows; only the idle-move layers are decorative.
+    for attrs in pages[root / 'index.html'].images:
+        if re.match(r'/art/(era|step)-', attrs.get('src') or ''):
+            assert (attrs.get('alt') or '').strip(), f'painting without a description: {attrs.get("src")}'
+    check_motion((root / names['site.css']).read_text())
+    assert not pages[root / 'index.html'].inline_scripts, 'an inline script runs before site.js; only site.js may enable the animated story'
+    assert f"classList.add('{LIVE_CLASS}')" in (root / names['site.js']).read_text(), f'site.js must enable the animated story ({LIVE_CLASS})'
     # Install stays "coming soon" until a stranger can install (AN8); only these mentions are allowed.
     # The one allowed mention is the disabled Install button's own label; any other "install" anywhere in the
     # rendered page (an extra link with the same words included) fails.

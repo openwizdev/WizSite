@@ -4,7 +4,9 @@ import shutil
 import tempfile
 import unittest
 
-from check import FINGERPRINTS, HASHED, ROOT, Page, check_privacy, check_ref, check_site, check_vector, check_webp, fingerprint
+import re
+
+from check import FINGERPRINTS, HASHED, ROOT, Page, check_motion, check_privacy, check_ref, check_site, check_vector, check_webp, fingerprint
 
 
 def edit_built(root, name, change):
@@ -115,9 +117,9 @@ class Checks(unittest.TestCase):
     def test_encoded_copy_and_teaser_pairs(self):
         for old, new in (('<h2 id="ship-h">Ship log</h2>', '<h2 id="ship-h">Ship log</h2><p>play&#98;ook</p>'),
                          ('<h2 id="ship-h">Ship log</h2>', '<h2 id="ship-h">Ship log</h2><p>Building in p&#117;blic</p>'),
-                         ('alt="" width="400"', 'alt="Pl&#97;ybook" width="400"'),
+                         ('src="/art/layer-hammer.webp" alt=""', 'src="/art/layer-hammer.webp" alt="Pl&#97;ybook"'),
                          ('<h2 id="ship-h">Ship log</h2>', '<h2 id="ship-h">Ship log</h2><p>play<b>bo</b>ok</p>'),
-                         ('alt="" width="400"', 'alt="Illustration, not l&#105;ve data" width="400"'),
+                         ('src="/art/layer-hammer.webp" alt=""', 'src="/art/layer-hammer.webp" alt="Illustration, not l&#105;ve data"'),
                          ('<h2 id="ship-h">Ship log</h2>', '<h2 id="ship-h">Ship log</h2><p>Building <em>in</em> public</p>'),
                          ('<p class="sub">You make the decisions.<br>The agents run the factory.</p>', '<p class="sub">You decide.<br>Agents build.</p>'),
                          ('<p class="sub">You make the decisions.<br>The agents run the factory.</p>', ''),
@@ -132,6 +134,68 @@ class Checks(unittest.TestCase):
                 landing.write_text(text.replace(old, new, 1))
                 with self.assertRaises(AssertionError):
                     check_site(root)
+
+    def test_landing_story(self):
+        # Catches: the example idea or the zoom-out's "This is your factory." dropped, the old example idea
+        # back on the page (in text or a description), and an era painting or How it works square shipped
+        # without a description, which loses that scene for screen-reader visitors.
+        def no_alt(name):
+            return lambda t: re.sub(rf'(<img[^>]*src="/art/{name}"[^>]*?alt=")[^"]*', r'\1', t, count=1)
+        for change in (lambda t: t.replace('Build a to-do app', 'Build an app'),
+                       lambda t: t.replace('This is your factory.', 'This is a factory.'),
+                       lambda t: t.replace('<h2 id="ship-h">Ship log</h2>', '<h2 id="ship-h">Ship log</h2><p>Add a dark mode toggle</p>'),
+                       lambda t: re.sub(r'(src="/art/era-1-cave.webp"[^>]*alt=")', r'\1A dark-mode idea. ', t, count=1),
+                       no_alt('era-3-forge.webp'), no_alt('era-7-rooms.webp'), no_alt('step-2-answer.webp')):
+            with self.subTest(change=change), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp) / 'dist'
+                shutil.copytree(ROOT / 'dist', root)
+                landing = root / 'index.html'
+                text = landing.read_text()
+                changed = change(text)
+                self.assertNotEqual(changed, text)
+                landing.write_text(changed)
+                with self.assertRaises(AssertionError):
+                    check_site(root)
+
+    def test_story_shows_if_site_js_fails(self):
+        # Catches: an inline script that switches on the animated story (sticky zoom-out with its hand-off hidden
+        # until scrolled, Pause motion) before site.js loads; if site.js then fails to download, the last painting
+        # and "This is your factory." never show and Pause does nothing.
+        for change in ((lambda t: t.replace('</head>', "<script>document.documentElement.classList.add('story-live')</script></head>", 1)),
+                       (lambda t: t.replace('<body>', '<body><script type="module">document.body.dataset.x = 1</script>', 1))):
+            with self.subTest(change=change), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp) / 'dist'
+                shutil.copytree(ROOT / 'dist', root)
+                landing = root / 'index.html'
+                text = landing.read_text()
+                changed = change(text)
+                self.assertNotEqual(changed, text)
+                landing.write_text(changed)
+                with self.assertRaises(AssertionError):
+                    check_site(root)
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / 'dist'
+            shutil.copytree(ROOT / 'dist', root)
+            edit_built(root, 'site.js', lambda t: t.replace("classList.add('story-live')", ''))
+            with self.assertRaises(AssertionError):
+                check_site(root)
+
+    def test_motion_only_without_reduced_motion(self):
+        # Catches: an idle move, a transition or smooth scrolling that still runs for a visitor who asked for
+        # reduced motion. Stopping motion (animation: none) is allowed anywhere.
+        check_motion('@media (prefers-reduced-motion: no-preference){.a{animation:x 1s}html{scroll-behavior:smooth}'
+                     '.b:hover{transition:opacity .2s}}@keyframes x{to{opacity:0}}.c{animation:none !important}')
+        for bad in ('.a{animation:x 1s}', 'html{scroll-behavior:smooth}', '.b{transition:transform .2s}',
+                    '@media (prefers-reduced-motion:reduce){.a{animation:x 1s}}', '@media (min-width:1px){.a{animation-name:x}}',
+                    '@media (prefers-reduced-motion:no-preference){.a{color:red}}.b{animation:y 2s infinite}'):
+            with self.subTest(css=bad), self.assertRaises(AssertionError):
+                check_motion(bad)
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / 'dist'
+            shutil.copytree(ROOT / 'dist', root)
+            edit_built(root, 'site.css', lambda t: t + '\n.l-rocket{animation:shake .4s infinite}\n')
+            with self.assertRaises(AssertionError):
+                check_site(root)
 
     def test_fingerprints(self):
         css = FINGERPRINTS['site.css']
