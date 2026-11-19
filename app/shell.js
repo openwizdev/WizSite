@@ -9,8 +9,13 @@
   let built = null; // the shell's live parts, once drawn
   const INSTALL = 'https://github.com/apps/openwiz-viewer/installations/new'; // GitHub returns to /app (the setup URL)
 
+  // #/<page>, or #/specs/<n> for one spec's page (the Specs page draws it; its navigation stays on Specs).
+  const route = () => {
+    const [id, arg] = location.hash.replace(/^#\/?/, '').split('/');
+    return id === 'specs' && /^[1-9]\d*$/.test(arg || '') ? { id, arg } : { id: arg === undefined ? id : '', arg: null };
+  };
   const current = () => {
-    const id = location.hash.replace(/^#\/?/, '');
+    const { id } = route();
     return OW.pages.find(page => page.id === id) || OW.pages[0];
   };
 
@@ -169,7 +174,7 @@
     } else if (mine.some(feed => feed.state === 'loading') && !mine.some(feed => feed.data)) {
       built.body.replaceChildren(OW.ui.placeholder('Reading GitHub…'));
     } else {
-      page.render(built.body, feeds);
+      page.render(built.body, feeds, route().arg);
     }
     if (built.page !== page.id) {
       built.title.textContent = page.title;
@@ -182,7 +187,7 @@
   function draw() {
     if (!data.auth.signedIn()) return signedOut();
     if (!data.repo.get()) return picker();
-    if (!ROUTES().includes(location.hash.replace(/^#\/?/, ''))) history.replaceState(null, '', `#/${OW.pages[0].id}`);
+    if (!ROUTES().includes(route().id)) history.replaceState(null, '', `#/${OW.pages[0].id}`);
     if (!built) {
       buildShell();
       data.start();

@@ -15,6 +15,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
+      - name: Install the pinned npm dependencies
+        run: npm ci
       - name: Build static site
         run: npm run build
       - name: Check links, resources and privacy
