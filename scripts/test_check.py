@@ -157,6 +157,29 @@ class Checks(unittest.TestCase):
                 with self.assertRaises(AssertionError):
                     check_site(root)
 
+    def test_story_shows_if_site_js_fails(self):
+        # Catches: an inline script that switches on the animated story (sticky zoom-out with its hand-off hidden
+        # until scrolled, Pause motion) before site.js loads; if site.js then fails to download, the last painting
+        # and "This is your factory." never show and Pause does nothing.
+        for change in ((lambda t: t.replace('</head>', "<script>document.documentElement.classList.add('story-live')</script></head>", 1)),
+                       (lambda t: t.replace('<body>', '<body><script type="module">document.body.dataset.x = 1</script>', 1))):
+            with self.subTest(change=change), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp) / 'dist'
+                shutil.copytree(ROOT / 'dist', root)
+                landing = root / 'index.html'
+                text = landing.read_text()
+                changed = change(text)
+                self.assertNotEqual(changed, text)
+                landing.write_text(changed)
+                with self.assertRaises(AssertionError):
+                    check_site(root)
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / 'dist'
+            shutil.copytree(ROOT / 'dist', root)
+            edit_built(root, 'site.js', lambda t: t.replace("classList.add('story-live')", ''))
+            with self.assertRaises(AssertionError):
+                check_site(root)
+
     def test_motion_only_without_reduced_motion(self):
         # Catches: an idle move, a transition or smooth scrolling that still runs for a visitor who asked for
         # reduced motion. Stopping motion (animation: none) is allowed anywhere.

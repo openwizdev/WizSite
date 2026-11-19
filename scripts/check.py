@@ -94,6 +94,10 @@ OLD_EXAMPLE = ('dark mode', 'dark-mode')
 # Motion runs only when the visitor has not asked for less: every animation, transition and smooth scroll
 # sits inside this media query, so reduced motion shows the same story as still paintings.
 MOTION_OK = '@media (prefers-reduced-motion:no-preference)'
+# The animated layout (sticky zoom-out, hidden-until-scrolled hand-off, Pause motion) is switched on only by
+# site.js itself, once its handlers are in place: no inline script may set it first, so a failed site.js
+# download leaves the still story fully visible.
+LIVE_CLASS = 'story-live'
 # The ship log: the approved VS9 changelog text (What's new for you, tested line, Under the hood), plus Being built.
 CHANGELOG_MAIN = '17830d3f9a837a3ec24f2382829093cc941e0d1f5fd873e45e4d3a44c6e897c2'
 
@@ -107,6 +111,7 @@ class Page(HTMLParser):
         self.social = []
         self.buttons = []
         self.images = []
+        self.inline_scripts = 0
         self.stylesheets, self.scripts = [], []
         self.feed(text)
 
@@ -122,6 +127,8 @@ class Page(HTMLParser):
             self.buttons.append(attrs)
         if tag == 'img':
             self.images.append(attrs)
+        if tag == 'script' and not attrs.get('src'):
+            self.inline_scripts += 1
         # Only references the browser applies: an enabled stylesheet for all media, a script of a runnable type.
         if (tag == 'link' and attrs.get('rel') == 'stylesheet' and attrs.get('href') and 'disabled' not in attrs
                 and attrs.get('media', 'all') in ('all', 'screen')):
@@ -308,6 +315,8 @@ def check_site(root):
         if re.match(r'/art/(era|step)-', attrs.get('src') or ''):
             assert (attrs.get('alt') or '').strip(), f'painting without a description: {attrs.get("src")}'
     check_motion((root / names['site.css']).read_text())
+    assert not pages[root / 'index.html'].inline_scripts, 'an inline script runs before site.js; only site.js may enable the animated story'
+    assert f"classList.add('{LIVE_CLASS}')" in (root / names['site.js']).read_text(), f'site.js must enable the animated story ({LIVE_CLASS})'
     # Install stays "coming soon" until a stranger can install (AN8); only these mentions are allowed.
     # The one allowed mention is the disabled Install button's own label; any other "install" anywhere in the
     # rendered page (an extra link with the same words included) fails.
