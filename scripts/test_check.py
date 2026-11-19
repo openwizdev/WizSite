@@ -6,7 +6,7 @@ import unittest
 
 import re
 
-from check import FINGERPRINTS, HASHED, ROOT, Page, check_changelog, check_motion, check_privacy, check_ref, check_site, check_vector, check_webp, fingerprint
+from check import FINGERPRINTS, HASHED, ROOT, Page, check_changelog, check_releases, split_releases, check_motion, check_privacy, check_ref, check_site, check_vector, check_webp, fingerprint
 
 
 def edit_built(root, name, change):
@@ -34,6 +34,14 @@ CHANGELOG = ('<html><head><title>Changelog — OpenWiz</title><style>.part{color
              '<section class="today"><h2>What exists today</h2>'
              + ''.join(PART.format(id=n.lower(), name=n) for n in ('OpenWiz', 'WizSkills', 'WizLoops', 'WizPlugins', 'WizSite'))
              + '</section></main></body></html>')
+
+RELEASE = '<article class="release"><h4>{repo} {v}</h4><p class="released">Released <time datetime="2031-01-01">2031-01-01</time></p><div class="notes"><ul><li><code>x</code> <strong>y</strong></li></ul></div></article>'
+RELEASES = ('<section class="releases" id="releases" aria-labelledby="releases-h"><h2 id="releases-h">Releases</h2><p class="note">Generated.</p>'
+            '<section class="release-part" id="openwiz-releases" data-repo="OpenWiz"><h3>OpenWiz <span>openwizdev/OpenWiz</span></h3>'
+            + RELEASE.format(repo='OpenWiz', v='0.1.10') + RELEASE.format(repo='OpenWiz', v='0.1.2') + '</section>'
+            '<section class="release-part" id="wizskills-releases" data-repo="WizSkills"><h3>WizSkills</h3><p class="no-release">No release yet.</p></section>'
+            '<section class="release-part" id="wizloops-releases" data-repo="WizLoops"><h3>WizLoops</h3><p class="missing read">Missing.</p></section></section>')
+
 
 class Checks(unittest.TestCase):
     def test_valid_site(self):
@@ -229,6 +237,34 @@ class Checks(unittest.TestCase):
                 (CHANGELOG.replace('.part{color:red}', '.part{transition:opacity .2s}'), 'motion outside')):
             with self.subTest(error=error, at=changelog[-120:]), self.assertRaisesRegex(AssertionError, error):
                 check_changelog(LANDING, changelog)
+
+    def test_generated_releases(self):
+        # catches: a build without the generated section, or with it twice or outside main; a part missing, renamed
+        # or out of order; releases out of version order or repeated; a part showing both releases and a state, or
+        # nothing; and markup from release notes (a link, a script, an inline handler) reaching the page.
+        page = CHANGELOG.replace('</main>', '<!-- releases:start -->' + RELEASES + '<!-- releases:end --></main>')
+        self.assertEqual(split_releases(page), (CHANGELOG, RELEASES))
+        check_releases(RELEASES)
+        for built in (CHANGELOG, page.replace('</main>', '</main><!-- releases:start --><!-- releases:end -->'),
+                      page.replace('<!-- releases:end --></main>', '<!-- releases:end --><p>after</p></main>')):
+            with self.subTest(built=built[-80:]), self.assertRaises(AssertionError):
+                split_releases(built)
+        for section, error in (
+                (RELEASES.replace('>Releases<', '>Ship<'), 'headed Releases'),
+                (RELEASES.replace('data-repo="WizLoops"', 'data-repo="WizVault"'), 'per versioned repository'),
+                (RELEASES.replace('data-repo="WizSkills"', 'data-repo="X"').replace('data-repo="OpenWiz"', 'data-repo="WizSkills"').replace('data-repo="X"', 'data-repo="OpenWiz"'), 'per versioned repository'),
+                (RELEASES.replace('0.1.10', '0.1.1'), 'newest first'),
+                (RELEASES.replace('0.1.10', '0.1.2'), 'newest first'),
+                (RELEASES.replace('0.1.10', '0.0.9').replace('0.1.2', '0.0.8'), 'from 0.1.0'),
+                (RELEASES.replace('<p class="no-release">No release yet.</p>', ''), 'one of no release yet and missing'),
+                (RELEASES.replace('<p class="missing read">Missing.</p>', '<p class="missing read">Missing.</p><p class="no-release">No.</p>'), 'one of'),
+                (RELEASES.replace('<p class="no-release">No release yet.</p>', RELEASE.format(repo='WizSkills', v='1.0.0') + '<p class="no-release">No.</p>'), 'one of'),
+                (RELEASES.replace('<h4>OpenWiz 0.1.2</h4>', '<h4>WizSkills 0.1.2</h4>'), 'unexpected release title'),
+                (RELEASES.replace('<strong>y</strong>', '<a href="https://example.com/">y</a>'), 'unexpected element'),
+                (RELEASES.replace('<strong>y</strong>', '<script>y</script>'), 'unexpected element'),
+                (RELEASES.replace('<strong>y</strong>', '<strong onclick="y()">y</strong>'), 'unexpected attribute')):
+            with self.subTest(error=error), self.assertRaisesRegex(AssertionError, error):
+                check_releases(section)
 
     def test_landing_starts_in_still_mode(self):
         # Catches: an early inline script, a visible broken motion control or an autoplaying clip.
