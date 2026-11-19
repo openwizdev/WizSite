@@ -135,6 +135,7 @@ class World {
     this.helper = {}; // helper path -> answer function (body) => {status, json} (may wait, to hold a response)
     this.done = []; // paths answered so far
     this.opened = []; // tabs the page opened (a link to GitHub), by their first request: never answered
+    this.site = {}; // site path -> answer function () => {status, raw, type} or {abort}, in place of the built file
   }
 
   answered(path) {
@@ -153,6 +154,7 @@ class World {
       }
       return { status: 404, json: { error: 'not_found' } };
     }
+    if (url.origin === SITE && this.site[url.pathname]) return this.site[url.pathname]();
     if (url.origin === SITE) {
       const file = await staticFile(url.pathname);
       return { status: file.status, raw: file.body, type: file.type, headers: await siteHeaders(url.pathname) };
@@ -352,6 +354,71 @@ async function main() {
   if (!existsSync(new URL('index.html', DIST))) throw new Error('dist/ is missing: run npm run build first');
   const browser = await launch();
   try {
+    // #1357: the landing's install box. The line is the one the install skill expects, word for word.
+    const LINE = 'Install OpenWiz from github.com/openwizdev/OpenWiz';
+    const landing = await readFile(new URL('index.html', DIST), 'utf8');
+    // The release's one change: the box's switch from coming-soon to live, served in place of the built landing.
+    const switchedOn = world => {
+      assert(landing.split('data-install="coming-soon"').length === 2, 'the landing has no single coming-soon switch to turn on');
+      world.site['/'] = async () => ({ status: 200, raw: Buffer.from(landing.replace('data-install="coming-soon"', 'data-install="live"')), type: 'html' });
+    };
+    const installBox = page => page.run(`(() => { ${LABEL} const box = document.querySelector('.install-box'); const b = box.querySelector('button.install');
+      const line = box.querySelector('.install-line'); const hint = box.querySelector('.install-hint');
+      return { line: line && line.textContent, lineShown: !!line && line.offsetParent !== null, hint: hint && hint.innerText.trim(),
+        shown: b.offsetParent !== null, disabled: b.disabled, label: label(b) }; })()`);
+    const landed = page => page.until(`document.readyState === 'complete' && window.gsap`, 'the landing and its scripts');
+
+    await check('#1357 install box before the release: the line and the instruction show, Copy is disabled, coming soon, and copies nothing', async () => {
+      const world = new World();
+      const page = await open(browser, world);
+      await page.go(`${SITE}/`);
+      await landed(page);
+      await page.run(`navigator.clipboard.writeText('untouched')`);
+      await settle(page);
+      const box = await installBox(page);
+      assert(box.line === LINE && box.lineShown, `the install line is not shown exactly: ${JSON.stringify(box.line)}`);
+      assert(box.hint === 'Paste this into your agent', `the instruction is missing: ${box.hint}`);
+      assert(box.shown && box.disabled && box.label === 'Copy · coming soon', `Copy is not shown disabled as coming soon: ${JSON.stringify(box)}`);
+      await page.run(`document.querySelector('.install-box button.install').click()`);
+      await settle(page);
+      assert(await page.clipboard() === 'untouched', 'the disabled Copy button changed the clipboard');
+      checkRequestLog(world);
+      await page.close();
+    });
+
+    await check('#1357 install box switched on: Copy is enabled and puts exactly the install line on the clipboard', async () => {
+      const world = new World();
+      switchedOn(world);
+      const page = await open(browser, world);
+      await page.go(`${SITE}/`);
+      await landed(page);
+      await page.run(`navigator.clipboard.writeText('untouched')`);
+      await page.until(`!document.querySelector('.install-box button.install').disabled`, 'Copy to be enabled');
+      const box = await installBox(page);
+      assert(box.line === LINE && box.lineShown && box.hint === 'Paste this into your agent', `the box changed when switched on: ${JSON.stringify(box)}`);
+      assert(box.shown && box.label === 'Copy', `the switched-on button does not read Copy: ${JSON.stringify(box)}`);
+      await page.click('Copy');
+      await page.until(`document.querySelector('.install-box button.install').innerText.trim() === 'Copied'`, 'Copied');
+      const copied = await page.clipboard();
+      assert(copied === LINE, `the clipboard does not hold exactly the install line: ${JSON.stringify(copied)}`);
+      checkRequestLog(world);
+      await page.close();
+    });
+
+    await check('#1357 install box switched on with its script blocked: the line still shows, with no dead Copy button', async () => {
+      const world = new World();
+      switchedOn(world);
+      const script = landing.match(/src="(\/site\.[0-9a-f]{10}\.js)"/)[1];
+      world.site[script] = async () => ({ abort: true });
+      const page = await open(browser, world);
+      await page.go(`${SITE}/`);
+      await page.until(`document.readyState === 'complete'`, 'the landing');
+      const box = await installBox(page);
+      assert(box.line === LINE && box.lineShown, 'the install line is hidden without the script');
+      assert(!box.shown, `a Copy button that can't copy is shown: ${JSON.stringify(box)}`);
+      await page.close();
+    });
+
     await check('signed out: the app offers Sign in with GitHub through the helper', async () => {
       const world = new World();
       const page = await open(browser, world);
