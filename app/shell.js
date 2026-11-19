@@ -7,6 +7,7 @@
   const root = document.getElementById('app');
   const ROUTES = () => OW.pages.map(page => page.id);
   let built = null; // the shell's live parts, once drawn
+  const INSTALL = 'https://github.com/apps/openwiz-viewer/installations/new'; // GitHub returns to /app (the setup URL)
 
   const current = () => {
     const id = location.hash.replace(/^#\/?/, '');
@@ -52,6 +53,16 @@
     }
     if (data.auth.session() !== session) return; // this list belongs to a sign-in that has ended
     const repos = found.repos;
+    // Signing in authorizes the Viewer App but doesn't install it: a first-time user sees nothing until they do.
+    if (!repos.length && found.complete) {
+      return screen(
+        h('h1', {}, 'Pick a repository'),
+        h('p', {}, 'One more step: let OpenWiz Viewer read your repositories.'),
+        h('a', { class: 'btn primary', href: INSTALL, rel: 'noreferrer' }, 'Install OpenWiz Viewer'),
+        h('p', { class: 'small' }, 'On GitHub, pick the repositories it may read. GitHub brings you back here.'),
+        h('p', { class: 'small' }, signOutButton()),
+      );
+    }
     const list = h('ul', { class: 'repos' }, repos.map(r => h('li', {},
       h('button', { type: 'button', onclick: () => { data.repo.pick(r.full); location.hash = '#/you'; draw(); } }, r.full),
       h('span', { class: 'tag' }, r.private ? 'Private' : 'Public'))));
@@ -60,7 +71,7 @@
       found.complete ? null : h('div', { class: 'notices' }, h('div', { class: 'notice bad', role: 'alert' }, icon('warn'),
         h('span', {}, h('b', {}, 'Only part of your repositories could be read, '), 'so some may be missing. '),
         h('button', { class: 'btn', type: 'button', onclick: picker }, 'Try again'))),
-      h('p', {}, repos.length ? 'The app opens straight to it on this device next time.' : found.complete ? 'The app can\'t see any repository yet.' : 'None could be read.'),
+      h('p', {}, repos.length ? 'The app opens straight to it on this device next time.' : 'None could be read.'),
       repos.length ? list : null,
       h('p', { class: 'small' }, 'Missing one? ', h('a', { href: 'https://github.com/settings/installations', rel: 'noreferrer' }, 'Choose repositories on GitHub'), ', then come back.'),
       h('p', { class: 'small' }, signOutButton()),

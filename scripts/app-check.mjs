@@ -614,6 +614,10 @@ async function main() {
       assert(JSON.stringify(main) === JSON.stringify(['https://github.com/apps/openwiz-viewer/installations/new']),
         `the main button is ${JSON.stringify(main)}, not the direct install link`);
       assert(!(await page.text()).includes('Choose repositories on GitHub'), 'the empty state still offers the settings link');
+      await page.size(320, 640, true);
+      const width = await page.run('document.documentElement.scrollWidth');
+      assert(width <= 320, `the one-more-step screen is ${width} CSS pixels wide on a 320-pixel phone`);
+      await page.size(null);
       if (process.env.SHOTS) await page.shot(join(process.env.SHOTS, 'install-phone.png'), 390, 844, true);
       // GitHub sends the installer back to the setup URL with installation_id and setup_action; still signed in.
       installed = true;
