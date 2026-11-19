@@ -387,21 +387,7 @@ def check_site(root):
         if attrs.get('src') == '/art/era-2-grill.webp':
             assert (attrs.get('alt') or '').strip(), f'painting without a description: {attrs.get("src")}'
     check_motion((root / names['site.css']).read_text())
-    # Install stays "coming soon" until a stranger can install (AN8); only these mentions are allowed.
-    # The one allowed mention is the disabled Install button's own label; any other "install" anywhere in the
-    # rendered page (an extra link with the same words included) fails.
-    button = re.findall(r'<button class="btn install"[^>]*>([\s\S]*?)</button>', landing)
-    assert len(button) == 1 and re.sub(r'\s+', ' ', unescape(re.sub(r'<[^>]*>', '', button[0]))).strip() == 'Install · coming soon', 'Install button must read Install · coming soon'
-    rest = re.sub(r'<button class="btn install"[^>]*>[\s\S]*?</button>', ' ', landing, count=1)
-    reader = Text(rest)
-    for reading in [reader.joined(), reader.spaced()] + reader.shown:
-        assert not re.search(r'install|paid plans|works today', re.sub(r'\s+', ' ', reading), re.I), 'unsettled landing claim or live install CTA'
-    installs = [b for b in pages[root / 'index.html'].buttons if 'install' in (b.get('class') or '').split()]
-    assert len(installs) == 1, 'exactly one Install button'
-    assert 'disabled' in installs[0], 'Install must stay natively disabled'
-    assert not any(k.startswith('on') or k in ('form', 'formaction') for k in installs[0]), 'Install must have no activation handler'
-    scripts = (root / names['site.js']).read_text()
-    assert not re.search(r'install|clipboard', scripts, re.I), 'no script may activate Install or copy the prompt yet'
+    check_install(landing, pages[root / 'index.html'])
     assert not re.search(r'\b\d{4}-\d{2}-\d{2}\b', words), 'dated landing promise'
     changelog, releases = split_releases((root / 'changelog/index.html').read_text())
     assert not re.search(r'(?<![\d.])\d+\.\d+\.\d+(?![\d.])', flat), 'release version mentioned on the landing'
@@ -475,6 +461,40 @@ class Outline(HTMLParser):
 
 def sentences(text):
     return [s for s in re.split(r'(?<=[.!?])\s+', text.strip()) if s]
+
+
+# The install box (#1357, under AN8). The line is the install skill's own, word for word (WizSkills' install skill,
+# "The user pasted one line into their agent"). Until OpenWiz 0.1.0 is released the box's switch reads coming-soon;
+# the release changes only that switch to live. Either way the button ships natively disabled, labelled coming soon,
+# with no handler: site.js enables it only when the switch reads live (npm run test:app checks both in a browser).
+INSTALL_LINE = 'Install OpenWiz from github.com/openwizdev/OpenWiz'
+INSTALL_HINT = 'Paste this into your agent'
+INSTALL_BUTTON = 'Copy · coming soon'
+INSTALL_SWITCH = ('coming-soon', 'live')
+
+
+def check_install(landing, page):
+    flat = lambda html: re.sub(r'\s+', ' ', unescape(re.sub(r'<[^>]*>', '', html))).strip()
+    boxes = re.findall(r'<div class="install-box"([^>]*)>([\s\S]*?)</div>\s*</div>', landing)
+    assert len(boxes) == 1, 'exactly one install box'
+    attrs, box = boxes[0]
+    switch = re.fullmatch(r'\s*data-install="([^"]*)"\s*', attrs)
+    assert switch and switch[1] in INSTALL_SWITCH, f'the install box needs its one switch, data-install = {" or ".join(INSTALL_SWITCH)}'
+    lines = re.findall(r'<code class="install-line">([^<]*)</code>', box)
+    assert lines == [INSTALL_LINE], f'the install line must read exactly: {INSTALL_LINE}'
+    hints = re.findall(r'<p class="install-hint">([\s\S]*?)</p>', box)
+    assert [flat(h) for h in hints] == [INSTALL_HINT], f'the install box must say: {INSTALL_HINT}'
+    labels = re.findall(r'<button class="btn install"[^>]*>([\s\S]*?)</button>', landing)
+    assert len(labels) == 1 and flat(labels[0]) == INSTALL_BUTTON, f'the install button must read {INSTALL_BUTTON}'
+    installs = [b for b in page.buttons if 'install' in (b.get('class') or '').split()]
+    assert len(installs) == 1, 'exactly one install button'
+    assert 'disabled' in installs[0], 'the install button must ship natively disabled'
+    assert not any(k.startswith('on') or k in ('form', 'formaction') for k in installs[0]), 'the install button must have no activation handler'
+    # Outside the box, no install wording or unsettled claim, in any reading of the page.
+    rest = landing.replace(box, ' ', 1)
+    reader = Text(rest)
+    for reading in [reader.joined(), reader.spaced()] + reader.shown:
+        assert not re.search(r'install|coming soon|paid plans|works today', re.sub(r'\s+', ' ', reading), re.I), 'unsettled landing claim or a second install mention'
 
 
 def check_changelog(landing, changelog):
