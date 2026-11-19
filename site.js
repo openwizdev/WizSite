@@ -263,15 +263,13 @@ function enableFamily(gsap) {
   const line = document.createElement('span');
   line.className = 'wiz-line';
   line.setAttribute('role', 'status');
-  let lineTimer;
-  let active; // the one Wiz acting now
-  let near;
+  // The one reaction running now: its Wiz, and its timeline or timer. Every new reaction ends it first.
+  let current = null;
 
   family.removeAttribute('aria-hidden');
   family.setAttribute('role', 'group');
   family.setAttribute('aria-label', 'The Wiz family');
   wizes.forEach((wiz, i) => {
-    wiz.dataset.costume = i;
     wiz.tabIndex = 0;
     wiz.setAttribute('role', 'button');
     wiz.setAttribute('aria-label', FAMILY[i][0]);
@@ -281,79 +279,101 @@ function enableFamily(gsap) {
     wiz.append(sprite);
   });
 
-  const costume = wiz => Number(wiz.dataset.costume);
+  const picture = index => `/art/family-${String(index + 1).padStart(2, '0')}.webp`;
   const frame = (wiz, sheet, index) => {
     const sprite = wiz.querySelector('.wiz-sprite');
     sprite.style.backgroundImage = `url("${sheet}")`;
     sprite.style.backgroundPositionX = `${index * 100 / 8}%`;
     sprite.style.display = 'block';
   };
-  const wear = (wiz, index) => {
-    wiz.dataset.costume = index;
-    wiz.querySelector('img').src = `/art/family-${String(index + 1).padStart(2, '0')}.webp`;
-    wiz.setAttribute('aria-label', FAMILY[index][0]);
-  };
-  const rest = wiz => {
-    if (!wiz) return;
-    gsap?.killTweensOf(wiz);
-    const sprite = wiz.querySelector('.wiz-sprite');
-    gsap?.killTweensOf(sprite);
-    sprite.removeAttribute('style');
-    wiz.classList.remove('is-acting');
+  // A costume change lasts only for its reaction; the Wiz keeps its own picture and name at rest.
+  const wear = (wiz, index) => { wiz.querySelector('img').src = picture(index); };
+  const release = () => {
+    if (!current) return;
+    const { wiz, timeline, timer } = current;
+    current = null;
+    timeline?.kill();
+    clearTimeout(timer);
+    gsap?.killTweensOf([wiz, line]);
     if (gsap) gsap.set(wiz, { clearProps: 'transform' });
+    wiz.querySelector('.wiz-sprite').removeAttribute('style');
+    wiz.classList.remove('is-acting');
+    wear(wiz, wizes.indexOf(wiz));
+    line.style.visibility = 'hidden';
   };
   const say = (wiz, text) => {
-    clearTimeout(lineTimer);
-    gsap?.killTweensOf(line);
     line.textContent = text;
     line.removeAttribute('style');
     wiz.append(line);
-    if (moving()) gsap.fromTo(line, { autoAlpha: 1 }, { autoAlpha: 0, delay: .8, duration: .25 });
-    else lineTimer = setTimeout(() => { line.style.visibility = 'hidden'; }, 1200);
+  };
+  // Starts one short reaction (under a second) on one Wiz, ending any other first.
+  const react = (wiz, build, text) => {
+    release();
+    const timeline = gsap.timeline({ onComplete: () => { if (current?.timeline === timeline) release(); } });
+    current = { wiz, timeline };
+    build(timeline);
+    if (text) {
+      say(wiz, text);
+      timeline.fromTo(line, { autoAlpha: 1 }, { autoAlpha: 0, duration: .2, immediateRender: false }, .6);
+    }
   };
 
   const act = wiz => {
-    const index = costume(wiz);
+    const index = wizes.indexOf(wiz);
     const [, role, text, era] = FAMILY[index];
-    if (active && active !== wiz) rest(active);
-    active = wiz;
     if (!moving()) {
+      // A still pose: another costume for a moment, with this Wiz's own line, then back.
+      release();
+      current = { wiz, timer: setTimeout(release, 900) };
       wear(wiz, (index + 1) % FAMILY.length);
-      say(wiz, FAMILY[costume(wiz)][2]);
+      say(wiz, text);
       return;
     }
-    rest(wiz);
-    const done = () => { rest(wiz); if (active === wiz) active = null; };
-    const timeline = gsap.timeline({ onComplete: done });
     if (Math.random() < .2) {
-      // Now and then: a poof into another costume, from the hero's own smoke frames.
-      const next = (index + 1 + Math.floor(Math.random() * (FAMILY.length - 1))) % FAMILY.length;
-      timeline.call(() => frame(wiz, POOF, 6))
-        .call(() => { frame(wiz, POOF, 7); wear(wiz, next); }, [], .1)
-        .call(() => frame(wiz, POOF, 8), [], .2)
-        .call(() => {}, [], .32);
-      say(wiz, 'poof!');
+      // Now and then a poof, from the hero's own smoke frames, into another costume and back.
+      const other = (index + 1 + Math.floor(Math.random() * (FAMILY.length - 1))) % FAMILY.length;
+      react(wiz, timeline => timeline
+        .call(() => frame(wiz, POOF, 6), [], 0)
+        .call(() => { frame(wiz, POOF, 7); wear(wiz, other); }, [], .08)
+        .call(() => frame(wiz, POOF, 8), [], .16)
+        .call(() => frame(wiz, POOF, 6), [], .5)
+        .call(() => { frame(wiz, POOF, 7); wear(wiz, index); }, [], .58)
+        .call(() => frame(wiz, POOF, 8), [], .66)
+        .call(() => { wiz.querySelector('.wiz-sprite').removeAttribute('style'); }, [], .76), 'poof!');
       return;
     }
-    say(wiz, text);
-    if (role === 'era') {
-      // The era Wizes play their work frames from the hero's sprite sheet.
-      wiz.classList.add('is-acting');
-      [2, 3, 4, 5, 0].forEach((n, i) => timeline.call(() => frame(wiz, `/art/hero-${era}-frames.webp`, n), [], i * .14));
-      timeline.call(() => {}, [], .7);
-    } else if (role === 'builder') {
-      timeline.to(wiz, { rotation: 7, y: 3, duration: .09, yoyo: true, repeat: 5, transformOrigin: '50% 90%', ease: 'power1.in' });
-    } else if (role === 'reviewer') {
-      timeline.to(wiz, { scale: 1.07, rotation: -4, duration: .18, transformOrigin: '50% 90%' })
-        .to(wiz, { rotation: 4, duration: .2 }).to(wiz, { scale: 1, rotation: 0, duration: .16 });
-    } else {
-      timeline.to(wiz, { rotation: -9, duration: .11, yoyo: true, repeat: 5, transformOrigin: '50% 90%', ease: 'sine.inOut' });
-    }
+    react(wiz, timeline => {
+      if (role === 'era') {
+        // The era Wizes play their work frames from the hero's sprite sheet.
+        timeline.call(() => wiz.classList.add('is-acting'), [], 0);
+        [2, 3, 4, 5].forEach((n, i) => timeline.call(() => frame(wiz, `/art/hero-${era}-frames.webp`, n), [], i * .14));
+        timeline.call(() => { wiz.classList.remove('is-acting'); wiz.querySelector('.wiz-sprite').removeAttribute('style'); }, [], .6);
+      } else if (role === 'builder') {
+        timeline.to(wiz, { rotation: 7, y: 3, duration: .09, yoyo: true, repeat: 5, transformOrigin: '50% 90%', ease: 'power1.in' });
+      } else if (role === 'reviewer') {
+        timeline.to(wiz, { scale: 1.07, rotation: -4, duration: .18, transformOrigin: '50% 90%' })
+          .to(wiz, { rotation: 4, duration: .2 }).to(wiz, { scale: 1, rotation: 0, duration: .16 });
+      } else {
+        timeline.to(wiz, { rotation: -9, duration: .11, yoyo: true, repeat: 5, transformOrigin: '50% 90%', ease: 'sine.inOut' });
+      }
+    }, text);
   };
+  // Hover and focus: a short wave on that Wiz only; moving on ends it at once.
   const wave = wiz => {
-    if (!moving() || active) return;
-    gsap.fromTo(wiz, { rotation: 0 }, { rotation: -6, duration: .12, yoyo: true, repeat: 3, transformOrigin: '50% 90%',
-      ease: 'sine.inOut', overwrite: true });
+    if (!moving() || current?.wiz === wiz) return;
+    react(wiz, timeline => timeline.to(wiz, { rotation: -6, duration: .12, yoyo: true, repeat: 3,
+      transformOrigin: '50% 90%', ease: 'sine.inOut' }));
+  };
+  // Entering the footer: the Wiz nearest the pointer hops once toward it.
+  const perk = event => {
+    if (event.pointerType === 'touch' || !moving()) return;
+    const boxes = wizes.map(wiz => [wiz, wiz.getBoundingClientRect()]).filter(([, box]) => box.width);
+    const [wiz, box] = boxes.reduce((best, item) =>
+      Math.abs(event.clientX - item[1].left - item[1].width / 2) < Math.abs(event.clientX - best[1].left - best[1].width / 2) ? item : best);
+    const toward = Math.sign(event.clientX - box.left - box.width / 2);
+    react(wiz, timeline => timeline
+      .to(wiz, { y: -5, rotation: toward * 3, duration: .15, transformOrigin: '50% 90%', ease: 'power2.out' })
+      .to(wiz, { y: 0, rotation: 0, duration: .2, ease: 'power2.in' }));
   };
 
   for (const wiz of wizes) {
@@ -366,27 +386,7 @@ function enableFamily(gsap) {
     wiz.addEventListener('pointerenter', event => { if (event.pointerType !== 'touch') wave(wiz); });
     wiz.addEventListener('focus', () => { if (wiz.matches(':focus-visible')) wave(wiz); });
   }
-  // Hovering the footer: the Wiz nearest the pointer perks up and leans toward it.
-  const footer = document.querySelector('.landing-footer');
-  const settle = () => {
-    if (near && near !== active) gsap?.to(near, { y: 0, rotation: 0, duration: .2, overwrite: true });
-    near = null;
-  };
-  footer.addEventListener('pointermove', event => {
-    if (event.pointerType === 'touch' || !moving()) return settle();
-    const nearest = wizes.reduce((best, wiz) => {
-      const box = wiz.getBoundingClientRect();
-      const distance = Math.abs(event.clientX - box.left - box.width / 2);
-      return distance < best[1] ? [wiz, distance, box] : best;
-    }, [null, Infinity])[0];
-    if (nearest === near || nearest === active) return;
-    settle();
-    near = nearest;
-    const box = near.getBoundingClientRect();
-    const toward = Math.sign(event.clientX - box.left - box.width / 2);
-    gsap.to(near, { y: -5, rotation: toward * 3, duration: .18, transformOrigin: '50% 90%', ease: 'power2.out', overwrite: true });
-  }, { passive: true });
-  footer.addEventListener('pointerleave', settle);
+  document.querySelector('.landing-footer').addEventListener('pointerenter', perk);
 }
 
 // The silent spec sample plays only on request, so it stays available with reduced motion on or GSAP blocked.
