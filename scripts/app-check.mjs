@@ -632,6 +632,26 @@ async function main() {
       checkRequestLog(world);
       await page.close();
     });
+
+    await check('#1325 R1: an existing installation with no readable repository keeps the picker and its settings link', async () => {
+      for (const [name, reply, shown] of [
+        ['no readable repository', { status: 200, json: { total_count: 0, repositories: [] } }, /can.t see any repository yet/i],
+        ['a failed repository read', { status: 502, json: { message: 'Bad Gateway' } }, /some may be missing/i],
+      ]) {
+        const world = new World();
+        world.rest['/user/installations/1001/repositories'] = async () => reply;
+        const page = await open(browser, world);
+        await page.go(`${SITE}/app/?code=c0de&state=${STATE}`);
+        await page.until(`document.body.innerText.includes('Choose repositories on GitHub') || /one more step/i.test(document.body.innerText)`, `the picker (${name})`);
+        const text = await page.text();
+        assert(!/one more step/i.test(text), `${name}: an existing installation is asked to install again`);
+        assert(shown.test(text), `${name}: the picker does not say ${shown}`);
+        const href = await page.run(`[...document.querySelectorAll('a')].find(a => a.textContent.trim() === 'Choose repositories on GitHub')?.getAttribute('href')`);
+        assert(href === 'https://github.com/settings/installations', `${name}: the settings link is ${href}`);
+        checkRequestLog(world);
+        await page.close();
+      }
+    });
   } finally {
     await browser.close();
   }
