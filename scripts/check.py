@@ -273,7 +273,8 @@ def check_film_script(js):
     entry = "gsap.matchMedia().add('(prefers-reduced-motion: no-preference)', () => {"
     assert js.count(entry) == 1, 'the film must start only under gsap.matchMedia no-preference'
     at = js.index(entry)
-    assert set(re.findall(r'\bgsap\.(\w+)', js)) <= {'matchMedia', 'timeline'}, 'GSAP used outside the film timeline'
+    used = re.findall(r'\bgsap\s*(?:\?\.|\.|\[)\s*[\'"]?(\w+)', js)
+    assert set(used) <= {'matchMedia', 'timeline'}, 'GSAP used outside the film timeline'
     assert js.count('buildFilm(') == 2 and js.rindex('buildFilm(') > at, 'the film timeline is built outside matchMedia'
     assert js.count("classList.add('film-live')") == 1 and js.index("classList.add('film-live')") > at, '.film-live added outside matchMedia'
 
