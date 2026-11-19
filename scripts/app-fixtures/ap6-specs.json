@@ -1,0 +1,119 @@
+{
+  "data": {
+    "rateLimit": {
+      "limit": 5000,
+      "remaining": 4800,
+      "resetAt": "2099-01-01T00:00:00Z"
+    },
+    "repository": {
+      "issues": {
+        "totalCount": 1,
+        "nodes": [
+          {
+            "number": 80,
+            "title": "A tracking issue",
+            "url": "https://github.com/acme/factory/issues/80",
+            "updatedAt": "2030-01-01T00:00:00Z",
+            "labels": {
+              "nodes": []
+            },
+            "subIssuesSummary": {
+              "total": 2,
+              "completed": 0
+            }
+          }
+        ]
+      },
+      "fleet": {
+        "text": "# Fleet settings\n\n## GitHub identity\n\n| Setting | Value |\n| --- | --- |\n| App | Synthetic |\n| Record authors | `factory-bot[bot]`, `acme-owner` |\n\n## Next\n"
+      },
+      "specIssues": {
+        "totalCount": 3,
+        "nodes": [
+          {
+            "number": 60,
+            "title": "Spec: dark mode",
+            "url": "https://github.com/acme/factory/issues/60",
+            "updatedAt": "2030-01-03T10:00:00Z",
+            "labels": {
+              "nodes": [
+                {
+                  "name": "spec"
+                }
+              ]
+            },
+            "subIssuesSummary": {
+              "total": 0,
+              "completed": 0
+            }
+          },
+          {
+            "number": 50,
+            "title": "Spec: search",
+            "url": "https://github.com/acme/factory/issues/50",
+            "updatedAt": "2030-01-02T09:00:00Z",
+            "labels": {
+              "nodes": [
+                {
+                  "name": "spec"
+                }
+              ]
+            },
+            "subIssuesSummary": {
+              "total": 3,
+              "completed": 2
+            }
+          },
+          {
+            "number": 40,
+            "title": "Spec: shipping notes",
+            "url": "https://github.com/acme/factory/issues/40",
+            "updatedAt": "2029-12-30T09:00:00Z",
+            "labels": {
+              "nodes": [
+                {
+                  "name": "spec"
+                }
+              ]
+            },
+            "subIssuesSummary": {
+              "total": 9,
+              "completed": 1
+            }
+          }
+        ]
+      },
+      "youIssues": {
+        "totalCount": 2,
+        "nodes": [
+          {
+            "number": 46,
+            "title": "Pick the release name",
+            "url": "https://github.com/acme/factory/issues/46",
+            "updatedAt": "2030-01-04T08:00:00Z",
+            "labels": {
+              "nodes": [
+                {
+                  "name": "needs-info"
+                }
+              ]
+            }
+          },
+          {
+            "number": 48,
+            "title": "Register the notes domain",
+            "url": "https://github.com/acme/factory/issues/48",
+            "updatedAt": "2030-01-01T09:00:00Z",
+            "labels": {
+              "nodes": [
+                {
+                  "name": "ready-for-human"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  }
+}

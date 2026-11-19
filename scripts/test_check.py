@@ -6,7 +6,7 @@ import unittest
 
 import re
 
-from check import FINGERPRINTS, HASHED, ROOT, Page, check_motion, check_privacy, check_ref, check_site, check_vector, check_webp, fingerprint
+from check import FINGERPRINTS, HASHED, ROOT, Page, check_changelog, check_motion, check_privacy, check_ref, check_site, check_vector, check_webp, fingerprint
 
 
 def edit_built(root, name, change):
@@ -22,6 +22,18 @@ def edit_built(root, name, change):
         path = root / page
         path.write_text(path.read_text().replace(f'"/{was}"', f'"/{new}"'))
 
+
+# A synthetic landing and changelog, valid as they stand; each case below plants one break.
+LANDING = ('<html><head><title>OpenWiz</title></head><body><header><nav><a href="/changelog/">Changelog</a></nav></header>'
+           '<main><h1>Bring your own everything.</h1></main><footer><a href="/changelog/">Changelog</a></footer></body></html>')
+PART = ('<section class="part" id="{id}"><h3>{name} <span>openwizdev/{name}</span></h3>'
+        '<p class="intro">{name} is one part. It does one thing.</p><ul><li>One thing works.</li></ul></section>')
+CHANGELOG = ('<html><head><title>Changelog — OpenWiz</title><style>.part{color:red}</style></head><body><main id="main">'
+             '<h1>Changelog</h1><p class="lead">How the repositories fit together.</p>'
+             '<figure class="repo-map"><svg role="img" aria-label="OpenWiz in the middle; private records and tools aside" viewBox="0 0 10 10"><text>OpenWiz</text></svg></figure>'
+             '<section class="today"><h2>What exists today</h2>'
+             + ''.join(PART.format(id=n.lower(), name=n) for n in ('OpenWiz', 'WizSkills', 'WizLoops', 'WizPlugins', 'WizSite'))
+             + '</section></main></body></html>')
 
 class Checks(unittest.TestCase):
     def test_valid_site(self):
@@ -186,6 +198,57 @@ class Checks(unittest.TestCase):
                     page.write_text(text.replace(old, new, 1))
                 with self.assertRaisesRegex(AssertionError, 'approval step'):
                     check_site(root)
+
+    def test_changelog_named_everywhere(self):
+        # Catches: a landing nav or footer label left as the old name, an extra or missing Changelog link on the
+        # landing, inline styles leaking into the landing, and the old name on either page's heading, title or text.
+        check_changelog(LANDING, CHANGELOG)
+        for landing, error in (
+                (LANDING.replace('>Changelog</a></nav>', '>Ship log</a></nav>'), 'nav and footer'),
+                (LANDING.replace('>Changelog</a></footer>', '>Ship log</a></footer>'), 'nav and footer'),
+                (LANDING.replace('</footer>', '<a href="/changelog">Changelog</a></footer>'), 'nav and footer'),
+                (LANDING.replace('<a href="/changelog/">Changelog</a></nav>', '</nav>'), 'nav and footer'),
+                (LANDING.replace('</title>', '</title><style>.part{color:red}</style>'), 'no inline styles'),
+                (LANDING.replace('</h1>', '</h1><p>See the ship&#32;log.</p>'), 'never ship log')):
+            with self.subTest(landing=landing[-90:]), self.assertRaisesRegex(AssertionError, error):
+                check_changelog(landing, CHANGELOG)
+        for changelog, error in (
+                (CHANGELOG.replace('<h1>Changelog</h1>', '<h1>Ship log</h1>'), 'never ship log'),
+                (CHANGELOG.replace('<title>Changelog — OpenWiz', '<title>Ship log — OpenWiz'), 'never ship log'),
+                (CHANGELOG.replace('<h1>Changelog</h1>', '<h1>Releases</h1>'), 'heading must be Changelog'),
+                (CHANGELOG.replace('<title>Changelog — OpenWiz', '<title>OpenWiz'), 'title must be Changelog')):
+            with self.subTest(changelog=error), self.assertRaisesRegex(AssertionError, error):
+                check_changelog(LANDING, changelog)
+
+    def test_changelog_picture_parts_and_no_history(self):
+        # Catches: the picture missing, unlabelled or after What exists today; a second section of the same
+        # kind; a repository part without its two or three opening sentences, missing, or doubled; a private
+        # repository named; and a release entry, version number or date coming back.
+        figure = CHANGELOG[CHANGELOG.index('<figure'):CHANGELOG.index('</figure>') + 9]
+        no_figure = CHANGELOG.replace(figure, '')
+        wizsite = PART.format(id='wizsite', name='WizSite')
+        for changelog, error in (
+                (no_figure, 'picture opens the page'),
+                (no_figure.replace('</section></main>', figure + '</section></main>'), 'picture opens the page'),
+                (CHANGELOG.replace(' aria-label="OpenWiz in the middle; private records and tools aside"', ''), 'labelled SVG'),
+                (CHANGELOG.replace('</section></main>', '<h2>What exists today</h2></section></main>'), 'exactly one What exists today'),
+                (CHANGELOG.replace('<h2>What exists today</h2>', '<h2>Coming soon</h2>'), 'exactly one What exists today'),
+                (CHANGELOG.replace('WizSite is one part. It does one thing.', 'WizSite is one part.'), 'not two or three'),
+                (CHANGELOG.replace('WizSite is one part. It does one thing.', 'One. Two. Three. Four.'), 'not two or three'),
+                (CHANGELOG.replace('<p class="intro">WizSite', '<p>WizSite'), 'plain lines'),
+                (CHANGELOG.replace(wizsite, ''), 'one part per public repository'),
+                (CHANGELOG.replace(wizsite, wizsite + wizsite.replace('id="wizsite"', 'id="again"')), 'one part per public repository'),
+                (CHANGELOG.replace(wizsite, PART.format(id='wizvault', name='WizVault')), 'not public'),
+                (CHANGELOG.replace('One thing works.', 'WizVault keeps the scores.'), 'private repository is named'),
+                (CHANGELOG.replace('One thing works.', 'Wiz<b>Room</b> keeps the scores.'), 'private repository is named'),
+                (CHANGELOG.replace('One thing works.', 'WizSiteOps deploys it.'), 'private repository is named'),
+                (CHANGELOG.replace('One thing works.', 'Released in 0.0.12.'), 'version number or date'),
+                (CHANGELOG.replace('One thing works.', 'Shipped on Nov 16, 2026.'), 'version number or date'),
+                (CHANGELOG.replace('One thing works.', '<time datetime="x">Last week</time>'), 'no release entry'),
+                (CHANGELOG.replace('One thing works.', '<a href="https://github.com/openwizdev/OpenWiz/releases/tag/vX">Notes</a>'), 'no release entry'),
+                (CHANGELOG.replace('.part{color:red}', '.part{transition:opacity .2s}'), 'motion outside')):
+            with self.subTest(error=error, at=changelog[-120:]), self.assertRaisesRegex(AssertionError, error):
+                check_changelog(LANDING, changelog)
 
     def test_landing_starts_in_still_mode(self):
         # Catches: an early inline script, a visible broken motion control or an autoplaying clip.

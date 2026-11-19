@@ -1,0 +1,587 @@
+{
+  "data": {
+    "rateLimit": {
+      "limit": 5000,
+      "remaining": 4800,
+      "resetAt": "2099-01-01T00:00:00Z"
+    },
+    "repository": {
+      "s60": {
+        "number": 60,
+        "comments": {
+          "totalCount": 2,
+          "nodes": [
+            {
+              "databaseId": 9001,
+              "body": "Spec ready for your confirm.\n\n```json\n{\n  \"schema\": \"openwiz.decisions.v1\",\n  \"kind\": \"spec_confirmation\",\n  \"id\": \"r-spec_confirmation-60-open\",\n  \"status\": \"open\",\n  \"fingerprint\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\n  \"risk\": \"ordinary\",\n  \"spec\": 60,\n  \"summary\": [\n    \"Synthetic summary line.\"\n  ],\n  \"headline\": \"Synthetic headline.\",\n  \"tickets\": [],\n  \"graph\": []\n}\n```",
+              "url": "https://github.com/acme/factory/issues/60#issuecomment-9001",
+              "createdAt": "2030-01-03T10:00:00Z",
+              "updatedAt": "2030-01-03T10:00:00Z",
+              "author": {
+                "login": "factory-bot[bot]"
+              }
+            },
+            {
+              "databaseId": 9002,
+              "body": "```json\n{\n  \"schema\": \"openwiz.decisions.v1\",\n  \"kind\": \"plan_approval\",\n  \"id\": \"r-plan_approval-60-open\",\n  \"status\": \"open\",\n  \"fingerprint\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\n  \"risk\": \"ordinary\",\n  \"spec\": 60,\n  \"summary\": [\n    \"Synthetic summary line.\"\n  ],\n  \"tickets\": [],\n  \"graph\": []\n}\n```",
+              "url": "https://github.com/acme/factory/issues/60#issuecomment-9002",
+              "createdAt": "2030-01-03T11:00:00Z",
+              "updatedAt": "2030-01-03T11:00:00Z",
+              "author": {
+                "login": "helpful-collaborator"
+              }
+            }
+          ]
+        },
+        "subIssues": {
+          "totalCount": 0,
+          "nodes": []
+        }
+      },
+      "s50": {
+        "number": 50,
+        "comments": {
+          "totalCount": 4,
+          "nodes": [
+            {
+              "databaseId": 9003,
+              "body": "Plan graph for your approval.\n\n```json\n{\n  \"schema\": \"openwiz.decisions.v1\",\n  \"kind\": \"plan_approval\",\n  \"id\": \"r-plan_approval-50-open\",\n  \"status\": \"open\",\n  \"fingerprint\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\n  \"risk\": \"ordinary\",\n  \"spec\": 50,\n  \"summary\": [\n    \"Synthetic summary line.\"\n  ],\n  \"headline\": \"Synthetic headline.\",\n  \"tickets\": [\n    {\n      \"number\": 51,\n      \"title\": \"Index\",\n      \"blockers\": []\n    }\n  ],\n  \"graph\": []\n}\n```",
+              "url": "https://github.com/acme/factory/issues/50#issuecomment-9003",
+              "createdAt": "2030-01-02T09:00:00Z",
+              "updatedAt": "2030-01-02T09:00:00Z",
+              "author": {
+                "login": "factory-bot[bot]"
+              }
+            },
+            {
+              "databaseId": 9004,
+              "body": "```json\n{\n  \"schema\": \"openwiz.decisions.v1\",\n  \"kind\": \"spec_confirmation\",\n  \"id\": \"r-spec_confirmation-50-resolved\",\n  \"status\": \"resolved\",\n  \"fingerprint\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\n  \"risk\": \"ordinary\",\n  \"spec\": 50,\n  \"summary\": [\n    \"Synthetic summary line.\"\n  ],\n  \"headline\": \"Synthetic headline.\",\n  \"tickets\": [],\n  \"graph\": []\n}\n```",
+              "url": "https://github.com/acme/factory/issues/50#issuecomment-9004",
+              "createdAt": "2030-01-01T09:00:00Z",
+              "updatedAt": "2030-01-01T09:00:00Z",
+              "author": {
+                "login": "factory-bot[bot]"
+              }
+            },
+            {
+              "databaseId": 9005,
+              "body": "```json\n{\n  \"schema\": \"openwiz.decisions.v1\",\n  \"kind\": \"plan_approval\",\n  \"id\": \"r-plan_approval-50-open\",\n  \"status\": \"open\",\n  \"risk\": \"ordinary\",\n  \"spec\": 50,\n  \"summary\": [\n    \"Synthetic summary line.\"\n  ],\n  \"headline\": \"Synthetic headline.\",\n  \"tickets\": [],\n  \"graph\": []\n}\n```",
+              "url": "https://github.com/acme/factory/issues/50#issuecomment-9005",
+              "createdAt": "2030-01-01T12:00:00Z",
+              "updatedAt": "2030-01-01T12:00:00Z",
+              "author": {
+                "login": "acme-owner"
+              }
+            },
+            {
+              "databaseId": 9006,
+              "body": "```json\n{\n  \"schema\": \"openwiz.decisions.v1\",\n  \"kind\": \"spec_confirmation\",\n  \"id\": \"r-spec_confirmation-99-open\",\n  \"status\": \"open\",\n  \"fingerprint\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\n  \"risk\": \"ordinary\",\n  \"spec\": 99,\n  \"summary\": [\n    \"Synthetic summary line.\"\n  ],\n  \"headline\": \"Synthetic headline.\",\n  \"tickets\": [],\n  \"graph\": []\n}\n```",
+              "url": "https://github.com/acme/factory/issues/50#issuecomment-9006",
+              "createdAt": "2029-12-31T12:00:00Z",
+              "updatedAt": "2029-12-31T12:00:00Z",
+              "author": {
+                "login": "factory-bot[bot]"
+              }
+            }
+          ]
+        },
+        "subIssues": {
+          "totalCount": 3,
+          "nodes": [
+            {
+              "number": 51,
+              "title": "Index",
+              "url": "https://github.com/acme/factory/issues/51",
+              "state": "CLOSED",
+              "stateReason": "COMPLETED",
+              "repository": {
+                "nameWithOwner": "acme/factory"
+              },
+              "labels": {
+                "nodes": []
+              },
+              "blockedBy": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "closedByPullRequestsReferences": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "comments": {
+                "totalCount": 0,
+                "nodes": []
+              }
+            },
+            {
+              "number": 52,
+              "title": "Query",
+              "url": "https://github.com/acme/factory/issues/52",
+              "state": "CLOSED",
+              "stateReason": "COMPLETED",
+              "repository": {
+                "nameWithOwner": "acme/factory"
+              },
+              "labels": {
+                "nodes": []
+              },
+              "blockedBy": {
+                "totalCount": 1,
+                "nodes": [
+                  {
+                    "number": 51,
+                    "title": "#51",
+                    "url": "https://github.com/acme/factory/issues/51",
+                    "state": "OPEN",
+                    "stateReason": null,
+                    "repository": {
+                      "nameWithOwner": "acme/factory"
+                    }
+                  }
+                ]
+              },
+              "closedByPullRequestsReferences": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "comments": {
+                "totalCount": 0,
+                "nodes": []
+              }
+            },
+            {
+              "number": 53,
+              "title": "Results page",
+              "url": "https://github.com/acme/factory/issues/53",
+              "state": "OPEN",
+              "stateReason": null,
+              "repository": {
+                "nameWithOwner": "acme/factory"
+              },
+              "labels": {
+                "nodes": [
+                  {
+                    "name": "ready-for-agent"
+                  }
+                ]
+              },
+              "blockedBy": {
+                "totalCount": 1,
+                "nodes": [
+                  {
+                    "number": 52,
+                    "title": "#52",
+                    "url": "https://github.com/acme/factory/issues/52",
+                    "state": "OPEN",
+                    "stateReason": null,
+                    "repository": {
+                      "nameWithOwner": "acme/factory"
+                    }
+                  }
+                ]
+              },
+              "closedByPullRequestsReferences": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "comments": {
+                "totalCount": 0,
+                "nodes": []
+              }
+            }
+          ]
+        }
+      },
+      "s40": {
+        "number": 40,
+        "comments": {
+          "totalCount": 0,
+          "nodes": []
+        },
+        "subIssues": {
+          "totalCount": 9,
+          "nodes": [
+            {
+              "number": 41,
+              "title": "Notes format",
+              "url": "https://github.com/acme/factory/issues/41",
+              "state": "CLOSED",
+              "stateReason": "COMPLETED",
+              "repository": {
+                "nameWithOwner": "acme/factory"
+              },
+              "labels": {
+                "nodes": []
+              },
+              "blockedBy": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "closedByPullRequestsReferences": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "comments": {
+                "totalCount": 0,
+                "nodes": []
+              }
+            },
+            {
+              "number": 42,
+              "title": "Write the notes page",
+              "url": "https://github.com/acme/factory/issues/42",
+              "state": "OPEN",
+              "stateReason": null,
+              "repository": {
+                "nameWithOwner": "acme/factory"
+              },
+              "labels": {
+                "nodes": []
+              },
+              "blockedBy": {
+                "totalCount": 1,
+                "nodes": [
+                  {
+                    "number": 41,
+                    "title": "#41",
+                    "url": "https://github.com/acme/factory/issues/41",
+                    "state": "OPEN",
+                    "stateReason": null,
+                    "repository": {
+                      "nameWithOwner": "acme/factory"
+                    }
+                  }
+                ]
+              },
+              "closedByPullRequestsReferences": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "comments": {
+                "totalCount": 2,
+                "nodes": [
+                  {
+                    "databaseId": 9007,
+                    "body": "<!-- openwiz:status v1 -->\nagent: reviewer\nstate: working\nharness: Synthetic Harness\nmodel: Synthetic Model\nstep: a synthetic step\ntime: 2030-01-01T00:00:00Z",
+                    "url": "https://github.com/acme/factory/issues/42#issuecomment-9007",
+                    "createdAt": "2029-12-31T09:00:00Z",
+                    "updatedAt": "LIVE",
+                    "author": {
+                      "login": "factory-bot[bot]"
+                    }
+                  },
+                  {
+                    "databaseId": 9008,
+                    "body": "<!-- openwiz:status v1 -->\nagent: builder\nstate: done\nharness: Synthetic Harness\nmodel: Synthetic Model\nstep: a synthetic step\ntime: 2030-01-01T00:00:00Z",
+                    "url": "https://github.com/acme/factory/issues/42#issuecomment-9008",
+                    "createdAt": "2029-12-30T09:00:00Z",
+                    "updatedAt": "LIVE-5",
+                    "author": {
+                      "login": "factory-bot[bot]"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "number": 43,
+              "title": "Store the notes",
+              "url": "https://github.com/acme/factory/issues/43",
+              "state": "OPEN",
+              "stateReason": null,
+              "repository": {
+                "nameWithOwner": "acme/factory"
+              },
+              "labels": {
+                "nodes": []
+              },
+              "blockedBy": {
+                "totalCount": 1,
+                "nodes": [
+                  {
+                    "number": 30,
+                    "title": "#30",
+                    "url": "https://github.com/acme/factory/issues/30",
+                    "state": "CLOSED",
+                    "stateReason": "COMPLETED",
+                    "repository": {
+                      "nameWithOwner": "acme/factory"
+                    }
+                  }
+                ]
+              },
+              "closedByPullRequestsReferences": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "comments": {
+                "totalCount": 2,
+                "nodes": [
+                  {
+                    "databaseId": 9009,
+                    "body": "<!-- openwiz:status v1 -->\nagent: builder\nstate: working\nharness: Synthetic Harness\nmodel: Synthetic Model\nstep: a synthetic step\ntime: 2030-01-01T00:00:00Z",
+                    "url": "https://github.com/acme/factory/issues/43#issuecomment-9009",
+                    "createdAt": "2029-12-31T10:00:00Z",
+                    "updatedAt": "LIVE",
+                    "author": {
+                      "login": "factory-bot[bot]"
+                    }
+                  },
+                  {
+                    "databaseId": 9010,
+                    "body": "<!-- openwiz:status v1 -->\nagent: builder\nstate: done\nharness: Synthetic Harness\nmodel: Synthetic Model\nstep: a synthetic step\ntime: 2030-01-01T00:00:00Z",
+                    "url": "https://github.com/acme/factory/issues/43#issuecomment-9010",
+                    "createdAt": "2029-12-30T10:00:00Z",
+                    "updatedAt": "LIVE-5",
+                    "author": {
+                      "login": "factory-bot[bot]"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "number": 44,
+              "title": "Notes feed",
+              "url": "https://github.com/acme/factory/issues/44",
+              "state": "OPEN",
+              "stateReason": null,
+              "repository": {
+                "nameWithOwner": "acme/factory"
+              },
+              "labels": {
+                "nodes": [
+                  {
+                    "name": "ready-for-agent"
+                  }
+                ]
+              },
+              "blockedBy": {
+                "totalCount": 1,
+                "nodes": [
+                  {
+                    "number": 41,
+                    "title": "#41",
+                    "url": "https://github.com/acme/factory/issues/41",
+                    "state": "OPEN",
+                    "stateReason": null,
+                    "repository": {
+                      "nameWithOwner": "acme/factory"
+                    }
+                  }
+                ]
+              },
+              "closedByPullRequestsReferences": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "comments": {
+                "totalCount": 1,
+                "nodes": [
+                  {
+                    "databaseId": 9011,
+                    "body": "<!-- openwiz:status v1 -->\nagent: builder\nstate: asking\nharness: Synthetic Harness\nmodel: Synthetic Model\nstep: a synthetic step\ntime: 2030-01-01T00:00:00Z",
+                    "url": "https://github.com/acme/factory/issues/44#issuecomment-9011",
+                    "createdAt": "2029-12-31T11:00:00Z",
+                    "updatedAt": "LIVE",
+                    "author": {
+                      "login": "helpful-collaborator"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "number": 45,
+              "title": "Notes search",
+              "url": "https://github.com/acme/factory/issues/45",
+              "state": "OPEN",
+              "stateReason": null,
+              "repository": {
+                "nameWithOwner": "acme/factory"
+              },
+              "labels": {
+                "nodes": [
+                  {
+                    "name": "ready-for-agent"
+                  }
+                ]
+              },
+              "blockedBy": {
+                "totalCount": 2,
+                "nodes": [
+                  {
+                    "number": 42,
+                    "title": "#42",
+                    "url": "https://github.com/acme/factory/issues/42",
+                    "state": "OPEN",
+                    "stateReason": null,
+                    "repository": {
+                      "nameWithOwner": "acme/factory"
+                    }
+                  },
+                  {
+                    "number": 43,
+                    "title": "#43",
+                    "url": "https://github.com/acme/factory/issues/43",
+                    "state": "OPEN",
+                    "stateReason": null,
+                    "repository": {
+                      "nameWithOwner": "acme/factory"
+                    }
+                  }
+                ]
+              },
+              "closedByPullRequestsReferences": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "comments": {
+                "totalCount": 0,
+                "nodes": []
+              }
+            },
+            {
+              "number": 46,
+              "title": "Pick the release name",
+              "url": "https://github.com/acme/factory/issues/46",
+              "state": "OPEN",
+              "stateReason": null,
+              "repository": {
+                "nameWithOwner": "acme/factory"
+              },
+              "labels": {
+                "nodes": [
+                  {
+                    "name": "needs-info"
+                  }
+                ]
+              },
+              "blockedBy": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "closedByPullRequestsReferences": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "comments": {
+                "totalCount": 0,
+                "nodes": []
+              }
+            },
+            {
+              "number": 47,
+              "title": "Notes export",
+              "url": "https://github.com/acme/factory/issues/47",
+              "state": "OPEN",
+              "stateReason": null,
+              "repository": {
+                "nameWithOwner": "acme/factory"
+              },
+              "labels": {
+                "nodes": [
+                  {
+                    "name": "held"
+                  }
+                ]
+              },
+              "blockedBy": {
+                "totalCount": 1,
+                "nodes": [
+                  {
+                    "number": 44,
+                    "title": "#44",
+                    "url": "https://github.com/acme/factory/issues/44",
+                    "state": "OPEN",
+                    "stateReason": null,
+                    "repository": {
+                      "nameWithOwner": "acme/factory"
+                    }
+                  }
+                ]
+              },
+              "closedByPullRequestsReferences": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "comments": {
+                "totalCount": 0,
+                "nodes": []
+              }
+            },
+            {
+              "number": 49,
+              "title": "Notes digest",
+              "url": "https://github.com/acme/factory/issues/49",
+              "state": "OPEN",
+              "stateReason": null,
+              "repository": {
+                "nameWithOwner": "acme/factory"
+              },
+              "labels": {
+                "nodes": [
+                  {
+                    "name": "ready-for-agent"
+                  }
+                ]
+              },
+              "blockedBy": {
+                "totalCount": 3,
+                "nodes": [
+                  {
+                    "number": 41,
+                    "title": "#41",
+                    "url": "https://github.com/acme/factory/issues/41",
+                    "state": "OPEN",
+                    "stateReason": null,
+                    "repository": {
+                      "nameWithOwner": "acme/factory"
+                    }
+                  },
+                  null
+                ]
+              },
+              "closedByPullRequestsReferences": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "comments": {
+                "totalCount": 0,
+                "nodes": []
+              }
+            },
+            null
+          ]
+        }
+      }
+    }
+  },
+  "errors": [
+    {
+      "type": "FORBIDDEN",
+      "path": [
+        "repository",
+        "s40",
+        "subIssues",
+        "nodes",
+        8
+      ],
+      "message": "Resource not accessible by integration"
+    },
+    {
+      "type": "FORBIDDEN",
+      "path": [
+        "repository",
+        "s40",
+        "subIssues",
+        "nodes",
+        7,
+        "blockedBy",
+        "nodes",
+        1
+      ],
+      "message": "Resource not accessible by integration"
+    }
+  ]
+}

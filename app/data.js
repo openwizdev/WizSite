@@ -212,8 +212,39 @@
       totalCount
       nodes { number title url updatedAt labels(first: 20) { nodes { name } } subIssuesSummary { total completed } }
     }
+    specIssues: issues(first: 50, states: OPEN, labels: ["spec"], orderBy: {field: UPDATED_AT, direction: DESC}) {
+      totalCount
+      nodes { number title url updatedAt subIssuesSummary { total completed } }
+    }
+    youIssues: issues(first: 50, states: OPEN, labels: ["needs-info", "ready-for-human"], orderBy: {field: UPDATED_AT, direction: DESC}) {
+      totalCount
+      nodes { number title url updatedAt labels(first: 20) { nodes { name } } }
+    }
+    fleet: object(expression: "HEAD:docs/agents/fleet.md") { ... on Blob { text } }
   }
 }`;
+  // The Specs feed's second read (AP6): each open spec's recent comments (its decision records) and its tickets, with
+  // their state, labels, blocked-by links, the open pull requests that close them and their most recently edited
+  // comments (the agents' status notes). Every list carries its total, so a page can tell a partial list from a whole
+  // one. One aliased query for up to SPEC_DETAILS specs (the most recently updated); a spec past that is unknown.
+  const SPEC_DETAILS = 20;
+  const RECENT = 'orderBy: {field: UPDATED_AT, direction: DESC}';
+  const TICKET = 'number title url state stateReason repository { nameWithOwner }';
+  function specTickets(repository) {
+    const numbers = (repository.specIssues?.nodes || []).map(issue => issue?.number).filter(Number.isSafeInteger).slice(0, SPEC_DETAILS);
+    if (!numbers.length) return null;
+    return `query SpecTickets($owner: String!, $name: String!) {
+  rateLimit { limit remaining resetAt }
+  repository(owner: $owner, name: $name) {${numbers.map(n => `
+    s${n}: issue(number: ${n}) { number
+      comments(first: 50, ${RECENT}) { totalCount nodes { databaseId body url createdAt updatedAt author { login } } }
+      subIssues(first: 50) { totalCount nodes { ${TICKET} labels(first: 20) { nodes { name } }
+        blockedBy(first: 10) { totalCount nodes { ${TICKET} } }
+        closedByPullRequestsReferences(first: 5) { totalCount nodes { url state isDraft reviewDecision } }
+        comments(first: 20, ${RECENT}) { totalCount nodes { databaseId body createdAt updatedAt author { login } } } } } }`).join('')}
+  }
+}`;
+  }
   const AGENTS = `query Agents($owner: String!, $name: String!) {
   rateLimit { limit remaining resetAt }
   repository(owner: $owner, name: $name) {
@@ -223,7 +254,7 @@
   }
 }`;
   const feeds = {
-    specs: { label: 'Specs', every: 10 * 60 * 1000, query: SPECS },
+    specs: { label: 'Specs', every: 10 * 60 * 1000, query: SPECS, more: specTickets },
     agents: { label: 'Agents', every: 2 * 60 * 1000, query: AGENTS },
   };
   for (const feed of Object.values(feeds)) Object.assign(feed, { state: 'loading', data: null, readAt: null, failedAt: null, timer: null, busy: false });
@@ -261,9 +292,34 @@
       if (mine !== generation) return;
       noteLimit(answer?.data?.rateLimit, response);
       if (!response.ok || !answer?.data?.repository) throw new Error(`GitHub answered ${response.status}`);
-      feed.data = answer.data.repository;
-      feed.state = answer.errors?.length ? 'partial' : 'ok';
-      feed.errors = answer.errors || [];
+      const data = answer.data.repository;
+      const errors = [...(answer.errors || [])];
+      // A feed's second read (Specs: the running specs' tickets). If it fails, or GitHub's limit is now low, its part
+      // is unknown (data.specs is null) and the feed is partial.
+      const more = feed.more?.(data);
+      if (more) {
+        data.specs = null;
+        if (paused()) {
+          errors.push({ message: 'the second read waits for GitHub\'s limit' });
+        } else {
+          // A failure here (even of the network) keeps the first read: only its own part is unknown.
+          try {
+            const second = await github('POST', '/graphql', { query: more, variables: { owner: picked.owner, name: picked.name } });
+            const extra = await second.json().catch(() => null);
+            if (mine !== generation) return;
+            noteLimit(extra?.data?.rateLimit, second);
+            if (second.ok && extra?.data?.repository) data.specs = extra.data.repository;
+            errors.push(...(second.ok && extra?.data?.repository ? extra.errors || [] : [{ message: `GitHub answered ${second.status}` }]));
+          } catch (error) {
+            if (error instanceof Ended || error instanceof SignedOut) throw error;
+            if (mine !== generation) return;
+            errors.push({ message: 'the second read failed' });
+          }
+        }
+      }
+      feed.data = data;
+      feed.state = errors.length ? 'partial' : 'ok';
+      feed.errors = errors;
       feed.readAt = Date.now();
       feed.failedAt = null;
     } catch (error) {
