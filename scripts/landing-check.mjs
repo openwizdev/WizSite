@@ -131,6 +131,7 @@ async function open(browser, origin, width, height, mode) {
 // Shared page helpers, evaluated inside the page.
 const HELPERS = `
   const shown = el => !!el && el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden';
+  const still = el => ['none', 'matrix(1, 0, 0, 1, 0, 0)'].includes(getComputedStyle(el).transform);
   const box = el => { const r = el.getBoundingClientRect(); return { left: r.left, right: r.right, top: r.top + scrollY, bottom: r.bottom + scrollY }; };
 `;
 
@@ -256,39 +257,98 @@ async function family(page, where, mode) {
     wiz.scrollIntoView({ block: 'end' }); const r = wiz.getBoundingClientRect();
     return { x: r.left + r.width / 2, y: Math.min(r.top + r.height * .45, innerHeight - 4), rest: !!document.querySelector('.wiz-line') }; })()`);
   expect(!at.rest, where, 'a Wiz line shows at rest');
+  // Watches one Wiz for 1.4 s: its line, whether it moved, its picture and its accessible name.
   const watch = `(wiz) => new Promise(resolve => { ${HELPERS}
-    const before = wiz.querySelector('img').getAttribute('src');
-    const seen = { line: '', moved: false, faded: false };
+    const before = { src: wiz.querySelector('img').getAttribute('src'), name: wiz.getAttribute('aria-label') };
+    const seen = { line: '', moved: false, swapped: false, renamed: false };
     const started = Date.now();
     const look = () => {
       const line = wiz.querySelector('.wiz-line');
       if (shown(line) && getComputedStyle(line).opacity > .5) seen.line ||= line.textContent.trim();
-      if (getComputedStyle(wiz).transform !== 'none' || shown(wiz.querySelector('.wiz-sprite'))) seen.moved = true;
-      if (Date.now() - started > 2200) {
+      if (!still(wiz) || shown(wiz.querySelector('.wiz-sprite'))) seen.moved = true;
+      if (wiz.querySelector('img').getAttribute('src') !== before.src) seen.swapped = true;
+      if (wiz.getAttribute('aria-label') !== before.name) seen.renamed = true;
+      if (Date.now() - started > 1400) {
         seen.faded = !shown(line) || getComputedStyle(line).opacity < .05;
-        seen.costume = wiz.querySelector('img').getAttribute('src') !== before;
+        seen.restored = wiz.querySelector('img').getAttribute('src') === before.src && still(wiz)
+          && !shown(wiz.querySelector('.wiz-sprite'));
         return resolve(seen);
       }
-      setTimeout(look, 40);
+      setTimeout(look, 30);
     };
     look();
   })`;
+  const press = async () => {
+    await page.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
+    await page.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
+  };
   // Start watching first, in its own call: the protocol does not order input events after an evaluation.
   await page.evaluate(`window.landingWatch = (${watch})(document.querySelectorAll('.family-wiz')[5]); true`);
   await page.click(at.x, at.y);
   const clicked = await page.evaluate('window.landingWatch');
   expect(!!clicked.line, where, 'clicking a Wiz shows no line');
   expect(clicked.faded, where, 'the Wiz line does not fade');
-  if (mode === 'motion') expect(clicked.moved || clicked.costume, where, 'a clicked Wiz does not react');
+  // Every reaction ends within a second and leaves the Wiz as it was, under the same name.
+  expect(clicked.restored, where, 'a clicked Wiz is not back at rest, in its own costume, a second later');
+  expect(!clicked.renamed, where, 'a clicked Wiz changes its accessible name');
+  if (mode === 'motion') expect(clicked.moved || clicked.swapped, where, 'a clicked Wiz does not react');
   if (mode === 'reduced') {
     expect(!clicked.moved, where, 'a Wiz moves with reduced motion on');
-    expect(clicked.costume, where, 'with reduced motion a click is not a still pose change');
+    expect(clicked.swapped, where, 'with reduced motion a click is not a still pose change');
   }
-  // Keyboard: focus the next Wiz and press Enter.
-  await page.evaluate(`window.landingWatch = (${watch})((() => { const wiz = document.querySelectorAll('.family-wiz')[6]; wiz.focus(); return wiz; })()); true`);
-  await page.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
-  await page.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
-  expect(!!(await page.evaluate('window.landingWatch')).line, where, 'Enter on a focused Wiz shows no line');
+  // Keyboard: focus the next Wiz and press Enter, twice; with reduced motion it answers as itself both times.
+  const keyed = [];
+  for (let i = 0; i < 2; i++) {
+    await page.evaluate(`window.landingWatch = (${watch})((() => { const wiz = document.querySelectorAll('.family-wiz')[6]; wiz.focus(); return wiz; })()); true`);
+    await press();
+    keyed.push(await page.evaluate('window.landingWatch'));
+  }
+  expect(keyed.every(k => k.line), where, 'Enter on a focused Wiz shows no line');
+  expect(keyed.every(k => !k.renamed && k.restored), where, 'Enter leaves a Wiz renamed or in another costume');
+  if (mode === 'reduced') expect(keyed[0].line === keyed[1].line, where,
+    `the same Wiz answers as someone else the second time ("${keyed[0].line}", then "${keyed[1].line}")`);
+  if (mode === 'motion') await handoff(page, where);
+}
+
+// One Wiz at a time, each reaction under a second: hovering, moving along the row and quick clicks.
+async function handoff(page, where) {
+  const centre = i => page.evaluate(`(() => { const r = document.querySelectorAll('.family-wiz')[${i}].getBoundingClientRect();
+    return { x: r.left + r.width / 2, y: Math.min(r.top + r.height * .45, innerHeight - 4) }; })()`);
+  const busy = `(() => { ${HELPERS} return [...document.querySelectorAll('.family-wiz')].map((wiz, i) =>
+    !still(wiz) || shown(wiz.querySelector('.wiz-sprite')) ? i : -1).filter(i => i >= 0); })()`;
+  const wait = ms => page.evaluate(`new Promise(r => setTimeout(r, ${ms}))`);
+  const move = async ({ x, y }) => page.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y });
+  await move({ x: 2, y: 2 });
+  await wait(1200);
+  // Resting the pointer on a Wiz: its reaction is over within a second.
+  const [a, b, c, d] = [await centre(4), await centre(7), await centre(3), await centre(8)];
+  await move(a);
+  await wait(1000);
+  let now = await page.evaluate(busy);
+  expect(now.length === 0, where, `a hovered Wiz is still reacting after a second (Wiz ${now.join(', ')})`);
+  // Moving to another Wiz ends the first one's reaction at once.
+  await move({ x: a.x, y: a.y - 400 });
+  await wait(1000);
+  await move(a);
+  await wait(100);
+  await move(b);
+  await wait(100);
+  now = await page.evaluate(busy);
+  expect(now.length <= 1, where, `${now.length} Wizes react at once after moving along the row`);
+  await move({ x: 2, y: 2 });
+  await wait(1100);
+  // Two quick clicks: the second cancels the first.
+  await page.click(c.x, c.y);
+  await wait(60);
+  await page.click(d.x, d.y);
+  for (const ms of [60, 175, 400]) {
+    await wait(ms === 60 ? 60 : ms - 60);
+    now = await page.evaluate(busy);
+    expect(now.length <= 1, where, `${now.length} Wizes react at once ${ms} ms after a second click`);
+  }
+  await wait(1000);
+  now = await page.evaluate(busy);
+  expect(now.length === 0, where, `a Wiz still reacts more than a second after the last click (Wiz ${now.join(', ')})`);
 }
 
 async function main() {
