@@ -120,7 +120,7 @@ PHONE_QUERY = re.compile(r'\(max-width:[0-9]+px\)')
 # the page, then one "What exists today" section with one part per public repository, each opening with two or
 # three plain sentences. Private repositories appear at most as "private records and tools". No release entry,
 # version number or date: the old release list stays on GitHub's releases. Its reviewed text is pinned below.
-CHANGELOG_MAIN = '17830d3f9a837a3ec24f2382829093cc941e0d1f5fd873e45e4d3a44c6e897c2'
+CHANGELOG_MAIN = '8da41a55cf9b4468da03c339bc3296066163bda9a71fd56d19fcffa9fc1c56db'
 CHANGELOG_LINKS = ('/changelog/', '/changelog')
 PUBLIC_REPOS = ('OpenWiz', 'WizSkills', 'WizLoops', 'WizPlugins', 'WizSite')
 PUBLIC_WIZ_NAMES = set(PUBLIC_REPOS) | {'WizBar'}  # WizBar is WizPlugins' plugin, not a repository
@@ -494,8 +494,9 @@ def check_changelog(landing, changelog):
     reader = Text(main)
     readings = [reader.joined(), reader.spaced()] + reader.attrs
     for reading in readings:
-        # Fail closed: every Wiz name is a public one (text read joined can run two names together).
-        public = '(?:' + '|'.join(sorted(PUBLIC_WIZ_NAMES)) + ')+'
+        # Fail closed: every Wiz name is a public one. Text read joined can run a name into the next name or
+        # into a lowercase word, never into a capital: "WizSkillsthe" passes, "WizVault" and "WizSiteOps" fail.
+        public = '(?:' + '|'.join(sorted(PUBLIC_WIZ_NAMES)) + ')+(?:[a-z][A-Za-z]*)?'
         for name in re.findall(r'\bWiz[A-Z][A-Za-z]*', reading):
             assert re.fullmatch(public, name), f'a private repository is named; say "private records and tools": {name}'
         assert not re.search(r'\d+\.\d+|\b(?:19|20)\d\d\b', reading), 'no version number or date on the changelog'
