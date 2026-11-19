@@ -8,5 +8,8 @@
     "test": "python3 -B -m unittest discover -s scripts -p 'test_*.py'",
     "test:functions": "node --test tests/sign-in.test.mjs",
     "test:app": "node scripts/app-check.mjs"
+  },
+  "dependencies": {
+    "@dagrejs/dagre": "3.1.3"
   }
 }

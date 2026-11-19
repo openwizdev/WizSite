@@ -623,7 +623,7 @@ async function main() {
       await page.key('Enter');
       await page.until(`location.hash === '#/specs/40' && document.activeElement.classList.contains('spec-title')`, 'focus on the spec page\'s title');
       // The graph's tickets come in reading order: every ticket after each ticket it waits for.
-      const walk = await tabTo('https://github.com/acme/factory/issues/41', 80);
+      const walk = await tabTo('41', 80);
       const graph = [];
       for (let i = 0; i < 12 && graph.length < 8; i += 1) {
         await page.key('Tab');

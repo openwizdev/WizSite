@@ -50,7 +50,10 @@ HASHED = ('tokens.css', 'site.css', 'site.js')
 # The page applies only ember.css and loads exactly these scripts, in this order, all fingerprinted.
 APP_PAGE = 'app/index.html'
 APP_STYLE = 'app/ember.css'
-APP_SCRIPTS = ('app/data.js', 'app/ui.js', 'app/pages/you.js', 'app/pages/specs.js', 'app/pages/agents.js', 'app/shell.js')
+APP_SCRIPTS = ('app/data.js', 'app/ui.js', 'app/pages/you.js', 'app/pages/specs.js', 'app/pages/spec.js', 'app/pages/agents.js', 'app/shell.js')
+# Pinned npm files (package.json, exact versions): export name -> (its source after npm ci, the app script it loads before).
+APP_VENDOR = {'app/vendor/dagre-3.1.3.min.js': ('node_modules/@dagrejs/dagre/dist/dagre.min.js', 'app/pages/spec.js'),
+              'app/vendor/dagre-LICENSE.txt': ('node_modules/@dagrejs/dagre/LICENSE', None)}
 HASHED += (APP_STYLE,) + APP_SCRIPTS
 # The app may reach only this site and GitHub's API, with no inline script or style (P3).
 APP_CSP = ("default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; "
@@ -71,7 +74,7 @@ FINGERPRINTS = {name: fingerprint(name, (ROOT / name).read_bytes()) for name in 
 STATIC = {
     'index.html', 'changelog/index.html', '_headers', APP_PAGE, 'app/manifest.webmanifest',
     'fonts/Geist-var.woff2', 'fonts/GeistMono-var.woff2', 'fonts/OFL.txt',
-} | ART | set(ICON_HASHES) | set(VECTORS)
+} | ART | set(ICON_HASHES) | set(VECTORS) | set(APP_VENDOR)
 RUNTIME = STATIC | set(FINGERPRINTS.values())
 
 
@@ -375,7 +378,8 @@ def check_app(root, names, pages):
     page = Page((root / APP_PAGE).read_text())
     assert not set(page.refs) & {f'/{name}' for name in HASHED}, 'the app uses an unfingerprinted style or script'
     assert page.stylesheets == [f'/{names[APP_STYLE]}'], 'the app must apply exactly the fingerprinted ember.css'
-    assert page.scripts == [f'/{names[name]}' for name in APP_SCRIPTS], 'the app must load its fingerprinted scripts in order'
+    assert page.scripts == [ref for name in APP_SCRIPTS for ref in [f'/{v}' for v, (_, before) in APP_VENDOR.items() if before == name] + [f'/{names[name]}']], \
+        'the app must load its fingerprinted scripts (and each pinned file before its user) in order'
     assert not page.inline_scripts, 'the app allows no inline script'
     for ref in page.refs:
         check_ref(root, root / APP_PAGE, ref, pages, page.favicons)
@@ -427,7 +431,8 @@ def main():
     output = ROOT / 'dist'
     check_site(output)
     for name in RUNTIME - set(FINGERPRINTS.values()) - set(ALL_PAGES):
-        assert (ROOT / name).read_bytes() == (output / name).read_bytes(), f'export differs: {name}'
+        source = APP_VENDOR[name][0] if name in APP_VENDOR else name
+        assert (ROOT / source).read_bytes() == (output / name).read_bytes(), f'export differs: {name}'
     assert built_fingerprints(output) == FINGERPRINTS, 'build is stale: rebuild the site'
     for name, hashed in FINGERPRINTS.items():
         assert (ROOT / name).read_bytes() == (output / hashed).read_bytes(), f'export differs: {name}'

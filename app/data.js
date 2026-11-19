@@ -210,10 +210,30 @@
   repository(owner: $owner, name: $name) {
     issues(first: 100, states: OPEN, orderBy: {field: UPDATED_AT, direction: DESC}) {
       totalCount
-      nodes { number title url updatedAt labels(first: 20) { nodes { name } } subIssuesSummary { total completed } }
+      nodes { number title url updatedAt labels(first: 20) { nodes { name } } subIssuesSummary { total completed }
+        comments(last: 10) { nodes { body url createdAt authorAssociation } } }
     }
   }
 }`;
+  // The Specs feed's second read (AP6): each running spec's tickets, with their state, labels, blocked-by links,
+  // the open pull requests that close them and their recent comments (the agents' status notes). One aliased
+  // query for up to SPEC_DETAILS specs (the most recently updated); a spec past that shows its tickets as unknown.
+  const SPEC_DETAILS = 20;
+  const TICKET = 'number title url state stateReason repository { nameWithOwner } labels(first: 10) { nodes { name } }';
+  function specTickets(repository) {
+    const numbers = (repository.issues?.nodes || []).filter(issue => issue?.subIssuesSummary?.total > 0)
+      .map(issue => issue.number).filter(Number.isSafeInteger).slice(0, SPEC_DETAILS);
+    if (!numbers.length) return null;
+    return `query SpecTickets($owner: String!, $name: String!) {
+  rateLimit { limit remaining resetAt }
+  repository(owner: $owner, name: $name) {${numbers.map(n => `
+    s${n}: issue(number: ${n}) { number subIssues(first: 50) { totalCount nodes { ${TICKET}
+      blockedBy(first: 10) { nodes { ${TICKET} } }
+      closedByPullRequestsReferences(first: 5) { nodes { url state isDraft reviewDecision } }
+      comments(last: 10) { nodes { body createdAt updatedAt authorAssociation } } } } }`).join('')}
+  }
+}`;
+  }
   const AGENTS = `query Agents($owner: String!, $name: String!) {
   rateLimit { limit remaining resetAt }
   repository(owner: $owner, name: $name) {
@@ -223,7 +243,7 @@
   }
 }`;
   const feeds = {
-    specs: { label: 'Specs', every: 10 * 60 * 1000, query: SPECS },
+    specs: { label: 'Specs', every: 10 * 60 * 1000, query: SPECS, more: specTickets },
     agents: { label: 'Agents', every: 2 * 60 * 1000, query: AGENTS },
   };
   for (const feed of Object.values(feeds)) Object.assign(feed, { state: 'loading', data: null, readAt: null, failedAt: null, timer: null, busy: false });
@@ -261,9 +281,27 @@
       if (mine !== generation) return;
       noteLimit(answer?.data?.rateLimit, response);
       if (!response.ok || !answer?.data?.repository) throw new Error(`GitHub answered ${response.status}`);
-      feed.data = answer.data.repository;
-      feed.state = answer.errors?.length ? 'partial' : 'ok';
-      feed.errors = answer.errors || [];
+      const data = answer.data.repository;
+      const errors = [...(answer.errors || [])];
+      // A feed's second read (Specs: the running specs' tickets). If it fails, or GitHub's limit is now low, its part
+      // is unknown (data.specs is null) and the feed is partial.
+      const more = feed.more?.(data);
+      if (more) {
+        data.specs = null;
+        if (paused()) {
+          errors.push({ message: 'the second read waits for GitHub\'s limit' });
+        } else {
+          const second = await github('POST', '/graphql', { query: more, variables: { owner: picked.owner, name: picked.name } });
+          const extra = await second.json().catch(() => null);
+          if (mine !== generation) return;
+          noteLimit(extra?.data?.rateLimit, second);
+          if (second.ok && extra?.data?.repository) data.specs = extra.data.repository;
+          errors.push(...(second.ok && extra?.data?.repository ? extra.errors || [] : [{ message: `GitHub answered ${second.status}` }]));
+        }
+      }
+      feed.data = data;
+      feed.state = errors.length ? 'partial' : 'ok';
+      feed.errors = errors;
       feed.readAt = Date.now();
       feed.failedAt = null;
     } catch (error) {
