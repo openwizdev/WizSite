@@ -22,7 +22,7 @@ code,.v{font-family:var(--ow-font-mono)}
 
 /* The ship log page (/changelog) */
 .shiplog{padding:64px 0 0}
-.shiplog h1{font-size:64px}
+.shiplog h1{font-size:64px;font-weight:700;line-height:.98;letter-spacing:-.045em}
 .shiplog .lead{margin-top:16px;max-width:720px;font-size:19px;color:var(--grey2)}
 .shiplog .lead a{color:var(--ink);text-decoration:underline;text-decoration-color:var(--brass);text-underline-offset:4px;white-space:nowrap}
 .shiplog h2{margin-top:56px;font-size:30px}
@@ -64,6 +64,7 @@ code,.v{font-family:var(--ow-font-mono)}
 .earlier{margin-top:40px;padding-bottom:4px;font:600 13px/1 var(--ow-font-sans);letter-spacing:.08em;text-transform:uppercase;color:var(--grey)}
 .earlier+.rel{border-top:0}
 @media (max-width:960px){
+  .foot-site{margin-top:72px}
   .shiplog{padding-top:32px}
   .shiplog h1{font-size:42px}
   .shiplog .lead{font-size:16.5px}
@@ -88,10 +89,6 @@ code,.v{font-family:var(--ow-font-mono)}
 }
 
 
-@media (max-width:360px){
-  .rows.steps{grid-template-columns:1fr}
-}
-
 /* Landing */
 .landing { --m: clamp(18px, 4vw, 68px); --round: 18px; }
 .landing-nav { display: flex; min-height: 76px; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--line); }
@@ -103,13 +100,13 @@ code,.v{font-family:var(--ow-font-mono)}
 .sign-in { padding: 8px 14px; border-radius: 8px; background: #cfc6b8; color: var(--ground); font-weight: 650; white-space: nowrap; }
 .landing-nav a:hover, .footer-links a:hover { text-decoration: underline; text-underline-offset: 4px; }
 .product-hero { display: grid; grid-template-columns: minmax(0, .86fr) minmax(0, 1.25fr); gap: clamp(22px, 4vw, 60px); align-items: center; padding-block: clamp(40px, 6vw, 84px) 32px; }
-.hero-copy h1 { max-width: 8ch; font-size: clamp(52px, 6vw, 96px); font-weight: 760; line-height: .98; letter-spacing: -.07em; }
+.hero-copy h1 { max-width: 8ch; font-size: clamp(52px, 6vw, 96px); font-weight: 760; line-height: .98; letter-spacing: -.06em; }
 .landing .sub { margin-top: 22px; color: #e1d7cb; font-size: clamp(18px, 1.8vw, 24px); line-height: 1.4; letter-spacing: -.025em; }
 .hero-description { margin-top: 14px; max-width: 34ch; color: var(--grey); font-size: 15px; }
 .install-box { display: flex; align-items: center; gap: 14px; width: fit-content; margin-top: 24px; padding: 5px 6px 5px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); color: var(--grey); font-family: var(--ow-font-mono); }
 .landing .install { min-height: 36px; padding: 0 12px; border: 0; border-radius: 6px; background: var(--navy); color: var(--grey2); font: 550 13px var(--ow-font-sans); cursor: not-allowed; }
-.product-stage { position: relative; isolation: isolate; padding: clamp(16px, 3vw, 48px); border: 1px solid var(--line); border-radius: var(--round); }
-.landscape { position: absolute; z-index: -1; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 43%; border-radius: inherit; filter: brightness(.63) saturate(.72); }
+.product-stage { position: relative; isolation: isolate; padding: clamp(24px, 5vw, 66px) clamp(16px, 3vw, 48px); border: 1px solid var(--line); border-radius: var(--round); }
+.landscape { position: absolute; z-index: -1; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 43%; border-radius: inherit; filter: brightness(.78) saturate(.8); }
 .product-window { overflow: hidden; border: 1px solid #726052; border-radius: 12px; background: #25211e; box-shadow: 0 18px 48px #090706b0; }
 .window-bar { display: flex; align-items: center; gap: 5px; padding: 10px 12px; border-bottom: 1px solid #42372f; color: #c8baaf; font: 11px var(--ow-font-mono); }
 .window-bar i { width: 7px; height: 7px; border-radius: 50%; background: #726052; }
@@ -135,7 +132,7 @@ code,.v{font-family:var(--ow-font-mono)}
 .ticket-arrow { width: 100%; fill: none; stroke: #a09385; }
 .work-pulse { position: absolute; top: -7px; right: -5px; width: 16px; fill: var(--sea); overflow: visible; }
 .pulse-ring { opacity: .25; transform-origin: center; transform-box: fill-box; }
-.demo-status { position: absolute; left: 13px; bottom: 15px; max-width: 64%; color: #c8baaf; font: 10px var(--ow-font-mono); }
+.demo-status { color: #c8baaf; font: 10px var(--ow-font-mono); }
 .hero-wiz { position: absolute; width: clamp(76px, 9vw, 130px); height: auto; right: 0; bottom: 0; pointer-events: none; }
 .agent-row { display: flex; justify-content: center; flex-wrap: wrap; align-items: center; gap: 12px 34px; padding-block: 22px 30px; border-bottom: 1px solid var(--line); }
 .agent-row h2 { font-size: 14px; font-weight: 500; color: var(--grey); }
@@ -158,9 +155,9 @@ code,.v{font-family:var(--ow-font-mono)}
 .landing-footer { overflow: hidden; border-top: 1px solid var(--line); background: #221e1a; }
 .footer-links { justify-content: center; padding-top: 24px; }
 .footer-wordmark { margin: 16px 0 0; color: #cfc6b8; text-align: center; font-size: min(19vw, 280px); font-weight: 780; line-height: .87; letter-spacing: -.095em; padding-right: .09em; }
-.family { display: flex; justify-content: center; max-width: 1480px; margin: 15px auto 0; padding-inline: 8px; overflow: hidden; }
-.family-wiz { position: relative; flex: 0 0 8.5%; margin-inline: -.08%; }
-.family-wiz img { position: relative; display: block; width: 100%; height: auto; margin-bottom: -22%; }
+.family { display: flex; justify-content: center; max-width: 1480px; margin: 15px auto clamp(-48px, -3vw, -10px); padding-inline: 8px; overflow: hidden; }
+.family-wiz { position: relative; flex: 0 0 8.5%; margin-inline: -.08%; aspect-ratio: 1; }
+.family-wiz img { position: relative; display: block; width: 100%; height: auto; }
 @media (max-width: 850px) {
   .product-hero { grid-template-columns: 1fr; }
   .hero-copy h1 { max-width: 13ch; }
@@ -203,3 +200,54 @@ code,.v{font-family:var(--ow-font-mono)}
 }
 .app-entry .signin { display: inline-flex; gap: 8px; align-items: center; padding: 8px 12px; border-radius: 7px; font-size: 13px; font-weight: 650; }
 .app-entry .signin svg { width: 16px; height: 16px; }
+
+/* The product demo starts as a readable still. The script reveals controls once motion is available. */
+.product-hero .app-entry { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 20px; width: 100%; margin-top: 0; padding-top: 14px; }
+.app-entry .app-lead { margin-right: auto; }
+.app-entry .signin, .app-entry .home-screen { margin: 0; }
+.app-entry .home-screen summary { min-height: 34px; display: list-item; padding-block: 7px; }
+.app-entry .home-screen [href] { text-decoration: underline; text-underline-offset: 3px; }
+.demo-progress { position: absolute; left: 13px; bottom: 15px; width: 58%; }
+.demo-steps { display: flex; gap: 4px; margin-top: 8px; }
+.demo-steps i { width: 14px; height: 3px; border-radius: 3px; background: #594b40; }
+.demo-steps i:nth-child(-n+3), .demo-steps .active { background: var(--brass); }
+.product-window.is-playing .demo-steps i:not(.active) { background: #594b40; }
+.hero-sprite, .hero-smoke { position: absolute; width: clamp(80px, 10vw, 143px); aspect-ratio: 1; right: 0; bottom: 0; background-size: 900% 100%; pointer-events: none; }
+.hero-fleet { position: absolute; display: flex; right: clamp(70px, 8vw, 113px); bottom: 2px; pointer-events: none; }
+.hero-fleet span { display: block; width: clamp(27px, 3.6vw, 54px); aspect-ratio: 1; background: url(/art/fleet-frames.webp); background-size: 400% 1000%; }
+.hero-sprite, .hero-smoke, .hero-fleet { display: none; }
+.product-window.is-playing :is(.hero-sprite,.hero-smoke) { display: block; }
+.product-window.is-playing .hero-fleet { display: flex; }
+.product-window.is-playing .hero-wiz { visibility: hidden; }
+.demo-pause, .spec-play { min-height: 34px; padding: 0 8px; border: 1px solid var(--edge); border-radius: 6px; background: var(--ground); color: var(--ink); font: 550 12px var(--ow-font-sans); cursor: pointer; }
+.demo-pause { position: absolute; right: 10px; bottom: 8px; }
+.demo-pause[aria-pressed="true"] { color: var(--sea); }
+.moment-heading { display: flex; align-items: center; justify-content: space-between; gap: 2px; margin-top: 8px; }
+.moment-heading h3 { margin: 4px; }
+.spec-play svg { width: 17px; height: 17px; fill: currentColor; vertical-align: middle; }
+.spec-video { display: block; width: 100%; min-height: 174px; border-radius: 8px; background: #1b1816; }
+.spec-video[hidden] { display: none; }
+.wiz-eye { position: absolute; display: none; width: 7%; aspect-ratio: 1; border-radius: 50%; transform: translate(-50%, -50%); background: radial-gradient(circle at 35% 30%, #fff3d8, #e1bd8d); }
+.family.is-playing .wiz-eye { display: grid; place-items: center; }
+.wiz-eye i { width: 37%; aspect-ratio: 1; border-radius: 50%; background: #251912; }
+@media (prefers-reduced-motion: no-preference) {
+  .hood summary::before { transition: transform .18s; }
+}
+@media (max-width: 480px) {
+  .product-stage { padding-block: 18px 36px; }
+  .product-hero .app-entry { gap: 6px 12px; }
+  .app-entry .app-lead, .app-entry .home-screen { font-size: 13px; }
+  .demo-progress { left: 8px; }
+  .spec-video { min-height: 162px; }
+}
+.spec-screen[hidden] { display: none; }
+
+@media (min-width: 961px) and (max-width: 1279px) { :root { --m: 48px; } }
+@media (max-width: 480px) {
+  .landing-brand { gap: 4px; font-size: 19px; }
+  .landing-brand svg { width: 28px; height: 28px; }
+  .landing-nav nav { gap: 8px; }
+  .landing-nav .sign-in { padding-inline: 10px; }
+  .hero-copy h1 { font-size: clamp(44px, 13vw, 52px); }
+  .ember-ticket { overflow-wrap: anywhere; }
+}

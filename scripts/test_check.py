@@ -49,6 +49,11 @@ class Checks(unittest.TestCase):
             with self.assertRaises(AssertionError):
                 check_site(root)
             licence.write_bytes(original)
+            gsap_licence = root / 'vendor/GSAP-LICENSE.txt'
+            gsap_licence.unlink()
+            with self.assertRaisesRegex(AssertionError, 'missing build output'):
+                check_site(root)
+            gsap_licence.write_bytes((ROOT / 'vendor/GSAP-LICENSE.txt').read_bytes())
             edit_built(root, 'site.css', lambda t: t + '\np { background: url(/missing.png) }\n')
             with self.assertRaises(AssertionError):
                 check_site(root)
@@ -115,17 +120,21 @@ class Checks(unittest.TestCase):
         with self.assertRaises(AssertionError):
             check_privacy('README.md', f'skills are {word}s'.encode())
 
-    def test_encoded_copy_and_teaser_pairs(self):
-        for old, new in (('<h2 id="ship-h">Ship log</h2>', '<h2 id="ship-h">Ship log</h2><p>play&#98;ook</p>'),
-                         ('<h2 id="ship-h">Ship log</h2>', '<h2 id="ship-h">Ship log</h2><p>Building in p&#117;blic</p>'),
-                         ('src="/art/layer-hammer.webp" alt=""', 'src="/art/layer-hammer.webp" alt="Pl&#97;ybook"'),
-                         ('<h2 id="ship-h">Ship log</h2>', '<h2 id="ship-h">Ship log</h2><p>play<b>bo</b>ok</p>'),
-                         ('src="/art/layer-hammer.webp" alt=""', 'src="/art/layer-hammer.webp" alt="Illustration, not l&#105;ve data"'),
-                         ('<h2 id="ship-h">Ship log</h2>', '<h2 id="ship-h">Ship log</h2><p>Building <em>in</em> public</p>'),
-                         ('<p class="sub">You make the decisions.<br>The agents run the factory.</p>', '<p class="sub">You decide.<br>Agents build.</p>'),
-                         ('<p class="sub">You make the decisions.<br>The agents run the factory.</p>', ''),
-                         ('<h1>Bring your<br>own<br>everything.</h1>', '<h1>Bring your<br>own<br>anything.</h1>'),
-                         ('<span class="v">0.0.12</span><span>Scripts and agents can drive OpenWiz</span>', '<span class="v">0.0.12</span><span>A cockpit for your phone and PC</span>')):
+    def test_encoded_landing_copy(self):
+        headline = '<h1>Bring your own everything.</h1>'
+        for old, new, error in (
+                (headline, headline + '<p>play&#98;ook</p>', 'banned word'),
+                (headline, headline + '<p>play<b>bo</b>ok</p>', 'banned word'),
+                (headline, headline + '<p>Building in p&#117;blic</p>', 'cut copy'),
+                (headline, headline + '<p>Building <em>in</em> public</p>', 'cut copy'),
+                ('src="/art/hero-cave.webp" width="192" height="192" alt=""',
+                 'src="/art/hero-cave.webp" width="192" height="192" alt="Pl&#97;ybook"', 'banned word'),
+                ('src="/art/hero-cave.webp" width="192" height="192" alt=""',
+                 'src="/art/hero-cave.webp" width="192" height="192" alt="Illustration, not l&#105;ve data"', 'cut copy'),
+                (headline, '<h1>Bring your own anything.</h1>', 'headline changed'),
+                ('<p class="sub">You make the decisions.<br>The agents run the factory.</p>',
+                 '<p class="sub">You decide.<br>Agents build.</p>', 'subline changed'),
+                ('<p class="sub">You make the decisions.<br>The agents run the factory.</p>', '', 'subline changed')):
             with self.subTest(new=new), tempfile.TemporaryDirectory() as temp:
                 root = Path(temp) / 'dist'
                 shutil.copytree(ROOT / 'dist', root)
@@ -133,21 +142,18 @@ class Checks(unittest.TestCase):
                 text = landing.read_text()
                 self.assertIn(old, text)
                 landing.write_text(text.replace(old, new, 1))
-                with self.assertRaises(AssertionError):
+                with self.assertRaisesRegex(AssertionError, error):
                     check_site(root)
 
-    def test_landing_story(self):
-        # Catches: the example idea or the zoom-out's "This is your factory." dropped, the old example idea
-        # back on the page (in text or a description), and an era painting or How it works square shipped
-        # without a description, which loses that scene for screen-reader visitors.
-        def no_alt(name):
-            return lambda t: re.sub(rf'(<img[^>]*src="/art/{name}"[^>]*?alt=")[^"]*', r'\1', t, count=1)
-        for change in (lambda t: t.replace('Build a to-do app', 'Build an app'),
-                       lambda t: t.replace('This is your factory.', 'This is a factory.'),
-                       lambda t: t.replace('<h2 id="ship-h">Ship log</h2>', '<h2 id="ship-h">Ship log</h2><p>Add a dark mode toggle</p>'),
-                       lambda t: re.sub(r'(src="/art/era-1-cave.webp"[^>]*alt=")', r'\1A dark-mode idea. ', t, count=1),
-                       no_alt('era-3-forge.webp'), no_alt('era-7-rooms.webp'), no_alt('step-2-answer.webp')):
-            with self.subTest(change=change), tempfile.TemporaryDirectory() as temp:
+    def test_product_first_landing(self):
+        # Catches: a missing to-do example, a mixed-up product road, a return to the old example,
+        # or the loss of the painting's description for screen-reader visitors.
+        for change, error in (
+                (lambda t: t.replace('Build a to-do app', 'Build an app'), 'missing landing story copy'),
+                (lambda t: t.replace('<h3>Watch your spec</h3>', '<h3>Watch it ship</h3>'), 'four moments'),
+                (lambda t: t.replace('</main>', '<p>Add a dark mode toggle</p></main>'), 'old example'),
+                (lambda t: t.replace('Oil painting of Wiz scholars studying a to-do list', ''), 'painting without a description')):
+            with self.subTest(error=error), tempfile.TemporaryDirectory() as temp:
                 root = Path(temp) / 'dist'
                 shutil.copytree(ROOT / 'dist', root)
                 landing = root / 'index.html'
@@ -155,16 +161,19 @@ class Checks(unittest.TestCase):
                 changed = change(text)
                 self.assertNotEqual(changed, text)
                 landing.write_text(changed)
-                with self.assertRaises(AssertionError):
+                with self.assertRaisesRegex(AssertionError, error):
                     check_site(root)
 
-    def test_story_shows_if_site_js_fails(self):
-        # Catches: an inline script that switches on the animated story (sticky zoom-out with its hand-off hidden
-        # until scrolled, Pause motion) before site.js loads; if site.js then fails to download, the last painting
-        # and "This is your factory." never show and Pause does nothing.
-        for change in ((lambda t: t.replace('</head>', "<script>document.documentElement.classList.add('story-live')</script></head>", 1)),
-                       (lambda t: t.replace('<body>', '<body><script type="module">document.body.dataset.x = 1</script>', 1))):
-            with self.subTest(change=change), tempfile.TemporaryDirectory() as temp:
+    def test_landing_starts_in_still_mode(self):
+        # Catches: an early inline script, a visible broken motion control or an autoplaying clip.
+        for change, error in (
+                (lambda t: t.replace('</head>', '<script>document.body.dataset.x = 1</script></head>', 1),
+                 'wait for both external scripts'),
+                (lambda t: t.replace('aria-pressed="false" hidden', 'aria-pressed="false"', 1),
+                 'motion controls must wait'),
+                (lambda t: t.replace('preload="none"', 'preload="none" autoplay', 1),
+                 'recording must be opt-in')):
+            with self.subTest(error=error), tempfile.TemporaryDirectory() as temp:
                 root = Path(temp) / 'dist'
                 shutil.copytree(ROOT / 'dist', root)
                 landing = root / 'index.html'
@@ -172,14 +181,8 @@ class Checks(unittest.TestCase):
                 changed = change(text)
                 self.assertNotEqual(changed, text)
                 landing.write_text(changed)
-                with self.assertRaises(AssertionError):
+                with self.assertRaisesRegex(AssertionError, error):
                     check_site(root)
-        with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp) / 'dist'
-            shutil.copytree(ROOT / 'dist', root)
-            edit_built(root, 'site.js', lambda t: t.replace("classList.add('story-live')", ''))
-            with self.assertRaises(AssertionError):
-                check_site(root)
 
     def test_transition_duration_respects_reduced_motion(self):
         with self.assertRaisesRegex(AssertionError, 'motion outside'):
@@ -261,12 +264,12 @@ class Checks(unittest.TestCase):
                 root = Path(temp) / 'dist'
                 shutil.copytree(ROOT / 'dist', root)
                 page = root / 'index.html'
-                page.write_text(page.read_text().replace('<h2 id="ship-h">Ship log</h2>', '<h2 id="ship-h">Ship log</h2>' + extra, 1))
+                page.write_text(page.read_text().replace('</main>', extra + '</main>', 1))
                 with self.assertRaises(AssertionError):
                     check_site(root)
 
     def test_install_stays_disabled(self):
-        good = '<button class="btn install" type="button" disabled aria-describedby="install-note">'
+        good = '<button class="btn install" type="button" disabled>'
         for bad in ('<button class="btn install" type="button" aria-disabled="true">',
                     '<button class="btn install" type="button" disabled onclick="copy()">',
                     '<button class="btn install" type="button" disabled onclick ="copy()">',
@@ -275,7 +278,9 @@ class Checks(unittest.TestCase):
                 root = Path(temp) / 'dist'
                 shutil.copytree(ROOT / 'dist', root)
                 landing = root / 'index.html'
-                landing.write_text(landing.read_text().replace(good, bad))
+                text = landing.read_text()
+                self.assertIn(good, text)
+                landing.write_text(text.replace(good, bad))
                 with self.assertRaises(AssertionError):
                     check_site(root)
         with tempfile.TemporaryDirectory() as temp:
