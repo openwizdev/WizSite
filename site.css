@@ -1,11 +1,3 @@
-/* openwiz.dev: warm charcoal, with the paintings' three pigments (Sea Glass builder, Orchid reviewer, Guava you
- * and shipping). The landing page and the ship log (/changelog).
- * The landing is one story as you scroll: one Wiz in every era (the idea, the grill, the build, the review, the
- * launch), then a slow zoom-out that hands off to "This is your factory." Every painting's resting state is the
- * story itself: without JavaScript, if site.js fails to load, or with reduced motion, it reads as still
- * paintings. Only site.js adds .story-live to <html>, after its handlers are in place. site.js only sets
- * --p (each painting's place in the viewport, -1..1) and --z (the zoom-out's progress, 0..1); everything that
- * moves is inside @media (prefers-reduced-motion:no-preference), which the site check enforces. */
 :root{color-scheme:dark;--ground:#1b1916;--ink:#f3eee8;--grey:#aaa197;--grey2:#c8c0b8;--brass:#ff8f80;--brass-hi:#ffb3a8;--on-brass:#1b1916;--sea:#83d7bd;--orchid:#d9afe8;--navy:#2a2520;--navy2:#5a4f46;--panel:#221f1b;--line:#3a342e;--edge:#5a5048;--m:100px;--round:16px}
 *{box-sizing:border-box}
 body{margin:0;background:var(--ground);color:var(--ink);font:400 17px/1.55 var(--ow-font-sans);-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;overflow-x:clip}
@@ -25,228 +17,8 @@ code,.v{font-family:var(--ow-font-mono)}
 .top nav,.foot-site div{margin-left:auto;margin-right:-12px;display:flex;gap:4px;font:450 17px/1 var(--ow-font-sans);color:var(--grey2)}
 :is(.top nav,.foot-site div) a{display:inline-flex;align-items:center;min-height:44px;padding:0 12px;border-radius:8px}
 :is(.top nav,.foot-site div) a:hover{color:var(--ink)}
-.top nav .nav-signin{margin-left:8px;color:var(--ink);box-shadow:inset 0 0 0 1px var(--edge)}
-.top nav .nav-signin:hover{box-shadow:inset 0 0 0 1px var(--grey)}
 .foot-site{display:flex;align-items:center;margin-top:120px;padding:24px 0 48px;border-top:1px solid rgb(242 242 240 / 14%)}
 
-/* Hero: copy and the two calls to action on the left, the animation on the right (phone: below it). */
-.hero{display:grid;grid-template-columns:510px minmax(0,1fr);grid-template-areas:"copy stage" "ctas stage";grid-template-rows:auto 1fr;column-gap:24px;padding:96px 0 40px;min-height:820px}
-.copy{grid-area:copy;position:relative;z-index:2}
-.kicker{margin-bottom:14px;font:600 13px/1.4 var(--ow-font-sans);letter-spacing:.04em;color:var(--brass)}
-h1{font:700 78px/.98 var(--ow-font-sans);letter-spacing:-.045em}
-.sub{margin-top:28px;font:400 24px/1.45 var(--ow-font-sans);letter-spacing:-.012em;color:var(--grey2)}
-.intro{margin-top:16px;max-width:470px;font-size:17px;line-height:1.5;color:var(--grey2)}
-.ctas{grid-area:ctas;position:relative;z-index:2;margin-top:40px;max-width:440px}
-.buttons{display:flex;flex-wrap:wrap;gap:12px}
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;min-height:52px;padding:0 20px;border-radius:12px;font:600 17px/1 var(--ow-font-sans);letter-spacing:-.01em;white-space:nowrap}
-.btn svg{width:17px;height:17px;flex:none}
-.star{background:var(--brass);color:var(--on-brass);box-shadow:0 0 0 1px rgb(255 200 190 / 30%) inset,0 8px 28px -12px rgb(255 143 128 / 55%)}
-.star svg{fill:currentColor}
-.star:hover{background:var(--brass-hi)}
-.install:disabled{opacity:1}
-.install{border:0;background:rgb(242 242 240 / 6%);color:var(--grey2);box-shadow:inset 0 0 0 1px var(--edge);cursor:not-allowed}
-.install-note{margin-top:14px;font-size:15px;line-height:1.5;color:var(--grey)}
-/* The app's entry (openwiz.dev/app): Sign in with GitHub, and how to put the app on a phone's home screen. */
-.app-entry{margin-top:28px;padding-top:24px;border-top:1px solid var(--line)}
-.app-lead{font-size:15px;line-height:1.5;color:var(--grey2)}
-.signin{margin-top:14px;background:var(--ink);color:var(--ground)}
-.signin svg{fill:currentColor}
-.signin:hover{background:#fff}
-.home-screen{margin-top:14px;font-size:15px;line-height:1.5;color:var(--grey)}
-.home-screen summary{display:inline-flex;align-items:center;min-height:44px;cursor:pointer;color:var(--sea)}
-.home-screen summary:hover{text-decoration:underline}
-.home-screen ol{margin:4px 0 0;padding-left:22px;list-style:decimal}
-.home-screen li+li{margin-top:4px}
-.home-screen b{color:var(--grey2);font-weight:600}
-.home-screen p{margin-top:8px}
-
-/* Hero: copy and the two calls to action on the left, the cave painting (the idea) behind and to the right. */
-.hero{position:relative;display:grid;grid-template-columns:510px minmax(0,1fr);grid-template-areas:"copy ." "ctas .";grid-template-rows:auto 1fr;padding:96px 0 40px;min-height:820px}
-.hero .cave{position:absolute;z-index:0;top:24px;left:22%;right:calc(-1 * var(--m));margin:0}
-.hero .cave .frame{border:0;border-radius:0;-webkit-mask:linear-gradient(90deg,transparent,#000 30%),linear-gradient(transparent,#000 12%,#000 75%,transparent);mask:linear-gradient(90deg,transparent,#000 30%),linear-gradient(transparent,#000 12%,#000 75%,transparent);-webkit-mask-composite:source-in;mask-composite:intersect}
-.hero .cave figcaption{position:absolute;right:calc(var(--m) + 4%);bottom:2%;max-width:none}
-
-/* The story: one Wiz in every era. Each painting sits in a frame; its plate drifts a little with the scroll (parallax). */
-.story{margin-top:72px}
-h2{font:700 52px/1.05 var(--ow-font-sans);letter-spacing:-.035em}
-.story-head{display:flex;align-items:flex-end;justify-content:space-between;gap:24px}
-.works-sub{margin-top:8px;font-size:19px;color:var(--grey)}
-.eras{list-style:none;margin:40px 0 0;padding:0;display:grid;gap:72px}
-.era figure,figure.era{margin:0}
-.era figure{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,1fr);align-items:end;gap:32px}
-.era:nth-child(even) figure{grid-template-columns:minmax(0,1fr) minmax(0,3fr)}
-.era:nth-child(even) .frame{order:2}
-.frame{position:relative;overflow:hidden;aspect-ratio:1672/941;border-radius:var(--round);border:1px solid var(--line);background:var(--panel)}
-.plate{position:absolute;inset:0}
-.plate>img{position:absolute;display:block}
-.plate>img:first-child{inset:0;width:100%;height:100%}
-figcaption{max-width:340px;font-size:16.5px;line-height:1.5;color:var(--grey2)}
-figcaption .when{display:block;margin-bottom:10px;font:600 12px/1.4 var(--ow-font-sans);letter-spacing:.06em;text-transform:uppercase;color:var(--brass)}
-figcaption b{display:block;margin-bottom:6px;font:650 21px/1.3 var(--ow-font-sans);letter-spacing:-.012em;color:var(--ink)}
-.cave figcaption b{display:inline;margin:0;font-size:inherit;color:var(--ink)}
-.cave figcaption{padding:10px 16px;border-radius:12px;background:rgb(27 25 22 / 86%);box-shadow:inset 0 0 0 1px var(--edge)}
-/* The idle-move layers: cut from the same painting and laid exactly over it, so at rest nothing shows. */
-.layer{height:auto;transform-origin:50% 50%}
-.l-hammer{left:10.646%;top:20.935%;width:16.627%;transform-origin:24.1% 71.09%}
-.l-stamp{left:52.811%;top:36.451%;width:19.258%;transform-origin:50% 100%}
-.l-rocket{left:48.146%;top:8.077%;width:49.641%;transform-origin:50% 49.5%}
-.flash{position:absolute;width:16%;aspect-ratio:1;translate:-50% -50%;border-radius:50%;background:radial-gradient(closest-side,rgb(255 200 160 / 85%),rgb(255 143 128 / 0%));mix-blend-mode:screen;opacity:0;pointer-events:none}
-.f-forge{left:52%;top:80%}
-.f-stamp{left:64%;top:84%;background:radial-gradient(closest-side,rgb(240 210 250 / 80%),rgb(217 175 232 / 0%))}
-.pause{display:inline-flex;flex:none;align-items:center;gap:6px;min-height:40px;padding:0 14px;border:0;border-radius:999px;background:var(--panel);box-shadow:inset 0 0 0 1px var(--edge);color:var(--grey2);font:500 14px/1 var(--ow-font-sans);cursor:pointer}
-.pause svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round}
-.pause:hover{color:var(--ink);box-shadow:inset 0 0 0 1px var(--brass)}
-.pause[aria-pressed=true]{color:var(--brass-hi);box-shadow:inset 0 0 0 1px var(--brass)}
-html:not(.story-live) .pause{display:none}
-
-/* The zoom-out: the three lanes, then the room lattice, then "This is your factory." At rest (no JavaScript,
-   reduced motion) the two paintings sit one after the other with the line below them. */
-.factory{margin-top:96px}
-.scene{display:grid;gap:24px;width:min(100% - 2 * var(--m),1240px);margin-inline:auto}
-.scene img{display:block;width:100%;height:auto;border-radius:var(--round);border:1px solid var(--line)}
-.handoff{margin-top:40px}
-.handoff h2{font-size:64px}
-.handoff p{margin-top:16px;max-width:620px;font-size:20px;line-height:1.45;color:var(--grey2)}
-
-/* How it works: four gouache squares. */
-.works{margin-top:112px}
-.how h2{margin:0 0 24px;font-size:40px}
-.steps img{display:block;width:100%;height:auto;aspect-ratio:1;margin-bottom:16px;border-radius:12px;border:1px solid var(--line)}
-.rows.steps li{padding-top:0;border-top:0}
-.rows.steps li:nth-child(1) .role,.rows.steps li:nth-child(4) .role{color:var(--brass)}
-.rows.steps li:nth-child(2) .role{color:var(--orchid)}
-.rows.steps li:nth-child(3) .role{color:var(--sea)}
-.rows.steps{grid-template-columns:repeat(4,minmax(0,1fr))}
-.works-with{margin-top:26px;display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px}.works-with .ww-label{font:600 12px/1.4 var(--ow-font-sans);letter-spacing:.06em;text-transform:uppercase;color:var(--brass);margin-right:6px}.works-with ul{display:flex;flex-wrap:wrap;gap:8px;margin:0;padding:0;list-style:none}.works-with li{display:inline-flex;align-items:center;height:34px;margin:0;border:1px solid rgba(255,255,255,.14);border-radius:999px;padding:0 13px;font-size:15px;line-height:1}.works-with li.soon{color:var(--grey);border-style:dashed}
-.rows{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:28px}
-.rows li{padding-top:16px;border-top:2px solid var(--navy2);font-size:16.5px;line-height:1.5;color:var(--grey2)}
-.rows .role{display:block;margin-bottom:10px;font:600 12px/1.4 var(--ow-font-sans);letter-spacing:.06em;text-transform:uppercase;color:var(--brass)}
-.rows b{display:block;margin-bottom:6px;font:650 19px/1.3 var(--ow-font-sans);letter-spacing:-.012em;color:var(--ink)}
-.rows a{display:inline-block;padding-block:3px;text-decoration:underline;text-decoration-color:var(--brass);text-decoration-thickness:1.5px;text-underline-offset:4px}
-.rows a:hover{color:var(--brass-hi)}
-.fit{margin-top:28px;max-width:760px;font-size:20px;line-height:1.45;color:var(--ink)}
-/* Ship log teaser */
-.ship{margin-top:112px}
-.ship h2{font-size:40px}
-.cols{display:grid;grid-template-columns:1.3fr 1fr;gap:56px;margin-top:28px}
-.ship h3{font:600 14px/1 var(--ow-font-sans);letter-spacing:.08em;text-transform:uppercase;color:var(--grey)}
-.bundles{list-style:none;margin:20px 0 0;padding:0;display:flex;flex-wrap:wrap;gap:10px}
-.bundles li{display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border-radius:999px;box-shadow:inset 0 0 0 1px var(--edge);font-size:16px;color:var(--grey2)}
-.bundles li::before{content:"";width:10px;height:10px;border-radius:50%;box-sizing:border-box;border:2px solid var(--navy2);border-top-color:var(--brass)}
-.rail{list-style:none;padding:0;margin-top:14px}
-.rail li{position:relative;display:grid;grid-template-columns:96px 1fr;gap:16px;padding:10px 0 10px 40px;font-size:18px;color:var(--grey2)}
-.rail li::before{content:"";position:absolute;left:4px;top:19px;width:11px;height:11px;border-radius:50%;background:var(--ink)}
-.rail li:first-child::before{background:var(--brass);box-shadow:0 0 0 4px rgb(255 143 128 / 20%)}
-.rail li::after{content:"";position:absolute;left:9px;top:30px;bottom:-19px;width:1.5px;background:rgb(242 242 240 / 35%)}
-.rail li:last-child::after{display:none}
-.rail .v{font-weight:600;font-size:18px;color:var(--ink)}
-.more{display:inline-flex;align-items:center;gap:8px;min-height:44px;margin-top:18px;font-weight:500;color:var(--ink);text-decoration:underline;text-decoration-color:var(--brass);text-underline-offset:6px}
-.more:hover span{transform:translateX(3px)}
-
-
-/* ---------- Motion: only for visitors who have not asked for less ---------- */
-@keyframes hammer{0%,8%{rotate:0deg}44%,58%{rotate:-9deg;animation-timing-function:cubic-bezier(.6,0,1,.6)}66%{rotate:1.5deg}72%,100%{rotate:0deg}}
-@keyframes forge{0%,64%{opacity:0;scale:.6}67%{opacity:1;scale:1.1}90%,100%{opacity:0;scale:1.3}}
-@keyframes stamp{0%,10%{translate:0 0;rotate:0deg}40%,56%{translate:0 -5%;rotate:-1.5deg;animation-timing-function:cubic-bezier(.7,0,1,.5)}63%{translate:0 .8%;rotate:0deg;scale:1.01 .98}70%,100%{translate:0 0;scale:1}}
-@keyframes approve{0%,62%{opacity:0}65%{opacity:.9}88%,100%{opacity:0}}
-@keyframes shake{0%{translate:0 0;rotate:0deg}20%{translate:.25% -.35%;rotate:.3deg}40%{translate:-.2% .25%;rotate:-.2deg}60%{translate:.3% .2%;rotate:.25deg}80%{translate:-.25% -.25%;rotate:-.3deg}100%{translate:0 0;rotate:0deg}}
-@media (prefers-reduced-motion:no-preference){
-  html{scroll-behavior:smooth}
-  .more span{transition:transform .18s}
-  .hood summary::before{transition:transform .18s}
-  .story-live .l-hammer{animation:hammer 2.6s ease-in-out infinite}
-  .story-live .f-forge{animation:forge 2.6s ease-out infinite}
-  .story-live .l-stamp{animation:stamp 3.2s ease-in-out infinite}
-  .story-live .f-stamp{animation:approve 3.2s ease-out infinite}
-  .story-live .l-rocket{animation:shake .42s linear infinite}
-  .motion-paused .plate *,.plate.offscreen *{animation-play-state:paused !important}
-  /* Parallax: the plate is a little larger than its frame (same shape) and drifts against the scroll. */
-  .story-live .plate{scale:1.1;translate:0 calc(var(--p, 0) * 4%);will-change:translate}
-  .story-live .cave .plate{scale:1;translate:0 calc(var(--p, 0) * 3%)}
-  /* The zoom-out: a tall section with a sticky stage; --z runs 0 to 1 as it scrolls past. */
-  .story-live .zoom{height:300vh}
-  .story-live .zoom-stick{position:sticky;top:0;height:100vh;overflow:hidden;display:grid;place-items:center}
-  .story-live .scene{display:block;position:absolute;inset:0;width:auto;margin:0}
-  .story-live .scene img{position:absolute;left:50%;top:50%;width:max(100vw,100vh * 1672 / 941);max-width:none;border:0;border-radius:0;translate:-50% -50%;transform-origin:50% 50%}
-  .story-live .lanes{scale:calc(1.25 - .75 * min(var(--z, 0) * 1.6, 1));opacity:calc(1 - (var(--z, 0) - .3) * 4)}
-  .story-live .rooms{scale:calc(2.6 - 1.7 * min(var(--z, 0) * 1.15, 1));opacity:calc((var(--z, 0) - .25) * 4);-webkit-mask:radial-gradient(farthest-side,#000 72%,transparent);mask:radial-gradient(farthest-side,#000 72%,transparent)}
-  .story-live .scene::after{content:"";position:absolute;inset:0;background:linear-gradient(transparent 40%,rgb(27 25 22 / 92%));opacity:calc((var(--z, 0) - .7) * 4)}
-  .story-live .handoff{position:absolute;left:0;right:0;bottom:12vh;margin:0 auto;opacity:calc((var(--z, 0) - .78) * 6);translate:0 calc((1 - min(var(--z, 0) * 1.1, 1)) * 40px)}
-}
-
-/* ---------- Small desktop and tablet landscape (961-1279 px) ---------- */
-@media (min-width:961px) and (max-width:1279px){
-  :root{--m:48px}
-  .hero{grid-template-columns:400px minmax(0,1fr);min-height:700px}
-  h1{font-size:64px}
-  .sub{font-size:21px}
-  .buttons{flex-wrap:nowrap}
-  .btn{padding:0 14px;font-size:16px}
-}
-h1{white-space:nowrap}
-
-/* ---------- Phone (designed first at 390 px) ----------
- * The copy and buttons first, then the cave painting, then each era as a full-width painting with its caption below. */
-@media (max-width:960px){
-  :root{--m:20px}
-  .top{height:60px}
-  .brand img{height:34px}
-  .top nav{font-size:16px}
-  .top nav a{padding:0 10px}
-  .top nav .nav-signin{display:none}
-  .hero{grid-template-columns:minmax(0,1fr);grid-template-areas:"copy" "ctas" "art";grid-template-rows:none;padding:24px 0 0;min-height:0}
-  .hero .cave{grid-area:art;position:relative;top:auto;left:auto;right:auto;margin:16px calc(-1 * var(--m)) 0}
-  .hero .cave .frame{-webkit-mask:linear-gradient(transparent,#000 12%,#000 82%,transparent);mask:linear-gradient(transparent,#000 12%,#000 82%,transparent)}
-  .hero .cave .plate>img:first-child{left:-38%;width:138%}
-  .hero .cave figcaption{position:relative;right:auto;bottom:auto;margin:-12px var(--m) 0}
-  h1{font-size:44px}
-  .kicker{margin-bottom:8px}
-  .sub{margin-top:8px;font-size:17px}
-  .intro{margin-top:8px;font-size:15px;line-height:1.4}
-  .ctas{margin-top:20px;max-width:none}
-  .buttons{flex-wrap:wrap;gap:10px}
-  .btn{flex:1 1 auto;min-height:48px;padding:0 10px;font-size:15px;gap:8px}
-  .install-note{margin-top:10px;font-size:14px}
-  .app-entry{margin-top:20px;padding-top:18px}
-  .signin{width:100%}
-  .app-lead,.home-screen{font-size:14px}
-  .story{margin-top:56px}
-  h2{font-size:34px;max-width:12ch}
-  .story-head{flex-direction:column;align-items:flex-start;gap:16px}
-  .eras{margin-top:28px;gap:44px}
-  .era figure,.era:nth-child(even) figure{grid-template-columns:minmax(0,1fr);gap:14px}
-  .era:nth-child(even) .frame{order:0}
-  .eras .frame{margin:0 calc(-1 * var(--m));border-radius:0;border-inline:0}
-  figcaption{max-width:none;font-size:15.5px}
-  figcaption b{font-size:18px}
-  .factory{margin-top:64px}
-  .scene{width:100%;gap:12px}
-  .scene img{border-radius:0;border-inline:0}
-  .handoff{margin-top:24px}
-  .handoff h2{font-size:38px}
-  .handoff p{font-size:17px}
-  .works{margin-top:72px}
-  .how h2{margin-bottom:16px;font-size:30px}
-  .rows,.rows.steps{grid-template-columns:1fr;gap:20px}
-  .rows.steps{grid-template-columns:repeat(2,minmax(0,1fr));gap:24px 14px}
-  .rows li{padding-top:12px;font-size:15.5px}
-  .rows.steps li{font-size:14.5px}
-  .rows b{font-size:17.5px}
-  .rows.steps b{font-size:16px}
-  .fit{margin-top:20px;font-size:17.5px}
-  .ship{margin-top:72px}
-  .ship h2{font-size:30px}
-  .cols{grid-template-columns:1fr;gap:28px;margin-top:18px}
-  .rail li{grid-template-columns:64px 1fr;gap:10px;padding:8px 0 8px 32px;font-size:16px}
-  .rail li::before{top:15px}
-  .rail li::after{top:28px}
-  .bundles li{font-size:15px;padding:7px 12px}
-  .foot-site{margin-top:72px}
-}
-@media (max-width:960px) and (prefers-reduced-motion:no-preference){
-  .story-live .scene img{width:max(100vw * 1.6,100vh * 1672 / 941 * .9)}
-  .story-live .handoff{bottom:8vh}
-}
 
 /* The ship log page (/changelog) */
 .shiplog{padding:64px 0 0}
@@ -319,3 +91,115 @@ h1{white-space:nowrap}
 @media (max-width:360px){
   .rows.steps{grid-template-columns:1fr}
 }
+
+/* Landing */
+.landing { --m: clamp(18px, 4vw, 68px); --round: 18px; }
+.landing-nav { display: flex; min-height: 76px; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--line); }
+.landing-brand, .landing-nav nav, .github-star, .footer-links { display: flex; align-items: center; }
+.landing-brand { gap: 8px; color: #cfc6b8; font-size: 21px; font-weight: 720; letter-spacing: -.04em; }
+.landing-nav nav, .footer-links { gap: clamp(10px, 2vw, 22px); font-size: 14px; color: var(--grey2); }
+.github-star { gap: 8px; min-height: 40px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; }
+.github-star span { border-left: 1px solid var(--line); padding-left: 8px; font-variant-numeric: tabular-nums; }
+.sign-in { padding: 8px 14px; border-radius: 8px; background: #cfc6b8; color: var(--ground); font-weight: 650; white-space: nowrap; }
+.landing-nav a:hover, .footer-links a:hover { text-decoration: underline; text-underline-offset: 4px; }
+.product-hero { display: grid; grid-template-columns: minmax(0, .86fr) minmax(0, 1.25fr); gap: clamp(22px, 4vw, 60px); align-items: center; padding-block: clamp(40px, 6vw, 84px) 32px; }
+.hero-copy h1 { max-width: 8ch; font-size: clamp(52px, 6vw, 96px); font-weight: 760; line-height: .98; letter-spacing: -.07em; }
+.landing .sub { margin-top: 22px; color: #e1d7cb; font-size: clamp(18px, 1.8vw, 24px); line-height: 1.4; letter-spacing: -.025em; }
+.hero-description { margin-top: 14px; max-width: 34ch; color: var(--grey); font-size: 15px; }
+.install-box { display: flex; align-items: center; gap: 14px; width: fit-content; margin-top: 24px; padding: 5px 6px 5px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); color: var(--grey); font-family: var(--ow-font-mono); }
+.landing .install { min-height: 36px; padding: 0 12px; border: 0; border-radius: 6px; background: var(--navy); color: var(--grey2); font: 550 13px var(--ow-font-sans); cursor: not-allowed; }
+.product-stage { position: relative; isolation: isolate; padding: clamp(16px, 3vw, 48px); border: 1px solid var(--line); border-radius: var(--round); }
+.landscape { position: absolute; z-index: -1; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 43%; border-radius: inherit; filter: brightness(.63) saturate(.72); }
+.product-window { overflow: hidden; border: 1px solid #726052; border-radius: 12px; background: #25211e; box-shadow: 0 18px 48px #090706b0; }
+.window-bar { display: flex; align-items: center; gap: 5px; padding: 10px 12px; border-bottom: 1px solid #42372f; color: #c8baaf; font: 11px var(--ow-font-mono); }
+.window-bar i { width: 7px; height: 7px; border-radius: 50%; background: #726052; }
+.window-bar span { margin-left: 5px; }
+.window-body { display: grid; grid-template-columns: minmax(72px, 20%) minmax(0, 1fr); min-height: 314px; }
+.window-sidebar { display: grid; align-content: start; gap: 5px; padding: 13px 7px; background: #1b1816; color: #c8baaf; font-size: 11px; }
+.window-sidebar > * { padding: 4px 6px; }
+.window-sidebar strong { color: var(--ink); }
+.window-sidebar .selected { border-radius: 5px; background: #342d27; color: var(--ink); }
+.window-main { position: relative; min-width: 0; padding: 14px 13px 80px; }
+.window-title > span, .screen-label { color: #c2b2a5; font: 10px/1.4 var(--ow-font-mono); }
+.window-title h2 { font-size: clamp(17px, 2vw, 24px); letter-spacing: -.045em; }
+.window-metrics { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 4px; margin: 12px 0; }
+.window-metrics div { display: flex; flex-direction: column-reverse; gap: 2px; padding: 5px; border-radius: 6px; background: #332c26; }
+.window-metrics dt { color: #cdc0b4; font-size: 9px; }
+.window-metrics dd { margin: 0; font-size: 16px; font-weight: 650; }
+.window-metrics div:nth-child(2) dd, .ember-ticket.building small { color: var(--sea); }
+.window-metrics div:nth-child(3) dd, .ember-ticket.review small { color: var(--orchid); }
+.ticket-graph { display: grid; grid-template-columns: minmax(0,1fr) 11px minmax(0,1fr) 11px minmax(0,1fr); gap: 3px; align-items: center; }
+.ember-ticket { position: relative; padding: 7px; border: 1px solid #55483e; border-radius: 6px; background: #342d27; color: var(--ink); font-size: 11px; line-height: 1.2; }
+.ember-ticket small { display: block; margin-top: 4px; color: #c8baaf; font-size: 9px; }
+.ember-ticket.merged small { color: #b9d7a5; }
+.ticket-arrow { width: 100%; fill: none; stroke: #a09385; }
+.work-pulse { position: absolute; top: -7px; right: -5px; width: 16px; fill: var(--sea); overflow: visible; }
+.pulse-ring { opacity: .25; transform-origin: center; transform-box: fill-box; }
+.demo-status { position: absolute; left: 13px; bottom: 15px; max-width: 64%; color: #c8baaf; font: 10px var(--ow-font-mono); }
+.hero-wiz { position: absolute; width: clamp(76px, 9vw, 130px); height: auto; right: 0; bottom: 0; pointer-events: none; }
+.agent-row { display: flex; justify-content: center; flex-wrap: wrap; align-items: center; gap: 12px 34px; padding-block: 22px 30px; border-bottom: 1px solid var(--line); }
+.agent-row h2 { font-size: 14px; font-weight: 500; color: var(--grey); }
+.agent-row ul { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px 26px; list-style: none; padding: 0; margin: 0; }
+.agent-row li { display: flex; align-items: center; gap: 7px; font-weight: 620; color: #d6cdc0; }
+.agent-row svg { width: 20px; height: 20px; flex: none; }
+.moments { padding-block: clamp(48px, 7vw, 100px); }
+.moments h2 { font-size: clamp(34px, 5vw, 62px); letter-spacing: -.06em; line-height: 1; }
+.moments ol { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 12px; margin-top: 26px; padding: 0; list-style: none; }
+.moments li { min-width: 0; }
+.moments ol > li { padding: 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
+.moments h3 { margin: 12px 4px 4px; font-size: clamp(15px, 1.35vw, 20px); font-weight: 650; letter-spacing: -.02em; }
+.moment-screen { display: flex; flex-direction: column; gap: 6px; min-height: 174px; padding: 12px; border-radius: 8px; background: #1b1816; font-size: 11px; line-height: 1.4; }
+.moment-screen strong { font-size: 15px; }
+.chat-screen p:not(.screen-label) { width: fit-content; padding: 5px 8px; border-radius: 6px; background: #322b25; }
+.chat-screen p:nth-child(odd):not(.screen-label) { align-self: flex-end; background: #45312d; }
+.spec-screen ul { padding-left: 15px; margin: 0; color: var(--grey2); }
+.plan-approval { margin-top: auto; padding: 4px 8px; align-self: flex-start; border-radius: 5px; background: #ff8f80; color: var(--ground); font-weight: 650; }
+.ship-screen p:not(.screen-label) { padding: 4px 7px; border: 1px solid var(--line); border-radius: 5px; color: #d4c8ba; }
+.landing-footer { overflow: hidden; border-top: 1px solid var(--line); background: #221e1a; }
+.footer-links { justify-content: center; padding-top: 24px; }
+.footer-wordmark { margin: 16px 0 0; color: #cfc6b8; text-align: center; font-size: min(19vw, 280px); font-weight: 780; line-height: .87; letter-spacing: -.095em; padding-right: .09em; }
+.family { display: flex; justify-content: center; max-width: 1480px; margin: 15px auto 0; padding-inline: 8px; overflow: hidden; }
+.family-wiz { position: relative; flex: 0 0 8.5%; margin-inline: -.08%; }
+.family-wiz img { position: relative; display: block; width: 100%; height: auto; margin-bottom: -22%; }
+@media (max-width: 850px) {
+  .product-hero { grid-template-columns: 1fr; }
+  .hero-copy h1 { max-width: 13ch; }
+  .product-stage { padding: clamp(12px, 4vw, 32px); }
+  .moments ol { grid-template-columns: repeat(2,minmax(0,1fr)); }
+}
+@media (max-width: 480px) {
+  .landing-nav { min-height: 65px; }
+  .nav-log { display: none; }
+  .window-body { grid-template-columns: 55px minmax(0,1fr); min-height: 263px; }
+  .window-sidebar { padding-inline: 3px; font-size: 9px; }
+  .window-main { padding-inline: 8px; }
+  .window-metrics dt { font-size: 8px; }
+  .ticket-graph { gap: 2px; grid-template-columns: minmax(0,1fr) 7px minmax(0,1fr) 7px minmax(0,1fr); }
+  .ember-ticket { padding: 5px; font-size: 9px; }
+  .ember-ticket small { font-size: 8px; }
+  .moment-screen { min-height: 162px; padding: 8px; font-size: 10px; }
+  .family { display: grid; grid-template-columns: repeat(6,minmax(0,1fr)); }
+}
+
+.app-entry{margin-top:28px;padding-top:24px;border-top:1px solid var(--line)}
+.app-lead{font-size:15px;line-height:1.5;color:var(--grey2)}
+.signin{margin-top:14px;background:var(--ink);color:var(--ground)}
+.signin svg{fill:currentColor}
+.signin:hover{background:#fff}
+.home-screen{margin-top:14px;font-size:15px;line-height:1.5;color:var(--grey)}
+.home-screen summary{display:inline-flex;align-items:center;min-height:44px;cursor:pointer;color:var(--sea)}
+.home-screen summary:hover{text-decoration:underline}
+.home-screen ol{margin:4px 0 0;padding-left:22px;list-style:decimal}
+.home-screen li+li{margin-top:4px}
+.home-screen b{color:var(--grey2);font-weight:600}
+.home-screen p{margin-top:8px}
+
+@media (max-width:960px){
+  :root{--m:20px}
+  .top{height:60px}
+  .brand img{height:34px}
+  .top nav{font-size:16px}
+  .top nav a{padding:0 10px}
+}
+.app-entry .signin { display: inline-flex; gap: 8px; align-items: center; padding: 8px 12px; border-radius: 7px; font-size: 13px; font-weight: 650; }
+.app-entry .signin svg { width: 16px; height: 16px; }

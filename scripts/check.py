@@ -13,6 +13,19 @@ ROOT = Path(__file__).resolve().parents[1]
 # cut-out layers for the idle moves (hammer, stamp, rocket). Pinned by hash like the fonts. A changed or new picture
 # needs review (including its raw bytes for private markers) before its hash is updated here.
 ART_HASHES = {
+    'art/family-01.webp': '14532efb522eb7129ced9e1093f4b0321b1f00459301f059f2d9b5a8c2a7161f',
+    'art/family-02.webp': '0c64fa6a32853b694b7c2b09c2f8a2d296ca878c464b57ba9d0aae101aed81d2',
+    'art/family-03.webp': 'f7aa428b6d3961c0e6530898cb1bfaf1c74c81d6f4b3f23a1eb888dca5c1b40c',
+    'art/family-04.webp': '38eaba2fc285d05ae6c530724c63934b0c661a0912f8cf20e351d71db706bab4',
+    'art/family-05.webp': '534d0b861f5f3407b4989b9f24b9a37cce1dac94531873068d7ef81f4a855224',
+    'art/family-06.webp': '25fd341648787216c64f9f5052400a170cb351654a2f1f77ad614ff6e6cb48fd',
+    'art/family-07.webp': '273be7e2be6dc67e7913967e6381451dd839d273855b778b2bc2b82177ff0a71',
+    'art/family-08.webp': '89ec3bea0d430424239d5aefd52f94762e4d4e589e5a3bddd14f01e04d40522f',
+    'art/family-09.webp': 'd65ee1ff0844408b4dec17ed96e6d5e631d874828406000d364f7a088b8b4f75',
+    'art/family-10.webp': '9ae6ba5adc0cef5b7abd9007d99261a4e65cf130df5f175376f79fa53342e34f',
+    'art/family-11.webp': '3a37702058088886b72330737dce7c45724eeb29ff15300cf682f1ac686b9327',
+    'art/family-12.webp': '509d80e2a4f529771deaafb8e7524f55a4fa2086016559e76803054f6102aa18',
+    'art/hero-cave.webp': 'ec65d3561e29f0b12a54117023ea39371fb7aa1a975a05bf6b8480e65302e28e',
     'art/era-1-cave.webp': 'd9c6bf6697489c0970b1aaf0897b4be0cb1c4c1208d8d6ffc0c421c74203d390',
     'art/era-2-grill.webp': 'efaf213c3f389c8feb2f9d0436e94b1f9241d0ecf3cc3e793385d34f11cd11dd',
     'art/era-3-forge.webp': 'ec01ffe4207f7b7ca25a56cbca91af898222647f64fd9b60e08654f732136b42',
@@ -101,7 +114,7 @@ PAGES = ('index.html', 'changelog/index.html')
 ALL_PAGES = PAGES + (APP_PAGE,)
 # The landing story (#1287): one Wiz through every era, with "Build a to-do app" as the example idea and the
 # zoom-out handing off to "This is your factory." The old example idea must not come back beside it.
-STORY_COPY = ('Build a to-do app', 'This is your factory.')
+STORY_COPY = ('Build a to-do app', 'Bring any agent', 'Sign in with GitHub', 'Put the app on your phone')
 OLD_EXAMPLE = ('dark mode', 'dark-mode')
 # Motion runs only when the visitor has not asked for less: every animation, transition and smooth scroll
 # sits inside this media query, so reduced motion shows the same story as still paintings.
@@ -109,7 +122,6 @@ MOTION_OK = '@media (prefers-reduced-motion:no-preference)'
 # The animated layout (sticky zoom-out, hidden-until-scrolled hand-off, Pause motion) is switched on only by
 # site.js itself, once its handlers are in place: no inline script may set it first, so a failed site.js
 # download leaves the still story fully visible.
-LIVE_CLASS = 'story-live'
 # The ship log: the approved VS9 changelog text (What's new for you, tested line, Under the hood), plus Being built.
 CHANGELOG_MAIN = '17830d3f9a837a3ec24f2382829093cc941e0d1f5fd873e45e4d3a44c6e897c2'
 
@@ -207,7 +219,14 @@ def check_motion(css):
             name, value = name.strip(), value.strip().removesuffix('!important').strip()
             moving = ((name in ('animation', 'animation-name', 'transition', 'transition-property') and value != 'none')
                       or (name == 'scroll-behavior' and value == 'smooth'))
-            if moving and not any(p.startswith('@keyframes') for p in stack) and MOTION_OK not in stack:
+            if name == 'transition-duration':
+                moving = not all(re.fullmatch(r'[+-]?(?:0+(?:\.0+)?|\.0+)(?:ms|s)', item.strip())
+                                 for item in value.split(','))
+            guarded = any(re.fullmatch(
+                r'@media \(prefers-reduced-motion:no-preference\)'
+                r'|@media \(max-width:[0-9]+px\) and \(prefers-reduced-motion:no-preference\)',
+                item, re.I) for item in stack)
+            if moving and not any(p.startswith('@keyframes') for p in stack) and not guarded:
                 found.append(f'{" > ".join(stack)} {{{decl}}}')
             if m[0] == '}' and stack:
                 stack.pop()
@@ -310,12 +329,9 @@ def check_site(root):
             assert not any(word in low for word in BANNED_COPY), f'banned word rendered in {path.name}'
             for text in ('illustration, not live data', 'building in public'):
                 assert text not in low, f'cut copy is back in {path.name}: {text}'
-    for text in ('Star on GitHub', 'Not ready for everyone yet.', 'Idea in. Shipped work out.', 'How it works',
-                 'Build at the speed of ideas.', 'Paste one line into your agent.', 'Answer a few questions.',
-                 'Approve the plan.', 'Watch it ship.', 'Works with what you already use',
-                 'You decide what gets built. Your agents do the work, on the computers you choose. OpenWiz runs the line and shows you every step.',
-                 'Ship log', 'Shipped', 'Being built'):
-        assert text in flat, f'missing landing copy: {text}'
+    moments = ('Answer a few questions', 'Watch your spec', 'Approve the plan', 'Watch it ship')
+    captions = re.findall(r'<h3>([^<]+)</h3>', landing)
+    assert tuple(captions) == moments, 'the four moments must appear in order'
     # Owner cuts (round 6): obvious notes stay off the page.
     for text in ('Illustration, not live data', 'Building in public'):
         assert text.lower() not in flat.lower(), f'cut copy is back: {text}'
@@ -329,7 +345,6 @@ def check_site(root):
             assert (attrs.get('alt') or '').strip(), f'painting without a description: {attrs.get("src")}'
     check_motion((root / names['site.css']).read_text())
     assert not pages[root / 'index.html'].inline_scripts, 'an inline script runs before site.js; only site.js may enable the animated story'
-    assert f"classList.add('{LIVE_CLASS}')" in (root / names['site.js']).read_text(), f'site.js must enable the animated story ({LIVE_CLASS})'
     # Install stays "coming soon" until a stranger can install (AN8); only these mentions are allowed.
     # The one allowed mention is the disabled Install button's own label; any other "install" anywhere in the
     # rendered page (an extra link with the same words included) fails.
@@ -347,16 +362,10 @@ def check_site(root):
     assert not re.search(r'install|clipboard', scripts, re.I), 'no script may activate Install or copy the prompt yet'
     assert not re.search(r'\b\d{4}-\d{2}-\d{2}\b', words), 'dated landing promise'
     changelog = (root / 'changelog/index.html').read_text()
-    # The teaser shows only versions the changelog publishes.
-    teaser = re.findall(r'<span class="v">(\d+\.\d+\.\d+)</span><span>([^<]+)</span>', landing)
-    # Each teaser line must match its own release in the ship log (version and headline together).
-    releases = dict(re.findall(r'<article class="rel" id="v[\d.]+"><p class="when"><span class="v">([\d.]+)</span>[\s\S]*?<h3>([\s\S]*?)</h3>', changelog))
-    assert teaser and all(releases.get(v) == h for v, h in teaser), 'ship log teaser line does not match its release'
-    teaser = [v for v, _ in teaser]
     # "Being built" names bundles, never versions.
     being = re.search(r'<ul class="bundle-list">([\s\S]*?)</ul>', changelog)
     assert being and not re.search(r'\d+\.\d+', re.sub(r'<[^>]*>', '', being[1])), 'Being built must not name versions'
-    assert len(re.findall(r'(?<![\d.])\d+\.\d+\.\d+(?![\d.])', flat)) == len(teaser), 'version mentioned outside the changelog teaser'
+    assert not re.search(r'(?<![\d.])\d+\.\d+\.\d+(?![\d.])', flat), 'version mentioned outside the changelog teaser'
     for name in VECTORS:
         check_vector((root / name).read_bytes())
     total = 0
