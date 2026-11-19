@@ -7,7 +7,84 @@
     },
     "repository": {
       "issues": {
-        "totalCount": 11,
+        "totalCount": 1,
+        "nodes": [
+          {
+            "number": 80,
+            "title": "A tracking issue",
+            "url": "https://github.com/acme/factory/issues/80",
+            "updatedAt": "2030-01-01T00:00:00Z",
+            "labels": {
+              "nodes": []
+            },
+            "subIssuesSummary": {
+              "total": 2,
+              "completed": 0
+            }
+          }
+        ]
+      },
+      "fleet": {
+        "text": "# Fleet settings\n\n## GitHub identity\n\n| Setting | Value |\n| --- | --- |\n| App | Synthetic |\n| Record authors | `factory-bot[bot]`, `acme-owner` |\n\n## Next\n"
+      },
+      "specIssues": {
+        "totalCount": 3,
+        "nodes": [
+          {
+            "number": 60,
+            "title": "Spec: dark mode",
+            "url": "https://github.com/acme/factory/issues/60",
+            "updatedAt": "2030-01-03T10:00:00Z",
+            "labels": {
+              "nodes": [
+                {
+                  "name": "spec"
+                }
+              ]
+            },
+            "subIssuesSummary": {
+              "total": 0,
+              "completed": 0
+            }
+          },
+          {
+            "number": 50,
+            "title": "Spec: search",
+            "url": "https://github.com/acme/factory/issues/50",
+            "updatedAt": "2030-01-02T09:00:00Z",
+            "labels": {
+              "nodes": [
+                {
+                  "name": "spec"
+                }
+              ]
+            },
+            "subIssuesSummary": {
+              "total": 3,
+              "completed": 2
+            }
+          },
+          {
+            "number": 40,
+            "title": "Spec: shipping notes",
+            "url": "https://github.com/acme/factory/issues/40",
+            "updatedAt": "2029-12-30T09:00:00Z",
+            "labels": {
+              "nodes": [
+                {
+                  "name": "spec"
+                }
+              ]
+            },
+            "subIssuesSummary": {
+              "total": 9,
+              "completed": 1
+            }
+          }
+        ]
+      },
+      "youIssues": {
+        "totalCount": 2,
         "nodes": [
           {
             "number": 46,
@@ -20,196 +97,6 @@
                   "name": "needs-info"
                 }
               ]
-            },
-            "subIssuesSummary": {
-              "total": 0,
-              "completed": 0
-            },
-            "comments": {
-              "nodes": []
-            }
-          },
-          {
-            "number": 60,
-            "title": "Spec: dark mode",
-            "url": "https://github.com/acme/factory/issues/60",
-            "updatedAt": "2030-01-03T10:00:00Z",
-            "labels": {
-              "nodes": []
-            },
-            "subIssuesSummary": {
-              "total": 0,
-              "completed": 0
-            },
-            "comments": {
-              "nodes": [
-                {
-                  "body": "Spec ready for your confirm.\n\n```json\n{\n  \"schema\": \"openwiz.decisions.v1\",\n  \"id\": \"r-spec_confirmation-60\",\n  \"fingerprint\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\n  \"risk\": \"ordinary\",\n  \"summary\": [\n    \"Synthetic.\"\n  ],\n  \"headline\": \"none\",\n  \"tickets\": [],\n  \"graph\": [],\n  \"kind\": \"spec_confirmation\",\n  \"status\": \"open\",\n  \"spec\": 60\n}\n```",
-                  "url": "https://github.com/acme/factory/issues/60#issuecomment-6001",
-                  "createdAt": "2030-01-03T10:00:00Z",
-                  "authorAssociation": "MEMBER"
-                }
-              ]
-            }
-          },
-          {
-            "number": 50,
-            "title": "Spec: search",
-            "url": "https://github.com/acme/factory/issues/50",
-            "updatedAt": "2030-01-02T09:00:00Z",
-            "labels": {
-              "nodes": []
-            },
-            "subIssuesSummary": {
-              "total": 3,
-              "completed": 2
-            },
-            "comments": {
-              "nodes": [
-                {
-                  "body": "```json\n{\n  \"schema\": \"openwiz.decisions.v1\",\n  \"id\": \"r-spec_confirmation-50\",\n  \"fingerprint\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\n  \"risk\": \"ordinary\",\n  \"summary\": [\n    \"Synthetic.\"\n  ],\n  \"headline\": \"none\",\n  \"tickets\": [],\n  \"graph\": [],\n  \"kind\": \"spec_confirmation\",\n  \"status\": \"resolved\",\n  \"spec\": 50\n}\n```",
-                  "url": "https://github.com/acme/factory/issues/50#issuecomment-5001",
-                  "createdAt": "2030-01-01T09:00:00Z",
-                  "authorAssociation": "MEMBER"
-                },
-                {
-                  "body": "Plan graph for your approval.\n\n```json\n{\n  \"schema\": \"openwiz.decisions.v1\",\n  \"id\": \"r-plan_approval-50\",\n  \"fingerprint\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\n  \"risk\": \"ordinary\",\n  \"summary\": [\n    \"Synthetic.\"\n  ],\n  \"headline\": \"none\",\n  \"tickets\": [],\n  \"graph\": [],\n  \"kind\": \"plan_approval\",\n  \"status\": \"open\",\n  \"spec\": 50\n}\n```",
-                  "url": "https://github.com/acme/factory/issues/50#issuecomment-5002",
-                  "createdAt": "2030-01-02T09:00:00Z",
-                  "authorAssociation": "MEMBER"
-                }
-              ]
-            }
-          },
-          {
-            "number": 70,
-            "title": "Question from a visitor",
-            "url": "https://github.com/acme/factory/issues/70",
-            "updatedAt": "2030-01-05T09:00:00Z",
-            "labels": {
-              "nodes": []
-            },
-            "subIssuesSummary": {
-              "total": 0,
-              "completed": 0
-            },
-            "comments": {
-              "nodes": [
-                {
-                  "body": "```json\n{\n  \"schema\": \"openwiz.decisions.v1\",\n  \"id\": \"r-plan_approval-70\",\n  \"fingerprint\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\n  \"risk\": \"ordinary\",\n  \"summary\": [\n    \"Synthetic.\"\n  ],\n  \"headline\": \"none\",\n  \"tickets\": [],\n  \"graph\": [],\n  \"kind\": \"plan_approval\",\n  \"status\": \"open\",\n  \"spec\": 70\n}\n```",
-                  "url": "https://github.com/acme/factory/issues/70#issuecomment-7001",
-                  "createdAt": "2030-01-05T09:00:00Z",
-                  "authorAssociation": "NONE"
-                }
-              ]
-            }
-          },
-          {
-            "number": 40,
-            "title": "Spec: shipping notes",
-            "url": "https://github.com/acme/factory/issues/40",
-            "updatedAt": "2029-12-30T09:00:00Z",
-            "labels": {
-              "nodes": []
-            },
-            "subIssuesSummary": {
-              "total": 8,
-              "completed": 1
-            },
-            "comments": {
-              "nodes": []
-            }
-          },
-          {
-            "number": 42,
-            "title": "Write the notes page",
-            "url": "https://github.com/acme/factory/issues/42",
-            "updatedAt": "2029-12-31T09:00:00Z",
-            "labels": {
-              "nodes": []
-            },
-            "subIssuesSummary": {
-              "total": 0,
-              "completed": 0
-            },
-            "comments": {
-              "nodes": []
-            }
-          },
-          {
-            "number": 43,
-            "title": "Store the notes",
-            "url": "https://github.com/acme/factory/issues/43",
-            "updatedAt": "2029-12-31T08:00:00Z",
-            "labels": {
-              "nodes": []
-            },
-            "subIssuesSummary": {
-              "total": 0,
-              "completed": 0
-            },
-            "comments": {
-              "nodes": []
-            }
-          },
-          {
-            "number": 44,
-            "title": "Notes feed",
-            "url": "https://github.com/acme/factory/issues/44",
-            "updatedAt": "2029-12-31T07:00:00Z",
-            "labels": {
-              "nodes": [
-                {
-                  "name": "ready-for-agent"
-                }
-              ]
-            },
-            "subIssuesSummary": {
-              "total": 0,
-              "completed": 0
-            },
-            "comments": {
-              "nodes": []
-            }
-          },
-          {
-            "number": 45,
-            "title": "Notes search",
-            "url": "https://github.com/acme/factory/issues/45",
-            "updatedAt": "2029-12-31T06:00:00Z",
-            "labels": {
-              "nodes": [
-                {
-                  "name": "ready-for-agent"
-                }
-              ]
-            },
-            "subIssuesSummary": {
-              "total": 0,
-              "completed": 0
-            },
-            "comments": {
-              "nodes": []
-            }
-          },
-          {
-            "number": 47,
-            "title": "Notes export",
-            "url": "https://github.com/acme/factory/issues/47",
-            "updatedAt": "2029-12-31T05:00:00Z",
-            "labels": {
-              "nodes": [
-                {
-                  "name": "held"
-                }
-              ]
-            },
-            "subIssuesSummary": {
-              "total": 0,
-              "completed": 0
-            },
-            "comments": {
-              "nodes": []
             }
           },
           {
@@ -223,13 +110,6 @@
                   "name": "ready-for-human"
                 }
               ]
-            },
-            "subIssuesSummary": {
-              "total": 0,
-              "completed": 0
-            },
-            "comments": {
-              "nodes": []
             }
           }
         ]

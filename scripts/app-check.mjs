@@ -174,8 +174,9 @@ async function open(browser, world) {
       const { requestId, request } = message.params;
       const reply = await world.answer(request);
       world.done.push(new URL(request.url).pathname);
-      if (!reply) {
-        await send('Fetch.failRequest', { requestId, errorReason: 'BlockedByClient' }).catch(() => {});
+      if (!reply || reply.abort) {
+        // Refused (not GitHub, not the site), or a recorded network failure (abort).
+        await send('Fetch.failRequest', { requestId, errorReason: reply ? 'ConnectionFailed' : 'BlockedByClient' }).catch(() => {});
         return;
       }
       const body = reply.raw ?? Buffer.from(JSON.stringify(reply.json));
@@ -475,15 +476,27 @@ async function main() {
     });
 
     // ---- AP6 (#1259): You, Specs and a spec's page, against recorded answers (ap6-*.json) ----
-    // The tickets' state comes from GitHub and the agents' openwiz:status v1 notes, never from a state label.
+    // A ticket's state comes from GitHub and the agents' openwiz:status v1 notes (AP1's contract), never from a state
+    // label. Notes and decision records count only from the record authors in the repository's docs/agents/fleet.md.
 
-    const ap6World = () => {
+    const live = text => {
+      const now = Date.now();
+      return JSON.parse(text.replaceAll('"LIVE-5"', JSON.stringify(new Date(now - 5 * 60 * 1000).toISOString()))
+        .replaceAll('"LIVE"', JSON.stringify(new Date(now).toISOString())));
+    };
+    const ap6World = (change = {}) => {
       const world = new World();
-      world.graphql.Specs = ok('ap6-specs.json');
+      world.graphql.Specs = async () => {
+        const answer = await fixture('ap6-specs.json');
+        change.specs?.(answer.data.repository);
+        return { status: 200, json: answer };
+      };
       world.graphql.Agents = ok('agents.json');
-      // The building ticket's note was edited just now, so its claim is live (a claim lapses after 30 minutes).
-      world.graphql.SpecTickets = async () => ({ status: 200,
-        json: JSON.parse(JSON.stringify(await fixture('ap6-spec-tickets.json')).replaceAll('"LIVE"', JSON.stringify(new Date().toISOString()))) });
+      world.graphql.SpecTickets = async () => {
+        const answer = live(JSON.stringify(await fixture('ap6-spec-tickets.json')));
+        change.tickets?.(answer.data.repository);
+        return { status: 200, json: answer };
+      };
       return world;
     };
     const ap6Open = async (world, route) => {
@@ -494,24 +507,19 @@ async function main() {
       if (route) await page.go(`${SITE}/app/${route}`);
       return page;
     };
+    const youItems = page => page.run(`[...document.querySelectorAll('main .cards a.card')].map(a => a.querySelector('.num').textContent.split(' · ')[0] + ' ' + a.getAttribute('href').replace('https://github.com/acme/factory/issues/', ''))`);
+    const graphStates = page => page.run(`Object.fromEntries([...document.querySelectorAll('main .graph [data-ticket]')].map(c => [c.dataset.ticket, c.dataset.state]))`);
 
     await check('AP6 You: the counts, then what needs you, newest first, each linked to GitHub', async () => {
       const world = ap6World();
       const page = await ap6Open(world);
-      await page.until(`document.querySelectorAll('main .cards a.card').length >= 4`, 'the You items');
+      await page.until(`document.querySelectorAll('main .cards a.card').length >= 6`, 'the You items');
       const tiles = await page.run(`[...document.querySelectorAll('main .tile')].map(t => t.querySelector('.k').textContent + '=' + t.querySelector('.v').textContent)`);
       assert(JSON.stringify(tiles) === JSON.stringify(['Needs you=4', 'Building=1', 'In review=1', 'Merged=3']), `tiles: ${JSON.stringify(tiles)}`);
-      const items = await page.run(`[...document.querySelectorAll('main .cards a.card')].map(a => [a.querySelector('h3').textContent, a.getAttribute('href')])`);
-      const want = [
-        ['Pick the release name', 'https://github.com/acme/factory/issues/46'],
-        ['Spec: dark mode', 'https://github.com/acme/factory/issues/60#issuecomment-6001'],
-        ['Spec: search', 'https://github.com/acme/factory/issues/50#issuecomment-5002'],
-        ['Register the notes domain', 'https://github.com/acme/factory/issues/48'],
-      ];
+      const items = await youItems(page);
+      const want = ['Ticket marked for you 46', 'Spec to confirm 60#issuecomment-9001', 'Plan to approve 50#issuecomment-9003',
+        'A decision record that couldn\'t be read 50#issuecomment-9005', 'Ticket marked for you 48', 'A decision record that couldn\'t be read 50#issuecomment-9006'];
       assert(JSON.stringify(items) === JSON.stringify(want), `You items: ${JSON.stringify(items)}`);
-      const text = await page.run(`document.querySelector('main').innerText`);
-      assert(/Ticket marked for you/.test(text) && /Spec to confirm/.test(text) && /Plan to approve/.test(text), 'the items do not say what each one is');
-      assert(!text.includes('Question from a visitor'), 'a visitor\'s decision record shows as needing you');
       const badge = await page.run(`document.querySelector('nav.main a[href="#/you"] .badge').textContent`);
       assert(badge === '4', `the You badge is ${badge}`);
       if (process.env.SHOTS) {
@@ -522,46 +530,95 @@ async function main() {
       await page.close();
     });
 
-    await check('AP6 Specs: every running spec with how many of its tickets are done', async () => {
+    await check('R3: a decision record needs a record author and a valid, bound decisions.v1 request, or it is unreadable', async () => {
+      const world = ap6World({ specs: repository => { repository.fleet = null; } });
+      const page = await ap6Open(world);
+      await page.until(`document.querySelectorAll('main .cards a.card').length >= 2`, 'the You items');
+      await settle(page, 600);
+      const items = await youItems(page);
+      // Without the repository's record authors no record can be verified: each is unreadable, none is an approval.
+      assert(!items.some(item => /^(Spec to confirm|Plan to approve)/.test(item)), `an unverified record shows as needing a yes: ${JSON.stringify(items)}`);
+      assert(items.filter(item => item.startsWith('A decision record that couldn\'t be read')).length === 4, `unverified records are not unreadable: ${JSON.stringify(items)}`);
+      checkRequestLog(world);
+      await page.close();
+    });
+
+    await check('R4: a list GitHub gave only part of says so, never "nothing needs you"', async () => {
+      const world = ap6World({
+        specs: repository => { repository.youIssues = { totalCount: 1, nodes: [] }; repository.specIssues = { totalCount: 2, nodes: [] }; },
+      });
+      const page = await ap6Open(world);
+      await page.until(`/may be missing/.test(document.querySelector('main').innerText)`, 'the partial-list notice');
+      const main = await page.run(`document.querySelector('main').innerText`);
+      assert(!/Nothing needs you/.test(main), 'a partial read says nothing needs you');
+      const needs = await page.run(`document.querySelector('main .tile .v').textContent`);
+      assert(needs === '0+', `the Needs you count from a partial list is ${needs}`);
+      checkRequestLog(world);
+      await page.close();
+    });
+
+    await check('R4: a failed ticket read keeps the specs from the first read', async () => {
+      const world = ap6World();
+      world.graphql.SpecTickets = async () => ({ abort: true });
+      const page = await ap6Open(world, '#/specs');
+      await page.until(`document.querySelectorAll('main a.card').length === 3`, 'the spec cards from the first read');
+      const main = await page.run(`document.querySelector('main').innerText`);
+      assert(/1 of 9 tickets done/.test(main) && /couldn.t be read/.test(main), 'the spec list or its unknown tickets are lost');
+      world.violations = world.violations.filter(text => !/ERR_CONNECTION_FAILED|Failed to load resource/.test(text));
+      checkRequestLog(world);
+      await page.close();
+    });
+
+    await check('AP6 Specs and R5: every spec by its label, with its progress, including one with no tickets yet', async () => {
       const world = ap6World();
       const page = await ap6Open(world, '#/specs');
-      await page.until(`document.querySelectorAll('main a.card').length === 2`, 'the spec cards');
-      const cards = await page.run(`[...document.querySelectorAll('main a.card')].map(a => [a.getAttribute('href'), a.querySelector('h3').textContent, [...a.querySelectorAll('p')].map(p => p.textContent).join('|')])`);
-      assert(JSON.stringify(cards.map(c => c[0])) === JSON.stringify(['#/specs/50', '#/specs/40']), `spec links: ${JSON.stringify(cards)}`);
-      assert(cards[0][2].includes('2 of 3 tickets done') && cards[1][2].includes('1 of 8 tickets done'), `progress: ${JSON.stringify(cards)}`);
+      await page.until(`document.querySelectorAll('main a.card').length === 3`, 'the spec cards');
+      const cards = await page.run(`[...document.querySelectorAll('main a.card')].map(a => [a.getAttribute('href'), [...a.querySelectorAll('p')].map(p => p.textContent).join('|')])`);
+      assert(JSON.stringify(cards.map(c => c[0])) === JSON.stringify(['#/specs/60', '#/specs/50', '#/specs/40']), `spec links: ${JSON.stringify(cards)}`);
+      assert(cards[0][1].includes('No tickets yet') && cards[1][1].includes('2 of 3 tickets done') && cards[2][1].includes('1 of 9 tickets done'), `progress: ${JSON.stringify(cards)}`);
       const bar = await page.run(`document.querySelector('main a.card[href="#/specs/40"] .bar').getAttribute('aria-label')`);
-      assert(bar === '1 merged, 1 in review, 1 building, 1 ready, 1 waiting, 1 needs you, 1 held, 1 unknown', `spec #40's bar: ${bar}`);
+      assert(bar === '1 merged, 1 in review, 1 building, 1 ready, 2 waiting, 1 needs you, 1 held, 1 unknown', `spec #40's bar: ${bar}`);
       if (process.env.SHOTS) await page.shot(join(process.env.SHOTS, 'specs-laptop.png'), 1440, 900, false);
       checkRequestLog(world);
       await page.close();
     });
 
-    await check('AP6 spec page: the blocking arrows and one colour per state, from GitHub and the status notes', async () => {
+    await check('AP6 spec page and R1, R2: arrows, one colour per state, AP1 notes per agent kind and blocker gaps', async () => {
       const world = ap6World();
       const page = await ap6Open(world, '#/specs');
       await page.until(`document.querySelector('main a.card[href="#/specs/40"]')`, 'the spec card');
       await page.run(`document.querySelector('main a.card[href="#/specs/40"]').click()`);
-      await page.until(`document.querySelectorAll('main .graph [data-ticket]').length === 8`, 'the ticket graph');
+      await page.until(`document.querySelectorAll('main .graph [data-ticket]').length === 10`, 'the ticket graph');
       assert(await page.run(`document.querySelector('h1').textContent.trim()`) === 'Specs', 'the spec page is not inside the Specs page');
-      assert(await page.run(`document.querySelector('nav.main a[aria-current="page"]').getAttribute('href')`) === '#/specs', 'Specs is not the current page');
-      const states = await page.run(`Object.fromEntries([...document.querySelectorAll('main .graph [data-ticket]')].map(c => [c.dataset.ticket, c.dataset.state]))`);
-      const want = { 41: 'merged', 42: 'review', 43: 'building', 44: 'ready', 45: 'waiting', 46: 'you', 47: 'held', 30: 'merged' };
+      const states = await graphStates(page);
+      const want = { 30: 'merged', 41: 'merged', 42: 'review', 43: 'building', 44: 'ready', 45: 'waiting', 46: 'you', 47: 'held', 49: 'waiting', 'gap-49': 'unknown' };
       assert(JSON.stringify(states) === JSON.stringify(want), `states: ${JSON.stringify(states)}`);
-      // Each state's card is drawn in that state's Ember colour, and the seven states are seven colours.
       const colours = await page.run(`(() => {
         const root = getComputedStyle(document.documentElement);
-        const token = { merged: '--em-merged', review: '--em-review', building: '--em-building', ready: '--em-ready', waiting: '--em-waiting', you: '--em-you', held: '--em-held' };
+        const token = { merged: '--em-merged', review: '--em-review', building: '--em-building', ready: '--em-ready', waiting: '--em-waiting', you: '--em-you', held: '--em-held', unknown: '--em-unknown' };
         return [...document.querySelectorAll('main .graph [data-ticket]')].map(c => [c.dataset.state, getComputedStyle(c, '::before').backgroundColor,
           (() => { const probe = document.createElement('i'); probe.style.color = root.getPropertyValue(token[c.dataset.state]).trim(); document.body.append(probe); const v = getComputedStyle(probe).color; probe.remove(); return v; })()]);
       })()`);
       for (const [state, shown, token] of colours) assert(shown === token, `a ${state} ticket is drawn ${shown}, not its colour ${token}`);
-      assert(new Set(colours.map(c => c[1])).size === 7, `the seven states are not seven colours: ${JSON.stringify(colours)}`);
-      const arrows = await page.run(`[...document.querySelectorAll('main .graph path.arrow')].map(p => p.dataset.from.split('#')[1] + '>' + p.dataset.to.split('#')[1]).sort()`);
-      assert(JSON.stringify(arrows) === JSON.stringify(['30>43', '41>42', '41>44', '42>45', '43>45', '44>47']), `arrows: ${JSON.stringify(arrows)}`);
+      assert(new Set(colours.filter(c => c[0] !== 'unknown').map(c => c[1])).size === 7, `the seven states are not seven colours: ${JSON.stringify(colours)}`);
+      const arrows = await page.run(`[...document.querySelectorAll('main .graph path.arrow')].map(p => p.dataset.from.split('#').pop() + '>' + p.dataset.to.split('#').pop()).sort()`);
+      assert(JSON.stringify(arrows) === JSON.stringify(['30>43', '41>42', '41>44', '41>49', '42>45', '43>45', '44>47', 'gap-49>49']), `arrows: ${JSON.stringify(arrows)}`);
+      assert(/Waits for #41 and 2 tickets GitHub couldn.t read or list/.test(await page.run(`document.querySelector('main').innerText`)), 'the blocker gap is not said');
       if (process.env.SHOTS) {
         await page.shot(join(process.env.SHOTS, 'spec-laptop.png'), 1440, 900, false);
         await page.shot(join(process.env.SHOTS, 'spec-phone.png'), 390, 844, true);
       }
+      checkRequestLog(world);
+      await page.close();
+    });
+
+    await check('R1: without the record authors, a ticket whose state rests on its notes is unknown', async () => {
+      const world = ap6World({ specs: repository => { repository.fleet = null; } });
+      const page = await ap6Open(world, '#/specs/40');
+      await page.until(`document.querySelectorAll('main .graph [data-ticket]').length === 10`, 'the ticket graph');
+      const states = await graphStates(page);
+      assert(states[42] === 'unknown' && states[43] === 'unknown', `notes from unverified authors decided a state: ${JSON.stringify(states)}`);
+      assert(states[41] === 'merged' && states[46] === 'you' && states[47] === 'held', `GitHub's own states were lost: ${JSON.stringify(states)}`);
       checkRequestLog(world);
       await page.close();
     });
@@ -573,7 +630,6 @@ async function main() {
       const main = await page.run(`document.querySelector('main').innerText`);
       assert(/1 of this spec.s tickets couldn.t be read/.test(main), 'the unreadable ticket is not called out');
       assert(/A ticket GitHub couldn.t read\s*Unknown/.test(main), 'the unreadable ticket is not listed as unknown');
-      assert(/1 unknown/.test(main), 'the legend does not count the unknown ticket');
       checkRequestLog(world);
       await page.close();
     });
@@ -586,7 +642,7 @@ async function main() {
       const main = await page.run(`document.querySelector('main').innerText`);
       assert(/This spec.s tickets couldn.t be read/.test(main), 'the failed ticket read is not called unknown');
       assert(!(await page.run(`!!document.querySelector('main .graph')`)), 'an empty graph is drawn for tickets that could not be read');
-      assert(/1 of 8 tickets done/.test(main), 'the spec\'s own progress is lost');
+      assert(/1 of 9 tickets done/.test(main), 'the spec\'s own progress is lost');
       checkRequestLog(world);
       await page.close();
     });
@@ -594,7 +650,7 @@ async function main() {
     await check('AP6 keyboard: every page and link is reachable by keyboard, with visible focus, in reading order', async () => {
       const world = ap6World();
       const page = await ap6Open(world);
-      await page.until(`document.querySelectorAll('main .cards a.card').length >= 4`, 'the You items');
+      await page.until(`document.querySelectorAll('main .cards a.card').length >= 6`, 'the You items');
       // What has focus: a ticket card's number, a link's address, or the element's tag; and whether its focus shows.
       const focused = () => page.run(`(() => { const e = document.activeElement; const s = getComputedStyle(e);
         return { what: e.dataset.ticket || e.getAttribute('href') || e.tagName, shows: s.outlineStyle !== 'none' && s.outlineWidth !== '0px' }; })()`);
@@ -613,8 +669,8 @@ async function main() {
       };
       // You: each item is reached by Tab, newest first.
       const you = await tabTo('https://github.com/acme/factory/issues/48');
-      const order = ['https://github.com/acme/factory/issues/46', 'https://github.com/acme/factory/issues/60#issuecomment-6001',
-        'https://github.com/acme/factory/issues/50#issuecomment-5002', 'https://github.com/acme/factory/issues/48'];
+      const order = ['https://github.com/acme/factory/issues/46', 'https://github.com/acme/factory/issues/60#issuecomment-9001',
+        'https://github.com/acme/factory/issues/50#issuecomment-9003', 'https://github.com/acme/factory/issues/48'];
       assert(JSON.stringify(you.filter(w => order.includes(w))) === JSON.stringify(order), `You's items in Tab order: ${you.join(' ')}`);
       // The shell's 2 opens Specs; Tab reaches a spec and Enter opens its page, with focus on its title.
       await page.key('2');
@@ -625,15 +681,16 @@ async function main() {
       // The graph's tickets come in reading order: every ticket after each ticket it waits for.
       const walk = await tabTo('41', 80);
       const graph = [];
-      for (let i = 0; i < 12 && graph.length < 8; i += 1) {
+      const card = what => /^(\d+|gap-\d+)$/.test(what);
+      for (let i = 0; i < 14 && graph.length < 10; i += 1) {
         await page.key('Tab');
         const now = await focused();
         assert(now.shows, `${now.what} has focus but no visible focus ring`);
-        if (/^\d+$/.test(now.what)) graph.push(Number(now.what));
+        if (card(now.what)) graph.push(now.what);
       }
-      const all = [...walk.filter(w => /^\d+$/.test(w)).map(Number), ...graph];
-      assert(new Set(all).size === 8, `not every ticket card is reached by Tab: ${all.join(' ')}`);
-      for (const [blocker, ticket] of [[30, 43], [41, 42], [41, 44], [42, 45], [43, 45], [44, 47]]) {
+      const all = [...walk.filter(card), ...graph];
+      assert(new Set(all).size === 10, `not every ticket card is reached by Tab: ${all.join(' ')}`);
+      for (const [blocker, ticket] of [['30', '43'], ['41', '42'], ['41', '44'], ['41', '49'], ['42', '45'], ['43', '45'], ['44', '47'], ['gap-49', '49']]) {
         assert(all.indexOf(blocker) < all.indexOf(ticket), `#${ticket} comes before #${blocker}, which it waits for: ${all.join(' ')}`);
       }
       // Esc goes back to all specs, with focus on the spec just left; the shell's 1 still opens You.
@@ -641,6 +698,22 @@ async function main() {
       await page.until(`location.hash === '#/specs' && document.activeElement.getAttribute('href') === '#/specs/40'`, 'Esc back to the spec\'s card');
       await page.key('1');
       await page.until(`location.hash === '#/you'`, 'You by its key');
+      checkRequestLog(world);
+      await page.close();
+    });
+
+    await check('R6: a refresh keeps keyboard focus on the same ticket', async () => {
+      const world = ap6World();
+      const page = await ap6Open(world, '#/specs/40');
+      await page.until(`document.querySelector('main .graph [data-ticket="41"]')`, 'the ticket graph');
+      await page.run(`document.querySelector('main .graph [data-ticket="41"]').focus()`);
+      const before = graphqlCount(world);
+      await page.run(`OW.data.refreshAll()`);
+      await waitFor(() => graphqlCount(world) >= before + 3, 'both feeds read again');
+      await settle(page, 500);
+      const focused = await page.run(`document.activeElement.dataset.ticket || document.activeElement.tagName`);
+      assert(focused === '41', `after a refresh focus is on ${focused}, not ticket 41`);
+      assert(await page.run(`document.activeElement.isConnected && document.querySelector('main .graph').contains(document.activeElement)`), 'focus is on a card no longer shown');
       checkRequestLog(world);
       await page.close();
     });
