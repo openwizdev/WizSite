@@ -25,6 +25,8 @@ code,.v{font-family:var(--ow-font-mono)}
 .top nav,.foot-site div{margin-left:auto;margin-right:-12px;display:flex;gap:4px;font:450 17px/1 var(--ow-font-sans);color:var(--grey2)}
 :is(.top nav,.foot-site div) a{display:inline-flex;align-items:center;min-height:44px;padding:0 12px;border-radius:8px}
 :is(.top nav,.foot-site div) a:hover{color:var(--ink)}
+.top nav .nav-signin{margin-left:8px;color:var(--ink);box-shadow:inset 0 0 0 1px var(--edge)}
+.top nav .nav-signin:hover{box-shadow:inset 0 0 0 1px var(--grey)}
 .foot-site{display:flex;align-items:center;margin-top:120px;padding:24px 0 48px;border-top:1px solid rgb(242 242 240 / 14%)}
 
 /* Hero: copy and the two calls to action on the left, the animation on the right (phone: below it). */
@@ -44,6 +46,19 @@ h1{font:700 78px/.98 var(--ow-font-sans);letter-spacing:-.045em}
 .install:disabled{opacity:1}
 .install{border:0;background:rgb(242 242 240 / 6%);color:var(--grey2);box-shadow:inset 0 0 0 1px var(--edge);cursor:not-allowed}
 .install-note{margin-top:14px;font-size:15px;line-height:1.5;color:var(--grey)}
+/* The app's entry (openwiz.dev/app): Sign in with GitHub, and how to put the app on a phone's home screen. */
+.app-entry{margin-top:28px;padding-top:24px;border-top:1px solid var(--line)}
+.app-lead{font-size:15px;line-height:1.5;color:var(--grey2)}
+.signin{margin-top:14px;background:var(--ink);color:var(--ground)}
+.signin svg{fill:currentColor}
+.signin:hover{background:#fff}
+.home-screen{margin-top:14px;font-size:15px;line-height:1.5;color:var(--grey)}
+.home-screen summary{display:inline-flex;align-items:center;min-height:44px;cursor:pointer;color:var(--sea)}
+.home-screen summary:hover{text-decoration:underline}
+.home-screen ol{margin:4px 0 0;padding-left:22px;list-style:decimal}
+.home-screen li+li{margin-top:4px}
+.home-screen b{color:var(--grey2);font-weight:600}
+.home-screen p{margin-top:8px}
 
 /* Hero: copy and the two calls to action on the left, the cave painting (the idea) behind and to the right. */
 .hero{position:relative;display:grid;grid-template-columns:510px minmax(0,1fr);grid-template-areas:"copy ." "ctas .";grid-template-rows:auto 1fr;padding:96px 0 40px;min-height:820px}
@@ -178,6 +193,7 @@ h1{white-space:nowrap}
   .brand img{height:34px}
   .top nav{font-size:16px}
   .top nav a{padding:0 10px}
+  .top nav .nav-signin{display:none}
   .hero{grid-template-columns:minmax(0,1fr);grid-template-areas:"copy" "ctas" "art";grid-template-rows:none;padding:24px 0 0;min-height:0}
   .hero .cave{grid-area:art;position:relative;top:auto;left:auto;right:auto;margin:16px calc(-1 * var(--m)) 0}
   .hero .cave .frame{-webkit-mask:linear-gradient(transparent,#000 12%,#000 82%,transparent);mask:linear-gradient(transparent,#000 12%,#000 82%,transparent)}
@@ -191,6 +207,9 @@ h1{white-space:nowrap}
   .buttons{flex-wrap:wrap;gap:10px}
   .btn{flex:1 1 auto;min-height:48px;padding:0 10px;font-size:15px;gap:8px}
   .install-note{margin-top:10px;font-size:14px}
+  .app-entry{margin-top:20px;padding-top:18px}
+  .signin{width:100%}
+  .app-lead,.home-screen{font-size:14px}
   .story{margin-top:56px}
   h2{font-size:34px;max-width:12ch}
   .story-head{flex-direction:column;align-items:flex-start;gap:16px}
