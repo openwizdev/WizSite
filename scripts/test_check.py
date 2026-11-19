@@ -181,6 +181,18 @@ class Checks(unittest.TestCase):
             with self.assertRaises(AssertionError):
                 check_site(root)
 
+    def test_transition_duration_respects_reduced_motion(self):
+        with self.assertRaisesRegex(AssertionError, 'motion outside'):
+            check_motion('.x { transition-duration: .35s } .x:hover { opacity: .5 }')
+        check_motion('.x { transition-duration: 0s, 0ms }')
+
+    def test_motion_in_combined_phone_query(self):
+        check_motion('@media (max-width: 700px) and (prefers-reduced-motion: no-preference)'
+                     '{.x{transition:opacity .35s}}')
+        with self.assertRaisesRegex(AssertionError, 'motion outside'):
+            check_motion('@media (max-width: 700px), (prefers-reduced-motion: no-preference)'
+                         '{.x{transition:opacity .35s}}')
+
     def test_motion_only_without_reduced_motion(self):
         # Catches: an idle move, a transition or smooth scrolling that still runs for a visitor who asked for
         # reduced motion. Stopping motion (animation: none) is allowed anywhere.
