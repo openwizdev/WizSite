@@ -125,12 +125,12 @@ h2{font:700 44px/1.05 var(--ow-font-sans);letter-spacing:-.035em}
   .motion-paused .loop *,.loop.offscreen *{animation-play-state:paused !important}
 
   /* The film (site.js adds .film-live only while its GSAP timeline runs): every shot stacked on one stage; each
-     camera is the painting's own box covering the stage, with --fx/--fy the point of the painting at the stage's
+     camera is the painting's own box covering the stage, with --fx/--fy the point of the painting (0..1) at the stage's
      centre (phones pick their own) and --ox/--oy the focus it pushes into. The timeline sets opacity, the cameras'
      transforms and --w, the brush wipe's position (cave to grill, forge to mill, launch to the lines). */
   .film-live .shots{display:block;position:relative;width:100%;aspect-ratio:1672/941;max-height:calc(100svh - 230px);min-height:320px;overflow:hidden;container-type:size;border-radius:var(--round);background:#000;box-shadow:inset 0 0 0 1px var(--line)}
   .film-live .shots .shot{position:absolute;inset:0;aspect-ratio:auto;border:0;border-radius:0;background:none;opacity:0}
-  .film-live .shots .cam{inset:auto;left:50%;top:50%;width:max(100cqw,100cqh * 1672 / 941);aspect-ratio:1672/941;translate:calc(-1 * var(--fx,50%)) calc(-1 * var(--fy,50%));transform-origin:var(--ox,50%) var(--oy,50%);will-change:transform}
+  .film-live .shots .cam{--cw:max(100cqw,100cqh * 1672 / 941);inset:auto;left:calc(50cqw - var(--fx,.5) * var(--cw));top:calc(50cqh - var(--fy,.5) * var(--cw) * 941 / 1672);width:var(--cw);aspect-ratio:1672/941;transform-origin:var(--ox,50%) var(--oy,50%);will-change:transform}
   .film-live .shots :is(.s-grill,.s-mill,.s-lanes){mask-image:linear-gradient(90deg,#000 44%,transparent 50%),repeating-linear-gradient(0deg,#000 0 9px,transparent 9px 13px,#000 13px 27px,transparent 27px 30px,#000 30px 34px,transparent 34px 46px),linear-gradient(90deg,#000 41%,transparent 44.5%);mask-size:260% 100%,auto,260% 100%;mask-repeat:no-repeat,repeat,no-repeat;mask-composite:intersect,add,add;mask-position:var(--w,100%) 0,0 0,var(--w,100%) 0}
   .film-live .s-cave{--ox:46%;--oy:72%}
   .film-live .s-forge{--ox:42%;--oy:66%}
@@ -195,13 +195,13 @@ h2{font:700 44px/1.05 var(--ow-font-sans);letter-spacing:-.035em}
 }
 @media (max-width:960px) and (prefers-reduced-motion:no-preference){
   .film-live .shots{aspect-ratio:4/5;max-height:none}
-  .film-live .s-cave{--fx:66%}
-  .film-live .s-grill{--fx:56%}
-  .film-live .s-forge{--fx:40%}
-  .film-live .s-mill{--fx:60%}
-  .film-live .s-launch{--fx:62%}
-  .film-live .s-lanes{--fx:40%}
-  .film-live .s-rooms{--fx:55%}
+  .film-live .s-cave{--fx:.66}
+  .film-live .s-grill{--fx:.56}
+  .film-live .s-forge{--fx:.40}
+  .film-live .s-mill{--fx:.60}
+  .film-live .s-launch{--fx:.62}
+  .film-live .s-lanes{--fx:.40}
+  .film-live .s-rooms{--fx:.55}
   .film-live .in-film{width:92cqw;margin-bottom:20cqh}
   .story-live .track li{width:62vw;margin-right:10px}
   @keyframes move{0%,18%{left:0}30%,52%{left:calc(50% - 20px)}64%,90%{left:calc(100% - 40px);opacity:1}96%{left:calc(100% - 40px);opacity:0}97%{left:0;opacity:0}100%{left:0;opacity:1}}
