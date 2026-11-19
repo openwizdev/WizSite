@@ -12,22 +12,26 @@ const CODE = 'fakecode0123456789ab';
 const ACCESS = 'ghu_fakeaccesstoken000000000000000000';
 const REFRESH = 'ghr_fakerefreshtoken00000000000000000000000000000000000000000000000000000000000';
 const STATE = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'; // 43 base64url characters
-const COOKIE = '__Host-openwiz-sign-in';
+const COOKIE = '__Host-openwiz-sign-in-'; // one cookie per attempt, named by its state
 const GITHUB_TOKEN_URL = 'https://github.com/login/oauth/access_token';
 const GRANT = {
   access_token: ACCESS, expires_in: 28800, refresh_token: REFRESH,
   refresh_token_expires_in: 15811200, token_type: 'bearer', scope: '',
 };
 
-// The fake GitHub: every outgoing request is recorded and answered by `github.answer`.
+// The fake GitHub: every outgoing request is recorded and answered by `github.answer`. Like fetch, it
+// follows a redirect unless the request says redirect: 'manual', re-sending the same body to the new place.
 let github, logs, envKeys, realFetch;
 const realConsole = {};
 beforeEach(() => {
   github = { calls: [], answer: () => Response.json(GRANT) };
   realFetch = globalThis.fetch;
-  globalThis.fetch = async (url, init = {}) => {
+  globalThis.fetch = async function fake(url, init = {}) {
     github.calls.push({ url: String(url), method: init.method, headers: new Headers(init.headers), body: init.body });
-    return github.answer();
+    const response = github.calls.length === 1 ? github.answer() : Response.json(GRANT);
+    const to = response.headers.get('Location');
+    if (to && response.status >= 300 && response.status < 400 && (init.redirect ?? 'follow') === 'follow') return fake(to, init);
+    return response;
   };
   logs = [];
   for (const level of ['log', 'info', 'warn', 'error', 'debug', 'trace']) {
@@ -49,7 +53,7 @@ const env = (values = { GITHUB_CLIENT_ID: ID, GITHUB_CLIENT_SECRET: SECRET }) =>
   get(target, key) { envKeys.add(String(key)); return target[key]; },
 });
 
-function call(step, { method = 'POST', origin = SITE, host = SITE, cookie = `${COOKIE}=${STATE}`, body, type = 'application/json', settings } = {}) {
+function call(step, { method = 'POST', origin = SITE, host = SITE, cookie = `${COOKIE}${STATE}=1`, body, type = 'application/json', settings } = {}) {
   const headers = new Headers();
   if (origin) headers.set('Origin', origin);
   if (cookie) headers.set('Cookie', cookie);
@@ -74,7 +78,7 @@ test('start: a fresh state value goes to GitHub and into a host-only, single-sit
   assert.equal(to.searchParams.get('redirect_uri'), 'https://openwiz.dev/app');
   const state = to.searchParams.get('state');
   assert.match(state, /^[A-Za-z0-9_-]{43}$/);
-  assert.equal(first.headers.get('Set-Cookie'), `${COOKIE}=${state}; Path=/; Max-Age=600; Secure; HttpOnly; SameSite=Lax`);
+  assert.deepEqual(first.headers.getSetCookie(), [`${COOKIE}${state}=1; Path=/; Max-Age=600; Secure; HttpOnly; SameSite=Lax`]);
   assert.notEqual(new URL(second.headers.get('Location')).searchParams.get('state'), state);
   assert.equal(github.calls.length, 0);
 });
@@ -86,7 +90,7 @@ test('token: the code is exchanged once and only the token fields reach the brow
   assert.deepEqual(await response.json(), {
     access_token: ACCESS, expires_in: 28800, refresh_token: REFRESH, refresh_token_expires_in: 15811200, token_type: 'bearer',
   });
-  assert.equal(response.headers.get('Set-Cookie'), `${COOKIE}=; Path=/; Max-Age=0; Secure; HttpOnly; SameSite=Lax`);
+  assert.deepEqual(response.headers.getSetCookie(), [`${COOKIE}${STATE}=; Path=/; Max-Age=0; Secure; HttpOnly; SameSite=Lax`]);
   assert.equal(github.calls.length, 1);
   const [sent] = github.calls;
   assert.equal(sent.url, GITHUB_TOKEN_URL);
@@ -109,7 +113,9 @@ test('refresh: the refresh token is exchanged once for a new pair', async () => 
 const REFUSALS = [
   ['token: wrong state value', 'token', { body: { code: CODE, state: 'B'.repeat(43) } }, 403, 'bad_state'],
   ['token: no state cookie', 'token', { cookie: null, body: { code: CODE, state: STATE } }, 403, 'bad_state'],
-  ['token: two state cookies', 'token', { cookie: `${COOKIE}=${STATE}; ${COOKIE}=${STATE}`, body: { code: CODE, state: STATE } }, 403, 'bad_state'],
+  ['token: two cookies for one attempt', 'token', { cookie: `${COOKIE}${STATE}=1; ${COOKIE}${STATE}=1`, body: { code: CODE, state: STATE } }, 403, 'bad_state'],
+  ['token: a cookie for another attempt only', 'token', { cookie: `${COOKIE}${'B'.repeat(43)}=1`, body: { code: CODE, state: STATE } }, 403, 'bad_state'],
+  ['token: an install-time callback (code, no state)', 'token', { cookie: null, body: { code: CODE } }, 400, 'bad_request'],
   ['token: missing code', 'token', { body: { state: STATE } }, 400, 'bad_request'],
   ['token: empty code', 'token', { body: { code: '', state: STATE } }, 400, 'bad_request'],
   ['token: code not a string', 'token', { body: { code: 7, state: STATE } }, 400, 'bad_request'],
@@ -141,6 +147,8 @@ for (const [name, step, options, status, error] of REFUSALS) {
     assert.deepEqual(JSON.parse(text), { error });
     for (const secret of [CODE, REFRESH, SECRET, STATE]) assert.ok(!text.includes(secret));
     assert.equal(response.headers.get('Location'), null);
+    // A refused callback leaves every sign-in attempt's cookie alone.
+    assert.deepEqual(response.headers.getSetCookie(), []);
     assert.equal(github.calls.length, 0);
   });
 }
@@ -151,6 +159,7 @@ const GITHUB_FAILURES = [
   ['GitHub answers 500', () => new Response('oops', { status: 500 })],
   ['GitHub answers without a token', () => Response.json({ token_type: 'bearer' })],
   ['GitHub answers with a non-string token', () => Response.json({ ...GRANT, access_token: 7 })],
+  ['GitHub redirects the exchange elsewhere', () => new Response(null, { status: 307, headers: { Location: 'https://evil.example/collect' } })],
   ['GitHub cannot be reached', () => { throw new TypeError('fetch failed'); }],
 ];
 for (const [name, answer] of GITHUB_FAILURES) {
@@ -161,9 +170,69 @@ for (const [name, answer] of GITHUB_FAILURES) {
     noStore(response);
     const text = await response.text();
     assert.deepEqual(JSON.parse(text), { error: 'github_refused' });
-    assert.equal(github.calls.length, 1);
+    // The code and the client secret went to GitHub's token URL and nowhere else.
+    assert.deepEqual(github.calls.map(sent => sent.url), [GITHUB_TOKEN_URL]);
   });
 }
+
+test('refused: GitHub redirects the refresh elsewhere, and the refresh token goes nowhere else', async () => {
+  github.answer = () => new Response(null, { status: 308, headers: { Location: 'https://evil.example/collect' } });
+  const response = await call('refresh', { cookie: null, body: { refresh_token: REFRESH } });
+  assert.equal(response.status, 502);
+  assert.deepEqual(await response.json(), { error: 'github_refused' });
+  assert.deepEqual(github.calls.map(sent => sent.url), [GITHUB_TOKEN_URL]);
+});
+
+// A browser cookie jar, in creation order, as the helper's Set-Cookie lines leave it.
+function keep(jar, response) {
+  for (const line of response.headers.getSetCookie()) {
+    const [pair, ...rules] = line.split('; ');
+    const [name, value] = pair.split('=');
+    jar.delete(name);
+    if (!rules.includes('Max-Age=0')) jar.set(name, value);
+  }
+}
+const sent = jar => [...jar].map(([name, value]) => `${name}=${value}`).join('; ');
+async function startIn(jar) {
+  const response = await call('start', { method: 'GET', origin: null, cookie: sent(jar) || null, type: null });
+  keep(jar, response);
+  return new URL(response.headers.get('Location')).searchParams.get('state');
+}
+async function returnIn(jar, state) {
+  const response = await call('token', { cookie: sent(jar) || null, body: { code: CODE, state } });
+  keep(jar, response);
+  return response.status;
+}
+
+test('two tabs: overlapping attempts both sign in, whichever returns from GitHub first', async () => {
+  for (const order of [[0, 1], [1, 0]]) {
+    const jar = new Map();
+    const states = [await startIn(jar), await startIn(jar)];
+    assert.equal(await returnIn(jar, states[order[0]]), 200);
+    assert.equal(await returnIn(jar, states[order[1]]), 200);
+    assert.equal(jar.size, 0);
+  }
+  assert.equal(github.calls.length, 4);
+});
+
+test('a stale or replayed callback leaves the current attempt intact', async () => {
+  const jar = new Map();
+  const first = await startIn(jar);
+  assert.equal(await returnIn(jar, first), 200);
+  const current = await startIn(jar);
+  assert.equal(await returnIn(jar, first), 403);
+  assert.equal(await returnIn(jar, current), 200);
+  assert.equal(github.calls.length, 2);
+});
+
+test('at most four attempts are kept: a fifth start drops the oldest', async () => {
+  const jar = new Map();
+  const states = [];
+  for (let i = 0; i < 5; i++) states.push(await startIn(jar));
+  assert.deepEqual([...jar.keys()], states.slice(1).map(state => `${COOKIE}${state}`));
+  assert.equal(await returnIn(jar, states[0]), 403);
+  assert.equal(await returnIn(jar, states[4]), 200);
+});
 
 test('the manifest asks for read-only metadata, issues and pull requests and nothing else', async () => {
   const manifest = JSON.parse(await readFile(new URL('../docs/github-app-manifest.json', import.meta.url), 'utf8'));
@@ -173,7 +242,11 @@ test('the manifest asks for read-only metadata, issues and pull requests and not
   assert.deepEqual(manifest.hook_attributes, { url: 'https://openwiz.dev/', active: false });
   // Only the manifest keys this app uses: nothing that could add access or a webhook elsewhere.
   assert.deepEqual(Object.keys(manifest).sort(),
-    ['callback_urls', 'default_events', 'default_permissions', 'description', 'hook_attributes', 'name', 'public', 'request_oauth_on_install', 'url']);
+    ['callback_urls', 'default_events', 'default_permissions', 'description', 'hook_attributes', 'name', 'public', 'request_oauth_on_install', 'setup_url', 'url']);
+  // No sign-in during installation (it would return without the helper's state): installers land on the app,
+  // which starts the state-bearing sign-in itself.
+  assert.equal(manifest.request_oauth_on_install, false);
+  assert.equal(manifest.setup_url, 'https://openwiz.dev/app');
   assert.equal(manifest.url, 'https://openwiz.dev/');
   assert.equal(manifest.public, true);
 });
