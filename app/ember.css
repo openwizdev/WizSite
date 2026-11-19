@@ -1,0 +1,237 @@
+/* Ember: the app's design system. The map's warm charcoal look, tuned to be read all day.
+ *
+ * Tokens first (colour, type, space, radius), then the shell, then the components pages share.
+ * Few colours: cream text on warm charcoal, one amber for what needs the user, and one soft pastel
+ * per ticket state, always beside its word. No motion anywhere. Generous type and line height.
+ * Pages (You, Specs, Agents) use these classes; they never add colours of their own.
+ */
+
+@font-face {
+  font-family: Geist;
+  src: url('/fonts/Geist-var.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+}
+@font-face {
+  font-family: GeistMono;
+  src: url('/fonts/GeistMono-var.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+:root {
+  color-scheme: dark;
+  /* Surfaces: warm charcoal, never black. */
+  --em-bg: #1c1a17;
+  --em-side: #161412;
+  --em-card: #25221e;
+  --em-card-hover: #2b2723;
+  --em-line: #36312b;
+  /* Text: high but soft contrast (about 13:1, 8:1 and 6:1 on the background). */
+  --em-text: #ede5d8;
+  --em-text-2: #cbc2b4;
+  --em-muted: #aaa194;
+  /* The one accent: what needs the user. */
+  --em-amber: #e8b46a;
+  --em-on-amber: #1c1a17;
+  --em-link: #a9cbf5;
+  /* Ticket states, pastel, always shown with their word. */
+  --em-merged: #a7d4a0;
+  --em-review: #bba8e8;
+  --em-building: #8ccbd9;
+  --em-ready: #e9d38c;
+  --em-waiting: #9a9184;
+  --em-you: var(--em-amber);
+  --em-held: #e39a90;
+  --em-unknown: #e39a90;
+
+  --em-font: Geist, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --em-mono: GeistMono, ui-monospace, Menlo, monospace;
+  --em-size: 17px;
+  --em-leading: 1.6;
+  --em-radius: 14px;
+  --em-radius-sm: 9px;
+  --em-gap: 16px;
+  --em-side-width: 264px;
+  --em-tap: 48px;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--em-bg); color: var(--em-text); }
+body {
+  font: 400 var(--em-size)/var(--em-leading) var(--em-font);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  font-variant-numeric: tabular-nums;
+}
+a { color: var(--em-link); text-decoration: none; }
+a:hover { text-decoration: underline; }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--em-amber); outline-offset: 2px; border-radius: 6px; }
+svg.ic { width: 20px; height: 20px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.skip { position: absolute; left: 12px; top: -60px; background: var(--em-amber); color: var(--em-on-amber); padding: 8px 14px; border-radius: var(--em-radius-sm); z-index: 10; }
+.skip:focus { top: 12px; }
+
+/* ---- The shell ------------------------------------------------------------------------------------------ */
+
+.shell { display: grid; grid-template-columns: var(--em-side-width) minmax(0, 1fr); min-height: 100vh; }
+.side {
+  position: sticky; top: 0; height: 100vh; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 20px;
+  background: var(--em-side); border-right: 1px solid var(--em-line); padding: 20px 12px;
+}
+.brand { display: flex; align-items: center; gap: 10px; padding: 2px 10px; color: var(--em-text); font-weight: 600; font-size: 19px; }
+.brand:hover { text-decoration: none; }
+.brand svg { width: 28px; height: 28px; flex: none; }
+.repo {
+  display: flex; align-items: center; gap: 10px; width: 100%; min-height: var(--em-tap);
+  background: var(--em-card); border: 1px solid var(--em-line); border-radius: 11px;
+  padding: 8px 12px; text-align: left; cursor: pointer; color: var(--em-text-2); font-size: 16px;
+}
+.repo:hover { background: var(--em-card-hover); color: var(--em-text); }
+.repo .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+nav.main { display: flex; flex-direction: column; gap: 4px; }
+nav.main a {
+  display: flex; align-items: center; gap: 12px; min-height: var(--em-tap); padding: 0 12px;
+  border-radius: 10px; color: var(--em-text-2); font-size: 17px; font-weight: 500;
+}
+nav.main a:hover { background: var(--em-card); color: var(--em-text); text-decoration: none; }
+nav.main a[aria-current='page'] { background: var(--em-card-hover); color: var(--em-text); box-shadow: inset 3px 0 0 var(--em-amber); }
+nav.main .key { margin-left: auto; font: 500 12px/1 var(--em-mono); color: var(--em-muted); border: 1px solid var(--em-line); border-radius: 5px; padding: 3px 6px; }
+.badge { margin-left: auto; min-width: 24px; text-align: center; font-size: 13px; font-weight: 700; line-height: 22px; border-radius: 11px; padding: 0 7px; background: var(--em-amber); color: var(--em-on-amber); }
+.badge + .key { margin-left: 8px; }
+.side .foot { margin-top: auto; display: flex; flex-direction: column; gap: 12px; padding: 0 10px; }
+.reads { font-size: 14px; line-height: 1.7; color: var(--em-muted); }
+.reads b { color: var(--em-text-2); font-weight: 500; }
+.reads .bad { color: var(--em-unknown); }
+.side .actions { display: flex; gap: 8px; }
+.side .actions .btn { flex: 1; padding: 0 10px; }
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 40px;
+  padding: 0 14px; border-radius: 10px; border: 1px solid var(--em-line); background: var(--em-card);
+  color: var(--em-text-2); font-size: 15px; font-weight: 500; cursor: pointer; white-space: nowrap;
+}
+.btn:hover { background: var(--em-card-hover); color: var(--em-text); text-decoration: none; }
+.btn:disabled { opacity: .55; cursor: not-allowed; }
+.btn.primary { background: var(--em-amber); border-color: var(--em-amber); color: var(--em-on-amber); font-weight: 600; min-height: var(--em-tap); padding: 0 22px; font-size: 17px; }
+.btn.primary:hover { background: #efc283; }
+
+main { padding: 40px 48px 72px; max-width: 1180px; width: 100%; }
+.page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 24px; }
+h1 { margin: 0; font-size: 32px; line-height: 1.25; font-weight: 700; letter-spacing: -.01em; }
+.page-head .read { margin: 0; font-size: 15px; color: var(--em-muted); }
+.top, .tabs, .phone-reads, .phone-actions { display: none; }
+h1:focus { outline: none; } /* focused after navigation for screen readers; the page change itself is visible */
+.phone-reads { margin: 0 0 18px; font-size: 15px; color: var(--em-muted); }
+.phone-reads b { color: var(--em-text-2); font-weight: 500; }
+.phone-reads .bad { color: var(--em-unknown); }
+.phone-actions { gap: 10px; margin-top: 28px; }
+
+/* Phone: a top bar with the repository, and big tabs at the bottom, under the thumb. */
+@media (max-width: 760px) {
+  :root { --em-size: 17px; }
+  .shell { display: block; }
+  .side { display: none; }
+  .top {
+    display: flex; align-items: center; gap: 12px; position: sticky; top: 0; z-index: 4;
+    background: var(--em-side); border-bottom: 1px solid var(--em-line); padding: 10px 14px;
+  }
+  .top .brand { padding: 0; }
+  .top .brand span { display: none; }
+  .top .repo { flex: 1; min-height: 44px; }
+  main { padding: 22px 16px 120px; }
+  h1 { font-size: 28px; }
+  .page-head { flex-direction: column; align-items: flex-start; gap: 4px; margin-bottom: 8px; }
+  .page-head .read { display: none; } /* the phone shows each feed's read time just below */
+  .tabs {
+    display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 5;
+    background: var(--em-side); border-top: 1px solid var(--em-line);
+    padding: 6px 8px calc(8px + env(safe-area-inset-bottom));
+  }
+  .tabs a {
+    flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+    min-height: 60px; border-radius: 12px; color: var(--em-muted); font-size: 14px; font-weight: 500; position: relative;
+  }
+  .tabs a:hover { text-decoration: none; }
+  .tabs a[aria-current='page'] { color: var(--em-text); background: var(--em-card); }
+  .tabs svg.ic { width: 24px; height: 24px; }
+  .tabs .badge { position: absolute; top: 4px; left: calc(50% + 6px); margin: 0; min-width: 20px; line-height: 18px; font-size: 12px; padding: 0 5px; }
+  .phone-reads { display: block; }
+  .phone-actions { display: flex; }
+}
+
+/* ---- Notices: failed, partial and paused reads ----------------------------------------------------------- */
+
+.notices { display: flex; flex-direction: column; gap: 10px; margin-bottom: 22px; }
+.notice {
+  display: flex; gap: 12px; align-items: flex-start; border-radius: 12px; padding: 14px 16px;
+  background: var(--em-card); border: 1px solid var(--em-line); color: var(--em-text-2); font-size: 16px;
+}
+.notice svg.ic { margin-top: 3px; }
+.notice.bad { border-color: #5a3a35; background: #2a201d; color: #f1d5cf; }
+.notice.bad svg.ic { color: var(--em-unknown); }
+.notice.slow { border-color: #5a4a30; background: #2a241b; color: #f1e2c9; }
+.notice.slow svg.ic { color: var(--em-amber); }
+.notice b { color: var(--em-text); font-weight: 600; }
+
+/* ---- Components for the pages ---------------------------------------------------------------------------- */
+
+/* Count tiles (You): big numbers, one dot of the state's colour. Set --c on the tile. */
+.tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--em-gap); margin-bottom: 28px; }
+.tile { background: var(--em-card); border-radius: var(--em-radius); padding: 16px 18px; color: var(--em-text); }
+.tile .k { display: flex; align-items: center; gap: 8px; font-size: 15px; color: var(--em-text-2); }
+.tile .k::before { content: ''; width: 9px; height: 9px; border-radius: 50%; background: var(--c, var(--em-muted)); }
+.tile .v { font-size: 34px; font-weight: 650; line-height: 1.3; margin-top: 4px; }
+.tile.you { box-shadow: inset 0 0 0 1.5px var(--em-amber); }
+@media (max-width: 760px) { .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; } .tile .v { font-size: 28px; } }
+
+/* Cards (Specs, Agents): the map's card with a coloured left stripe. Set --c on the card. */
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: var(--em-gap); }
+@media (max-width: 760px) { .cards { grid-template-columns: minmax(0, 1fr); gap: 12px; } }
+.card {
+  position: relative; overflow: hidden; display: block; color: var(--em-text);
+  background: var(--em-card); border-radius: var(--em-radius); padding: 18px 20px 18px 24px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, .22), inset 0 0 0 1px rgba(255, 255, 255, .04);
+}
+.card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--c, var(--em-line)); }
+a.card:hover { background: var(--em-card-hover); text-decoration: none; }
+.card.you { box-shadow: 0 0 0 1.5px var(--em-amber), 0 6px 24px rgba(0, 0, 0, .25); }
+.card h3 { margin: 0; font-size: 19px; line-height: 1.4; font-weight: 600; }
+.card p { margin: 6px 0 0; color: var(--em-text-2); font-size: 16px; }
+.card .num { font: 400 14px var(--em-mono); color: var(--em-muted); }
+
+/* A state pill: the state's colour, its dot and always its word. Set --c on the pill. */
+.pill { display: inline-flex; align-items: center; gap: 7px; font-size: 14px; font-weight: 600; padding: 2px 10px; border-radius: 20px; color: var(--c); background: color-mix(in srgb, var(--c) 15%, transparent); white-space: nowrap; }
+.pill::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--c); }
+
+/* A progress bar of ticket states; an unreadable one is hatched, never empty. */
+.bar { display: flex; height: 9px; border-radius: 5px; overflow: hidden; gap: 2px; background: var(--em-line); }
+.bar i { display: block; background: var(--c); }
+.bar.unknown { background: repeating-linear-gradient(135deg, var(--em-line) 0 6px, var(--em-card-hover) 6px 12px); }
+
+/* The unknown block: what a page shows instead of data it couldn't read. */
+.unknown { border: 1px dashed #6a4a44; border-radius: var(--em-radius); padding: 22px 24px; color: var(--em-text-2); }
+.unknown b { color: var(--em-unknown); }
+.placeholder { background: var(--em-card); border-radius: var(--em-radius); padding: 22px 24px; color: var(--em-text-2); }
+
+/* Screens before the shell: sign-in and the repository picker. */
+.center { min-height: 100vh; display: grid; place-items: center; padding: 24px 16px; }
+.panel { width: min(520px, 100%); background: var(--em-card); border-radius: 18px; padding: 32px 30px; box-shadow: 0 10px 40px rgba(0, 0, 0, .3); }
+.panel .brand { padding: 0; margin-bottom: 22px; }
+.panel h1 { font-size: 28px; margin-bottom: 8px; }
+.panel p { color: var(--em-text-2); margin: 0 0 22px; }
+.panel .small { font-size: 15px; color: var(--em-muted); margin: 18px 0 0; }
+.repos { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.repos li { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.repos button {
+  flex: 1; min-width: 0; overflow-wrap: anywhere; line-height: 1.4; min-height: var(--em-tap); text-align: left;
+  padding: 10px 16px; border-radius: 11px; cursor: pointer;
+  background: var(--em-bg); border: 1px solid var(--em-line); color: var(--em-text); font-size: 17px; font-weight: 500;
+}
+.repos button:hover { background: var(--em-card-hover); }
+.repos .tag { flex: none; font-size: 14px; color: var(--em-muted); min-width: 56px; }
+.panel .actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.notice .btn { margin-left: auto; }

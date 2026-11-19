@@ -23,3 +23,5 @@ jobs:
         run: npm test
       - name: Test the sign-in helper against a fake GitHub
         run: npm run test:functions
+      - name: Test the app in a browser against recorded GitHub answers
+        run: npm run test:app

@@ -1,0 +1,5 @@
+{"data": {"rateLimit": {"limit": 5000, "remaining": 4890, "resetAt": "2030-01-01T00:00:00Z"},
+  "repository": {"issues": {"totalCount": 2, "nodes": [
+    {"number": 41, "title": "Spec: sign in with GitHub", "url": "https://github.com/acme/factory/issues/41", "updatedAt": "2030-01-01T00:00:00Z", "labels": {"nodes": []}, "subIssuesSummary": {"total": 9, "completed": 7}},
+    {"number": 52, "title": "Spec: ticket graph page", "url": "https://github.com/acme/factory/issues/52", "updatedAt": "2030-01-01T00:00:00Z", "labels": {"nodes": []}, "subIssuesSummary": {"total": 8, "completed": 3}}
+  ]}}}}

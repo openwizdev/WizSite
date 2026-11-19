@@ -1,0 +1,4 @@
+{"data": {"rateLimit": {"limit": 5000, "remaining": 4880, "resetAt": "2030-01-01T00:00:00Z"},
+  "repository": {"issues": {"nodes": [
+    {"number": 56, "title": "Node states", "url": "https://github.com/acme/factory/issues/56", "updatedAt": "2030-01-01T00:00:00Z", "labels": {"nodes": [{"name": "building"}]}, "comments": {"nodes": []}}
+  ]}}}}

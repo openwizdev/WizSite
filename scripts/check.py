@@ -3,6 +3,7 @@ from hashlib import sha256
 from html import unescape
 from html.parser import HTMLParser
 from pathlib import Path
+import json
 import re
 import subprocess
 from urllib.parse import unquote, urlsplit
@@ -45,6 +46,15 @@ SITE_URL = 'https://openwiz.dev/'
 ART_BUDGET = 2_000_000  # bytes, all art together
 # Styles and scripts ship fingerprinted (name.<first 10 hex of sha256>.ext); the pages use only those names.
 HASHED = ('tokens.css', 'site.css', 'site.js')
+# The app (openwiz.dev/app, #1258): its page, design system (Ember), data layer, page modules and shell.
+# The page applies only ember.css and loads exactly these scripts, in this order, all fingerprinted.
+APP_PAGE = 'app/index.html'
+APP_STYLE = 'app/ember.css'
+APP_SCRIPTS = ('app/data.js', 'app/ui.js', 'app/pages/you.js', 'app/pages/specs.js', 'app/pages/agents.js', 'app/shell.js')
+HASHED += (APP_STYLE,) + APP_SCRIPTS
+# The app may reach only this site and GitHub's API, with no inline script or style (P3).
+APP_CSP = ("default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; "
+           "connect-src 'self' https://api.github.com; manifest-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
 
 
 def fingerprint(name, data):
@@ -59,7 +69,7 @@ def fingerprinted_page(html):
 
 FINGERPRINTS = {name: fingerprint(name, (ROOT / name).read_bytes()) for name in HASHED}
 STATIC = {
-    'index.html', 'changelog/index.html', '_headers',
+    'index.html', 'changelog/index.html', '_headers', APP_PAGE, 'app/manifest.webmanifest',
     'fonts/Geist-var.woff2', 'fonts/GeistMono-var.woff2', 'fonts/OFL.txt',
 } | ART | set(ICON_HASHES) | set(VECTORS)
 RUNTIME = STATIC | set(FINGERPRINTS.values())
@@ -70,7 +80,8 @@ def built_fingerprints(root):
     names = {}
     for name in HASHED:
         stem, ext = name.rsplit('.', 1)
-        found = [p.name for p in root.glob(f'{stem}.*.{ext}') if re.fullmatch(rf'{re.escape(stem)}\.[0-9a-f]{{10}}\.{ext}', p.name)]
+        found = [p.relative_to(root).as_posix() for p in root.glob(f'{stem}.*.{ext}')
+                 if re.fullmatch(rf'{re.escape(stem)}\.[0-9a-f]{{10}}\.{ext}', p.relative_to(root).as_posix())]
         assert len(found) == 1, f'expected one fingerprinted {name}, found {found}'
         assert fingerprint(name, (root / found[0]).read_bytes()) == found[0], f'fingerprint does not match content: {found[0]}'
         names[name] = found[0]
@@ -87,6 +98,7 @@ FONT_HASHES = {
     'fonts/OFL.txt': 'c683bfbcc7e087f5d37a54ef628f10387c451a83ddc459b151403a164ac46c90',
 }
 PAGES = ('index.html', 'changelog/index.html')
+ALL_PAGES = PAGES + (APP_PAGE,)
 # The landing story (#1287): one Wiz through every era, with "Build a to-do app" as the example idea and the
 # zoom-out handing off to "This is your factory." The old example idea must not come back beside it.
 STORY_COPY = ('Build a to-do app', 'This is your factory.')
@@ -267,6 +279,7 @@ def check_site(root):
     for path in root.glob('*.css'):
         for ref in css_refs(path.read_text()):
             check_ref(root, path, ref, pages)
+    check_app(root, names, pages)
     for name in FONT_HASHES:
         data = (root / name).read_bytes()
         assert sha256(data).hexdigest() == FONT_HASHES[name], 'font or licence changed; review before updating its hash'
@@ -357,6 +370,30 @@ def check_site(root):
     assert main and sha256(main[0].encode()).hexdigest() == CHANGELOG_MAIN, 'changelog content changed; review explicitly before updating its snapshot'
 
 
+def check_app(root, names, pages):
+    """The app's page: fingerprinted Ember and scripts only, no inline script, local links, its manifest, its CSP."""
+    page = Page((root / APP_PAGE).read_text())
+    assert not set(page.refs) & {f'/{name}' for name in HASHED}, 'the app uses an unfingerprinted style or script'
+    assert page.stylesheets == [f'/{names[APP_STYLE]}'], 'the app must apply exactly the fingerprinted ember.css'
+    assert page.scripts == [f'/{names[name]}' for name in APP_SCRIPTS], 'the app must load its fingerprinted scripts in order'
+    assert not page.inline_scripts, 'the app allows no inline script'
+    for ref in page.refs:
+        check_ref(root, root / APP_PAGE, ref, pages, page.favicons)
+    assert '/app/manifest.webmanifest' in page.refs, 'the app must link its manifest'
+    manifest = json.loads((root / 'app/manifest.webmanifest').read_text())
+    assert manifest['start_url'] == manifest['scope'] == '/app/' and manifest['display'] == 'standalone', 'the app manifest must open /app/ standalone'
+    for icon in manifest['icons']:
+        assert icon['src'].lstrip('/') in STATIC, f'manifest icon is not a built file: {icon["src"]}'
+    # Calm to read all day: Ember has no animation or transition at all.
+    style = (root / names[APP_STYLE]).read_text()
+    assert not re.search(r'\b(animation|transition)\s*:', style), 'Ember allows no motion'
+    headers = (root / '_headers').read_text()
+    for path in ('/app/*',):  # on Pages this rule also covers /app/ itself (one header, not two)
+        rule = re.search(rf'^{re.escape(path)}\n((?:  .*\n?)*)', headers, re.M)
+        assert rule and f'  Content-Security-Policy: {APP_CSP}' in rule[1].splitlines(), f'_headers must give {path} the app CSP'
+        assert '  Referrer-Policy: no-referrer' in rule[1].splitlines(), f'_headers must give {path} no-referrer'
+
+
 def check_privacy(path, data):
     # Font binaries contain author metadata; the fonts and legal attributions need review.
     # Every other tracked file must be UTF-8. Scan paths too; do not follow symlinks.
@@ -389,12 +426,12 @@ def check_privacy(path, data):
 def main():
     output = ROOT / 'dist'
     check_site(output)
-    for name in RUNTIME - set(FINGERPRINTS.values()) - set(PAGES):
+    for name in RUNTIME - set(FINGERPRINTS.values()) - set(ALL_PAGES):
         assert (ROOT / name).read_bytes() == (output / name).read_bytes(), f'export differs: {name}'
     assert built_fingerprints(output) == FINGERPRINTS, 'build is stale: rebuild the site'
     for name, hashed in FINGERPRINTS.items():
         assert (ROOT / name).read_bytes() == (output / hashed).read_bytes(), f'export differs: {name}'
-    for name in PAGES:
+    for name in ALL_PAGES:
         assert fingerprinted_page((ROOT / name).read_text()) == (output / name).read_text(), f'export differs: {name}'
     paths = subprocess.check_output(['git', 'ls-files', '-z', '--cached', '--others', '--exclude-standard'], cwd=ROOT).decode().split('\0')
     for name in set(paths) - {''}:
@@ -405,7 +442,7 @@ def main():
         check_privacy('dist/' + name, (output / name).read_bytes())
     print('PASS: art is plain WebP with no metadata chunks, within budget')
     print('PASS: exact export, local links/fragments, CSS resources, fonts/licences, copy and privacy')
-    print('GAP: automated browser tests (layout, keyboard, accessibility and animation) are not installed')
+    print('GAP: the landing page has no automated browser test (layout, keyboard, accessibility, animation); the app has npm run test:app')
     print('LIMIT: external URL destinations are constrained; remote availability is not checked')
 
 

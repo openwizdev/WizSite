@@ -1,0 +1,4 @@
+{"total_count": 2, "repositories": [
+  {"id": 2001, "name": "factory", "full_name": "acme/factory", "private": true, "owner": {"login": "acme"}},
+  {"id": 2002, "name": "site", "full_name": "acme/site", "private": false, "owner": {"login": "acme"}}
+]}
