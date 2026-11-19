@@ -114,17 +114,15 @@ class Checks(unittest.TestCase):
         with self.assertRaises(AssertionError):
             check_privacy('README.md', f'skills are {word}s'.encode())
 
-    def test_encoded_copy_and_teaser_pairs(self):
-        for old, new in (('<h2 id="ship-h">Ship log</h2>', '<h2 id="ship-h">Ship log</h2><p>play&#98;ook</p>'),
-                         ('<h2 id="ship-h">Ship log</h2>', '<h2 id="ship-h">Ship log</h2><p>Building in p&#117;blic</p>'),
+    def test_encoded_copy_and_versions(self):
+        for old, new in (('<h2 id="act-1">One idea, through all of history.</h2>', '<h2 id="act-1">One idea, through all of history.</h2><p>play&#98;ook</p>'),
+                         ('<h2 id="act-1">One idea, through all of history.</h2>', '<h2 id="act-1">One idea, through all of history.</h2><p>Building in p&#117;blic</p>'),
                          ('src="/art/layer-hammer.webp" alt=""', 'src="/art/layer-hammer.webp" alt="Pl&#97;ybook"'),
-                         ('<h2 id="ship-h">Ship log</h2>', '<h2 id="ship-h">Ship log</h2><p>play<b>bo</b>ok</p>'),
+                         ('<h2 id="act-1">One idea, through all of history.</h2>', '<h2 id="act-1">One idea, through all of history.</h2><p>play<b>bo</b>ok</p>'),
                          ('src="/art/layer-hammer.webp" alt=""', 'src="/art/layer-hammer.webp" alt="Illustration, not l&#105;ve data"'),
-                         ('<h2 id="ship-h">Ship log</h2>', '<h2 id="ship-h">Ship log</h2><p>Building <em>in</em> public</p>'),
-                         ('<p class="sub">You make the decisions.<br>The agents run the factory.</p>', '<p class="sub">You decide.<br>Agents build.</p>'),
-                         ('<p class="sub">You make the decisions.<br>The agents run the factory.</p>', ''),
-                         ('<h1>Bring your<br>own<br>everything.</h1>', '<h1>Bring your<br>own<br>anything.</h1>'),
-                         ('<span class="v">0.0.12</span><span>Scripts and agents can drive OpenWiz</span>', '<span class="v">0.0.12</span><span>A cockpit for your phone and PC</span>')):
+                         ('<h2 id="act-1">One idea, through all of history.</h2>', '<h2 id="act-1">One idea, through all of history.</h2><p>Building <em>in</em> public</p>'),
+                         ('<h1 id="hero-h">Bring your own everything.</h1>', '<h1 id="hero-h">Bring your own anything.</h1>'),
+                         ('<h2 id="act-1">One idea, through all of history.</h2>', '<h2 id="act-1">One idea, through all of history.</h2><p>Shipped 0.0.12</p>')):
             with self.subTest(new=new), tempfile.TemporaryDirectory() as temp:
                 root = Path(temp) / 'dist'
                 shutil.copytree(ROOT / 'dist', root)
@@ -136,16 +134,15 @@ class Checks(unittest.TestCase):
                     check_site(root)
 
     def test_landing_story(self):
-        # Catches: the example idea or the zoom-out's "This is your factory." dropped, the old example idea
-        # back on the page (in text or a description), and an era painting or How it works square shipped
-        # without a description, which loses that scene for screen-reader visitors.
+        # Catches: the film's "This is your factory." dropped, the old example idea back on the page (in text or a
+        # description), and an era painting shipped without a description, which loses that scene for
+        # screen-reader visitors.
         def no_alt(name):
             return lambda t: re.sub(rf'(<img[^>]*src="/art/{name}"[^>]*?alt=")[^"]*', r'\1', t, count=1)
-        for change in (lambda t: t.replace('Build a to-do app', 'Build an app'),
-                       lambda t: t.replace('This is your factory.', 'This is a factory.'),
-                       lambda t: t.replace('<h2 id="ship-h">Ship log</h2>', '<h2 id="ship-h">Ship log</h2><p>Add a dark mode toggle</p>'),
+        for change in (lambda t: t.replace('This is your factory.', 'This is a factory.'),
+                       lambda t: t.replace('<h2 id="act-1">One idea, through all of history.</h2>', '<h2 id="act-1">One idea, through all of history.</h2><p>Add a dark mode toggle</p>'),
                        lambda t: re.sub(r'(src="/art/era-1-cave.webp"[^>]*alt=")', r'\1A dark-mode idea. ', t, count=1),
-                       no_alt('era-3-forge.webp'), no_alt('era-7-rooms.webp'), no_alt('step-2-answer.webp')):
+                       no_alt('era-3-forge.webp'), no_alt('era-7-rooms.webp'), no_alt('era-2-grill.webp')):
             with self.subTest(change=change), tempfile.TemporaryDirectory() as temp:
                 root = Path(temp) / 'dist'
                 shutil.copytree(ROOT / 'dist', root)
@@ -287,12 +284,12 @@ class Checks(unittest.TestCase):
                 root = Path(temp) / 'dist'
                 shutil.copytree(ROOT / 'dist', root)
                 page = root / 'index.html'
-                page.write_text(page.read_text().replace('<h2 id="ship-h">Ship log</h2>', '<h2 id="ship-h">Ship log</h2>' + extra, 1))
+                page.write_text(page.read_text().replace('<h2 id="act-1">One idea, through all of history.</h2>', '<h2 id="act-1">One idea, through all of history.</h2>' + extra, 1))
                 with self.assertRaises(AssertionError):
                     check_site(root)
 
     def test_install_stays_disabled(self):
-        good = '<button class="btn install" type="button" disabled aria-describedby="install-note">'
+        good = '<button class="btn install" type="button" disabled>'
         for bad in ('<button class="btn install" type="button" aria-disabled="true">',
                     '<button class="btn install" type="button" disabled onclick="copy()">',
                     '<button class="btn install" type="button" disabled onclick ="copy()">',

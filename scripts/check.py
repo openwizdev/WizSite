@@ -8,8 +8,8 @@ import subprocess
 from urllib.parse import unquote, urlsplit
 
 ROOT = Path(__file__).resolve().parents[1]
-# The landing story's art: the approved era paintings and How it works squares, web-sized WebP, plus the
-# cut-out layers for the idle moves (hammer, stamp, rocket). Pinned by hash like the fonts. A changed or new picture
+# The landing film's art: the approved round-3 era paintings, web-sized WebP, plus the cut-out layers for the
+# small moves (hammer, stamp, rocket). Pinned by hash like the fonts. A changed or new picture
 # needs review (including its raw bytes for private markers) before its hash is updated here.
 ART_HASHES = {
     'art/era-1-cave.webp': 'd9c6bf6697489c0970b1aaf0897b4be0cb1c4c1208d8d6ffc0c421c74203d390',
@@ -22,10 +22,6 @@ ART_HASHES = {
     'art/layer-hammer.webp': '963b036ae6ecb931b646134b2bf1b147778028100c5bafccd0d2f9e696f12c51',
     'art/layer-rocket.webp': '04297046455e108974d4a152b07dd77c39ab9d28a1fa9b8fef87d2c521dbef1f',
     'art/layer-stamp.webp': '306522a6cd5952f16e1fe34a2daec89e4861b20f3cc335f0ed6ad8790451d658',
-    'art/step-1-paste.webp': 'c3fbcb016aac4eec3df83ff4f17f2cfafe010b64469055dda85d6c6f26b84cae',
-    'art/step-2-answer.webp': 'f7b8348b5bf393a1c1263383754089d64673f94e12bf21a153559f972e823b24',
-    'art/step-3-approve.webp': '10e5faacc18a392a9de71cc7d68d894ae40a1232c25d8e242390a0466c9805c5',
-    'art/step-4-watch.webp': '34bd4d3371d761403109df430c11155b25ee2f7c77d1d25e89a8d659ee94a2c7',
 }
 ART = set(ART_HASHES)
 # Logo pack. Raster icons and the social card are pinned by hash like the art; a new picture needs review.
@@ -224,8 +220,42 @@ def check_motion(css):
     assert not found, f'motion outside {MOTION_OK}: {found[:3]}'
 
 
+class Words(HTMLParser):
+    """Each run of rendered text (outside script/style), whitespace-collapsed; tags split runs."""
+    def __init__(self, text):
+        super().__init__(convert_charrefs=True)
+        self.runs, self.skip = [], 0
+        self.feed(text)
+
+    def handle_starttag(self, tag, attrs):
+        self.skip += tag in ('script', 'style')
+
+    def handle_endtag(self, tag):
+        if tag in ('script', 'style') and self.skip:
+            self.skip -= 1
+
+    def handle_data(self, data):
+        run = re.sub(r'\s+', ' ', data).strip()
+        if run and not self.skip:
+            self.runs.append(run)
+
+
 def check_landing_text(landing):
     """The landing's rendered words (inside <main>) are only the headline, the buttons and the act captions."""
+    main = re.search(r'<main\b[^>]*>([\s\S]*)</main>', landing)
+    assert main, 'landing has no <main>'
+    runs = Words(main[1]).runs
+    allowed = {HEADLINE, *BUTTONS, *CAPTIONS}
+    extra = [run for run in runs if run not in allowed]
+    assert not extra, f'words on the landing beyond the headline, buttons and captions: {extra[:3]}'
+    for text in (HEADLINE, *BUTTONS):
+        assert runs.count(text) == 1, f'missing or repeated landing text: {text}'
+    for caption in CAPTIONS:
+        assert len(caption.split()) <= CAPTION_WORDS, f'caption over {CAPTION_WORDS} words: {caption}'
+        assert re.search(rf'<h2 id="act-\d">{re.escape(caption)}</h2>', main[1]), f'missing act caption: {caption}'
+    # The film ends on the last act's caption, inside the hero.
+    hero = re.search(r'<section class="hero[\s\S]*?</section>', main[1])
+    assert hero and f'<p class="cap">{CAPTIONS[-1]}</p>' in hero[0], f'the film must end on "{CAPTIONS[-1]}"'
 
 
 def check_vector(data):
@@ -305,13 +335,11 @@ def check_site(root):
         assert re.search(rf'^/\*\.{kind}\n  Cache-Control: public, max-age=0, must-revalidate$', headers, re.M), f'_headers must revalidate .{kind}'
     landing = (root / 'index.html').read_text()
     words = re.sub(r'<[^>]*>', '', landing)
-    headline = re.sub(r'<[^>]*>', '', re.search(r'<h1>([\s\S]*?)</h1>', landing)[1].replace('<br>', ' '))
+    headline = re.sub(r'<[^>]*>', '', re.search(r'<h1\b[^>]*>([\s\S]*?)</h1>', landing)[1].replace('<br>', ' '))
     assert headline == 'Bring your own everything.', 'hero headline changed'
     flat = re.sub(r'\s+', ' ', re.sub(r'<br>', ' ', landing))
     flat = re.sub(r'\s+', ' ', unescape(re.sub(r'<[^>]*>', '', flat)))
-    sub = re.search(r'<p class="sub">([\s\S]*?)</p>', landing)
-    assert sub and re.sub(r'\s+', ' ', unescape(re.sub(r'<[^>]*>', ' ', sub[1]))).strip() == 'You make the decisions. The agents run the factory.', 'hero subline changed'
-    assert 'You make the decisions. The agents run the factory.' in flat, 'hero subline changed'
+    check_landing_text(landing)
     # Rendered text and attribute values (alt, title, meta), decoded, on both pages. Text is read both
     # joined (inline tags can split a word) and spaced; every attribute value is read on its own.
     for path in pages:
@@ -322,22 +350,14 @@ def check_site(root):
             assert not any(word in low for word in BANNED_COPY), f'banned word rendered in {path.name}'
             for text in ('illustration, not live data', 'building in public'):
                 assert text not in low, f'cut copy is back in {path.name}: {text}'
-    for text in ('Star on GitHub', 'Not ready for everyone yet.', 'Idea in. Shipped work out.', 'How it works',
-                 'Build at the speed of ideas.', 'Paste one line into your agent.', 'Answer a few questions.',
-                 'Approve the plan.', 'Watch it ship.', 'Works with what you already use',
-                 'You decide what gets built. Your agents do the work, on the computers you choose. OpenWiz runs the line and shows you every step.',
-                 'Ship log', 'Shipped', 'Being built'):
-        assert text in flat, f'missing landing copy: {text}'
     # Owner cuts (round 6): obvious notes stay off the page.
     for text in ('Illustration, not live data', 'Building in public'):
         assert text.lower() not in flat.lower(), f'cut copy is back: {text}'
-    for text in STORY_COPY:
-        assert text in flat, f'missing landing story copy: {text}'
     for reading in [Text(landing).spaced()] + Text(landing).shown:
         assert not any(old in reading.lower() for old in OLD_EXAMPLE), 'the old example idea is back on the landing'
-    # Every era painting and How it works square says what it shows; only the idle-move layers are decorative.
+    # Every era painting says what it shows; only the small-move layers and the board's thumbnails are decorative.
     for attrs in pages[root / 'index.html'].images:
-        if re.match(r'/art/(era|step)-', attrs.get('src') or ''):
+        if re.match(r'/art/era-', attrs.get('src') or '') and 'card' not in (attrs.get('class') or '').split():
             assert (attrs.get('alt') or '').strip(), f'painting without a description: {attrs.get("src")}'
     check_motion((root / names['site.css']).read_text())
     assert not pages[root / 'index.html'].inline_scripts, 'an inline script runs before site.js; only site.js may enable the animated story'
@@ -359,16 +379,10 @@ def check_site(root):
     assert not re.search(r'install|clipboard', scripts, re.I), 'no script may activate Install or copy the prompt yet'
     assert not re.search(r'\b\d{4}-\d{2}-\d{2}\b', words), 'dated landing promise'
     changelog = (root / 'changelog/index.html').read_text()
-    # The teaser shows only versions the changelog publishes.
-    teaser = re.findall(r'<span class="v">(\d+\.\d+\.\d+)</span><span>([^<]+)</span>', landing)
-    # Each teaser line must match its own release in the ship log (version and headline together).
-    releases = dict(re.findall(r'<article class="rel" id="v[\d.]+"><p class="when"><span class="v">([\d.]+)</span>[\s\S]*?<h3>([\s\S]*?)</h3>', changelog))
-    assert teaser and all(releases.get(v) == h for v, h in teaser), 'ship log teaser line does not match its release'
-    teaser = [v for v, _ in teaser]
     # "Being built" names bundles, never versions.
     being = re.search(r'<ul class="bundle-list">([\s\S]*?)</ul>', changelog)
     assert being and not re.search(r'\d+\.\d+', re.sub(r'<[^>]*>', '', being[1])), 'Being built must not name versions'
-    assert len(re.findall(r'(?<![\d.])\d+\.\d+\.\d+(?![\d.])', flat)) == len(teaser), 'version mentioned outside the changelog teaser'
+    assert not re.search(r'(?<![\d.])\d+\.\d+\.\d+(?![\d.])', flat), 'version mentioned on the landing'
     for name in VECTORS:
         check_vector((root / name).read_bytes())
     total = 0
