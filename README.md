@@ -36,13 +36,51 @@ Cloudflare Pages deploys from **main**. Configure the repository root as the bui
 
 Changes merge after green CI and one review from the other model family. No per-change maintainer approval is required. This repository contains no deployment credentials or separate deploy workflow; the Pages project owns the Git integration.
 
+## The Changelog's releases
+
+Nobody writes the Changelog's release entries by hand. At every build, `scripts/changelog.mjs` reads the published releases of the three versioned repositories (OpenWiz, WizSkills and WizLoops) from GitHub's public API, unauthenticated, and `build.mjs` adds them to `/changelog/` as a *Releases* section after *What exists today*. It holds one part per repository, in that order. Each part lists every published release from 0.1.0 on, patches included, newest first by version. Each entry shows that release's own notes. WizSkills' notes are its Changesets notes. Drafts, pre-releases and releases before 0.1.0 stay on GitHub.
+
+- **OpenWiz entries list the versions they ship with,** read from a `**Ships with**` line in that release's notes and the list items under it (for example `- WizSkills 0.1.2`). An OpenWiz release whose notes have no such list says so.
+- **A part with no release from 0.1.0 on** says "No release yet".
+- **A failed read** says the part is missing: a network error, a non-200 answer, an answer that isn't a list of releases, or a published release whose tag isn't a plain version such as `v1.2.3`. The build never fails on it and never shows an empty history.
+- **Notes are text.** They are escaped. Code and bold keep their look, and links keep only their words.
+
+The generator's tests (`scripts/test_changelog.py`, run by `npm test`) use the synthetic release lists in `scripts/changelog-fixtures/`. To see the section a fixture case produces, run `node scripts/changelog.mjs --fixtures scripts/changelog-fixtures/full`.
+
+### Owner step: rebuild on each release
+
+A release can trigger a rebuild through a Cloudflare Pages deploy hook. This repository doesn't configure one. Setting it up is the owner's step, once the first versioned release ships:
+
+1. In the Cloudflare dashboard, open the WizSite Pages project, then **Settings → Builds → Deploy hooks**. Add a hook named `release` for the `main` branch, and copy its URL. The URL is a secret: anyone who has it can start a build.
+2. In each releasing repository (OpenWiz, WizSkills and WizLoops), add the URL as an Actions secret named `WIZSITE_DEPLOY_HOOK`.
+3. In each of them, add a workflow that posts to the hook when a release is published:
+
+   ```yaml
+   name: Rebuild openwiz.dev
+   on:
+     release:
+       types: [published]
+   permissions: {}
+   jobs:
+     rebuild:
+       runs-on: ubuntu-latest
+       steps:
+         - run: curl -fsS -X POST "$HOOK"
+           env:
+             HOOK: ${{ secrets.WIZSITE_DEPLOY_HOOK }}
+   ```
+
+4. Publish a release, or re-run the workflow, and check that a new production deployment starts in Pages and that `/changelog/` lists the release.
+
+Without the hook, the Changelog changes only when WizSite itself next deploys.
+
 ## Site assets
 
 WizSite owns `tokens.css`. The landing page and the Changelog use it with `site.css`; the Changelog keeps its own styles inline in `changelog/index.html`, so the landing never loads them. The landing also loads the pinned GSAP 3.15.1 core and `site.js`. The build fingerprints these styles and scripts so new HTML gets the matching assets. The GreenSock Standard No Charge licence and the agent icon notices ship in `vendor/`.
 
 The landing page opens on an Ember-style OpenWiz window that walks through one to-do build. Painted WebP costume and crew sprites sit alongside HTML ticket states and an SVG working pulse. Below it are the supported agent logos and three product moments. The spec card describes steering the build from a narrated video and includes a labeled silent sample that loads on request. The footer's twelve waving Wizes look toward the pointer. The demo pauses off screen, offers a Pause motion control and keeps a readable still when reduced motion is on or either script is unavailable. The OpenWiz install button stays disabled as **Install · coming soon**. Sign in and the phone home-screen instructions lead to the existing app.
 
-`/changelog` is the **Changelog**. A small picture of how the public repositories fit together opens it, then one *What exists today* section: one part per public repository, each opening with two or three plain sentences, then what a person can use now, written from merged code. Private repositories appear only as "private records and tools". It holds no release entries, version numbers or dates; release notes stay on GitHub's releases.
+`/changelog` is the **Changelog**. A small picture of how the public repositories fit together opens it, then one *What exists today* section: one part per public repository, each opening with two or three plain sentences, then what a person can use now, written from merged code. Private repositories appear only as "private records and tools". *What exists today* holds no release entries, version numbers or dates. After it, the build adds a generated *Releases* section; see below.
 
 The logo files are the favicons (`favicon.ico` with 16, 32 and 48 px images, `favicon.svg`, `apple-touch-icon.png`), the header lockup `brand/openwiz-lockup.svg` and the 1200×630 social card `brand/og.png` (the lockup on the site ground, rendered from the SVG). The lockup's wordmark is converted to outlines: the SVG has no text and no font reference, and the check refuses one that does, so the wordmark font never ships.
 
