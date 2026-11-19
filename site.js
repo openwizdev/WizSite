@@ -36,7 +36,6 @@
   addEventListener('scroll', queue, { passive: true });
   addEventListener('resize', queue);
   still.addEventListener('change', reset);
-  queue();
 
   // The idle moves (hammer, stamp, rocket) run only while their painting is on screen.
   if ('IntersectionObserver' in window) {
@@ -52,4 +51,9 @@
     pause.setAttribute('aria-pressed', String(paused));
     root.classList.toggle('motion-paused', paused);
   });
+
+  // Only now, with every handler in place, switch on the animated story (sticky zoom-out, Pause motion), and set
+  // the scroll state at once. If this file never loads, the page keeps its still layout with every scene shown.
+  root.classList.add('story-live');
+  frame();
 })();
