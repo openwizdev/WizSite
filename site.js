@@ -223,9 +223,6 @@ function followPointer(gsap, paused, signal) {
 function enableMotion(gsap) {
   const preference = matchMedia('(prefers-reduced-motion: no-preference)');
   const pause = document.querySelector('.demo-pause');
-  const play = document.querySelector('.spec-play');
-  const video = document.querySelector('.spec-video');
-  const still = document.querySelector('.spec-screen');
   let controller;
 
   const configure = () => {
@@ -237,7 +234,6 @@ function enableMotion(gsap) {
     const updateHero = showHero(gsap, isPaused, signal);
     const updateEyes = followPointer(gsap, isPaused, signal);
     pause.hidden = false;
-    play.hidden = false;
     pause.addEventListener('click', () => {
       const paused = !isPaused();
       pause.setAttribute('aria-pressed', String(paused));
@@ -245,29 +241,60 @@ function enableMotion(gsap) {
       updateHero();
       updateEyes();
     }, { signal });
-    play.addEventListener('click', async () => {
-      video.hidden = false;
-      still.hidden = true;
-      try {
-        video.currentTime = 0;
-        await video.play();
-        if (!signal.aborted) video.focus();
-      } catch {
-        video.hidden = true;
-        still.hidden = false;
-      }
-    }, { signal });
     signal.addEventListener('abort', () => {
       pause.hidden = true;
-      play.hidden = true;
-      video.pause();
-      video.hidden = true;
-      still.hidden = false;
     }, { once: true });
   };
   preference.addEventListener('change', configure);
   configure();
 }
 
+// The "Watch your spec" moment (#1405). The video loads only when it first plays. With motion it plays muted while it
+// is in view; with reduced motion, Pause motion or the tab hidden it waits on its poster. It never starts with sound on
+// its own: "Play with sound" does that on request, and from then on (or once the visitor uses its own controls) the
+// visitor drives it and scrolling no longer starts or stops it. It needs only this script, not GSAP.
+function specVideo() {
+  const video = document.querySelector('.spec-video');
+  const sound = document.querySelector('.spec-play');
+  const pause = document.querySelector('.demo-pause');
+  if (!video || !sound) return;
+  const calm = matchMedia('(prefers-reduced-motion: reduce)');
+  let inView = false;
+  let visitor = false; // the visitor has taken over playback
+  let ours = 0; // play and pause events we caused, not the visitor
+  const update = () => {
+    if (visitor) return;
+    const ambient = inView && !calm.matches && pause.getAttribute('aria-pressed') !== 'true' && !document.hidden;
+    if (ambient && video.paused) {
+      ours += 1;
+      video.muted = true;
+      video.play().catch(() => { ours = 0; });
+    } else if (!ambient && !video.paused) {
+      ours += 1;
+      video.pause();
+    }
+  };
+  const take = () => {
+    if (ours > 0) ours -= 1;
+    else visitor = true;
+  };
+  video.addEventListener('play', take);
+  video.addEventListener('pause', take);
+  video.addEventListener('volumechange', () => { if (!video.muted) visitor = true; });
+  new IntersectionObserver(([entry]) => { inView = entry.isIntersecting; update(); }, { threshold: .5 }).observe(video);
+  calm.addEventListener('change', update);
+  document.addEventListener('visibilitychange', update);
+  pause.addEventListener('click', () => setTimeout(update));
+  sound.hidden = false;
+  sound.addEventListener('click', () => {
+    visitor = true;
+    video.muted = false;
+    video.loop = false;
+    video.currentTime = 0;
+    video.play().catch(() => {});
+  });
+}
+
 showStars().catch(() => {});
+specVideo();
 if (window.gsap) enableMotion(window.gsap);

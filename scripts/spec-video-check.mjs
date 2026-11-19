@@ -146,6 +146,10 @@ const FACTS = `(() => {
     sound: shown(sound) && /sound/i.test(sound.textContent + (sound.getAttribute('aria-label') || '')),
     link: shown(link), cues: track ? (track.cues?.length || 0) : -1, captions: track ? track.mode : 'none',
     sideways: document.documentElement.scrollWidth > innerWidth,
+    inside: !moment || [...moment.querySelectorAll('video, .spec-play, a')].filter(shown).every(el => {
+      const r = el.getBoundingClientRect(), m = moment.getBoundingClientRect();
+      return r.left >= m.left - 0.5 && r.right <= m.right + 0.5;
+    }),
   };
 })()`;
 // Polled from Node: with no JavaScript the page's own timers never run.
@@ -187,6 +191,7 @@ async function moment(page, where, name, width) {
   }
   expect(scripted ? facts.sound : true, where, 'no visible "Play with sound" control');
   if (scripted) expect(!facts.sideways, where, 'the page scrolls sideways with the moment in view');
+  expect(facts.inside, where, 'the video, its control or its link sticks out of the moment\'s card');
   if (process.env.SHOTS && name === 'motion') await page.shot(join(process.env.SHOTS, `spec-moment-${width}.png`));
 
   if (ambient) {

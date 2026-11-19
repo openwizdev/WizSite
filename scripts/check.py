@@ -32,6 +32,9 @@ ART_HASHES = {
     'art/hero-samurai-frames.webp': '3a6eef42bfd2fc6f7b8e847d4355d75c283425a274b5fb9c95c3404f580725c5',
     'art/hero-steam-frames.webp': '20f057c963be16ebc3cabbf1d2ab849e2e8144d29a3e419344a867eef2c41f3c',
     'art/spec-demo.webm': '6619ae77a13229d9056037e5bc793d48f7fc98490d068c2b6e4f58426a8fac22',
+    # The spec video's poster frame and captions (#1405), pinned with the video they belong to.
+    'art/spec-poster.webp': 'f4749f7b20c1785c147b5184979a554015e0aed492b935b0fb12d1b32498b645',
+    'art/spec-demo.vtt': '59a9c8c6527ff79ce2f7be38211be9e0fa91cbefeb30ac0606844081ebb0e645',
 }
 ART = set(ART_HASHES)
 # Logo pack. Raster icons and the social card are pinned by hash like the art; a new picture needs review.
@@ -148,6 +151,8 @@ class Page(HTMLParser):
         self.buttons = []
         self.images = []
         self.videos = []
+        self.tracks = []
+        self.links = []
         self.inline_scripts = 0
         self.stylesheets, self.scripts = [], []
         self.feed(text)
@@ -166,6 +171,10 @@ class Page(HTMLParser):
             self.images.append(attrs)
         if tag == 'video':
             self.videos.append(attrs)
+        if tag == 'track':
+            self.tracks.append(attrs)
+        if tag == 'a':
+            self.links.append(attrs)
         if tag == 'script' and not attrs.get('src'):
             self.inline_scripts += 1
         # Only references the browser applies: an enabled stylesheet for all media, a script of a runnable type.
@@ -305,7 +314,13 @@ def check_site(root):
     assert not page.inline_scripts, 'landing motion must wait for both external scripts'
     assert len(page.videos) == 1, 'expected one spec recording'
     clip = page.videos[0]
-    assert clip.get('preload') == 'none' and 'autoplay' not in clip and 'hidden' in clip, 'spec recording must be opt-in'
+    # The spec video (#1405) loads only when it first plays, and site.js starts it muted inline, never with sound;
+    # its poster, default captions and a plain link to the video show without any script.
+    assert clip.get('preload') == 'none' and 'autoplay' not in clip, 'spec recording must be opt-in'
+    assert 'muted' in clip and 'playsinline' in clip, 'spec video must start muted inline'
+    assert clip.get('poster', '').removeprefix('/') in ART, 'spec video needs a pinned poster'
+    assert any(t.get('kind') == 'captions' and 'default' in t and t.get('src', '').removeprefix('/') in ART for t in page.tracks), 'spec video needs default captions'
+    assert any(a.get('href') == clip.get('src') and 'hidden' not in a for a in page.links), 'needs a plain link to the spec video'
     for attrs in page.buttons:
         if attrs.get('class') in ('demo-pause', 'spec-play'):
             assert 'hidden' in attrs, 'motion controls must wait for both scripts'
@@ -607,6 +622,8 @@ def check_art(name, data):
     assert name in ART_HASHES and sha256(data).hexdigest() == ART_HASHES[name], 'unreviewed art or recording'
     if name.endswith('.webp'):
         check_webp(data)
+    elif name.endswith('.vtt'):
+        assert data.startswith(b'WEBVTT') and data.decode('utf-8'), 'invalid WebVTT captions'
     else:
         assert data[:4] == b'\x1a\x45\xdf\xa3' and b'webm' in data[:64], 'invalid WebM header'
     assert not any(marker.encode() in data.lower() for marker in DENYLIST), f'private marker in {name}'
@@ -620,7 +637,7 @@ def check_privacy(path, data):
         assert sha256(data).hexdigest() == FONT_HASHES[font], 'unreviewed font or licence'
     if path.endswith('.woff2'):
         assert font in FONT_HASHES, 'unreviewed binary font'
-    if path.endswith(('.webp', '.webm')):
+    if path.endswith(('.webp', '.webm', '.vtt')):
         check_art(font, data)
     if path.endswith(('.png', '.ico')):
         pinned = DOC_HASHES.get(path) or ICON_HASHES.get(font)
