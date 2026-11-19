@@ -286,6 +286,25 @@ class Checks(unittest.TestCase):
                 with self.assertRaisesRegex(AssertionError, error):
                     check_site(root)
 
+    def test_spec_video_poster_captions_and_link(self):
+        # Catches: the spec video losing its poster, captions, plain link or lazy, muted inline start (#1405).
+        for change, error in (
+                (lambda t: re.sub(r' poster="[^"]*"', '', t, count=1), 'spec video needs a pinned poster'),
+                (lambda t: re.sub(r'<track [^>]*>', '', t, count=1), 'spec video needs default captions'),
+                (lambda t: t.replace('class="spec-link"', 'class="spec-link" hidden', 1), 'plain link to the spec video'),
+                (lambda t: t.replace(' muted', '', 1), 'spec video must start muted inline'),
+                (lambda t: t.replace('preload="none"', 'preload="auto"', 1), 'recording must be opt-in')):
+            with self.subTest(error=error), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp) / 'dist'
+                shutil.copytree(ROOT / 'dist', root)
+                landing = root / 'index.html'
+                text = landing.read_text()
+                changed = change(text)
+                self.assertNotEqual(changed, text)
+                landing.write_text(changed)
+                with self.assertRaisesRegex(AssertionError, error):
+                    check_site(root)
+
     def test_transition_duration_respects_reduced_motion(self):
         with self.assertRaisesRegex(AssertionError, 'motion outside'):
             check_motion('.x { transition-duration: .35s } .x:hover { opacity: .5 }')
