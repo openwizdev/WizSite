@@ -599,6 +599,59 @@ async function main() {
       checkRequestLog(world);
       await page.close();
     });
+    // ---- #1325: a first sign-in with no installation ----
+
+    await check('#1325: no installation yet: one more step installs OpenWiz Viewer, and the return lists the repositories', async () => {
+      const world = new World();
+      let installed = false;
+      world.rest['/user/installations'] = async () => ({ status: 200,
+        json: installed ? await fixture('installations.json') : { total_count: 0, installations: [] } });
+      const page = await open(browser, world);
+      await page.go(`${SITE}/app/?code=c0de&state=${STATE}`);
+      await page.until(`/one more step/i.test(document.body.innerText)`, 'the one-more-step message');
+      assert((await page.text()).includes('One more step: let OpenWiz Viewer read your repositories'), 'the message is not the plain one-more-step sentence');
+      const main = await page.run(`[...document.querySelectorAll('a.btn.primary')].filter(a => a.offsetParent !== null).map(a => a.getAttribute('href'))`);
+      assert(JSON.stringify(main) === JSON.stringify(['https://github.com/apps/openwiz-viewer/installations/new']),
+        `the main button is ${JSON.stringify(main)}, not the direct install link`);
+      assert(!(await page.text()).includes('Choose repositories on GitHub'), 'the empty state still offers the settings link');
+      await page.size(320, 640, true);
+      const width = await page.run('document.documentElement.scrollWidth');
+      assert(width <= 320, `the one-more-step screen is ${width} CSS pixels wide on a 320-pixel phone`);
+      await page.size(null);
+      if (process.env.SHOTS) await page.shot(join(process.env.SHOTS, 'install-phone.png'), 390, 844, true);
+      // GitHub sends the installer back to the setup URL with installation_id and setup_action; still signed in.
+      installed = true;
+      await page.go(`${SITE}/app/?installation_id=1001&setup_action=install`);
+      await page.until(`document.body.innerText.includes('acme/factory') && document.body.innerText.includes('acme/site')`, 'the filled picker');
+      assert(await page.run('location.search') === '', 'the setup parameters stayed in the address');
+      const text = await page.text();
+      assert(!/one more step/i.test(text), 'the filled picker still asks for one more step');
+      assert(text.includes('Choose repositories on GitHub'), 'the filled picker lost its link');
+      const swaps = world.log.filter(r => r.path === '/api/sign-in/token').length;
+      assert(swaps === 1, `returning from the install exchanged ${swaps} codes, not the one sign-in`);
+      checkRequestLog(world);
+      await page.close();
+    });
+
+    await check('#1325 R1: an existing installation with no readable repository keeps the picker and its settings link', async () => {
+      for (const [name, reply, shown] of [
+        ['no readable repository', { status: 200, json: { total_count: 0, repositories: [] } }, /can.t see any repository yet/i],
+        ['a failed repository read', { status: 502, json: { message: 'Bad Gateway' } }, /some may be missing/i],
+      ]) {
+        const world = new World();
+        world.rest['/user/installations/1001/repositories'] = async () => reply;
+        const page = await open(browser, world);
+        await page.go(`${SITE}/app/?code=c0de&state=${STATE}`);
+        await page.until(`document.body.innerText.includes('Choose repositories on GitHub') || /one more step/i.test(document.body.innerText)`, `the picker (${name})`);
+        const text = await page.text();
+        assert(!/one more step/i.test(text), `${name}: an existing installation is asked to install again`);
+        assert(shown.test(text), `${name}: the picker does not say ${shown}`);
+        const href = await page.run(`[...document.querySelectorAll('a')].find(a => a.textContent.trim() === 'Choose repositories on GitHub')?.getAttribute('href')`);
+        assert(href === 'https://github.com/settings/installations', `${name}: the settings link is ${href}`);
+        checkRequestLog(world);
+        await page.close();
+      }
+    });
   } finally {
     await browser.close();
   }
