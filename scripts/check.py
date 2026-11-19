@@ -120,7 +120,7 @@ PHONE_QUERY = re.compile(r'\(max-width:[0-9]+px\)')
 # the page, then one "What exists today" section with one part per public repository, each opening with two or
 # three plain sentences. Private repositories appear at most as "private records and tools". No release entry,
 # version number or date: the old release list stays on GitHub's releases. Its reviewed text is pinned below.
-CHANGELOG_MAIN = '8da41a55cf9b4468da03c339bc3296066163bda9a71fd56d19fcffa9fc1c56db'
+CHANGELOG_MAIN = 'a41401f686dd700c766358c47d89375a89f1faad74b668574d35cf5c0ac45567'
 CHANGELOG_LINKS = ('/changelog/', '/changelog')
 PUBLIC_REPOS = ('OpenWiz', 'WizSkills', 'WizLoops', 'WizPlugins', 'WizSite')
 PUBLIC_WIZ_NAMES = set(PUBLIC_REPOS) | {'WizBar'}  # WizBar is WizPlugins' plugin, not a repository
