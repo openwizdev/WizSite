@@ -121,7 +121,7 @@ class Checks(unittest.TestCase):
                          ('<h2 id="ship-h">Ship log</h2>', '<h2 id="ship-h">Ship log</h2><p>Building <em>in</em> public</p>'),
                          ('<p class="sub">You make the decisions.<br>The agents run the factory.</p>', '<p class="sub">You decide.<br>Agents build.</p>'),
                          ('<p class="sub">You make the decisions.<br>The agents run the factory.</p>', ''),
-                         ('<h1>Build at the<br>speed of<br>ideas.</h1>', '<h1>Build at the<br>speed of<br>thought.</h1>'),
+                         ('<h1>Bring your<br>own<br>everything.</h1>', '<h1>Bring your<br>own<br>anything.</h1>'),
                          ('<span class="v">0.0.12</span><span>Scripts and agents can drive OpenWiz</span>', '<span class="v">0.0.12</span><span>A cockpit for your phone and PC</span>')):
             with self.subTest(new=new), tempfile.TemporaryDirectory() as temp:
                 root = Path(temp) / 'dist'

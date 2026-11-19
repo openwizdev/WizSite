@@ -247,7 +247,7 @@ def check_site(root):
     landing = (root / 'index.html').read_text()
     words = re.sub(r'<[^>]*>', '', landing)
     headline = re.sub(r'<[^>]*>', '', re.search(r'<h1>([\s\S]*?)</h1>', landing)[1].replace('<br>', ' '))
-    assert headline == 'Build at the speed of ideas.', 'hero headline changed'
+    assert headline == 'Bring your own everything.', 'hero headline changed'
     flat = re.sub(r'\s+', ' ', re.sub(r'<br>', ' ', landing))
     flat = re.sub(r'\s+', ' ', unescape(re.sub(r'<[^>]*>', '', flat)))
     sub = re.search(r'<p class="sub">([\s\S]*?)</p>', landing)
@@ -264,9 +264,9 @@ def check_site(root):
             for text in ('illustration, not live data', 'building in public'):
                 assert text not in low, f'cut copy is back in {path.name}: {text}'
     for text in ('Star on GitHub', 'Not ready for everyone yet.', 'Idea in. Shipped work out.', 'How it works',
-                 'OpenWiz runs your factory.', 'WizSkills are the skills your agents follow.',
-                 'WizPlugins put the controls in Cloudroom.',
-                 'You decide what gets built. WizSkills tell the agents how. OpenWiz runs the line and shows you every step.',
+                 'Build at the speed of ideas.', 'Paste one line into your agent.', 'Answer a few questions.',
+                 'Approve the plan.', 'Watch it ship.', 'Works with what you already use',
+                 'You decide what gets built. Your agents do the work, on the computers you choose. OpenWiz runs the line and shows you every step.',
                  'Ship log', 'Shipped', 'Being built'):
         assert text in flat, f'missing landing copy: {text}'
     # Owner cuts (round 6): obvious notes stay off the page.
