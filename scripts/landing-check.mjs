@@ -94,7 +94,7 @@ const MODES = {
 };
 const WIDTHS = [[320, 640], [390, 844], [800, 1000], [1280, 800]];
 
-async function open(browser, origin, width, height, mode) {
+async function open(browser, origin, width, height, mode, path = '/') {
   const { targetId } = await browser.send('Target.createTarget', { url: 'about:blank' });
   const { sessionId } = await browser.send('Target.attachToTarget', { targetId, flatten: true });
   const send = (method, params) => browser.send(method, params, sessionId);
@@ -106,7 +106,7 @@ async function open(browser, origin, width, height, mode) {
   await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: mode.reduced ? 'reduce' : 'no-preference' }] });
   if (mode.noScript) await send('Emulation.setScriptExecutionDisabled', { value: true });
   const loaded = new Promise(resolve => browser.on(m => m.sessionId === sessionId && m.method === 'Page.loadEventFired' && resolve()));
-  await send('Page.navigate', { url: `${origin}/` });
+  await send('Page.navigate', { url: `${origin}${path}` });
   await loaded;
   // With scripts disabled, evaluation still works through the protocol (it is the page's scripts that stop).
   const evaluate = async expression => {
@@ -351,6 +351,31 @@ async function handoff(page, where) {
   expect(now.length === 0, where, `a Wiz still reacts more than a second after the last click (Wiz ${now.join(', ')})`);
 }
 
+// The owner's fix 3: every site page outside the app has the landing's exact top bar (the cream mark, the GitHub
+// logo with its star count or the logo alone, Sign in) and its footer, with no sideways scroll.
+async function chrome(page, where, mode) {
+  const facts = await page.evaluate(`(() => { ${HELPERS}
+    const bar = document.querySelector('header.landing-nav');
+    const mark = bar?.querySelector('.landing-brand svg');
+    const star = bar?.querySelector('.github-star');
+    const footer = document.querySelector('footer.landing-footer');
+    return {
+      scroll: document.scrollingElement.scrollWidth, inner: innerWidth,
+      mark: shown(mark) && mark.querySelector('[fill="#cfc6b8"]') !== null,
+      star: shown(star) && star.getAttribute('href') === 'https://github.com/openwizdev/openwiz' && shown(star.querySelector('svg')),
+      signIn: shown(bar?.querySelector('a.sign-in[href="/app/"]')),
+      footer: shown(footer?.querySelector('.footer-wordmark')) && footer.querySelectorAll('.family-wiz').length === 12,
+      font: getComputedStyle(document.body).fontFamily.split(',')[0].trim(),
+    };
+  })()`);
+  expect(facts.scroll <= facts.inner, where, `sideways scroll (${facts.scroll}px content in a ${facts.inner}px window)`);
+  expect(facts.mark, where, 'the top bar lacks the cream mark');
+  expect(facts.star, where, 'the top bar lacks the GitHub logo link');
+  expect(facts.signIn, where, 'the top bar lacks Sign in');
+  expect(facts.footer, where, 'the page lacks the landing footer (wordmark and Wizes)');
+  expect(facts.font === 'Geist', where, `the page is not set in the landing's type (${facts.font})`);
+}
+
 async function main() {
   const server = await serve();
   const origin = `http://127.0.0.1:${server.address().port}`;
@@ -362,6 +387,7 @@ async function main() {
         const page = await open(browser, origin, width, height, mode);
         try {
           await layout(page, where, width, name);
+          await chrome(page, where, name);
           if (process.env.SHOTS && name === 'motion' && (width === 390 || width === 1280)) {
             await page.shot(join(process.env.SHOTS, `landing-${width}.png`));
           }
@@ -370,6 +396,15 @@ async function main() {
           if ((name === 'motion' || name === 'reduced') && (width === 390 || width === 1280)) await family(page, where, name);
         } finally {
           await page.close();
+        }
+        const changelog = await open(browser, origin, width, height, mode, '/changelog/');
+        try {
+          await chrome(changelog, `/changelog/ ${where}`, name);
+          if (process.env.SHOTS && name === 'motion' && (width === 390 || width === 1280)) {
+            await changelog.shot(join(process.env.SHOTS, `changelog-${width}.png`));
+          }
+        } finally {
+          await changelog.close();
         }
       }
     }
