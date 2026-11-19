@@ -26,12 +26,16 @@
     set(key, value) { localStorage.setItem(key, JSON.stringify(value)); },
     drop(key) { localStorage.removeItem(key); },
   };
+  // A sign-in is one session: a random id kept beside the token. Anything started for a session (a token refresh,
+  // a picker read, a feed read) is dropped when it ends: on Sign out, or when a new sign-in replaces it.
   const auth = {
     get: () => store.get(AUTH_KEY),
+    session: () => store.get(AUTH_KEY)?.session ?? null,
     signedIn: () => Boolean(store.get(AUTH_KEY)?.token),
-    keep(grant) {
+    keep(grant, session) {
       const now = Date.now();
       store.set(AUTH_KEY, {
+        session,
         token: grant.access_token,
         expiresAt: grant.expires_in ? now + grant.expires_in * 1000 : null,
         refresh: grant.refresh_token || null,
@@ -41,6 +45,10 @@
     signOut() {
       store.drop(AUTH_KEY);
       store.drop(REPO_KEY);
+      refreshing = null;
+      stop();
+      // A new sign-in may be another account, with its own GitHub limit.
+      Object.assign(limit, { remaining: null, limit: null, pausedUntil: null });
     },
   };
   const repo = {
@@ -80,56 +88,116 @@
     const response = await ask('POST', '/api/sign-in/token', { code, state });
     const grant = response.ok ? await response.json() : null;
     if (!grant?.access_token) throw new Error('the sign-in did not finish');
-    auth.keep(grant);
+    auth.keep(grant, crypto.randomUUID());
   }
+  // One token refresh at a time, for one session. Its answer is kept only if that session is still the current one.
   let refreshing = null;
-  function refresh() {
-    refreshing ||= (async () => {
-      const kept = auth.get();
-      if (!kept?.refresh || (kept.refreshExpiresAt && kept.refreshExpiresAt < Date.now())) return false;
-      const response = await ask('POST', '/api/sign-in/refresh', { refresh_token: kept.refresh });
-      const grant = response.ok ? await response.json() : null;
-      if (!grant?.access_token) return false;
-      auth.keep(grant);
-      return true;
-    })().catch(() => false).finally(() => { refreshing = null; });
-    return refreshing;
+  function refresh(session) {
+    if (refreshing?.session !== session) {
+      const run = (async () => {
+        const kept = auth.get();
+        if (kept?.session !== session || !kept.refresh || (kept.refreshExpiresAt && kept.refreshExpiresAt < Date.now())) return false;
+        const response = await ask('POST', '/api/sign-in/refresh', { refresh_token: kept.refresh });
+        const grant = response.ok ? await response.json() : null;
+        if (auth.session() !== session || !grant?.access_token) return false;
+        auth.keep(grant, session);
+        return true;
+      })().catch(() => false).finally(() => { if (refreshing?.run === run) refreshing = null; });
+      refreshing = { session, run };
+    }
+    return refreshing.run;
   }
 
-  // A GitHub request with the token. An expired token is refreshed once; a refused refresh signs out.
+  // The session ended (signed out or replaced) while a request was out: its result is dropped, quietly.
+  class Ended extends Error {}
+  // GitHub refused the sign-in itself (expired and not refreshable): the user has to sign in again.
+  class SignedOut extends Error {}
+
+  // A GitHub request with this session's token. An expired token is refreshed once; a refused refresh signs out.
+  // Every await is followed by a check that the session that started the request is still the current one.
   async function github(method, path, body) {
+    const session = auth.session();
+    if (!session) throw new Ended();
+    const still = () => { if (auth.session() !== session) throw new Ended(); };
     for (let attempt = 0; attempt < 2; attempt += 1) {
       const kept = auth.get();
-      if (!kept?.token) throw new SignedOut();
-      if (kept.expiresAt && kept.expiresAt < Date.now() + 60_000 && attempt === 0 && !(await refresh())) {
-        auth.signOut();
-        throw new SignedOut();
+      if (kept.expiresAt && kept.expiresAt < Date.now() + 60_000 && attempt === 0) {
+        const renewed = await refresh(session);
+        still();
+        if (!renewed) {
+          auth.signOut();
+          throw new SignedOut();
+        }
       }
       const response = await ask(method, `${API}${path}`, body, {
         Authorization: `Bearer ${auth.get().token}`,
         Accept: 'application/vnd.github+json',
       });
+      still();
       if (response.status !== 401) return response;
-      if (attempt === 0 && (await refresh())) continue;
+      const renewed = attempt === 0 && (await refresh(session));
+      still();
+      if (renewed) continue;
       auth.signOut();
       throw new SignedOut();
     }
     throw new SignedOut();
   }
-  class SignedOut extends Error {}
 
   // ---- The repository picker's read: every repository the user's installations of the App can see ----
 
-  async function repositories() {
-    const installs = await github('GET', '/user/installations?per_page=100');
-    if (!installs.ok) throw new Error(`GitHub answered ${installs.status}`);
-    const out = [];
-    for (const install of (await installs.json()).installations || []) {
-      const page = await github('GET', `/user/installations/${encodeURIComponent(install.id)}/repositories?per_page=100`);
-      if (!page.ok) throw new Error(`GitHub answered ${page.status}`);
-      for (const r of (await page.json()).repositories || []) out.push({ full: r.full_name, private: Boolean(r.private) });
+  // The next page of a GitHub list, only if its Link header points at the same route on api.github.com with
+  // nothing but per_page and page; anything else is not followed (and the list is reported incomplete).
+  const MAX_PAGES = 50;
+  function nextPage(response, path) {
+    const link = (response.headers.get('Link') || '').split(',').map(part => part.match(/^\s*<([^>]*)>\s*;\s*rel="next"\s*$/)).find(Boolean);
+    if (!link) return { done: true };
+    let url;
+    try { url = new URL(link[1]); } catch { return { done: false }; }
+    const keys = [...url.searchParams.keys()];
+    const fine = url.origin === API && url.pathname === path && !url.hash && !url.username && !url.password
+      && keys.every(key => key === 'per_page' || key === 'page') && /^\d+$/.test(url.searchParams.get('page') || '');
+    return fine ? { next: `${url.pathname}${url.search}` } : { done: false };
+  }
+  // Every page of one list: {items, complete}. The first page failing throws; a later one makes it incomplete.
+  async function every(path, field) {
+    const items = [];
+    let at = `${path}?per_page=100`;
+    for (let page = 0; page < MAX_PAGES; page += 1) {
+      const response = await github('GET', at);
+      if (!response.ok) {
+        if (!page) throw new Error(`GitHub answered ${response.status}`);
+        return { items, complete: false };
+      }
+      const body = await response.json().catch(() => null);
+      if (!Array.isArray(body?.[field])) {
+        if (!page) throw new Error('GitHub answered an unreadable list');
+        return { items, complete: false };
+      }
+      items.push(...body[field]);
+      const next = nextPage(response, path);
+      if (!next.next) return { items, complete: next.done };
+      at = next.next;
     }
-    return out.sort((a, b) => a.full.localeCompare(b.full));
+    return { items, complete: false };
+  }
+
+  async function repositories() {
+    const installs = await every('/user/installations', 'installations');
+    let complete = installs.complete;
+    const repos = [];
+    for (const install of installs.items) {
+      if (!Number.isSafeInteger(install?.id)) { complete = false; continue; }
+      try {
+        const page = await every(`/user/installations/${install.id}/repositories`, 'repositories');
+        complete &&= page.complete;
+        for (const r of page.items) if (typeof r?.full_name === 'string') repos.push({ full: r.full_name, private: Boolean(r.private) });
+      } catch (error) {
+        if (error instanceof Ended || error instanceof SignedOut) throw error;
+        complete = false;
+      }
+    }
+    return { repos: repos.sort((a, b) => a.full.localeCompare(b.full)), complete };
   }
 
   // ---- Feeds: the reads pages show, each on its own schedule ----
@@ -199,6 +267,7 @@
       feed.readAt = Date.now();
       feed.failedAt = null;
     } catch (error) {
+      if (error instanceof Ended) return;
       if (error instanceof SignedOut) {
         OW.onSignedOut?.();
         return;
@@ -234,7 +303,7 @@
       clearTimeout(feed.timer);
       Object.assign(feed, { state: 'loading', data: null, readAt: null, failedAt: null, busy: false });
     }
-    limit.pausedUntil = null;
+    // GitHub's limit belongs to the signed-in account, not the repository: a pause outlives a repository change.
   }
   // Read everything now (the Refresh button), unless GitHub's limit is low.
   function refreshAll() {
@@ -253,7 +322,7 @@
   });
 
   OW.data = {
-    auth, repo, feeds, limit, paused, finishSignIn, repositories, start, stop, refreshAll, SignedOut,
+    auth, repo, feeds, limit, paused, finishSignIn, repositories, start, stop, refreshAll, SignedOut, Ended,
     onChange: listener => listeners.add(listener),
   };
 })();

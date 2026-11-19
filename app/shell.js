@@ -32,28 +32,38 @@
     );
   }
 
+  // Sign out is offered on every picker screen: loading, failed and listed.
+  const signOutButton = () => h('button', { class: 'btn', type: 'button', onclick: () => { data.auth.signOut(); signedOut(); } }, 'Sign out');
+
   async function picker() {
     data.stop();
-    screen(h('h1', {}, 'Pick a repository'), h('p', {}, 'Reading your repositories from GitHub…'));
-    let repos;
+    const session = data.auth.session();
+    screen(h('h1', {}, 'Pick a repository'), h('p', {}, 'Reading your repositories from GitHub…'), h('p', { class: 'small' }, signOutButton()));
+    let found;
     try {
-      repos = await data.repositories();
+      found = await data.repositories();
     } catch (error) {
+      if (data.auth.session() !== session || error instanceof data.Ended) return; // signed out (or in again) meanwhile
       if (error instanceof data.SignedOut) return signedOut('Your sign-in ended. Sign in again.');
       return screen(h('h1', {}, 'Pick a repository'),
         h('div', { class: 'notices' }, h('div', { class: 'notice bad', role: 'alert' }, icon('warn'),
           h('span', {}, h('b', {}, 'Couldn\'t read your repositories. '), 'GitHub didn\'t answer, so the list is unknown, not empty.'))),
-        h('button', { class: 'btn', type: 'button', onclick: picker }, icon('refresh'), 'Try again'));
+        h('p', { class: 'actions' }, h('button', { class: 'btn', type: 'button', onclick: picker }, icon('refresh'), 'Try again'), ' ', signOutButton()));
     }
+    if (data.auth.session() !== session) return; // this list belongs to a sign-in that has ended
+    const repos = found.repos;
     const list = h('ul', { class: 'repos' }, repos.map(r => h('li', {},
       h('button', { type: 'button', onclick: () => { data.repo.pick(r.full); location.hash = '#/you'; draw(); } }, r.full),
       h('span', { class: 'tag' }, r.private ? 'Private' : 'Public'))));
     screen(
       h('h1', {}, 'Pick a repository'),
-      h('p', {}, repos.length ? 'The app opens straight to it on this device next time.' : 'The app can\'t see any repository yet.'),
+      found.complete ? null : h('div', { class: 'notices' }, h('div', { class: 'notice bad', role: 'alert' }, icon('warn'),
+        h('span', {}, h('b', {}, 'Only part of your repositories could be read, '), 'so some may be missing. '),
+        h('button', { class: 'btn', type: 'button', onclick: picker }, 'Try again'))),
+      h('p', {}, repos.length ? 'The app opens straight to it on this device next time.' : found.complete ? 'The app can\'t see any repository yet.' : 'None could be read.'),
       repos.length ? list : null,
       h('p', { class: 'small' }, 'Missing one? ', h('a', { href: 'https://github.com/settings/installations', rel: 'noreferrer' }, 'Choose repositories on GitHub'), ', then come back.'),
-      h('p', { class: 'small' }, h('button', { class: 'btn', type: 'button', onclick: () => { data.auth.signOut(); signedOut(); } }, 'Sign out')),
+      h('p', { class: 'small' }, signOutButton()),
     );
   }
 
@@ -84,7 +94,8 @@
     const notices = h('div', { class: 'notices', role: 'status' });
     const body = h('section', { class: 'page-body' });
     root.replaceChildren(
-      h('a', { class: 'skip', href: '#content' }, 'Skip to the page'),
+      // Moves focus to the page's heading; the route (#/specs) stays as it is.
+      h('a', { class: 'skip', href: '#content', onclick: event => { event.preventDefault(); title.focus(); } }, 'Skip to the page'),
       h('div', { class: 'shell' },
         h('aside', { class: 'side' },
           h('a', { class: 'brand', href: '#/you' }, logo(), h('span', {}, 'OpenWiz')),

@@ -225,10 +225,13 @@ a.card:hover { background: var(--em-card-hover); text-decoration: none; }
 .panel p { color: var(--em-text-2); margin: 0 0 22px; }
 .panel .small { font-size: 15px; color: var(--em-muted); margin: 18px 0 0; }
 .repos { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-.repos li { display: flex; align-items: center; gap: 12px; }
+.repos li { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .repos button {
-  flex: 1; min-height: var(--em-tap); text-align: left; padding: 0 16px; border-radius: 11px; cursor: pointer;
+  flex: 1; min-width: 0; overflow-wrap: anywhere; line-height: 1.4; min-height: var(--em-tap); text-align: left;
+  padding: 10px 16px; border-radius: 11px; cursor: pointer;
   background: var(--em-bg); border: 1px solid var(--em-line); color: var(--em-text); font-size: 17px; font-weight: 500;
 }
 .repos button:hover { background: var(--em-card-hover); }
-.repos .tag { font-size: 14px; color: var(--em-muted); min-width: 56px; }
+.repos .tag { flex: none; font-size: 14px; color: var(--em-muted); min-width: 56px; }
+.panel .actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.notice .btn { margin-left: auto; }
