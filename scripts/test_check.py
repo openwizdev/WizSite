@@ -197,6 +197,24 @@ class Checks(unittest.TestCase):
             with self.assertRaises(AssertionError):
                 check_site(root)
 
+    def test_motion_combined_phone_query(self):
+        # Catches (#1298): the combined phone and no-preference query refused although it only narrows the safe
+        # one; a zero transition-duration is no motion.
+        check_motion('@media (max-width:960px) and (prefers-reduced-motion: no-preference){.a{animation:x 1s}'
+                     '.b{transition-duration:.3s}}.c{transition-duration:0s}.d{transition-duration:0s, 0ms}')
+
+    def test_motion_transition_duration(self):
+        # Catches (#1298): a positive transition-duration outside the query animates every property (the default
+        # transition-property is all) for a visitor who asked for reduced motion; and a query that only
+        # mentions no-preference beside an "or" (a comma) or under "not" does not keep motion away from them.
+        for bad in ('.x{transition-duration:.35s}.x:hover{opacity:.5}', '.x{transition-duration:0s, 200ms}',
+                    '@media (min-width:1px){.x{transition-duration:1s}}',
+                    '@media (max-width:960px), (prefers-reduced-motion:no-preference){.a{animation:x 1s}}',
+                    '@media not all and (prefers-reduced-motion:no-preference){.a{animation:x 1s}}',
+                    '@media (max-width:960px) or (prefers-reduced-motion:no-preference){.a{animation:x 1s}}'):
+            with self.subTest(css=bad), self.assertRaises(AssertionError):
+                check_motion(bad)
+
     def test_fingerprints(self):
         css = FINGERPRINTS['site.css']
         for change in ('stale-name', 'tampered', 'unhashed-ref'):
