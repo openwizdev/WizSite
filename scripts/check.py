@@ -388,7 +388,7 @@ def check_app(root, names, pages):
     style = (root / names[APP_STYLE]).read_text()
     assert not re.search(r'\b(animation|transition)\s*:', style), 'Ember allows no motion'
     headers = (root / '_headers').read_text()
-    for path in ('/app/', '/app/*'):
+    for path in ('/app/*',):  # on Pages this rule also covers /app/ itself (one header, not two)
         rule = re.search(rf'^{re.escape(path)}\n((?:  .*\n?)*)', headers, re.M)
         assert rule and f'  Content-Security-Policy: {APP_CSP}' in rule[1].splitlines(), f'_headers must give {path} the app CSP'
         assert '  Referrer-Policy: no-referrer' in rule[1].splitlines(), f'_headers must give {path} no-referrer'
