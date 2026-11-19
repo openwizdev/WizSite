@@ -39,10 +39,11 @@ DOC_HASHES = {
 VECTORS = ('favicon.svg', 'brand/openwiz-lockup.svg')
 # Vendored dependencies (J187: small, pinned, licence-checked): GSAP 3.15.1 runs the hero film's timeline. The file is
 # byte for byte the npm package's dist/gsap.min.js (package.json and package-lock.json pin the version); its licence
-# notice ships beside it. A new version needs review before its hash changes here.
+# notice and the licence's text ship beside it. A new version needs review before its hash changes here.
 VENDOR_HASHES = {
     'vendor/gsap-3.15.1.min.js': '3d1bea374ab1b703cc5c4105358eec63c4465efdc573931dc116e34a0a190c1b',
-    'vendor/GSAP-NOTICE.txt': '7799352104b22c11051f17f09e04c440495419a7a5c615161b942f48572954d9',
+    'vendor/GSAP-NOTICE.txt': 'cf03e9a25c411ad5bb2bd5592acc8fe9e965ddf0ef2a62c9768e874c25b61d28',
+    'vendor/GSAP-LICENSE.txt': 'a2def97f7f419e51d13ed8a8f4a8b77d9d5f6767d4d6f9727232b45d2da8ba15',
 }
 GSAP = '/vendor/gsap-3.15.1.min.js'
 SITE_URL = 'https://openwiz.dev/'
