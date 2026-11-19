@@ -119,8 +119,15 @@ STORY_COPY = ('Build a to-do app', 'Bring any agent', 'Sign in with GitHub', 'Pu
 OLD_EXAMPLE = ('dark mode', 'dark-mode')
 MOTION_OK = '@media (prefers-reduced-motion:no-preference)'
 PHONE_QUERY = re.compile(r'\(max-width:[0-9]+px\)')
-# The ship log: the approved VS9 changelog text (What's new for you, tested line, Under the hood), plus Being built.
-CHANGELOG_MAIN = '17830d3f9a837a3ec24f2382829093cc941e0d1f5fd873e45e4d3a44c6e897c2'
+# The Changelog (#1363): named Changelog everywhere; a small picture of how the repositories fit together opens
+# the page, then one "What exists today" section with one part per public repository, each opening with two or
+# three plain sentences. Private repositories appear at most as "private records and tools". No release entry,
+# version number or date: the old release list stays on GitHub's releases. Its reviewed text is pinned below.
+CHANGELOG_MAIN = 'a41401f686dd700c766358c47d89375a89f1faad74b668574d35cf5c0ac45567'
+CHANGELOG_LINKS = ('/changelog/', '/changelog')
+PUBLIC_REPOS = ('OpenWiz', 'WizSkills', 'WizLoops', 'WizPlugins', 'WizSite')
+PUBLIC_WIZ_NAMES = set(PUBLIC_REPOS) | {'WizBar'}  # WizBar is WizPlugins' plugin, not a repository
+TODAY = 'What exists today'
 
 
 class Page(HTMLParser):
@@ -379,9 +386,6 @@ def check_site(root):
     assert not re.search(r'install|clipboard', scripts, re.I), 'no script may activate Install or copy the prompt yet'
     assert not re.search(r'\b\d{4}-\d{2}-\d{2}\b', words), 'dated landing promise'
     changelog = (root / 'changelog/index.html').read_text()
-    # "Being built" names bundles, never versions.
-    being = re.search(r'<ul class="bundle-list">([\s\S]*?)</ul>', changelog)
-    assert being and not re.search(r'\d+\.\d+', re.sub(r'<[^>]*>', '', being[1])), 'Being built must not name versions'
     assert not re.search(r'(?<![\d.])\d+\.\d+\.\d+(?![\d.])', flat), 'release version mentioned on the landing'
     for name in VECTORS:
         check_vector((root / name).read_bytes())
@@ -391,8 +395,117 @@ def check_site(root):
         check_art(name, data)
         total += len(data)
     assert total <= ART_BUDGET, f'art is {total} bytes, over the {ART_BUDGET} budget'
+    check_changelog(landing, changelog)
     main = re.search(r'<main\b[^>]*>[\s\S]*?</main>', changelog)
     assert main and sha256(main[0].encode()).hexdigest() == CHANGELOG_MAIN, 'changelog content changed; review explicitly before updating its snapshot'
+
+
+class Outline(HTMLParser):
+    """A page's links with their text, its title, its inline styles, and the outline of its main: the headings,
+    the picture, the parts and each part's opening paragraph, in order."""
+    def __init__(self, text):
+        super().__init__(convert_charrefs=True)
+        self.links, self.items, self.styles, self.title = [], [], [], None
+        self.open = []  # [kind, attrs, text] being read
+        self.in_main = False
+        self.feed(text)
+
+    def handle_starttag(self, tag, attrs):
+        attrs = dict(attrs)
+        classes = (attrs.get('class') or '').split()
+        if tag == 'main':
+            self.in_main = True
+        kind = None
+        if tag == 'a' and attrs.get('href'):
+            kind = 'a'
+        elif tag in ('title', 'style'):
+            kind = tag
+        elif self.in_main and tag in ('h1', 'h2', 'h3'):
+            kind = tag
+        elif self.in_main and tag == 'p' and 'intro' in classes:
+            kind = 'intro'
+        elif self.in_main and tag == 'figure':
+            self.items.append(('figure', attrs, ''))
+        elif self.in_main and tag == 'svg':
+            self.items.append(('svg', attrs, ''))
+        elif self.in_main and tag == 'section' and 'part' in classes:
+            self.items.append(('part', attrs, ''))
+        if kind:
+            self.open.append([kind, attrs, ''])
+
+    def handle_data(self, data):
+        for item in self.open:
+            item[2] += data
+
+    def handle_endtag(self, tag):
+        if tag == 'main':
+            self.in_main = False
+        want = {'a': 'a', 'title': 'title', 'style': 'style', 'h1': 'h1', 'h2': 'h2', 'h3': 'h3', 'p': 'intro'}.get(tag)
+        if want and self.open and self.open[-1][0] == want:
+            kind, attrs, text = self.open.pop()
+            text = re.sub(r'\s+', ' ', text).strip()
+            if kind == 'a':
+                self.links.append((attrs['href'], text))
+            elif kind == 'title':
+                self.title = text
+            elif kind == 'style':
+                self.styles.append(text)
+            else:
+                self.items.append((kind, attrs, text))
+
+
+def sentences(text):
+    return [s for s in re.split(r'(?<=[.!?])\s+', text.strip()) if s]
+
+
+def check_changelog(landing, changelog):
+    """The Changelog's name, its picture first, one What exists today with a part per public repository, and no
+    release history. `landing` and `changelog` are the two pages' HTML."""
+    home = Outline(landing)
+    labels = [text for href, text in home.links if href in CHANGELOG_LINKS]
+    assert labels == ['Changelog', 'Changelog'], f'the landing nav and footer must each link the Changelog: {labels}'
+    assert not home.styles, 'the landing page gets no inline styles; the changelog keeps its own'
+    for page in (landing, changelog):
+        reader = Text(page)
+        for reading in [reader.joined(), reader.spaced()] + reader.attrs:
+            assert not re.search(r'ship\s*log', reading, re.I), 'the page is called Changelog, never ship log'
+    page = Outline(changelog)
+    assert page.title == 'Changelog — OpenWiz', 'the changelog page title must be Changelog'
+    items = page.items
+    kinds = [kind for kind, _, _ in items]
+    assert kinds[:1] == ['h1'] and items[0][2] == 'Changelog', 'the changelog heading must be Changelog'
+    today = [i for i, (kind, _, text) in enumerate(items) if kind == 'h2' and text == TODAY]
+    assert len(today) == 1 and kinds.count('h2') == 1, f'exactly one {TODAY} section'
+    figures = [i for i, kind in enumerate(kinds) if kind == 'figure']
+    # Right after the heading (and its lead, which the outline doesn't list), before anything else.
+    assert figures == [1] and today[0] > 1 and 'repo-map' in (items[1][1].get('class') or '').split(), 'the repository picture opens the page, before What exists today'
+    svg = [attrs for kind, attrs, _ in items if kind == 'svg']
+    assert len(svg) == 1 and svg[0].get('role') == 'img' and (svg[0].get('aria-label') or '').strip(), 'the picture is one labelled SVG'
+    parts = [i for i, kind in enumerate(kinds) if kind == 'part']
+    assert parts and parts[0] > today[0], 'the repository parts sit inside What exists today'
+    names = []
+    for at, end in zip(parts, parts[1:] + [len(items)]):
+        body = items[at + 1:end]
+        assert [k for k, _, _ in body[:2]] == ['h3', 'intro'], 'each part opens with its repository heading, then its plain lines'
+        name = body[0][2].split()[0] if body[0][2] else ''
+        assert name in PUBLIC_REPOS, f'a part names a repository that is not public: {name!r}'
+        count = len(sentences(body[1][2]))
+        assert 2 <= count <= 3, f'{name} opens with {count} sentences, not two or three'
+        names.append(name)
+    assert sorted(names) == sorted(PUBLIC_REPOS), f'one part per public repository: {names}'
+    main = re.search(r'<main\b[^>]*>([\s\S]*?)</main>', changelog)[1]
+    reader = Text(main)
+    readings = [reader.joined(), reader.spaced()] + reader.attrs
+    for reading in readings:
+        # Fail closed: every Wiz name is a public one. Text read joined can run a name into the next name or
+        # into a lowercase word, never into a capital: "WizSkillsthe" passes, "WizVault" and "WizSiteOps" fail.
+        public = '(?:' + '|'.join(sorted(PUBLIC_WIZ_NAMES)) + ')+(?:[a-z][A-Za-z]*)?'
+        for name in re.findall(r'\bWiz[A-Z][A-Za-z]*', reading):
+            assert re.fullmatch(public, name), f'a private repository is named; say "private records and tools": {name}'
+        assert not re.search(r'\d+\.\d+|\b(?:19|20)\d\d\b', reading), 'no version number or date on the changelog'
+    assert not re.search(r'<time\b|releases/tag/|class="rel"', main), 'no release entry on the changelog'
+    for style in page.styles:
+        check_motion(style)
 
 
 def check_app(root, names, pages):

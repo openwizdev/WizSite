@@ -6,7 +6,7 @@ The standalone static site for [OpenWiz](https://github.com/openwizdev/openwiz),
 
 <picture>
   <source media="(max-width: 600px)" srcset="docs/map-phone.png">
-  <img alt="WizSite's parts: the landing page, the ship log, the art, the brand and fonts, the build and checks, and the deploy" src="docs/map.png" width="560">
+  <img alt="WizSite's parts: the landing page, the Changelog, the art, the brand and fonts, the build and checks, and the deploy" src="docs/map.png" width="560">
 </picture>
 
 WizSite is the factory's site, openwiz.dev. The [org map](https://github.com/openwizdev) shows how it fits with the other repos.
@@ -22,7 +22,7 @@ npm run check
 npm test
 ```
 
-`npm run build` copies the public runtime files (pages, fingerprinted styles and scripts, fonts, approved artwork, the sample spec video, vendor licences and the logo files) into `dist/`. The checks require that build first. `npm run check` checks JavaScript syntax, exact build contents, local links and fragments, HTML/CSS resources, font signatures and OFL licences, landing copy, the retained changelog content, and private markers. `npm test` exercises those gates with synthetic broken links, missing resources and private markers.
+`npm run build` copies the public runtime files (pages, fingerprinted styles and scripts, fonts, approved artwork, the sample spec video, vendor licences and the logo files) into `dist/`. The checks require that build first. `npm run check` checks JavaScript syntax, exact build contents, local links and fragments, HTML/CSS resources, font signatures and OFL licences, landing copy, the Changelog (its name, picture, parts and reviewed content), and private markers. `npm test` exercises those gates with synthetic broken links, missing resources and private markers.
 
 To preview locally:
 
@@ -38,11 +38,11 @@ Changes merge after green CI and one review from the other model family. No per-
 
 ## Site assets
 
-WizSite owns `tokens.css`. The landing page and ship log use it with `site.css`. The landing also loads the pinned GSAP 3.15.1 core and `site.js`. The build fingerprints these styles and scripts so new HTML gets the matching assets. The GreenSock Standard No Charge licence and the agent icon notices ship in `vendor/`.
+WizSite owns `tokens.css`. The landing page and the Changelog use it with `site.css`; the Changelog keeps its own styles inline in `changelog/index.html`, so the landing never loads them. The landing also loads the pinned GSAP 3.15.1 core and `site.js`. The build fingerprints these styles and scripts so new HTML gets the matching assets. The GreenSock Standard No Charge licence and the agent icon notices ship in `vendor/`.
 
 The landing page opens on an Ember-style OpenWiz window that walks through one to-do build. Painted WebP costume and crew sprites sit alongside HTML ticket states and an SVG working pulse. Below it are the supported agent logos and three product moments. The spec card describes steering the build from a narrated video and includes a labeled silent sample that loads on request. The footer's twelve waving Wizes look toward the pointer. The demo pauses off screen, offers a Pause motion control and keeps a readable still when reduced motion is on or either script is unavailable. The OpenWiz install button stays disabled as **Install · coming soon**. Sign in and the phone home-screen instructions lead to the existing app.
 
-`/changelog` is the **ship log**: *Shipped* (published releases, newest first) and *Being built* (named bundles, never version numbers). Each release uses the changelog's own text: a plain headline, *What's new for you*, one line on what was tested and what is still unverified, and a folded *Under the hood* list for contributors.
+`/changelog` is the **Changelog**. A small picture of how the public repositories fit together opens it, then one *What exists today* section: one part per public repository, each opening with two or three plain sentences, then what a person can use now, written from merged code. Private repositories appear only as "private records and tools". It holds no release entries, version numbers or dates; release notes stay on GitHub's releases.
 
 The logo files are the favicons (`favicon.ico` with 16, 32 and 48 px images, `favicon.svg`, `apple-touch-icon.png`), the header lockup `brand/openwiz-lockup.svg` and the 1200×630 social card `brand/og.png` (the lockup on the site ground, rendered from the SVG). The lockup's wordmark is converted to outlines: the SVG has no text and no font reference, and the check refuses one that does, so the wordmark font never ships.
 
