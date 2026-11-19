@@ -7,13 +7,14 @@ import { createHash } from 'node:crypto';
 
 const root = new URL('./', import.meta.url);
 const output = new URL('dist/', root);
+const vendor = ['vendor/gsap-3.15.1.min.js', 'vendor/GSAP-LICENSE.txt', 'vendor/LOBE-ICONS-LICENSE.txt'];
 const art = (await readdir(new URL('art/', root))).filter(name => name.endsWith('.webp')).sort().map(name => `art/${name}`);
 const pages = ['index.html', 'changelog/index.html', 'app/index.html'];
 // The app (openwiz.dev/app): its design system, data layer, page modules and shell, fingerprinted like the site's.
 const app = ['app/ember.css', 'app/data.js', 'app/ui.js', 'app/pages/you.js', 'app/pages/specs.js', 'app/pages/agents.js', 'app/shell.js'];
-const hashed = ['tokens.css', 'site.css', 'site.js', ...app];
+const hashed = ['tokens.css', 'site.css', 'site.js', vendor[0], ...app];
 const brand = ['favicon.ico', 'favicon.svg', 'apple-touch-icon.png', 'brand/openwiz-lockup.svg', 'brand/og.png'];
-const files = ['_headers', 'app/manifest.webmanifest', ...art, ...brand, 'fonts/Geist-var.woff2', 'fonts/GeistMono-var.woff2', 'fonts/OFL.txt'];
+const files = ['_headers', 'app/manifest.webmanifest', ...art, 'art/spec-demo.webm', ...vendor.slice(1), ...brand, 'fonts/Geist-var.woff2', 'fonts/GeistMono-var.woff2', 'fonts/OFL.txt'];
 await rm(output, { recursive: true, force: true });
 const put = async (name, data) => {
   const target = new URL(name, output);

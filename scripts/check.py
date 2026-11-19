@@ -9,24 +9,29 @@ import subprocess
 from urllib.parse import unquote, urlsplit
 
 ROOT = Path(__file__).resolve().parents[1]
-# The landing story's art: the approved era paintings and How it works squares, web-sized WebP, plus the
-# cut-out layers for the idle moves (hammer, stamp, rocket). Pinned by hash like the fonts. A changed or new picture
-# needs review (including its raw bytes for private markers) before its hash is updated here.
+# Reviewed artwork and the sample spec recording. Pin them after checking the visual content and metadata.
 ART_HASHES = {
-    'art/era-1-cave.webp': 'd9c6bf6697489c0970b1aaf0897b4be0cb1c4c1208d8d6ffc0c421c74203d390',
     'art/era-2-grill.webp': 'efaf213c3f389c8feb2f9d0436e94b1f9241d0ecf3cc3e793385d34f11cd11dd',
-    'art/era-3-forge.webp': 'ec01ffe4207f7b7ca25a56cbca91af898222647f64fd9b60e08654f732136b42',
-    'art/era-4-mill.webp': 'd9974ea70daf8b7864097595ffd137bad22aafc5f6d2be57c6b5398cb6415b4d',
-    'art/era-5-launch.webp': '62e17450559df808a658f6f3320e6da8914dd74974f77e7bbd08f6480dce61cb',
-    'art/era-6-lanes.webp': 'c1534e99ffd4023132c4c331113f87bf61550b5eaabd82909618f9f850debb91',
-    'art/era-7-rooms.webp': '71c2dba4da362472a9f1d07bbf1f206f08078c3222ddb87efce685f062d90476',
-    'art/layer-hammer.webp': '963b036ae6ecb931b646134b2bf1b147778028100c5bafccd0d2f9e696f12c51',
-    'art/layer-rocket.webp': '04297046455e108974d4a152b07dd77c39ab9d28a1fa9b8fef87d2c521dbef1f',
-    'art/layer-stamp.webp': '306522a6cd5952f16e1fe34a2daec89e4861b20f3cc335f0ed6ad8790451d658',
-    'art/step-1-paste.webp': 'c3fbcb016aac4eec3df83ff4f17f2cfafe010b64469055dda85d6c6f26b84cae',
-    'art/step-2-answer.webp': 'f7b8348b5bf393a1c1263383754089d64673f94e12bf21a153559f972e823b24',
-    'art/step-3-approve.webp': '10e5faacc18a392a9de71cc7d68d894ae40a1232c25d8e242390a0466c9805c5',
-    'art/step-4-watch.webp': '34bd4d3371d761403109df430c11155b25ee2f7c77d1d25e89a8d659ee94a2c7',
+    'art/family-01.webp': '14532efb522eb7129ced9e1093f4b0321b1f00459301f059f2d9b5a8c2a7161f',
+    'art/family-02.webp': '0c64fa6a32853b694b7c2b09c2f8a2d296ca878c464b57ba9d0aae101aed81d2',
+    'art/family-03.webp': 'f7aa428b6d3961c0e6530898cb1bfaf1c74c81d6f4b3f23a1eb888dca5c1b40c',
+    'art/family-04.webp': '38eaba2fc285d05ae6c530724c63934b0c661a0912f8cf20e351d71db706bab4',
+    'art/family-05.webp': '534d0b861f5f3407b4989b9f24b9a37cce1dac94531873068d7ef81f4a855224',
+    'art/family-06.webp': '25fd341648787216c64f9f5052400a170cb351654a2f1f77ad614ff6e6cb48fd',
+    'art/family-07.webp': '273be7e2be6dc67e7913967e6381451dd839d273855b778b2bc2b82177ff0a71',
+    'art/family-08.webp': '89ec3bea0d430424239d5aefd52f94762e4d4e589e5a3bddd14f01e04d40522f',
+    'art/family-09.webp': 'd65ee1ff0844408b4dec17ed96e6d5e631d874828406000d364f7a088b8b4f75',
+    'art/family-10.webp': '9ae6ba5adc0cef5b7abd9007d99261a4e65cf130df5f175376f79fa53342e34f',
+    'art/family-11.webp': '3a37702058088886b72330737dce7c45724eeb29ff15300cf682f1ac686b9327',
+    'art/family-12.webp': '509d80e2a4f529771deaafb8e7524f55a4fa2086016559e76803054f6102aa18',
+    'art/fleet-frames.webp': 'b83fc71f7a51651c91095802a655cd77fcda686285e3eabb6109644b16121fb8',
+    'art/hero-astronaut-frames.webp': '41813d81fa385406cd022bbc76a483bcd565a2392ef9a3d4e74c50c607e8aeb1',
+    'art/hero-cave-frames.webp': 'dde349b01d974b3101f2838b31d63a712b98483d3a050ce4494886fc1e483437',
+    'art/hero-cave.webp': 'ec65d3561e29f0b12a54117023ea39371fb7aa1a975a05bf6b8480e65302e28e',
+    'art/hero-renaissance-frames.webp': '04192a312129777ab9b4ee43ea632d04c6b725938b6feb7d134db4fcfdfd4cec',
+    'art/hero-samurai-frames.webp': '3a6eef42bfd2fc6f7b8e847d4355d75c283425a274b5fb9c95c3404f580725c5',
+    'art/hero-steam-frames.webp': '20f057c963be16ebc3cabbf1d2ab849e2e8144d29a3e419344a867eef2c41f3c',
+    'art/spec-demo.webm': '6619ae77a13229d9056037e5bc793d48f7fc98490d068c2b6e4f58426a8fac22',
 }
 ART = set(ART_HASHES)
 # Logo pack. Raster icons and the social card are pinned by hash like the art; a new picture needs review.
@@ -45,7 +50,14 @@ VECTORS = ('favicon.svg', 'brand/openwiz-lockup.svg')
 SITE_URL = 'https://openwiz.dev/'
 ART_BUDGET = 2_000_000  # bytes, all art together
 # Styles and scripts ship fingerprinted (name.<first 10 hex of sha256>.ext); the pages use only those names.
-HASHED = ('tokens.css', 'site.css', 'site.js')
+GSAP = 'vendor/gsap-3.15.1.min.js'
+VENDOR_HASHES = {
+    'vendor/GSAP-LICENSE.txt': '791e7d34e6718aad2bd3e20fa5240a4c0e47d73ee3ca31424652cca52fe9acf0',
+    'vendor/LOBE-ICONS-LICENSE.txt': 'add9d7531d1b21646317a8958e38fc727506fa39d24bdecb44154d943c82753a',
+    'vendor/gsap-3.15.1.min.js': '3d1bea374ab1b703cc5c4105358eec63c4465efdc573931dc116e34a0a190c1b',
+}
+
+HASHED = ('tokens.css', 'site.css', GSAP, 'site.js')
 # The app (openwiz.dev/app, #1258): its page, design system (Ember), data layer, page modules and shell.
 # The page applies only ember.css and loads exactly these scripts, in this order, all fingerprinted.
 APP_PAGE = 'app/index.html'
@@ -71,7 +83,7 @@ FINGERPRINTS = {name: fingerprint(name, (ROOT / name).read_bytes()) for name in 
 STATIC = {
     'index.html', 'changelog/index.html', '_headers', APP_PAGE, 'app/manifest.webmanifest',
     'fonts/Geist-var.woff2', 'fonts/GeistMono-var.woff2', 'fonts/OFL.txt',
-} | ART | set(ICON_HASHES) | set(VECTORS)
+} | ART | set(ICON_HASHES) | set(VECTORS) | (set(VENDOR_HASHES) - {GSAP})
 RUNTIME = STATIC | set(FINGERPRINTS.values())
 
 
@@ -99,17 +111,11 @@ FONT_HASHES = {
 }
 PAGES = ('index.html', 'changelog/index.html')
 ALL_PAGES = PAGES + (APP_PAGE,)
-# The landing story (#1287): one Wiz through every era, with "Build a to-do app" as the example idea and the
-# zoom-out handing off to "This is your factory." The old example idea must not come back beside it.
-STORY_COPY = ('Build a to-do app', 'This is your factory.')
+# The to-do example and both app entry points stay visible in the static landing page.
+STORY_COPY = ('Build a to-do app', 'Bring any agent', 'Sign in with GitHub', 'Put the app on your phone')
 OLD_EXAMPLE = ('dark mode', 'dark-mode')
-# Motion runs only when the visitor has not asked for less: every animation, transition and smooth scroll
-# sits inside this media query, so reduced motion shows the same story as still paintings.
 MOTION_OK = '@media (prefers-reduced-motion:no-preference)'
-# The animated layout (sticky zoom-out, hidden-until-scrolled hand-off, Pause motion) is switched on only by
-# site.js itself, once its handlers are in place: no inline script may set it first, so a failed site.js
-# download leaves the still story fully visible.
-LIVE_CLASS = 'story-live'
+PHONE_QUERY = re.compile(r'\(max-width:[0-9]+px\)')
 # The ship log: the approved VS9 changelog text (What's new for you, tested line, Under the hood), plus Being built.
 CHANGELOG_MAIN = '17830d3f9a837a3ec24f2382829093cc941e0d1f5fd873e45e4d3a44c6e897c2'
 
@@ -123,6 +129,7 @@ class Page(HTMLParser):
         self.social = []
         self.buttons = []
         self.images = []
+        self.videos = []
         self.inline_scripts = 0
         self.stylesheets, self.scripts = [], []
         self.feed(text)
@@ -139,6 +146,8 @@ class Page(HTMLParser):
             self.buttons.append(attrs)
         if tag == 'img':
             self.images.append(attrs)
+        if tag == 'video':
+            self.videos.append(attrs)
         if tag == 'script' and not attrs.get('src'):
             self.inline_scripts += 1
         # Only references the browser applies: an enabled stylesheet for all media, a script of a runnable type.
@@ -194,20 +203,32 @@ class Text(HTMLParser):
         return ' '.join(self.parts)
 
 
+def guards_motion(rule):
+    if not rule.lower().startswith('@media '):
+        return False
+    conditions = re.split(r'\s+and\s+', rule[7:].lower())
+    preference = MOTION_OK.removeprefix('@media ')
+    return preference in conditions and all(
+        condition == preference or PHONE_QUERY.fullmatch(condition) for condition in conditions)
+
+
 def check_motion(css):
     """Every animation, transition and smooth scroll is inside MOTION_OK (stopping one is always allowed)."""
     stack, at, found = [], 0, []
     for m in re.finditer(r'[{};]', css):
         chunk = css[at:m.start()]
         if m[0] == '{':
-            stack.append(re.sub(r'\s+', ' ', re.sub(r'/\*[\s\S]*?\*/', '', chunk)).strip().replace(': ', ':'))
+            stack.append(re.sub(r'\s*:\s*', ':', re.sub(r'\s+', ' ', re.sub(r'/\*[\s\S]*?\*/', '', chunk)).strip()))
         else:
             decl = re.sub(r'/\*[\s\S]*?\*/', '', chunk).strip().lower()
             name, _, value = decl.partition(':')
             name, value = name.strip(), value.strip().removesuffix('!important').strip()
             moving = ((name in ('animation', 'animation-name', 'transition', 'transition-property') and value != 'none')
                       or (name == 'scroll-behavior' and value == 'smooth'))
-            if moving and not any(p.startswith('@keyframes') for p in stack) and MOTION_OK not in stack:
+            if name == 'transition-duration':
+                moving = not all(re.fullmatch(r'[+-]?(?:0+(?:\.0+)?|\.0+)(?:ms|s)', item.strip())
+                                 for item in value.split(','))
+            if moving and not any(p.startswith('@keyframes') or guards_motion(p) for p in stack):
                 found.append(f'{" > ".join(stack)} {{{decl}}}')
             if m[0] == '}' and stack:
                 stack.pop()
@@ -261,7 +282,18 @@ def check_site(root):
         # The pages never use an unfingerprinted name, and apply the fingerprinted styles as stylesheets.
         assert not set(page.refs) & {f'/{name}' for name in HASHED}, 'a page uses an unfingerprinted style or script'
         assert page.stylesheets == [f'/{names["tokens.css"]}', f'/{names["site.css"]}'], 'a page must apply exactly tokens.css then site.css'
-    assert pages[root / 'index.html'].scripts == [f'/{names["site.js"]}'], 'the landing page must load the fingerprinted site.js'
+    page = pages[root / 'index.html']
+    assert page.scripts == [f'/{names[GSAP]}', f'/{names["site.js"]}'], 'load the pinned GSAP before site.js'
+    assert not page.inline_scripts, 'landing motion must wait for both external scripts'
+    assert len(page.videos) == 1, 'expected one spec recording'
+    clip = page.videos[0]
+    assert clip.get('preload') == 'none' and 'autoplay' not in clip and 'hidden' in clip, 'spec recording must be opt-in'
+    for attrs in page.buttons:
+        if attrs.get('class') in ('demo-pause', 'spec-play'):
+            assert 'hidden' in attrs, 'motion controls must wait for both scripts'
+    for name, digest in VENDOR_HASHES.items():
+        data = (root / names.get(name, name)).read_bytes()
+        assert sha256(data).hexdigest() == digest, f'unreviewed vendor file: {name}'
     def css_refs(text):
         # CSS escapes could hide or split a url(); none are used, so refuse them all, then require
         # that every url( is read whole.
@@ -310,12 +342,11 @@ def check_site(root):
             assert not any(word in low for word in BANNED_COPY), f'banned word rendered in {path.name}'
             for text in ('illustration, not live data', 'building in public'):
                 assert text not in low, f'cut copy is back in {path.name}: {text}'
-    for text in ('Star on GitHub', 'Not ready for everyone yet.', 'Idea in. Shipped work out.', 'How it works',
-                 'Build at the speed of ideas.', 'Paste one line into your agent.', 'Answer a few questions.',
-                 'Approve the plan.', 'Watch it ship.', 'Works with what you already use',
-                 'You decide what gets built. Your agents do the work, on the computers you choose. OpenWiz runs the line and shows you every step.',
-                 'Ship log', 'Shipped', 'Being built'):
-        assert text in flat, f'missing landing copy: {text}'
+    moments = ('Answer a few questions', 'Watch your spec', 'Watch it ship')
+    captions = re.findall(r'<h3>([^<]+)</h3>', landing)
+    assert tuple(captions) == moments, 'the three moments must appear in order'
+    assert 'Steer the build from the narrated video.' in flat, 'spec video steering copy is missing'
+    assert 'Silent sample' in flat, 'the landing clip must be labeled as a silent sample'
     # Owner cuts (round 6): obvious notes stay off the page.
     for text in ('Illustration, not live data', 'Building in public'):
         assert text.lower() not in flat.lower(), f'cut copy is back: {text}'
@@ -323,13 +354,11 @@ def check_site(root):
         assert text in flat, f'missing landing story copy: {text}'
     for reading in [Text(landing).spaced()] + Text(landing).shown:
         assert not any(old in reading.lower() for old in OLD_EXAMPLE), 'the old example idea is back on the landing'
-    # Every era painting and How it works square says what it shows; only the idle-move layers are decorative.
+    # The hero painting has a description. The sprite cut-outs are decorative.
     for attrs in pages[root / 'index.html'].images:
-        if re.match(r'/art/(era|step)-', attrs.get('src') or ''):
+        if attrs.get('src') == '/art/era-2-grill.webp':
             assert (attrs.get('alt') or '').strip(), f'painting without a description: {attrs.get("src")}'
     check_motion((root / names['site.css']).read_text())
-    assert not pages[root / 'index.html'].inline_scripts, 'an inline script runs before site.js; only site.js may enable the animated story'
-    assert f"classList.add('{LIVE_CLASS}')" in (root / names['site.js']).read_text(), f'site.js must enable the animated story ({LIVE_CLASS})'
     # Install stays "coming soon" until a stranger can install (AN8); only these mentions are allowed.
     # The one allowed mention is the disabled Install button's own label; any other "install" anywhere in the
     # rendered page (an extra link with the same words included) fails.
@@ -347,23 +376,16 @@ def check_site(root):
     assert not re.search(r'install|clipboard', scripts, re.I), 'no script may activate Install or copy the prompt yet'
     assert not re.search(r'\b\d{4}-\d{2}-\d{2}\b', words), 'dated landing promise'
     changelog = (root / 'changelog/index.html').read_text()
-    # The teaser shows only versions the changelog publishes.
-    teaser = re.findall(r'<span class="v">(\d+\.\d+\.\d+)</span><span>([^<]+)</span>', landing)
-    # Each teaser line must match its own release in the ship log (version and headline together).
-    releases = dict(re.findall(r'<article class="rel" id="v[\d.]+"><p class="when"><span class="v">([\d.]+)</span>[\s\S]*?<h3>([\s\S]*?)</h3>', changelog))
-    assert teaser and all(releases.get(v) == h for v, h in teaser), 'ship log teaser line does not match its release'
-    teaser = [v for v, _ in teaser]
     # "Being built" names bundles, never versions.
     being = re.search(r'<ul class="bundle-list">([\s\S]*?)</ul>', changelog)
     assert being and not re.search(r'\d+\.\d+', re.sub(r'<[^>]*>', '', being[1])), 'Being built must not name versions'
-    assert len(re.findall(r'(?<![\d.])\d+\.\d+\.\d+(?![\d.])', flat)) == len(teaser), 'version mentioned outside the changelog teaser'
+    assert not re.search(r'(?<![\d.])\d+\.\d+\.\d+(?![\d.])', flat), 'release version mentioned on the landing'
     for name in VECTORS:
         check_vector((root / name).read_bytes())
     total = 0
     for name in ART:
         data = (root / name).read_bytes()
-        assert sha256(data).hexdigest() == ART_HASHES[name], f'unreviewed picture {name}; review before updating its hash'
-        check_webp(data)
+        check_art(name, data)
         total += len(data)
     assert total <= ART_BUDGET, f'art is {total} bytes, over the {ART_BUDGET} budget'
     main = re.search(r'<main\b[^>]*>[\s\S]*?</main>', changelog)
@@ -394,6 +416,15 @@ def check_app(root, names, pages):
         assert '  Referrer-Policy: no-referrer' in rule[1].splitlines(), f'_headers must give {path} no-referrer'
 
 
+def check_art(name, data):
+    assert name in ART_HASHES and sha256(data).hexdigest() == ART_HASHES[name], 'unreviewed art or recording'
+    if name.endswith('.webp'):
+        check_webp(data)
+    else:
+        assert data[:4] == b'\x1a\x45\xdf\xa3' and b'webm' in data[:64], 'invalid WebM header'
+    assert not any(marker.encode() in data.lower() for marker in DENYLIST), f'private marker in {name}'
+
+
 def check_privacy(path, data):
     # Font binaries contain author metadata; the fonts and legal attributions need review.
     # Every other tracked file must be UTF-8. Scan paths too; do not follow symlinks.
@@ -402,18 +433,15 @@ def check_privacy(path, data):
         assert sha256(data).hexdigest() == FONT_HASHES[font], 'unreviewed font or licence'
     if path.endswith('.woff2'):
         assert font in FONT_HASHES, 'unreviewed binary font'
-    if path.endswith('.webp'):
-        assert font in ART_HASHES and sha256(data).hexdigest() == ART_HASHES[font], 'unreviewed picture'
-        check_webp(data)
-        # Pictures are binary, but scan their raw bytes for the same markers (e.g. in metadata).
-        assert not any(marker.encode() in data.lower() for marker in DENYLIST), f'private marker in {path}'
+    if path.endswith(('.webp', '.webm')):
+        check_art(font, data)
     if path.endswith(('.png', '.ico')):
         pinned = DOC_HASHES.get(path) or ICON_HASHES.get(font)
         assert pinned and sha256(data).hexdigest() == pinned, 'unreviewed picture'
         assert not any(marker.encode() in data.lower() for marker in DENYLIST), f'private marker in {path}'
     if font in VECTORS:
         check_vector(data)
-    binary = path.endswith(('.webp', '.png', '.ico')) or (font in FONT_HASHES and font.endswith('.woff2'))
+    binary = path.endswith(('.webp', '.webm', '.png', '.ico')) or (font in FONT_HASHES and font.endswith('.woff2'))
     text = path + '\n' + ('' if binary else data.decode('utf-8'))
     # The owner's copy rule covers every text file, this checker included (it builds the word from parts).
     assert not any(word in text.lower() for word in BANNED_COPY), f'banned word in {path}'
@@ -440,7 +468,7 @@ def main():
         check_privacy(name, path.read_bytes())
     for name in RUNTIME:
         check_privacy('dist/' + name, (output / name).read_bytes())
-    print('PASS: art is plain WebP with no metadata chunks, within budget')
+    print('PASS: pinned WebP artwork and spec recording within budget')
     print('PASS: exact export, local links/fragments, CSS resources, fonts/licences, copy and privacy')
     print('GAP: the landing page has no automated browser test (layout, keyboard, accessibility, animation); the app has npm run test:app')
     print('LIMIT: external URL destinations are constrained; remote availability is not checked')

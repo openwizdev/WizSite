@@ -1,88 +1,155 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="Bring your own everything. The open source factory layer for coding agents, ADEs, compute and always-on bots."><title>OpenWiz — Bring your own everything.</title><link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48"><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><meta property="og:image" content="https://openwiz.dev/brand/og.png"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="OpenWiz"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="https://openwiz.dev/brand/og.png"><link rel="preload" href="/art/era-1-cave.webp" as="image"><link rel="preload" href="/fonts/Geist-var.woff2" as="font" type="font/woff2" crossorigin><link rel="stylesheet" href="/tokens.css"><link rel="stylesheet" href="/site.css"><script src="/site.js" defer></script></head>
-<body><a class="skip" href="#main">Skip to content</a>
-<header class="top wrap"><a class="brand" href="/"><img src="/brand/openwiz-lockup.svg" alt="OpenWiz" width="140" height="40"></a><nav aria-label="Main navigation"><a href="/changelog/">Ship log</a><a href="https://github.com/openwizdev/openwiz">GitHub ↗</a><a class="nav-signin" href="/app/">Sign in</a></nav></header>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="Bring your own everything. The open source factory layer for coding agents, ADEs, compute and always-on bots."><title>OpenWiz — Bring your own everything.</title><link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48"><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><meta property="og:image" content="https://openwiz.dev/brand/og.png"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="OpenWiz"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="https://openwiz.dev/brand/og.png"><link rel="preload" href="/fonts/Geist-var.woff2" as="font" type="font/woff2" crossorigin><link rel="stylesheet" href="/tokens.css"><link rel="stylesheet" href="/site.css"><script src="/vendor/gsap-3.15.1.min.js" defer></script><script src="/site.js" defer></script></head>
+<body class="landing">
+<a class="skip" href="#main">Skip to content</a>
+<header class="landing-nav wrap">
+  <a class="landing-brand" href="/"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" aria-hidden="true" width="34" height="34">
+    <defs><mask id="cutouts" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512">
+      <rect width="512" height="512" fill="white"/><g fill="black"><path d="M132 234 Q132 210 158 210 H354 Q380 210 380 236 V293
+ C380 322 368 345 348 358 H164 C144 344 132 322 132 293 Z"/><path d="M148 325 C151 362 164 390 186 410 L207 391 L228 438
+      L247 405 L264 461 L283 405 L304 438 L325 391 L346 410
+      C368 388 379 358 380 325 C351 346 324 353 294 353 H220
+      C192 353 167 345 148 325 Z"/></g>
+      <g fill="white"><path d="M132 234 Q132 210 158 210 H354 Q380 210 380 236 V293
+ C380 322 368 345 348 358 H164 C144 344 132 322 132 293 Z"/><path d="M148 325 C151 362 164 390 186 410 L207 391 L228 438
+      L247 405 L264 461 L283 405 L304 438 L325 391 L346 410
+      C368 388 379 358 380 325 C351 346 324 353 294 353 H220
+      C192 353 167 345 148 325 Z"/></g>
+      <g fill="black"><circle cx="219" cy="278" r="30"/><circle cx="291" cy="278" r="30"/><path d="M190 323 Q190 312 202 312 H310 Q322 312 322 324 V342 Q322 354 310 354 H202 Q190 354 190 342 Z"/></g>
+    </mask><mask id="hatcut" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512">
+      <rect width="512" height="512" fill="white"/><g fill="black"><path d="M154 222 L228 81 C249 40 281 25 313 30 C357 36 385 73 384 111
+ C383 139 367 154 350 145 C336 138 342 110 323 96 C307 84 288 91 278 106
+ L328 222 Z"/></g>
+      <g fill="white"><path d="M154 222 L228 81 C249 40 281 25 313 30 C357 36 385 73 384 111
+ C383 139 367 154 350 145 C336 138 342 110 323 96 C307 84 288 91 278 106
+ L328 222 Z"/></g>
+    </mask></defs>
+    <g fill="#cfc6b8" color="#cfc6b8">
+      <g mask="url(#cutouts)"><path d="M132 234 Q132 210 158 210 H354 Q380 210 380 236 V293
+ C380 322 368 345 348 358 H164 C144 344 132 322 132 293 Z"/><path d="M148 325 C151 362 164 390 186 410 L207 391 L228 438
+      L247 405 L264 461 L283 405 L304 438 L325 391 L346 410
+      C368 388 379 358 380 325 C351 346 324 353 294 353 H220
+      C192 353 167 345 148 325 Z"/></g>
+      <circle cx="230" cy="273" r="8"/><circle cx="280" cy="284" r="8"/><path d="M220 313 V353 H228 V313 Z M252 313 V353 H260 V313 Z
+ M284 313 V353 H292 V313 Z"/>
+      <path d="M154 222 L228 81 C249 40 281 25 313 30 C357 36 385 73 384 111
+ C383 139 367 154 350 145 C336 138 342 110 323 96 C307 84 288 91 278 106
+ L328 222 Z" mask="url(#hatcut)"/><path d="M96 210 Q96 190 117 190 H395 Q416 190 416 210 V228 Q416 246 397 246 H115 Q96 246 96 228 Z"/>
+    </g></svg>OpenWiz</a>
+  <nav aria-label="Main navigation">
+    <a class="nav-log" href="/changelog/">Ship log</a>
+    <a class="github-star" href="https://github.com/openwizdev/openwiz" aria-label="Star on GitHub"><svg aria-hidden="true" viewBox="0 0 16 16" width="17" height="17" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg><span data-stars hidden></span></a>
+    <a class="sign-in" href="/app/" aria-label="Sign in with GitHub">Sign in</a>
+  </nav>
+</header>
 <main id="main">
-<section class="hero wrap">
-<div class="copy">
-<p class="kicker">A factory for your coding agents</p>
-<h1>Bring your<br>own<br>everything.</h1>
-<p class="sub">You make the decisions.<br>The agents run the factory.</p>
-<p class="intro">The open source factory layer for coding agents, ADEs, compute and always-on bots. Keep the agents, subscriptions and computers you already use: OpenWiz turns your ideas into reviewed, merged code after you approve a plan.</p>
-</div>
-<div class="ctas">
-<div class="buttons"><button class="btn install" type="button" disabled aria-describedby="install-note">Install · coming soon</button><a class="btn star" href="https://github.com/openwizdev/openwiz"><svg aria-hidden="true" viewBox="0 0 16 16"><path d="M8 1.6l1.9 4 4.4.5-3.3 3 .9 4.3L8 11.2l-3.9 2.2.9-4.3-3.3-3 4.4-.5z"/></svg>Star on GitHub</a></div>
-<p class="install-note" id="install-note">Not ready for everyone yet. For now, star it on GitHub to follow along.</p>
-<div class="app-entry">
-<p class="app-lead">Already running OpenWiz? See what needs you, every spec and your agents at work, on any laptop or phone.</p>
-<a class="btn signin" href="/app/"><svg aria-hidden="true" viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>Sign in with GitHub</a>
-<details class="home-screen"><summary>Put the app on your phone's home screen</summary>
-<ol>
-<li>Open <b>openwiz.dev/app</b> on your phone and sign in.</li>
-<li><b>iPhone:</b> tap Share, then <b>Add to Home Screen</b>.</li>
-<li><b>Android:</b> open the browser's menu, then <b>Add to Home screen</b>.</li>
-</ol>
-<p>It opens on its own, like any app, read-only.</p>
-</details>
-</div>
-</div>
-<figure class="era cave"><div class="frame"><div class="plate"><img src="/art/era-1-cave.webp" alt="Cave painting: a Guava Wiz types an idea, Build a to-do app, into a stone laptop, while a builder Wiz and a reviewer Wiz wait their turn." width="1672" height="941"></div></div>
-<figcaption><span class="when">The idea · a cave wall</span>Your idea, in one line: <b>Build a to-do app</b></figcaption></figure>
-</section>
-
-<section class="story wrap" id="story" aria-labelledby="story-h">
-<div class="story-head"><div><h2 id="story-h">Build at the speed of ideas.</h2><p class="works-sub">Idea in. Shipped work out.</p></div>
-<button class="pause" type="button" aria-pressed="false"><svg aria-hidden="true" viewBox="0 0 16 16"><path d="M5.5 3.5v9M10.5 3.5v9"/></svg>Pause motion</button></div>
-<ol class="eras">
-<li class="era"><figure><div class="frame"><div class="plate"><img src="/art/era-2-grill.webp" alt="Renaissance oil study: three Wiz scholars lean over a to-do checklist, one through an enormous lens." width="1672" height="941" loading="lazy" decoding="async"></div></div>
-<figcaption><span class="when">The grill · a Renaissance study</span><b>A few questions, three at a time.</b> Your agent asks until the to-do app is clear: what a task holds, where the list lives, what done looks like.</figcaption></figure></li>
-<li class="era"><figure><div class="frame"><div class="plate"><img src="/art/era-3-forge.webp" alt="Woodblock print: a samurai builder Wiz raises a hammer over a glowing checkbox ticket at the forge, under Mount Fuji and cherry blossom." width="1672" height="941" loading="lazy" decoding="async"><img class="layer l-hammer" src="/art/layer-hammer.webp" alt="" width="278" height="377" loading="lazy" decoding="async"><i class="flash f-forge"></i></div></div>
-<figcaption><span class="when">The build · an Edo forge</span><b>You approve the plan once.</b> Builder agents take its tickets and forge the code.</figcaption></figure></li>
-<li class="era"><figure><div class="frame"><div class="plate"><img src="/art/era-4-mill.webp" alt="Steam-mill photogravure: at the end of the assembly line a reviewer Wiz brings a giant rubber stamp down on a ticket marked APPROVED, with a checkbox." width="1672" height="941" loading="lazy" decoding="async"><img class="layer l-stamp" src="/art/layer-stamp.webp" alt="" width="322" height="377" loading="lazy" decoding="async"><i class="flash f-stamp"></i></div></div>
-<figcaption><span class="when">The review · a steam mill</span><b>Every change gets a review.</b> A reviewer agent checks each ticket before it merges.</figcaption></figure></li>
-<li class="era"><figure><div class="frame"><div class="plate"><img src="/art/era-5-launch.webp" alt="Retro space painting: the Guava Wiz pilots a rocket with a checkmark badge up out of an orbital launch ring." width="1672" height="941" loading="lazy" decoding="async"><img class="layer l-rocket" src="/art/layer-rocket.webp" alt="" width="830" height="513" loading="lazy" decoding="async"></div></div>
-<figcaption><span class="when">The launch · orbit</span><b>Merged and shipped.</b> The to-do app is out, and you saw every step.</figcaption></figure></li>
-</ol>
-</section>
-
-<section class="factory" aria-labelledby="factory-h">
-<div class="zoom"><div class="zoom-stick">
-<div class="scene">
-<img class="lanes" src="/art/era-6-lanes.webp" alt="The camera steps back: three Wiz crews build three different ideas on three parallel lines of the mill." width="1672" height="941" loading="lazy" decoding="async">
-<img class="rooms" src="/art/era-7-rooms.webp" alt="Further back: the rocket flies through an endless lattice of glowing rooms from every era, a Wiz crew at work on a different idea in each." width="1672" height="941" loading="lazy" decoding="async">
-</div>
-<div class="handoff wrap"><h2 id="factory-h">This is your factory.</h2><p>One idea was one line. Every idea gets its own line, all running at once, on the computers you choose.</p></div>
-</div></div>
-</section>
-
-<section class="works wrap" id="works" aria-labelledby="works-h">
-<div class="how">
-<h2 id="works-h">How it works</h2>
-<ol class="rows steps">
-<li><img src="/art/step-1-paste.webp" alt="Gouache: a Guava Wiz types Build a to-do app on a little laptop." width="720" height="720" loading="lazy" decoding="async"><span class="role">Step 1</span><b>Paste one line into your agent.</b> The agent you already use sets everything up.</li>
-<li><img src="/art/step-2-answer.webp" alt="Gouache: the Guava Wiz answers a builder Wiz and a reviewer Wiz around a tiny desk." width="720" height="720" loading="lazy" decoding="async"><span class="role">Step 2</span><b>Answer a few questions.</b> Your agent asks three at a time until the idea is clear.</li>
-<li><img src="/art/step-3-approve.webp" alt="Gouache: the Guava Wiz brings a big stamp down on the plan, APPROVED, as the reviewer Wiz watches." width="720" height="720" loading="lazy" decoding="async"><span class="role">Step 3</span><b>Approve the plan.</b> One look at the tickets and how they fit together.</li>
-<li><img src="/art/step-4-watch.webp" alt="Gouache: the Guava Wiz pulls a lever and watches the finished to-do app lift off on a rocket plume." width="720" height="720" loading="lazy" decoding="async"><span class="role">Step 4</span><b>Watch it ship.</b> Agents build, review and merge, and you see every step.</li>
-</ol>
-<div class="works-with"><span class="ww-label">Works with what you already use</span><ul><li>Claude Code</li><li>Codex</li><li>Cloudroom</li><li>Your laptop or any VPS</li><li>GitHub</li><li class="soon">More coming</li></ul></div>
-<p class="fit">You decide what gets built. Your agents do the work, on the computers you choose. OpenWiz runs the line and shows you every step.</p>
-</div>
-</section>
-
-<section class="ship wrap" id="ship" aria-labelledby="ship-h">
-<h2 id="ship-h">Ship log</h2>
-<div class="cols">
-<div><h3>Shipped</h3>
-<ol class="rail">
-<li><span class="v">0.0.12</span><span>Scripts and agents can drive OpenWiz</span></li>
-<li><span class="v">0.0.11</span><span>Make every decision in one place, and see the whole plan</span></li>
-<li><span class="v">0.0.10</span><span>A cockpit for your phone and PC</span></li>
-</ol></div>
-<div class="building"><h3>Being built</h3>
-<ul class="bundles"><li>Across your machines</li><li>Offline notifications</li></ul></div>
-</div>
-<a class="more" href="/changelog/">The full ship log <span aria-hidden="true">→</span></a>
-</section>
+  <section class="product-hero wrap">
+    <div class="hero-copy">
+      <h1>Bring your own everything.</h1>
+      <p class="sub">You make the decisions.<br>The agents run the factory.</p>
+      <p class="hero-description">Turn an idea into a spec and reviewed code. Use the coding agents and computers you already have.</p>
+      <div class="install-box"><span aria-hidden="true">›_</span><button class="btn install" type="button" disabled>Install · coming soon</button></div>
+    </div>
+    <div class="product-stage">
+      <img class="landscape" src="/art/era-2-grill.webp" alt="Oil painting of Wiz scholars studying a to-do list" width="1672" height="941" fetchpriority="high">
+      <div class="product-window" role="group" aria-label="OpenWiz product demo">
+        <div class="window-bar"><i></i><i></i><i></i><span>openwiz.dev/app</span></div>
+        <div class="window-body">
+          <aside class="window-sidebar" aria-label="Demo sidebar"><strong>OpenWiz</strong><span>You</span><span class="selected">Specs</span><span>Agents</span></aside>
+          <div class="window-main">
+            <div class="window-title"><span>Specs / To-do app</span><h2>Build a to-do app</h2></div>
+            <dl class="window-metrics"><div><dt>Need you</dt><dd>0</dd></div><div><dt>Building</dt><dd>1</dd></div><div><dt>In review</dt><dd>1</dd></div><div><dt>Merged</dt><dd>1</dd></div></dl>
+            <div class="ticket-graph" role="group" aria-label="To-do app tickets">
+              <div class="ember-ticket merged">Task list<small>Merged</small></div>
+              <svg class="ticket-arrow" aria-hidden="true" viewBox="0 0 16 16"><path d="M2 8h11m-4-4 4 4-4 4"/></svg>
+              <div class="ember-ticket building">Add a task<small>Building</small><svg class="work-pulse" aria-hidden="true" viewBox="0 0 20 20"><circle class="pulse-ring" cx="10" cy="10" r="8"/><circle cx="10" cy="10" r="3.5"/></svg></div>
+              <svg class="ticket-arrow" aria-hidden="true" viewBox="0 0 16 16"><path d="M2 8h11m-4-4 4 4-4 4"/></svg>
+              <div class="ember-ticket review">Save tasks<small>In review</small></div>
+            </div>
+            <div class="demo-progress" aria-hidden="true">
+              <p class="demo-status">Building the to-do app</p>
+              <div class="demo-steps"><i></i><i></i><i></i><i></i><i></i></div>
+            </div>
+            <div class="hero-fleet" aria-hidden="true"><span></span><span></span></div>
+            <span class="hero-sprite" aria-hidden="true"></span>
+            <span class="hero-smoke" aria-hidden="true"></span>
+            <img class="hero-wiz" src="/art/hero-cave.webp" width="192" height="192" alt="">
+          </div>
+        </div>
+      </div>
+      <button class="demo-pause" type="button" aria-pressed="false" hidden>Pause motion</button>
+    </div>
+    <div class="app-entry">
+      <p class="app-lead">Already running OpenWiz? See what needs you, every spec and your agents at work, on any laptop or phone.</p>
+      <a class="btn signin" href="/app/"><svg aria-hidden="true" viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>Sign in with GitHub</a>
+      <details class="home-screen"><summary>Put the app on your phone's home screen</summary>
+      <ol>
+      <li>Open <a href="/app/">openwiz.dev/app</a> on your phone and sign in.</li>
+      <li><b>iPhone:</b> tap Share, then <b>Add to Home Screen</b>.</li>
+      <li><b>Android:</b> open the browser's menu, then <b>Add to Home screen</b>.</li>
+      </ol>
+      <p>It opens on its own, like any app, read-only.</p>
+      </details>
+    </div>
+  </section>
+  <section class="agent-row wrap" aria-labelledby="agents-title">
+    <h2 id="agents-title">Bring any agent</h2>
+    <ul>
+      <li><svg aria-hidden="true" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M4.709 15.955l4.72-2.647.08-.23-.08-.128H9.2l-.79-.048-2.698-.073-2.339-.097-2.266-.122-.571-.121L0 11.784l.055-.352.48-.321.686.06 1.52.103 2.278.158 1.652.097 2.449.255h.389l.055-.157-.134-.098-.103-.097-2.358-1.596-2.552-1.688-1.336-.972-.724-.491-.364-.462-.158-1.008.656-.722.881.06.225.061.893.686 1.908 1.476 2.491 1.833.365.304.145-.103.019-.073-.164-.274-1.355-2.446-1.446-2.49-.644-1.032-.17-.619a2.97 2.97 0 01-.104-.729L6.283.134 6.696 0l.996.134.42.364.62 1.414 1.002 2.229 1.555 3.03.456.898.243.832.091.255h.158V9.01l.128-1.706.237-2.095.23-2.695.08-.76.376-.91.747-.492.584.28.48.685-.067.444-.286 1.851-.559 2.903-.364 1.942h.212l.243-.242.985-1.306 1.652-2.064.73-.82.85-.904.547-.431h1.033l.76 1.129-.34 1.166-1.064 1.347-.881 1.142-1.264 1.7-.79 1.36.073.11.188-.02 2.856-.606 1.543-.28 1.841-.315.833.388.091.395-.328.807-1.969.486-2.309.462-3.439.813-.042.03.049.061 1.549.146.662.036h1.622l3.02.225.79.522.474.638-.079.485-1.215.62-1.64-.389-3.829-.91-1.312-.329h-.182v.11l1.093 1.068 2.006 1.81 2.509 2.33.127.578-.322.455-.34-.049-2.205-1.657-.851-.747-1.926-1.62h-.128v.17l.444.649 2.345 3.521.122 1.08-.17.353-.608.213-.668-.122-1.374-1.925-1.415-2.167-1.143-1.943-.14.08-.674 7.254-.316.37-.729.28-.607-.461-.322-.747.322-1.476.389-1.924.315-1.53.286-1.9.17-.632-.012-.042-.14.018-1.434 1.967-2.18 2.945-1.726 1.845-.414.164-.717-.37.067-.662.401-.589 2.388-3.036 1.44-1.882.93-1.086-.006-.158h-.055L4.132 18.56l-1.13.146-.487-.456.061-.746.231-.243 1.908-1.312-.006.006z" fill="#D97757" fill-rule="nonzero"></path></svg>Claude Code</li>
+      <li><svg aria-hidden="true" fill="currentColor" fill-rule="evenodd" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path clip-rule="evenodd" d="M8.086.457a6.105 6.105 0 013.046-.415c1.333.153 2.521.72 3.564 1.7a.117.117 0 00.107.029c1.408-.346 2.762-.224 4.061.366l.063.03.154.076c1.357.703 2.33 1.77 2.918 3.198.278.679.418 1.388.421 2.126a5.655 5.655 0 01-.18 1.631.167.167 0 00.04.155 5.982 5.982 0 011.578 2.891c.385 1.901-.01 3.615-1.183 5.14l-.182.22a6.063 6.063 0 01-2.934 1.851.162.162 0 00-.108.102c-.255.736-.511 1.364-.987 1.992-1.199 1.582-2.962 2.462-4.948 2.451-1.583-.008-2.986-.587-4.21-1.736a.145.145 0 00-.14-.032c-.518.167-1.04.191-1.604.185a5.924 5.924 0 01-2.595-.622 6.058 6.058 0 01-2.146-1.781c-.203-.269-.404-.522-.551-.821a7.74 7.74 0 01-.495-1.283 6.11 6.11 0 01-.017-3.064.166.166 0 00.008-.074.115.115 0 00-.037-.064 5.958 5.958 0 01-1.38-2.202 5.196 5.196 0 01-.333-1.589 6.915 6.915 0 01.188-2.132c.45-1.484 1.309-2.648 2.577-3.493.282-.188.55-.334.802-.438.286-.12.573-.22.861-.304a.129.129 0 00.087-.087A6.016 6.016 0 015.635 2.31C6.315 1.464 7.132.846 8.086.457zm-.804 7.85a.848.848 0 00-1.473.842l1.694 2.965-1.688 2.848a.849.849 0 001.46.864l1.94-3.272a.849.849 0 00.007-.854l-1.94-3.393zm5.446 6.24a.849.849 0 000 1.695h4.848a.849.849 0 000-1.696h-4.848z"></path></svg>Codex</li>
+      <li><svg aria-hidden="true" fill="currentColor" fill-rule="evenodd" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M16 6H8v12h8V6zm4 16H4V2h16v20z"></path></svg>OpenCode</li>
+    </ul>
+  </section>
+  <section class="moments wrap" aria-labelledby="moments-title">
+    <h2 id="moments-title">From idea to shipped.</h2>
+    <ol>
+      <li>
+        <div class="moment-screen chat-screen">
+          <p class="screen-label">Build a to-do app</p>
+          <p>Where should tasks live?</p><p>One list for now.</p>
+          <p>Keep completed tasks visible?</p><p>Yes, greyed out.</p>
+        </div>
+        <h3>Answer a few questions</h3>
+      </li>
+      <li>
+        <div class="moment-screen spec-screen">
+          <p class="screen-label">Specs / To-do app</p><strong>Build a to-do app</strong>
+          <p>A single list for adding and completing tasks.</p>
+          <ul><li>Add a task</li><li>Mark it complete</li><li>Keep tasks after reload</li></ul>
+        </div>
+        <video class="spec-video" src="/art/spec-demo.webm" preload="none" playsinline controls hidden aria-label="Silent sample of the to-do app spec video"></video>
+        <p class="screen-label spec-sample">Silent sample</p>
+        <div class="moment-heading"><h3>Watch your spec</h3><button class="spec-play" type="button" aria-label="Play the silent spec sample" hidden><svg aria-hidden="true" viewBox="0 0 16 16"><path d="M5 3l8 5-8 5z"/></svg></button></div>
+        <p class="moment-copy">Steer the build from the narrated video.</p>
+      </li>
+      <li>
+        <div class="moment-screen ship-screen">
+          <p class="screen-label">To-do app</p><strong>Today</strong>
+          <p>✓ Sketch the first screen</p><p>✓ Add a task</p><p>□ Make a cup of tea</p>
+        </div>
+        <h3>Watch it ship</h3>
+      </li>
+    </ol>
+  </section>
 </main>
-<footer class="foot-site wrap"><a class="brand" href="/"><img src="/brand/openwiz-lockup.svg" alt="OpenWiz" width="140" height="40"></a><div><a href="/changelog/">Ship log</a><a href="https://github.com/openwizdev/openwiz">GitHub ↗</a></div></footer>
+<footer class="landing-footer">
+  <div class="wrap">
+    <div class="footer-links"><a href="/changelog/">Ship log</a><a href="https://github.com/openwizdev/openwiz#readme">Docs</a><a class="github-star" href="https://github.com/openwizdev/openwiz" aria-label="Star on GitHub"><svg aria-hidden="true" viewBox="0 0 16 16" width="17" height="17" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg><span data-stars hidden></span></a></div>
+    <p class="footer-wordmark">OpenWiz</p>
+  </div>
+  <div class="family" aria-hidden="true">
+    <span class="family-wiz"><img src="/art/family-01.webp" alt="" width="160" height="160" loading="lazy"><span class="wiz-eye"><i></i></span><span class="wiz-eye"><i></i></span></span>
+    <span class="family-wiz"><img src="/art/family-02.webp" alt="" width="160" height="160" loading="lazy"><span class="wiz-eye"><i></i></span><span class="wiz-eye"><i></i></span></span>
+    <span class="family-wiz"><img src="/art/family-03.webp" alt="" width="160" height="160" loading="lazy"><span class="wiz-eye"><i></i></span><span class="wiz-eye"><i></i></span></span>
+    <span class="family-wiz"><img src="/art/family-04.webp" alt="" width="160" height="160" loading="lazy"><span class="wiz-eye"><i></i></span><span class="wiz-eye"><i></i></span></span>
+    <span class="family-wiz"><img src="/art/family-05.webp" alt="" width="160" height="160" loading="lazy"><span class="wiz-eye"><i></i></span><span class="wiz-eye"><i></i></span></span>
+    <span class="family-wiz"><img src="/art/family-06.webp" alt="" width="160" height="160" loading="lazy"><span class="wiz-eye"><i></i></span><span class="wiz-eye"><i></i></span></span>
+    <span class="family-wiz"><img src="/art/family-07.webp" alt="" width="160" height="160" loading="lazy"><span class="wiz-eye"><i></i></span><span class="wiz-eye"><i></i></span></span>
+    <span class="family-wiz"><img src="/art/family-08.webp" alt="" width="160" height="160" loading="lazy"><span class="wiz-eye"><i></i></span><span class="wiz-eye"><i></i></span></span>
+    <span class="family-wiz"><img src="/art/family-09.webp" alt="" width="160" height="160" loading="lazy"><span class="wiz-eye"><i></i></span><span class="wiz-eye"><i></i></span></span>
+    <span class="family-wiz"><img src="/art/family-10.webp" alt="" width="160" height="160" loading="lazy"><span class="wiz-eye"><i></i></span><span class="wiz-eye"><i></i></span></span>
+    <span class="family-wiz"><img src="/art/family-11.webp" alt="" width="160" height="160" loading="lazy"><span class="wiz-eye"><i></i></span><span class="wiz-eye"><i></i></span></span>
+    <span class="family-wiz"><img src="/art/family-12.webp" alt="" width="160" height="160" loading="lazy"><span class="wiz-eye"><i></i></span><span class="wiz-eye"><i></i></span></span>
+  </div>
+</footer>
 </body></html>
