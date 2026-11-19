@@ -30,8 +30,9 @@
 
   function card(ticket) {
     const s = STATES[ticket.state];
-    const el = h('a', { class: 'card', href: ticket.url, rel: 'noreferrer', '--c': s.colour, 'data-ticket': ticket.number, 'data-state': ticket.state },
-      h('div', { class: 'num' }, `#${ticket.number}${ticket.outside ? ' · outside this spec' : ''}`),
+    const id = ticket.gap ? ticket.key : ticket.number;
+    const el = h('a', { class: 'card', href: ticket.url, rel: 'noreferrer', '--c': s.colour, 'data-ticket': id, 'data-state': ticket.state, 'data-focus': `ticket:${ticket.key}` },
+      h('div', { class: 'num' }, ticket.gap ? 'Blocked by' : `#${ticket.number}${ticket.outside ? ' · outside this spec' : ''}`),
       css(h('h3', {}, ticket.title), { 'font-size': '16px', 'line-height': '1.35', overflow: 'hidden', 'max-height': '2.7em' }),
       css(h('p', {}, OW.ui.pill(ticket.state)), { margin: '8px 0 0' }));
     if (ticket.outside) css(el, { opacity: '.8' });
@@ -81,10 +82,15 @@
 
   function ticketList(spec) {
     const byKey = new Map(spec.graph.tickets.map(t => [t.key, t]));
+    const waits = t => {
+      const known = t.blockers.filter(b => !byKey.get(b)?.gap).map(b => `#${byKey.get(b)?.number ?? '?'}`);
+      const gap = t.missing ? [`${t.missing} ${t.missing === 1 ? 'ticket' : 'tickets'} GitHub couldn't read or list`] : [];
+      const all = [...known, ...gap];
+      return all.length ? `Waits for ${all.length > 1 ? `${all.slice(0, -1).join(', ')} and ${all[all.length - 1]}` : all[0]}` : null;
+    };
     const rows = spec.graph.tickets.filter(t => !t.outside).map(t => css(h('li', {},
-      h('a', { href: t.url, rel: 'noreferrer' }, `#${t.number} ${t.title}`), ' ', OW.ui.pill(t.state),
-      t.blockers.length ? css(h('div', {}, `Waits for ${t.blockers.map(b => `#${byKey.get(b)?.number ?? '?'}`).join(', ')}`),
-        { color: 'var(--em-muted)', 'font-size': '15px' }) : null),
+      h('a', { href: t.url, rel: 'noreferrer', 'data-focus': `list:${t.key}` }, `#${t.number} ${t.title}`), ' ', OW.ui.pill(t.state),
+      waits(t) ? css(h('div', {}, waits(t)), { color: 'var(--em-muted)', 'font-size': '15px' }) : null),
     { padding: '10px 0', 'border-top': '1px solid var(--em-line)' }));
     for (let i = 0; i < spec.graph.unknown; i += 1) {
       rows.push(css(h('li', {}, 'A ticket GitHub couldn\'t read ', OW.ui.pill('unknown')), { padding: '10px 0', 'border-top': '1px solid var(--em-line)' }));
@@ -97,21 +103,31 @@
   let last = null;
   PHONE.addEventListener('change', () => { if (last && last[0].isConnected && location.hash === `#/specs/${last[2]}`) render(...last); });
 
+  // A redraw (a feed refresh, or the screen turning) keeps keyboard focus on the same control.
   function render(el, feeds, arg) {
     last = [el, feeds, arg];
-    const back = h('p', {}, h('a', { href: '#/specs', 'aria-keyshortcuts': 'Escape' }, '← All specs',
+    OW.factory.redraw(el, () => draw(el, feeds, arg));
+  }
+
+  function draw(el, feeds, arg) {
+    const back = h('p', {}, h('a', { href: '#/specs', 'aria-keyshortcuts': 'Escape', 'data-focus': 'back' }, '← All specs',
       css(h('span', { 'aria-hidden': 'true' }, ' · Esc'), { color: 'var(--em-muted)', 'font-size': '14px' })));
     const seen = OW.factory.model(feeds);
     if (!seen) return el.replaceChildren(back, OW.ui.placeholder('Reading GitHub…'));
     const spec = seen.specs.find(s => String(s.number) === arg);
     if (!spec) {
-      el.replaceChildren(back, OW.ui.unknown(`Spec #${arg} isn't among the open specs with tickets that GitHub gave this read.`));
+      el.replaceChildren(back, OW.ui.unknown(`Spec #${arg} isn't among the open specs (labelled spec) that GitHub gave this read.`));
       if (OW.specPage.shown !== arg) back.querySelector('a').focus();
       OW.specPage.shown = arg;
       return;
     }
-    const head = [back, css(h('h2', { tabindex: '-1', class: 'spec-title' }, h('a', { href: spec.url, rel: 'noreferrer' }, `#${spec.number} ${spec.title}`)), { margin: '0 0 6px', 'font-size': '24px', 'line-height': '1.35' }),
-      css(h('p', {}, `${spec.done} of ${spec.total} tickets done`), { margin: '0 0 16px', color: 'var(--em-text-2)' })];
+    const head = [back, css(h('h2', { tabindex: '-1', class: 'spec-title', 'data-focus': 'spec-title' }, h('a', { href: spec.url, rel: 'noreferrer', 'data-focus': 'spec-link' }, `#${spec.number} ${spec.title}`)), { margin: '0 0 6px', 'font-size': '24px', 'line-height': '1.35' }),
+      css(h('p', {}, spec.total === 0 ? 'No tickets yet: its plan graph isn\'t written.' : spec.total ? `${spec.done} of ${spec.total} tickets done` : 'Its tickets couldn\'t be counted.'),
+        { margin: '0 0 16px', color: 'var(--em-text-2)' })];
+    if (spec.total === 0 && spec.graph && !spec.graph.tickets.length && !spec.graph.unknown) {
+      el.replaceChildren(...head);
+      return arrived(el, arg);
+    }
     if (!spec.graph) {
       el.replaceChildren(...head, OW.ui.unknown('This spec\'s tickets couldn\'t be read from GitHub.'));
       return arrived(el, arg);

@@ -536,9 +536,10 @@ async function main() {
       await page.until(`document.querySelectorAll('main .cards a.card').length >= 2`, 'the You items');
       await settle(page, 600);
       const items = await youItems(page);
-      // Without the repository's record authors no record can be verified: each is unreadable, none is an approval.
+      // Without the repository's record authors no record can be verified, not even a visitor's or a resolved one: all
+      // six are unreadable, and none is an approval.
       assert(!items.some(item => /^(Spec to confirm|Plan to approve)/.test(item)), `an unverified record shows as needing a yes: ${JSON.stringify(items)}`);
-      assert(items.filter(item => item.startsWith('A decision record that couldn\'t be read')).length === 4, `unverified records are not unreadable: ${JSON.stringify(items)}`);
+      assert(items.filter(item => item.startsWith('A decision record that couldn\'t be read')).length === 6, `unverified records are not unreadable: ${JSON.stringify(items)}`);
       checkRequestLog(world);
       await page.close();
     });
