@@ -109,6 +109,13 @@ class World {
     this.log = [];
     this.violations = [];
     this.graphql = {}; // operation name -> answer function (body) => {status, json, headers}
+    this.rest = {}; // GitHub REST path -> answer function (url) => {status, json, headers}
+    this.helper = {}; // helper path -> answer function (body) => {status, json} (may wait, to hold a response)
+    this.done = []; // paths answered so far
+  }
+
+  answered(path) {
+    return this.done.includes(path);
   }
 
   async answer(request) {
@@ -117,6 +124,7 @@ class World {
       headers: request.headers, body: request.postData || '' };
     this.log.push(entry);
     if (url.origin === SITE && url.pathname.startsWith('/api/sign-in/')) {
+      if (request.method === 'POST' && this.helper[url.pathname]) return this.helper[url.pathname](request.postData || '');
       if (url.pathname === '/api/sign-in/token' && request.method === 'POST') {
         return { status: 200, json: await fixture('token.json') };
       }
@@ -132,6 +140,7 @@ class World {
         return { status: 204, raw: Buffer.alloc(0), headers: { 'Access-Control-Allow-Methods': 'GET, POST',
           'Access-Control-Allow-Headers': 'Authorization, Accept, Content-Type' } };
       }
+      if (request.method === 'GET' && this.rest[url.pathname]) return this.rest[url.pathname](url);
       if (request.method === 'GET' && url.pathname === '/user/installations') return { status: 200, json: await fixture('installations.json') };
       if (request.method === 'GET' && url.pathname === '/user/installations/1001/repositories') return { status: 200, json: await fixture('repositories.json') };
       if (request.method === 'POST' && url.pathname === '/graphql') {
@@ -162,13 +171,18 @@ async function open(browser, world) {
     if (message.method === 'Fetch.requestPaused') {
       const { requestId, request } = message.params;
       const reply = await world.answer(request);
+      world.done.push(new URL(request.url).pathname);
       if (!reply) {
         await send('Fetch.failRequest', { requestId, errorReason: 'BlockedByClient' }).catch(() => {});
         return;
       }
       const body = reply.raw ?? Buffer.from(JSON.stringify(reply.json));
       const headers = { 'Content-Type': TYPES[reply.type || 'json'] || 'application/octet-stream', ...(reply.headers || {}) };
-      if (request.url.startsWith(API)) headers['Access-Control-Allow-Origin'] = SITE;
+      if (request.url.startsWith(API)) {
+        // As GitHub's API answers a browser: any origin, with its paging and limit headers readable.
+        headers['Access-Control-Allow-Origin'] = SITE;
+        headers['Access-Control-Expose-Headers'] = 'Link, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset, Retry-After';
+      }
       await send('Fetch.fulfillRequest', { requestId, responseCode: reply.status,
         responseHeaders: Object.entries(headers).map(([name, value]) => ({ name, value })),
         body: Buffer.from(body).toString('base64') }).catch(() => {});
@@ -242,6 +256,14 @@ async function check(name, body) {
 }
 function assert(ok, message) {
   if (!ok) throw new Error(message);
+}
+
+async function waitFor(test, what, ms = 8000) {
+  const end = Date.now() + ms;
+  while (!test()) {
+    if (Date.now() > end) throw new Error(`timed out waiting for ${what}`);
+    await new Promise(resolve => setTimeout(resolve, 50));
+  }
 }
 
 const graphqlCount = world => world.log.filter(r => r.origin === API && r.path === '/graphql' && r.method === 'POST').length;
@@ -434,6 +456,147 @@ async function main() {
       const end = Date.now() + 5000;
       while (!world.violations.some(text => /Content Security Policy/.test(text)) && Date.now() < end) await new Promise(r => setTimeout(r, 50));
       assert(world.violations.some(text => /Content Security Policy/.test(text)), 'no Content Security Policy refused it');
+      await page.close();
+    });
+
+    // ---- Review round 1 (R1-R6) ----
+
+    await check('R1: signing out while a token refresh is still out stays signed out', async () => {
+      const world = new World();
+      const grant = await fixture('token.json');
+      world.helper['/api/sign-in/token'] = async () => ({ status: 200, json: { ...grant, expires_in: 30 } });
+      let release;
+      const held = new Promise(resolve => { release = resolve; });
+      world.helper['/api/sign-in/refresh'] = async () => {
+        await held;
+        return { status: 200, json: { ...grant, access_token: 'ghu_SYNTHETICafter0000000000000000000' } };
+      };
+      const page = await open(browser, world);
+      await page.go(`${SITE}/app/?code=c0de&state=${STATE}`);
+      await waitFor(() => world.log.some(r => r.path === '/api/sign-in/refresh'), 'the held token refresh');
+      await page.click('Sign out');
+      await page.until(`[...document.querySelectorAll('a')].some(a => a.textContent.trim() === 'Sign in with GitHub')`, 'the signed-out screen');
+      const signedOutAt = world.log.length;
+      release();
+      await waitFor(() => world.answered('/api/sign-in/refresh'), 'the refresh answer');
+      await page.run(`new Promise(resolve => setTimeout(resolve, 400))`);
+      assert(await page.run(`localStorage.getItem('openwiz.app.auth')`) === null, 'the late refresh put a sign-in back');
+      const after = world.log.slice(signedOutAt).filter(r => r.origin === API && r.method !== 'OPTIONS');
+      assert(after.length === 0, `GitHub was read after sign-out: ${after.map(r => r.path).join(', ')}`);
+      assert((await page.text()).includes('Sign in with GitHub'), 'the page left the signed-out screen');
+      checkRequestLog(world);
+      await page.close();
+    });
+
+    await check('R2: changing repository keeps a GitHub back-off', async () => {
+      const world = new World();
+      world.graphql.Specs = ok('specs.json');
+      world.graphql.Agents = async () => {
+        const answer = await fixture('agents.json');
+        answer.data.rateLimit = { limit: 5000, remaining: 12, resetAt: '2030-01-01T00:00:00Z' };
+        return { status: 200, json: answer };
+      };
+      const page = await open(browser, world);
+      await signIn(page, world);
+      await page.click('acme/factory');
+      await page.until(`/GitHub.s limit is low/.test(document.body.innerText)`, 'the low-limit notice');
+      const before = graphqlCount(world);
+      await page.click('acme/factory'); // the repository button: change repository
+      await page.until(`[...document.querySelectorAll('button')].some(b => b.textContent.trim() === 'acme/site')`, 'the picker');
+      await page.click('acme/site');
+      await page.until(`document.querySelector('h1') && document.querySelector('h1').textContent.trim() === 'You' && document.body.innerText.includes('acme/site')`, 'the shell on acme/site');
+      await page.run(`new Promise(resolve => setTimeout(resolve, 400))`);
+      assert(graphqlCount(world) === before, `changing repository read GitHub's GraphQL while paused (${graphqlCount(world) - before} more)`);
+      assert(/GitHub.s limit is low/.test(await page.text()), 'the back-off notice is gone after changing repository');
+      checkRequestLog(world);
+      await page.close();
+    });
+
+    await check('R3: the skip link moves to the page without changing it', async () => {
+      const world = new World();
+      world.graphql.Specs = ok('specs.json');
+      world.graphql.Agents = ok('agents.json');
+      const page = await open(browser, world);
+      await signIn(page, world);
+      await page.click('acme/factory');
+      await page.click('Specs');
+      await page.until(`location.hash === '#/specs'`, 'the Specs page');
+      await page.click('Skip to the page');
+      await page.run(`new Promise(resolve => setTimeout(resolve, 200))`);
+      assert(await page.run('location.hash') === '#/specs', `the skip link changed the route to ${await page.run('location.hash')}`);
+      assert(await page.run(`document.querySelector('h1').textContent.trim()`) === 'Specs', 'the skip link changed the page');
+      assert(await page.run(`!!document.activeElement.closest('main')`), 'focus did not move into the page');
+      checkRequestLog(world);
+      await page.close();
+    });
+
+    const many = Array.from({ length: 100 }, (_, i) => ({ id: 3000 + i, name: `repo-${String(i).padStart(3, '0')}`,
+      full_name: `acme/repo-${String(i).padStart(3, '0')}`, private: true, owner: { login: 'acme' } }));
+    const pageTwo = `${API}/user/installations/1001/repositories?per_page=100&page=2`;
+    const paged = second => async url => url.searchParams.get('page') === '2' ? second()
+      : { status: 200, json: { total_count: 101, repositories: many }, headers: { Link: `<${pageTwo}>; rel="next", <${pageTwo}>; rel="last"` } };
+
+    await check('R4: the picker follows every page of repositories', async () => {
+      const world = new World();
+      world.rest['/user/installations/1001/repositories'] = paged(async () => ({ status: 200,
+        json: { total_count: 101, repositories: [{ id: 3999, name: 'zz-last', full_name: 'acme/zz-last', private: false, owner: { login: 'acme' } }] } }));
+      const page = await open(browser, world);
+      await page.go(`${SITE}/app/?code=c0de&state=${STATE}`);
+      await page.until(`document.body.innerText.includes('acme/repo-000')`, 'the picker');
+      await page.until(`document.body.innerText.includes('acme/zz-last')`, 'the repository on the second page');
+      const count = await page.run(`document.querySelectorAll('.repos button').length`);
+      assert(count === 101, `the picker shows ${count} repositories, not 101`);
+      checkRequestLog(world);
+      await page.close();
+    });
+
+    await check('R4: a failed or foreign next page says the list is incomplete', async () => {
+      for (const [name, second, link] of [
+        ['a failed page', async () => ({ status: 502, json: { message: 'Bad Gateway' } }), null],
+        ['a next link off GitHub\'s route', null, 'https://example.com/user/installations/1001/repositories?page=2'],
+      ]) {
+        const world = new World();
+        world.rest['/user/installations/1001/repositories'] = link
+          ? async () => ({ status: 200, json: { total_count: 101, repositories: many }, headers: { Link: `<${link}>; rel="next"` } })
+          : paged(second);
+        const page = await open(browser, world);
+        await page.go(`${SITE}/app/?code=c0de&state=${STATE}`);
+        await page.until(`document.body.innerText.includes('acme/repo-000')`, `the picker (${name})`);
+        await page.until(`/some may be missing/i.test(document.body.innerText)`, `the incomplete-list notice (${name})`);
+        assert(!world.log.some(r => r.url.startsWith('https://example.com')), `${name}: the app followed a link off GitHub`);
+        checkRequestLog(world);
+        await page.close();
+      }
+    });
+
+    await check('R5: Sign out stays offered while the picker can\'t read GitHub', async () => {
+      const world = new World();
+      world.rest['/user/installations'] = async () => ({ status: 502, json: { message: 'Bad Gateway' } });
+      const page = await open(browser, world);
+      await page.go(`${SITE}/app/?code=c0de&state=${STATE}`);
+      await page.until(`/couldn.t read your repositories/i.test(document.body.innerText)`, 'the picker error');
+      await page.click('Sign out');
+      await page.until(`[...document.querySelectorAll('a')].some(a => a.textContent.trim() === 'Sign in with GitHub')`, 'the signed-out screen');
+      assert(await page.run(`localStorage.getItem('openwiz.app.auth')`) === null, 'the sign-in is still kept');
+      checkRequestLog(world);
+      await page.close();
+    });
+
+    await check('R6: a long repository name fits a phone', async () => {
+      const world = new World();
+      const long = `acme/${'averylongrepositoryname'.repeat(4)}`; // 92 characters, nowhere to break
+      world.rest['/user/installations/1001/repositories'] = async () => ({ status: 200,
+        json: { total_count: 1, repositories: [{ id: 4001, name: long.slice(5), full_name: long, private: true, owner: { login: 'acme' } }] } });
+      const page = await open(browser, world);
+      await page.size(320, 640, true);
+      await page.go(`${SITE}/app/?code=c0de&state=${STATE}`);
+      await page.until(`document.body.innerText.includes('Private')`, 'the picker');
+      const width = await page.run('document.documentElement.scrollWidth');
+      assert(width <= 320, `the picker is ${width} CSS pixels wide on a 320-pixel phone`);
+      const tag = await page.run(`(() => { const r = document.querySelector('.repos .tag').getBoundingClientRect(); return r.right; })()`);
+      assert(tag <= 320, 'the Private label is off screen');
+      await page.size(null);
+      checkRequestLog(world);
       await page.close();
     });
   } finally {
