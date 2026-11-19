@@ -7,6 +7,7 @@
   const root = document.getElementById('app');
   const ROUTES = () => OW.pages.map(page => page.id);
   let built = null; // the shell's live parts, once drawn
+  const INSTALL = 'https://github.com/apps/openwiz-viewer/installations/new'; // GitHub returns to /app (the setup URL)
 
   // #/<page>, or #/specs/<n> for one spec's page (the Specs page draws it; its navigation stays on Specs).
   const route = () => {
@@ -57,6 +58,16 @@
     }
     if (data.auth.session() !== session) return; // this list belongs to a sign-in that has ended
     const repos = found.repos;
+    // Signing in authorizes the Viewer App but doesn't install it: only a complete read with no installation asks for it.
+    if (found.complete && found.installations === 0) {
+      return screen(
+        h('h1', {}, 'Pick a repository'),
+        h('p', {}, 'One more step: let OpenWiz Viewer read your repositories.'),
+        h('a', { class: 'btn primary', href: INSTALL, rel: 'noreferrer' }, 'Install OpenWiz Viewer'),
+        h('p', { class: 'small' }, 'On GitHub, pick the repositories it may read. GitHub brings you back here.'),
+        h('p', { class: 'small' }, signOutButton()),
+      );
+    }
     const list = h('ul', { class: 'repos' }, repos.map(r => h('li', {},
       h('button', { type: 'button', onclick: () => { data.repo.pick(r.full); location.hash = '#/you'; draw(); } }, r.full),
       h('span', { class: 'tag' }, r.private ? 'Private' : 'Public'))));

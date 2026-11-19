@@ -197,7 +197,7 @@
         complete = false;
       }
     }
-    return { repos: repos.sort((a, b) => a.full.localeCompare(b.full)), complete };
+    return { repos: repos.sort((a, b) => a.full.localeCompare(b.full)), complete, installations: installs.items.length };
   }
 
   // ---- Feeds: the reads pages show, each on its own schedule ----
