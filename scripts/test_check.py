@@ -359,8 +359,8 @@ class Checks(unittest.TestCase):
             with self.assertRaises(AssertionError):
                 check_site(root)
 
-    def test_install_wording_only_on_the_button(self):
-        for extra in ('<a href="/">Install · coming soon</a>', '<p>Install now</p>', '<p>Inst&#97;ll today</p>',
+    def test_install_wording_only_in_the_install_box(self):
+        for extra in ('<a href="/">Copy · coming soon</a>', '<p>Install now</p>', '<p>Inst&#97;ll today</p>',
                       '<p>in<b>stall</b> now</p>', '<p>Ins<span>t</span>all</p>', '<img alt="Install now" src="/favicon.svg">'):
             with self.subTest(extra=extra), tempfile.TemporaryDirectory() as temp:
                 root = Path(temp) / 'dist'
@@ -370,27 +370,51 @@ class Checks(unittest.TestCase):
                 with self.assertRaises(AssertionError):
                     check_site(root)
 
-    def test_install_stays_disabled(self):
-        good = '<button class="btn install" type="button" disabled>'
-        for bad in ('<button class="btn install" type="button" aria-disabled="true">',
-                    '<button class="btn install" type="button" disabled onclick="copy()">',
-                    '<button class="btn install" type="button" disabled onclick ="copy()">',
-                    '<button class="btn install" type="button" title=" disabled ">'):
+    def test_install_line_and_its_switch(self):
+        """#1357: the box shows exactly the line the install skill expects, the instruction and one copy button; the
+        button ships natively disabled and labelled coming soon, and one switch (data-install) is the only change
+        that turns it on. Each case below plants one break in the built landing."""
+        line = '<code class="install-line">Install OpenWiz from github.com/openwizdev/OpenWiz</code>'
+        hint = '<p class="install-hint">Paste this into your agent</p>'
+        button = '<button class="btn install" type="button" disabled>Copy · coming soon</button>'
+        switch = 'data-install="coming-soon"'
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / 'dist'
+            shutil.copytree(ROOT / 'dist', root)
+            landing = root / 'index.html'
+            text = landing.read_text()
+            for part in (line, hint, button, switch):
+                self.assertEqual(text.count(part), 1, part)
+            landing.write_text(text.replace(switch, 'data-install="live"'))
+            check_site(root)  # the release's one change keeps every other rule
+        breaks = [
+            (line, line.replace('github.com/openwizdev/OpenWiz', 'https://github.com/openwizdev/OpenWiz')),
+            (line, line.replace('OpenWiz</code>', 'openwiz</code>')),
+            (line, line.replace('</code>', '.</code>')),
+            (line, line.replace('Install OpenWiz', 'Install  OpenWiz')),
+            (line, line.replace('OpenWiz from', 'Open<b>Wiz</b> from')),
+            (line, ''),
+            (line, line + line),
+            (hint, ''),
+            (hint, hint.replace('your agent', 'your terminal')),
+            (switch, ''),
+            (switch, 'data-install="on"'),
+            (button, button.replace(' disabled', '')),
+            (button, button.replace(' disabled', ' aria-disabled="true"')),
+            (button, button.replace(' disabled', ' title=" disabled "')),
+            (button, button.replace(' disabled', ' disabled onclick="copy()"')),
+            (button, button.replace(' disabled', ' disabled onclick ="copy()"')),
+            (button, button.replace('Copy · coming soon', 'Copy')),
+            (button, button + button),
+        ]
+        for good, bad in breaks:
             with self.subTest(bad=bad), tempfile.TemporaryDirectory() as temp:
                 root = Path(temp) / 'dist'
                 shutil.copytree(ROOT / 'dist', root)
                 landing = root / 'index.html'
-                text = landing.read_text()
-                self.assertIn(good, text)
-                landing.write_text(text.replace(good, bad))
+                landing.write_text(landing.read_text().replace(good, bad, 1))
                 with self.assertRaises(AssertionError):
                     check_site(root)
-        with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp) / 'dist'
-            shutil.copytree(ROOT / 'dist', root)
-            edit_built(root, 'site.js', lambda t: t + "\nnavigator.clipboard.writeText('x');\n")
-            with self.assertRaises(AssertionError):
-                check_site(root)
 
     def test_app_page_policy_and_calm(self):
         # catches: the app losing the browser-enforced limit to GitHub and this site, loading an unchecked

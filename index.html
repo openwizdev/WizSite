@@ -48,7 +48,12 @@
       <h1>Bring your own everything.</h1>
       <p class="sub">You make the decisions.<br>The agents run the factory.</p>
       <p class="hero-description">Turn an idea into a spec and reviewed code. Use the coding agents and computers you already have.</p>
-      <div class="install-box"><span aria-hidden="true">›_</span><button class="btn install" type="button" disabled>Install · coming soon</button></div>
+      <!-- The install switch (#1357): the box's data-install reads coming-soon until OpenWiz 0.1.0 is released. At the
+           release, change it to live and nothing else; site.js then enables Copy. Without scripts the line stays selectable. -->
+      <div class="install-box" data-install="coming-soon">
+        <p class="install-hint">Paste this into your agent</p>
+        <div class="install-row"><span aria-hidden="true">›_</span><code class="install-line">Install OpenWiz from github.com/openwizdev/OpenWiz</code><button class="btn install" type="button" disabled>Copy · coming soon</button></div>
+      </div>
     </div>
     <div class="product-stage">
       <img class="landscape" src="/art/era-2-grill.webp" alt="Oil painting of Wiz scholars studying a to-do list" width="1672" height="941" fetchpriority="high">

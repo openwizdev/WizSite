@@ -269,5 +269,27 @@ function enableMotion(gsap) {
   configure();
 }
 
+// The install box (#1357): Copy works only once index.html's switch says live; until then it stays disabled.
+function enableCopy() {
+  const box = document.querySelector('.install-box[data-install="live"]');
+  if (!box || !navigator.clipboard) return;
+  const button = box.querySelector('button.install');
+  const line = box.querySelector('.install-line').textContent;
+  let timer;
+  button.textContent = 'Copy';
+  button.disabled = false;
+  button.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(line);
+      button.textContent = 'Copied';
+    } catch {
+      button.textContent = 'Select the line to copy';
+    }
+    clearTimeout(timer);
+    timer = setTimeout(() => { button.textContent = 'Copy'; }, 2000);
+  });
+}
+
+enableCopy();
 showStars().catch(() => {});
 if (window.gsap) enableMotion(window.gsap);
