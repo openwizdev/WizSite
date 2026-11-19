@@ -244,6 +244,53 @@ async function sequence(page, where) {
   }
 }
 
+// The owner's fix 2: a click (or Enter) on a footer Wiz gets a reaction and a tiny line that then fades; with
+// reduced motion it is a still pose change only. At rest no line shows.
+async function family(page, where, mode) {
+  // Wait until the footer stops moving (the spec sample's metadata can resize the page above it).
+  await page.evaluate(`new Promise(resolve => { let last; const tick = () => {
+    const wiz = document.querySelectorAll('.family-wiz')[5]; wiz.scrollIntoView({ block: 'end' });
+    const now = JSON.stringify(wiz.getBoundingClientRect()); if (now === last) return resolve(); last = now; setTimeout(tick, 300); };
+    tick(); })`);
+  const at = await page.evaluate(`(() => { const wiz = document.querySelectorAll('.family-wiz')[5];
+    wiz.scrollIntoView({ block: 'end' }); const r = wiz.getBoundingClientRect();
+    return { x: r.left + r.width / 2, y: Math.min(r.top + r.height * .45, innerHeight - 4), rest: !!document.querySelector('.wiz-line') }; })()`);
+  expect(!at.rest, where, 'a Wiz line shows at rest');
+  const watch = `(wiz) => new Promise(resolve => { ${HELPERS}
+    const before = wiz.querySelector('img').getAttribute('src');
+    const seen = { line: '', moved: false, faded: false };
+    const started = Date.now();
+    const look = () => {
+      const line = wiz.querySelector('.wiz-line');
+      if (shown(line) && getComputedStyle(line).opacity > .5) seen.line ||= line.textContent.trim();
+      if (getComputedStyle(wiz).transform !== 'none' || shown(wiz.querySelector('.wiz-sprite'))) seen.moved = true;
+      if (Date.now() - started > 2200) {
+        seen.faded = !shown(line) || getComputedStyle(line).opacity < .05;
+        seen.costume = wiz.querySelector('img').getAttribute('src') !== before;
+        return resolve(seen);
+      }
+      setTimeout(look, 40);
+    };
+    look();
+  })`;
+  // Start watching first, in its own call: the protocol does not order input events after an evaluation.
+  await page.evaluate(`window.landingWatch = (${watch})(document.querySelectorAll('.family-wiz')[5]); true`);
+  await page.click(at.x, at.y);
+  const clicked = await page.evaluate('window.landingWatch');
+  expect(!!clicked.line, where, 'clicking a Wiz shows no line');
+  expect(clicked.faded, where, 'the Wiz line does not fade');
+  if (mode === 'motion') expect(clicked.moved || clicked.costume, where, 'a clicked Wiz does not react');
+  if (mode === 'reduced') {
+    expect(!clicked.moved, where, 'a Wiz moves with reduced motion on');
+    expect(clicked.costume, where, 'with reduced motion a click is not a still pose change');
+  }
+  // Keyboard: focus the next Wiz and press Enter.
+  await page.evaluate(`window.landingWatch = (${watch})((() => { const wiz = document.querySelectorAll('.family-wiz')[6]; wiz.focus(); return wiz; })()); true`);
+  await page.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
+  await page.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
+  expect(!!(await page.evaluate('window.landingWatch')).line, where, 'Enter on a focused Wiz shows no line');
+}
+
 async function main() {
   const server = await serve();
   const origin = `http://127.0.0.1:${server.address().port}`;
@@ -260,6 +307,7 @@ async function main() {
           }
           if (name === 'reduced' || name === 'no GSAP') await playable(page, where);
           if (name === 'motion' && (width === 390 || width === 1280)) await sequence(page, where);
+          if ((name === 'motion' || name === 'reduced') && (width === 390 || width === 1280)) await family(page, where, name);
         } finally {
           await page.close();
         }
