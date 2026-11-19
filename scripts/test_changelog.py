@@ -72,7 +72,7 @@ def titles(part):
 class Generator(unittest.TestCase):
     def test_full_notes_render_per_repository_newest_first_with_patches(self):
         # catches: parts in the wrong order or missing, string-sorted versions (0.1.2 above 0.1.10), a dropped patch,
-        # drafts, pre-releases or pre-0.1.0 releases on the page, and an empty repository rendered as nothing.
+        # drafts, pre-releases (0.3.0 here) or pre-0.1.0 releases on the page, and an empty repository rendered as nothing.
         out = Releases(generate('--fixtures', FIXTURES / 'full'))
         self.assertEqual([p['repo'] for p in out.parts], REPOS)
         openwiz, skills, loops = out.parts
@@ -80,6 +80,7 @@ class Generator(unittest.TestCase):
         self.assertEqual(titles(skills), ['WizSkills 0.1.10', 'WizSkills 0.1.2', 'WizSkills 0.1.0'])
         self.assertEqual((loops['state'], loops['entries']), ('no release yet', []))
         self.assertEqual([p['state'] for p in (openwiz, skills)], [None, None])
+        self.assertEqual([e['ships'] for e in skills['entries']], [None] * 3)  # only OpenWiz ships other versions
         self.assertIn('the tenth patch', skills['entries'][0]['notes'])
         self.assertIn('a patch line', skills['entries'][1]['notes'])
 
@@ -97,12 +98,14 @@ class Generator(unittest.TestCase):
         self.assertNotIn('sample-driver', patch['notes'] + first['notes'])
 
     def test_openwiz_entry_without_a_ships_with_list_says_so(self):
-        # catches: an OpenWiz entry whose notes list no versions shown with an empty list, or silently without one.
+        # catches: an OpenWiz entry whose notes list no versions shown with an empty list, or silently without one;
+        # and a published release with an unreadable tag silently left out of an otherwise complete history.
         out = Releases(generate('--fixtures', FIXTURES / 'sparse'))
         self.assertEqual([p['repo'] for p in out.parts], REPOS)
         self.assertEqual(titles(out.parts[0]), ['OpenWiz 0.1.0'])
         self.assertEqual(out.parts[0]['entries'][0]['ships'], 'missing')
-        self.assertEqual([p['state'] for p in out.parts[1:]], ['no release yet', 'no release yet'])
+        # A published release whose tag is no version fails its part closed, never dropped from the history.
+        self.assertEqual([(p['state'], p['entries']) for p in out.parts[1:]], [('missing', []), ('no release yet', [])])
 
     def test_failed_reads_show_as_missing_never_as_no_history(self):
         # catches: an API error object, an absent answer or a malformed release read as an empty history or as
@@ -121,7 +124,8 @@ class Generator(unittest.TestCase):
         self.assertIn('Lists <script>sample</script> threads & specs.', out.text)
 
     def test_reads_every_page_and_marks_an_http_failure_missing(self):
-        # catches: only the first page of 100 releases read, and a non-200 answer treated as no releases.
+        # catches: only the first page of 100 releases read, a non-200 answer (even one whose body is a list) and a
+        # 200 answer that isn't a list each treated as no releases.
         releases = [{'tag_name': f'v1.0.{n}', 'name': '', 'draft': False, 'prerelease': False,
                      'published_at': '2031-05-01T00:00:00Z', 'body': f'- Patch {n}.'} for n in range(101)]
 
@@ -132,9 +136,9 @@ class Generator(unittest.TestCase):
                 if path == '/repos/openwizdev/WizSkills/releases':
                     body, status = json.dumps(releases[(page - 1) * 100:page * 100]), 200
                 elif path == '/repos/openwizdev/WizLoops/releases':
-                    body, status = '[]', 200
+                    body, status = '{"message": "Not a list"}', 200
                 else:
-                    body, status = '{"message": "Server Error"}', 500
+                    body, status = '[]', 500
                 self.send_response(status)
                 self.send_header('Content-Type', 'application/json')
                 self.end_headers()
@@ -149,11 +153,12 @@ class Generator(unittest.TestCase):
             out = Releases(generate('--api', f'http://127.0.0.1:{server.server_port}'))
         finally:
             server.shutdown()
+            server.server_close()
         self.assertEqual([p['repo'] for p in out.parts], REPOS)
         openwiz, skills, loops = out.parts
         self.assertEqual(openwiz['state'], 'missing')
         self.assertEqual(titles(skills), [f'WizSkills 1.0.{n}' for n in range(100, -1, -1)])
-        self.assertEqual(loops['state'], 'no release yet')
+        self.assertEqual((loops['state'], loops['entries']), ('missing', []))
 
     def test_page_keeps_what_exists_today_and_adds_releases_after_it(self):
         # catches: the merged What exists today section changed or moved, the parts placed outside the page's
