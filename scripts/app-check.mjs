@@ -751,6 +751,136 @@ async function main() {
       await page.close();
     });
 
+    // ---- AP7 (#1260): the Agents page and the pulse, against recorded answers (ap7-agents.json) ----
+    // Agents come from their openwiz:status v1 notes (WizSkills' agent-status contract) and GitHub's pull requests,
+    // reviews and checks, never from a state label. "LIVE-<n>" in a fixture is n minutes before the read.
+
+    const ago = text => {
+      const now = Date.now();
+      const at = n => new Date(now - Number(n) * 60 * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z');
+      return JSON.parse(text.replace(/"LIVE-(\d+)"/g, (_, n) => JSON.stringify(at(n))).replace(/time: LIVE-(\d+)/g, (_, n) => `time: ${at(n)}`));
+    };
+    const ap7World = (change = {}) => {
+      const world = ap6World(change);
+      world.graphql.Agents = async () => {
+        const answer = ago(JSON.stringify(await fixture('ap7-agents.json')));
+        change.agents?.(answer.data.repository);
+        return { status: 200, json: answer };
+      };
+      return world;
+    };
+    // Each card on the Agents page: [section, note id, status, its text].
+    const agentRows = page => page.run(`[...document.querySelectorAll('main article.card')].map(c => [
+      c.closest('.cards').previousElementSibling.textContent, Number(c.dataset.note), c.dataset.status, c.innerText.replace(/\\s+/g, ' ')])`);
+
+    await check('AP7 Agents: working now and the last day, each with kind, model, last step, ticket, time and its pull request', async () => {
+      const world = ap7World();
+      const page = await ap6Open(world, '#/agents');
+      await page.until(`document.querySelectorAll('main article.card').length >= 10`, 'the agent cards');
+      const rows = await agentRows(page);
+      const ids = section => rows.filter(r => r[0] === section).map(r => [r[1], r[2]]);
+      assert(JSON.stringify(ids('Working now')) === JSON.stringify([[7201, 'asking'], [7001, 'working'], [7101, 'working']]),
+        `working now: ${JSON.stringify(ids('Working now'))}`);
+      assert(JSON.stringify(ids('In the last day')) === JSON.stringify([[7005, 'second'], [7601, 'unknown'], [7901, 'unknown'], [7401, 'lapsed'],
+        [7501, 'stopped'], [7102, 'done'], [7301, 'done']]), `the last day: ${JSON.stringify(ids('In the last day'))}`);
+      const text = Object.fromEntries(rows.map(r => [r[1], r[3]]));
+      assert(/Builder · Synthetic Harness, Synthetic Model/.test(text[7001]) && /#70 Synthetic agents page/.test(text[7001])
+        && /opened the pull request; CI is running/.test(text[7001]) && /Working · \d\d:\d\d \(3 min ago\)/.test(text[7001]),
+        `the builder's row: ${text[7001]}`);
+      assert(/Pull request #12: open, waiting for review, checks running/.test(text[7001]), `#12 from GitHub: ${text[7001]}`);
+      assert(/Reviewer ·/.test(text[7101]) && /Pull request #13: open, approved, checks pass/.test(text[7101]), `the reviewer's row: ${text[7101]}`);
+      assert(/Pull request #11: merged/.test(text[7301]) && /Stopped: lost claim/.test(text[7501]) && /Fleet ·/.test(text[7501]), 'merged or stopped rows');
+      assert(/Lapsed/.test(text[7401]) && /Asking you/.test(text[7201]) && /Not holding the claim/.test(text[7005]), 'lapsed, asking or second rows');
+      assert(!rows.some(r => [7701, 7801].includes(r[1])), 'a note older than a day, or a visitor\'s, is shown');
+      const links = await page.run(`[...document.querySelectorAll('main article.card[data-note="7001"] a')].map(a => a.getAttribute('href'))`);
+      assert(JSON.stringify(links) === JSON.stringify(['https://github.com/acme/factory/issues/70', 'https://github.com/acme/site/pull/12',
+        'https://12.example-site.pages.dev/app/']), `the builder's links: ${JSON.stringify(links)}`);
+      const badge = await page.run(`[...document.querySelectorAll('nav.main a')].find(a => a.getAttribute('href') === '#/agents').querySelector('.badge').textContent`);
+      assert(badge === '3', `the Agents badge says ${badge}, not 3 working now`);
+      assert(!/building|in-review/i.test(world.log.filter(r => operation(r) === 'Agents').map(r => r.body).join('')), 'the Agents read asks for a state label');
+      if (process.env.SHOTS) {
+        await page.shot(join(process.env.SHOTS, 'agents-laptop.png'), 1440, 900, false);
+        await page.shot(join(process.env.SHOTS, 'agents-phone.png'), 390, 844, true);
+      }
+      checkRequestLog(world);
+      await page.close();
+    });
+
+    await check('AP7 Agents: a status note of an unknown version, or one that does not read as v1, shows as unknown', async () => {
+      const world = ap7World();
+      const page = await ap6Open(world, '#/agents');
+      await page.until(`document.querySelector('main article.card[data-note="7601"]')`, 'the unknown note');
+      const rows = Object.fromEntries((await agentRows(page)).map(r => [r[1], r]));
+      for (const id of [7601, 7901]) {
+        assert(rows[id][2] === 'unknown' && /Unknown agent/.test(rows[id][3]) && /Unknown\b/.test(rows[id][3]), `note ${id}: ${rows[id][3]}`);
+        assert(!/Synthetic Harness|mood|no skills line/.test(rows[id][3]), `note ${id}'s fields are guessed at: ${rows[id][3]}`);
+      }
+      assert(/version 2/.test(rows[7601][3]), `the v2 note doesn't say its version: ${rows[7601][3]}`);
+      checkRequestLog(world);
+      await page.close();
+    });
+
+    await check('AP7 Agents: without the record authors, every note is unknown, never trusted', async () => {
+      const world = ap7World({ agents: repository => { repository.fleet = null; } });
+      const page = await ap6Open(world, '#/agents');
+      await page.until(`/record authors/i.test(document.querySelector('main').innerText)`, 'the record-authors notice');
+      const rows = await agentRows(page);
+      assert(rows.length && rows.every(r => r[2] === 'unknown'), `a note was trusted without its author checked: ${JSON.stringify(rows.map(r => r.slice(1, 3)))}`);
+      assert(!rows.some(r => r[0] === 'Working now'), 'an unverified note is listed as working now');
+      checkRequestLog(world);
+      await page.close();
+    });
+
+    await check('AP7 pulse: a spec page marks the tickets an agent is working on now, and only those', async () => {
+      // AP1's writer always writes a skills line; the recorded AP6 notes get one here.
+      const skills = repository => {
+        for (const ticket of repository.s40.subIssues.nodes) for (const c of ticket?.comments?.nodes || []) {
+          c.body = c.body.replace('\nstep:', '\nskills: build-ticket@0.1.2\nstep:');
+        }
+      };
+      const world = ap7World({ tickets: skills });
+      const page = await ap6Open(world, '#/specs/40');
+      await page.until(`document.querySelectorAll('main .graph [data-ticket]').length === 10`, 'the ticket graph');
+      await page.until(`document.querySelector('main .graph [data-pulse]')`, 'a pulse');
+      const pulsing = await page.run(`[...document.querySelectorAll('main .graph [data-pulse]')].map(c => c.dataset.ticket).sort()`);
+      assert(JSON.stringify(pulsing) === JSON.stringify(['42', '43']), `pulsing tickets: ${JSON.stringify(pulsing)}`);
+      const said = await page.run(`document.querySelector('main .graph [data-ticket="43"]').innerText`);
+      assert(/Agent working/.test(said), `the pulse has no words: ${said}`);
+      if (process.env.SHOTS) await page.shot(join(process.env.SHOTS, 'pulse-laptop.png'), 1440, 900, false);
+      checkRequestLog(world);
+      await page.close();
+    });
+
+    await check('AP7 keyboard: 3 opens Agents; Tab walks each card\'s ticket, pull request and preview with visible focus; a refresh keeps it', async () => {
+      const world = ap7World();
+      const page = await ap6Open(world);
+      await page.until(`document.querySelectorAll('main .cards a.card').length >= 6`, 'the You page');
+      await page.key('3');
+      await page.until(`location.hash === '#/agents' && document.querySelectorAll('main article.card').length >= 10`, 'Agents by its key');
+      const focused = () => page.run(`(() => { const e = document.activeElement; const s = getComputedStyle(e);
+        return { what: e.getAttribute('href') || e.tagName, shows: s.outlineStyle !== 'none' && s.outlineWidth !== '0px' }; })()`);
+      const walk = [];
+      for (let i = 0; i < 40 && walk.length < 6; i += 1) {
+        await page.key('Tab');
+        const now = await focused();
+        if (!now.what.startsWith('https://')) continue;
+        assert(now.shows, `${now.what} has focus but no visible focus ring`);
+        walk.push(now.what);
+      }
+      const want = ['https://github.com/acme/factory/issues/72', 'https://github.com/acme/factory/issues/70', 'https://github.com/acme/site/pull/12',
+        'https://12.example-site.pages.dev/app/', 'https://github.com/acme/factory/issues/71', 'https://github.com/acme/site/pull/13'];
+      assert(JSON.stringify(walk) === JSON.stringify(want), `Tab order: ${walk.join(' ')}`);
+      const before = graphqlCount(world, ['Agents']);
+      await page.run(`OW.data.refreshAll()`);
+      await waitFor(() => graphqlCount(world, ['Agents']) > before, 'the Agents feed read again');
+      await settle(page, 500);
+      assert((await focused()).what === 'https://github.com/acme/site/pull/13', 'a refresh moved keyboard focus');
+      await page.key('1');
+      await page.until(`location.hash === '#/you'`, 'You by its key');
+      checkRequestLog(world);
+      await page.close();
+    });
+
     // ---- Review round 1 (R1-R6) ----
 
     await check('R1: signing out while a token refresh is still out stays signed out', async () => {

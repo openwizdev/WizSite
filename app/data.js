@@ -245,12 +245,20 @@
   }
 }`;
   }
+  // The Agents feed (AP7): the 50 most recently updated issues, each with its most recently edited comments (the
+  // agents' status notes, with their ids and authors) and the pull requests that close it (state, review, checks),
+  // and fleet.md (Record authors), whose notes count. About 13 GraphQL points a read.
   const AGENTS = `query Agents($owner: String!, $name: String!) {
   rateLimit { limit remaining resetAt }
   repository(owner: $owner, name: $name) {
     issues(first: 50, orderBy: {field: UPDATED_AT, direction: DESC}) {
-      nodes { number title url state updatedAt labels(first: 20) { nodes { name } } comments(last: 20) { nodes { body updatedAt } } }
+      totalCount
+      nodes { number title url state updatedAt
+        comments(first: 20, orderBy: {field: UPDATED_AT, direction: DESC}) { totalCount nodes { databaseId body createdAt updatedAt author { login } } }
+        closedByPullRequestsReferences(first: 5, includeClosedPrs: true) { totalCount nodes { url state isDraft reviewDecision
+          commits(last: 1) { nodes { commit { statusCheckRollup { state } } } } } } }
     }
+    fleet: object(expression: "HEAD:docs/agents/fleet.md") { ... on Blob { text } }
   }
 }`;
   const feeds = {

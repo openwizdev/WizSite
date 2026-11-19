@@ -2,8 +2,8 @@
 // then the same tickets as a plain list. The layout is dagre's (layered, with fewer crossings and routed arrows):
 // left to right on a laptop, top to bottom on a phone. Ticket cards use Ember's card, pill and colours.
 //
-// Seam for AP7 (#1260): OW.specPage.pulse(card, ticket) is called for every ticket card; AP7 marks the tickets an
-// agent is working on. Until then it does nothing.
+// The pulse (AP7, #1260): OW.specPage.pulse(card, ticket) is called for every ticket card, and marks the tickets an
+// agent is working on now (OW.agents.working()). The mark is still, a dot and its words: Ember has no motion.
 'use strict';
 (() => {
   const { h, STATES } = OW.ui;
@@ -152,5 +152,15 @@
     location.hash = '#/specs';
   });
 
-  OW.specPage = { render, pulse: () => {}, shown: null };
+  function pulse(el, ticket) {
+    if (ticket.gap || !OW.agents?.working().has(ticket.key)) return;
+    const dot = css(h('span', { 'aria-hidden': 'true' }), { width: '8px', height: '8px', 'border-radius': '50%', background: 'var(--em-building)',
+      'box-shadow': '0 0 0 3px color-mix(in srgb, var(--em-building) 30%, transparent)' });
+    el.setAttribute('data-pulse', '');
+    // On the card's number line: the graph's cards have a fixed height, and the state pill's line has no room.
+    el.firstElementChild.append(' · ', css(h('span', { class: 'pulse' }, dot, 'Agent working'),
+      { display: 'inline-flex', 'align-items': 'center', gap: '7px', color: 'var(--em-text-2)' }));
+  }
+
+  OW.specPage = { render, pulse, shown: null };
 })();
