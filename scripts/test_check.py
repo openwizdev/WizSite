@@ -556,6 +556,38 @@ class Checks(unittest.TestCase):
                 with self.assertRaisesRegex(AssertionError, message.strip()):
                     check_site(root)
 
+    def test_report_a_problem_link(self):
+        """#1851: openwiz.dev's Report a problem link opens GitHub's new-issue form on openwizdev/OpenWiz with the
+        feedback template (contracts/feedback-loop.v1.md: destination openwizdev/OpenWiz, template
+        .github/ISSUE_TEMPLATE/feedback.yml), in the footer of every site page and once in the changelog's main.
+        Catches: the link missing from the footer or the changelog, pointing at another repository or template, or
+        carrying anything more (a prefilled title or body would send words from openwiz.dev)."""
+        form = '<a href="https://github.com/openwizdev/OpenWiz/issues/new?template=feedback.yml">Report a problem</a>'
+        for page, count in {'index.html': 1, 'drivers/index.html': 1, 'team/index.html': 1, 'changelog/index.html': 2, 'app/index.html': 0}.items():
+            with self.subTest(page=page):
+                self.assertEqual((ROOT / 'dist' / page).read_text().count(form), count)
+        main = re.search(r'<main\b[^>]*>[\s\S]*?</main>', (ROOT / 'dist/changelog/index.html').read_text())[0]
+        self.assertEqual(main.count(form), 1)
+        href = 'https://github.com/openwizdev/OpenWiz/issues/new?template=feedback.yml'
+        for message, (page, old, new) in {
+            'Report a problem link': ('changelog/index.html', form, 'Report a problem'),
+            'Report a problem link ': ('team/index.html', form, '<a href="/">Report a problem</a>'),
+            'Report a problem link  ': ('drivers/index.html', '</main>', form + '</main>'),
+            'Report a problem link, the footer\'s: the app': ('app/index.html', '</body>', form + '</body>'),
+            'unexpected external URL parts': ('index.html', href, href + '&amp;body=x'),
+            'unexpected external URL parts ': ('changelog/index.html', href, href.replace('feedback.yml', 'bug.yml')),
+            'unexpected repository link|unexpected external URL parts': ('index.html', href, href.replace('OpenWiz', 'WizSkills')),
+        }.items():
+            with tempfile.TemporaryDirectory() as temp, self.subTest(message=message):
+                root = Path(temp) / 'dist'
+                shutil.copytree(ROOT / 'dist', root)
+                path = root / page
+                text = path.read_text()
+                self.assertIn(old, text)
+                path.write_text(text.replace(old, new, 1))
+                with self.assertRaisesRegex(AssertionError, message.strip()):
+                    check_site(root)
+
     def test_drivers_page(self):
         # Catches (#50, #62): the drivers page dropped from the build or its checks; a card missing, reordered or with
         # its facts changed; boat.dev losing the hero, or a second hero; a link off the public OpenWiz repository; a top
