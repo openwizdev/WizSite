@@ -1,4 +1,3 @@
-"""Runs the "Watch your spec" moment's browser check (scripts/spec-video-check.mjs) as part of npm test; needs the build first."""
 from pathlib import Path
 import subprocess
 import unittest

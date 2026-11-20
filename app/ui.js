@@ -1,12 +1,7 @@
-// Ember's building blocks for pages, and the page registry the shell reads.
-//
-// Pages build DOM with OW.ui.h (never HTML strings with style attributes: the page's Content-Security-Policy
-// allows no inline style). A colour is set as a CSS variable: h('span', {class: 'pill', '--c': colour}, word).
 'use strict';
 (() => {
   const OW = (window.OW = window.OW || {});
 
-  // h('a', {class: 'card', href: url, '--c': colour}, child, 'text', ...)
   function h(tag, attrs = {}, ...children) {
     const el = document.createElementNS(tag === 'svg' || tag === 'path' || tag === 'circle' || tag === 'rect'
       ? 'http://www.w3.org/2000/svg' : 'http://www.w3.org/1999/xhtml', tag);
@@ -23,7 +18,6 @@
     return el;
   }
 
-  // Ticket states: one soft colour each, always shown with the word.
   const STATES = {
     merged: { word: 'Merged', colour: 'var(--em-merged)' },
     review: { word: 'In review', colour: 'var(--em-review)' },
@@ -54,7 +48,6 @@
     h('circle', { cx: 443, cy: 561, r: 59, fill: '#1c1a17' }),
     h('circle', { cx: 574, cy: 561, r: 59, fill: '#1c1a17' }));
 
-  // 14:02 today; 3 Jan 14:02 on another day.
   function time(ms) {
     const at = new Date(ms);
     const clock = at.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
@@ -65,10 +58,8 @@
   const ui = {
     h, icon, logo, time, STATES,
     pill: state => h('span', { class: 'pill', '--c': STATES[state].colour }, STATES[state].word),
-    // tiles([{label: 'Needs you', value: 3, state: 'you'}, ...]); a value of null shows as "?" (unknown).
     tiles: items => h('div', { class: 'tiles' }, items.map(item => h('div', { class: `tile${item.state === 'you' ? ' you' : ''}`, '--c': STATES[item.state]?.colour },
       h('div', { class: 'k' }, item.label), h('div', { class: 'v' }, item.value ?? '?')))),
-    // bar({merged: 7, building: 1}) or bar(null) for unknown: each segment as wide as its count.
     bar(counts) {
       if (!counts) return h('div', { class: 'bar unknown', role: 'img', 'aria-label': 'unknown' });
       const shown = Object.entries(counts).filter(([, n]) => n > 0);
@@ -83,6 +74,5 @@
   const pages = [];
   OW.ui = ui;
   OW.pages = pages;
-  // A page: {id, title, icon, feeds: [feed names], badge(feeds) -> number|null, render(el, feeds)}.
   OW.page = page => pages.push(page);
 })();

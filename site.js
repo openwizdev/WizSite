@@ -65,7 +65,6 @@ function showHero(gsap, paused, signal) {
     }
     metrics.forEach((metric, i) => { metric.textContent = counts[i]; });
     steps.forEach((step, i) => step.classList.toggle('active', i <= index));
-    // Nothing downstream exists before its step: the stylesheet greys out the spec and tickets until then.
     demo.dataset.scene = index;
     setCrew(index, 0);
   };
@@ -104,7 +103,6 @@ function showHero(gsap, paused, signal) {
       timeline.fromTo(builder, { rotation: -10 }, {
         rotation: 8, duration: .32, repeat: 7, yoyo: true, ease: 'sine.inOut', transformOrigin: '50% 85%',
       }, at + .1);
-      // The smoke belongs to the outgoing costume. Hide the mascot only on the occlusion frame.
       timeline.call(() => {
         setFrame(smoke, sheet, 6);
         smoke.style.visibility = 'visible';
@@ -135,7 +133,7 @@ function showHero(gsap, paused, signal) {
   });
   observer.observe(demo);
   document.addEventListener('visibilitychange', update, { signal });
-  start().catch(() => {}); // Keep the still if a sheet is unavailable.
+  start().catch(() => {});
   signal.addEventListener('abort', () => {
     observer.disconnect();
     timeline?.kill();
@@ -163,7 +161,6 @@ function followPointer(gsap, paused, signal) {
     const pupil = eye.firstElementChild;
     return { eye, x: gsap.quickTo(pupil, 'x', { duration: .26 }), y: gsap.quickTo(pupil, 'y', { duration: .26 }), pupil };
   });
-  // Only update the pupils while the footer is on screen.
   let visible = false;
   let frame = 0;
   let pointer;
@@ -228,7 +225,6 @@ function enableMotion(gsap) {
     controller = new AbortController();
     const { signal } = controller;
     const isPaused = () => pause?.getAttribute('aria-pressed') === 'true';
-    // Every site page shares the footer's eyes; only the landing has the hero demo and its Pause motion.
     const updateEyes = followPointer(gsap, isPaused, signal);
     if (!pause) return;
     const updateHero = showHero(gsap, isPaused, signal);
@@ -246,10 +242,6 @@ function enableMotion(gsap) {
   configure();
 }
 
-// The "Watch your spec" moment (#1405). The video loads only when it first plays. With motion it plays muted while it
-// is in view; with reduced motion, Pause motion or the tab hidden it waits on its poster. It never starts with sound on
-// its own: "Play with sound" does that on request, and from then on (or once the visitor uses its own controls) the
-// visitor drives it and scrolling no longer starts or stops it. It needs only this script, not GSAP.
 function specVideo() {
   const video = document.querySelector('.spec-video');
   const sound = document.querySelector('.spec-play');
@@ -257,44 +249,41 @@ function specVideo() {
   if (!video || !sound) return;
   const calm = matchMedia('(prefers-reduced-motion: reduce)');
   let inView = false;
-  let visitor = false; // the visitor has taken over playback
-  let ours = 0; // play and pause events we caused, not the visitor
+  let visitorDrives = false;
+  let ownPlayEvents = 0;
   const update = () => {
-    if (visitor) return;
+    if (visitorDrives) return;
     const ambient = inView && !calm.matches && pause.getAttribute('aria-pressed') !== 'true' && !document.hidden;
     if (ambient && video.paused) {
-      ours += 1;
+      ownPlayEvents += 1;
       video.muted = true;
-      video.play().catch(() => { ours = 0; });
+      video.play().catch(() => { ownPlayEvents = 0; });
     } else if (!ambient && !video.paused) {
-      ours += 1;
+      ownPlayEvents += 1;
       video.pause();
     }
   };
   const take = () => {
-    if (ours > 0) ours -= 1;
-    else visitor = true;
+    if (ownPlayEvents > 0) ownPlayEvents -= 1;
+    else visitorDrives = true;
   };
   video.addEventListener('play', take);
   video.addEventListener('pause', take);
-  video.addEventListener('volumechange', () => { if (!video.muted) visitor = true; });
+  video.addEventListener('volumechange', () => { if (!video.muted) visitorDrives = true; });
   new IntersectionObserver(([entry]) => { inView = entry.isIntersecting; update(); }, { threshold: .5 }).observe(video);
   calm.addEventListener('change', update);
   document.addEventListener('visibilitychange', update);
   pause.addEventListener('click', () => setTimeout(update));
   sound.hidden = false;
   sound.addEventListener('click', () => {
-    visitor = true;
+    visitorDrives = true;
     video.muted = false;
     video.loop = false;
     video.currentTime = 0;
-    // Focus moves into the player, so the keyboard reaches its pause control next, as #32's player did.
     video.play().then(() => video.focus(), () => {});
   });
 }
 
-// The footer Wizes react, one at a time and briefly; at rest the footer is unchanged. With reduced motion, Pause
-// motion or no GSAP, a click is a still pose change (another costume) and the line, nothing moves.
 const FAMILY = [
   ['Cave Wiz', 'era', 'thinking…', 'cave'], ['Builder Wiz', 'builder', 'building…'], ['Reviewer Wiz', 'reviewer', 'looks good!'],
   ['Samurai Wiz', 'era', 'building…', 'samurai'], ['Astronaut Wiz', 'orchestrator', 'shipped!'], ['Reviewer Wiz', 'reviewer', 'looks good!'],
@@ -312,7 +301,6 @@ function enableFamily(gsap) {
   const line = document.createElement('span');
   line.className = 'wiz-line';
   line.setAttribute('role', 'status');
-  // The one reaction running now: its Wiz, and its timeline or timer. Every new reaction ends it first.
   let current = null;
 
   family.removeAttribute('aria-hidden');
@@ -335,7 +323,6 @@ function enableFamily(gsap) {
     sprite.style.backgroundPositionX = `${index * 100 / 8}%`;
     sprite.style.display = 'block';
   };
-  // A costume change lasts only for its reaction; the Wiz keeps its own picture and name at rest.
   const wear = (wiz, index) => { wiz.querySelector('img').src = picture(index); };
   const release = () => {
     if (!current) return;
@@ -355,7 +342,6 @@ function enableFamily(gsap) {
     line.removeAttribute('style');
     wiz.append(line);
   };
-  // Starts one short reaction (under a second) on one Wiz, ending any other first.
   const react = (wiz, build, text) => {
     release();
     const timeline = gsap.timeline({ onComplete: () => { if (current?.timeline === timeline) release(); } });
@@ -371,7 +357,6 @@ function enableFamily(gsap) {
     const index = wizes.indexOf(wiz);
     const [, role, text, era] = FAMILY[index];
     if (!moving()) {
-      // A still pose: another costume for a moment, with this Wiz's own line, then back.
       release();
       current = { wiz, timer: setTimeout(release, 900) };
       wear(wiz, (index + 1) % FAMILY.length);
@@ -379,7 +364,6 @@ function enableFamily(gsap) {
       return;
     }
     if (Math.random() < .2) {
-      // Now and then a poof, from the hero's own smoke frames, into another costume and back.
       const other = (index + 1 + Math.floor(Math.random() * (FAMILY.length - 1))) % FAMILY.length;
       react(wiz, timeline => timeline
         .call(() => frame(wiz, POOF, 6), [], 0)
@@ -393,7 +377,6 @@ function enableFamily(gsap) {
     }
     react(wiz, timeline => {
       if (role === 'era') {
-        // The era Wizes play their work frames from the hero's sprite sheet.
         timeline.call(() => wiz.classList.add('is-acting'), [], 0);
         [2, 3, 4, 5].forEach((n, i) => timeline.call(() => frame(wiz, `/art/hero-${era}-frames.webp`, n), [], i * .14));
         timeline.call(() => { wiz.classList.remove('is-acting'); wiz.querySelector('.wiz-sprite').removeAttribute('style'); }, [], .6);
@@ -407,13 +390,11 @@ function enableFamily(gsap) {
       }
     }, text);
   };
-  // Hover and focus: a short wave on that Wiz only; moving on ends it at once.
   const wave = wiz => {
     if (!moving() || current?.wiz === wiz) return;
     react(wiz, timeline => timeline.to(wiz, { rotation: -6, duration: .12, yoyo: true, repeat: 3,
       transformOrigin: '50% 90%', ease: 'sine.inOut' }));
   };
-  // Entering the footer: the Wiz nearest the pointer hops once toward it.
   const perk = event => {
     if (event.pointerType === 'touch' || !moving()) return;
     const boxes = wizes.map(wiz => [wiz, wiz.getBoundingClientRect()]).filter(([, box]) => box.width);
@@ -438,7 +419,6 @@ function enableFamily(gsap) {
   document.querySelector('.landing-footer').addEventListener('pointerenter', perk);
 }
 
-// The install box (#1357): Copy works only once index.html's switch says live; until then it stays disabled.
 function enableCopy() {
   const box = document.querySelector('.install-box[data-install="live"]');
   if (!box || !navigator.clipboard) return;
