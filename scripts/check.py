@@ -9,6 +9,12 @@ import subprocess
 from urllib.parse import unquote, urlsplit
 
 ROOT = Path(__file__).resolve().parents[1]
+# J267: the landing's three moments link the real to-do run, in moment order: its grill, its spec, the live app.
+TODO_LINKS = (
+    'https://github.com/openwizdev/todo-demo/issues/1#issuecomment-7037022878',
+    'https://github.com/openwizdev/todo-demo/issues/1',
+    'https://openwizdev.github.io/todo-demo/',
+)
 # Reviewed artwork and the spec video. Pin them after checking the visual content and metadata.
 ART_HASHES = {
     'art/era-2-grill.webp': 'efaf213c3f389c8feb2f9d0436e94b1f9241d0ecf3cc3e793385d34f11cd11dd',
@@ -33,9 +39,9 @@ ART_HASHES = {
     'art/hero-steam-frames.webp': '20f057c963be16ebc3cabbf1d2ab849e2e8144d29a3e419344a867eef2c41f3c',
     # The landing's spec video (#70, J267): the to-do app's real spec (openwizdev/todo-demo #1), narrated with captions,
     # its poster and captions; local voice, no paid service; every frame privacy-scanned.
-    'art/todo-spec.mp4': '16fe3ea3efa7a55c55f083aa50bed05311ad09d5af50f6527a86bbcfb46a8a23',
-    'art/todo-spec-poster.webp': 'd672bb39a2de2a9b5c8723c6474f9461aed1982542bcd28db70e1e8a11a58c9c',
-    'art/todo-spec.vtt': '76fb64dd07669b859264776fa51dc000b423aad8ac661eaaa2b03442efcfce9c',
+    'art/todo-spec.mp4': '52bb1fa94a154e17270f7512db19efcedae921e4769a28742bc8a36093d1c732',
+    'art/todo-spec-poster.webp': '9f68e7ab1f17ea97659a085072500055adcd11c8ffd737231f1db114924dc963',
+    'art/todo-spec.vtt': '47e9ffb41081dd72f541110c43312521a8dd92f1c8e58c11092ecd0daa74eee2',
     # OpenWiz's model config spec video (#1802), off the landing (J267) but still served at its URL for #1802's links.
     'art/spec-video.mp4': 'feb357b9a80453d676123a31285a36c34b5873e102ed58c95728bfd6315bfe16',
     # The model config video's poster frame and captions (#1405), still served for OpenWiz #1802's links (J267).
@@ -337,12 +343,11 @@ def check_ref(root, source, ref, pages, favicons=()):
         assert ref in ('/favicon.ico', '/favicon.svg', '/app/icon.ico', '/app/icon.svg'), 'unexpected favicon'
     url = urlsplit(ref)
     if url.scheme or url.netloc:
-        # The to-do app the landing's moments follow (J267): its repository above, and its live page here.
-        if url.scheme == 'https' and url.netloc == 'openwizdev.github.io':
-            assert re.match(r'^/todo-demo/$', url.path) and not url.query, 'unexpected live app link'
+        # The to-do run the landing's moments follow (J267): only its exact grill, spec and live app links.
+        if ref in TODO_LINKS:
             return
         assert url.scheme == 'https' and url.netloc == 'github.com', 'unexpected external URL'
-        assert re.match(r'^/openwizdev/(?:openwiz|OpenWiz|WizSkills|WizPlugins|todo-demo)(?:/|$)', url.path), 'unexpected repository link'
+        assert re.match(r'^/openwizdev/(?:openwiz|OpenWiz|WizSkills|WizPlugins)(?:/|$)', url.path), 'unexpected repository link'
         assert not url.username and not url.password and not url.query, 'unexpected external URL parts'
         return
     assert not url.query, 'unexpected local query'
@@ -445,8 +450,12 @@ def check_site(root):
     assert 'Steer the build from the narrated video.' in flat, 'spec video steering copy is missing'
     assert 'The real spec of an OpenWiz-built to-do app' in flat, 'the spec video must say it is the to-do app\'s real spec'
     # J267: the three moments point at the real to-do run: its grill, its spec and the live app.
-    for target in ('https://github.com/openwizdev/todo-demo/issues/1#issuecomment-', 'https://github.com/openwizdev/todo-demo/issues/1"', 'https://openwizdev.github.io/todo-demo/"'):
-        assert target in landing, f'a moment must link the real to-do run: {target}'
+    hrefs = {}
+    for block in re.findall(r'<li[^>]*>\s*(?:<div class="moment-screen|<video).*?</li>', landing, re.S):
+        found = Page(block)
+        hrefs[re.search(r'<h3>([^<]+)</h3>', block)[1]] = {a.get('href') for a in found.links}
+    for card, link in zip(moments, TODO_LINKS):
+        assert link in hrefs.get(card, ()), f'the {card} moment must link the real to-do run: {link}'
     # Owner cuts (round 6): obvious notes stay off the page.
     for text in ('Illustration, not live data', 'Building in public'):
         assert text.lower() not in flat.lower(), f'cut copy is back: {text}'
