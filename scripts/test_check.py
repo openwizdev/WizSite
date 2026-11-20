@@ -1,6 +1,7 @@
 """Synthetic negative cases for link/resource and privacy gates; no browser tools."""
 from pathlib import Path
 import shutil
+import subprocess
 import tempfile
 import unittest
 
@@ -264,6 +265,32 @@ class Checks(unittest.TestCase):
                 (RELEASES.replace('<strong>y</strong>', '<script>y</script>'), 'unexpected element'),
                 (RELEASES.replace('<strong>y</strong>', '<strong onclick="y()">y</strong>'), 'unexpected attribute')):
             with self.subTest(error=error), self.assertRaisesRegex(AssertionError, error):
+                check_releases(section)
+
+    def test_named_release_headline_passes_the_release_check(self):
+        # catches (#46 R1): the release check refusing the headline the generator writes for an OpenWiz release named
+        # "OpenWiz 0.NN" (its public name, its semver small beside it), so CI fails once that release is published;
+        # and the exception reaching further: a public name on another repository or without its semver, a semver
+        # beside a semver headline, a public name of another shape, an unlabelled small, a small outside the
+        # headline, or named releases out of version order.
+        done = subprocess.run(['node', str(ROOT / 'scripts/changelog.mjs'), '--fixtures', str(ROOT / 'scripts/changelog-fixtures/named')],
+                              capture_output=True, text=True, timeout=60)
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertIn('<h4>OpenWiz 0.01 <small class="semver">0.1.0</small></h4>', done.stdout)
+        check_releases(done.stdout)
+        named = RELEASES.replace('<h4>OpenWiz 0.1.10</h4>', '<h4>OpenWiz 0.02 <small class="semver">0.1.10</small></h4>')
+        check_releases(named)
+        for section, error in (
+                (named.replace('<h4>OpenWiz 0.02 <small', '<h4>WizSkills 0.02 <small'), 'unexpected release title'),
+                (named.replace('<h4>OpenWiz 0.1.2</h4>', '<h4>OpenWiz 0.01</h4>'), 'unexpected release title'),
+                (named.replace('<h4>OpenWiz 0.1.2</h4>', '<h4>OpenWiz 0.1.2 <small class="semver">0.1.2</small></h4>'), 'unexpected release title'),
+                (named.replace('OpenWiz 0.02 <small', 'OpenWiz 0.2 <small'), 'unexpected release title'),
+                (named.replace('OpenWiz 0.02 <small', 'OpenWiz 0.02 beta <small'), 'unexpected release title'),
+                (named.replace('<small class="semver">0.1.10</small>', '<small class="semver">0.01</small>'), 'unexpected release title'),
+                (named.replace('<small class="semver">', '<small>'), 'unexpected element'),
+                (named.replace('<strong>y</strong>', '<small class="semver">y</small>'), 'unexpected element'),
+                (named.replace('<small class="semver">0.1.10</small>', '<small class="semver">0.1.1</small>'), 'newest first')):
+            with self.subTest(section=section), self.assertRaisesRegex(AssertionError, error):
                 check_releases(section)
 
     def test_landing_starts_in_still_mode(self):
