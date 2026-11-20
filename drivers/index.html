@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="OpenWiz drivers: one kernel, four words, five checks. See which hosts pass the test kit, and write your own driver."><title>Drivers — OpenWiz</title><link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48"><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><meta property="og:image" content="https://openwiz.dev/brand/og.png?v=2"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="OpenWiz"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="https://openwiz.dev/brand/og.png?v=2"><link rel="preload" href="/fonts/Geist-var.woff2" as="font" type="font/woff2" crossorigin><link rel="stylesheet" href="/tokens.css"><link rel="stylesheet" href="/site.css"><script src="/vendor/gsap-3.15.1.min.js" defer></script><script src="/site.js" defer></script></head>
+<body class="landing drivers-page">
+<a class="skip" href="#main">Skip to content</a>
+<header class="landing-nav wrap">
+  <a class="landing-brand" href="/"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" aria-hidden="true" width="34" height="34">
+    <defs><mask id="cutouts" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512">
+      <rect width="512" height="512" fill="white"/><g fill="black"><path d="M132 234 Q132 210 158 210 H354 Q380 210 380 236 V293
+ C380 322 368 345 348 358 H164 C144 344 132 322 132 293 Z"/><path d="M148 325 C151 362 164 390 186 410 L207 391 L228 438
+      L247 405 L264 461 L283 405 L304 438 L325 391 L346 410
+      C368 388 379 358 380 325 C351 346 324 353 294 353 H220
+      C192 353 167 345 148 325 Z"/></g>
+      <g fill="white"><path d="M132 234 Q132 210 158 210 H354 Q380 210 380 236 V293
+ C380 322 368 345 348 358 H164 C144 344 132 322 132 293 Z"/><path d="M148 325 C151 362 164 390 186 410 L207 391 L228 438
+      L247 405 L264 461 L283 405 L304 438 L325 391 L346 410
+      C368 388 379 358 380 325 C351 346 324 353 294 353 H220
+      C192 353 167 345 148 325 Z"/></g>
+      <g fill="black"><circle cx="219" cy="278" r="30"/><circle cx="291" cy="278" r="30"/><path d="M190 323 Q190 312 202 312 H310 Q322 312 322 324 V342 Q322 354 310 354 H202 Q190 354 190 342 Z"/></g>
+    </mask><mask id="hatcut" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512">
+      <rect width="512" height="512" fill="white"/><g fill="black"><path d="M154 222 L228 81 C249 40 281 25 313 30 C357 36 385 73 384 111
+ C383 139 367 154 350 145 C336 138 342 110 323 96 C307 84 288 91 278 106
+ L328 222 Z"/></g>
+      <g fill="white"><path d="M154 222 L228 81 C249 40 281 25 313 30 C357 36 385 73 384 111
+ C383 139 367 154 350 145 C336 138 342 110 323 96 C307 84 288 91 278 106
+ L328 222 Z"/></g>
+    </mask></defs>
+    <g fill="#cfc6b8" color="#cfc6b8">
+      <g mask="url(#cutouts)"><path d="M132 234 Q132 210 158 210 H354 Q380 210 380 236 V293
+ C380 322 368 345 348 358 H164 C144 344 132 322 132 293 Z"/><path d="M148 325 C151 362 164 390 186 410 L207 391 L228 438
+      L247 405 L264 461 L283 405 L304 438 L325 391 L346 410
+      C368 388 379 358 380 325 C351 346 324 353 294 353 H220
+      C192 353 167 345 148 325 Z"/></g>
+      <circle cx="230" cy="273" r="8"/><circle cx="280" cy="284" r="8"/><path d="M220 313 V353 H228 V313 Z M252 313 V353 H260 V313 Z
+ M284 313 V353 H292 V313 Z"/>
+      <path d="M154 222 L228 81 C249 40 281 25 313 30 C357 36 385 73 384 111
+ C383 139 367 154 350 145 C336 138 342 110 323 96 C307 84 288 91 278 106
+ L328 222 Z" mask="url(#hatcut)"/><path d="M96 210 Q96 190 117 190 H395 Q416 190 416 210 V228 Q416 246 397 246 H115 Q96 246 96 228 Z"/>
+    </g></svg>OpenWiz</a>
+  <nav aria-label="Main navigation">
+    <a class="nav-log" href="/drivers/" aria-current="page">Drivers</a>
+    <a class="nav-log" href="/changelog/">Changelog</a>
+    <a class="github-star" href="https://github.com/openwizdev/openwiz" aria-label="Star on GitHub"><svg aria-hidden="true" viewBox="0 0 16 16" width="17" height="17" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg><span data-stars hidden></span></a>
+    <a class="sign-in" href="/app/" aria-label="Sign in with GitHub">Sign in</a>
+  </nav>
+</header>
+<main id="main" class="drivers wrap">
+  <section class="drivers-intro">
+    <p class="drivers-eyebrow"><code>openwiz:driver v1</code></p>
+    <h1>One kernel.<br>Four drivers.</h1>
+    <p class="drivers-lead">A driver is how a place that runs agents plugs into OpenWiz. Each one answers the same four words, and the test kit checks them on the real host.</p>
+    <ul class="drivers-facts" aria-label="In numbers">
+      <li><b>4</b> drivers</li><li><b>4</b> words</li><li><b>5</b> checks in the kit</li><li><b>1</b> passed, 5 of 5</li>
+    </ul>
+  </section>
+
+  <figure class="kernel-map" aria-labelledby="kernel-h">
+    <img class="map-paint" src="/art/drivers-c-boat.webp" alt="" width="1672" height="941">
+    <div class="kernel">
+      <h2 id="kernel-h">The OpenWiz kernel</h2>
+      <ul class="kernel-parts">
+        <li><b>Records on GitHub</b><span>Every agent keeps its own status note</span></li>
+        <li><b>The test kit</b><span>Five checks, on the real host</span></li>
+        <li><b>The four words</b><span><code>version</code> <code>start</code> <code>wake</code> <code>stop</code></span></li>
+      </ul>
+    </div>
+    <ol class="driver-row" aria-label="The four drivers">
+    <li class="driver" data-kit="in-progress">
+      <article class="driver-card" aria-labelledby="driver-own">
+        <ul class="driver-words" aria-label="Its four words"><li><code>version</code></li><li><code>start</code></li><li><code>wake</code></li><li><code>stop</code></li></ul>
+        <h3 id="driver-own">Your own computer or VPS</h3>
+        <p class="driver-status">Being fixed: its kit run is in progress</p>
+        <div class="kit">
+          <p class="kit-result">Test kit: Run <b>in progress</b></p>
+          <ol class="kit-checks" aria-label="The kit's five checks">
+            <li data-check="version" data-state="in-progress"><svg class="mark" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M8 1.5a6.5 6.5 0 0 1 0 13z"/></svg>version<span class="sr-only">: in progress</span></li>
+            <li data-check="start" data-state="in-progress"><svg class="mark" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M8 1.5a6.5 6.5 0 0 1 0 13z"/></svg>start<span class="sr-only">: in progress</span></li>
+            <li data-check="wake" data-state="in-progress"><svg class="mark" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M8 1.5a6.5 6.5 0 0 1 0 13z"/></svg>wake<span class="sr-only">: in progress</span></li>
+            <li data-check="stop" data-state="in-progress"><svg class="mark" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M8 1.5a6.5 6.5 0 0 1 0 13z"/></svg>stop<span class="sr-only">: in progress</span></li>
+            <li data-check="token" data-state="in-progress"><svg class="mark" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M8 1.5a6.5 6.5 0 0 1 0 13z"/></svg>token<span class="sr-only">: in progress</span></li>
+          </ol>
+        </div>
+      </article>
+    </li>
+    <li class="driver" data-kit="not-run">
+      <article class="driver-card" aria-labelledby="driver-cloudroom">
+        <ul class="driver-words" aria-label="Its four words"><li><code>version</code></li><li><code>start</code></li><li><code>wake</code></li><li><code>stop</code></li></ul>
+        <h3 id="driver-cloudroom">Cloudroom</h3>
+        <p class="driver-status">Works today: built real pull requests for OpenWiz</p>
+        <div class="kit">
+          <p class="kit-result">Test kit: <b>Not yet run</b></p>
+          <ol class="kit-checks" aria-label="The kit's five checks">
+            <li data-check="version" data-state="not-run"><svg class="mark" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/></svg>version<span class="sr-only">: not yet run</span></li>
+            <li data-check="start" data-state="not-run"><svg class="mark" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/></svg>start<span class="sr-only">: not yet run</span></li>
+            <li data-check="wake" data-state="not-run"><svg class="mark" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/></svg>wake<span class="sr-only">: not yet run</span></li>
+            <li data-check="stop" data-state="not-run"><svg class="mark" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/></svg>stop<span class="sr-only">: not yet run</span></li>
+            <li data-check="token" data-state="not-run"><svg class="mark" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/></svg>token<span class="sr-only">: not yet run</span></li>
+          </ol>
+        </div>
+      </article>
+    </li>
+    <li class="driver" data-kit="passed">
+      <article class="driver-card is-hero" aria-labelledby="driver-boat">
+        <ul class="driver-words" aria-label="Its four words"><li><code>version</code></li><li><code>start</code></li><li><code>wake</code></li><li><code>stop</code></li></ul>
+        <img class="driver-art" src="/art/drivers-c-boat.webp" alt="" width="1672" height="941" loading="lazy">
+        <p class="driver-flag">The hero driver</p>
+        <h3 id="driver-boat">boat.dev</h3>
+        <p class="driver-status"><strong>Passed the kit, 5 of 5</strong>, on a real account (2026-11-19)</p>
+        <div class="kit">
+          <p class="kit-result">Test kit: <b>5 of 5</b> passed</p>
+          <ol class="kit-checks" aria-label="The kit's five checks">
+            <li data-check="version" data-state="passed"><svg class="mark" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7"/><path d="M4.6 8.3 7 10.6l4.4-5"/></svg>version<span class="sr-only">: passed</span></li>
+            <li data-check="start" data-state="passed"><svg class="mark" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7"/><path d="M4.6 8.3 7 10.6l4.4-5"/></svg>start<span class="sr-only">: passed</span></li>
+            <li data-check="wake" data-state="passed"><svg class="mark" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7"/><path d="M4.6 8.3 7 10.6l4.4-5"/></svg>wake<span class="sr-only">: passed</span></li>
+            <li data-check="stop" data-state="passed"><svg class="mark" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7"/><path d="M4.6 8.3 7 10.6l4.4-5"/></svg>stop<span class="sr-only">: passed</span></li>
+            <li data-check="token" data-state="passed"><svg class="mark" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7"/><path d="M4.6 8.3 7 10.6l4.4-5"/></svg>token<span class="sr-only">: passed</span></li>
+          </ol>
+        </div>
+      </article>
+    </li>
+    <li class="driver" data-kit="not-run">
+      <article class="driver-card" aria-labelledby="driver-grok">
+        <ul class="driver-words" aria-label="Its four words"><li><code>version</code></li><li><code>start</code></li><li><code>wake</code></li><li><code>stop</code></li></ul>
+        <h3 id="driver-grok">Grok Bot</h3>
+        <p class="driver-status">Coming soon: listed when its driver lands</p>
+        <div class="kit">
+          <p class="kit-result">Test kit: <b>Not yet run</b></p>
+          <ol class="kit-checks" aria-label="The kit's five checks">
+            <li data-check="version" data-state="not-run"><svg class="mark" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/></svg>version<span class="sr-only">: not yet run</span></li>
+            <li data-check="start" data-state="not-run"><svg class="mark" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/></svg>start<span class="sr-only">: not yet run</span></li>
+            <li data-check="wake" data-state="not-run"><svg class="mark" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/></svg>wake<span class="sr-only">: not yet run</span></li>
+            <li data-check="stop" data-state="not-run"><svg class="mark" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/></svg>stop<span class="sr-only">: not yet run</span></li>
+            <li data-check="token" data-state="not-run"><svg class="mark" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/></svg>token<span class="sr-only">: not yet run</span></li>
+          </ol>
+        </div>
+      </article>
+    </li>
+    </ol>
+    <figcaption>Each driver plugs into the kernel through the same four words. Under each, the kit's five checks: <span class="legend"><svg class="mark" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7"/><path d="M4.6 8.3 7 10.6l4.4-5"/></svg>passed</span> <span class="legend"><svg class="mark" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M8 1.5a6.5 6.5 0 0 1 0 13z"/></svg>in progress</span> <span class="legend"><svg class="mark" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/></svg>not yet run</span></figcaption>
+  </figure>
+
+  <section class="boat-deck" aria-labelledby="boat-h">
+    <div class="boat-scene">
+      <img src="/art/drivers-c-boat.webp" alt="Oil painting of the Wiz crew's ship in cutaway at night: on its three decks, Wizes steer and read, write at desks, and tend a brass engine" width="1672" height="941" loading="lazy">
+      <p class="boat-callout" aria-hidden="true"><code>boat.dev</code><code>kit 5/5</code></p>
+    </div>
+    <div class="boat-copy">
+      <p class="drivers-eyebrow">The hero driver</p>
+      <h2 id="boat-h">boat.dev passed the kit, 5 of 5.</h2>
+      <p>On a real account, on 2026-11-19. The kit ran its five checks against boat.dev's driver on its real host.</p>
+      <ol class="boat-checks">
+          <li><svg class="mark" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7"/><path d="M4.6 8.3 7 10.6l4.4-5"/></svg><code>version</code><span>names the records version it supports, and prints its schema unchanged</span><span class="sr-only"> (passed)</span></li>
+          <li><svg class="mark" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7"/><path d="M4.6 8.3 7 10.6l4.4-5"/></svg><code>start</code><span>answers a run id; the agent's status note appears on the ticket</span><span class="sr-only"> (passed)</span></li>
+          <li><svg class="mark" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7"/><path d="M4.6 8.3 7 10.6l4.4-5"/></svg><code>wake</code><span>reaches the same run: that note is edited, never a second one</span><span class="sr-only"> (passed)</span></li>
+          <li><svg class="mark" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7"/><path d="M4.6 8.3 7 10.6l4.4-5"/></svg><code>stop</code><span>ends the run: nothing it started still runs</span><span class="sr-only"> (passed)</span></li>
+          <li><svg class="mark" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7"/><path d="M4.6 8.3 7 10.6l4.4-5"/></svg><code>token</code><span>no credential in its output, command lines or environment</span><span class="sr-only"> (passed)</span></li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="write-own" aria-labelledby="own-h">
+    <div class="own-copy">
+      <h2 id="own-h">Write your own driver</h2>
+      <p>A driver is one small program, in any language, that answers four words. Pass the kit's five checks on your real host and it can join.</p>
+      <p class="own-login">OpenWiz never touches a login.</p>
+      <ul class="own-links">
+        <li><a href="https://github.com/openwizdev/OpenWiz/blob/main/kernel/driver.v1.md">Read the contract <code>kernel/driver.v1.md</code></a></li>
+        <li><a href="https://github.com/openwizdev/OpenWiz/tree/main/kernel/driver-kit">Run the kit <code>kernel/driver-kit/</code></a></li>
+        <li><a href="https://github.com/openwizdev/OpenWiz/tree/main/adapters/template">Copy the template <code>adapters/template/</code></a></li>
+      </ul>
+    </div>
+    <dl class="own-words">
+      <div><dt><code>version</code></dt><dd>Says the driver's name and its records version.</dd></div>
+      <div><dt><code>start</code></dt><dd>Runs one agent on one ticket, and answers a run id.</dd></div>
+      <div><dt><code>wake</code></dt><dd>Reaches the same run again.</dd></div>
+      <div><dt><code>stop</code></dt><dd>Ends everything the run started.</dd></div>
+    </dl>
+  </section>
+</main>
+<footer class="landing-footer">
+  <div class="wrap">
+    <div class="footer-links"><a href="/changelog/">Changelog</a><a href="https://github.com/openwizdev/openwiz#readme">Docs</a><a class="github-star" href="https://github.com/openwizdev/openwiz" aria-label="Star on GitHub"><svg aria-hidden="true" viewBox="0 0 16 16" width="17" height="17" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg><span data-stars hidden></span></a></div>
+    <p class="footer-wordmark">OpenWiz</p>
+  </div>
+  <div class="family" aria-hidden="true">
+    <span class="family-wiz"><img src="/art/family-01.webp" alt="" width="160" height="160" loading="lazy"><span class="wiz-eye"><i></i></span><span class="wiz-eye"><i></i></span></span>
+    <span class="family-wiz"><img src="/art/family-02.webp" alt="" width="160" height="160" loading="lazy"><span class="wiz-eye"><i></i></span><span class="wiz-eye"><i></i></span></span>
+    <span class="family-wiz"><img src="/art/family-03.webp" alt="" width="160" height="160" loading="lazy"><span class="wiz-eye"><i></i></span><span class="wiz-eye"><i></i></span></span>
+    <span class="family-wiz"><img src="/art/family-04.webp" alt="" width="160" height="160" loading="lazy"><span class="wiz-eye"><i></i></span><span class="wiz-eye"><i></i></span></span>
+    <span class="family-wiz"><img src="/art/family-05.webp" alt="" width="160" height="160" loading="lazy"><span class="wiz-eye"><i></i></span><span class="wiz-eye"><i></i></span></span>
+    <span class="family-wiz"><img src="/art/family-06.webp" alt="" width="160" height="160" loading="lazy"><span class="wiz-eye"><i></i></span><span class="wiz-eye"><i></i></span></span>
+    <span class="family-wiz"><img src="/art/family-07.webp" alt="" width="160" height="160" loading="lazy"><span class="wiz-eye"><i></i></span><span class="wiz-eye"><i></i></span></span>
+    <span class="family-wiz"><img src="/art/family-08.webp" alt="" width="160" height="160" loading="lazy"><span class="wiz-eye"><i></i></span><span class="wiz-eye"><i></i></span></span>
+    <span class="family-wiz"><img src="/art/family-09.webp" alt="" width="160" height="160" loading="lazy"><span class="wiz-eye"><i></i></span><span class="wiz-eye"><i></i></span></span>
+    <span class="family-wiz"><img src="/art/family-10.webp" alt="" width="160" height="160" loading="lazy"><span class="wiz-eye"><i></i></span><span class="wiz-eye"><i></i></span></span>
+    <span class="family-wiz"><img src="/art/family-11.webp" alt="" width="160" height="160" loading="lazy"><span class="wiz-eye"><i></i></span><span class="wiz-eye"><i></i></span></span>
+    <span class="family-wiz"><img src="/art/family-12.webp" alt="" width="160" height="160" loading="lazy"><span class="wiz-eye"><i></i></span><span class="wiz-eye"><i></i></span></span>
+  </div>
+</footer>
+</body></html>

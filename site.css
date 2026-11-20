@@ -285,3 +285,133 @@ code,.v{font-family:var(--ow-font-mono)}
   .hero-copy h1 { font-size: clamp(44px, 13vw, 52px); }
   .ember-ticket { overflow-wrap: anywhere; }
 }
+
+/* The Drivers page (#49, variant C: the kernel diagram). One clear diagram: the kernel above, four drivers plugged in
+   below through the four words, each with its kit result as word and shape. A quiet painted layer behind; boat.dev,
+   the hero, is the Wiz crew's ship. Every rule is scoped to .drivers-page; motion waits for no-preference. */
+.drivers-page .drivers { --pass: var(--sea); --doing: #f2c46d; --idle: #8f867c; padding-block: clamp(36px, 5vw, 72px) clamp(56px, 7vw, 100px); }
+.drivers-page .drivers code { font-family: var(--ow-font-mono); }
+.drivers-page .drivers-eyebrow { color: var(--brass-hi); font: 500 13px/1.4 var(--ow-font-mono); letter-spacing: .02em; }
+.drivers-page .drivers-intro h1 { margin-top: 14px; font-size: clamp(44px, 6vw, 84px); font-weight: 760; line-height: .98; letter-spacing: -.06em; }
+.drivers-page .drivers-lead { margin-top: 18px; max-width: 40ch; color: #e1d7cb; font-size: clamp(17px, 1.6vw, 21px); line-height: 1.45; letter-spacing: -.02em; }
+.drivers-page .drivers-facts { display: flex; flex-wrap: wrap; gap: 8px; margin: 22px 0 0; padding: 0; list-style: none; color: var(--grey2); font: 13px/1.3 var(--ow-font-mono); }
+.drivers-page .drivers-facts li { padding: 6px 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--panel); }
+.drivers-page .drivers-facts b { color: var(--ink); font-weight: 650; }
+.drivers-page .mark { width: 16px; height: 16px; flex: none; fill: none; stroke-width: 1.5; }
+.drivers-page [data-state="passed"] .mark, .drivers-page .legend:nth-of-type(1) .mark, .drivers-page .boat-checks .mark { fill: var(--pass); stroke: var(--pass); }
+.drivers-page :is([data-state="passed"], .legend:nth-of-type(1), .boat-checks) .mark path { fill: none; stroke: var(--ground); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.drivers-page :is([data-state="in-progress"], .legend:nth-of-type(2)) .mark { stroke: var(--doing); }
+.drivers-page :is([data-state="in-progress"], .legend:nth-of-type(2)) .mark path { fill: var(--doing); stroke: none; }
+.drivers-page :is([data-state="not-run"], .legend:nth-of-type(3)) .mark { stroke: var(--idle); stroke-dasharray: 2.2 2.2; }
+
+/* The diagram: the kernel, a bus, one labelled drop per driver. */
+.drivers-page .kernel-map { position: relative; isolation: isolate; margin: clamp(36px, 5vw, 64px) 0 0; padding: clamp(20px, 3vw, 40px); border: 1px solid var(--line); border-radius: var(--round); background: #1d1a17; overflow: hidden; }
+.drivers-page .map-paint { position: absolute; z-index: -1; right: 0; bottom: 0; width: min(100%, 1100px); height: auto; opacity: .22; filter: saturate(.7); -webkit-mask-image: linear-gradient(90deg, transparent, #000 45%); mask-image: linear-gradient(90deg, transparent, #000 45%); pointer-events: none; }
+.drivers-page .kernel { position: relative; max-width: 760px; margin-inline: auto; padding: 18px 20px 20px; border: 1px solid #7a5d52; border-radius: 12px; background: #24201c; box-shadow: 0 0 0 4px #1d1a17, 0 0 0 5px var(--line); }
+.drivers-page .kernel h2 { font: 650 13px/1.4 var(--ow-font-mono); letter-spacing: .04em; text-transform: uppercase; color: var(--brass-hi); text-align: center; }
+.drivers-page .kernel-parts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 14px 0 0; padding: 0; list-style: none; }
+.drivers-page .kernel-parts li { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--ground); }
+.drivers-page .kernel-parts b { font-size: 15px; font-weight: 650; }
+.drivers-page .kernel-parts span { color: var(--grey2); font-size: 13px; line-height: 1.4; }
+.drivers-page .kernel-parts code { color: #ffd0c8; font-size: 12px; }
+.drivers-page .kernel::after { content: ""; position: absolute; left: 50%; top: calc(100% + 5px); width: 1px; height: 32px; background: var(--edge); }
+.drivers-page .driver-row { --drop: 56px; --gap: 16px; position: relative; display: grid; grid-template-columns: 1fr 1fr 1.42fr 1fr; gap: var(--gap); margin: 37px 0 0; padding: var(--drop) 0 0; list-style: none; }
+.drivers-page .driver { position: relative; display: flex; min-width: 0; }
+.drivers-page .driver::after { content: ""; position: absolute; top: calc(var(--drop) * -1); left: calc(var(--gap) / -2); right: calc(var(--gap) / -2); border-top: 1px solid var(--edge); }
+.drivers-page .driver:first-child::after { left: 50%; }
+.drivers-page .driver:last-child::after { right: 50%; }
+.drivers-page .driver::before { content: ""; position: absolute; top: calc(var(--drop) * -1); left: 50%; height: var(--drop); border-left: 2px dotted var(--idle); transform: translateX(-1px); }
+.drivers-page .driver[data-kit="in-progress"]::before { border-left: 2px dashed var(--doing); }
+.drivers-page .driver[data-kit="passed"]::before { border: 0; width: 2px; background: var(--pass); box-shadow: 0 0 12px #83d7bd80; }
+.drivers-page .driver-card { position: relative; display: flex; flex-direction: column; width: 100%; padding: 0 16px 16px; border: 1px solid var(--line); border-radius: 12px; background: #221f1bf2; }
+.drivers-page .driver-words { display: flex; flex-wrap: wrap; justify-content: center; gap: 3px; margin: -12px -8px 0; padding: 0; list-style: none; }
+.drivers-page .driver-words code { display: block; padding: 2px 5px; border: 1px solid var(--edge); border-radius: 6px; background: var(--ground); color: #e1d7cb; font-size: 11px; line-height: 1.4; }
+.drivers-page .driver-card h3 { margin: 16px 0 0; font-size: 21px; font-weight: 680; line-height: 1.2; letter-spacing: -.025em; }
+.drivers-page .driver-status { margin-top: 6px; color: var(--grey2); font-size: 15px; line-height: 1.45; }
+.drivers-page .driver-status strong { color: var(--ink); font-weight: 650; }
+.drivers-page .kit { margin-top: auto; padding-top: 16px; }
+.drivers-page .kit-result { padding-top: 12px; border-top: 1px solid var(--line); color: var(--grey); font: 12px/1.4 var(--ow-font-mono); }
+.drivers-page .kit-result b { color: var(--ink); font-weight: 600; }
+.drivers-page .kit-checks { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; margin: 10px 0 0; padding: 0; list-style: none; }
+.drivers-page .kit-checks li { display: flex; flex-direction: column; align-items: center; gap: 5px; min-width: 0; color: var(--grey2); font: 10px/1.2 var(--ow-font-mono); }
+.drivers-page .kit-checks [data-state="not-run"] { color: var(--grey); }
+/* The hero: wider, warm-edged, the ship painted into its head. */
+.drivers-page .driver-card.is-hero { border-color: #c98e74; background: #26211cf7; box-shadow: 0 0 0 1px #c98e7440, 0 24px 60px #0b0806b0; }
+.drivers-page .is-hero .driver-words code { border-color: #c98e74; }
+.drivers-page .driver-art { display: block; width: calc(100% + 32px); height: 132px; margin: 12px -16px 0; object-fit: cover; object-position: 66% 62%; border-block: 1px solid var(--line); }
+.drivers-page .driver-flag { margin-top: 14px; color: var(--brass-hi); font: 500 12px/1.3 var(--ow-font-mono); letter-spacing: .02em; }
+.drivers-page .is-hero .driver-flag + h3 { margin-top: 4px; font-size: 26px; }
+.drivers-page .is-hero .driver-status { color: #e1d7cb; }
+.drivers-page .kernel-map figcaption { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin-top: 22px; color: var(--grey2); font-size: 14px; }
+.drivers-page .legend { display: inline-flex; align-items: center; gap: 6px; font: 12px var(--ow-font-mono); }
+
+/* boat.dev, the hero: the ship in cutaway, its kit result beside it. */
+.drivers-page .boat-deck { position: relative; margin-top: clamp(48px, 7vw, 96px); border: 1px solid var(--line); border-radius: var(--round); overflow: hidden; background: #110f0d; }
+.drivers-page .boat-scene { position: relative; aspect-ratio: 1672 / 941; }
+.drivers-page .boat-scene img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.drivers-page .boat-callout { position: absolute; right: 3%; top: 6%; display: flex; gap: 6px; }
+.drivers-page .boat-callout code { padding: 4px 8px; border: 1px solid #c98e74; border-radius: 6px; background: #1b1916e6; color: #f3d9c8; font-size: 12px; }
+.drivers-page .boat-copy { padding: 22px 20px 26px; }
+.drivers-page .boat-copy h2 { margin-top: 10px; font-size: clamp(28px, 3.2vw, 44px); font-weight: 740; line-height: 1.02; letter-spacing: -.05em; }
+.drivers-page .boat-copy > p:not(.drivers-eyebrow) { margin-top: 12px; color: #e1d7cb; font-size: 16px; line-height: 1.5; }
+.drivers-page .boat-checks { display: grid; gap: 2px; margin: 18px 0 0; padding: 0; list-style: none; }
+.drivers-page .boat-checks li { display: grid; grid-template-columns: 16px 64px 1fr; align-items: baseline; gap: 10px; padding: 8px 0; border-top: 1px solid #ffffff14; font-size: 14px; line-height: 1.4; color: var(--grey2); }
+.drivers-page .boat-checks .mark { align-self: center; }
+.drivers-page .boat-checks code { color: var(--ink); font-size: 13px; }
+
+/* Write your own driver. */
+.drivers-page .write-own { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: clamp(24px, 4vw, 64px); align-items: start; margin-top: clamp(48px, 7vw, 96px); padding-top: clamp(32px, 4vw, 48px); border-top: 1px solid var(--line); }
+.drivers-page .write-own h2 { font-size: clamp(30px, 3.6vw, 48px); font-weight: 740; line-height: 1; letter-spacing: -.05em; }
+.drivers-page .own-copy > p { margin-top: 14px; max-width: 46ch; color: #e1d7cb; font-size: 17px; line-height: 1.5; }
+.drivers-page .own-copy .own-login { color: var(--grey2); font-size: 15px; }
+.drivers-page .own-links { display: grid; gap: 8px; margin: 20px 0 0; padding: 0; list-style: none; }
+.drivers-page .own-links a { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; min-height: 44px; padding: 10px 0; color: var(--ink); font-weight: 600; text-decoration: underline; text-decoration-color: var(--brass); text-underline-offset: 4px; }
+.drivers-page .own-links code { color: var(--grey); font-size: 13px; font-weight: 400; }
+.drivers-page .own-words { margin: 0; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
+.drivers-page .own-words div { display: grid; grid-template-columns: 84px 1fr; gap: 12px; padding: 14px 18px; }
+.drivers-page .own-words div + div { border-top: 1px solid var(--line); }
+.drivers-page .own-words dt code { color: #ffd0c8; font-size: 14px; }
+.drivers-page .own-words dd { margin: 0; color: var(--grey2); font-size: 15px; line-height: 1.45; }
+
+/* Wide screens: the copy sits over the dark sky, left of the ship. */
+@media (min-width: 1100px) {
+  .drivers-page .boat-scene::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, #110f0d 0 24%, #110f0dd9 33%, #110f0d00 46%); }
+  .drivers-page .boat-copy { position: absolute; z-index: 1; left: 0; top: 0; bottom: 0; display: flex; flex-direction: column; justify-content: center; width: 36%; padding: 32px 36px; }
+}
+/* Below the four-up width: one column, the bus becomes a spine down the left. */
+@media (max-width: 1099px) {
+  .drivers-page .kernel-map { --spine: 22px; --stub: 26px; }
+  .drivers-page .driver-row { grid-template-columns: minmax(0, 1fr); gap: 0; margin-top: 37px; padding: 0 0 0 calc(var(--spine) + var(--stub)); }
+  .drivers-page .kernel { margin-inline: 0; }
+  .drivers-page .kernel::after { left: var(--spine); }
+  .drivers-page .driver { padding: 26px 0 8px; }
+  .drivers-page .driver::after, .drivers-page .driver:first-child::after { top: 0; bottom: 0; left: calc(var(--stub) * -1); right: auto; width: 0; border-top: 0; border-left: 1px solid var(--edge); }
+  .drivers-page .driver:last-child::after { right: auto; bottom: auto; height: 39px; }
+  .drivers-page .driver::before { top: 38px; left: calc(var(--stub) * -1); width: var(--stub); height: 0; border-left: 0; border-top: 2px dotted var(--idle); transform: none; }
+  .drivers-page .driver[data-kit="in-progress"]::before { border-left: 0; border-top: 2px dashed var(--doing); }
+  .drivers-page .driver[data-kit="passed"]::before { height: 2px; border: 0; }
+  .drivers-page .driver-card { max-width: 640px; }
+  .drivers-page .driver-words { justify-content: flex-start; margin-inline: 0; }
+  .drivers-page .driver-words code { padding: 3px 7px; font-size: 12px; }
+  .drivers-page .kit-checks li { font-size: 11px; }
+  .drivers-page .write-own { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 600px) {
+  .drivers-page .kernel-map { --spine: 12px; --stub: 18px; padding: 16px 14px 18px; }
+  .drivers-page .kernel-parts { grid-template-columns: minmax(0, 1fr); }
+  .drivers-page .driver-card { padding-inline: 14px; }
+  .drivers-page .driver-art { width: calc(100% + 28px); margin-inline: -14px; }
+  .drivers-page .boat-callout { display: none; }
+  .drivers-page .boat-checks li { grid-template-columns: 16px 56px 1fr; gap: 8px; }
+  .drivers-page .own-words div { grid-template-columns: 68px 1fr; padding: 12px 14px; }
+}
+/* Motion only when welcome: a signal runs down boat.dev's line, and the ship rides a slow swell. */
+@keyframes drivers-signal { from { background-position: 0 -60px; } to { background-position: 0 120px; } }
+@keyframes drivers-swell { 0%, 100% { transform: translateY(0) rotate(0deg); } 50% { transform: translateY(-4px) rotate(-.25deg); } }
+@media (prefers-reduced-motion: no-preference) {
+  .drivers-page .driver[data-kit="passed"]::before { background: linear-gradient(180deg, transparent 0 30%, #e9fff7 50%, transparent 70%) no-repeat, var(--pass); background-size: 100% 60px, auto; animation: drivers-signal 2.6s linear infinite; }
+  .drivers-page .boat-scene img { animation: drivers-swell 9s ease-in-out infinite; transform-origin: 60% 80%; }
+}
+@media (prefers-reduced-motion: no-preference) and (max-width: 1099px) {
+  .drivers-page .driver[data-kit="passed"]::before { background: var(--pass); animation: none; }
+}
