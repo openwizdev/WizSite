@@ -42,6 +42,9 @@ ART_HASHES = {
     'art/todo-spec.mp4': '52bb1fa94a154e17270f7512db19efcedae921e4769a28742bc8a36093d1c732',
     'art/todo-spec-poster.webp': '9f68e7ab1f17ea97659a085072500055adcd11c8ffd737231f1db114924dc963',
     'art/todo-spec.vtt': '47e9ffb41081dd72f541110c43312521a8dd92f1c8e58c11092ecd0daa74eee2',
+    # The moments' real thumbnails: a crop of the to-do run's grill questions (no names) and the live to-do app.
+    'art/todo-grill.webp': '7329ec31d07b4829cda08a69f3bcb8b1ae27167b81792028180b148839abd266',
+    'art/todo-app.webp': 'ccc5be87687b1d4ac387cfb623033c0f567890cfe73570f8e4d4bb4b8a81de54',
     # OpenWiz's model config spec video (#1802), off the landing (J267) but still served at its URL for #1802's links.
     'art/spec-video.mp4': 'feb357b9a80453d676123a31285a36c34b5873e102ed58c95728bfd6315bfe16',
     # The model config video's poster frame and captions (#1405), still served for OpenWiz #1802's links (J267).
@@ -615,6 +618,12 @@ def check_site(root):
         hrefs[re.search(r'<h3>([^<]+)</h3>', block)[1]] = {a.get('href') for a in found.links}
     for card, link in zip(moments, TODO_LINKS):
         assert link in hrefs.get(card, ()), f'the {card} moment must link the real to-do run: {link}'
+    # Steps 1 and 3 show real thumbnails, not mock screens: the pinned grill crop and live app capture, each described.
+    steps = re.findall(r'<li class="moment-step[^"]*">.*?</li>', section[0] if section else '', re.S)
+    assert len(steps) == 2, 'steps 1 and 3 must stay beside the spec video'
+    for block, src in zip(steps, ('/art/todo-grill.webp', '/art/todo-app.webp')):
+        thumb = next((i for i in Page(block).images if i.get('src') == src), None)
+        assert thumb and (thumb.get('alt') or '').strip(), f'a moment lost its real thumbnail with a description: {src}'
     # Owner cuts (round 6): obvious notes stay off the page.
     for text in ('Illustration, not live data', 'Building in public'):
         assert text.lower() not in flat.lower(), f'cut copy is back: {text}'

@@ -198,6 +198,9 @@ class Checks(unittest.TestCase):
                 (lambda t: t.replace('https://github.com/openwizdev/todo-demo/issues/1"', 'https://github.com/openwizdev/todo-demo/issues/2"'), 'unexpected repository link'),
                 (lambda t: re.sub(r'(<li class="moment-step moment-grill">.*?</li>)', r'<!-- \1 -->', t, count=1, flags=re.S), 'Answer a few questions moment must link'),
                 (lambda t: re.sub(r'(<li class="moment-step moment-ship">.*?</li>)', r'<!-- \1 -->', t, count=1, flags=re.S), 'Watch it ship moment must link'),
+                # Catches: a step losing its real thumbnail or its description.
+                (lambda t: re.sub(r'<img class="moment-thumb" src="/art/todo-app.webp"[^>]*>', '', t), 'real thumbnail'),
+                (lambda t: t.replace('src="/art/todo-grill.webp" alt="The', 'src="/art/todo-grill.webp" alt=" " data-x="'), 'real thumbnail'),
                 (lambda t: t.replace('</main>', '<p>Add a dark mode toggle</p></main>'), 'old example'),
                 (lambda t: t.replace('Oil painting of Wiz scholars studying a to-do list', ''), 'painting without a description')):
             with self.subTest(error=error), tempfile.TemporaryDirectory() as temp:
@@ -798,8 +801,9 @@ class Checks(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp) / 'dist'
             shutil.copytree(ROOT / 'dist', root)
-            (root / 'art/drivers-x-unused.webp').write_bytes((root / 'art/drivers-c-boat.webp').read_bytes())
-            with mock.patch.dict('check.ART_HASHES', {'art/drivers-x-unused.webp': '39fd43d08aa36bce84e964699d493a03af090499a63dffbfaa43e61804b7e1ef'}), \
+            # The smallest pinned drivers picture, so the copy tests the unused-art rule rather than the art budget's headroom.
+            (root / 'art/drivers-x-unused.webp').write_bytes((root / 'art/drivers-d-sea.webp').read_bytes())
+            with mock.patch.dict('check.ART_HASHES', {'art/drivers-x-unused.webp': 'f2699bd8fe4763993a492dfac2bdbfc3eae46ec33bae0ab74127ad6ebc6a6285'}), \
                     mock.patch('check.ART', set(__import__('check').ART) | {'art/drivers-x-unused.webp'}), \
                     mock.patch('check.STATIC', set(__import__('check').STATIC) | {'art/drivers-x-unused.webp'}), \
                     self.assertRaisesRegex(AssertionError, 'unused drivers art'):
