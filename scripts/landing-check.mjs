@@ -91,6 +91,8 @@ const MODES = {
   reduced: { reduced: true },
   'no GSAP': { block: ['*gsap*'] },
   'no JavaScript': { noScript: true },
+  // #77 R1: the FAQ's own script fails to load; the rest of the page's scripts run.
+  'no FAQ script': { block: ['*/faq.*.js'] },
 };
 const WIDTHS = [[320, 640], [390, 844], [800, 1000], [1280, 800], [1440, 1100]];
 
@@ -476,6 +478,7 @@ async function faq(page, where, width, mode) {
       width: faq.getBoundingClientRect().width,
       expanded: buttons.map(b => b.getAttribute('aria-expanded')),
       open: answers.map(a => shown(a) && a.getBoundingClientRect().height > 20),
+      disabled: buttons.map(b => b.disabled),
       duration: getComputedStyle(answers[0]).transitionDuration,
     };
   })()`);
@@ -487,10 +490,13 @@ async function faq(page, where, width, mode) {
       `the Questions are not two columns, heading about a third (${third.toFixed(2)})`);
   }
   if (width <= 480) expect(facts.list.top > facts.head.top && Math.abs(facts.list.left - facts.head.left) < 2, where, 'the Questions are not one column on a phone');
-  if (mode === 'no JavaScript') {
-    expect(facts.open.every(Boolean), where, 'without scripts an answer is hidden');
+  if (mode === 'no JavaScript' || mode === 'no FAQ script') {
+    // Without its script every answer shows, and no row offers a control that does nothing.
+    expect(facts.open.every(Boolean), where, `without ${mode === 'no JavaScript' ? 'scripts' : 'faq.js'} an answer is hidden`);
+    expect(facts.disabled.every(Boolean) && facts.expanded.every(e => e === 'true'), where, 'a row offers a button that does nothing');
     return;
   }
+  expect(facts.disabled.every(d => !d), where, 'a row button stays disabled with its script');
   expect(facts.open.every(o => !o) && facts.expanded.every(e => e === 'false'), where, 'an answer starts open');
   if (mode === 'no GSAP' || (width !== 390 && width !== 1280)) return;
   expect(facts.duration === (mode === 'reduced' ? '0s' : '0.35s, 0.35s, 0s'), where, `the answer's motion is ${facts.duration}`);

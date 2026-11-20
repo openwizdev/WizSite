@@ -581,7 +581,9 @@ class Checks(unittest.TestCase):
         for message, change in {
             'the Questions rows': lambda f: f.replace('What is a kernel?', 'What is a core?', 1),
             'the Questions rows ': lambda f: re.sub(r'\s*<div class="faq-row">[\s\S]*?</div></div>\n    </div>', '', f, count=1),
-            'a button that names its answer': lambda f: f.replace('aria-expanded="false" ', '', 1),
+            'a button that names its answer': lambda f: f.replace('type="button" ', '', 1),
+            'open and disabled until faq.js runs': lambda f: f.replace(' disabled id=', ' id=', 1),
+            'open and disabled until faq.js runs ': lambda f: f.replace('aria-expanded="true"', 'aria-expanded="false"', 1),
             'a button that names its answer ': lambda f: f.replace('aria-controls="faq-a2"', 'aria-controls="faq-a1"', 1),
             'links off the site': lambda f: f.replace('href="/team/#book"', 'href="https://example.com/"', 1),
             'heading and its line': lambda f: f.replace('The short ones are here.', 'More.', 1),

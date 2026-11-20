@@ -1094,7 +1094,7 @@ def check_footer(htmls):
 def check_faq(htmls, pages, names):
     """#76: the landing, /team and /faq each show the one Questions snippet from faq.html, once, and load faq.js; no other
     page shows it. On the landing it closes the main; on /team it sits right above the closing Book a call. Each row is a
-    real button that names its answer; the answers link only within the site."""
+    real button that names its answer, shipped open and disabled until faq.js runs; the answers link only within the site."""
     for name, html in htmls.items():
         want = FAQ_ON.get(name)
         assert html.count('class="faq ') == (1 if want else 0) and (not want or html.count(want) == 1), \
@@ -1111,8 +1111,11 @@ def check_faq(htmls, pages, names):
     assert tuple(plain(q) for _, q, _, _ in rows) == FAQ_QUESTIONS and FAQ.count('class="faq-row"') == len(FAQ_QUESTIONS), \
         f'the Questions rows, in order: {[plain(q) for _, q, _, _ in rows]}'
     for attrs, question, answer_id, answer in rows:
-        assert 'type="button"' in attrs and 'aria-expanded="false"' in attrs and f'aria-controls="{answer_id}"' in attrs, \
+        assert 'type="button"' in attrs and f'aria-controls="{answer_id}"' in attrs, \
             f'each question is a button that names its answer: {plain(question)}'
+        # #77 R1: it ships open and disabled, so its answer reads even if faq.js never loads; faq.js closes and enables it.
+        assert re.search(r'(?:^|\s)disabled(?:\s|$)', attrs) and 'aria-expanded="true"' in attrs, \
+            f'each question ships open and disabled until faq.js runs: {plain(question)}'
         assert plain(answer), f'a question without its answer: {plain(question)}'
         for href in re.findall(r'href="([^"]*)"', answer):
             assert href.startswith('/'), f'an answer links off the site: {href}'
