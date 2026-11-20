@@ -462,8 +462,31 @@ function enableCopy() {
 // The "Ask a Wiz..." row (#1902, contract openwiz.ask-a-wiz.v1): the FAQ's last row, added only when GET /api/ask
 // answers the contract's probe (its switch, ASK_A_WIZ, is exactly "on"); anything else, the site's own page included,
 // leaves the FAQ as it is. A question streams in; a finished answer becomes a normal row and a fresh input row follows.
-// Everything from the stream is set as text; only the not-covered links, when they are exactly the contract's, link.
-const ASK_LINKS = { 'Book a call': 'https://openwiz.dev/team/#book', 'GitHub issues': 'https://github.com/openwizdev/openwiz/issues' };
+// Everything from the stream is set as text; only the not-covered answer's links, exactly the contract's, are links.
+const ASK_KEYS = { text: 'text,type', sources: 'sources,type', done: 'type', not_covered: 'links,text,type', refused: 'message,reason,type' };
+const ASK_REASONS = ['bad_request', 'too_long', 'rate_limited', 'daily_cap', 'upstream_error', 'unavailable', 'store_error', 'no_private_route'];
+const ASK_NOT_COVERED = 'The OpenWiz docs don\'t cover that yet, so I won\'t guess. Book a call or open a GitHub issue, and we\'ll answer it.';
+const ASK_LINKS = [['Book a call', 'https://openwiz.dev/team/#book'], ['GitHub issues', 'https://github.com/openwizdev/openwiz/issues']];
+const askKeys = value => value && typeof value === 'object' && !Array.isArray(value) ? Object.keys(value).sort().join() : '';
+const askText = value => typeof value === 'string' && value.length > 0;
+// One line of the stream, read only in the contract's shape: each event with exactly its keys, in one of its orders
+// (text, then sources, then done; not_covered alone; refused alone, or after text only as upstream_error).
+// Anything else throws, and the row treats the stream as broken.
+function askEvent(line, text, sources) {
+  const e = JSON.parse(line);
+  const ok = askKeys(e) === ASK_KEYS[e?.type] && {
+    text: () => !sources && askText(e.text),
+    sources: () => text && !sources && Array.isArray(e.sources) && e.sources.length >= 1 && e.sources.length <= 6
+      && new Set(e.sources.map(s => s?.url)).size === e.sources.length
+      && e.sources.every(s => askKeys(s) === 'title,url' && askText(s.title) && /^https:\/\/(openwiz\.dev|github\.com\/openwizdev)\//.test(s.url)),
+    done: () => !!sources,
+    not_covered: () => !text && e.text === ASK_NOT_COVERED && Array.isArray(e.links) && e.links.length === ASK_LINKS.length
+      && e.links.every((link, i) => askKeys(link) === 'href,label' && link.label === ASK_LINKS[i][0] && link.href === ASK_LINKS[i][1]),
+    refused: () => !sources && ASK_REASONS.includes(e.reason) && askText(e.message) && (!text || e.reason === 'upstream_error'),
+  }[e.type]();
+  if (!ok) throw new Error('not the contract\'s stream');
+  return e;
+}
 async function askAWiz() {
   const lists = document.querySelectorAll('.faq .faq-rows');
   if (!lists.length) return;
@@ -484,6 +507,10 @@ async function askAWiz() {
   for (const list of lists) {
     const faq = list.closest('.faq');
     const level = list.querySelector('.faq-q')?.tagName.toLowerCase() || 'h3';
+    // One polite status line per FAQ, outside the rows, so every outcome is announced even as its row is replaced.
+    const status = el('p', 'sr-only');
+    status.setAttribute('aria-live', 'polite');
+    list.after(status);
     const addRow = () => {
       const n = ++made, row = el('div', 'faq-row faq-ask'), form = el('form', 'faq-ask-form'), input = el('input');
       const label = el('label', 'sr-only', 'Ask a Wiz a question about OpenWiz');
@@ -491,7 +518,6 @@ async function askAWiz() {
       label.htmlFor = input.id;
       form.append(label, input, el('button', 'faq-ask-go', 'Ask'));
       const heading = el(level, 'faq-q'), answer = el('p', 'faq-ask-answer'), body = el('div', 'faq-a'), actions = el('div', 'faq-ask-actions');
-      answer.setAttribute('aria-live', 'polite');
       body.append(el('div'));
       body.firstChild.append(answer);
       const buttons = {};
@@ -499,8 +525,9 @@ async function askAWiz() {
       row.append(form, heading, body, actions);
       list.append(row);
       let question = '', controller = null;
-      // idle: the input; asking: the question, its answer so far and Stop; ended: the question, a message, Retry and Edit.
-      const show = (state, message = '', retry = true) => {
+      // idle: the input; asking: the question, its answer so far and Stop; ended: the question, a message, Retry and
+      // Edit. Focus moves to the control that replaces the one just used, never to the page.
+      const show = (state, message = '', retry = true, focus = true) => {
         row.dataset.state = state;
         form.hidden = state !== 'idle';
         heading.hidden = body.hidden = state === 'idle';
@@ -510,6 +537,8 @@ async function askAWiz() {
         buttons.Retry.hidden = state !== 'ended' || !retry;
         buttons.Edit.hidden = state !== 'ended';
         actions.hidden = state === 'idle';
+        if (state !== 'idle') status.textContent = state === 'asking' ? 'Ask a Wiz is answering.' : message;
+        if (focus) (state === 'idle' ? input : state === 'asking' ? buttons.Stop : retry ? buttons.Retry : buttons.Edit).focus();
       };
       const finish = (paragraphs, links = []) => {
         const done = el('div', 'faq-row'), h = el(level, 'faq-q'), button = el('button', '', question), a = el('div', 'faq-a');
@@ -523,17 +552,18 @@ async function askAWiz() {
         for (const [text, className] of paragraphs) a.firstChild.append(el('p', className, text));
         if (links.length) {
           const p = el('p', 'faq-ask-links');
-          links.forEach(({ label, href }, i) => p.append(...(i ? [' · '] : []), Object.assign(el('a', '', label), { href })));
+          links.forEach(([label, href], i) => p.append(...(i ? [' · '] : []), Object.assign(el('a', '', label), { href })));
           a.firstChild.append(p);
         }
         done.append(h, a);
         row.replaceWith(done);
+        status.textContent = paragraphs[0][0];
         addRow().focus({ preventScroll: true });
       };
       const ask = async () => {
         controller = new AbortController();
         show('asking');
-        let text = '', sources = [], end = null;
+        let text = '', sources = null, end = null;
         try {
           const response = await fetch('/api/ask', { method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ question }), cache: 'no-store', signal: controller.signal });
@@ -544,25 +574,21 @@ async function askAWiz() {
             if (done) break;
             buffer += value;
             for (let at; !end && (at = buffer.indexOf('\n')) >= 0; buffer = buffer.slice(at + 1)) {
-              const event = JSON.parse(buffer.slice(0, at));
-              if (event.type === 'text' && typeof event.text === 'string') answer.textContent = text += event.text;
-              else if (event.type === 'sources' && Array.isArray(event.sources)) sources = event.sources.map(s => String(s.title));
-              else if (['done', 'not_covered', 'refused'].includes(event.type)) end = event;
+              const event = askEvent(buffer.slice(0, at), text, sources);
+              if (event.type === 'text') answer.textContent = text += event.text;
+              else if (event.type === 'sources') sources = event.sources.map(s => s.title);
+              else end = event;
             }
           }
-          if (end) controller.abort(); // nothing may follow the last event
-        } catch {}
-        controller = null;
-        if (end?.type === 'done' && text) {
-          finish([[text], ...(sources.length ? [[`Sources: ${sources.join(', ')}`, 'faq-ask-sources']] : [])]);
-        } else if (end?.type === 'not_covered' && typeof end.text === 'string') {
-          const links = Array.isArray(end.links) && end.links.length === 2 && end.links.every(l => ASK_LINKS[l?.label] === l.href) ? end.links : [];
-          finish([[end.text]], links);
-        } else if (end?.type === 'refused' && typeof end.message === 'string') {
-          show('ended', end.message, end.reason !== 'too_long');
-        } else {
-          show('ended', 'stopped' in row.dataset ? 'Stopped.' : 'The answer didn’t finish. Try again.');
+        } catch {
+          end = null;
         }
+        controller.abort(); // nothing may follow the last event
+        controller = null;
+        if (end?.type === 'done') finish([[text], [`Sources: ${sources.join(', ')}`, 'faq-ask-sources']]);
+        else if (end?.type === 'not_covered') finish([[end.text]], ASK_LINKS);
+        else if (end?.type === 'refused') show('ended', end.message, end.reason !== 'too_long');
+        else show('ended', 'stopped' in row.dataset ? 'Stopped.' : 'The answer didn’t finish. Try again.');
         delete row.dataset.stopped;
       };
       form.addEventListener('submit', event => {
@@ -572,8 +598,8 @@ async function askAWiz() {
       });
       buttons.Stop.addEventListener('click', () => { row.dataset.stopped = ''; controller?.abort(); });
       buttons.Retry.addEventListener('click', ask);
-      buttons.Edit.addEventListener('click', () => { show('idle'); input.value = question; input.focus(); });
-      show('idle');
+      buttons.Edit.addEventListener('click', () => { show('idle'); input.value = question; });
+      show('idle', '', true, false);
       return input;
     };
     addRow();

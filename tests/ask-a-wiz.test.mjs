@@ -201,6 +201,7 @@ test('an answer streams in, becomes a normal FAQ row, and a fresh input row appe
     await page.until(`document.querySelector('.faq-ask input')`, 'the input row');
     assert.equal(await page.evaluate(`document.querySelector('.faq-ask input').placeholder`), 'Ask a Wiz...');
     assert.equal(await page.evaluate(`document.querySelector('.faq-rows').lastElementChild.classList.contains('faq-ask')`), true);
+    assert.equal(await focused(page), 'the page', 'the row never takes focus on its own'); // catches: the page jumping to the FAQ
     await page.ask('  What does OpenWiz run?  ');
     await page.until(`document.querySelector('.faq-ask .faq-a')?.innerText.includes('Synthetic answer: OpenWiz')`, 'the first piece');
     let seen = (await rows(page)).at(-1);
