@@ -42,6 +42,9 @@ ART_HASHES = {
     'art/todo-spec.mp4': '52bb1fa94a154e17270f7512db19efcedae921e4769a28742bc8a36093d1c732',
     'art/todo-spec-poster.webp': '9f68e7ab1f17ea97659a085072500055adcd11c8ffd737231f1db114924dc963',
     'art/todo-spec.vtt': '47e9ffb41081dd72f541110c43312521a8dd92f1c8e58c11092ecd0daa74eee2',
+    # The landing's real frames: a crop of the to-do run's grill questions (no names) and the live to-do app.
+    'art/todo-grill.webp': '7329ec31d07b4829cda08a69f3bcb8b1ae27167b81792028180b148839abd266',
+    'art/todo-app.webp': 'ccc5be87687b1d4ac387cfb623033c0f567890cfe73570f8e4d4bb4b8a81de54',
     # OpenWiz's model config spec video (#1802), off the landing (J267) but still served at its URL for #1802's links.
     'art/spec-video.mp4': 'feb357b9a80453d676123a31285a36c34b5873e102ed58c95728bfd6315bfe16',
     # The model config video's poster frame and captions (#1405), still served for OpenWiz #1802's links (J267).
@@ -604,16 +607,20 @@ def check_site(root):
     moments = ('Answer a few questions', 'Watch your spec', 'Watch it ship')
     captions = re.findall(r'<h3>([^<]+)</h3>', landing)
     assert tuple(captions) == moments, 'the three moments must appear in order'
-    assert 'Steer the build from the narrated video.' in flat, 'spec video steering copy is missing'
-    assert 'The real spec of an OpenWiz-built to-do app' in flat, 'the spec video must say it is the to-do app\'s real spec'
+    assert 'moment-screen' not in landing, 'a mock moment screen is back'
+    assert "real narrated spec" in landing, 'the spec video must say it is the to-do app\'s real spec'
     # J267: the three moments point at the real to-do run: its grill, its spec and the live app.
     hrefs = {}
     # Comments hide markup from visitors, so a commented-out card or link counts as missing.
-    for block in re.findall(r'<li[^>]*>\s*(?:<div class="moment-screen|<video).*?</li>', re.sub(r'<!--.*?-->', '', landing, flags=re.S), re.S):
+    for block in re.findall(r'<li[^>]*>\s*<div class="moment-frame.*?</li>', re.sub(r'<!--.*?-->', '', landing, flags=re.S), re.S):
         found = Page(block)
         hrefs[re.search(r'<h3>([^<]+)</h3>', block)[1]] = {a.get('href') for a in found.links}
     for card, link in zip(moments, TODO_LINKS):
         assert link in hrefs.get(card, ()), f'the {card} moment must link the real to-do run: {link}'
+    # The moments show real frames, not mock screens: the grill and the live app are pinned captures with descriptions.
+    frames = {a.get('src'): (a.get('alt') or '').strip() for a in pages[root / 'index.html'].images}
+    for src in ('/art/todo-grill.webp', '/art/todo-app.webp'):
+        assert frames.get(src), f'the moments need their real frame with a description: {src}'
     # Owner cuts (round 6): obvious notes stay off the page.
     for text in ('Illustration, not live data', 'Building in public'):
         assert text.lower() not in flat.lower(), f'cut copy is back: {text}'

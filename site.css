@@ -163,12 +163,6 @@ code,.v{font-family:var(--ow-font-mono)}
 .agent-row svg { width: 20px; height: 20px; flex: none; }
 .moments { padding-block: clamp(48px, 7vw, 100px); }
 .moments h2 { font-size: clamp(34px, 5vw, 62px); letter-spacing: -.06em; line-height: 1; }
-.moments ol { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; margin-top: 26px; padding: 0; list-style: none; }
-.moments li { min-width: 0; }
-.moments ol > li { padding: 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
-.moments h3 { margin: 12px 4px 4px; font-size: clamp(15px, 1.35vw, 20px); font-weight: 650; letter-spacing: -.02em; }
-.moment-screen { display: flex; flex-direction: column; gap: 6px; min-height: 174px; padding: 12px; border-radius: 8px; background: #1b1816; font-size: 11px; line-height: 1.4; }
-.moment-screen strong { font-size: 15px; }
 .chat-screen p:not(.screen-label) { width: fit-content; padding: 5px 8px; border-radius: 6px; background: #322b25; }
 .chat-screen p:nth-child(odd):not(.screen-label) { align-self: flex-end; background: #45312d; }
 .ship-screen p:not(.screen-label) { padding: 4px 7px; border: 1px solid var(--line); border-radius: 5px; color: #d4c8ba; }
@@ -201,9 +195,6 @@ body.landing > main { flex: 1 0 auto; }
   .hero-copy h1 { max-width: 13ch; }
   .product-stage { padding: clamp(12px, 4vw, 32px); }
 }
-@media (max-width: 600px) {
-  .moments ol { grid-template-columns: 1fr; }
-}
 @media (max-width: 480px) {
   .landing-nav { min-height: 65px; }
   .nav-log { display: none; }
@@ -216,7 +207,6 @@ body.landing > main { flex: 1 0 auto; }
   .ticket-chip { padding-inline: 4px; font-size: 8px; }
   .ticket-builder { width: 22px; height: 22px; top: -10px; right: -5px; }
   .spec-summary { font-size: 9.5px; }
-  .moment-screen { min-height: 162px; padding: 8px; font-size: 10px; }
   .family { padding-inline: 0; margin-bottom: -14px; }
   .family-wiz { flex-basis: 16%; }
   .family-wiz:nth-child(-n+3), .family-wiz:nth-child(n+10) { display: none; }
@@ -268,16 +258,33 @@ body.landing > main { flex: 1 0 auto; }
 .demo-pause[aria-pressed="true"] { color: var(--sea); }
 /* #1351: with Pause motion shown, the stage keeps room below the window so the control never covers it. */
 .product-stage:has(> .demo-pause:not([hidden])) { padding-bottom: clamp(50px, 5vw, 66px); }
-.moment-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 2px; margin-top: 8px; }
-.moment-heading h3 { margin: 4px; }
-.spec-sample { margin: 6px 4px 0; }
-.moment-copy { margin: 0 4px 4px; color: var(--grey2); font-size: 12px; }
-.spec-play { display: inline-flex; flex: none; align-items: center; gap: 3px; }
+/* "From idea to shipped": real frames only. The grill and the live app are captures, set on the hero painting;
+   the spec video is the widest card and plays clean (no native bar) until the visitor asks for sound. */
+.moments ol { display: grid; grid-template-columns: minmax(0,1fr); gap: 36px; margin-top: 28px; padding: 0; list-style: none; }
+.moment { min-width: 0; }
+.moment-frame { position: relative; isolation: isolate; display: grid; place-items: center; padding: clamp(18px, 5vw, 28px); overflow: hidden; border-radius: 12px; background: #14110f url(/art/era-2-grill.webp) 8% 40% / cover; }
+.moment-frame::before { content: ""; position: absolute; inset: 0; z-index: -1; background: linear-gradient(rgb(20 17 15 / .5), rgb(20 17 15 / .72)); }
+.moment-frame-ship { background-position: 96% 40%; }
+.moment-frame-ship img { max-width: 300px; }
+.moment-frame img { display: block; width: 100%; max-width: 420px; height: auto; border-radius: 8px; box-shadow: 0 18px 44px rgb(0 0 0 / .55), 0 0 0 1px rgb(255 255 255 / .08); }
+.spec-frame { padding: 0; background: #1b1816; }
+.spec-frame::before { content: none; }
+.moments h3 { margin: 16px 0 0; font-size: clamp(17px, 1.5vw, 21px); font-weight: 650; letter-spacing: -.02em; }
+.moment-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; margin-top: 8px; }
+.moment-link, .spec-link { display: inline-flex; align-items: center; min-height: 32px; color: var(--grey2); font-size: 14px; white-space: nowrap; text-decoration: underline; text-decoration-color: var(--edge); text-underline-offset: 4px; }
+:is(.moment-link, .spec-link):hover { color: var(--ink); text-decoration-color: var(--brass); }
+.spec-play { display: inline-flex; flex: none; align-items: center; gap: 6px; min-height: 40px; padding: 0 16px 0 12px; border-color: transparent; border-radius: 999px; background: var(--brass); color: var(--on-brass); font-weight: 650; font-size: 14px; }
+.spec-play:hover { background: var(--brass-hi); }
 .spec-play[hidden] { display: none; }
-.spec-play svg { width: 15px; height: 15px; fill: currentColor; }
-.spec-video { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 8px; background: #1b1816; }
-.spec-link, .moment-link { color: var(--ink); white-space: nowrap; }
+.spec-play svg { width: 14px; height: 14px; fill: currentColor; }
+.spec-video { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover; background: #1b1816; }
+.spec-video:not([controls]) { cursor: pointer; }
 .spec-video::cue { color: #fff; background: rgba(15, 17, 21, .85); }
+@media (min-width: 900px) {
+  .moments ol { grid-template-columns: minmax(0,1fr) minmax(0,2fr) minmax(0,1fr); grid-template-rows: auto auto auto; gap: 0 20px; margin-top: 36px; }
+  .moment { display: grid; grid-row: span 3; grid-template-rows: subgrid; align-content: start; }
+  .moment-frame:not(.spec-frame) { padding: 20px; }
+}
 .wiz-eye { position: absolute; display: none; width: 7%; aspect-ratio: 1; border-radius: 50%; transform: translate(-50%, -50%); background: radial-gradient(circle at 35% 30%, #fff3d8, #e1bd8d); }
 .family.is-playing .wiz-eye { display: grid; place-items: center; }
 .wiz-eye i { width: 37%; aspect-ratio: 1; border-radius: 50%; background: #251912; }

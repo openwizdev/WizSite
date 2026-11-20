@@ -248,8 +248,9 @@ function enableMotion(gsap) {
 
 // The "Watch your spec" moment (#1405). The video loads only when it first plays. With motion it plays muted while it
 // is in view; with reduced motion, Pause motion or the tab hidden it waits on its poster. It never starts with sound on
-// its own: "Play with sound" does that on request, and from then on (or once the visitor uses its own controls) the
-// visitor drives it and scrolling no longer starts or stops it. It needs only this script, not GSAP.
+// its own: "Play with sound" (or a click on the frame) does that on request, and from then on the visitor drives it
+// and scrolling no longer starts or stops it. Until then the frame stays clean: the native control bar (kept in the
+// markup for visitors without this script) comes back only with sound. It needs only this script, not GSAP.
 function specVideo() {
   const video = document.querySelector('.spec-video');
   const sound = document.querySelector('.spec-play');
@@ -282,15 +283,19 @@ function specVideo() {
   calm.addEventListener('change', update);
   document.addEventListener('visibilitychange', update);
   pause.addEventListener('click', () => setTimeout(update));
+  video.controls = false;
   sound.hidden = false;
-  sound.addEventListener('click', () => {
+  const listen = () => {
     visitor = true;
+    video.controls = true;
     video.muted = false;
     video.loop = false;
     video.currentTime = 0;
     // Focus moves into the player, so the keyboard reaches its pause control next, as #32's player did.
     video.play().then(() => video.focus(), () => {});
-  });
+  };
+  sound.addEventListener('click', listen);
+  video.addEventListener('click', () => { if (!video.controls) listen(); });
 }
 
 // The footer Wizes react, one at a time and briefly; at rest the footer is unchanged. With reduced motion, Pause
