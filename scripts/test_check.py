@@ -174,7 +174,7 @@ class Checks(unittest.TestCase):
                 (lambda t: t.replace('<h3>Watch your spec</h3>', '<h3>Watch it ship</h3>'), 'three moments'),
                 (lambda t: t.replace('<h3>Watch it ship</h3>', '<h3>Approve the plan</h3><h3>Watch it ship</h3>'), 'three moments'),
                 (lambda t: t.replace('Steer the build from the narrated video.', 'Watch the video.'), 'steering copy'),
-                (lambda t: t.replace('>Silent sample</p>', '>Spec video</p>'), 'labeled as a silent sample'),
+                (lambda t: t.replace('The real spec of an OpenWiz-built to-do app', 'A sample spec'), "to-do app's real spec"),
                 (lambda t: t.replace('</main>', '<p>Add a dark mode toggle</p></main>'), 'old example'),
                 (lambda t: t.replace('Oil painting of Wiz scholars studying a to-do list', ''), 'painting without a description')):
             with self.subTest(error=error), tempfile.TemporaryDirectory() as temp:
@@ -296,6 +296,25 @@ class Checks(unittest.TestCase):
                  'motion controls must wait'),
                 (lambda t: t.replace('preload="none"', 'preload="none" autoplay', 1),
                  'recording must be opt-in')):
+            with self.subTest(error=error), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp) / 'dist'
+                shutil.copytree(ROOT / 'dist', root)
+                landing = root / 'index.html'
+                text = landing.read_text()
+                changed = change(text)
+                self.assertNotEqual(changed, text)
+                landing.write_text(changed)
+                with self.assertRaisesRegex(AssertionError, error):
+                    check_site(root)
+
+    def test_spec_video_poster_captions_and_link(self):
+        # Catches: the spec video losing its poster, captions, plain link or lazy, muted inline start (#1405).
+        for change, error in (
+                (lambda t: re.sub(r' poster="[^"]*"', '', t, count=1), 'spec video needs a pinned poster'),
+                (lambda t: re.sub(r'<track [^>]*>', '', t, count=1), 'spec video needs default captions'),
+                (lambda t: t.replace('class="spec-link"', 'class="spec-link" hidden', 1), 'plain link to the spec video'),
+                (lambda t: t.replace(' muted', '', 1), 'spec video must start muted inline'),
+                (lambda t: t.replace('preload="none"', 'preload="auto"', 1), 'recording must be opt-in')):
             with self.subTest(error=error), tempfile.TemporaryDirectory() as temp:
                 root = Path(temp) / 'dist'
                 shutil.copytree(ROOT / 'dist', root)

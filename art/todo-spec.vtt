@@ -1,0 +1,46 @@
+WEBVTT
+
+00:00:00.000 --> 00:00:03.078 line:80% size:94% align:center
+Build a to-do app. One list for now. Here's what
+
+00:00:03.078 --> 00:00:05.450 line:80% size:94% align:center
+changes, in the order we'll build it.
+
+00:00:05.900 --> 00:00:08.235 line:80% size:94% align:center
+First, the task list itself. Add a
+
+00:00:08.235 --> 00:00:10.708 line:80% size:94% align:center
+task, mark it complete, and save the
+
+00:00:10.708 --> 00:00:12.150 line:80% size:94% align:center
+list in your browser.
+
+00:00:12.500 --> 00:00:14.511 line:80% size:94% align:center
+Then, side by side: the list
+
+00:00:14.511 --> 00:00:15.875 line:80% size:94% align:center
+view, and the look.
+
+00:00:16.300 --> 00:00:19.152 line:80% size:94% align:center
+Completed tasks stay visible, greyed out.
+
+00:00:19.152 --> 00:00:21.100 line:80% size:94% align:center
+Untick one to bring it back.
+
+00:00:21.500 --> 00:00:24.521 line:80% size:94% align:center
+Last, the working page. Type a task and
+
+00:00:24.521 --> 00:00:27.000 line:80% size:94% align:center
+add it. Empty tasks are refused.
+
+00:00:27.400 --> 00:00:29.687 line:80% size:94% align:center
+And your tasks are kept after a
+
+00:00:29.687 --> 00:00:31.900 line:80% size:94% align:center
+reload. No account, no server.
+
+00:00:32.300 --> 00:00:35.401 line:80% size:94% align:center
+Then it ships, as a page anyone can open. Tell
+
+00:00:35.401 --> 00:00:37.625 line:80% size:94% align:center
+your orchestrator what to change.
