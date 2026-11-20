@@ -82,7 +82,7 @@ DRIVER_LOGOS = {
     'drivers/logos/bot.svg': ('dcc04dfbe4330e73de3a093bc7b692ac9c373b6a40f41f38c0b05e746c99a250', 'bot'),
 }
 
-HASHED = ('tokens.css', 'site.css', GSAP, 'site.js')
+HASHED = ('tokens.css', 'site.css', GSAP, 'site.js', 'faq.js')
 # The app (openwiz.dev/app, #1258): its page, design system (Ember), data layer, page modules and shell.
 # The page applies only ember.css and loads exactly these scripts, in this order, all fingerprinted.
 APP_PAGE = 'app/index.html'
@@ -104,7 +104,7 @@ def fingerprint(name, data):
 def fingerprinted_page(html, cta=False):
     for name, hashed in FINGERPRINTS.items():
         html = html.replace(f'"/{name}"', f'"/{hashed}"')
-    return with_footer(with_cta(html)) if cta else html
+    return with_faq(with_footer(with_cta(html))) if cta else html
 
 
 # The header's one buy button (#63): one snippet, which the build adds to every site page's top bar (not the app's).
@@ -118,7 +118,7 @@ BOOK_PLACEHOLDER = '#book'
 TEAM_COPY = ('We set up your agent factory with you.', 'Your repos, your models, your machines. First fleet running in a day.',
              'Solo builders and small teams.', 'Custom pricing.', 'Book a call')
 # #73: the team page's body after its hero, in order: what you get (three steps), where your agents run, the closing call.
-TEAM_PARTS = ('What you get', 'Where your agents run', 'Plan your factory with us.')
+TEAM_PARTS = ('What you get', 'Where your agents run', 'Questions', 'Plan your factory with us.')
 TEAM_STEPS = ('A call to plan your setup', 'We install OpenWiz with you', 'Your first fleet ships')
 # #1851: Report a problem opens GitHub's new-issue form on openwizdev/openwiz with the feedback template
 # (contracts/feedback-loop.v1.md: .github/ISSUE_TEMPLATE/feedback.yml). The only external URL with a query; nothing
@@ -128,16 +128,32 @@ REPORT_LINK = 'https://github.com/openwizdev/openwiz/issues/new?template=feedbac
 FOOTER = (ROOT / 'footer.html').read_text()
 FOOTER_SLOT = '<!-- footer.html -->\n'
 FOOTER_LINKS = (('/drivers/', 'Drivers'), ('/changelog/', 'Changelog'), ('https://github.com/openwizdev/openwiz#readme', 'Docs'),
-                ('/app/', 'The app'), (REPORT_LINK, 'Report a problem'), ('/team/', 'For teams'),
+                ('/faq/', 'FAQ'), ('/app/', 'The app'), (REPORT_LINK, 'Report a problem'), ('/team/', 'For teams'),
                 ('https://github.com/openwizdev/openwiz', 'GitHub'), ('https://x.com/openwiz', 'X @openwiz'))
 FOOTER_LINE = 'Apache-2.0. Owned by no one.'
 # The only external link off GitHub: OpenWiz's own X account, in the footer.
 X_ACCOUNT = 'https://x.com/openwiz'
+# The Questions (#76): one snippet, faq.html, the FAQ's one source. The build adds it at the landing's and /team's slot,
+# and at /faq's top slot as the page's own heading (its title the h1, each question an h2). Its questions, in order.
+FAQ = (ROOT / 'faq.html').read_text()
+FAQ_TOP = re.sub(r'<(/?)h3\b', r'<\1h2', re.sub(r'<(/?)h2\b', r'<\1h1', FAQ))
+FAQ_SLOTS = {'<!-- faq.html -->\n': FAQ, '<!-- faq.html h1 -->\n': FAQ_TOP}
+FAQ_PAGE = 'faq/index.html'
+FAQ_ON = {'index.html': FAQ, TEAM_PAGE: FAQ, FAQ_PAGE: FAQ_TOP}
+FAQ_TITLE = ('Questions', 'The short ones are here.')
+FAQ_QUESTIONS = ('What is OpenWiz?', 'What is a kernel?', 'What do I need to run it?', 'Where do my agents run?',
+                 'Does OpenWiz see my code or my logins?', 'What does it cost?', 'Can you set it up for my team?')
 
 
 def with_footer(html):
     assert html.count(FOOTER_SLOT) == 1, 'a site page needs exactly one footer slot'
     return html.replace(FOOTER_SLOT, FOOTER)
+
+
+def with_faq(html):
+    for slot, faq in FAQ_SLOTS.items():
+        html = html.replace(slot, faq)
+    return html
 
 
 def with_cta(html):
@@ -147,7 +163,7 @@ def with_cta(html):
 
 FINGERPRINTS = {name: fingerprint(name, (ROOT / name).read_bytes()) for name in HASHED}
 STATIC = {
-    'index.html', 'changelog/index.html', 'drivers/index.html', 'team/index.html', '_headers', APP_PAGE, 'app/manifest.webmanifest',
+    'index.html', 'changelog/index.html', 'drivers/index.html', 'team/index.html', 'faq/index.html', '_headers', APP_PAGE, 'app/manifest.webmanifest',
     'fonts/Geist-var.woff2', 'fonts/GeistMono-var.woff2', 'fonts/OFL.txt',
 } | ART | set(ICON_HASHES) | set(VECTORS) | (set(VENDOR_HASHES) - {GSAP}) | set(APP_VENDOR) | set(DRIVER_LOGOS)
 RUNTIME = STATIC | set(FINGERPRINTS.values())
@@ -175,7 +191,7 @@ FONT_HASHES = {
     'fonts/GeistMono-var.woff2': '55419aa06f58adcd7f145c6c920e56936416f17e528f60efc6032ffa4269972b',
     'fonts/OFL.txt': 'c683bfbcc7e087f5d37a54ef628f10387c451a83ddc459b151403a164ac46c90',
 }
-PAGES = ('index.html', 'changelog/index.html', 'drivers/index.html', TEAM_PAGE)
+PAGES = ('index.html', 'changelog/index.html', 'drivers/index.html', TEAM_PAGE, FAQ_PAGE)
 ALL_PAGES = PAGES + (APP_PAGE,)
 # The to-do example and both app entry points stay visible in the static landing page.
 STORY_COPY = ('Build a to-do app', 'Bring any agent', 'Sign in with GitHub', 'Put the app on your phone')
@@ -462,7 +478,7 @@ def check_site(root):
         assert not set(page.refs) & {f'/{name}' for name in HASHED}, 'a page uses an unfingerprinted style or script'
         assert page.stylesheets == [f'/{names["tokens.css"]}', f'/{names["site.css"]}'], 'a page must apply exactly tokens.css then site.css'
     page = pages[root / 'index.html']
-    assert page.scripts == [f'/{names[GSAP]}', f'/{names["site.js"]}'], 'load the pinned GSAP before site.js'
+    assert page.scripts == [f'/{names[GSAP]}', f'/{names["site.js"]}', f'/{names["faq.js"]}'], 'load the pinned GSAP before site.js, then faq.js'
     assert not page.inline_scripts, 'landing motion must wait for both external scripts'
     assert len(page.videos) == 1, 'expected one spec recording'
     clip = page.videos[0]
@@ -575,6 +591,7 @@ def check_site(root):
     check_releases(releases)
     check_team({name: (root / name).read_text() for name in PAGES}, {name: pages[root / name] for name in PAGES})
     check_footer({name: (root / name).read_text() for name in PAGES})
+    check_faq({name: (root / name).read_text() for name in PAGES}, {name: pages[root / name] for name in PAGES}, names)
     main = re.search(r'<main\b[^>]*>[\s\S]*?</main>', changelog)
     assert main and sha256(main[0].encode()).hexdigest() == CHANGELOG_MAIN, 'changelog content changed; review explicitly before updating its snapshot'
 
@@ -828,7 +845,8 @@ def check_drivers(landing, changelog, drivers, page):
     assert not re.search(r'grok bot[^.;]*\bpass', description[0], re.I), f'Grok Bot has not passed: {description[0]}'
     # #75 R1: the page itself reads without scripts; it loads only the site's own two (GSAP, then site.js), as every site
     # page does, for the shared footer's star count and Wizes.
-    assert page.scripts == Page(landing).scripts and not page.inline_scripts, \
+    # (#76: the landing's faq.js is for its Questions, which the drivers page doesn't show.)
+    assert page.scripts == [s for s in Page(landing).scripts if not s.startswith('/faq.')] and not page.inline_scripts, \
         'the drivers page loads only the site\'s footer scripts (GSAP, site.js), never its own'
     main = re.search(r'<main\b[^>]*>[\s\S]*?</main>', drivers)
     assert main, 'the drivers page needs its main'
@@ -1084,6 +1102,37 @@ def check_footer(htmls):
     assert FOOTER_LINE in plain(FOOTER), f'the footer says {FOOTER_LINE}'
     assert '<p class="footer-wordmark">OpenWiz</p>' in FOOTER, 'the footer shows the wordmark'
     assert FOOTER.count('class="family-wiz"') == 12, 'the footer has the twelve Wizes'
+
+
+def check_faq(htmls, pages, names):
+    """#76: the landing, /team and /faq each show the one Questions snippet from faq.html, once, and load faq.js; no other
+    page shows it. On the landing it closes the main; on /team it sits right above the closing Book a call. Each row is a
+    real button that names its answer, shipped open and disabled until faq.js runs; the answers link only within the site."""
+    for name, html in htmls.items():
+        want = FAQ_ON.get(name)
+        assert html.count('class="faq ') == (1 if want else 0) and (not want or html.count(want) == 1), \
+            f'the {name} page needs the one Questions section from faq.html' if want else f'the {name} page shows no Questions'
+        assert (f'/{names["faq.js"]}' in pages[name].scripts) == bool(want), \
+            f'the {name} page needs faq.js for its Questions' if want else f'the {name} page loads faq.js without Questions'
+    assert re.search(r'</section>\n' + re.escape(FAQ) + '</main>', htmls['index.html']), 'the landing Questions close its main'
+    assert (FAQ + '<section class="team-part team-close') in htmls[TEAM_PAGE], 'the /team Questions sit above its closing Book a call'
+    assert (FAQ_TOP + '</main>') in htmls[FAQ_PAGE], 'the /faq page is its Questions'
+    Page(FAQ)  # its ids never repeat
+    title = [plain(h) for h in re.findall(r'<h2\b[^>]*>([\s\S]*?)</h2>', FAQ)] + [plain(p) for p in re.findall(r'<p class="faq-lead">([\s\S]*?)</p>', FAQ)]
+    assert tuple(title) == FAQ_TITLE, f'the Questions heading and its line: {title}'
+    rows = re.findall(r'<div class="faq-row">\s*<h3 class="faq-q"><button ([^>]*)>([\s\S]*?)</button></h3>\s*<div class="faq-a" id="([^"]*)"><div>([\s\S]*?)</div></div>\s*</div>', FAQ)
+    assert tuple(plain(q) for _, q, _, _ in rows) == FAQ_QUESTIONS and FAQ.count('class="faq-row"') == len(FAQ_QUESTIONS), \
+        f'the Questions rows, in order: {[plain(q) for _, q, _, _ in rows]}'
+    for attrs, question, answer_id, answer in rows:
+        assert 'type="button"' in attrs and f'aria-controls="{answer_id}"' in attrs, \
+            f'each question is a button that names its answer: {plain(question)}'
+        # #77 R1: it ships open and disabled, so its answer reads even if faq.js never loads; faq.js closes and enables it.
+        assert re.search(r'(?:^|\s)disabled(?:\s|$)', attrs) and 'aria-expanded="true"' in attrs, \
+            f'each question ships open and disabled until faq.js runs: {plain(question)}'
+        assert plain(answer), f'a question without its answer: {plain(question)}'
+        for href in re.findall(r'href="([^"]*)"', answer):
+            assert href.startswith('/'), f'an answer links off the site: {href}'
+    assert not re.search(r'<(?:form|input|textarea)\b', FAQ), 'part 1 asks nothing: no form or input in the Questions'
 
 
 def check_drivers_nav(css, pages):
