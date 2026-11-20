@@ -171,6 +171,7 @@ test('with the switch off the FAQ shows no input row, and asks nothing', async (
   for (const probe of [{ status: 404 }, { status: 200, type: 'text/html', body: '<!doctype html><title>OpenWiz</title>' },
     { status: 200, body: '{"schema":"openwiz.ask-a-wiz.v1","enabled":false,"max_question_chars":300}' },
     { status: 200, body: '{"schema":"openwiz.ask-a-wiz.v1","enabled":true}' }, // R4: the pinned on answer, or nothing
+    { status: 200, body: '{"schema":"openwiz.ask-a-wiz.v1","enabled":true,"max_question_chars":299}' },
     { status: 200, body: '{"schema":"openwiz.ask-a-wiz.v1","enabled":true,"max_question_chars":300,"extra":1}' }]) {
     fake.probe = probe;
     for (const path of ['/', '/team/', '/faq/']) {
@@ -303,7 +304,7 @@ test('a stream that breaks the contract\'s shape is never shown as an answer', a
     [text, done], [text, sources, text, done], [text, line({ type: 'sources', sources: [] }), done],
     [line({ type: 'not_covered', text: NOT_COVERED_TEXT, links: [LINKS[0], { label: 'GitHub issues', href: 'https://example.com/' }] })],
     [line({ type: 'not_covered', text: 'Synthetic other text.', links: LINKS })], [text, refused('too_long', 'Synthetic.')], ['not json\n'],
-    [ANSWER.join('') + text], [ANSWER.join(''), 'x'], [ANSWER.join('').slice(0, -1)], // R3: anything after the end, or no end
+    [ANSWER.join('') + text], [ANSWER.join(''), 'x'], [ANSWER.join('') + done], [NOT_COVERED[0] + NOT_COVERED[0]], [ANSWER.join('').slice(0, -1)], // R3: anything after the end, or no end
   ].map(lines => ({ lines })).concat({ status: 503, lines: ANSWER }, { status: 200, lines: [TOO_LONG] }, { type: 'text/html', lines: ANSWER },
     { status: 413, lines: [refused('too_long', 'Synthetic other message.')] }); // R3: the wrong status, media type or message
   for (const answer of bad) fake.answers.push(answer);

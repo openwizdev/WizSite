@@ -464,14 +464,24 @@ function enableCopy() {
 // leaves the FAQ as it is. A question streams in; a finished answer becomes a normal row and a fresh input row follows.
 // Everything from the stream is set as text; only the not-covered answer's links, exactly the contract's, are links.
 const ASK_KEYS = { text: 'text,type', sources: 'sources,type', done: 'type', not_covered: 'links,text,type', refused: 'message,reason,type' };
-const ASK_REASONS = ['bad_request', 'too_long', 'rate_limited', 'daily_cap', 'upstream_error', 'unavailable', 'store_error', 'no_private_route'];
+// Each refusal's status and exact message, as the contract pins them.
+const ASK_REFUSALS = {
+  bad_request: [400, 'That question couldn\'t be read. Try again.'],
+  too_long: [413, 'That question is too long. Keep it to 300 characters or fewer.'],
+  rate_limited: [429, 'That\'s a lot of questions at once. Try again in a few minutes.'],
+  daily_cap: [429, 'Ask a Wiz has answered all it can for today. Try again tomorrow.'],
+  upstream_error: [502, 'Ask a Wiz couldn\'t answer just now. Try again.'],
+  unavailable: [503, 'Ask a Wiz isn\'t available right now.'],
+  store_error: [503, 'Ask a Wiz couldn\'t keep count just now. Try again.'],
+  no_private_route: [503, 'Ask a Wiz can\'t answer privately just now. Try again later.'],
+};
 const ASK_NOT_COVERED = 'The OpenWiz docs don\'t cover that yet, so I won\'t guess. Book a call or open a GitHub issue, and we\'ll answer it.';
 const ASK_LINKS = [['Book a call', 'https://openwiz.dev/team/#book'], ['GitHub issues', 'https://github.com/openwizdev/openwiz/issues']];
 const askKeys = value => value && typeof value === 'object' && !Array.isArray(value) ? Object.keys(value).sort().join() : '';
 const askText = value => typeof value === 'string' && value.length > 0;
 // One line of the stream, read only in the contract's shape: each event with exactly its keys, in one of its orders
-// (text, then sources, then done; not_covered alone; refused alone, or after text only as upstream_error).
-// Anything else throws, and the row treats the stream as broken.
+// (text, then sources, then done; not_covered alone; refused alone, or after text only as upstream_error), refusals
+// with their exact message. Anything else throws, and the row treats the stream as broken.
 function askEvent(line, text, sources) {
   const e = JSON.parse(line);
   const ok = askKeys(e) === ASK_KEYS[e?.type] && {
@@ -482,7 +492,7 @@ function askEvent(line, text, sources) {
     done: () => !!sources,
     not_covered: () => !text && e.text === ASK_NOT_COVERED && Array.isArray(e.links) && e.links.length === ASK_LINKS.length
       && e.links.every((link, i) => askKeys(link) === 'href,label' && link.label === ASK_LINKS[i][0] && link.href === ASK_LINKS[i][1]),
-    refused: () => !sources && ASK_REASONS.includes(e.reason) && askText(e.message) && (!text || e.reason === 'upstream_error'),
+    refused: () => !sources && Object.hasOwn(ASK_REFUSALS, e.reason) && e.message === ASK_REFUSALS[e.reason][1] && (!text || e.reason === 'upstream_error'),
   }[e.type]();
   if (!ok) throw new Error('not the contract\'s stream');
   return e;
@@ -496,7 +506,9 @@ async function askAWiz() {
     lists.forEach(list => near.observe(list));
   });
   const probe = await fetch('/api/ask', { cache: 'no-store' }).then(r => r.status === 200 ? r.json() : null).catch(() => null);
-  if (probe?.schema !== 'openwiz.ask-a-wiz.v1' || probe.enabled !== true) return;
+  // Only the contract's exact on answer turns the row on.
+  if (askKeys(probe) !== 'enabled,max_question_chars,schema' || probe.schema !== 'openwiz.ask-a-wiz.v1' || probe.enabled !== true
+    || probe.max_question_chars !== 300) return;
   let made = 0;
   const el = (tag, className, text) => {
     const node = document.createElement(tag);
@@ -526,8 +538,10 @@ async function askAWiz() {
       list.append(row);
       let question = '', controller = null;
       // idle: the input; asking: the question, its answer so far and Stop; ended: the question, a message, Retry and
-      // Edit. Focus moves to the control that replaces the one just used, never to the page.
+      // Edit. When focus is in the row, it moves to the control that replaces the one just used, never to the page;
+      // focus the visitor moved elsewhere stays there.
       const show = (state, message = '', retry = true, focus = true) => {
+        const inside = row.contains(document.activeElement);
         row.dataset.state = state;
         form.hidden = state !== 'idle';
         heading.hidden = body.hidden = state === 'idle';
@@ -538,10 +552,11 @@ async function askAWiz() {
         buttons.Edit.hidden = state !== 'ended';
         actions.hidden = state === 'idle';
         if (state !== 'idle') status.textContent = state === 'asking' ? 'Ask a Wiz is answering.' : message;
-        if (focus) (state === 'idle' ? input : state === 'asking' ? buttons.Stop : retry ? buttons.Retry : buttons.Edit).focus();
+        if (focus && inside) (state === 'idle' ? input : state === 'asking' ? buttons.Stop : retry ? buttons.Retry : buttons.Edit).focus();
       };
       const finish = (paragraphs, links = []) => {
-        const done = el('div', 'faq-row'), h = el(level, 'faq-q'), button = el('button', '', question), a = el('div', 'faq-a');
+        const done = el('div', 'faq-row faq-asked'), h = el(level, 'faq-q'), button = el('button'), a = el('div', 'faq-a');
+        button.append(el('span', 'faq-ask-label', question));
         Object.assign(button, { type: 'button', id: `faq-ask-q${n}`, disabled: !faq.hasAttribute('data-ready') });
         button.setAttribute('aria-expanded', 'true');
         button.setAttribute('aria-controls', a.id = `faq-ask-a${n}`);
@@ -556,9 +571,11 @@ async function askAWiz() {
           a.firstChild.append(p);
         }
         done.append(h, a);
+        const inside = row.contains(document.activeElement);
         row.replaceWith(done);
         status.textContent = paragraphs[0][0];
-        addRow().focus({ preventScroll: true });
+        const input = addRow();
+        if (inside) input.focus({ preventScroll: true });
       };
       const ask = async () => {
         controller = new AbortController();
@@ -567,23 +584,27 @@ async function askAWiz() {
         try {
           const response = await fetch('/api/ask', { method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ question }), cache: 'no-store', signal: controller.signal });
+          if (!/^application\/x-ndjson\s*(;|$)/i.test(response.headers.get('content-type') || '')) throw new Error('not a stream');
           const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
           let buffer = '';
-          while (!end) {
+          for (;;) { // to the stream's end: nothing may follow the last event
             const { value, done } = await reader.read();
             if (done) break;
             buffer += value;
-            for (let at; !end && (at = buffer.indexOf('\n')) >= 0; buffer = buffer.slice(at + 1)) {
+            for (let at; (at = buffer.indexOf('\n')) >= 0; buffer = buffer.slice(at + 1)) {
+              if (end) throw new Error('data after the last event');
               const event = askEvent(buffer.slice(0, at), text, sources);
               if (event.type === 'text') answer.textContent = text += event.text;
               else if (event.type === 'sources') sources = event.sources.map(s => s.title);
               else end = event;
             }
           }
+          const status = end?.type === 'refused' && !text ? ASK_REFUSALS[end.reason][0] : 200;
+          if (buffer || response.status !== status) throw new Error('not the contract\'s response');
         } catch {
           end = null;
         }
-        controller.abort(); // nothing may follow the last event
+        controller.abort();
         controller = null;
         if (end?.type === 'done') finish([[text], [`Sources: ${sources.join(', ')}`, 'faq-ask-sources']]);
         else if (end?.type === 'not_covered') finish([[end.text]], ASK_LINKS);
