@@ -246,53 +246,6 @@ function enableMotion(gsap) {
   configure();
 }
 
-// The "Watch your spec" moment (#1405). The video loads only when it first plays. With motion it plays muted while it
-// is in view; with reduced motion, Pause motion or the tab hidden it waits on its poster. It never starts with sound on
-// its own: "Play with sound" does that on request, and from then on (or once the visitor uses its own controls) the
-// visitor drives it and scrolling no longer starts or stops it. It needs only this script, not GSAP.
-function specVideo() {
-  const video = document.querySelector('.spec-video');
-  const sound = document.querySelector('.spec-play');
-  const pause = document.querySelector('.demo-pause');
-  if (!video || !sound) return;
-  const calm = matchMedia('(prefers-reduced-motion: reduce)');
-  let inView = false;
-  let visitor = false; // the visitor has taken over playback
-  let ours = 0; // play and pause events we caused, not the visitor
-  const update = () => {
-    if (visitor) return;
-    const ambient = inView && !calm.matches && pause.getAttribute('aria-pressed') !== 'true' && !document.hidden;
-    if (ambient && video.paused) {
-      ours += 1;
-      video.muted = true;
-      video.play().catch(() => { ours = 0; });
-    } else if (!ambient && !video.paused) {
-      ours += 1;
-      video.pause();
-    }
-  };
-  const take = () => {
-    if (ours > 0) ours -= 1;
-    else visitor = true;
-  };
-  video.addEventListener('play', take);
-  video.addEventListener('pause', take);
-  video.addEventListener('volumechange', () => { if (!video.muted) visitor = true; });
-  new IntersectionObserver(([entry]) => { inView = entry.isIntersecting; update(); }, { threshold: .5 }).observe(video);
-  calm.addEventListener('change', update);
-  document.addEventListener('visibilitychange', update);
-  pause.addEventListener('click', () => setTimeout(update));
-  sound.hidden = false;
-  sound.addEventListener('click', () => {
-    visitor = true;
-    video.muted = false;
-    video.loop = false;
-    video.currentTime = 0;
-    // Focus moves into the player, so the keyboard reaches its pause control next, as #32's player did.
-    video.play().then(() => video.focus(), () => {});
-  });
-}
-
 // The footer Wizes react, one at a time and briefly; at rest the footer is unchanged. With reduced motion, Pause
 // motion or no GSAP, a click is a still pose change (another costume) and the line, nothing moves.
 const FAMILY = [
@@ -438,6 +391,26 @@ function enableFamily(gsap) {
   document.querySelector('.landing-footer').addEventListener('pointerenter', perk);
 }
 
+// The silent spec sample plays only on request, so it stays available with reduced motion on or GSAP blocked.
+function enableVideo() {
+  const play = document.querySelector('.spec-play');
+  const video = document.querySelector('.spec-video');
+  const still = document.querySelector('.spec-screen');
+  play.hidden = false;
+  play.addEventListener('click', async () => {
+    video.hidden = false;
+    still.hidden = true;
+    try {
+      video.currentTime = 0;
+      await video.play();
+      video.focus();
+    } catch {
+      video.hidden = true;
+      still.hidden = false;
+    }
+  });
+}
+
 // The install box (#1357): Copy works only once index.html's switch says live; until then it stays disabled.
 function enableCopy() {
   const box = document.querySelector('.install-box[data-install="live"]');
@@ -461,6 +434,6 @@ function enableCopy() {
 
 enableCopy();
 showStars().catch(() => {});
-specVideo();
+if (document.querySelector('.spec-play')) enableVideo();
 enableFamily(window.gsap);
 if (window.gsap) enableMotion(window.gsap);
