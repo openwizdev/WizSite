@@ -1,4 +1,4 @@
-# FA3 (#1901) green run at 914642ec597f58979a8accda0343f4a8efb97443 (planner ruling: no partial key on failure): npm run test:functions
+# FA3 (#1901) green run at 9f741dbdfc482af19562090e33d35bec86e37fb9 (review R6: the upstream deadline is terminal): npm run test:functions
 ✔ a fixture site and docs folder build exactly the expected sources and passages
 ✔ the index holds only public pages and docs: never the app, page chrome, scripts or internal folders
 ✔ a long section splits into passages within the limit, keeping every word in order
@@ -60,6 +60,7 @@
 ✔ R3: a call is counted on the newest day the store holds, even when this request's clock is behind
 ✔ a visitor who stops the stream cancels the upstream call, and the reservation stays
 ✔ a stream nobody reads still ends at the timeout: the upstream call is cancelled and its waitUntil settles
+✔ R6: a reader who pauses past the deadline then resumes gets only the refusal: no held text, no buffered piece, no done
 ✔ an invalid reported cost keeps the whole reservation; a valid one replaces it
 ✔ a store that fails at any step before the call refuses store_error with no call
 ✔ a store that never answers times out as store_error
@@ -107,7 +108,8 @@
 ✔ a stale or replayed callback leaves the current attempt intact
 ✔ at most four attempts are kept: a fifth start drops the oldest
 ✔ the manifest asks for read-only metadata, issues and pull requests and nothing else
-ℹ tests 108
-ℹ pass 108
+ℹ tests 109
+ℹ pass 109
 ℹ fail 0
+# Planted breaks for R6, each caught by the R6 test: the deadline not marking the stream failed; an in-flight parser result accepted after the abort; the answer stream pulling ahead of the visitor's read (default highWaterMark)
 # npm run build: ok; npm run check: PASS (exact export, links, resources, copy and privacy)
