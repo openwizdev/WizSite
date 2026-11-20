@@ -694,8 +694,9 @@ class Checks(unittest.TestCase):
         feedback template (contracts/feedback-loop.v1.md: template .github/ISSUE_TEMPLATE/feedback.yml; the exact link
         is the planner's answer on #1851), in the footer of every site page, the changelog's included.
         Catches: the link missing from a page's footer, pointing at another repository or template, or
-        carrying anything more (a prefilled title or body would send words from openwiz.dev)."""
-        form = '<a href="https://github.com/openwizdev/openwiz/issues/new?template=feedback.yml">Report a problem</a>'
+        carrying anything more (a prefilled title or body would send words from openwiz.dev), or (R2 on WizSite #90)
+        sending the page's address as a Referer: the link must carry rel="noreferrer"."""
+        form = '<a href="https://github.com/openwizdev/openwiz/issues/new?template=feedback.yml" rel="noreferrer">Report a problem</a>'
         for page, count in {'index.html': 1, 'drivers/index.html': 1, 'team/index.html': 1, 'faq/index.html': 1, 'changelog/index.html': 1, 'app/index.html': 0}.items():
             with self.subTest(page=page):
                 self.assertEqual((ROOT / 'dist' / page).read_text().count(form), count)
@@ -705,6 +706,9 @@ class Checks(unittest.TestCase):
             'Report a problem link ': ('team/index.html', form, '<a href="/">Report a problem</a>'),
             'Report a problem link  ': ('drivers/index.html', '</main>', form + '</main>'),
             'Report a problem link, the footer\'s: the app': ('app/index.html', '</body>', form + '</body>'),
+            'Report a problem link needs rel="noreferrer"': ('index.html', ' rel="noreferrer">Report', '>Report'),
+            'Report a problem link needs rel="noreferrer" ': ('changelog/index.html', ' rel="noreferrer">Report', ' rel="noopener">Report'),
+            'Report a problem link needs rel="noreferrer"  ': ('team/index.html', ' rel="noreferrer">Report', ' rel="noreferrer" referrerpolicy="unsafe-url">Report'),
             'unexpected external URL parts': ('index.html', href, href + '&amp;body=x'),
             'unexpected external URL parts ': ('changelog/index.html', href, href.replace('feedback.yml', 'bug.yml')),
             'unexpected repository link|unexpected external URL parts': ('index.html', href, href.replace('/openwiz/', '/WizSkills/')),
