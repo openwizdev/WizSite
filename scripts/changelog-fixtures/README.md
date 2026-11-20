@@ -9,3 +9,5 @@ Every version, date and line here is made up.
 - `failed`: OpenWiz answers an API error object, WizSkills isn't there, and WizLoops' one release has a numeric tag.
 - `sparse`: OpenWiz's only release lists no shipped versions; WizSkills' one release has a tag that is no version;
   WizLoops has no release.
+- `named` (#1674): OpenWiz releases named by public name (`OpenWiz 0.01`, `OpenWiz 0.02`), one with no name and one whose
+  name only starts like one; WizSkills' release carries an OpenWiz-style name; WizLoops' release name is a number.
