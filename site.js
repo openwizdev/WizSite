@@ -288,7 +288,8 @@ function specVideo() {
     video.muted = false;
     video.loop = false;
     video.currentTime = 0;
-    video.play().catch(() => {});
+    // Focus moves into the player, so the keyboard reaches its pause control next, as #32's player did.
+    video.play().then(() => video.focus(), () => {});
   });
 }
 

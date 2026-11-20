@@ -208,6 +208,12 @@ async function moment(page, where, name, width) {
   await page.click(at.x, at.y);
   facts = await until(page, f => f.playing && !f.muted, 5000);
   expect(facts.playing && !facts.muted, where, '"Play with sound" does not play the video with sound');
+  let focused = false;
+  for (let i = 0; i < 30 && !focused; i++) {
+    focused = await page.evaluate(`document.activeElement === ${MOMENT}.querySelector('video')`);
+    if (!focused) await new Promise(r => setTimeout(r, 100));
+  }
+  expect(focused, where, '"Play with sound" leaves focus on the button instead of the player');
   facts = await until(page, f => f.cues > 0, 3000);
   expect(facts.captions === 'showing' && facts.cues > 0, where, `captions are not showing (${facts.captions}, ${facts.cues} cues)`);
   await page.evaluate('scrollTo(0, 0), true');
