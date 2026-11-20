@@ -252,6 +252,8 @@ async function open(browser, world) {
       await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: mobile ? 2 : 1, mobile });
       await new Promise(resolve => setTimeout(resolve, 200));
     },
+    // CSS media features as the page sees them, e.g. display-mode: standalone for an app installed to the home screen.
+    media: features => send('Emulation.setEmulatedMedia', { features }),
     async shot(path, width, height, mobile) {
       await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: mobile ? 2 : 1, mobile });
       await new Promise(resolve => setTimeout(resolve, 400));
@@ -625,7 +627,7 @@ async function main() {
       const world = new World();
       world.graphql.Specs = async () => {
         const answer = await fixture('ap6-specs.json');
-        change.specs?.(answer.data.repository);
+        change.specs?.(answer.data.repository, answer.data);
         return { status: 200, json: answer };
       };
       world.graphql.Agents = ok('agents.json');
@@ -663,6 +665,90 @@ async function main() {
         await page.shot(join(process.env.SHOTS, 'you-laptop.png'), 1440, 900, false);
         await page.shot(join(process.env.SHOTS, 'you-phone.png'), 390, 844, true);
       }
+      checkRequestLog(world);
+      await page.close();
+    });
+
+    // AP21 (#1909, F2 of #1266): on a phone, and installed to the home screen, the tab bar stays on the bottom edge.
+    // On the owner's iPhone the document scrolled under a fixed bar, and at the list's end (and in rubber-band
+    // overscroll) iOS drew the bar mid-screen with the page below it. The phone shell is now fixed to the screen and
+    // only its content scrolls, so the document itself never scrolls; the bar ends where the screen does.
+    const tabBarAtEnd = page => page.run(`(() => {
+      for (const el of [document.scrollingElement, ...document.querySelectorAll('main')]) el.scrollTop = el.scrollHeight;
+      const H = window.innerHeight, W = window.innerWidth, bar = document.querySelector('nav.tabs').getBoundingClientRect();
+      const doc = document.scrollingElement;
+      const below = [8, W / 2, W - 8].map(x => document.elementFromPoint(x, H - 1)).filter(e => !e || !e.closest('nav.tabs')).map(e => e ? e.tagName : 'nothing');
+      const cards = [...document.querySelectorAll('main .cards a.card')];
+      const out = btn => btn.getBoundingClientRect().bottom;
+      const signOut = [...document.querySelectorAll('.phone-actions button')].find(b => b.textContent.trim() === 'Sign out');
+      return { H, top: bar.top, bottom: bar.bottom, docScrolls: doc.scrollHeight - doc.clientHeight, below,
+        long: doc.scrollHeight > doc.clientHeight || document.querySelector('main').scrollHeight > document.querySelector('main').clientHeight,
+        lastCard: cards.length ? out(cards[cards.length - 1]) : null, signOut: signOut ? out(signOut) : null };
+    })()`);
+    await check('AP21 phone: the tab bar stays on the bottom edge at the end of the You list, installed or not', async () => {
+      const many = Array.from({ length: 14 }, (_, i) => ({ number: 100 + i, title: `A ticket marked for you, number ${i + 1}`,
+        url: `https://github.com/acme/factory/issues/${100 + i}`, updatedAt: '2029-12-01T00:00:00Z', labels: { nodes: [{ name: 'needs-info' }] } }));
+      const world = ap6World({ specs: repository => { repository.youIssues = { totalCount: many.length, nodes: many }; } });
+      const page = await ap6Open(world);
+      await page.until(`document.querySelectorAll('main .cards a.card').length >= 14`, 'the long You list');
+      for (const standalone of [false, true]) {
+        await page.media(standalone ? [{ name: 'display-mode', value: 'standalone' }] : []);
+        // An iPhone's screen, then the same screen with Safari's toolbar shown (a shorter viewport).
+        for (const [width, height] of [[390, 844], [390, 760]]) {
+          await page.size(width, height, true);
+          const at = await tabBarAtEnd(page);
+          const where = `${standalone ? 'installed' : 'in the browser'}, ${width} x ${height}: ${JSON.stringify(at)}`;
+          assert(at.long, `the You list is not longer than the screen, so this proves nothing: ${where}`);
+          assert(at.docScrolls <= 0, `the document itself scrolls under the tab bar (iOS lifts a fixed bar at its end): ${where}`);
+          assert(Math.abs(at.bottom - at.H) <= 0.5, `the tab bar's bottom edge is not the screen's: ${where}`);
+          assert(at.below.length === 0, `something other than the tab bar is drawn at the screen's bottom edge: ${where}`);
+          assert(at.lastCard !== null && at.lastCard <= at.top && at.signOut !== null && at.signOut <= at.top,
+            `the last card or Sign out sits under the tab bar at the list's end: ${where}`);
+        }
+        if (process.env.SHOTS) await page.shot(join(process.env.SHOTS, `you-phone-end${standalone ? '-installed' : ''}.png`), 390, 844, true);
+      }
+      checkRequestLog(world);
+      await page.close();
+    });
+
+    // AP21 (#1909, F1 of #1266): the factory titles a spec "<version> spec: <name>" and labels it nothing. The You
+    // tiles read Building 0, In review 0 and Merged 0 on OpenWiz because the app looked only for a spec label. Here
+    // GitHub is answered as it would answer each query: no issue carries the label, a wayfind map and a ticket that
+    // only mentions to-spec match the search but aren't specs. The counts are known from ap6-spec-tickets.json.
+    await check('AP21 You: specs titled "<version> spec:" with no spec label are counted; a map or a mention is not a spec', async () => {
+      const world = ap6World();
+      const searched = [];
+      world.graphql.Specs = async body => {
+        const answer = await fixture('ap6-specs.json');
+        const specs = answer.data.specSearch.nodes.map(issue => ({ ...issue, title: issue.title.replace(/^Spec:/, '0.1.0 spec:'), labels: { nodes: [] } }));
+        const others = [
+          { number: 70, title: 'Loops: the other half of the factory', url: 'https://github.com/acme/factory/issues/70', updatedAt: '2030-01-05T00:00:00Z',
+            labels: { nodes: [{ name: 'wayfind:map' }] }, subIssuesSummary: { total: 5, completed: 4 } },
+          { number: 71, title: 'to-spec step 1 drops a stop (polish for #50, R1)', url: 'https://github.com/acme/factory/issues/71', updatedAt: '2030-01-05T00:00:00Z',
+            labels: { nodes: [] }, subIssuesSummary: { total: 0, completed: 0 } },
+        ];
+        // The old read: open issues labelled spec. None is.
+        if (/labels:\s*\["spec"\]/.test(body.query)) answer.data.repository.specIssues = { totalCount: 0, nodes: [] };
+        // GitHub's issue search: "spec" as a word in the title, or the label.
+        if (/search\(query:\s*\$specs/.test(body.query)) {
+          searched.push(body.variables.specs);
+          const nodes = [...others, ...specs].filter(issue => /\bspec\b/i.test(issue.title) || issue.labels.nodes.some(l => l.name === 'spec'));
+          answer.data.specSearch = { totalCount: nodes.length, nodes };
+        } else delete answer.data.specSearch;
+        return { status: 200, json: answer };
+      };
+      const page = await ap6Open(world);
+      await page.until(`[...document.querySelectorAll('main .tile .v')].some(v => /\\d/.test(v.textContent))`, 'the counts');
+      await settle(page, 600);
+      const tiles = await page.run(`[...document.querySelectorAll('main .tile')].map(t => t.querySelector('.k').textContent + '=' + t.querySelector('.v').textContent)`);
+      assert(JSON.stringify(tiles) === JSON.stringify(['Needs you=4', 'Building=1', 'In review=1', 'Merged=3']), `tiles: ${JSON.stringify(tiles)}`);
+      assert(searched.length && searched.every(q => q.includes('repo:acme/factory') && /\bstate:open\b/.test(q) && /\bis:issue\b/.test(q)),
+        `the spec search is not this repository's open issues: ${JSON.stringify(searched)}`);
+      await page.go(`${SITE}/app/#/specs`);
+      await page.until(`document.querySelectorAll('main a.card').length >= 3`, 'the spec cards');
+      await settle(page);
+      const cards = await page.run(`[...document.querySelectorAll('main a.card')].map(a => a.getAttribute('href'))`);
+      assert(JSON.stringify(cards) === JSON.stringify(['#/specs/60', '#/specs/50', '#/specs/40']), `the Specs page lists: ${JSON.stringify(cards)}`);
       checkRequestLog(world);
       await page.close();
     });
@@ -715,7 +801,7 @@ async function main() {
 
     await check('R4: a list GitHub gave only part of says so, never "nothing needs you"', async () => {
       const world = ap6World({
-        specs: repository => { repository.youIssues = { totalCount: 1, nodes: [] }; repository.specIssues = { totalCount: 2, nodes: [] }; },
+        specs: (repository, data) => { repository.youIssues = { totalCount: 1, nodes: [] }; data.specSearch = { totalCount: 2, nodes: [] }; },
       });
       const page = await ap6Open(world);
       await page.until(`/may be missing/.test(document.querySelector('main').innerText)`, 'the partial-list notice');

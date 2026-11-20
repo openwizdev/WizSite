@@ -1,6 +1,6 @@
 // The Specs page, and the model of the factory that You, Specs and each spec's page read.
 //
-// The Specs feed (OW.data.feeds.specs) holds two GitHub reads. The first: `specIssues` (open issues labelled spec),
+// The Specs feed (OW.data.feeds.specs) holds two GitHub reads. The first: `specIssues` (open specs: titled "spec:" or labelled spec),
 // `youIssues` (open issues labelled needs-info or ready-for-human), each with its total, and `fleet` (the repository's
 // docs/agents/fleet.md, whose Record authors row says whose notes and decision records count). The second: `specs`,
 // each open spec's recent comments and its tickets with their state, labels, blocked-by links, closing pull requests

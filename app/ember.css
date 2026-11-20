@@ -131,23 +131,25 @@ h1:focus { outline: none; } /* focused after navigation for screen readers; the 
 .phone-actions { gap: 10px; margin-top: 28px; }
 
 /* Phone: a top bar with the repository, and big tabs at the bottom, under the thumb. */
+/* The shell is fixed to the screen (no 100vh, which iOS measures with its toolbar hidden) and only the page scrolls,
+   inside main: the document never scrolls, so iOS can't lift the bar mid-screen at a list's end or in overscroll. */
 @media (max-width: 760px) {
   :root { --em-size: 17px; }
-  .shell { display: block; }
+  .shell { display: flex; flex-direction: column; position: fixed; inset: 0; min-height: 0; overflow: hidden; }
   .side { display: none; }
   .top {
-    display: flex; align-items: center; gap: 12px; position: sticky; top: 0; z-index: 4;
+    display: flex; flex: none; align-items: center; gap: 12px; z-index: 4;
     background: var(--em-side); border-bottom: 1px solid var(--em-line); padding: 10px 14px;
   }
   .top .brand { padding: 0; }
   .top .brand span { display: none; }
   .top .repo { flex: 1; min-height: 44px; }
-  main { padding: 22px 16px 120px; }
+  main { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; padding: 22px 16px 32px; }
   h1 { font-size: 28px; }
   .page-head { flex-direction: column; align-items: flex-start; gap: 4px; margin-bottom: 8px; }
   .page-head .read { display: none; } /* the phone shows each feed's read time just below */
   .tabs {
-    display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 5;
+    display: flex; flex: none; z-index: 5;
     background: var(--em-side); border-top: 1px solid var(--em-line);
     padding: 6px 8px calc(8px + env(safe-area-inset-bottom));
   }
