@@ -249,8 +249,9 @@ function enableMotion(gsap) {
 // The "Watch your spec" moment (#1405). The video loads only when it first plays. With motion it plays muted while it
 // is in view; with reduced motion, Pause motion or the tab hidden it waits on its poster. It never starts with sound on
 // its own: "Play with sound" (or a click on the frame) does that on request, and from then on the visitor drives it
-// and scrolling no longer starts or stops it. Until then the frame stays clean: the native controls, there for visitors
-// without this script, come back only once the visitor takes over. It needs only this script, not GSAP.
+// and scrolling no longer starts or stops it. Until then the frame stays clean: it shows only the slides' band, with no
+// captions and no controls; the whole frame, its captions and the native controls (there for visitors without this
+// script) come back once the visitor takes over. It needs only this script, not GSAP.
 function specVideo() {
   const video = document.querySelector('.spec-video');
   const sound = document.querySelector('.spec-play');
@@ -260,6 +261,14 @@ function specVideo() {
   let inView = false;
   let visitor = false; // the visitor has taken over playback
   let ours = 0; // play and pause events we caused, not the visitor
+  const frame = video.closest('.spec-frame');
+  const track = video.textTracks[0];
+  const resting = on => {
+    frame?.classList.toggle('is-ambient', on);
+    video.controls = !on;
+    if (track) track.mode = on ? 'hidden' : 'showing';
+  };
+  const takeOver = () => { visitor = true; resting(false); };
   const update = () => {
     if (visitor) return;
     const ambient = inView && !calm.matches && pause.getAttribute('aria-pressed') !== 'true' && !document.hidden;
@@ -274,20 +283,21 @@ function specVideo() {
   };
   const take = () => {
     if (ours > 0) ours -= 1;
-    else visitor = true;
+    else takeOver();
   };
   video.addEventListener('play', take);
   video.addEventListener('pause', take);
-  video.addEventListener('volumechange', () => { if (!video.muted) visitor = true; });
+  video.addEventListener('volumechange', () => { if (!video.muted) takeOver(); });
   new IntersectionObserver(([entry]) => { inView = entry.isIntersecting; update(); }, { threshold: .5 }).observe(video);
   calm.addEventListener('change', update);
   document.addEventListener('visibilitychange', update);
   pause.addEventListener('click', () => setTimeout(update));
-  video.controls = false;
+  resting(true);
+  // The muted loop starts on the poster's own frame (a full slide), so the poster hands over without a jump.
+  video.addEventListener('loadedmetadata', () => { if (!visitor) video.currentTime = 17.5; }, { once: true });
   sound.hidden = false;
   const listen = () => {
-    visitor = true;
-    video.controls = true;
+    takeOver();
     video.muted = false;
     video.loop = false;
     video.currentTime = 0;
