@@ -6,7 +6,7 @@ import unittest
 
 import re
 
-from check import FINGERPRINTS, HASHED, ROOT, Page, check_changelog, check_releases, split_releases, check_motion, check_privacy, check_ref, check_site, check_vector, check_webp, fingerprint
+from check import FINGERPRINTS, HASHED, INSTALL_SWITCH, ROOT, Page, check_changelog, check_releases, split_releases, check_motion, check_privacy, check_ref, check_site, check_vector, check_webp, fingerprint
 
 
 def edit_built(root, name, change):
@@ -373,48 +373,52 @@ class Checks(unittest.TestCase):
     def test_install_line_and_its_switch(self):
         """#1357: the box shows exactly the line the install skill expects, the instruction and one copy button; the
         button ships natively disabled and labelled coming soon, and one switch (data-install) is the only change
-        that turns it on. Each case below plants one break in the built landing."""
+        that turns it on. Both switch values are built from the shipped landing and checked, whichever value it
+        ships (#1573); each case below plants one break in each of them."""
         line = '<code class="install-line">Install OpenWiz from github.com/openwizdev/OpenWiz</code>'
         hint = '<p class="install-hint">Paste this into your agent</p>'
         button = '<button class="btn install" type="button" disabled>Copy · coming soon</button>'
-        switch = 'data-install="coming-soon"'
-        with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp) / 'dist'
-            shutil.copytree(ROOT / 'dist', root)
-            landing = root / 'index.html'
-            text = landing.read_text()
-            for part in (line, hint, button, switch):
-                self.assertEqual(text.count(part), 1, part)
-            landing.write_text(text.replace(switch, 'data-install="live"'))
-            check_site(root)  # the release's one change keeps every other rule
-        breaks = [
-            (line, line.replace('github.com/openwizdev/OpenWiz', 'https://github.com/openwizdev/OpenWiz')),
-            (line, line.replace('OpenWiz</code>', 'openwiz</code>')),
-            (line, line.replace('</code>', '.</code>')),
-            (line, line.replace('Install OpenWiz', 'Install  OpenWiz')),
-            (line, line.replace('OpenWiz from', 'Open<b>Wiz</b> from')),
-            (line, ''),
-            (line, line + line),
-            (hint, ''),
-            (hint, hint.replace('your agent', 'your terminal')),
-            (switch, ''),
-            (switch, 'data-install="on"'),
-            (button, button.replace(' disabled', '')),
-            (button, button.replace(' disabled', ' aria-disabled="true"')),
-            (button, button.replace(' disabled', ' title=" disabled "')),
-            (button, button.replace(' disabled', ' disabled onclick="copy()"')),
-            (button, button.replace(' disabled', ' disabled onclick ="copy()"')),
-            (button, button.replace('Copy · coming soon', 'Copy')),
-            (button, button + button),
-        ]
-        for good, bad in breaks:
-            with self.subTest(bad=bad), tempfile.TemporaryDirectory() as temp:
+        text = (ROOT / 'dist/index.html').read_text()
+        shipped = re.findall(r'data-install="([^"]*)"', text)
+        self.assertEqual(len(shipped), 1, 'one install switch')
+        self.assertIn(shipped[0], INSTALL_SWITCH)
+        for part in (line, hint, button):
+            self.assertEqual(text.count(part), 1, part)
+        for state in INSTALL_SWITCH:
+            switch = f'data-install="{state}"'
+            variant = text.replace(f'data-install="{shipped[0]}"', switch)
+            with self.subTest(state=state), tempfile.TemporaryDirectory() as temp:
                 root = Path(temp) / 'dist'
                 shutil.copytree(ROOT / 'dist', root)
-                landing = root / 'index.html'
-                landing.write_text(landing.read_text().replace(good, bad, 1))
-                with self.assertRaises(AssertionError):
-                    check_site(root)
+                (root / 'index.html').write_text(variant)
+                check_site(root)  # either value keeps every other rule
+            breaks = [
+                (line, line.replace('github.com/openwizdev/OpenWiz', 'https://github.com/openwizdev/OpenWiz')),
+                (line, line.replace('OpenWiz</code>', 'openwiz</code>')),
+                (line, line.replace('</code>', '.</code>')),
+                (line, line.replace('Install OpenWiz', 'Install  OpenWiz')),
+                (line, line.replace('OpenWiz from', 'Open<b>Wiz</b> from')),
+                (line, ''),
+                (line, line + line),
+                (hint, ''),
+                (hint, hint.replace('your agent', 'your terminal')),
+                (switch, ''),
+                (switch, 'data-install="on"'),
+                (button, button.replace(' disabled', '')),
+                (button, button.replace(' disabled', ' aria-disabled="true"')),
+                (button, button.replace(' disabled', ' title=" disabled "')),
+                (button, button.replace(' disabled', ' disabled onclick="copy()"')),
+                (button, button.replace(' disabled', ' disabled onclick ="copy()"')),
+                (button, button.replace('Copy · coming soon', 'Copy')),
+                (button, button + button),
+            ]
+            for good, bad in breaks:
+                with self.subTest(state=state, bad=bad), tempfile.TemporaryDirectory() as temp:
+                    root = Path(temp) / 'dist'
+                    shutil.copytree(ROOT / 'dist', root)
+                    (root / 'index.html').write_text(variant.replace(good, bad, 1))
+                    with self.assertRaises(AssertionError):
+                        check_site(root)
 
     def test_app_page_policy_and_calm(self):
         # catches: the app losing the browser-enforced limit to GitHub and this site, loading an unchecked

@@ -7,11 +7,12 @@
 //
 //   node scripts/app-check.mjs            (after npm run build; CHROME=/path/to/chrome to pick the browser)
 //   SHOTS=dir node scripts/app-check.mjs  also saves the shell on a laptop and a phone as PNGs, for review
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { cp, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const ROOT = new URL('../', import.meta.url);
 const DIST = new URL('dist/', ROOT);
@@ -350,6 +351,36 @@ async function signIn(page, world) {
   await page.until(`document.body.innerText.includes('acme/factory')`, 'the repository picker');
 }
 
+async function releaseSwitchAlone() {
+  const temp = await mkdtemp(join(tmpdir(), 'switch-copy-'));
+  try {
+    const root = fileURLToPath(ROOT).replace(/\/$/, '');
+    const copy = join(temp, 'site');
+    await cp(root, copy, { recursive: true, filter: src => src === root || !['.git', 'dist', 'node_modules', '__pycache__'].includes(basename(src)) });
+    await symlink(join(root, 'node_modules'), join(copy, 'node_modules'));
+    // npm run check lists the site's files through git; the linked node_modules is not one of them.
+    const git = spawnSync('git', ['init', '-q'], { cwd: copy });
+    assert(git.status === 0, 'git init failed in the copy');
+    await writeFile(join(copy, '.git/info/exclude'), '/node_modules\n');
+    const landing = join(copy, 'index.html');
+    const text = await readFile(landing, 'utf8');
+    const switches = text.match(/data-install="(coming-soon|live)"/g) || [];
+    assert(switches.length === 1, `the landing has no single install switch: ${JSON.stringify(switches)}`);
+    await writeFile(landing, text.replace(switches[0], 'data-install="live"'));
+    const failed = [];
+    for (const step of ['build', 'check', 'test', 'test:functions', 'test:app']) {
+      const run = spawnSync('npm', ['run', step], { cwd: copy, env: { ...process.env, WIZSITE_SWITCH_COPY: '1' }, encoding: 'utf8', maxBuffer: 64 << 20 });
+      if (run.status !== 0) {
+        const out = `${run.stdout || ''}${run.stderr || ''}${run.error ? run.error.message : ''}`;
+        failed.push(`npm run ${step}:\n${out.split('\n').filter(line => !line.startsWith('PASS ')).join('\n').slice(-2000)}`);
+      }
+    }
+    assert(failed.length === 0, `with the switch on, CI fails:\n${failed.join('\n')}`);
+  } finally {
+    await rm(temp, { recursive: true, force: true });
+  }
+}
+
 async function main() {
   if (!existsSync(new URL('index.html', DIST))) throw new Error('dist/ is missing: run npm run build first');
   const browser = await launch();
@@ -357,10 +388,13 @@ async function main() {
     // #1357: the landing's install box. The line is the one the install skill expects, word for word.
     const LINE = 'Install OpenWiz from github.com/openwizdev/OpenWiz';
     const landing = await readFile(new URL('index.html', DIST), 'utf8');
-    // The release's one change: the box's switch from coming-soon to live, served in place of the built landing.
-    const switchedOn = world => {
-      assert(landing.split('data-install="coming-soon"').length === 2, 'the landing has no single coming-soon switch to turn on');
-      world.site['/'] = async () => ({ status: 200, raw: Buffer.from(landing.replace('data-install="coming-soon"', 'data-install="live"')), type: 'html' });
+    // The box's one switch (data-install): each check serves the built landing with the switch set to its state,
+    // so both states are checked whichever value the landing ships (#1573). The release changes only that value.
+    const shipped = landing.match(/data-install="[^"]*"/g) || [];
+    const servedAs = (world, state) => {
+      assert(shipped.length === 1 && ['data-install="coming-soon"', 'data-install="live"'].includes(shipped[0]),
+        `the landing has no single install switch: ${JSON.stringify(shipped)}`);
+      world.site['/'] = async () => ({ status: 200, raw: Buffer.from(landing.replace(shipped[0], `data-install="${state}"`)), type: 'html' });
     };
     const installBox = page => page.run(`(() => { ${LABEL} const box = document.querySelector('.install-box'); const b = box.querySelector('button.install');
       const line = box.querySelector('.install-line'); const hint = box.querySelector('.install-hint');
@@ -370,6 +404,7 @@ async function main() {
 
     await check('#1357 install box before the release: the line and the instruction show, Copy is disabled, coming soon, and copies nothing', async () => {
       const world = new World();
+      servedAs(world, 'coming-soon');
       const page = await open(browser, world);
       await page.go(`${SITE}/`);
       await landed(page);
@@ -388,7 +423,7 @@ async function main() {
 
     await check('#1357 install box switched on: Copy is enabled and puts exactly the install line on the clipboard', async () => {
       const world = new World();
-      switchedOn(world);
+      servedAs(world, 'live');
       const page = await open(browser, world);
       await page.go(`${SITE}/`);
       await landed(page);
@@ -407,7 +442,7 @@ async function main() {
 
     await check('#1357 install box switched on with its script blocked: the line still shows, with no dead Copy button', async () => {
       const world = new World();
-      switchedOn(world);
+      servedAs(world, 'live');
       const script = landing.match(/src="(\/site\.[0-9a-f]{10}\.js)"/)[1];
       world.site[script] = async () => ({ abort: true });
       const page = await open(browser, world);
@@ -1628,6 +1663,11 @@ async function main() {
     });
   } finally {
     await browser.close();
+  }
+  // #1573: the release's one documented change alone passes CI. A copy of the site gets only data-install set to live,
+  // then CI's own steps run on it; inside the copy this check is skipped, so the copy's test:app doesn't recurse.
+  if (!process.env.WIZSITE_SWITCH_COPY) {
+    await check('#1573 the release switch alone passes CI: a copy with only data-install set to live passes every CI step', releaseSwitchAlone);
   }
   console.log(results.join('\n'));
   const failed = results.filter(line => line.startsWith('FAIL')).length;
