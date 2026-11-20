@@ -11,6 +11,8 @@ from urllib.parse import unquote, urlsplit
 ROOT = Path(__file__).resolve().parents[1]
 # Reviewed artwork and the sample spec recording. Pin them after checking the visual content and metadata.
 ART_HASHES = {
+    # The drivers page's painted harbour (#48, variant B): plain WebP, generated with Codex's image tool.
+    'art/drivers-b-harbour.webp': 'c6d3e6950bb06eebe35190975d99d213d322a1cf8fdaf19f970988a8d021ea4d',
     'art/era-2-grill.webp': 'efaf213c3f389c8feb2f9d0436e94b1f9241d0ecf3cc3e793385d34f11cd11dd',
     'art/family-01.webp': '14532efb522eb7129ced9e1093f4b0321b1f00459301f059f2d9b5a8c2a7161f',
     'art/family-02.webp': '0c64fa6a32853b694b7c2b09c2f8a2d296ca878c464b57ba9d0aae101aed81d2',
@@ -88,7 +90,7 @@ def fingerprinted_page(html):
 
 FINGERPRINTS = {name: fingerprint(name, (ROOT / name).read_bytes()) for name in HASHED}
 STATIC = {
-    'index.html', 'changelog/index.html', '_headers', APP_PAGE, 'app/manifest.webmanifest',
+    'index.html', 'changelog/index.html', 'drivers/index.html', '_headers', APP_PAGE, 'app/manifest.webmanifest',
     'fonts/Geist-var.woff2', 'fonts/GeistMono-var.woff2', 'fonts/OFL.txt',
 } | ART | set(ICON_HASHES) | set(VECTORS) | (set(VENDOR_HASHES) - {GSAP}) | set(APP_VENDOR)
 RUNTIME = STATIC | set(FINGERPRINTS.values())
@@ -116,7 +118,8 @@ FONT_HASHES = {
     'fonts/GeistMono-var.woff2': '55419aa06f58adcd7f145c6c920e56936416f17e528f60efc6032ffa4269972b',
     'fonts/OFL.txt': 'c683bfbcc7e087f5d37a54ef628f10387c451a83ddc459b151403a164ac46c90',
 }
-PAGES = ('index.html', 'changelog/index.html')
+DRIVERS_PAGE = 'drivers/index.html'  # openwiz.dev/drivers (#48)
+PAGES = ('index.html', 'changelog/index.html', DRIVERS_PAGE)
 ALL_PAGES = PAGES + (APP_PAGE,)
 # The to-do example and both app entry points stay visible in the static landing page.
 STORY_COPY = ('Build a to-do app', 'Bring any agent', 'Sign in with GitHub', 'Put the app on your phone')
@@ -400,6 +403,7 @@ def check_site(root):
         total += len(data)
     assert total <= ART_BUDGET, f'art is {total} bytes, over the {ART_BUDGET} budget'
     check_changelog(landing, changelog)
+    check_drivers(landing, changelog, (root / DRIVERS_PAGE).read_text())
     check_releases(releases)
     main = re.search(r'<main\b[^>]*>[\s\S]*?</main>', changelog)
     assert main and sha256(main[0].encode()).hexdigest() == CHANGELOG_MAIN, 'changelog content changed; review explicitly before updating its snapshot'
@@ -547,8 +551,113 @@ def check_changelog(landing, changelog):
         check_motion(style)
 
 
+# The drivers page (#48): one card per driver, in this order, each with its exact status line (the ticket's facts,
+# nothing invented), the driver's four words and the kit's five checks with its result in words. boat.dev is the hero.
+DRIVERS = (
+    ('Your own computer or VPS', 'Being fixed: its kit run is in progress', 'in-progress'),
+    ('Cloudroom', 'Works today: built real pull requests for OpenWiz', 'not-run'),
+    ('boat.dev', 'Passed the kit, 5 of 5, on a real account (2026-11-19)', 'passed'),
+    ('Grok Bot', 'Coming soon: listed when its driver lands', 'not-run'),
+)
+DRIVER_HERO = 'boat.dev'
+DRIVER_WORDS = ('version', 'start', 'wake', 'stop')
+KIT_CHECKS = ('version', 'start', 'wake', 'stop', 'token')
+KIT_WORDS = {'passed': 'Test kit: passed, 5 of 5', 'in-progress': 'Test kit: in progress', 'not-run': 'Test kit: not yet run'}
+DRIVER_LINKS = ('https://github.com/openwizdev/OpenWiz/blob/main/kernel/driver.v1.md',
+                'https://github.com/openwizdev/OpenWiz/tree/main/kernel/driver-kit',
+                'https://github.com/openwizdev/OpenWiz/tree/main/adapters/template')
+DRIVERS_NAV = '<a class="nav-log" href="/drivers/">Drivers</a>'
+
+
+class DriverCards(HTMLParser):
+    """The drivers page's cards (li.driver-card): each one's classes, kit state, heading, status line, four words,
+    kit result and checks; and the main's links and h2 headings outside the cards."""
+    FIELDS = {'h2': 'name', 'p.status': 'status', 'p.kit-result': 'kit', 'code': 'word', 'li.check': 'check'}
+
+    def __init__(self, text):
+        super().__init__(convert_charrefs=True)
+        self.cards, self.links, self.headings = [], [], []
+        self.in_main, self.depth, self.open, self.where = False, 0, [], None
+        self.feed(text)
+
+    def handle_starttag(self, tag, attrs):
+        attrs = dict(attrs)
+        classes = (attrs.get('class') or '').split()
+        if tag == 'main':
+            self.in_main = True
+        if not self.in_main:
+            return
+        if tag == 'a' and attrs.get('href'):
+            self.links.append(attrs['href'])
+        card = self.cards[-1] if self.depth else None
+        if tag == 'li' and 'driver-card' in classes and not self.depth:
+            self.cards.append({'classes': classes, 'kit-state': attrs.get('data-kit'), 'name': '', 'status': '',
+                               'kit': '', 'words': [], 'checks': []})
+            self.depth = 1
+            return
+        if card is not None and tag in ('li', 'ul', 'ol', 'div'):
+            self.depth += 1
+        if card is not None and tag == 'ul':
+            self.where = 'words' if 'words' in classes else 'checks' if 'checks' in classes else self.where
+        key = tag + ('.' + classes[0] if classes else '')
+        if card is not None and tag == 'li' and self.where == 'checks':
+            key = 'li.check'
+        if card is not None and tag == 'code' and self.where != 'words':
+            key = None
+        if (card is not None and key in self.FIELDS) or (card is None and tag == 'h2'):
+            self.open.append([tag, key, ''])
+
+    def handle_data(self, data):
+        for item in self.open:
+            item[2] += data
+
+    def handle_endtag(self, tag):
+        if tag == 'main':
+            self.in_main = False
+        if self.open and self.open[-1][0] == tag:
+            _, key, text = self.open.pop()
+            text = re.sub(r'\s+', ' ', text).strip()
+            if not self.depth:
+                self.headings.append(text)
+            elif key == 'code':
+                self.cards[-1]['words'].append(text)
+            elif key == 'li.check':
+                self.cards[-1]['checks'].append(text.split(' ')[0])
+            else:
+                self.cards[-1][self.FIELDS[key]] = text
+        if self.depth and tag in ('li', 'ul', 'ol', 'div'):
+            self.depth -= 1
+            if tag == 'ul':
+                self.where = None
+
+
+def nav_bar(html):
+    found = re.findall(r'<header class="landing-nav wrap">[\s\S]*?</header>', html)
+    assert len(found) == 1, 'expected one landing top bar'
+    return found[0]
+
+
 def check_drivers(landing, changelog, drivers):
-    pass
+    """The drivers page (#48). `landing`, `changelog` and `drivers` are the three pages' HTML."""
+    bar = nav_bar(landing)
+    for name, page in (('landing', landing), ('changelog', changelog)):
+        assert nav_bar(page).count(DRIVERS_NAV) == 1, f'one Drivers link in the top bar of the {name}'
+    current = DRIVERS_NAV.replace('href="/drivers/"', 'href="/drivers/" aria-current="page"')
+    assert nav_bar(drivers) == bar.replace(DRIVERS_NAV, current), "the drivers page needs the landing's exact top bar, its Drivers link current"
+    assert Outline(drivers).title == 'Drivers — OpenWiz', 'the drivers page title must be Drivers'
+    page = DriverCards(drivers)
+    assert [card['name'] for card in page.cards] == [name for name, _, _ in DRIVERS], 'the four drivers, in order'
+    for card, (name, status, kit) in zip(page.cards, DRIVERS):
+        assert card['status'] == status, f'{name}: the status line must read exactly: {status}'
+        assert card['words'] == list(DRIVER_WORDS), f'{name}: the four words, in order'
+        assert card['checks'] == list(KIT_CHECKS), f"{name}: the kit's five checks, in order"
+        assert card['kit-state'] == kit and card['kit'] == KIT_WORDS[kit], f'{name}: the kit result in words must read: {KIT_WORDS[kit]}'
+    heroes = [card['name'] for card in page.cards if 'hero-card' in card['classes']]
+    assert heroes == [DRIVER_HERO], f'{DRIVER_HERO} is the one hero card'
+    assert 'Write your own driver' in page.headings, 'the Write your own driver section is missing'
+    outside = [ref for ref in page.links if urlsplit(ref).scheme or urlsplit(ref).netloc]
+    assert all(re.match(r'https://github\.com/openwizdev/OpenWiz(?:/|$)', ref) for ref in outside), 'the drivers page links only the OpenWiz repository'
+    assert all(ref in page.links for ref in DRIVER_LINKS), 'link the contract, kit and template in OpenWiz'
 
 
 def split_releases(built):
