@@ -716,6 +716,9 @@ class Checks(unittest.TestCase):
         for bad, error in (
                 ('\n.drivers-page .host-marks .host-lockup { height: 26px; }\n', 'sized apart from its slot'),
                 ('\n.drivers-page .host-mark .host-tile { width: 30px; }\n', 'sized apart from its slot'),
+                ('\n.drivers-page .host-mark .host-tile { border-radius: 4px; }\n', 'official marks show whole'),
+                ('\n.drivers-page .driver-logo.host-tile { border-radius: 7px; }\n', 'official marks show whole'),
+                ('\n.drivers-page .spot-logo { object-fit: cover; }\n', 'official marks show whole'),
                 ('\n@media (max-width: 760px) { .drivers-page .proof-scene { aspect-ratio: 1 / 1; } }\n', 'shorter supporting image'),
                 ('\n@media (max-width: 760px) { .drivers-page .proof-scene { order: -1; } }\n', 'keeps its reading order')):
             self.broken(page, '', '', error, css=bad)

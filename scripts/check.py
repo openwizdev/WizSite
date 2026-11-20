@@ -1098,6 +1098,11 @@ def check_driver_css(css):
             if 'host-mark' in one and one != '.drivers-page .host-mark img' and re.search(r'img|host-(?:icon|tile|lockup)\b', one):
                 assert not re.search(r'(?<![-\w])(?:height|max-height|width)\s*:\s*\d', body), \
                     f'a host mark sized apart from its slot, so the pills are uneven: {one}'
+    # #74 R1: an official mark shows whole, as its file draws it: no rounded corners, clip or crop on a logo image.
+    for sel, body in re.findall(r'([^{}]+)\{([^{}]*)\}', css):
+        if re.search(r'host-(?:tile|lockup|icon)\b|spot-logo|driver-logo|host-mark img', sel):
+            assert not re.search(r'(?<![-\w])(?:border-radius|clip-path|overflow|object-fit|mask)\s*:', body), \
+                f'a logo clipped or cropped; official marks show whole: {sel.strip()}'
     phone = [b for q, b in re.findall(r'@media\s*\(max-width:\s*(\d+)px\)\s*\{((?:[^{}]*\{[^{}]*\})*)[^{}]*\}', css) if int(q) <= 760]
     ratios = [r for block in phone for body in css_rules(block, '.drivers-page .proof-scene')
               for r in re.findall(r'aspect-ratio\s*:\s*(\d+(?:\.\d+)?)\s*/\s*(\d+(?:\.\d+)?)', body)]

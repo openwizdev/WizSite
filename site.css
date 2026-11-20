@@ -342,7 +342,6 @@ body.landing > main { flex: 1 0 auto; }
 .drivers-page .host-marks li { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 6px 14px; border: 1px solid rgb(242 194 123 / 24%); border-radius: 999px; background: rgb(15 13 11 / 76%); color: #ece3d6; font: 500 15px/1.2 var(--ow-font-sans); white-space: nowrap; }
 .drivers-page .host-mark { display: inline-flex; flex: none; align-items: center; height: 18px; }
 .drivers-page .host-mark img { display: block; width: auto; height: 100%; }
-.drivers-page .host-mark .host-tile { border-radius: 4px; }
 .drivers-page .host-state { padding-left: 8px; border-left: 1px solid rgb(242 194 123 / 28%); color: #cbbfae; font-size: 13px; font-weight: 450; }
 .drivers-page [data-state="passed"] .host-state { color: var(--gold); }
 .drivers-page .host-icon { filter: invert(1); opacity: .92; }
@@ -384,7 +383,6 @@ body.landing > main { flex: 1 0 auto; }
 .drivers-page .driver-list .driver { display: flex; flex-direction: column; gap: 12px; width: 100%; padding: 20px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); }
 .drivers-page .driver-list .driver-name { display: flex; align-items: center; gap: 10px; min-height: 32px; margin: 0; font-size: 20px; font-weight: 660; line-height: 1.2; letter-spacing: -.03em; }
 .drivers-page .driver-logo { flex: none; width: 28px; height: 28px; }
-.drivers-page .driver-logo.host-tile { border-radius: 7px; }
 .drivers-page .driver-list .driver-line { color: var(--grey2); font-size: 15px; line-height: 1.45; }
 .drivers-page .driver-list .driver-date { margin-top: -6px; font-size: 14px; }
 .drivers-page .driver-kit { display: flex; margin-top: auto; align-items: center; gap: 8px; padding-top: 12px; border-top: 1px solid var(--line); color: var(--ink); font-size: 14px; line-height: 1.4; white-space: nowrap; }
@@ -402,7 +400,6 @@ body.landing > main { flex: 1 0 auto; }
 .drivers-page .own-words dt code { color: var(--gold); font-size: 15px; }
 .drivers-page .own-words dd { margin: 0; color: #e1d7cb; font-size: 15px; }
 .drivers-page .own-words .own-token { border-top-style: dashed; }
-.drivers-page .drivers-footer .footer-wordmark { padding-bottom: 8px; }
 
 @media (max-width: 1100px) {
   .drivers-page .driver.hero { grid-template-columns: 1fr; }
