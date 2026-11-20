@@ -7,7 +7,7 @@ from unittest import mock
 
 import re
 
-from check import FINGERPRINTS, HASHED, INSTALL_SWITCH, ROOT, Page, check_changelog, check_releases, split_releases, check_motion, check_privacy, check_ref, check_site, check_vector, check_webp, fingerprint
+from check import CTA, FINGERPRINTS, HASHED, INSTALL_SWITCH, ROOT, Page, check_changelog, check_releases, split_releases, check_motion, check_privacy, check_ref, check_site, check_vector, check_webp, fingerprint
 
 
 def edit_built(root, name, change):
@@ -19,7 +19,7 @@ def edit_built(root, name, change):
     new = fingerprint(name, data)
     old.unlink()
     (root / new).write_bytes(data)
-    for page in ('index.html', 'changelog/index.html', 'drivers/index.html', 'app/index.html'):
+    for page in ('index.html', 'changelog/index.html', 'drivers/index.html', 'team/index.html', 'app/index.html'):
         path = root / page
         path.write_text(path.read_text().replace(f'"/{was}"', f'"/{new}"'))
 
@@ -461,6 +461,37 @@ class Checks(unittest.TestCase):
                 spoil(root)
                 with self.assertRaises(AssertionError):
                     check_site(root)
+
+    def test_team_page_and_buy_button(self):
+        """#63: every site page's header has the one buy button, and the site has one booking link, https or the placeholder."""
+        def planted(page, change):
+            temp = tempfile.TemporaryDirectory()
+            root = Path(temp.name) / 'dist'
+            shutil.copytree(ROOT / 'dist', root)
+            path = root / page
+            path.write_text(change(path.read_text()))
+            return temp, root
+        book = re.compile(r'data-book href="[^"]*"')
+        refused = {
+            'buy button': ('changelog/index.html', lambda t: t.replace(CTA, '', 1)),
+            'buy button to /team/': ('team/index.html', lambda t: t.replace('<a class="nav-team" href="/team/">', '<a class="nav-team" href="/">', 1)),
+            'one booking link': ('team/index.html', lambda t: t.replace('</main>', '<a data-book href="https://cal.com/x">Book</a></main>', 1)),
+            'outside the team page': ('index.html', lambda t: t.replace('</main>', '<a data-book href="https://cal.com/x">Book</a></main>', 1)),
+            'must be https': ('team/index.html', lambda t: book.sub('data-book href="http://cal.com/x"', t)),
+            'must be https ': ('team/index.html', lambda t: book.sub('data-book href="mailto:someone"', t)),
+            'outside the team page: the app': ('app/index.html', lambda t: t.replace('</body>', '<a data-book href="https://cal.com/x">Book</a></body>', 1)),
+            'unexpected external URL': ('team/index.html', lambda t: t.replace('</main>', '<img src="https://cal.com/openwiz-jake/setup" alt=""></main>', 1)),
+            'one booking link ': ('team/index.html', lambda t: t.replace('</main>', '<a data-book href="https://cal.com/openwiz-jake/setup">Again</a></main>', 1)),
+            'shows no price': ('team/index.html', lambda t: t.replace('Custom pricing.', 'Custom pricing. From $99 per month.', 1)),
+            'team page copy': ('team/index.html', lambda t: t.replace('>Book a call</a>', '>Talk</a>', 1)),
+        }
+        for message, (page, change) in refused.items():
+            temp, root = planted(page, change)
+            with temp, self.subTest(message=message), self.assertRaisesRegex(AssertionError, message.strip()):
+                check_site(root)
+        temp, root = planted('team/index.html', lambda t: book.sub('data-book href="https://cal.com/someone/intro"', t))
+        with temp:
+            check_site(root)
 
     def test_drivers_page(self):
         # Catches (#50): the drivers page dropped from the build or its checks; a card missing, reordered or with its

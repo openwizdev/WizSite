@@ -10,7 +10,15 @@ const root = new URL('./', import.meta.url);
 const output = new URL('dist/', root);
 const vendor = ['vendor/gsap-3.15.1.min.js', 'vendor/GSAP-LICENSE.txt', 'vendor/LOBE-ICONS-LICENSE.txt'];
 const art = (await readdir(new URL('art/', root))).filter(name => name.endsWith('.webp')).sort().map(name => `art/${name}`);
-const pages = ['index.html', 'changelog/index.html', 'drivers/index.html', 'app/index.html'];
+const pages = ['index.html', 'changelog/index.html', 'drivers/index.html', 'team/index.html', 'app/index.html'];
+// The header's one buy button (#63), from one snippet, added to every site page's top bar (not the app's), so no page
+// owns a copy of it.
+const cta = await readFile(new URL('header-cta.html', root), 'utf8');
+const withCta = html => {
+  const bar = '  </nav>\n</header>';
+  if (html.split(bar).length !== 2) throw new Error('a site page needs exactly one top bar');
+  return html.replace(bar, cta + bar);
+};
 // The app (openwiz.dev/app): its design system, data layer, page modules and shell, fingerprinted like the site's.
 const app = ['app/ember.css', 'app/data.js', 'app/ui.js', 'app/pages/you.js', 'app/pages/specs.js', 'app/pages/spec.js', 'app/pages/agents.js', 'app/palette.js', 'app/shell.js'];
 // Pinned npm dependencies (package.json, exact version), copied from node_modules with their licence; the version is in
@@ -41,6 +49,7 @@ for (const file of hashed) {
 for (const page of pages) {
   let html = await readFile(new URL(page, root), 'utf8');
   for (const [file, name] of Object.entries(names)) html = html.replaceAll(`"/${file}"`, `"/${name}"`);
+  if (page !== 'app/index.html') html = withCta(html);
   if (page === 'changelog/index.html') html = withReleases(html, render(releases));
   await put(page, html);
 }

@@ -376,6 +376,35 @@ async function chrome(page, where, mode) {
   expect(facts.font === 'Geist', where, `the page is not set in the landing's type (${facts.font})`);
 }
 
+// #63: every site page's top bar shows the one buy button and the Drivers link inside the window, with no sideways
+// scroll, and the team page shows its one Book a call link.
+async function buy(page, where, path) {
+  const facts = await page.evaluate(`(() => { ${HELPERS}
+    const bar = document.querySelector('header.landing-nav');
+    // The worst case a visitor sees: a long star count and, above phone and tablet widths, a classic scrollbar taking 17 px.
+    const stars = bar?.querySelector('[data-stars]');
+    if (stars) { stars.hidden = false; stars.textContent = '12.3k'; }
+    if (innerWidth > 640) document.documentElement.style.width = (innerWidth - 17) + 'px';
+    const inside = el => shown(el) && el.getBoundingClientRect().left >= 0 && el.getBoundingClientRect().right <= innerWidth && el.scrollWidth <= el.clientWidth + 1;
+    const button = bar?.querySelector('a.nav-team[href="/team/"]');
+    const facts = {
+      scroll: document.scrollingElement.scrollWidth, inner: innerWidth,
+      clipped: [...bar.querySelectorAll('a')].filter(a => a.scrollWidth > a.clientWidth + 1).map(a => a.className || a.getAttribute('href')),
+      over: bar.scrollWidth - bar.clientWidth,
+      button: inside(button) && button.innerText.trim().length > 0,
+      drivers: inside(bar?.querySelector('a[href="/drivers/"]')),
+      book: [...document.querySelectorAll('a[data-book]')].filter(shown).length,
+    };
+    document.documentElement.style.width = '';
+    return facts;
+  })()`);
+  expect(facts.over <= 1 && !facts.clipped.length, where, `the top bar clips (with a star count and a scrollbar): ${facts.over}px over, links ${facts.clipped.join(', ')}`);
+  expect(facts.scroll <= facts.inner, where, `sideways scroll (${facts.scroll}px content in a ${facts.inner}px window)`);
+  expect(facts.button, where, 'the top bar lacks the buy button inside the window');
+  expect(facts.drivers, where, 'the top bar lacks the Drivers link inside the window');
+  if (path === '/team/') expect(facts.book === 1, where, `the team page needs one Book a call link (${facts.book})`);
+}
+
 async function main() {
   const server = await serve();
   const origin = `http://127.0.0.1:${server.address().port}`;
@@ -397,6 +426,17 @@ async function main() {
         } finally {
           await page.close();
         }
+        for (const path of ['/', '/changelog/', '/drivers/', '/team/']) {
+          const other = await open(browser, origin, width, height, mode, path);
+          try {
+            await buy(other, `${path} ${where}`, path);
+            if (process.env.SHOTS && name === 'motion' && path === '/team/' && (width === 390 || width === 1280)) {
+              await other.shot(join(process.env.SHOTS, `team-${width}.png`));
+            }
+          } finally {
+            await other.close();
+          }
+        }
         const changelog = await open(browser, origin, width, height, mode, '/changelog/');
         try {
           await chrome(changelog, `/changelog/ ${where}`, name);
@@ -405,6 +445,17 @@ async function main() {
           }
         } finally {
           await changelog.close();
+        }
+      }
+    }
+    // #63 R1: the header between the phone and desktop widths, where the long button label must still fit.
+    for (const width of (process.env.WIDTHS || '481,500,560,640,641,700,760,761,800,900,960,1024').split(',').map(Number)) {
+      for (const path of ['/', '/changelog/', '/drivers/', '/team/']) {
+        const other = await open(browser, origin, width, 800, MODES.motion, path);
+        try {
+          await buy(other, `${path} ${width}px, motion`, path);
+        } finally {
+          await other.close();
         }
       }
     }
