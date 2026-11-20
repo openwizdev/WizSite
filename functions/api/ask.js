@@ -99,6 +99,11 @@ function caps(env) {
 
 // ---- The request ------------------------------------------------------------------------------------------------
 
+// A JSON object of one member whose name and value are both strings: '{' name ':' value '}', JSON white space around.
+const JSON_STRING = String.raw`"(?:[^"\\\u0000-\u001f]|\\(?:["\\/bfnrt]|u[0-9a-fA-F]{4}))*"`;
+const WS = '[ \\t\\n\\r]*';
+const ONE_STRING_MEMBER = new RegExp(`^${WS}\\{${WS}(${JSON_STRING})${WS}:${WS}(${JSON_STRING})${WS}\\}${WS}$`);
+
 // The trimmed question, or the refusal it earns.
 async function readQuestion(request) {
   const bad = { refusal: 'bad_request' };
@@ -108,14 +113,18 @@ async function readQuestion(request) {
   if (request.headers.get('Origin') !== new URL(request.url).origin) return bad;
   const body = await readLimited(request.body, MAX_BODY_BYTES);
   if (body === null) return bad;
-  let value;
+  // Exactly one member, written once: JSON.parse alone would keep the last of a repeated key.
+  let key, value;
   try {
-    value = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(body));
+    const shape = new TextDecoder('utf-8', { fatal: true }).decode(body).match(ONE_STRING_MEMBER);
+    if (!shape) return bad;
+    key = JSON.parse(shape[1]);
+    value = JSON.parse(shape[2]);
   } catch {
     return bad;
   }
-  if (!value || typeof value !== 'object' || Array.isArray(value) || Object.keys(value).length !== 1 || typeof value.question !== 'string') return bad;
-  const question = value.question.trim();
+  if (key !== 'question' || typeof value !== 'string') return bad;
+  const question = value.trim();
   const length = points(question);
   if (length < 1) return bad;
   if (length > MAX_QUESTION) return { refusal: 'too_long' };

@@ -365,6 +365,11 @@ test('a body of exactly 4096 bytes is read, and Content-Type parameters are allo
   const body = JSON.stringify({ question: 'Synthetic padded question?' }).padEnd(4096, ' ');
   const out = await run(withCase({ request: ask('', { body, headers: { 'Content-Type': 'application/json; charset=utf-8' } }) }));
   assert.equal(out.response.status, 200);
+  // Escapes in the name or the value, and JSON white space anywhere between tokens, are still one valid member.
+  answer = upstreamAnswer({ chunks: ['Synthetic answer to an escaped question.'], cost: 0.0001 });
+  const escaped = run(withCase({ request: ask('', { body: '\r\n\t{ "\\u0071uestion" :\n"Say \\"hi\\" \\u00e9 \\ud83d\\ude00 \\\\ \\/?" }\n' }) }));
+  assert.equal((await escaped).response.status, 200);
+  assert.match(JSON.parse(calls.at(-1).body).messages[1].content, /Question: Say "hi" é 😀 \\ \/\?$/);
 });
 
 // ---- Retrieval -----------------------------------------------------------------------------------------------
