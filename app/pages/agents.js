@@ -1,21 +1,11 @@
-// The Agents page (AP7, #1260): the agents working now and those that finished in the last day, read from their
-// status notes (WizSkills' agent-status contract, `openwiz:status v1`) and GitHub: kind, model, last step, ticket,
-// time, and what GitHub shows of the ticket's pull request (its state, review and checks).
-//
-// A note counts only from the repository's record authors (fleet.md's `Record authors` row). A note of another
-// version, or one that doesn't read exactly as v1 says, is shown as unknown: its fields are never guessed. A
-// `working` or `asking` note not edited for 30 minutes has lapsed. Per ticket and kind, the oldest live note holds
-// the claim. OW.agents.working() gives the tickets an agent is working on now, for the spec page's pulse.
 'use strict';
 (() => {
   const { h, STATES, time } = OW.ui;
   const LAPSE = 30 * 60 * 1000;
   const DAY = 24 * 60 * 60 * 1000;
-  const SKEW = 5 * 60 * 1000; // an edit up to 5 minutes ahead of this clock still counts as recent
+  const CLOCK_SKEW = 5 * 60 * 1000;
   const MARKER = '<!-- openwiz:status v1 -->';
   const KINDS = ['builder', 'reviewer', 'fleet'];
-
-  // ---- The status note, exactly as v1 says (contracts/agent-status.v1.md and its schema) ----
 
   const TEXT = /^[^\u0000-\u001f\u007f"\u201c\u201d>][^\u0000-\u001f\u007f"\u201c\u201d]*$/;
   const SKILL = '[a-z0-9]+(?:-[a-z0-9]+)*@[0-9]+\\.[0-9]+\\.[0-9]+';
@@ -31,10 +21,8 @@
     preview: v => /^https:\/\/(?![^/:]*\.(?:local|internal|lan|localhost)(?:[:/]|$))(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,63}(?::[0-9]{1,5})?(?:\/[^\s"<>?#@\\]*)?$/.test(v),
   };
   const FIELDS = Object.keys(RULES);
-  const REQUIRED = 7; // agent to time; pr and preview are optional
+  const REQUIRED_FIELDS = 7;
 
-  // The note's fields; {unknown: why} for another version or a note that doesn't read as v1; null for a comment
-  // that isn't a status note at all.
   function readNote(body) {
     const lines = String(body ?? '').replace(/\r\n/g, '\n').replace(/\n+$/, '').split('\n');
     if (lines[0] !== MARKER) {
@@ -54,19 +42,14 @@
       fields[m[1]] = value;
       at = index + 1;
     }
-    if (!FIELDS.slice(0, REQUIRED).every(name => name in fields)) return { unknown: 'a status note that doesn\'t read as version 1' };
+    if (!FIELDS.slice(0, REQUIRED_FIELDS).every(name => name in fields)) return { unknown: 'a status note that doesn\'t read as version 1' };
     const stopped = fields.state.match(/^stopped \((.*)\)$/);
     return { ...fields, state: stopped ? 'stopped' : fields.state, why: stopped ? stopped[1] : null };
   }
 
-  // ---- Every note on the tickets GitHub gave, with its claim worked out ----
-
-  const recent = (at, now) => at - now <= SKEW && now - at < LAPSE;
+  const recent = (at, now) => at - now <= CLOCK_SKEW && now - at < LAPSE;
   const keyOf = (issue, home) => `${issue.repository?.nameWithOwner || home}#${issue.number}`;
 
-  // [{key, issue, id, at, note, live, holds, unknown}] for one issue's comments. `uncertain` is set on the issue's
-  // result when its comment window is full of recent edits, so a live note may be missing.
-  // `authors` is the record authors (a Set, or null when they couldn't be read), or a function giving them per comment.
   function notesOf(issue, home, authors, now) {
     const authorsOf = typeof authors === 'function' ? authors : () => authors;
     const out = [];
@@ -80,7 +63,7 @@
       if (!note) continue;
       const set = authorsOf(comment);
       const by = typeof comment.author?.login === 'string' && set ? set.has(comment.author.login.toLowerCase()) : null;
-      if (by === false) continue; // a visitor's comment with the marker is ordinary discussion
+      if (by === false) continue;
       const at = Date.parse(comment.updatedAt) || 0;
       const base = { key: keyOf(issue, home), issue, id: comment.databaseId, at };
       if (by === null) out.push({ ...base, unknown: 'a status note whose author couldn\'t be checked against the record authors' });
@@ -88,7 +71,6 @@
       else if (!Number.isSafeInteger(comment.databaseId)) out.push({ ...base, unknown: 'a status note GitHub gave without its id' });
       else out.push({ ...base, note, live: (note.state === 'working' || note.state === 'asking') && recent(at, now) });
     }
-    // The oldest live note of each kind holds the claim; a newer live one of the same kind doesn't.
     for (const kind of KINDS) {
       const live = out.filter(n => n.live && n.note.agent === kind).sort((a, b) => a.id - b.id);
       live.forEach((n, i) => { n.holds = i === 0; });
@@ -96,7 +78,6 @@
     return { notes: out, uncertain };
   }
 
-  // The Agents page's picture from the Agents feed: {now, day, missing, partial} or null when nothing is read yet.
   function picture(feed, home, now = Date.now()) {
     const data = feed?.data;
     if (!data) return null;
@@ -121,15 +102,11 @@
     };
   }
 
-  // ---- What GitHub shows of a ticket's pull request ----
-
   const CHECKS = { SUCCESS: 'checks pass', FAILURE: 'checks fail', ERROR: 'checks fail', PENDING: 'checks running', EXPECTED: 'checks running' };
   const REVIEW = { APPROVED: 'approved', CHANGES_REQUESTED: 'changes requested', REVIEW_REQUIRED: 'waiting for review' };
   function pullRequest(row) {
     const list = row.issue.closedByPullRequestsReferences;
     const nodes = (list?.nodes || []).filter(Boolean);
-    // A note that names its pull request keeps it: GitHub's facts count only for that one. The ticket's own open or
-    // merged pull request stands in only when the note names none.
     const named = row.note?.pr || null;
     const pr = named ? nodes.find(p => p.url === named) || null : nodes.find(p => p.state === 'OPEN') || nodes.find(p => p.state === 'MERGED') || null;
     const url = pr?.url || named;
@@ -142,8 +119,6 @@
     const facts = [pr.isDraft ? 'draft' : 'open', REVIEW[pr.reviewDecision], rollup === undefined ? 'checks unknown' : rollup === null ? 'no checks' : CHECKS[rollup.state] || 'checks unknown'];
     return { url, number, facts: facts.filter(Boolean).join(', ') };
   }
-
-  // ---- Drawing ----
 
   const css = (el, props) => { for (const [k, v] of Object.entries(props)) el.style.setProperty(k, v); return el; };
   const WORDS = {
@@ -217,37 +192,23 @@
       ...section('In the last day', seen.day, 'No agent finished or stopped in the last day.', now));
   }
 
-  // ---- The pulse: the tickets an agent is working on now (a live `working` note that holds its claim) ----
-  // A ticket's notes can come from two reads: the Specs read and the Agents read. They are reconciled by comment id
-  // before any claim is worked out: each comment counts at its latest edit (the newer read on a tie), and a comment
-  // only the older read has is dropped when the newer read covers it (its list is whole, or its newest-edited-first
-  // window reaches back past that comment's edit), as it was deleted. One the newer read never reached is kept. Each
-  // comment is checked against the record authors of the read its copy came from.
-  //
-  // Which read is newer is known only when the newer one was asked for after the older one's answer arrived. When one
-  // feed's answer arrives while the other is still out, their order is unknown: a ticket then pulses only if it does
-  // in both orders, until a read on its own settles it.
-
   const FEEDS = ['agents', 'specs'];
   const order = Object.fromEntries(FEEDS.map(name => [name, { at: null, pending: false, overlapped: false }]));
-  // Registered before the shell's own listener (agents.js loads first), so a redraw sees the order as it is now.
   OW.data.onChange(() => {
     for (const name of FEEDS) {
       const feed = OW.data.feeds[name];
       const seen = order[name];
       if (feed.readAt === seen.at) {
-        if (!feed.busy) seen.pending = false; // a failed read: the next one starts afresh
+        if (!feed.busy) seen.pending = false;
         continue;
       }
-      // A new answer (or none, after a sign-out or a change of repository).
       Object.assign(seen, { at: feed.readAt, overlapped: feed.readAt !== null && seen.pending, pending: false });
       const other = FEEDS.find(n => n !== name);
-      if (OW.data.feeds[other].busy) order[other].pending = true; // its answer was asked for before this one arrived
+      if (OW.data.feeds[other].busy) order[other].pending = true;
     }
   });
 
   const edited = comment => Date.parse(comment?.updatedAt) || 0;
-  // key -> {issue, comments: Map(id -> {comment, authors})}, merging the reads oldest first.
   function reconcile(reads, home) {
     const tickets = new Map();
     for (const read of reads) {
@@ -287,7 +248,7 @@
       { name: 'agents', at: agents.readAt || 0, authors: OW.factory.recordAuthors(agents.data?.fleet?.text), issues: agents.data?.issues?.nodes || [] },
       { name: 'specs', at: specs.readAt || 0, authors: OW.factory.recordAuthors(specs.data?.fleet?.text),
         issues: Object.values(specs.data?.specs || {}).flatMap(spec => spec?.subIssues?.nodes || []) },
-    ].sort((a, b) => a.at - b.at); // the older read first
+    ].sort((a, b) => a.at - b.at);
     const [older, newer] = reads;
     const known = older.at < newer.at && !(order[newer.name].at === newer.at && order[newer.name].overlapped);
     const one = pulsing(reads, home, now);

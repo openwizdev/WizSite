@@ -1,7 +1,3 @@
-// The You page: what needs the user now. The count tiles (Needs you, Building, In review, Merged), then every
-// spec waiting for the user's confirm, every plan waiting for approval (open openwiz.decisions.v1 records from the
-// repository's record authors) and every ticket labelled needs-info or ready-for-human, newest first, each linked to
-// GitHub. A record that can't be read or verified is listed as unreadable; a list GitHub gave only part of says so.
 'use strict';
 OW.page({
   id: 'you',

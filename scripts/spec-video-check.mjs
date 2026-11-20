@@ -1,13 +1,3 @@
-// The "Watch your spec" moment's browser check (#1405): the built landing in a real headless Chromium, on a phone and
-// a laptop, with motion, with reduced motion, with GSAP blocked and with no JavaScript at all.
-//
-// The spec video must not load with the page; in view it plays muted (with motion) or waits on its poster (reduced
-// motion), and a "Play with sound" control plays it with sound on request; its captions load; with no script the poster
-// and a plain link to the video show. No sideways scroll on a phone. dist/ is served on 127.0.0.1; every other host is
-// blocked. No npm dependency: Node's own WebSocket talks to the browser.
-//
-//   node scripts/spec-video-check.mjs            (after npm run build; CHROME=/path/to/chrome to pick the browser)
-//   SHOTS=dir node scripts/spec-video-check.mjs  also saves the moment on a phone and a laptop as PNGs, for review
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
@@ -130,8 +120,6 @@ async function open(browser, origin, width, height, mode) {
   return { evaluate, click, shot, requests, close: () => browser.send('Target.closeTarget', { targetId }) };
 }
 
-// The moment's state, read inside the page.
-// The moment is the one of the three whose heading is "Watch your spec".
 const MOMENT = "[...document.querySelectorAll('.moments li')].find(li => li.querySelector('h3')?.textContent === 'Watch your spec')";
 const FACTS = `(() => {
   const moment = ${MOMENT};
@@ -152,7 +140,6 @@ const FACTS = `(() => {
     }),
   };
 })()`;
-// Polled from Node: with no JavaScript the page's own timers never run.
 const until = async (page, test, ms = 5000) => {
   const start = Date.now();
   for (;;) {

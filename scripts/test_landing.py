@@ -1,4 +1,3 @@
-"""Runs the landing page's browser check (scripts/landing-check.mjs) as part of npm test; needs the build first."""
 from pathlib import Path
 import subprocess
 import unittest

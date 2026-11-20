@@ -1,26 +1,14 @@
-// Cmd-K (Ctrl-K elsewhere), a keyboard-first command palette (AP15, #1327), and the `?` list of every shortcut.
-//
-// The palette is a modal dialog: a search field (a combobox) over a list of results (a listbox). It finds every page,
-// spec, ticket and agent the app shows, from the feeds the pages already read, and runs the app's view actions: open
-// on GitHub, copy a link, filter, refresh. It never writes to GitHub: anything that changes work is something an
-// agent does through GitHub, and the palette only links to it. The shell mounts it (OW.palette) and its keys.
-//
-// Function only (J196): no new look. It uses Ember's panel, tokens and focus ring; extra layout is set through the
-// CSSOM (the page's CSP allows no style attributes), as the pages do.
 'use strict';
 (() => {
   const { h, STATES } = OW.ui;
   const MAC = /Mac|iPhone|iPad/.test(navigator.platform);
   const PALETTE_KEY = MAC ? '⌘ K' : 'Ctrl K';
-  const MAX = 60; // results drawn at once; typing narrows the rest
+  const RESULTS_SHOWN = 60;
   const KINDS = { page: 'Page', action: 'Action', spec: 'Spec', ticket: 'Ticket', agent: 'Agent' };
   const FILTERS = { page: 'pages', spec: 'specs', ticket: 'tickets', agent: 'agents' };
   const css = (el, props) => { for (const [k, v] of Object.entries(props)) el.style.setProperty(k, v); return el; };
   const GITHUB = url => typeof url === 'string' && url.startsWith('https://github.com/');
 
-  // ---- What the palette finds: the app's pages, its actions, and what the feeds hold ----
-
-  // {kind, id, title, detail, go (an app route), focus (a selector to focus there), url (on GitHub), run (an action)}
   function results() {
     const feeds = OW.data.feeds;
     const home = OW.data.repo.get()?.full;
@@ -37,12 +25,9 @@
         detail: spec.total ? `${spec.done} of ${spec.total} tickets done` : '', go: `#/specs/${spec.number}`, focus: 'main .spec-title', url: spec.url });
       for (const t of spec.graph?.tickets || []) if (!t.outside && !tickets.has(t.key)) tickets.set(t.key, ticket(t, spec, 'in'));
     }
-    // A readable blocker a graph draws outside its spec, when no spec holds it (its own spec wins); never a placeholder.
     for (const spec of seen?.specs || []) {
       for (const t of spec.graph?.tickets || []) if (t.outside && !t.gap && !tickets.has(t.key)) tickets.set(t.key, ticket(t, spec, 'outside'));
     }
-    // Tickets marked for the user that no spec's graph holds: their card on You. (An agent's ticket is its agent's
-    // result: Enter goes to its card, Shift Enter opens the ticket.)
     for (const item of seen?.you || []) {
       const key = `${home}#${item.number}`;
       if (item.kind !== 'ticket' || tickets.has(key)) continue;
@@ -77,7 +62,6 @@
     return list;
   }
 
-  // Every word typed must appear in the result's kind, title or detail; titles that start with it come first.
   function match(list, query) {
     const words = query.toLowerCase().split(/\s+/).filter(Boolean);
     const scored = [];
@@ -95,11 +79,9 @@
     return scored.sort((a, b) => b.score - a.score || a.order - b.order).map(s => s.item);
   }
 
-  // ---- What a result does ----
-
   function refresh() {
     close(true);
-    OW.data.refreshAll(); // the shell says when GitHub's limit pauses reads
+    OW.data.refreshAll();
   }
 
   function copy(text, what) {
@@ -112,23 +94,19 @@
     window.open(url, '_blank', 'noopener,noreferrer');
   }
 
-  // Go to the result's place in the app, then focus it there (its card), or open it on GitHub when it has none.
   function go(item) {
     if (item.run) return item.run();
     if (!item.go) return openOnGitHub(item.url);
     close(false);
-    // Its card when the page draws it; otherwise the page keeps the focus the shell gave it, or its heading gets it.
     const land = () => {
       const target = item.focus && document.querySelector(item.focus);
       if (target) target.focus();
       else if (!document.querySelector('main')?.contains(document.activeElement)) document.querySelector('main h1')?.focus();
     };
     if (location.hash === item.go) return land();
-    window.addEventListener('hashchange', () => setTimeout(land), { once: true }); // after the shell has drawn the page
+    window.addEventListener('hashchange', () => setTimeout(land), { once: true });
     location.hash = item.go;
   }
-
-  // ---- The dialogs ----
 
   let dialog = null;
   let input = null;
@@ -138,11 +116,10 @@
   let shown = [];
   let active = 0;
   let filter = null;
-  let back = null; // where focus goes when a dialog closes
+  let focusReturn = null;
 
   const say = text => { if (status) status.textContent = text; };
 
-  // Tab and Shift+Tab stay inside an open dialog: the page behind it is inert.
   function trap(event, box) {
     if (event.key !== 'Tab') return;
     const stops = [...box.querySelectorAll('input, button, a[href]')].filter(el => !el.disabled);
@@ -169,7 +146,7 @@
       trap(event, dialog);
       if (event.key === 'Escape') {
         event.preventDefault();
-        event.stopPropagation(); // the spec page's Esc (back to all specs) waits until the palette is closed
+        event.stopPropagation();
         return close(true);
       }
       if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
@@ -218,11 +195,10 @@
     el.scrollIntoView({ block: 'nearest' });
   }
 
-  // Draw the results for what is typed, choosing the first; a refresh (`keep`) keeps the chosen one where it can.
   function draw(keep = false) {
     const was = keep ? shown[active]?.id : null;
     const found = match(results(), input.value);
-    shown = found.slice(0, MAX);
+    shown = found.slice(0, RESULTS_SHOWN);
     input.placeholder = filter ? `Find ${FILTERS[filter]}… (Backspace shows everything)` : 'Find a page, spec, ticket or agent…';
     const more = found.length - shown.length;
     const empty = filter ? `No ${FILTERS[filter].slice(0, -1)} matches. Backspace in the empty field shows everything.` : 'No match. Try a page, a spec or ticket number, or an agent\'s ticket.';
@@ -235,9 +211,9 @@
   function open() {
     if (!dialog) build();
     if (dialog.open) return;
-    const was = help?.open ? back : document.activeElement; // from the shortcut list, focus still goes back to the page
+    const was = help?.open ? focusReturn : document.activeElement;
     if (help?.open) close(false);
-    back = was;
+    focusReturn = was;
     filter = null;
     input.value = '';
     shown = [];
@@ -247,17 +223,14 @@
     input.focus();
   }
 
-  // Close whichever dialog is open; `restore` gives focus back to where it was (Esc), not when going somewhere.
   function close(restore) {
-    const was = back;
+    const was = focusReturn;
     for (const box of [dialog, help]) if (box?.open) box.close();
-    back = null;
+    focusReturn = null;
     if (!restore) return;
     if (was && was.isConnected && was !== document.body) was.focus();
     else document.querySelector('main h1')?.focus();
   }
-
-  // ---- `?`: every shortcut ----
 
   const SHORTCUTS = () => [
     ['Anywhere', [
@@ -279,9 +252,8 @@
   function shortcuts() {
     if (dialog?.open) close(false);
     if (help?.open) return;
-    if (!back) back = document.activeElement;
+    if (!focusReturn) focusReturn = document.activeElement;
     const done = h('button', { class: 'btn', type: 'button', onclick: () => close(true) }, 'Close');
-    // One table row per shortcut: its keys, then what it does.
     const groups = SHORTCUTS().map(([title, rows]) => [
       css(h('h3', {}, title), { margin: '18px 0 8px', 'font-size': '16px', color: 'var(--em-text-2)' }),
       css(h('table', {}, h('tbody', {}, rows.map(([keys, does]) => h('tr', {},
@@ -309,7 +281,6 @@
     done.focus();
   }
 
-  // A refresh while the palette is open redraws its results from the new read.
   OW.data.onChange(() => { if (dialog?.open) draw(true); });
 
   OW.palette = {
