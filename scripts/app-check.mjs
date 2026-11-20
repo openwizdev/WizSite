@@ -1561,6 +1561,69 @@ async function main() {
       });
     }
 
+    // ---- AP22 review R1-R4 (WizSite #120) ----
+
+    await check('AP22 R1: the two-minute read refreshes the checks of a card whose ticket did not change', async () => {
+      const world = ap7World();
+      const page = await ap6Open(world, '#/agents');
+      await page.until(`/checks running/.test(document.querySelector('main article.card[data-note="7001"]')?.innerText || '')`, 'the builder card, checks running');
+      const fleet = (await fixture('ap7-agents.json')).data.repository.fleet;
+      // Nothing was updated since the last read; GitHub now reports #12's checks passed.
+      world.graphql.Agents = async () => ({ status: 200, json: { data: { rateLimit: { limit: 5000, remaining: 4790, resetAt: '2099-01-01T00:00:00Z' },
+        repository: { issues: { totalCount: 0, pageInfo: { hasNextPage: false, endCursor: null }, nodes: [] }, fleet } } } });
+      world.graphql.AgentPulls = async body => {
+        const answer = { data: { rateLimit: { limit: 5000, remaining: 4780, resetAt: '2099-01-01T00:00:00Z' }, repository: {} } };
+        for (const [, n] of String(body.query).matchAll(/i(\d+): issue\(number: (?:\d+)\)/g)) answer.data.repository[`i${n}`] = null;
+        answer.data.repository.i70 = { closedByPullRequestsReferences: { totalCount: 1, nodes: [{ url: 'https://github.com/acme/site/pull/12', state: 'OPEN', isDraft: false,
+          reviewDecision: 'APPROVED', commits: { nodes: [{ commit: { statusCheckRollup: { state: 'SUCCESS' } } }] } }] } };
+        return { status: 200, json: answer };
+      };
+      await page.run(`(() => { OW.data.feeds.agents.readAt = 1; document.dispatchEvent(new Event('visibilitychange')); })()`);
+      await page.until(`OW.data.feeds.agents.readAt > 1 && !OW.data.feeds.agents.busy`, 'the next Agents read');
+      const card = await page.run(`document.querySelector('main article.card[data-note="7001"]').innerText.replace(/\\s+/g, ' ')`);
+      assert(/Pull request #12: open, approved, checks pass/.test(card), `the card keeps old checks: ${card}`);
+      checkRequestLog(world);
+      await page.close();
+    });
+
+    await check('AP22 R4: an error the read can\'t place shows the failure banner, never a count blamed on GitHub\'s limit', async () => {
+      const world = ap7World();
+      const fixed = world.graphql.Agents;
+      world.graphql.Agents = async body => { const reply = await fixed(body); reply.json.errors = [{ message: 'Something went wrong', path: ['repository', 'fleet'] }]; return reply; };
+      const page = await ap6Open(world, '#/agents');
+      await page.until(`/Part of this read failed/.test(document.body.innerText) && document.querySelector('main article.card')`, 'the failure banner');
+      const text = await page.run(`document.querySelector('main .page-body').innerText`);
+      assert(!/Read \d+ of the|limit/.test(text), `a complete read with an error blames a missing ticket on the limit: ${text.slice(0, 300)}`);
+      checkRequestLog(world);
+      await page.close();
+    });
+
+    await check('AP22 R2 and R3: the picker reads GitHub again on each open, and closing on the current repository keeps focus on its button', async () => {
+      const world = new World();
+      world.graphql.Specs = ok('specs.json');
+      world.graphql.Agents = ok('agents.json');
+      const page = await open(browser, world);
+      await signIn(page, world);
+      await page.click('acme/factory');
+      await page.until(`document.querySelector('aside.side button.repo')`, 'the shell');
+      await page.click('acme/factory');
+      await page.until(`[...document.querySelectorAll('aside.side .repo-list button')].some(b => b.textContent.trim() === 'acme/site')`, 'the list');
+      // Enter on the current repository closes the list and gives focus back to the button that opened it.
+      await page.until(`document.activeElement?.textContent.trim() === 'acme/factory' && document.activeElement.closest('.repo-list')`, 'focus on the current repository');
+      await page.key('Enter');
+      await page.until(`document.querySelector('aside.side .repo-list').hidden`, 'the list closed');
+      const focus = await page.run(`document.activeElement === document.querySelector('aside.side button.repo')`);
+      assert(focus, `focus went to ${await page.run('document.activeElement.tagName')}`);
+      // The user grants a repository on GitHub, comes back and opens the list again.
+      const repos = await fixture('repositories.json');
+      world.rest['/user/installations/1001/repositories'] = async () => ({ status: 200, json: { ...repos, total_count: repos.repositories.length + 1,
+        repositories: [...repos.repositories, { id: 2003, name: 'granted', full_name: 'acme/granted', private: false, owner: { login: 'acme' } }] } });
+      await page.click('acme/factory');
+      await page.until(`[...document.querySelectorAll('aside.side .repo-list button')].some(b => b.textContent.trim() === 'acme/granted')`, 'the newly granted repository', 4000);
+      checkRequestLog(world);
+      await page.close();
+    });
+
     await check('R3: the skip link moves to the page without changing it', async () => {
       const world = new World();
       world.graphql.Specs = ok('specs.json');
