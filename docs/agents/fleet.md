@@ -107,3 +107,9 @@ Source: [`README.md`](../../README.md#cloudflare-pages): changes merge after gre
 | Record authors | `openwiz[bot]`, `jparker2006` |
 
 Source: [OpenWiz GitHub identity settings](https://github.com/openwizdev/OpenWiz/blob/main/docs/agents/fleet.md#github-identity) and the verified fallback account.
+
+## Evidence
+
+Evidence (red and green runs, logs, screenshots, review captures) goes in the pull request's description or comments, never in the tree.
+
+Source: [cleanup wave 4](https://github.com/openwizdev/OpenWiz/issues/1860), Implementation Decisions, No regrowth.
