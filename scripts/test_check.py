@@ -502,8 +502,62 @@ class Checks(unittest.TestCase):
             (root / 'drivers/index.html').unlink()
             with self.assertRaisesRegex(AssertionError, 'missing build output'):
                 check_site(root)
-        with mock.patch('check.DRIVER_ART_BUDGET', 1000), self.assertRaisesRegex(AssertionError, 'variant D art'):
+        with mock.patch('check.DRIVER_ART_BUDGET', 1000), self.assertRaisesRegex(AssertionError, 'the drivers art'):
             check_site(ROOT / 'dist')
+
+    def test_drivers_round_2f(self):
+        # Catches (#56): the evidence chips missing, moved below the cards or with a number changed; boat.dev's proof
+        # section missing, before the cards, or with a check missing, reordered, not passed, without its state in words
+        # or without its plain line; the crew painting dropped; a picture shown twice (the ship in the hero and again in
+        # the card); Cloudroom's kit note gone; drivers art left unused; and drivers-page text under 12 px.
+        chips = '<ul class="drivers-chips" aria-label="In numbers">'
+        for name, old, new, error in (
+                ('drivers/index.html', chips, '<ul class="other-chips">', 'evidence chips'),
+                ('drivers/index.html', '<li><b>4</b> words</li>', '<li><b>3</b> words</li>', 'evidence chips must read'),
+                ('drivers/index.html', 'class="boat-proof', 'class="boat-other', 'one boat.dev proof section'),
+                ('drivers/index.html', '<h2 id="proof-title">boat.dev passed the kit, 5 of 5.</h2>', '<h2 id="proof-title">boat.dev passed.</h2>', 'titled'),
+                ('drivers/index.html', 'class="proof-check" data-check="wake" data-state="passed"', 'class="proof-check" data-check="wake" data-state="in progress"', 'each passed'),
+                ('drivers/index.html', 'class="proof-check" data-check="start"', 'class="proof-check" data-check="begin"', 'each passed'),
+                ('drivers/index.html', '<span class="proof-state">passed</span>', '<span class="proof-state"></span>', 'says passed in words'),
+                ('drivers/index.html', 'that note was edited, never a second one.', 'it works.', 'explains what it proved'),
+                ('drivers/index.html', '<img class="proof-art" src="/art/drivers-c-boat.webp"', '<img class="proof-art-x" src="/art/drivers-c-boat.webp"', 'painting of the crew'),
+                ('drivers/index.html', '<img class="proof-art" src="/art/drivers-c-boat.webp"', '<img class="proof-art" src="/art/drivers-d-ship.webp"', 'shown twice'),
+                ('drivers/index.html', '<p class="driver-kit-note">Kit: not run yet</p>', '', 'kit note'),
+                ('drivers/index.html', '</main>', '<p class="driver-kit-note">x</p></main>', 'kit note|four driver cards')):
+            with self.subTest(name=name, error=error), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp) / 'dist'
+                shutil.copytree(ROOT / 'dist', root)
+                page = root / name
+                text = page.read_text()
+                self.assertIn(old, text)
+                page.write_text(text.replace(old, new, 1))
+                with self.assertRaisesRegex(AssertionError, error):
+                    check_site(root)
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / 'dist'
+            shutil.copytree(ROOT / 'dist', root)
+            page = root / 'drivers/index.html'
+            text = page.read_text()
+            section = re.search(r'\s*<section class="boat-proof[\s\S]*?</section>', text)[0]
+            page.write_text(text.replace(section, '').replace('<section class="fleet', section.strip() + '<section class="fleet', 1))
+            with self.assertRaisesRegex(AssertionError, 'follows the four cards'):
+                check_site(root)
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / 'dist'
+            shutil.copytree(ROOT / 'dist', root)
+            (root / 'art/drivers-x-unused.webp').write_bytes((root / 'art/drivers-c-boat.webp').read_bytes())
+            with mock.patch.dict('check.ART_HASHES', {'art/drivers-x-unused.webp': '39fd43d08aa36bce84e964699d493a03af090499a63dffbfaa43e61804b7e1ef'}), \
+                    mock.patch('check.ART', set(__import__('check').ART) | {'art/drivers-x-unused.webp'}), \
+                    mock.patch('check.STATIC', set(__import__('check').STATIC) | {'art/drivers-x-unused.webp'}), \
+                    self.assertRaisesRegex(AssertionError, 'unused drivers art'):
+                check_site(root)
+        for bad in ('\n.drivers-page .kit h4 { font: 600 11px/1.3 monospace; }\n', '\n.drivers-page .x { font-size: 10px; }\n'):
+            with self.subTest(css=bad), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp) / 'dist'
+                shutil.copytree(ROOT / 'dist', root)
+                edit_built(root, 'site.css', lambda t: t + bad)
+                with self.assertRaisesRegex(AssertionError, 'under 12px'):
+                    check_site(root)
 
     def test_logo_pack(self):
         # Catches: a lockup that ships live text or a font reference (the wordmark font must never ship),
