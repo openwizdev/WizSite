@@ -139,6 +139,24 @@ RELEASES = ('<!-- releases:start -->', '<!-- releases:end -->')
 RELEASE_REPOS = ('OpenWiz', 'WizSkills', 'WizLoops')
 
 
+# The Drivers page (#47, variant A): one card per driver in this order, with its exact status line and its honest
+# kit result (passed, in progress or not yet run), from the ticket's facts. Nothing else is claimed.
+DRIVERS = (
+    ('Your own computer or VPS', 'Being fixed: its kit run is in progress', 'in progress'),
+    ('Cloudroom', 'Works today: built real pull requests for OpenWiz', 'not yet run'),
+    ('boat.dev', 'Passed the kit, 5 of 5, on a real account (2026-11-19)', 'passed'),
+    ('Grok Bot', 'Coming soon: listed when its driver lands', 'not yet run'),
+)
+
+
+def check_drivers(landing, changelog, drivers):
+    pass
+
+
+def check_drivers_art(sizes):
+    pass
+
+
 class Page(HTMLParser):
     def __init__(self, text):
         super().__init__(convert_charrefs=True)

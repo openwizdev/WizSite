@@ -6,7 +6,7 @@ import unittest
 
 import re
 
-from check import FINGERPRINTS, HASHED, INSTALL_SWITCH, ROOT, Page, check_changelog, check_releases, split_releases, check_motion, check_privacy, check_ref, check_site, check_vector, check_webp, fingerprint
+from check import DRIVERS, check_drivers, FINGERPRINTS, HASHED, INSTALL_SWITCH, ROOT, Page, check_changelog, check_releases, split_releases, check_motion, check_privacy, check_ref, check_site, check_vector, check_webp, fingerprint
 
 
 def edit_built(root, name, change):
@@ -18,7 +18,7 @@ def edit_built(root, name, change):
     new = fingerprint(name, data)
     old.unlink()
     (root / new).write_bytes(data)
-    for page in ('index.html', 'changelog/index.html', 'app/index.html'):
+    for page in ('index.html', 'changelog/index.html', 'app/index.html', 'drivers/index.html'):
         path = root / page
         path.write_text(path.read_text().replace(f'"/{was}"', f'"/{new}"'))
 
@@ -41,6 +41,24 @@ RELEASES = ('<section class="releases" id="releases" aria-labelledby="releases-h
             + RELEASE.format(repo='OpenWiz', v='0.1.10') + RELEASE.format(repo='OpenWiz', v='0.1.2') + '</section>'
             '<section class="release-part" id="wizskills-releases" data-repo="WizSkills"><h3>WizSkills</h3><p class="no-release">No release yet.</p></section>'
             '<section class="release-part" id="wizloops-releases" data-repo="WizLoops"><h3>WizLoops</h3><p class="missing read">Missing.</p></section></section>')
+
+
+# Drivers page (#47): a synthetic top bar, landing, changelog and drivers page, valid as they stand.
+BAR = ('<header class="landing-nav wrap"><a class="landing-brand" href="/">OpenWiz</a><nav aria-label="Main navigation">'
+       '<a class="nav-log" href="/drivers/"{cur}>Drivers</a><a class="nav-log" href="/changelog/">Changelog</a>'
+       '<a class="sign-in" href="/app/">Sign in</a></nav></header>')
+D_LANDING = '<html><body>' + BAR.format(cur='') + '<main><h1>Bring your own everything.</h1></main></body></html>'
+D_CHANGELOG = ('<html><body>' + BAR.format(cur='').replace('href="/changelog/">', 'href="/changelog/" aria-current="page">')
+               + '<main><h1>Changelog</h1></main></body></html>')
+CARD = ('<article class="driver{hero}" data-driver="{name}"><h3>{name}</h3><p class="status">{status}</p>'
+        '<ul class="words"><li>version</li><li>start</li><li>wake</li><li>stop</li></ul>'
+        '<ul class="kit" data-result="{result}">' + ''.join(
+            f'<li data-check="{c}" data-result="{{result}}">{c}: {{result}}</li>' for c in ('version', 'start', 'wake', 'stop', 'token'))
+        + '</ul></article>')
+D_PAGE = ('<html><body class="landing drivers-page">' + BAR.format(cur=' aria-current="page"') + '<main id="main">'
+          '<h1>Drivers</h1>' + ''.join(CARD.format(hero=' hero' if n == 'boat.dev' else '', name=n, status=s, result=r) for n, s, r in DRIVERS)
+          + '<section class="write-your-own"><h2>Write your own driver</h2><p>One program, four words, five checks.</p>'
+          '<a href="https://github.com/openwizdev/OpenWiz/blob/main/kernel/driver.v1.md">The contract</a></section></main></body></html>')
 
 
 class Checks(unittest.TestCase):
@@ -496,6 +514,50 @@ class Checks(unittest.TestCase):
             (root / 'brand/openwiz-lockup.svg').write_bytes(logo.replace(b'</svg>', b'<text>OpenWiz</text></svg>'))
             with self.assertRaises(AssertionError):
                 check_site(root)
+
+    def test_drivers_page_built_and_checked(self):
+        # Catches: /drivers missing from the build (so no link, font, privacy or art check reads it).
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / 'dist'
+            shutil.copytree(ROOT / 'dist', root)
+            (root / 'drivers/index.html').unlink(missing_ok=True)
+            with self.assertRaisesRegex(AssertionError, 'missing build output'):
+                check_site(root)
+
+    def test_drivers_cards_bar_and_links(self):
+        # Catches: a card out of order, missing, renamed or with changed facts; a word or kit check missing; a kit
+        # result shown in colour only or claimed beyond the facts; the hero moved; a link off the OpenWiz repository;
+        # the top bar drifting from the landing's; the Drivers link missing; a script the page needs; invented numbers.
+        check_drivers(D_LANDING, D_CHANGELOG, D_PAGE)
+        vps, cloud, boat, grok = (CARD.format(hero=' hero' if n == 'boat.dev' else '', name=n, status=s, result=r) for n, s, r in DRIVERS)
+        for page, error in (
+                (D_PAGE.replace(vps + cloud, cloud + vps), 'cards'),
+                (D_PAGE.replace(grok, ''), 'cards'),
+                (D_PAGE.replace('Works today: built real pull requests for OpenWiz', 'Works today'), 'cards'),
+                (D_PAGE.replace('<li>wake</li>', '', 1), 'four words'),
+                (D_PAGE.replace('<li data-check="token" data-result="passed">token: passed</li>', ''), 'five checks'),
+                (D_PAGE.replace('token: passed', 'token'), 'in words'),
+                (D_PAGE.replace('data-result="in progress"', 'data-result="passed"'), 'kit result'),
+                (D_PAGE.replace(' hero"', '"').replace('data-driver="Cloudroom"', 'data-driver="Cloudroom"', 1).replace('class="driver" data-driver="Cloudroom"', 'class="driver hero" data-driver="Cloudroom"'), 'hero'),
+                (D_PAGE.replace('Write your own driver', 'Build a driver'), 'Write your own driver'),
+                (D_PAGE.replace('https://github.com/openwizdev/OpenWiz/blob', 'https://github.com/openwizdev/WizSkills/blob'), 'OpenWiz repository'),
+                (D_PAGE.replace(' aria-current="page"', ''), 'top bar'),
+                (D_PAGE.replace('Sign in', 'Log in'), 'top bar'),
+                (D_PAGE.replace('</body>', '<script src="/site.js"></script></body>'), 'without scripts'),
+                (D_PAGE.replace('five checks', '12 checks'), 'number')):
+            with self.subTest(error=error, at=len(page)), self.assertRaisesRegex(AssertionError, error):
+                check_drivers(D_LANDING, D_CHANGELOG, page)
+        for landing, changelog in ((D_LANDING.replace('<a class="nav-log" href="/drivers/">Drivers</a>', ''), D_CHANGELOG),
+                                   (D_LANDING, D_CHANGELOG.replace('<a class="nav-log" href="/drivers/">Drivers</a>', ''))):
+            with self.subTest(nav=len(landing)), self.assertRaisesRegex(AssertionError, 'Drivers link'):
+                check_drivers(landing, changelog, D_PAGE)
+
+    def test_drivers_art_budget(self):
+        # Catches: the variant's art going over its 400 KB share, or a drivers picture left unpinned.
+        from check import check_drivers_art
+        check_drivers_art({'art/drivers-a-ship.webp': 300_000})
+        with self.assertRaisesRegex(AssertionError, '400'):
+            check_drivers_art({'art/drivers-a-ship.webp': 300_000, 'art/drivers-a-port.webp': 100_001})
 
 if __name__ == '__main__':
     unittest.main()
