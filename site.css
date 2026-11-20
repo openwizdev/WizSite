@@ -164,10 +164,11 @@ code,.v{font-family:var(--ow-font-mono)}
 /* From idea to shipped: the spec video as a short clip on a painting, engraved in a cool blue duotone (the painting
    goes grey, a light blue multiplies over it, a deep navy screens up its blacks, a fine hatch and dot grain etch it).
    The clip carries its own caption, like a reel: title, "Play with sound" and its links on a scrim along the bottom of
-   the frame. The grill and the live app are two aligned rows directly above and below it. */
+   the frame. The clip owns the stage, an even painting margin round it (edge to edge on a phone); the grill and the
+   live app are quiet hairline rows directly above and below it. */
 .moments { padding-block: clamp(48px, 7vw, 100px); }
 .moments h2 { font-size: clamp(34px, 5vw, 62px); letter-spacing: -.06em; line-height: 1; }
-.moment-stage { position: relative; isolation: isolate; margin-top: clamp(20px, 3vw, 32px); padding: clamp(14px, 3.4vw, 48px) clamp(12px, 4vw, 56px); overflow: hidden; border-radius: var(--round); background: #0a1222; box-shadow: inset 0 0 0 1px rgb(150 180 230 / 16%); }
+.moment-stage { position: relative; isolation: isolate; margin-top: clamp(20px, 3vw, 32px); padding: clamp(14px, 2.6vw, 36px); overflow: hidden; border-radius: var(--round); background: #0a1222; box-shadow: inset 0 0 0 1px rgb(150 180 230 / 16%); }
 .moment-art { position: absolute; inset: 0; z-index: -3; width: 100%; height: 100%; object-fit: cover; object-position: 62% 50%; filter: grayscale(1) contrast(1.35) brightness(1.6); }
 .moment-stage::before, .moment-stage::after { content: ""; position: absolute; inset: 0; pointer-events: none; }
 .moment-stage::before { z-index: -2; mix-blend-mode: multiply; background:
@@ -177,14 +178,17 @@ code,.v{font-family:var(--ow-font-mono)}
   radial-gradient(ellipse 80% 75% at 55% 45%, rgb(255 255 255 / 0%) 45%, rgb(90 110 150 / 80%)), #a9c2ea; }
 .moment-stage::after { z-index: -1; mix-blend-mode: screen; background: #0b1528; }
 @media (min-width: 901px) { .moment-art { transform: translateX(-6%) scale(1.15); transform-origin: 60% 50%; } }
-.moment-stage ol { position: relative; z-index: 1; display: grid; gap: 10px; max-width: 840px; margin: 0 auto; padding: 0; list-style: none; }
+.moment-stage ol { position: relative; z-index: 1; display: grid; gap: clamp(10px, 1.4vw, 18px); margin: 0; padding: 0; list-style: none; }
 .moment-stage li { min-width: 0; }
 .moments h3 { margin: 0; font-size: clamp(15px, 1.3vw, 19px); font-weight: 600; letter-spacing: -.015em; line-height: 1.3; }
 .moment-num { display: inline-grid; place-items: center; flex: none; width: 24px; height: 24px; border: 1px solid rgb(190 210 240 / 45%); border-radius: 50%; color: #d6e2f5; font: 500 11px/1 var(--ow-font-mono); }
-/* Steps 1 and 3: one row each, number and title on the left, the real link on the right edge. */
-.moment-step { position: relative; display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 10px 18px 10px 14px; border-radius: 12px; background: rgb(7 11 20 / 82%); box-shadow: 0 0 0 1px rgb(190 210 240 / 16%); }
+.moment-step .moment-num { width: auto; height: auto; border: 0; color: #9fb2cf; font-size: 12px; }
+/* Steps 1 and 3: quiet rows on the painting, one hairline each and no card, so the clip is the only card on the
+   panel. Number and title on the left, the real link on the right edge. */
+.moment-step { position: relative; display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 8px 4px; border-bottom: 1px solid rgb(190 210 240 / 24%); text-shadow: 0 1px 12px rgb(5 9 18 / 90%); }
+.moment-ship { border-top: 1px solid rgb(190 210 240 / 24%); border-bottom: 0; }
 .moment-step h3 { margin-right: auto; }
-.moment-link, .spec-link { color: #e9f0fb; font-size: 15px; white-space: nowrap; text-decoration: underline; text-decoration-color: rgb(190 210 240 / 50%); text-underline-offset: 4px; }
+.moment-link, .spec-link { color: #e9f0fb; font-size: clamp(15px, 1.15vw, 16px); white-space: nowrap; text-decoration: underline; text-decoration-color: rgb(190 210 240 / 50%); text-underline-offset: 4px; }
 .moment-link:hover, .spec-link:hover { text-decoration-color: currentColor; }
 .moment-step .moment-link::after { content: " →"; }
 /* Step 2, the clip: the caption sits on a scrim inside the bottom of the frame. */
@@ -200,7 +204,7 @@ code,.v{font-family:var(--ow-font-mono)}
 .spec-video[controls] + .spec-caption .spec-play { display: none; }
 .spec-title { display: flex; align-items: center; gap: 12px; }
 .spec-title h3 { font-size: clamp(18px, 1.8vw, 24px); }
-.moment-copy { margin: 0; color: #b9c6da; font-size: 14px; }
+.moment-copy { margin: 0; color: #b9c6da; font-size: clamp(14px, 1.15vw, 16px); }
 .spec-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px; margin-top: 6px; }
 .moments .spec-play { display: inline-flex; flex: none; align-items: center; gap: 6px; min-height: 40px; padding: 0 16px 0 12px; border: 0; border-radius: 999px; background: #e9f0fb; color: #0a1222; font: 600 14px var(--ow-font-sans); cursor: pointer; }
 .moments .spec-play:hover { background: #fff; }
@@ -216,12 +220,15 @@ code,.v{font-family:var(--ow-font-mono)}
   .spec-video[controls] + .spec-caption { margin-top: 0; padding-top: 12px; }
   .spec-actions { gap: 6px 14px; margin-top: 4px; }
   .moments .spec-play { min-height: 40px; padding: 0 14px 0 10px; font-size: 13px; }
-  .moment-step { gap: 10px; min-height: 52px; padding: 8px 14px 8px 12px; }
+  .moment-step { gap: 10px; min-height: 48px; padding: 6px 4px; }
   .moments h3 { font-size: 15px; }
   .moment-link, .spec-link { font-size: 14px; }
 }
 @media (max-width: 480px) {
   .moment-stage { margin-inline: calc(-1 * var(--m) + 8px); padding: 14px 10px; }
+  /* The clip takes the panel's full width on a phone; the stage's rounded edge clips its corners. */
+  .spec-moment { margin-inline: -10px; }
+  .spec-frame { border-radius: 0; box-shadow: none; }
 }
 /* The site footer (#73): one snippet on every site page. Short pages pin it to the bottom of the window. The link
    groups and the small line, then the wordmark whole (its descender inside the box), then the Wizes peeking up. */
