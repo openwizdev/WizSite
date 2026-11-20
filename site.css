@@ -476,3 +476,35 @@ body.landing > main { flex: 1 0 auto; }
   .team-art { order: -1; }
   .team-steps { grid-template-columns: 1fr; }
 }
+/* The Questions (#76): one section from faq.html on the landing, /team and /faq. Two columns on desktop (the heading,
+   then the rows), one on phones. Flat rows: the question, a thin chevron and a 1px rule. A row's button opens its
+   answer (height and opacity); without scripts every answer shows. */
+.faq { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 24px clamp(32px, 5vw, 72px); align-items: start; padding-block: clamp(48px, 6vw, 88px); border-top: 1px solid var(--line); }
+.faq-title { font-size: clamp(28px, 3vw, 40px); font-weight: 740; line-height: 1.1; letter-spacing: -.04em; }
+.faq-lead { margin-top: 12px; color: var(--grey2); }
+.faq-q { margin: 0; font: inherit; }
+.faq-q button { display: flex; align-items: center; justify-content: space-between; gap: 24px; width: 100%; min-height: 64px; padding: 18px 0; border: 0; background: none; color: var(--ink); font: 560 clamp(17px, 1.5vw, 19px)/1.35 var(--ow-font-sans); letter-spacing: -.015em; text-align: left; cursor: pointer; }
+.faq-chevron { flex: none; fill: none; stroke: var(--grey); stroke-width: 1.25; stroke-linecap: round; stroke-linejoin: round; }
+.faq-q button:hover .faq-chevron { stroke: var(--ink); }
+.faq-q [aria-expanded="true"] .faq-chevron { transform: rotate(180deg); }
+.faq-row { border-bottom: 1px solid var(--line); }
+.faq-a { display: grid; grid-template-rows: 0fr; opacity: 0; visibility: hidden; }
+.faq-a > div { min-height: 0; overflow: hidden; }
+.faq-a p { max-width: 62ch; padding: 0 40px 22px 0; color: var(--grey2); font-size: 16px; line-height: 1.6; }
+.faq-a a { color: var(--ink); text-decoration: underline; text-decoration-color: var(--brass); text-underline-offset: 4px; }
+.faq-q:has([aria-expanded="true"]) + .faq-a { grid-template-rows: 1fr; opacity: 1; visibility: visible; }
+.faq-main .faq { border-top: 0; }
+.faq-main .faq-title { font-size: clamp(40px, 5vw, 64px); font-weight: 760; line-height: 1; letter-spacing: -.05em; }
+@media (scripting: none) {
+  .faq-a { grid-template-rows: 1fr; opacity: 1; visibility: visible; }
+  .faq-chevron { display: none; }
+}
+@media (prefers-reduced-motion:no-preference) {
+  .faq-a { transition: grid-template-rows .35s ease-out, opacity .35s ease-out, visibility 0s linear .35s; }
+  .faq-q:has([aria-expanded="true"]) + .faq-a { transition-delay: 0s; }
+  .faq-chevron { transition: transform .35s ease-out; }
+}
+@media (max-width: 850px) {
+  .faq { grid-template-columns: 1fr; }
+  .faq-a p { padding-right: 0; }
+}
