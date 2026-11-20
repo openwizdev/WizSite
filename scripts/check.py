@@ -120,12 +120,16 @@ TEAM_COPY = ('We set up your agent factory with you.', 'Your repos, your models,
 # #73: the team page's body after its hero, in order: what you get (three steps), where your agents run, the closing call.
 TEAM_PARTS = ('What you get', 'Where your agents run', 'Plan your factory with us.')
 TEAM_STEPS = ('A call to plan your setup', 'We install OpenWiz with you', 'Your first fleet ships')
+# #1851: Report a problem opens GitHub's new-issue form on openwizdev/openwiz with the feedback template
+# (contracts/feedback-loop.v1.md: .github/ISSUE_TEMPLATE/feedback.yml). The only external URL with a query; nothing
+# else may ride along, so no words leave openwiz.dev. In the footer of every site page, and once in the changelog.
+REPORT_LINK = 'https://github.com/openwizdev/openwiz/issues/new?template=feedback.yml'
 # The site footer (#73): one snippet, which the build adds at each site page's one slot (not the app's). Its links, in order.
 FOOTER = (ROOT / 'footer.html').read_text()
 FOOTER_SLOT = '<!-- footer.html -->\n'
 FOOTER_LINKS = (('/drivers/', 'Drivers'), ('/changelog/', 'Changelog'), ('https://github.com/openwizdev/openwiz#readme', 'Docs'),
-                ('/app/', 'The app'), ('/team/', 'For teams'), ('https://github.com/openwizdev/openwiz', 'GitHub'),
-                ('https://x.com/openwiz', 'X @openwiz'))
+                ('/app/', 'The app'), (REPORT_LINK, 'Report a problem'), ('/team/', 'For teams'),
+                ('https://github.com/openwizdev/openwiz', 'GitHub'), ('https://x.com/openwiz', 'X @openwiz'))
 FOOTER_LINE = 'Apache-2.0. Owned by no one.'
 # The only external link off GitHub: OpenWiz's own X account, in the footer.
 X_ACCOUNT = 'https://x.com/openwiz'
@@ -182,7 +186,7 @@ PHONE_QUERY = re.compile(r'\(max-width:[0-9]+px\)')
 # the page, then one "What exists today" section with one part per public repository, each opening with two or
 # three plain sentences. Private repositories appear at most as "private records and tools". No release entry,
 # version number or date: the old release list stays on GitHub's releases. Its reviewed text is pinned below.
-CHANGELOG_MAIN = 'a41401f686dd700c766358c47d89375a89f1faad74b668574d35cf5c0ac45567'
+CHANGELOG_MAIN = '8e7a1d7cd523512fd9463ae6f5a8b31ddb1af1152d3c5828b2839b542cabba0b'
 CHANGELOG_LINKS = ('/changelog/', '/changelog')
 PUBLIC_REPOS = ('OpenWiz', 'WizSkills', 'WizLoops', 'WizPlugins', 'WizSite')
 PUBLIC_WIZ_NAMES = set(PUBLIC_REPOS) | {'WizBar'}  # WizBar is WizPlugins' plugin, not a repository
@@ -288,6 +292,7 @@ class Page(HTMLParser):
         self.inline_scripts = 0
         self.books = []
         self.x_links = 0
+        self.report_links = 0
         self.stylesheets, self.scripts = [], []
         self.feed(text)
 
@@ -305,6 +310,11 @@ class Page(HTMLParser):
             # #75 R3: OpenWiz's X account, only as a link a visitor follows (check_site allows one, the footer's);
             # anywhere else, as a resource or in CSS, check_ref refuses it like any external URL.
             self.x_links += 1
+            attrs = {key: value for key, value in attrs.items() if key != 'href'}
+        elif tag == 'a' and attrs.get('href') == REPORT_LINK:
+            # #1851: the Report a problem link, exempt from check_ref's no-query rule by its exact href only;
+            # check_site counts it per page.
+            self.report_links += 1
             attrs = {key: value for key, value in attrs.items() if key != 'href'}
         for key in ('href', 'src', 'poster'):
             if attrs.get(key):
@@ -477,6 +487,9 @@ def check_site(root):
         assert page.x_links == 1, f'one X link per page, the footer\'s: {path.relative_to(root)} has {page.x_links}'
         for ref in page.refs:
             check_ref(root, path, ref, pages, page.favicons)
+        # After check_ref, so a changed Report a problem URL is refused as an external URL first.
+        wanted = 2 if path == root / 'changelog/index.html' else 1
+        assert page.report_links == wanted, f'Report a problem link: {path.relative_to(root)} has {page.report_links}, not {wanted}'
         for ref in css_refs(path.read_text()):
             check_ref(root, path, ref, pages)
     for path in root.glob('*.css'):
@@ -1198,6 +1211,7 @@ def check_app(root, names, pages):
     page = Page((root / APP_PAGE).read_text())
     assert not page.books, 'a booking link outside the team page: the app'
     assert not page.x_links, 'one X link per page, the footer\'s: the app has one'
+    assert not page.report_links, 'Report a problem link, the footer\'s: the app has one'
     assert not set(page.refs) & {f'/{name}' for name in HASHED}, 'the app uses an unfingerprinted style or script'
     assert page.stylesheets == [f'/{names[APP_STYLE]}'], 'the app must apply exactly the fingerprinted ember.css'
     assert page.scripts == [ref for name in APP_SCRIPTS for ref in [f'/{v}' for v, (_, before) in APP_VENDOR.items() if before == name] + [f'/{names[name]}']], \
