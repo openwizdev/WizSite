@@ -248,13 +248,15 @@ function enableMotion(gsap) {
 
 // The "Watch your spec" moment (#1405). The video loads only when it first plays. With motion it plays muted while it
 // is in view; with reduced motion, Pause motion or the tab hidden it waits on its poster. It never starts with sound on
-// its own: "Play with sound" does that on request, and from then on (or once the visitor uses its own controls) the
-// visitor drives it and scrolling no longer starts or stops it. It needs only this script, not GSAP.
+// its own: "Play with sound", over the video, does that on request, and from then on the visitor drives it with the
+// native controls and scrolling no longer starts or stops it. Until then the native controls stay off, so nothing
+// covers the frame; without this script they stay on. It needs only this script, not GSAP.
 function specVideo() {
   const video = document.querySelector('.spec-video');
   const sound = document.querySelector('.spec-play');
   const pause = document.querySelector('.demo-pause');
   if (!video || !sound) return;
+  video.controls = false;
   const calm = matchMedia('(prefers-reduced-motion: reduce)');
   let inView = false;
   let visitor = false; // the visitor has taken over playback
@@ -285,6 +287,8 @@ function specVideo() {
   sound.hidden = false;
   sound.addEventListener('click', () => {
     visitor = true;
+    sound.hidden = true;
+    video.controls = true;
     video.muted = false;
     video.loop = false;
     video.currentTime = 0;
