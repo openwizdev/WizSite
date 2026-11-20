@@ -19,6 +19,13 @@ const withCta = html => {
   if (html.split(bar).length !== 2) throw new Error('a site page needs exactly one top bar');
   return html.replace(bar, cta + bar);
 };
+// The site footer (#73): one snippet, added at each site page's one footer slot, so no page keeps its own copy.
+const footer = await readFile(new URL('footer.html', root), 'utf8');
+const withFooter = html => {
+  const slot = '<!-- footer.html -->\n';
+  if (html.split(slot).length !== 2) throw new Error('a site page needs exactly one footer slot');
+  return html.replace(slot, footer);
+};
 // The app (openwiz.dev/app): its design system, data layer, page modules and shell, fingerprinted like the site's.
 const app = ['app/ember.css', 'app/data.js', 'app/ui.js', 'app/pages/you.js', 'app/pages/specs.js', 'app/pages/spec.js', 'app/pages/agents.js', 'app/palette.js', 'app/shell.js'];
 // Pinned npm dependencies (package.json, exact version), copied from node_modules with their licence; the version is in
@@ -49,7 +56,7 @@ for (const file of hashed) {
 for (const page of pages) {
   let html = await readFile(new URL(page, root), 'utf8');
   for (const [file, name] of Object.entries(names)) html = html.replaceAll(`"/${file}"`, `"/${name}"`);
-  if (page !== 'app/index.html') html = withCta(html);
+  if (page !== 'app/index.html') html = withFooter(withCta(html));
   if (page === 'changelog/index.html') html = withReleases(html, render(releases));
   await put(page, html);
 }

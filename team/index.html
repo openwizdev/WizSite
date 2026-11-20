@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="Get OpenWiz for your team. We set up your agent factory with you: your repos, your models, your machines. Book a call."><title>For your team — OpenWiz</title><link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48"><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><meta property="og:image" content="https://openwiz.dev/brand/og.png?v=2"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="OpenWiz"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="https://openwiz.dev/brand/og.png?v=2"><link rel="preload" href="/fonts/Geist-var.woff2" as="font" type="font/woff2" crossorigin><link rel="stylesheet" href="/tokens.css"><link rel="stylesheet" href="/site.css"></head>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="Get OpenWiz for your team. We set up your agent factory with you: your repos, your models, your machines. Book a call."><title>For your team — OpenWiz</title><link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48"><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><meta property="og:image" content="https://openwiz.dev/brand/og.png?v=2"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="OpenWiz"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="https://openwiz.dev/brand/og.png?v=2"><link rel="preload" href="/fonts/Geist-var.woff2" as="font" type="font/woff2" crossorigin><link rel="stylesheet" href="/tokens.css"><link rel="stylesheet" href="/site.css"><script src="/vendor/gsap-3.15.1.min.js" defer></script><script src="/site.js" defer></script></head>
 <body class="landing team-page">
 <a class="skip" href="#main">Skip to content</a>
 <header class="landing-nav wrap">
@@ -43,7 +43,8 @@
     <a class="sign-in" href="/app/" aria-label="Sign in with GitHub">Sign in</a>
   </nav>
 </header>
-<main id="main" class="team wrap">
+<main id="main" class="team-main">
+<div class="team wrap">
   <div class="team-copy">
     <p class="team-kicker">For your team</p>
     <h1>We set up your agent factory with you.</h1>
@@ -52,16 +53,35 @@
       <div><dt>Who it’s for</dt><dd>Solo builders and small teams.</dd></div>
       <div><dt>Pricing</dt><dd>Custom pricing.</dd></div>
     </dl>
-    <!-- The booking link: this href is its one value. -->
+    <!-- The booking link: this href is its one value; the closing Book a call repeats it exactly. -->
     <a class="team-book" id="book" data-book href="https://cal.com/openwiz-jake/setup">Book a call</a>
     <p class="team-note">A short call to plan your setup together. No checkout.</p>
   </div>
   <img class="team-art" src="/art/era-2-grill.webp" alt="Oil painting of Wiz scholars studying a to-do list" width="1672" height="941">
+</div>
+<section class="team-part wrap" aria-labelledby="team-get">
+  <h2 id="team-get">What you get</h2>
+  <ol class="team-steps">
+    <li><h3>A call to plan your setup</h3><p>Your repos, your agents and how your team ships today.</p></li>
+    <li><h3>We install OpenWiz with you</h3><p>On your repos, with your models and your machines.</p></li>
+    <li><h3>Your first fleet ships</h3><p>A real change, in a day.</p></li>
+  </ol>
+</section>
+<section class="team-part wrap" aria-labelledby="team-run">
+  <h2 id="team-run">Where your agents run</h2>
+  <p class="team-run-lead">A driver connects OpenWiz to wherever your agents run. Bring the ones you already use.</p>
+  <ul class="team-drivers">
+    <li><a href="/drivers/">Your computer or VPS</a></li>
+    <li><a href="/drivers/">Cloudroom</a></li>
+    <li><a href="/drivers/">boat.dev</a></li>
+    <li><a href="/drivers/">Grok Bot <span>coming soon</span></a></li>
+  </ul>
+  <a class="team-more" href="/drivers/">See how drivers work</a>
+</section>
+<section class="team-part team-close wrap" aria-labelledby="team-call">
+  <h2 id="team-call">Plan your factory with us.</h2>
+  <a class="team-book" data-book href="https://cal.com/openwiz-jake/setup">Book a call</a>
+</section>
 </main>
-<footer class="landing-footer">
-  <div class="wrap">
-    <div class="footer-links"><a href="/changelog/">Changelog</a><a href="https://github.com/openwizdev/openwiz#readme">Docs</a></div>
-    <p class="footer-wordmark">OpenWiz</p>
-  </div>
-</footer>
+<!-- footer.html -->
 </body></html>
