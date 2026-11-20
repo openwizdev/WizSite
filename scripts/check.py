@@ -547,6 +547,10 @@ def check_changelog(landing, changelog):
         check_motion(style)
 
 
+def check_drivers(landing, changelog, drivers):
+    pass
+
+
 def split_releases(built):
     """A built Changelog as (the page without its generated section, the section): exactly one, last in main."""
     start, end = RELEASES

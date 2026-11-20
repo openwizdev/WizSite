@@ -6,7 +6,7 @@ import unittest
 
 import re
 
-from check import FINGERPRINTS, HASHED, INSTALL_SWITCH, ROOT, Page, check_changelog, check_releases, split_releases, check_motion, check_privacy, check_ref, check_site, check_vector, check_webp, fingerprint
+from check import FINGERPRINTS, HASHED, INSTALL_SWITCH, ROOT, Page, check_changelog, check_drivers, check_releases, split_releases, check_motion, check_privacy, check_ref, check_site, check_vector, check_webp, fingerprint
 
 
 def edit_built(root, name, change):
@@ -18,7 +18,7 @@ def edit_built(root, name, change):
     new = fingerprint(name, data)
     old.unlink()
     (root / new).write_bytes(data)
-    for page in ('index.html', 'changelog/index.html', 'app/index.html'):
+    for page in ('index.html', 'changelog/index.html', 'drivers/index.html', 'app/index.html'):
         path = root / page
         path.write_text(path.read_text().replace(f'"/{was}"', f'"/{new}"'))
 
@@ -257,6 +257,39 @@ class Checks(unittest.TestCase):
                 (CHANGELOG.replace('.part{color:red}', '.part{transition:opacity .2s}'), 'motion outside')):
             with self.subTest(error=error, at=changelog[-120:]), self.assertRaisesRegex(AssertionError, error):
                 check_changelog(LANDING, changelog)
+
+    def test_drivers_page(self):
+        """#48: /drivers shows the four drivers in order with their exact facts, the four words and an honest kit
+        result in words on each card, boat.dev as the one hero, the landing's exact top bar, a Drivers link on the
+        landing and Changelog bars, and a Write your own driver section that links only to the OpenWiz repository."""
+        landing, changelog, drivers = ((ROOT / name).read_text() for name in ('index.html', 'changelog/index.html', 'drivers/index.html'))
+        check_drivers(landing, changelog, drivers)
+        computer = drivers[drivers.index('<li class="driver-card" data-kit="in-progress"'):drivers.index('<li class="driver-card" data-kit="not-run"')]
+        boat = drivers[drivers.index('<li class="driver-card hero-card"'):drivers.index('<li class="driver-card" data-kit="not-run" aria-labelledby="grok-h"')]
+        for page, error in (
+                (drivers.replace(computer, '').replace(boat, boat + computer), 'four drivers, in order'),
+                (drivers.replace('Being fixed: its kit run is in progress', 'Being fixed'), 'status line'),
+                (drivers.replace('Passed the kit, 5 of 5</strong>, on a real account (2026-11-19)', 'Passed the kit, 5 of 5</strong>, on a real account'), 'status line'),
+                (drivers.replace('Works today: built real pull requests for OpenWiz', 'Works today: built 40 pull requests for OpenWiz'), 'status line'),
+                (drivers.replace('<li><code>wake</code></li>', '', 1), 'four words'),
+                (drivers.replace('<li>token</li>', '', 1), 'five checks'),
+                (drivers.replace('Test kit: in progress', 'Test kit'), 'kit result in words'),
+                (drivers.replace('Test kit: passed, 5 of 5', 'Test kit: not yet run'), 'kit result in words'),
+                (drivers.replace('data-kit="in-progress"', 'data-kit="passed"'), 'kit result in words'),
+                (drivers.replace('driver-card hero-card', 'driver-card'), 'boat.dev is the one hero'),
+                (drivers.replace('<li class="driver-card" data-kit="not-run" aria-labelledby="grok-h">', '<li class="driver-card hero-card" data-kit="not-run" aria-labelledby="grok-h">'), 'boat.dev is the one hero'),
+                (drivers.replace('<h2 id="own-h">Write your own driver</h2>', '<h2 id="own-h">Build one</h2>'), 'Write your own driver'),
+                (drivers.replace('https://github.com/openwizdev/OpenWiz/tree/main/adapters/template', 'https://github.com/openwizdev/WizSkills'), 'only the OpenWiz repository'),
+                (drivers.replace('https://github.com/openwizdev/OpenWiz/tree/main/kernel/driver-kit', 'https://github.com/openwizdev/OpenWiz'), 'contract, kit and template'),
+                (drivers.replace('<a class="nav-log" href="/drivers/" aria-current="page">', '<a class="nav-log" href="/drivers/">'), 'top bar'),
+                (drivers.replace('Sign in</a>', 'Log in</a>', 1), 'top bar'),
+                (drivers.replace('<title>Drivers — OpenWiz</title>', '<title>OpenWiz</title>'), 'title must be Drivers')):
+            with self.subTest(error=error), self.assertRaisesRegex(AssertionError, error):
+                check_drivers(landing, changelog, page)
+        nav = '    <a class="nav-log" href="/drivers/">Drivers</a>\n'
+        for page, error in ((landing.replace(nav, ''), 'landing'), (changelog.replace(nav, ''), 'changelog')):
+            with self.subTest(error=error), self.assertRaisesRegex(AssertionError, f'Drivers link.*{error}'):
+                check_drivers(page if error == 'landing' else landing, page if error == 'changelog' else changelog, drivers)
 
     def test_generated_releases(self):
         # catches: a build without the generated section, or with it twice or outside main; a part missing, renamed
