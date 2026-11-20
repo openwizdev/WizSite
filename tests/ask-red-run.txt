@@ -93,3 +93,12 @@
     expected: [],
     actual: 1,
     expected: 0,
+
+# Planner ruling on Ruling 13, red run at 87afa9c: an upstream failure or stall right after part of the key arrives flushes the held piece, so part of the key is sent
+✖ R1: an upstream failure or stall right after part of the key arrives sends no part of the key, only the refusal
+ℹ tests 1
+ℹ pass 0
+ℹ fail 1
+✖ failing tests:
+    actual: false,
+    expected: true,

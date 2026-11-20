@@ -510,6 +510,30 @@ test('R1: a successful answer that carries the key, whole or split across pieces
   }
 });
 
+test('R1: an upstream failure or stall right after part of the key arrives sends no part of the key, only the refusal', async () => {
+  const part = KEY.slice(0, 9);
+  for (const [upstream, deps] of [
+    [{ chunks: [`Synthetic answer long enough to send: ${part}`], fails: true, after_chunks: 1 }, {}],
+    [{ chunks: ['Synthetic answer long enough to send: ', KEY.slice(0, 2), KEY.slice(2, 9)], fails: true, after_chunks: 3 }, {}],
+    [{ chunks: [`Synthetic answer long enough to send: ${part}`] }, { upstreamTimeout: 30, stall: true }],
+  ]) {
+    const { stall, ...options } = deps;
+    answer = stall
+      ? () => new Response(new ReadableStream({ start(c) { c.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ choices: [{ delta: { content: upstream.chunks[0] } }] })}\n\n`)); } }))
+      : upstreamAnswer(upstream);
+    const out = await run(withCase(), { deps: options });
+    for (let n = 2; n <= KEY.length; n++) assert.ok(!out.body.includes(KEY.slice(0, n)), `part of the key sent: ${JSON.stringify(out.body)}`);
+    assert.deepEqual(events(out.body).filter(e => e.type === 'text').map(e => e.text).filter(t => t.includes(KEY.slice(0, 2))), []);
+    assert.equal(events(out.body).at(-1).reason, 'upstream_error');
+    assert.equal(out.store.counters.find(r => r.key === 'spend').count, 63610, 'the reservation stays');
+  }
+  // Text that can't begin the key still streams before a failure, as the contract's mid-answer case requires.
+  answer = upstreamAnswer({ chunks: ['Synthetic safe first piece of the answer. ', `then ${part}`], fails: true, after_chunks: 2 });
+  const out = await run(withCase());
+  assert.equal(out.response.status, 200);
+  assert.deepEqual(events(out.body), [{ type: 'text', text: 'Synthetic safe first piece of the answer. ' }, { type: 'refused', reason: 'upstream_error', message: "Ask a Wiz couldn't answer just now. Try again." }]);
+});
+
 test('R2: a redirect from OpenRouter is not followed: one call, upstream_error, the question sent nowhere else', async () => {
   for (const status of [301, 302, 303, 307, 308]) {
     calls.length = 0;
