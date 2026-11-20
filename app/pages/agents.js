@@ -117,6 +117,9 @@
       day: shown.filter(r => !r.holds),
       missing,
       partial: (issues.totalCount ?? issues.nodes.length) > issues.nodes.length,
+      read: issues.nodes.length,
+      reading: Boolean(issues.reading),
+      total: issues.totalCount,
       authors: Boolean(authors),
     };
   }
@@ -132,6 +135,9 @@
     // merged pull request stands in only when the note names none.
     const named = row.note?.pr || null;
     const pr = named ? nodes.find(p => p.url === named) || null : nodes.find(p => p.state === 'OPEN') || nodes.find(p => p.state === 'MERGED') || null;
+    // GitHub refused part of this pull request (its checks, in a private repository the Viewer App can't read checks of).
+    const at = pr ? (list?.nodes || []).indexOf(pr) : -1;
+    const refused = (row.issue.errors || []).some(path => path[0] === 'closedByPullRequestsReferences' && path[1] === 'nodes' && path[2] === at);
     const url = pr?.url || named;
     if (!url) return list ? null : { url: null, facts: 'its pull request is unknown' };
     const number = url.split('/').pop();
@@ -139,7 +145,7 @@
     if (pr.state === 'MERGED') return { url, number, facts: 'merged', merged: true };
     if (pr.state === 'CLOSED') return { url, number, facts: 'closed without merging' };
     const rollup = pr.commits?.nodes?.[0]?.commit?.statusCheckRollup;
-    const facts = [pr.isDraft ? 'draft' : 'open', REVIEW[pr.reviewDecision], rollup === undefined ? 'checks unknown' : rollup === null ? 'no checks' : CHECKS[rollup.state] || 'checks unknown'];
+    const facts = [pr.isDraft ? 'draft' : 'open', REVIEW[pr.reviewDecision], refused || rollup === undefined ? 'checks unknown' : rollup === null ? 'no checks' : CHECKS[rollup.state] || 'checks unknown'];
     return { url, number, facts: facts.filter(Boolean).join(', ') };
   }
 
@@ -187,7 +193,7 @@
       meta.push(' · ', pr.url ? h('a', { href: pr.url, rel: 'noreferrer', 'data-focus': `pr:${row.key}:${row.id}` }, `Pull request #${pr.number}`) : 'Pull request', `: ${pr.facts}`);
     }
     if (n.preview) meta.push(' · ', h('a', { href: n.preview, rel: 'noreferrer', 'data-focus': `preview:${row.key}:${row.id}` }, 'Preview'));
-    el.append(h('div', { class: 'num' }, `${KIND[n.agent]} · ${n.harness}, ${n.model}`), h('h3', {}, ticket), h('p', {}, n.step), h('p', {}, ...meta));
+    el.append(h('div', { class: 'num' }, `${KIND[n.agent]} · ${OW.ui.agentName(n.harness, n.model)}`), h('h3', {}, ticket), h('p', {}, n.step), h('p', {}, ...meta));
     if (row.holds && n.state === 'working' && pr?.merged) {
       el.append(css(h('div', {}, OW.ui.unknown('GitHub shows its pull request merged, so this note is out of date.')), { margin: '8px 0 0' }));
     }
@@ -207,7 +213,8 @@
     if (seen.broken) return el.replaceChildren(OW.ui.unknown('GitHub\'s answer had no tickets in it, so the agents are unknown, not none.'));
     const notes = [];
     if (!seen.authors) notes.push('The record authors (fleet.md) couldn\'t be read, so no status note can be checked: each shows as unknown.');
-    if (seen.partial) notes.push('Only the 50 most recently updated tickets were read: an agent on an older ticket isn\'t shown.');
+    if (seen.reading) notes.push(`Still reading: ${seen.read} of the ${seen.total} tickets updated in the last day so far. Agents on the rest show as they are read.`);
+    else if (seen.partial) notes.push(`Read ${seen.read} of the ${seen.total} tickets updated in the last day: GitHub's limit can't cover the rest now, so an agent on another ticket may be missing.`);
     const hidden = seen.missing.filter(Boolean).map(issue => `#${issue.number}`);
     const unreadable = seen.missing.filter(issue => !issue).length;
     if (hidden.length) notes.push(`${hidden.join(', ')} ${hidden.length === 1 ? 'has' : 'have'} more recently edited comments than GitHub gave, so a note there may be missing.`);

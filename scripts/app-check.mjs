@@ -843,7 +843,7 @@ async function main() {
         repository.s50.comments.totalCount = repository.s50.comments.nodes.length;
       } });
       const page = await ap6Open(world);
-      await page.until(`document.querySelectorAll('main .cards a.card').length >= 6`, 'the You items');
+      await page.until(`document.querySelectorAll('main .cards a.card').length >= 6`, 'the You items').catch(e => { throw new Error(e.message + JSON.stringify(world.violations) + JSON.stringify(world.log.map(r => r.path))); });
       await settle(page, 600);
       const items = await youItems(page);
       const unreadable = id => `A decision record that couldn't be read 50#issuecomment-${id}`;
@@ -1114,13 +1114,8 @@ async function main() {
     });
 
     await check('AP7 pulse: a spec page marks the tickets an agent is working on now, and only those', async () => {
-      // AP1's writer always writes a skills line; the recorded AP6 notes get one here.
-      const skills = repository => {
-        for (const ticket of repository.s40.subIssues.nodes) for (const c of ticket?.comments?.nodes || []) {
-          c.body = c.body.replace('\nstep:', '\nskills: build-ticket@0.1.2\nstep:');
-        }
-      };
-      const world = ap7World({ tickets: skills });
+      // AP1's writer always writes a skills line, and the recorded AP6 notes carry one (AP22).
+      const world = ap7World();
       const page = await ap6Open(world, '#/specs/40');
       await page.until(`document.querySelectorAll('main .graph [data-ticket]').length === 10`, 'the ticket graph');
       await page.until(`document.querySelector('main .graph [data-pulse]')`, 'a pulse');
@@ -1147,7 +1142,6 @@ async function main() {
       const world = ap7World({
         tickets: repository => {
           for (const ticket of repository.s40.subIssues.nodes) for (const c of ticket?.comments?.nodes || []) {
-            c.body = c.body.replace('\nstep:', '\nskills: build-ticket@0.1.2\nstep:');
             if (c.databaseId === 9009 || c.databaseId === 9007) c.updatedAt = minutesAgo(5); // working in the Specs read, 5 minutes ago
             specs(c);
           }
@@ -1271,10 +1265,11 @@ async function main() {
       updatedAt: 'LIVE-1', comments: { totalCount: 0, nodes: [] }, closedByPullRequestsReferences: { totalCount: 0, nodes: [] } });
     const noteBody = (agent, state, harness, model, minutes) => `<!-- openwiz:status v1 -->\nagent: ${agent}\nstate: ${state}\nharness: ${harness}\nmodel: ${model}\nskills: build-ticket@0.2.0\nstep: synthetic step\ntime: LIVE-${minutes}`;
     // The Agents read in pages: 50 quiet tickets, then a second page holding a working builder on ticket #251.
-    const pagedAgents = async (world, { remaining = 4800 } = {}) => {
+    const pagedAgents = async (world, { remaining = 4800, hold = null } = {}) => {
       const fleet = (await fixture('ap7-agents.json')).data.repository.fleet;
       world.graphql.Agents = async body => {
         const second = body.variables?.after === 'cursor-50';
+        if (second && hold) await hold;
         const nodes = second ? [{ ...quietTicket(251), title: 'Synthetic ticket past the first page',
           comments: { totalCount: 1, nodes: [{ databaseId: 8801, body: noteBody('builder', 'working', 'claude-code', 'claude-opus-5-5', 2), createdAt: '2030-01-01T00:00:00Z', updatedAt: 'LIVE-2', author: { login: 'factory-bot[bot]' } }] } }, quietTicket(252)]
           : Array.from({ length: 50 }, (_, i) => quietTicket(200 + i));
@@ -1296,6 +1291,28 @@ async function main() {
       assert(!/Only the 50|Part of this read failed|tickets were read/.test(text), `a complete read says it is partial: ${text.slice(0, 300)}`);
       const sent = world.log.filter(r => operation(r) === 'Agents').map(r => JSON.parse(r.body));
       assert(sent.length >= 2 && sent.every(b => /filterBy:\s*\{\s*since:/.test(b.query) && b.variables.since), 'the Agents read is not limited to the last day');
+      // The next read (its two-minute schedule) asks only for what changed since this one, and keeps what it read.
+      world.graphql.Agents = async () => ({ status: 200, json: { data: { rateLimit: { limit: 5000, remaining: 4790, resetAt: '2099-01-01T00:00:00Z' },
+        repository: { issues: { totalCount: 0, pageInfo: { hasNextPage: false, endCursor: null }, nodes: [] }, fleet: (await fixture('ap7-agents.json')).data.repository.fleet } } } });
+      const was = world.log.length;
+      await page.run(`(() => { OW.data.feeds.agents.readAt = 1; document.dispatchEvent(new Event('visibilitychange')); })()`);
+      await page.until(`OW.data.feeds.agents.readAt > 1 && !OW.data.feeds.agents.busy`, 'the next Agents read');
+      const next = world.log.slice(was).filter(r => operation(r) === 'Agents').map(r => JSON.parse(r.body).variables.since);
+      assert(next.length === 1 && Date.parse(next[0]) > Date.now() - 10 * 60 * 1000, `the next read asked again for the whole day: ${JSON.stringify(next)}`);
+      assert(await page.run(`!!document.querySelector('main article.card[data-note="8801"]')`), 'the next read dropped what the first one read');
+      checkRequestLog(world);
+      await page.close();
+    });
+
+    await check('AP22 Agents: the first read shows the tickets read so far, and says it is still reading, until its last page', async () => {
+      let release;
+      const world = ap7World();
+      await pagedAgents(world, { hold: new Promise(resolve => { release = resolve; }) });
+      const page = await ap6Open(world, '#/agents');
+      await page.until(`/Still reading: 50 of the 52 tickets/.test(document.querySelector('main').innerText)`, 'the reading note');
+      release();
+      await page.until(`document.querySelector('main article.card[data-note="8801"]')`, 'the second page');
+      assert(!/Still reading/.test(await page.text()), 'the reading note stays after the last page');
       checkRequestLog(world);
       await page.close();
     });
@@ -1332,21 +1349,26 @@ async function main() {
       let plan;
       const world = ap6World({ tickets: repository => {
         plan = repository.s50.comments.nodes.find(c => c.databaseId === 9003);
+        first = repository.s50.comments.nodes;
         repository.s50.comments.totalCount = 60;
       } });
-      world.rest['/repos/acme/factory/issues/50/comments'] = async () => ({ status: 200, json: Array.from({ length: 60 }, (_, i) => {
-        const id = i === 59 ? 9050 : 9100 + i;
-        return { id, body: i === 59 ? plan.body.replace('r-plan_approval-50-open', 'r-plan_approval-50-late') : `An ordinary comment ${i}.`,
-          html_url: `https://github.com/acme/factory/issues/50#issuecomment-${id}`, created_at: '2030-01-05T00:00:00Z', updated_at: '2030-01-05T00:00:00Z',
-          user: { login: 'factory-bot[bot]' } };
-      }) });
+      let first;
+      // GitHub's REST list, oldest first: the four the first read gave, 55 ordinary comments, then an open plan approval.
+      world.rest['/repos/acme/factory/issues/50/comments'] = async () => ({ status: 200, json: [
+        ...first.map(c => ({ id: c.databaseId, body: c.body, html_url: c.url, created_at: c.createdAt, updated_at: c.updatedAt, user: c.author })),
+        ...Array.from({ length: 56 }, (_, i) => {
+          const id = i === 55 ? 9050 : 9100 + i;
+          return { id, body: i === 55 ? plan.body.replace('r-plan_approval-50-open', 'r-plan_approval-50-late') : `An ordinary comment ${i}.`,
+            html_url: `https://github.com/acme/factory/issues/50#issuecomment-${id}`, created_at: '2030-01-05T00:00:00Z', updated_at: '2030-01-05T00:00:00Z',
+            user: { login: 'factory-bot[bot]' } };
+        })] });
       const page = await ap6Open(world);
-      await page.until(`document.querySelectorAll('main .cards a.card').length >= 6`, 'the You items');
-      await settle(page, 600);
+      await page.until(`document.querySelectorAll('main .cards a.card').length >= 7`, 'the You items');
       const items = await youItems(page);
-      assert(items.includes('Plan to approve 50#issuecomment-9050'), `the record past the first 50 comments is missing: ${JSON.stringify(items)}`);
+      assert(items.includes('Plan to approve 50#issuecomment-9050') && items.includes('Plan to approve 50#issuecomment-9003'),
+        `a record is missing: ${JSON.stringify(items)}`);
       const text = await page.run(`document.querySelector('main').innerText`);
-      assert(!/Unknown\./.test(text), `a complete read says it is unknown: ${text.slice(0, 400)}`);
+      assert(!/GitHub gave only part of/.test(text), `a complete read says it is partial: ${text.slice(0, 400)}`);
       checkRequestLog(world);
       await page.close();
     });
@@ -1396,11 +1418,13 @@ async function main() {
         set(repository, 7001, 'claude-code', 'claude-opus-5-5');
         set(repository, 7101, 'Claude Code', 'Opus 5.5');
         set(repository, 7102, 'codex', 'synthetic-model-x');
+        set(repository, 7501, 'codex', 'gpt-6.2-sol medium');
       } });
       const page = await ap6Open(world, '#/agents');
       await page.until(`document.querySelector('main article.card[data-note="7102"]')`, 'the agent cards');
-      const heads = await page.run(`Object.fromEntries([7001, 7101, 7102].map(id => [id, document.querySelector('main article.card[data-note="' + id + '"] .num').textContent]))`);
-      assert(heads[7001] === 'Builder · Claude Code, Opus 5.5' && heads[7101] === 'Reviewer · Claude Code, Opus 5.5' && heads[7102] === 'Builder · Codex, synthetic-model-x',
+      const heads = await page.run(`Object.fromEntries([7001, 7101, 7102, 7501].map(id => [id, document.querySelector('main article.card[data-note="' + id + '"] .num').textContent]))`);
+      assert(heads[7001] === 'Builder · Claude Code, Opus 5.5' && heads[7101] === 'Reviewer · Claude Code, Opus 5.5' && heads[7102] === 'Builder · Codex, synthetic-model-x'
+        && heads[7501] === 'Fleet · Codex, Sol 6.2 Medium',
         `names: ${JSON.stringify(heads)}`);
       checkRequestLog(world);
       await page.close();
@@ -1412,7 +1436,8 @@ async function main() {
       await page.until(`document.querySelectorAll('main .cards a.card').length >= 6`, 'the You items');
       const links = await page.run(`[...document.querySelectorAll('main a[href^="https://github.com/"]')].map(a => [a.getAttribute('href'), a.target, a.rel])`);
       assert(links.length >= 6 && links.every(([, target, rel]) => target === '_blank' && /noreferrer/.test(rel)), `links that leave the app: ${JSON.stringify(links.filter(l => l[1] !== '_blank'))}`);
-      await page.run(`document.querySelector('main .cards a.card').click()`);
+      await page.run(`document.querySelector('main .cards a.card').focus()`);
+      await page.key('Enter');
       await waitFor(() => world.opened.length > 0, 'the new tab');
       assert(world.opened[0].url === links[0][0], `the new tab opened ${JSON.stringify(world.opened)}`);
       assert(await page.run(`location.pathname === '/app/' && !!document.querySelector('main .tiles')`), 'the app left its page');
@@ -1525,7 +1550,7 @@ async function main() {
         const before = world.log.length;
         await page.run(`[...document.querySelectorAll('aside.side button')].find(b => b.textContent.trim() === 'acme/site').click()`);
         await page.until(`[...document.querySelectorAll('aside.side button.repo')].some(b => b.textContent.includes('acme/site'))`, 'the sidebar on acme/site');
-        await waitFor(() => world.log.slice(before).some(r => r.path === '/graphql' && JSON.parse(r.body).variables?.name === 'site'), 'a read of acme/site');
+        await waitFor(() => world.log.slice(before).some(r => r.path === '/graphql' && r.body && JSON.parse(r.body).variables?.name === 'site'), 'a read of acme/site');
         const after = await page.run(`({ shell: !!document.querySelector('aside.side nav.main'), h1: document.querySelector('main h1')?.textContent.trim(), hash: location.hash, depth: history.length, picker: /Pick a repository/.test(document.body.innerText) })`);
         assert(after.shell && !after.picker && after.h1 === title && after.hash === route && after.depth === depth,
           `changing repository moved the user: ${JSON.stringify({ ...after, was: { route, depth } })}`);

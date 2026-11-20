@@ -101,10 +101,71 @@
     });
   }
 
+  // ---- Changing repository, in place (AP22) ----
+  // The repository button opens the list right under it: in the sidebar on a laptop, under the top bar on a phone.
+  // Picking one keeps the shell and the tab the user is on, adds no history entry, and only changes the reads. A spec's
+  // own page goes back to Specs, since that spec belongs to the old repository.
+  let listing = null; // {session, run}: one read of the repositories per sign-in, shared by both buttons
+  function readRepositories() {
+    const session = data.auth.session();
+    if (listing?.session !== session) listing = { session, run: data.repositories() };
+    const mine = listing;
+    mine.run.catch(() => { if (listing === mine) listing = null; }); // a failed read is tried again on the next open
+    return mine.run;
+  }
+  function switchTo(full) {
+    if (full === data.repo.get()?.full) return;
+    data.stop();
+    data.repo.pick(full);
+    if (route().arg) history.replaceState(null, '', `#/${route().id}`);
+    const side = document.activeElement?.closest?.('.side, .top')?.classList.contains('top') ? '.top' : '.side';
+    built = null;
+    buildShell();
+    data.start();
+    update();
+    root.querySelector(`${side} button.repo`)?.focus();
+  }
+  function repoSwitch(picked) {
+    const list = h('div', { class: 'repo-list', hidden: true, id: `repos-${Math.random().toString(36).slice(2)}` });
+    const close = () => { list.hidden = true; button.setAttribute('aria-expanded', 'false'); };
+    const fill = async () => {
+      const session = data.auth.session();
+      list.replaceChildren(h('p', {}, 'Reading your repositories…'));
+      let found;
+      try {
+        found = await readRepositories();
+      } catch (error) {
+        if (data.auth.session() !== session || error instanceof data.Ended) return;
+        if (error instanceof data.SignedOut) return signedOut('Your sign-in ended. Sign in again.');
+        return list.replaceChildren(h('p', { class: 'bad' }, 'Couldn\'t read your repositories, so the list is unknown, not empty.'),
+          h('button', { class: 'btn', type: 'button', onclick: fill }, icon('refresh'), 'Try again'));
+      }
+      if (data.auth.session() !== session || list.hidden) return;
+      list.replaceChildren(
+        found.complete ? null : h('p', { class: 'bad' }, 'Only part of your repositories could be read, so some may be missing.'),
+        h('ul', { class: 'repos' }, found.repos.map(r => h('li', {},
+          h('button', { type: 'button', 'aria-current': r.full === picked.full ? 'true' : null, onclick: () => { close(); switchTo(r.full); } }, r.full),
+          h('span', { class: 'tag' }, r.private ? 'Private' : 'Public')))),
+        h('p', {}, h('a', { href: 'https://github.com/settings/installations', target: '_blank', rel: 'noreferrer' }, 'Choose repositories on GitHub')));
+      list.querySelector('button[aria-current]')?.focus();
+    };
+    const button = h('button', { class: 'repo', type: 'button', 'aria-expanded': 'false', 'aria-controls': list.id,
+      'aria-label': `Repository ${picked.full}. Change repository`,
+      onclick: () => {
+        if (!list.hidden) return close();
+        list.hidden = false;
+        button.setAttribute('aria-expanded', 'true');
+        fill();
+      } },
+    icon('repo'), h('span', { class: 'name' }, picked.full), icon('chevron'));
+    const wrap = h('div', { class: 'repo-switch', onkeydown: event => { if (event.key === 'Escape' && !list.hidden) { event.stopPropagation(); close(); button.focus(); } } }, button, list);
+    wrap.addEventListener('focusout', event => { if (!wrap.contains(event.relatedTarget) && event.relatedTarget) close(); });
+    return wrap;
+  }
+
   function buildShell() {
     const picked = data.repo.get();
-    const repoButton = () => h('button', { class: 'repo', type: 'button', 'aria-label': `Repository ${picked.full}. Change repository`, onclick: () => { data.repo.forget(); picker(); } },
-      icon('repo'), h('span', { class: 'name' }, picked.full), icon('chevron'));
+    const repoButton = () => repoSwitch(picked);
     const side = navLinks('main');
     const tabs = navLinks('tabs');
     const reads = h('div', { class: 'reads', 'aria-live': 'polite' });
