@@ -3,11 +3,11 @@
 // Run: npm run test:functions
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { buildIndex, checkIndex, serialize } from '../scripts/ask-index.mjs';
+import { buildIndex, checkIndex, checkSnapshot, refreshSnapshot, serialize, snapshotIndex } from '../scripts/ask-index.mjs';
 
 const FIXTURES = fileURLToPath(new URL('./ask-index-fixtures/', import.meta.url));
 const site = join(FIXTURES, 'site');
@@ -38,7 +38,7 @@ test('the index holds only public pages and docs: never the app, page chrome, sc
   const text = serialize(await buildIndex({ site, docs }));
   for (const kept of ['First point', 'What does it cost?', 'Quick start', 'Step two']) assert.ok(text.includes(kept), `the index must hold: ${kept}`);
   for (const never of ['SYNTHETIC-APP-SHELL', 'SYNTHETIC-FLEET-INTERNAL', 'SYNTHETIC-EVIDENCE-LOG', 'SYNTHETIC-AGENT-RULES',
-    'SYNTHETIC-TEXT-NOTE', 'script text', '.x{color', 'Top bar link', 'Footer words', 'Icon title', 'a comment', 'example.invalid']) {
+    'SYNTHETIC-TEXT-NOTE', 'script text', '.x{color', 'Top bar link', 'Footer words', 'Icon title', 'a comment', 'example.invalid', 'synthetic decision', 'private record']) {
     assert.ok(!text.includes(never), `the index must not hold: ${never}`);
   }
 });
@@ -93,3 +93,70 @@ test('the contract\'s own index fixture passes the check, and every broken form 
     assert.throws(() => checkIndex(index), /ask index/, `must refuse ${name}`);
   }
 });
+
+// The snapshot (ask-docs/): OpenWiz's public README.md and top-level docs/*.md, named by the commit they came from.
+const SNAPSHOT = fileURLToPath(new URL('../ask-docs/', import.meta.url));
+const COMMIT = 'c0ffee0000000000000000000000000000000001'; // synthetic
+
+test('the shipped snapshot names its OpenWiz commit and passes its own check', async () => {
+  assert.match(await readFile(join(SNAPSHOT, 'commit.txt'), 'utf8').catch(() => 'missing'), /^[0-9a-f]{40}\n$/, 'commit.txt names a full commit');
+  await checkSnapshot(SNAPSHOT);
+  const index = JSON.parse(await snapshotIndex(site, SNAPSHOT));
+  assert.ok(index.sources.some(s => s.url === `${DOC}README.md`), 'the index holds the snapshot\'s README');
+});
+
+test('a refresh copies only README.md and the top-level docs, without private-record lines, and names the commit', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'ask-docs-'));
+  try {
+    const target = join(dir, 'ask-docs');
+    await refreshSnapshot(docs, target, COMMIT);
+    assert.deepEqual(await listed(target), ['README.md', 'commit.txt', 'docs/install.md']);
+    assert.equal(await readFile(join(target, 'commit.txt'), 'utf8'), `${COMMIT}\n`);
+    const install = await readFile(join(target, 'docs/install.md'), 'utf8');
+    assert.ok(install.includes('Step two') && !install.toLowerCase().includes('private record'), 'the pointer line is dropped, the rest kept');
+    await checkSnapshot(target);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('the snapshot check refuses internal folders, AGENTS.md, other files, a private-record line or no commit', async () => {
+  const planted = {
+    'docs/agents/': ['docs/agents/fleet.md', '# Fleet\n'],
+    'docs/evidence/': ['docs/evidence/run.md', '# Run\n'],
+    'docs/adr/': ['docs/adr/0001-choice.md', '# Choice\n'],
+    'AGENTS.md': ['AGENTS.md', '# Agents\n'],
+    'a file that is not Markdown': ['docs/notes.txt', 'notes\n'],
+    'a private-record line': ['docs/extra.md', '# Extra\n\nSource: a synthetic decision ([private record](https://github.com/synthetic-records/archive/issues/1)).\n'],
+    'a bad commit name': ['commit.txt', 'main\n'],
+  };
+  for (const [name, [path, text]] of Object.entries(planted)) {
+    const dir = await mkdtemp(join(tmpdir(), 'ask-docs-'));
+    try {
+      await refreshSnapshot(docs, dir, COMMIT);
+      await mkdir(join(dir, path, '..'), { recursive: true });
+      await writeFile(join(dir, path), text);
+      await assert.rejects(checkSnapshot(dir), /ask docs/, `must refuse ${name}`);
+      await assert.rejects(snapshotIndex(site, dir), /ask docs/, `the build must stop on ${name}`);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  }
+  const empty = await mkdtemp(join(tmpdir(), 'ask-docs-'));
+  try {
+    await refreshSnapshot(docs, empty, COMMIT);
+    await rm(join(empty, 'commit.txt'));
+    await assert.rejects(checkSnapshot(empty), /ask docs/, 'must refuse a snapshot without its commit');
+  } finally {
+    await rm(empty, { recursive: true, force: true });
+  }
+});
+
+async function listed(dir, rel = '') {
+  const out = [];
+  for (const entry of await readdir(join(dir, rel), { withFileTypes: true })) {
+    const path = rel ? `${rel}/${entry.name}` : entry.name;
+    if (entry.isDirectory()) out.push(...await listed(dir, path)); else out.push(path);
+  }
+  return out.sort();
+}

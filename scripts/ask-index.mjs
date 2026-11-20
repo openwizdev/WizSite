@@ -166,3 +166,8 @@ export function checkIndex(index) {
 
 // The file's text: JSON with every non-ASCII character escaped, so it reads the same in any encoding.
 export const serialize = index => JSON.stringify(index).replace(/[\u007f-￿]/g, c => `\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`);
+
+// Stubs for the snapshot's red run.
+export async function checkSnapshot() {}
+export async function refreshSnapshot(checkout, target) { await (await import("node:fs/promises")).mkdir(target, { recursive: true }); }
+export const snapshotIndex = async site => serialize(await buildIndex({ site }));
