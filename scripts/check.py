@@ -37,8 +37,8 @@ ART = set(ART_HASHES)
 # Logo pack. Raster icons and the social card are pinned by hash like the art; a new picture needs review.
 ICON_HASHES = {
     'favicon.ico': '5dc6f058d467f927617e28c10c2764a01e4f1b6e8c1017111920153a9fdf7020',
-    'apple-touch-icon.png': 'ff6e52cd499610049bbb6bf6289c77c99fe45ec667114ebcccab99266a9a09df',
-    'brand/og.png': '8ff8e60f4653d4ed0eb7bf47b81a87810d9a25b002ff796a6268f3f655caf582',
+    'apple-touch-icon.png': '86ba37a310f7640af172e1b64b5ac71c1f427f8a941f7c020c5040c19e4cc208',
+    'brand/og.png': '4e976988aed9f9d5a37e4254165f6267aeb376d8749e05c0a280520c10df0c5a',
     # The app's own icons: the new mark, cream on charcoal (J194, #1326).
     'app/icon.ico': '33a21c61aa051f91475b46678bc0c4f537ab507273c088c4ed016d5ddce2b9cd',
     'app/icon-180.png': 'deb93ec39812c224c1470e2f1730f7f4ead7be3d27428a20a2a83284b77fbc2f',
@@ -321,7 +321,7 @@ def check_site(root):
         return [ref for _, ref in found]
     for path, page in pages.items():
         # The social card: an absolute URL on the site that resolves to a built file.
-        assert page.social and all(s.startswith(SITE_URL) and s.removeprefix(SITE_URL) in STATIC for s in page.social), 'social image must be a built file on the site'
+        assert page.social and all(s.startswith(SITE_URL) and s.removeprefix(SITE_URL).split('?')[0] in STATIC for s in page.social), 'social image must be a built file on the site'
         for ref in page.refs:
             check_ref(root, path, ref, pages, page.favicons)
         for ref in css_refs(path.read_text()):
