@@ -7,11 +7,12 @@
 //
 //   node scripts/app-check.mjs            (after npm run build; CHROME=/path/to/chrome to pick the browser)
 //   SHOTS=dir node scripts/app-check.mjs  also saves the shell on a laptop and a phone as PNGs, for review
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { cp, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const ROOT = new URL('../', import.meta.url);
 const DIST = new URL('dist/', ROOT);
@@ -350,6 +351,36 @@ async function signIn(page, world) {
   await page.until(`document.body.innerText.includes('acme/factory')`, 'the repository picker');
 }
 
+async function releaseSwitchAlone() {
+  const temp = await mkdtemp(join(tmpdir(), 'switch-copy-'));
+  try {
+    const root = fileURLToPath(ROOT).replace(/\/$/, '');
+    const copy = join(temp, 'site');
+    await cp(root, copy, { recursive: true, filter: src => src === root || !['.git', 'dist', 'node_modules', '__pycache__'].includes(basename(src)) });
+    await symlink(join(root, 'node_modules'), join(copy, 'node_modules'));
+    // npm run check lists the site's files through git; the linked node_modules is not one of them.
+    const git = spawnSync('git', ['init', '-q'], { cwd: copy });
+    assert(git.status === 0, 'git init failed in the copy');
+    await writeFile(join(copy, '.git/info/exclude'), '/node_modules\n');
+    const landing = join(copy, 'index.html');
+    const text = await readFile(landing, 'utf8');
+    const switches = text.match(/data-install="(coming-soon|live)"/g) || [];
+    assert(switches.length === 1, `the landing has no single install switch: ${JSON.stringify(switches)}`);
+    await writeFile(landing, text.replace(switches[0], 'data-install="live"'));
+    const failed = [];
+    for (const step of ['build', 'check', 'test', 'test:functions', 'test:app']) {
+      const run = spawnSync('npm', ['run', step], { cwd: copy, env: { ...process.env, WIZSITE_SWITCH_COPY: '1' }, encoding: 'utf8', maxBuffer: 64 << 20 });
+      if (run.status !== 0) {
+        const out = `${run.stdout || ''}${run.stderr || ''}${run.error ? run.error.message : ''}`;
+        failed.push(`npm run ${step}:\n${out.split('\n').filter(line => !line.startsWith('PASS ')).join('\n').slice(-2000)}`);
+      }
+    }
+    assert(failed.length === 0, `with the switch on, CI fails:\n${failed.join('\n')}`);
+  } finally {
+    await rm(temp, { recursive: true, force: true });
+  }
+}
+
 async function main() {
   if (!existsSync(new URL('index.html', DIST))) throw new Error('dist/ is missing: run npm run build first');
   const browser = await launch();
@@ -357,10 +388,13 @@ async function main() {
     // #1357: the landing's install box. The line is the one the install skill expects, word for word.
     const LINE = 'Install OpenWiz from github.com/openwizdev/OpenWiz';
     const landing = await readFile(new URL('index.html', DIST), 'utf8');
-    // The release's one change: the box's switch from coming-soon to live, served in place of the built landing.
-    const switchedOn = world => {
-      assert(landing.split('data-install="coming-soon"').length === 2, 'the landing has no single coming-soon switch to turn on');
-      world.site['/'] = async () => ({ status: 200, raw: Buffer.from(landing.replace('data-install="coming-soon"', 'data-install="live"')), type: 'html' });
+    // The box's one switch (data-install): each check serves the built landing with the switch set to its state,
+    // so both states are checked whichever value the landing ships (#1573). The release changes only that value.
+    const shipped = landing.match(/data-install="[^"]*"/g) || [];
+    const servedAs = (world, state) => {
+      assert(shipped.length === 1 && ['data-install="coming-soon"', 'data-install="live"'].includes(shipped[0]),
+        `the landing has no single install switch: ${JSON.stringify(shipped)}`);
+      world.site['/'] = async () => ({ status: 200, raw: Buffer.from(landing.replace(shipped[0], `data-install="${state}"`)), type: 'html' });
     };
     const installBox = page => page.run(`(() => { ${LABEL} const box = document.querySelector('.install-box'); const b = box.querySelector('button.install');
       const line = box.querySelector('.install-line'); const hint = box.querySelector('.install-hint');
@@ -370,6 +404,7 @@ async function main() {
 
     await check('#1357 install box before the release: the line and the instruction show, Copy is disabled, coming soon, and copies nothing', async () => {
       const world = new World();
+      servedAs(world, 'coming-soon');
       const page = await open(browser, world);
       await page.go(`${SITE}/`);
       await landed(page);
@@ -388,7 +423,7 @@ async function main() {
 
     await check('#1357 install box switched on: Copy is enabled and puts exactly the install line on the clipboard', async () => {
       const world = new World();
-      switchedOn(world);
+      servedAs(world, 'live');
       const page = await open(browser, world);
       await page.go(`${SITE}/`);
       await landed(page);
@@ -407,7 +442,7 @@ async function main() {
 
     await check('#1357 install box switched on with its script blocked: the line still shows, with no dead Copy button', async () => {
       const world = new World();
-      switchedOn(world);
+      servedAs(world, 'live');
       const script = landing.match(/src="(\/site\.[0-9a-f]{10}\.js)"/)[1];
       world.site[script] = async () => ({ abort: true });
       const page = await open(browser, world);
@@ -953,6 +988,137 @@ async function main() {
       await page.close();
     });
 
+    // ---- AP17 (#1579): the pulse and the Agents card's pull request tell the truth (WizSite #34, R1 and R2) ----
+
+    // A status note on spec 40's ticket #43 as the Agents read gives it: its id, its state and its last edit.
+    const note43 = (id, state, updatedAt) => ({ databaseId: id, createdAt: '2030-01-01T00:00:00Z', updatedAt, author: { login: 'factory-bot[bot]' },
+      body: `<!-- openwiz:status v1 -->\nagent: builder\nstate: ${state}\nharness: Synthetic Harness\nmodel: Synthetic Model\nskills: build-ticket@0.1.2\nstep: a synthetic step\ntime: ${updatedAt}` });
+    const ticketOf = (number, comments, totalCount = comments.length) => ({ number, title: `Synthetic ticket ${number}`, url: `https://github.com/acme/factory/issues/${number}`,
+      state: 'OPEN', updatedAt: comments[0]?.updatedAt || '2030-01-01T00:00:00Z', comments: { totalCount, nodes: comments }, closedByPullRequestsReferences: { totalCount: 0, nodes: [] } });
+    const minutesAgo = n => new Date(Date.now() - n * 60 * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z');
+    // Spec 40 as both reads first give it (#42 and #43 working); then only the Agents read comes again, with `later`.
+    const pulseWorld = (later, specs = () => {}) => {
+      let changed = false;
+      const world = ap7World({
+        tickets: repository => {
+          for (const ticket of repository.s40.subIssues.nodes) for (const c of ticket?.comments?.nodes || []) {
+            c.body = c.body.replace('\nstep:', '\nskills: build-ticket@0.1.2\nstep:');
+            if (c.databaseId === 9009 || c.databaseId === 9007) c.updatedAt = minutesAgo(5); // working in the Specs read, 5 minutes ago
+            specs(c);
+          }
+        },
+        agents: repository => { if (changed) later(repository); },
+      });
+      world.later = () => { changed = true; };
+      return world;
+    };
+    const idle = `OW.data.feeds.agents.readAt && OW.data.feeds.specs.readAt && OW.data.feeds.specs.data?.specs && !OW.data.feeds.agents.busy && !OW.data.feeds.specs.busy`;
+    const pulsing = page => page.run(`[...document.querySelectorAll('main .graph [data-pulse]')].map(c => c.dataset.ticket).sort()`);
+    // Open spec 40, see both reads' pulse, then read Agents again (as its two-minute schedule does) and give the pulse.
+    const pulseAfterAgents = async (world, before = ['42', '43']) => {
+      const page = await ap6Open(world, '#/specs/40');
+      await page.until(`document.querySelectorAll('main .graph [data-ticket]').length === 10 && ${idle}`, 'the ticket graph and both reads');
+      const first = await pulsing(page);
+      assert(JSON.stringify(first) === JSON.stringify(before), `pulsing before the newer Agents read: ${JSON.stringify(first)}`);
+      world.later();
+      const specsAt = await page.run(`OW.data.feeds.specs.readAt`);
+      await page.run(`(() => { OW.data.feeds.agents.readAt = 1; document.dispatchEvent(new Event('visibilitychange')); })()`);
+      await page.until(`OW.data.feeds.agents.readAt > ${specsAt} && ${idle}`, 'the newer Agents read');
+      assert(await page.run(`OW.data.feeds.specs.readAt`) === specsAt, 'the Specs feed was read again');
+      return [page, await pulsing(page)];
+    };
+
+    await check('AP17 pulse: a note working in the Specs read and done in a newer Agents read shows no pulse', async () => {
+      // catches: the pulse unioning working claims from both snapshots, so an older Specs read keeps "Agent working" on.
+      const world = pulseWorld(repository => { repository.issues.nodes.unshift(ticketOf(43, [note43(9009, 'done', minutesAgo(1))])); });
+      const [page, now] = await pulseAfterAgents(world);
+      assert(JSON.stringify(now) === JSON.stringify(['42']), `pulsing tickets: ${JSON.stringify(now)}`);
+      checkRequestLog(world);
+      await page.close();
+    });
+
+    await check('AP17 pulse: a newer Agents read that covers a deleted note drops its pulse; one that does not reach it keeps it', async () => {
+      // catches: a deleted working note pulsing on from the older Specs read, or a note the newer read never reached being dropped.
+      const full = Array.from({ length: 20 }, (_, i) => ({ databaseId: 9900 + i, body: 'An ordinary comment.', createdAt: '2030-01-01T00:00:00Z',
+        updatedAt: minutesAgo(1), author: { login: 'factory-bot[bot]' } }));
+      const world = pulseWorld(repository => {
+        repository.issues.nodes.unshift(ticketOf(43, [], 0), ticketOf(42, full, 25)); // #43's note is gone; #42's window stops short of its note
+      });
+      const [page, now] = await pulseAfterAgents(world);
+      assert(JSON.stringify(now) === JSON.stringify(['42']), `pulsing tickets: ${JSON.stringify(now)}`);
+      checkRequestLog(world);
+      await page.close();
+    });
+
+    // Review round 1 of WizSite #41 (R1, R2): reads that overlap, and a newer read whose record authors can't be read.
+    // Both feeds are read again at once; the Specs answer, captured first, is held until the browser has taken the Agents one.
+    const overlapping = async (world, page) => {
+      let release;
+      const held = new Promise(resolve => { release = resolve; });
+      const answer = world.graphql.SpecTickets;
+      world.graphql.SpecTickets = async () => { const captured = await answer(); await held; return captured; };
+      world.later();
+      const agentsAt = await page.run(`OW.data.feeds.agents.readAt`);
+      await page.run(`OW.data.refreshAll()`);
+      await page.until(`OW.data.feeds.agents.readAt > ${agentsAt} && OW.data.feeds.specs.busy`, 'the Agents answer, with Specs still out');
+      release();
+      await page.until(`OW.data.feeds.specs.readAt > OW.data.feeds.agents.readAt && ${idle}`, 'the held Specs answer');
+      world.graphql.SpecTickets = answer;
+    };
+
+    await check('AP17 pulse: an older Specs answer that arrives after a newer Agents read never restores a deleted note', async () => {
+      // catches: snapshots ordered by when the browser took them, so a held Specs answer brings back a note the Agents read showed deleted.
+      const world = pulseWorld(repository => { repository.issues.nodes.unshift(ticketOf(43, [], 0)); });
+      const page = await ap6Open(world, '#/specs/40');
+      await page.until(`document.querySelectorAll('main .graph [data-ticket]').length === 10 && ${idle}`, 'the ticket graph and both reads');
+      await overlapping(world, page);
+      const held = await pulsing(page);
+      assert(JSON.stringify(held) === JSON.stringify(['42']), `pulsing after the held Specs answer: ${JSON.stringify(held)}`);
+      // An Agents read on its own settles the order: the note stays gone.
+      const specsAt = await page.run(`OW.data.feeds.specs.readAt`);
+      await page.run(`(() => { OW.data.feeds.agents.readAt = 1; document.dispatchEvent(new Event('visibilitychange')); })()`);
+      await page.until(`OW.data.feeds.agents.readAt > ${specsAt} && ${idle}`, 'a fresh Agents read');
+      const settled = await pulsing(page);
+      assert(JSON.stringify(settled) === JSON.stringify(['42']), `pulsing after a fresh Agents read: ${JSON.stringify(settled)}`);
+      checkRequestLog(world);
+      await page.close();
+    });
+
+    await check('AP17 pulse: a note first seen in an Agents read without record authors never pulses, as its card is unknown', async () => {
+      // catches: the older Specs read's record authors vouching for a note only the newer, unverifiable Agents read has.
+      const world = pulseWorld(repository => {
+        repository.fleet = null;
+        repository.issues.nodes.unshift(ticketOf(43, [note43(9009, 'working', minutesAgo(1))]));
+      }, c => { if (c.databaseId === 9009) c.body = c.body.replace('state: working', 'state: done'); });
+      const [page, now] = await pulseAfterAgents(world, ['42']);
+      assert(JSON.stringify(now) === JSON.stringify(['42']), `pulsing tickets: ${JSON.stringify(now)}`);
+      await page.go(`${SITE}/app/#/agents`);
+      await page.until(`document.querySelector('main article.card[data-note="9009"]')`, 'the note\'s card');
+      const status = await page.run(`document.querySelector('main article.card[data-note="9009"]').dataset.status`);
+      assert(status === 'unknown', `the note's card says ${status}`);
+      checkRequestLog(world);
+      await page.close();
+    });
+
+    await check('AP17 Agents: a note naming PR #12 that GitHub does not return links PR #12, with its facts unknown', async () => {
+      // catches: the card swapping in the ticket's other pull request (#99) beside the preview of the PR the note names.
+      const world = ap7World({ agents: repository => {
+        const pr = repository.issues.nodes.find(issue => issue.number === 70).closedByPullRequestsReferences;
+        pr.nodes = [{ ...pr.nodes[0], url: 'https://github.com/acme/site/pull/99', reviewDecision: 'APPROVED' }];
+      } });
+      const page = await ap6Open(world, '#/agents');
+      await page.until(`document.querySelector('main article.card[data-note="7001"]')`, 'the builder\'s card');
+      const links = await page.run(`[...document.querySelectorAll('main article.card[data-note="7001"] a')].map(a => a.getAttribute('href'))`);
+      assert(JSON.stringify(links) === JSON.stringify(['https://github.com/acme/factory/issues/70', 'https://github.com/acme/site/pull/12',
+        'https://12.example-site.pages.dev/app/']), `the builder's links: ${JSON.stringify(links)}`);
+      const text = await page.run(`document.querySelector('main article.card[data-note="7001"]').innerText.replace(/\\s+/g, ' ')`);
+      assert(/Pull request #12: [^·]*unknown/.test(text) && !/#99|approved|open,/.test(text), `the builder's pull request: ${text}`);
+      const second = await page.run(`document.querySelector('main article.card[data-note="7005"]').innerText.replace(/\\s+/g, ' ')`);
+      assert(/Pull request #99: open, approved/.test(second), `a note naming no PR loses the ticket's pull request: ${second}`);
+      checkRequestLog(world);
+      await page.close();
+    });
+
     await check('AP7 keyboard: 3 opens Agents; Tab walks each card\'s ticket, pull request and preview with visible focus; a refresh keeps it', async () => {
       const world = ap7World();
       const page = await ap6Open(world);
@@ -1446,6 +1612,75 @@ async function main() {
       await page.close();
     });
 
+    // AP18 (#1588): the palette reaches everything the app shows, outside blockers and You-only tickets included.
+    await check('AP18 R1: an outside blocker the graph draws is a palette result whose Enter focuses its card; its own spec wins; placeholders stay out', async () => {
+      // #45 (spec 40) also blocks #52, so spec 50 (read first) draws #45 outside it.
+      const world = ap7World({ tickets: repository => {
+        const query = repository.s50.subIssues.nodes.find(issue => issue?.number === 52);
+        query.blockedBy.nodes.push({ number: 45, title: 'Notes search', url: 'https://github.com/acme/factory/issues/45', state: 'OPEN',
+          stateReason: null, repository: { nameWithOwner: 'acme/factory' } });
+        query.blockedBy.totalCount += 1;
+      } });
+      const page = await ap6Open(world);
+      await page.until(`document.querySelectorAll('main .cards a.card').length >= 6`, 'the You page');
+      await page.until(`OW.factory.model(OW.data.feeds)?.specs.find(s => s.number === 50)?.graph?.tickets.some(t => t.number === 45 && t.outside)`,
+        'spec 50 drawing #45 outside it');
+      // #30 blocks #43 from outside spec 40: Enter opens spec 40 and focuses #30's card there.
+      await paletteOpen(page);
+      await find(page, '#30', '#30');
+      const blocker = (await palette(page)).options.filter(o => o.includes('#30 #30'));
+      assert(blocker.length === 1 && /outside #40/.test(blocker[0]), `the outside blocker's results: ${JSON.stringify(blocker)}`);
+      await page.key('Enter');
+      await page.until(`location.hash === '#/specs/40' && document.activeElement.dataset.ticket === '30'`, 'Enter on the outside blocker to focus its card');
+      assert(await visibleFocus(page), "the outside blocker's card has focus but no visible focus ring");
+      // A ticket drawn outside one spec and inside its own goes to its own spec.
+      await page.key('1');
+      await page.until(`location.hash === '#/you'`, 'You by its key');
+      await paletteOpen(page);
+      await find(page, '#45', '#45 Notes search');
+      const results = (await palette(page)).options.filter(o => o.includes('#45 Notes search'));
+      assert(results.length === 1 && !/outside/i.test(results[0]), `#45's results: ${JSON.stringify(results)}`);
+      await page.key('Enter');
+      await page.until(`location.hash === '#/specs/40' && document.activeElement.dataset.ticket === '45'`, 'Enter on #45 to its own spec');
+      // The blocked-by placeholders GitHub couldn't read are no result.
+      await paletteOpen(page);
+      await page.type("couldn't read");
+      await page.until(`/no match/i.test(document.querySelector('dialog[open]').innerText)`, 'no result for an unreadable placeholder');
+      await page.key('Escape');
+      checkRequestLog(world);
+      assert(world.opened.length === 0, `going somewhere in the app opened a tab: ${JSON.stringify(world.opened)}`);
+      await page.close();
+    });
+
+    await check('AP18 R2: a ticket shown only on You goes to You and focuses its card; Shift+Enter still opens it on GitHub', async () => {
+      const world = ap7World();
+      const page = await ap6Open(world, '#/specs');
+      await page.until(`OW.data.feeds.specs.data?.specs && document.querySelector('main a.card')`, 'the Specs page');
+      // #48 is on You and in no spec's graph.
+      await paletteOpen(page);
+      await find(page, '#48', '#48 Register the notes domain');
+      await page.key('Enter');
+      await page.until(`location.hash === '#/you' && document.activeElement.dataset.focus === 'item:https://github.com/acme/factory/issues/48'`,
+        "Enter on #48 to focus its card on You");
+      assert(await visibleFocus(page), "#48's card has focus but no visible focus ring");
+      assert(world.opened.length === 0, `Enter on #48 opened a tab: ${JSON.stringify(world.opened)}`);
+      // Shift+Enter is still the direct GitHub action, and the app stays where it is.
+      await paletteOpen(page);
+      await find(page, '#48', '#48 Register the notes domain');
+      await page.key('Enter', 'Shift');
+      await waitFor(() => world.opened.length >= 1, '#48 opened on GitHub');
+      assert(JSON.stringify(world.opened.map(o => `${o.method} ${o.url}`)) === JSON.stringify(['GET https://github.com/acme/factory/issues/48']),
+        `opened: ${JSON.stringify(world.opened)}`);
+      assert(await page.run(`location.hash`) === '#/you', 'Shift+Enter moved the app');
+      // #46 is on You and in spec 40's graph: its card in the graph stays its place.
+      await paletteOpen(page);
+      await find(page, '#46', '#46 ');
+      await page.key('Enter');
+      await page.until(`location.hash === '#/specs/40' && document.activeElement.dataset.ticket === '46'`, 'Enter on #46 to its graph card');
+      checkRequestLog(world);
+      await page.close();
+    });
+
     // Every key the app answers to, as the `?` list must name it: [keys, what they do].
     const SHORTCUTS = [/Ctrl K|⌘ K/, /\b1\b[^\n]*You/, /\b2\b[^\n]*Specs/, /\b3\b[^\n]*Agents/, /\?[^\n]*shortcuts/i, /Esc/, /↑ ↓|Up|Down/,
       /Enter[^\n]*go/i, /Shift Enter[^\n]*GitHub/i, /Alt Enter[^\n]*cop/i, /Backspace[^\n]*filter/i, /Tab/];
@@ -1559,6 +1794,11 @@ async function main() {
     });
   } finally {
     await browser.close();
+  }
+  // #1573: the release's one documented change alone passes CI. A copy of the site gets only data-install set to live,
+  // then CI's own steps run on it; inside the copy this check is skipped, so the copy's test:app doesn't recurse.
+  if (!process.env.WIZSITE_SWITCH_COPY) {
+    await check('#1573 the release switch alone passes CI: a copy with only data-install set to live passes every CI step', releaseSwitchAlone);
   }
   console.log(results.join('\n'));
   const failed = results.filter(line => line.startsWith('FAIL')).length;
