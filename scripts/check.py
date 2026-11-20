@@ -121,20 +121,29 @@ BOOK_PLACEHOLDER = '#book'
 TEAM_HEADLINE = 'Book 30 minutes. Leave with a shipped pull request.'
 TEAM_TERMS = ('A small, real change of your choice.',
               'On a repository with working CI and a signed-in coding agent (Claude Code or Codex).',
-              "If it hasn't shipped in 30 minutes, Jake stays on until it does.")
+              'If it hasn’t shipped in 30 minutes, Jake stays on until it does.')
+# #88: the terms read at body size under their own small, visible label.
+TEAM_TERMS_LABEL = 'How the call works'
 TEAM_SHIPS = 'Ships means a pull request opens on your repo, built by your agents and passing your CI. Merging is your call.'
+# #88: proof as two cards, never whole underlined sentences. Card 1: the three passed drivers' logos (the files /drivers/
+# ships), each over its result, and Grok Bot quietly coming soon; the card links to /drivers/. Card 2: the story, with
+# only its link text as a link.
+TEAM_PROOF_LOGOS = ('/drivers/logos/monitor.svg', '/drivers/logos/cloudroom.png', '/drivers/logos/boat-dev.svg')
+TEAM_PROOF_PASSED = 'Passed 5 of 5 checks'
+TEAM_PROOF_SOON = 'Grok Bot: coming soon'
+TEAM_PROOF_STORY = ('Our Drivers page was built the same way: a fleet of agents drew six designs, a council of judges picked '
+                    'one, and it merged in one night.')
+TEAM_PROOF_LINK = 'See the Drivers page'
 TEAM_COPY = ('For solo builders and small teams', TEAM_HEADLINE,
              'A 30-minute call with Jake, who builds OpenWiz. We connect it to your repo and the coding agent you already '
              'use, you pick one small change, and your first fleet ships it on your workflow.',
              *TEAM_TERMS, TEAM_SHIPS,
-             'Three drivers passed all five checks: your computer or VPS, Cloudroom and boat.dev. Grok Bot is coming soon.',
-             'Our Drivers page was built the same way: a fleet of agents drew six designs, a council of judges picked one, '
-             'and it merged in one night.',
+             TEAM_TERMS_LABEL, TEAM_PROOF_PASSED, TEAM_PROOF_SOON, TEAM_PROOF_STORY, TEAM_PROOF_LINK,
              'Watch the fleet build it (49 s, on X)',
              'Solo builders and small teams who already use Claude Code or Codex.', 'Custom pricing. No checkout.', 'Book a call')
 # The hero, then its sections in order: the timeline, proof, who it's for, pricing, where your agents run, the closing call.
 # #76: the Questions (faq.html) sit after where your agents run.
-TEAM_PARTS = ('The 30 minutes, roughly', 'Proof', "Who it's for", 'Pricing', 'Where your agents run', 'Questions',
+TEAM_PARTS = ('The 30 minutes, roughly', 'Proof', 'Who it’s for', 'Pricing', 'Where your agents run', 'Questions',
               'Your first fleet ships on the call.')
 TEAM_STEPS = (('Minute 0', 'We connect your repo and your agents.'),
               ('Minute 10', 'You answer a few questions about your change.'),
@@ -160,6 +169,8 @@ FAQ_SLOTS = {'<!-- faq.html -->\n': FAQ, '<!-- faq.html h1 -->\n': FAQ_TOP}
 FAQ_PAGE = 'faq/index.html'
 FAQ_ON = {'index.html': FAQ, TEAM_PAGE: FAQ, FAQ_PAGE: FAQ_TOP}
 FAQ_TITLE = ('Questions', 'The short ones are here.')
+# #88: the last answer, approved for the team page's round 3.
+FAQ_TEAM_ANSWER = 'Yes. Book a 30-minute call. Your first fleet ships on it.'
 FAQ_QUESTIONS = ('What is OpenWiz?', 'What is a kernel?', 'What do I need to run it?', 'Where do my agents run?',
                  'Does OpenWiz see my code or my logins?', 'What does it cost?', 'Can you set it up for my team?')
 
@@ -1102,6 +1113,9 @@ def check_team(htmls, pages):
     assert terms and [plain(t) for t in re.findall(r'<li>([\s\S]*?)</li>', terms[1])] == list(TEAM_TERMS), \
         f'the terms: three exact lines right under the hero button: {TEAM_TERMS}'
     assert hero.index('data-book') < hero.index('class="team-terms"'), 'the terms: under the first Book a call'
+    label = re.search(r'<p class="team-terms-label" id="([^"]+)">([\s\S]*?)</p>\s*<ul class="team-terms" aria-labelledby="([^"]+)">', hero)
+    assert label and plain(label[2]) == TEAM_TERMS_LABEL and label[1] == label[3], \
+        f'the terms label: a visible "{TEAM_TERMS_LABEL}" right above the terms, naming them'
     assert 'wizes' not in plain(hero).lower(), 'no Wizes in the team hero'
     poster = re.findall(r'<a [^>]*href="https://x\.com/openwiz"[^>]*>([\s\S]*?)</a>', hero)
     images = [dict(re.findall(r'([a-z-]+)="([^"]*)"', img)) for img in re.findall(r'<img\b[^>]*>', poster[0])] if len(poster) == 1 else []
@@ -1111,8 +1125,23 @@ def check_team(htmls, pages):
     assert 'Watch the fleet build it (49 s, on X)' in plain(poster[0]), 'the boat poster: its label is its caption'
     assert not re.search(r'<(?:video|iframe|embed|object|details)\b', main.replace(FAQ, '')), 'the team page embeds no video and folds nothing away'
     steps = re.search(r'<ol class="team-steps">([\s\S]*?)</ol>', main)
-    found = re.findall(r'<li><h3>([\s\S]*?)</h3><p>([\s\S]*?)</p></li>', steps[1]) if steps else []
-    assert [(plain(m), plain(t)) for m, t in found] == list(TEAM_STEPS), f'The 30 minutes, roughly: its four marks, in order: {TEAM_STEPS}'
+    found = re.findall(r'<li( class="team-step-end")?><h3>([\s\S]*?)</h3><p>([\s\S]*?)</p></li>', steps[1]) if steps else []
+    assert [(plain(m), plain(t)) for _, m, t in found] == list(TEAM_STEPS), f'The 30 minutes, roughly: its four marks, in order: {TEAM_STEPS}'
+    # #88: Minute 30 is the destination: the one highlighted stop.
+    assert [bool(end) for end, _, _ in found] == [False, False, False, True] and steps[1].count('class=') == 1, \
+        'the timeline highlights Minute 30 only'
+    proof = re.search(r'<ul class="team-proof">([\s\S]*?)</ul>\n</section>', main)
+    cards = re.findall(r'<li class="team-proof-card">([\s\S]*?)</li>\n', proof[1]) if proof else []
+    assert len(cards) == 2, f'the proof: two cards: {len(cards)}'
+    drivers = re.fullmatch(r'\s*<a class="team-proof-drivers" href="/drivers/">([\s\S]*)</a>\s*', cards[0])
+    assert drivers, 'the proof: card 1 is one link to /drivers/'
+    srcs = re.findall(r'<img\b[^>]*\bsrc="([^"]*)"', drivers[1])
+    assert tuple(srcs) == TEAM_PROOF_LOGOS and plain(drivers[1]).count(TEAM_PROOF_PASSED) == len(TEAM_PROOF_LOGOS), \
+        f'the proof: card 1 shows the three drivers\' logos, each over "{TEAM_PROOF_PASSED}": {srcs}'
+    assert plain(drivers[1]).endswith(TEAM_PROOF_SOON), f'the proof: card 1 ends with "{TEAM_PROOF_SOON}"'
+    links = re.findall(r'<a\b[^>]*href="([^"]*)"[^>]*>([\s\S]*?)</a>', cards[1])
+    assert links == [('/drivers/', TEAM_PROOF_LINK)] and TEAM_PROOF_STORY in plain(re.sub(r'<a\b[\s\S]*?</a>', '', cards[1])), \
+        f'the proof: card 2 tells the story, and only "{TEAM_PROOF_LINK}" is a link: {links}'
     ships = re.search(r'</ol>\s*<p class="team-ships">([\s\S]*?)</p>', main)
     assert ships and plain(ships[1]) == TEAM_SHIPS, 'the ships line: right under the timeline'
     # This page's own copy, without the shared Questions (#76), which check_faq owns.
@@ -1120,6 +1149,10 @@ def check_team(htmls, pages):
     shown = re.sub(r'\s+', ' ', unescape(re.sub(r'<[^>]*>', ' ', own)))
     assert not TEAM_NEVER.search(shown), f'a word the team page never uses: {TEAM_NEVER.search(shown)[0]}'
     assert not re.search(r'\bhidden\b|aria-hidden', own.split('<main', 1)[1]), 'the team page hides none of its copy'
+    # #88: curly apostrophes, like the rest of the site, in the copy and in the names it gives screen readers.
+    said = shown + ' '.join(unescape(v) for v in re.findall(r'\b(?:aria-label|alt|content)="([^"]*)"', own))
+    straight = re.findall(r"[^ ]*'[^ ]*", said)
+    assert not straight, f'the team page uses curly apostrophes: {straight}'
     # Last, so a broken part above fails on its own line first: the rest of the round 1 copy, word for word.
     for text in TEAM_COPY:
         assert text in flat, f'missing team page copy: {text}'
@@ -1172,6 +1205,7 @@ def check_faq(htmls, pages, names):
         for href in re.findall(r'href="([^"]*)"', answer):
             assert href.startswith('/'), f'an answer links off the site: {href}'
     assert not re.search(r'<(?:form|input|textarea)\b', FAQ), 'part 1 asks nothing: no form or input in the Questions'
+    assert rows and plain(rows[-1][3]) == FAQ_TEAM_ANSWER, f'the last answer: {FAQ_TEAM_ANSWER}'
 
 
 def check_drivers_nav(css, pages):
