@@ -961,39 +961,42 @@ async function main() {
     const ticketOf = (number, comments, totalCount = comments.length) => ({ number, title: `Synthetic ticket ${number}`, url: `https://github.com/acme/factory/issues/${number}`,
       state: 'OPEN', updatedAt: comments[0]?.updatedAt || '2030-01-01T00:00:00Z', comments: { totalCount, nodes: comments }, closedByPullRequestsReferences: { totalCount: 0, nodes: [] } });
     const minutesAgo = n => new Date(Date.now() - n * 60 * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z');
-    const pulseWorld = (agents, gate) => {
-      let specsRead;
-      const specsDone = new Promise(resolve => { specsRead = resolve; });
+    // Spec 40 as both reads first give it (#42 and #43 working); then only the Agents read comes again, with `later`.
+    const pulseWorld = later => {
+      let changed = false;
       const world = ap7World({
         tickets: repository => {
           for (const ticket of repository.s40.subIssues.nodes) for (const c of ticket?.comments?.nodes || []) {
             c.body = c.body.replace('\nstep:', '\nskills: build-ticket@0.1.2\nstep:');
             if (c.databaseId === 9009 || c.databaseId === 9007) c.updatedAt = minutesAgo(5); // working in the Specs read, 5 minutes ago
           }
-          specsRead();
         },
-        agents,
+        agents: repository => { if (changed) later(repository); },
       });
-      if (gate) {
-        // The Agents read answers only after the Specs read did, so it is the newer snapshot.
-        const answer = world.graphql.Agents;
-        world.graphql.Agents = async () => { await specsDone; await new Promise(r => setTimeout(r, 300)); return answer(); };
-      }
+      world.later = () => { changed = true; };
       return world;
     };
-    const pulsingOn = async (world, page) => {
-      await page.until(`document.querySelectorAll('main .graph [data-ticket]').length === 10`, 'the ticket graph');
-      await page.until(`OW.data.feeds.agents.readAt && OW.data.feeds.specs.readAt && OW.data.feeds.specs.data?.specs`, 'both reads');
-      await settle(page, 300);
-      return page.run(`[...document.querySelectorAll('main .graph [data-pulse]')].map(c => c.dataset.ticket).sort()`);
+    const idle = `OW.data.feeds.agents.readAt && OW.data.feeds.specs.readAt && OW.data.feeds.specs.data?.specs && !OW.data.feeds.agents.busy && !OW.data.feeds.specs.busy`;
+    const pulsing = page => page.run(`[...document.querySelectorAll('main .graph [data-pulse]')].map(c => c.dataset.ticket).sort()`);
+    // Open spec 40, see both reads' pulse, then read Agents again (as its two-minute schedule does) and give the pulse.
+    const pulseAfterAgents = async world => {
+      const page = await ap6Open(world, '#/specs/40');
+      await page.until(`document.querySelectorAll('main .graph [data-ticket]').length === 10 && ${idle}`, 'the ticket graph and both reads');
+      const first = await pulsing(page);
+      assert(JSON.stringify(first) === JSON.stringify(['42', '43']), `pulsing before the newer Agents read: ${JSON.stringify(first)}`);
+      world.later();
+      const specsAt = await page.run(`OW.data.feeds.specs.readAt`);
+      await page.run(`(() => { OW.data.feeds.agents.readAt = 1; document.dispatchEvent(new Event('visibilitychange')); })()`);
+      await page.until(`OW.data.feeds.agents.readAt > ${specsAt} && ${idle}`, 'the newer Agents read');
+      assert(await page.run(`OW.data.feeds.specs.readAt`) === specsAt, 'the Specs feed was read again');
+      return [page, await pulsing(page)];
     };
 
     await check('AP17 pulse: a note working in the Specs read and done in a newer Agents read shows no pulse', async () => {
       // catches: the pulse unioning working claims from both snapshots, so an older Specs read keeps "Agent working" on.
       const world = pulseWorld(repository => { repository.issues.nodes.unshift(ticketOf(43, [note43(9009, 'done', minutesAgo(1))])); });
-      const page = await ap6Open(world, '#/specs/40');
-      const pulsing = await pulsingOn(world, page);
-      assert(JSON.stringify(pulsing) === JSON.stringify(['42']), `pulsing tickets: ${JSON.stringify(pulsing)}`);
+      const [page, now] = await pulseAfterAgents(world);
+      assert(JSON.stringify(now) === JSON.stringify(['42']), `pulsing tickets: ${JSON.stringify(now)}`);
       checkRequestLog(world);
       await page.close();
     });
@@ -1004,10 +1007,9 @@ async function main() {
         updatedAt: minutesAgo(1), author: { login: 'factory-bot[bot]' } }));
       const world = pulseWorld(repository => {
         repository.issues.nodes.unshift(ticketOf(43, [], 0), ticketOf(42, full, 25)); // #43's note is gone; #42's window stops short of its note
-      }, true);
-      const page = await ap6Open(world, '#/specs/40');
-      const pulsing = await pulsingOn(world, page);
-      assert(JSON.stringify(pulsing) === JSON.stringify(['42']), `pulsing tickets: ${JSON.stringify(pulsing)}`);
+      });
+      const [page, now] = await pulseAfterAgents(world);
+      assert(JSON.stringify(now) === JSON.stringify(['42']), `pulsing tickets: ${JSON.stringify(now)}`);
       checkRequestLog(world);
       await page.close();
     });
