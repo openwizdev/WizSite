@@ -66,3 +66,12 @@
 ✖ failing tests:
     actual: 502,
     expected: 400,
+
+# R2 red run: a stream nobody reads stops at the timeout but never settles, so its waitUntil promise stays pending
+✖ a stream nobody reads still ends at the timeout: the upstream call is cancelled and its waitUntil settles (1031.565274ms)
+ℹ tests 1
+ℹ pass 0
+ℹ fail 1
+✖ failing tests:
+    actual: 'still pending',
+    expected: 'settled',

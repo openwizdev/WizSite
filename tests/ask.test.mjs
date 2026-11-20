@@ -476,6 +476,25 @@ test('a visitor who stops the stream cancels the upstream call, and the reservat
   assert.equal(store.dump().counters.find(r => r.key === 'spend').count, 63610);
 });
 
+test('a stream nobody reads still ends at the timeout: the upstream call is cancelled and its waitUntil settles', async () => {
+  let upstream;
+  answer = () => {
+    upstream = sse({ chunks: Array.from({ length: 20 }, (_, i) => `Synthetic unread piece ${i}. `), cost: 0.0001 });
+    return new Response(upstream.body);
+  };
+  const c = withCase();
+  const store = fakeD1(c.store);
+  const pending = [];
+  const env = { ...c.settings, ASSETS: assets(), ASK_A_WIZ_COUNTERS: store.binding };
+  const response = await handle({ request: new Request(`${SITE}/api/ask`, { method: 'POST', headers: c.request.headers, body: c.request.body }), env, waitUntil: p => pending.push(p) },
+    { clock: () => new Date(c.now), rank: () => c.retrieved, upstreamTimeout: 30 });
+  assert.equal(response.status, 200);
+  const outcome = await Promise.race([Promise.all(pending).then(() => 'settled'), new Promise(r => setTimeout(() => r('still pending'), 1000))]);
+  assert.equal(outcome, 'settled');
+  assert.equal(upstream.state.cancelled, true);
+  assert.equal(store.dump().counters.find(r => r.key === 'spend').count, 63610, 'the reservation stays');
+});
+
 test('an invalid reported cost keeps the whole reservation; a valid one replaces it', async () => {
   for (const [cost, spend] of [[-0.001, 63610], ['0.0001', 63610], [null, 63610], [0, 61000], [0.0000001, 61001], [0.0026, 63600]]) {
     answer = upstreamAnswer({ chunks: ['Synthetic answer with a cost.'], cost });
