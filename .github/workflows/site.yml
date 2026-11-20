@@ -15,6 +15,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
+      - name: Check added comments against contracts/comments.v1.md
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch --quiet --no-tags --depth=2 origin "$GITHUB_SHA"
+          python3 -I tools/comment-check/check.py diff --base HEAD^1
       - name: Install the pinned npm dependencies
         run: npm ci
       - name: Build static site
