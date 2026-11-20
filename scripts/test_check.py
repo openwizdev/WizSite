@@ -475,9 +475,11 @@ class Checks(unittest.TestCase):
         refused = {
             'buy button': ('changelog/index.html', lambda t: t.replace(CTA, '', 1)),
             'buy button to /team/': ('team/index.html', lambda t: t.replace('<a class="nav-team" href="/team/">', '<a class="nav-team" href="/">', 1)),
-            'one booking link': ('index.html', lambda t: t.replace('</main>', '<a data-book href="https://cal.com/x">Book</a></main>', 1)),
+            'one booking link': ('team/index.html', lambda t: t.replace('</main>', '<a data-book href="https://cal.com/x">Book</a></main>', 1)),
+            'unexpected external URL ': ('index.html', lambda t: t.replace('</main>', '<a data-book href="https://cal.com/x">Book</a></main>', 1)),
             'must be https': ('team/index.html', lambda t: book.sub('data-book href="http://cal.com/x"', t)),
             'must be https ': ('team/index.html', lambda t: book.sub('data-book href="mailto:someone"', t)),
+            'unexpected external URL': ('app/index.html', lambda t: t.replace('</body>', '<a data-book href="https://cal.com/x">Book</a></body>', 1)),
             'shows no price': ('team/index.html', lambda t: t.replace('Custom pricing.', 'Custom pricing. From $99 per month.', 1)),
             'team page copy': ('team/index.html', lambda t: t.replace('>Book a call</a>', '>Talk</a>', 1)),
         }

@@ -381,7 +381,7 @@ async function chrome(page, where, mode) {
 async function buy(page, where, path) {
   const facts = await page.evaluate(`(() => { ${HELPERS}
     const bar = document.querySelector('header.landing-nav');
-    const inside = el => shown(el) && el.getBoundingClientRect().left >= 0 && el.getBoundingClientRect().right <= innerWidth;
+    const inside = el => shown(el) && el.getBoundingClientRect().left >= 0 && el.getBoundingClientRect().right <= innerWidth && el.scrollWidth <= el.clientWidth + 1;
     const button = bar?.querySelector('a.nav-team[href="/team/"]');
     return {
       scroll: document.scrollingElement.scrollWidth, inner: innerWidth,
@@ -436,6 +436,17 @@ async function main() {
           }
         } finally {
           await changelog.close();
+        }
+      }
+    }
+    // #63 R1: the header between the phone and desktop widths, where the long button label must still fit.
+    for (const width of [481, 500, 560, 640, 720, 800, 900, 960]) {
+      for (const path of ['/', '/changelog/', '/drivers/', '/team/']) {
+        const other = await open(browser, origin, width, 800, MODES.motion, path);
+        try {
+          await buy(other, `${path} ${width}px, motion`, path);
+        } finally {
+          await other.close();
         }
       }
     }

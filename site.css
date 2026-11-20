@@ -286,12 +286,15 @@ code,.v{font-family:var(--ow-font-mono)}
   .landing-nav nav { gap: 8px; }
   .landing-nav .sign-in { padding-inline: 10px; }
   .landing-nav .nav-team { padding-inline: 10px; }
-  /* #63: room for the buy button: the brand shows its mark alone (its name stays for screen readers). */
+  .hero-copy h1 { font-size: clamp(44px, 13vw, 52px); }
+  .ember-ticket { overflow-wrap: anywhere; }
+}
+/* #63: room for the buy button up to 640 px: the brand shows its mark alone (its name stays for screen readers) and the
+   button says For teams. */
+@media (max-width: 640px) {
   .landing-nav .landing-brand { gap: 0; font-size: 0; }
   .nav-team-long { display: none; }
   .nav-team-short { display: inline; }
-  .hero-copy h1 { font-size: clamp(44px, 13vw, 52px); }
-  .ember-ticket { overflow-wrap: anywhere; }
 }
 @media (max-width: 360px) {
   .landing-nav nav { gap: 6px; }

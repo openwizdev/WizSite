@@ -221,9 +221,8 @@ class Page(HTMLParser):
             assert attrs['id'] not in self.ids, 'duplicate HTML id'
             self.ids.add(attrs['id'])
         if tag == 'a' and 'data-book' in attrs:
-            # The booking link may leave the site; check_book checks it instead of check_ref.
+            # The booking link may leave the site, from the team page only: check_team checks it there instead of check_ref.
             self.books.append(attrs.get('href') or '')
-            attrs = {key: value for key, value in attrs.items() if key != 'href'}
         for key in ('href', 'src', 'poster'):
             if attrs.get(key):
                 self.refs.append(attrs[key])
@@ -392,6 +391,8 @@ def check_site(root):
         # The social card: an absolute URL on the site that resolves to a built file.
         assert page.social and all(s.startswith(SITE_URL) and s.removeprefix(SITE_URL).split('?')[0] in STATIC for s in page.social), 'social image must be a built file on the site'
         for ref in page.refs:
+            if path == root / TEAM_PAGE and ref in page.books:
+                continue
             check_ref(root, path, ref, pages, page.favicons)
         for ref in css_refs(path.read_text()):
             check_ref(root, path, ref, pages)
