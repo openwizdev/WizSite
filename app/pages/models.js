@@ -174,29 +174,42 @@
     return `Set the ${word.toLowerCase()} to ${said(written(to.provider, to.model, to.effort))}: run \`openwiz models set ${token} ${to.provider} ${to.model} ${to.effort}\` and commit the change.`;
   }
 
+  // The snapshot's exact shape (models.v1.schema.json#/$defs/snapshot): every key it pins and no other, each of its type.
+  const LABEL = 'as reported by CloudRoom; it may answer from a saved copy';
+  const str = v => typeof v === 'string' && v !== '';
+  const exactly = (v, keys) => Boolean(v) && typeof v === 'object' && !Array.isArray(v)
+    && Object.keys(v).length === keys.length && keys.every(key => Object.hasOwn(v, key));
+  const listOf = (v, each) => Array.isArray(v) && v.every(each);
+  const validChoice = c => exactly(c, ['provider', 'model', 'effort', 'family', 'names']) && isId(c.provider) && isModel(c.model)
+    && isId(c.effort) && ['claude', 'gpt', null].includes(c.family) && exactly(c.names, ['harness', 'model', 'effort'])
+    && str(c.names.harness) && str(c.names.model) && str(c.names.effort);
+  const validSnapshot = s => exactly(s, ['schema', 'read_at', 'label', 'state', 'harnesses', 'unavailable', 'recommended'])
+    && s.schema === 'openwiz.models-offered.v1' && Number.isSafeInteger(s.read_at) && s.read_at >= 0 && s.label === LABEL
+    && exactly(s.state, ['kind']) && s.state.kind === 'offered'
+    && listOf(s.harnesses, hr => exactly(hr, ['harness', 'provider', 'models']) && str(hr.harness) && str(hr.provider)
+      && listOf(hr.models, m => exactly(m, ['model', 'efforts']) && str(m.model) && m.efforts.length > 0 && listOf(m.efforts, str)))
+    && listOf(s.unavailable, u => exactly(u, ['harness', 'reason', 'text']) && str(u.harness) && str(u.text)
+      && ['catalogue_not_reported', 'id_mapping_not_verified', 'no_offered_effort'].includes(u.reason))
+    && exactly(s.recommended, ['orchestrator', 'builder', 'reviewer'])
+    && Object.values(s.recommended).every(r => exactly(r, ['choice', 'source', 'offered']) && str(r.source)
+      && typeof r.offered === 'boolean' && (r.choice === null || validChoice(r.choice)));
+
   // The snapshot's text -> {readAt, label, choices: [{provider, model, effort, names, settable, recommended: [key]}]},
-  // or throws Refused. Every offered choice is listed; only those `set` can write are settable.
+  // or throws Refused: a snapshot that breaks its schema (or offered nothing) gives no choice at all. Every offered
+  // choice is listed; only those `set` can write (the ids rule) are settable.
   function offered(text) {
     let snap;
     try { snap = JSON.parse(text); } catch { refuse('not JSON'); }
-    if (snap?.schema !== 'openwiz.models-offered.v1' || !Number.isSafeInteger(snap.read_at) || snap.state?.kind !== 'offered'
-      || !Array.isArray(snap.harnesses)) refuse('not an offered-models snapshot');
-    const str = s => typeof s === 'string' && s !== '';
-    const choices = snap.harnesses.flatMap(harness => {
-      if (!str(harness?.provider) || !Array.isArray(harness.models)) refuse('a broken harness');
-      return harness.models.flatMap(m => {
-        if (!str(m?.model) || !Array.isArray(m.efforts) || !m.efforts.every(str)) refuse('a broken model');
-        return m.efforts.map(effort => ({ provider: harness.provider, model: m.model, effort, names: written(harness.provider, m.model, effort),
-          settable: isId(harness.provider) && isModel(m.model) && isId(effort), recommended: [] }));
-      });
-    });
-    for (const key of ['orchestrator', 'builder', 'reviewer']) {
-      const pick = snap.recommended?.[key];
-      if (pick?.offered !== true || !pick.choice) continue;
+    if (!validSnapshot(snap)) refuse('not an offered-models snapshot as models.v1 pins it');
+    const choices = snap.harnesses.flatMap(harness => harness.models.flatMap(m => m.efforts.map(effort => ({
+      provider: harness.provider, model: m.model, effort, names: written(harness.provider, m.model, effort),
+      settable: isId(harness.provider) && isModel(m.model) && isId(effort), recommended: [] }))));
+    for (const [key, pick] of Object.entries(snap.recommended)) {
+      if (pick.offered !== true || !pick.choice) continue;
       const same = choices.find(c => c.settable && c.provider === pick.choice.provider && c.model === pick.choice.model && c.effort === pick.choice.effort);
       same?.recommended.push(key);
     }
-    return { readAt: snap.read_at, label: str(snap.label) ? snap.label : '', choices };
+    return { readAt: snap.read_at, label: snap.label, choices };
   }
 
   OW.models = { read, offered, line, Refused };
@@ -212,6 +225,15 @@
     const repo = OW.data.repo.get()?.full;
     if (shown.repo !== repo) Object.assign(shown, { repo, open: null, picked: {} });
     if (!data) return el.replaceChildren(OW.ui.placeholder('Reading GitHub…'));
+    // A field GitHub refused or failed (an error at its path) is a failed read, never a missing file.
+    const failed = field => (feed.errors || []).find(e => Array.isArray(e?.path) && e.path[0] === 'repository' && e.path[1] === field);
+    const failedText = (field, file) => {
+      const error = failed(field);
+      return error?.type === 'FORBIDDEN'
+        ? `GitHub refused to read ${file} (${error.message || 'not accessible'}). The OpenWiz Viewer may not have access to this repository's files, so this is unknown, not missing.`
+        : `GitHub couldn't read ${file}, so it is unknown, not missing. The app tries again on its own, or press Refresh now.`;
+    };
+    if (failed('fleet')) return el.replaceChildren(OW.ui.unknown(failedText('fleet', 'docs/agents/fleet.md')));
     if (!data.fleet) {
       return el.replaceChildren(OW.ui.unknown('This repository has no docs/agents/fleet.md on its default branch, so its models aren\'t set. Ask your agent to run the setup skill, which writes it.'));
     }
@@ -224,7 +246,9 @@
     }
     let snapshot = null;
     let snapshotNote = null;
-    if (!data.offered) {
+    if (failed('offered')) {
+      snapshotNote = h('div', { class: 'notice bad' }, h('span', {}, h('b', {}, 'No choices: '), failedText('offered', 'docs/agents/models-offered.json')));
+    } else if (!data.offered) {
       snapshotNote = h('div', { class: 'notice' }, h('span', {}, h('b', {}, 'No list of offered models yet. '), MAKE));
     } else {
       try {
@@ -234,7 +258,18 @@
         snapshotNote = h('div', { class: 'notice bad' }, h('span', {}, h('b', {}, 'The list of offered models couldn\'t be read. '), MAKE));
       }
     }
-    const notes = [snapshotNote, ...config.warnings.map(text => h('div', { class: 'notice slow' }, h('span', {}, text)))].filter(Boolean);
+    // Choices and hand-offs only from a whole, current read: after a failed or partial read nothing is offered, and a
+    // line picked earlier is dropped unless this read still offers its choice.
+    const fresh = feed.state === 'ok';
+    if (!fresh) snapshot = null;
+    for (const [key, picked] of Object.entries(shown.picked)) {
+      const still = fresh && (picked.to === null || snapshot?.choices.some(c => c.settable && c.provider === picked.to.provider
+        && c.model === picked.to.model && c.effort === picked.to.effort));
+      if (!still) delete shown.picked[key];
+    }
+    const staleNote = feed.state === 'stale' ? h('div', { class: 'notice bad' }, h('span', {}, h('b', {}, 'No choices for now: '),
+      `the last read failed at ${time(feed.failedAt)}, so the roles shown are from ${time(feed.readAt)}. Choices show again once a read works: press Refresh now, or wait for the next read.`)) : null;
+    const notes = [staleNote, snapshotNote, ...config.warnings.map(text => h('div', { class: 'notice slow' }, h('span', {}, text)))].filter(Boolean);
     const intro = h('p', { class: 'small' }, config.form === 'older_tables'
       ? 'Read from fleet.md\'s older model tables. A change through your agent adds the one Models table.'
       : 'Read from the Models table in docs/agents/fleet.md. A change reaches the next agent started; running agents keep their model.');
@@ -246,11 +281,15 @@
       const open = shown.open === key;
       const picked = shown.picked[key];
       const pick = to => {
-        const text = line(key, to);
-        shown.picked[key] = { text, copied: null };
-        Promise.resolve().then(() => navigator.clipboard.writeText(text)).then(() => true, () => false).then(copied => {
-          if (shown.picked[key]?.text === text) shown.picked[key].copied = copied;
-          OW.factory.redraw(el, () => render(el, feed));
+        const record = { text: line(key, to), to, copied: null };
+        shown.picked[key] = record;
+        // The copy may finish after the user left this page or repository: redraw only while this pick is still shown.
+        Promise.resolve().then(() => navigator.clipboard.writeText(record.text)).then(() => true, () => false).then(copied => {
+          record.copied = copied;
+          const here = location.hash.replace(/^#\/?/, '').split('/')[0] === 'models';
+          if (here && el.isConnected && el.querySelector('.models') && shown.repo === OW.data.repo.get()?.full && shown.picked[key] === record) {
+            OW.factory.redraw(el, () => render(el, feed));
+          }
         });
         OW.factory.redraw(el, () => render(el, feed));
       };
@@ -258,11 +297,12 @@
         h('button', { type: 'button', 'data-focus': `models:${key}:${focusKey}`, onclick: () => pick(to) }, label),
         tag ? h('span', { class: 'tag' }, tag) : null);
       const picker = !open ? null : h('div', { class: 'picker' },
-        snapshot
-          ? h('p', { class: 'small' }, `Offered by your harnesses at ${time(snapshot.readAt)}${snapshot.label ? ` (${snapshot.label})` : ''}. Pick one to copy the line for your agent.`)
+        !fresh ? h('p', { class: 'small' }, 'No choices until a whole read of this repository works: press Refresh now.')
+          : snapshot
+          ? h('p', { class: 'small' }, `Offered by your harnesses at ${time(snapshot.readAt)}(${snapshot.label}). Pick one to copy the line for your agent.`)
           : h('p', { class: 'small' }, MAKE),
         h('ul', { class: 'repos' },
-          key === 'small_builder' || key === 'fixer' ? option('Follow the Builder', null, null, 'follow') : null,
+          fresh && (key === 'small_builder' || key === 'fixer') ? option('Follow the Builder', null, null, 'follow') : null,
           (snapshot?.choices || []).map(c => (c.settable
             ? option(said(c.names), c.recommended.includes(key) ? 'Recommended' : null, c, `${c.provider} ${c.model} ${c.effort}`)
             : h('li', {}, h('span', {}, said(c.names)), h('span', { class: 'tag' }, 'Can\'t be set from here'))))));
