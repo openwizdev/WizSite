@@ -288,10 +288,11 @@ code,.v{font-family:var(--ow-font-mono)}
   .hero-copy h1 { font-size: clamp(44px, 13vw, 52px); }
   .ember-ticket { overflow-wrap: anywhere; }
 }
-/* #63: room for the buy button up to 640 px: the brand shows its mark alone (its name stays for screen readers) and the
-   button says For teams. */
-@media (max-width: 640px) {
+/* #63: room for the buy button up to 760 px: the brand shows its mark alone (its name stays for screen readers), the
+   GitHub link its logo alone, and the button says For teams. */
+@media (max-width: 760px) {
   .landing-nav .landing-brand { gap: 0; font-size: 0; }
+  .landing-nav .github-star span { display: none; }
   .nav-team-long { display: none; }
   .nav-team-short { display: inline; }
 }
@@ -299,7 +300,6 @@ code,.v{font-family:var(--ow-font-mono)}
   .landing-nav nav { gap: 6px; }
   .landing-nav .sign-in, .landing-nav .nav-team { padding-inline: 8px; }
   .landing-nav .github-star { padding-inline: 8px; }
-  .landing-nav .github-star span { display: none; }
 }
 
 /* The drivers page (openwiz.dev/drivers, #50), variant D: the cinematic voyage. A painted night sea and the Wiz family's

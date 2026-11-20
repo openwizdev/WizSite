@@ -227,8 +227,10 @@ class Page(HTMLParser):
             assert attrs['id'] not in self.ids, 'duplicate HTML id'
             self.ids.add(attrs['id'])
         if tag == 'a' and 'data-book' in attrs:
-            # The booking link may leave the site, from the team page only: check_team checks it there instead of check_ref.
+            # The booking link may leave the site: check_team checks it, on the team page only, instead of check_ref.
+            # Only this element's href is exempt; check_site refuses a booking link on any other page.
             self.books.append(attrs.get('href') or '')
+            attrs = {key: value for key, value in attrs.items() if key != 'href'}
         for key in ('href', 'src', 'poster'):
             if attrs.get(key):
                 self.refs.append(attrs[key])
@@ -406,9 +408,8 @@ def check_site(root):
     for path, page in pages.items():
         # The social card: an absolute URL on the site that resolves to a built file.
         assert page.social and all(s.startswith(SITE_URL) and s.removeprefix(SITE_URL).split('?')[0] in STATIC for s in page.social), 'social image must be a built file on the site'
+        assert path == root / TEAM_PAGE or not page.books, f'a booking link outside the team page: {path.name}'
         for ref in page.refs:
-            if path == root / TEAM_PAGE and ref in page.books:
-                continue
             check_ref(root, path, ref, pages, page.favicons)
         for ref in css_refs(path.read_text()):
             check_ref(root, path, ref, pages)
@@ -912,6 +913,7 @@ def check_releases(section):
 def check_app(root, names, pages):
     """The app's page: fingerprinted Ember and scripts only, no inline script, local links, its manifest, its CSP."""
     page = Page((root / APP_PAGE).read_text())
+    assert not page.books, 'a booking link outside the team page: the app'
     assert not set(page.refs) & {f'/{name}' for name in HASHED}, 'the app uses an unfingerprinted style or script'
     assert page.stylesheets == [f'/{names[APP_STYLE]}'], 'the app must apply exactly the fingerprinted ember.css'
     assert page.scripts == [ref for name in APP_SCRIPTS for ref in [f'/{v}' for v, (_, before) in APP_VENDOR.items() if before == name] + [f'/{names[name]}']], \
