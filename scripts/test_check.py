@@ -7,7 +7,7 @@ from unittest import mock
 
 import re
 
-from check import CTA, FINGERPRINTS, HASHED, INSTALL_SWITCH, ROOT, Page, check_changelog, check_releases, split_releases, check_motion, check_privacy, check_ref, check_site, check_vector, check_webp, fingerprint
+from check import CTA, FOOTER, FINGERPRINTS, HASHED, INSTALL_SWITCH, ROOT, Page, check_changelog, check_releases, split_releases, check_motion, check_privacy, check_ref, check_site, check_vector, check_webp, fingerprint
 
 
 def edit_built(root, name, change):
@@ -518,15 +518,27 @@ class Checks(unittest.TestCase):
         refused = {
             'buy button': ('changelog/index.html', lambda t: t.replace(CTA, '', 1)),
             'buy button to /team/': ('team/index.html', lambda t: t.replace('<a class="nav-team" href="/team/">', '<a class="nav-team" href="/">', 1)),
-            'one booking link': ('team/index.html', lambda t: t.replace('</main>', '<a data-book href="https://cal.com/x">Book</a></main>', 1)),
+            'two booking links': ('team/index.html', lambda t: t.replace('</main>', '<a data-book href="https://cal.com/x">Book</a></main>', 1)),
+            'one booking value': ('team/index.html', lambda t: book.sub('data-book href="https://cal.com/x"', t, count=1)),
             'outside the team page': ('index.html', lambda t: t.replace('</main>', '<a data-book href="https://cal.com/x">Book</a></main>', 1)),
             'must be https': ('team/index.html', lambda t: book.sub('data-book href="http://cal.com/x"', t)),
             'must be https ': ('team/index.html', lambda t: book.sub('data-book href="mailto:someone"', t)),
             'outside the team page: the app': ('app/index.html', lambda t: t.replace('</body>', '<a data-book href="https://cal.com/x">Book</a></body>', 1)),
             'unexpected external URL': ('team/index.html', lambda t: t.replace('</main>', '<img src="https://cal.com/openwiz-jake/setup" alt=""></main>', 1)),
-            'one booking link ': ('team/index.html', lambda t: t.replace('</main>', '<a data-book href="https://cal.com/openwiz-jake/setup">Again</a></main>', 1)),
+            'two booking links ': ('team/index.html', lambda t: t.replace('</main>', '<a data-book href="https://cal.com/openwiz-jake/setup">Again</a></main>', 1)),
+            'two booking links  ': ('team/index.html', lambda t: re.sub(r'<a class="team-book" data-book[^>]*>Book a call</a>\n</section>', '</section>', t)),
             'shows no price': ('team/index.html', lambda t: t.replace('Custom pricing.', 'Custom pricing. From $99 per month.', 1)),
-            'team page copy': ('team/index.html', lambda t: t.replace('>Book a call</a>', '>Talk</a>', 1)),
+            'team page copy': ('team/index.html', lambda t: t.replace('>Book a call</a>', '>Talk</a>')),
+            'team page copy ': ('team/index.html', lambda t: t.replace('>Book a call</a>', '>Talk</a>', 1)),
+            # #73: the team page's body after its hero.
+            'the team page sections': ('team/index.html', lambda t: t.replace('>Where your agents run</h2>', '>Hosts</h2>', 1)),
+            'the team page sections ': ('team/index.html', lambda t: re.sub(r'<section class="team-part wrap" aria-labelledby="team-get">[\s\S]*?</section>\n', '', t)),
+            'three steps': ('team/index.html', lambda t: t.replace('<li><h3>Your first fleet ships</h3><p>A real change, in a day.</p></li>', '', 1)),
+            'link to /drivers/': ('team/index.html', lambda t: t.replace('<li><a href="/drivers/">Cloudroom</a></li>', '<li>Cloudroom</li><li><a href="/">x</a></li>', 1)),
+            # #73: the one site footer on every page.
+            'the one site footer|one X link per page': ('drivers/index.html', lambda t: t.replace(FOOTER, '', 1)),
+            'the one site footer|one X link per page ': ('changelog/index.html', lambda t: t.replace('</main>', '</main>' + FOOTER, 1)),
+            'the one site footer  ': ('index.html', lambda t: t.replace('X @openwiz', 'X', 1)),
         }
         for message, (page, change) in refused.items():
             temp, root = planted(page, change)
@@ -535,6 +547,42 @@ class Checks(unittest.TestCase):
         temp, root = planted('team/index.html', lambda t: book.sub('data-book href="https://cal.com/someone/intro"', t))
         with temp:
             check_site(root)
+
+    def test_footer_source(self):
+        """#73: the footer's own links and parts, and the one X link the site may make off GitHub."""
+        import check
+        for message, change in {
+            'the footer links': lambda f: f.replace('<li><a href="/app/">The app</a></li>', '', 1),
+            'the footer links ': lambda f: f.replace('href="https://x.com/openwiz"', 'href="https://x.com/someone"', 1),
+            'link groups': lambda f: f.replace('<h2>Company</h2>', '<h2>More</h2>', 1),
+            'Owned by no one': lambda f: f.replace('Owned by no one.', '', 1),
+            'wordmark': lambda f: f.replace('<p class="footer-wordmark">OpenWiz</p>', '', 1),
+            'twelve Wizes': lambda f: f.replace('<span class="family-wiz">', '<span>', 1),
+        }.items():
+            broken = change(FOOTER)
+            html = '<html><body><!-- footer.html -->\n</body></html>'.replace('<!-- footer.html -->\n', broken)
+            with self.subTest(message=message), mock.patch.object(check, 'FOOTER', broken), self.assertRaisesRegex(AssertionError, message.strip()):
+                check.check_footer({'index.html': html})
+        # #75 R3: the X account is a footer link only: never a resource, a CSS url() or a second link.
+        for url in ('https://x.com/someone', 'https://x.com/openwiz'):
+            with self.subTest(url=url), self.assertRaisesRegex(AssertionError, 'unexpected external URL'):
+                check_ref(ROOT, ROOT / 'site.css', url, {})
+        for message, (page, old, new) in {
+            'unexpected external URL': ('team/index.html', '</main>', '<img src="https://x.com/openwiz" alt=""></main>'),
+            'unexpected external URL ': ('index.html', '</head>', '<link rel="preload" href="https://x.com/openwiz" as="image"></head>'),
+            'one X link per page': ('changelog/index.html', '</main>', '<a href="https://x.com/openwiz">X</a></main>'),
+            'one X link per page ': ('drivers/index.html', '<a href="https://x.com/openwiz">X @openwiz</a>', '<a href="/">X @openwiz</a>'),
+            'one X link per page, the footer\'s: the app': ('app/index.html', '</body>', '<a href="https://x.com/openwiz">X</a></body>'),
+        }.items():
+            with tempfile.TemporaryDirectory() as temp, self.subTest(message=message):
+                root = Path(temp) / 'dist'
+                shutil.copytree(ROOT / 'dist', root)
+                path = root / page
+                text = path.read_text()
+                assert old in text, old
+                path.write_text(text.replace(old, new, 1))
+                with self.assertRaisesRegex(AssertionError, message.strip()):
+                    check_site(root)
 
     def test_drivers_page(self):
         # Catches (#50, #62): the drivers page dropped from the build or its checks; a card missing, reordered or with
@@ -554,7 +602,8 @@ class Checks(unittest.TestCase):
                 ('drivers/index.html', ' aria-current="page">Drivers', '>Drivers', 'aria-current'),
                 ('drivers/index.html', '</main>', '<p>Used by 300 teams.</p></main>', 'invented number'),
                 ('drivers/index.html', '</main>', '<p hidden>Later.</p></main>', 'without a script|waits for a script'),
-                ('drivers/index.html', '</head>', '<script>1</script></head>', 'without scripts'),
+                ('drivers/index.html', '</head>', '<script>1</script></head>', 'never its own'),
+                ('drivers/index.html', '</head>', '<script src="/drivers/logos/bot.svg"></script></head>', 'never its own'),
                 ('index.html', '<a class="nav-drivers" href="/drivers/">Drivers</a>', '', 'identical to the landing|landing top bar needs one Drivers'),
                 ('changelog/index.html', '<a class="nav-drivers" href="/drivers/">Drivers</a>', '', 'Changelog top bar needs one Drivers')):
             self.broken(name, old, new, error)
@@ -713,6 +762,9 @@ class Checks(unittest.TestCase):
         for bad, error in (
                 ('\n.drivers-page .host-marks .host-lockup { height: 26px; }\n', 'sized apart from its slot'),
                 ('\n.drivers-page .host-mark .host-tile { width: 30px; }\n', 'sized apart from its slot'),
+                ('\n.drivers-page .host-mark .host-tile { border-radius: 4px; }\n', 'official marks show whole'),
+                ('\n.drivers-page .driver-logo.host-tile { border-radius: 7px; }\n', 'official marks show whole'),
+                ('\n.drivers-page .spot-logo { object-fit: cover; }\n', 'official marks show whole'),
                 ('\n@media (max-width: 760px) { .drivers-page .proof-scene { aspect-ratio: 1 / 1; } }\n', 'shorter supporting image'),
                 ('\n@media (max-width: 760px) { .drivers-page .proof-scene { order: -1; } }\n', 'keeps its reading order')):
             self.broken(page, '', '', error, css=bad)

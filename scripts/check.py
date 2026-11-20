@@ -115,7 +115,7 @@ def fingerprint(name, data):
 def fingerprinted_page(html, cta=False):
     for name, hashed in FINGERPRINTS.items():
         html = html.replace(f'"/{name}"', f'"/{hashed}"')
-    return with_cta(html) if cta else html
+    return with_footer(with_cta(html)) if cta else html
 
 
 # The header's one buy button (#63): one snippet, which the build adds to every site page's top bar (not the app's).
@@ -128,6 +128,23 @@ TEAM_PAGE = 'team/index.html'
 BOOK_PLACEHOLDER = '#book'
 TEAM_COPY = ('We set up your agent factory with you.', 'Your repos, your models, your machines. First fleet running in a day.',
              'Solo builders and small teams.', 'Custom pricing.', 'Book a call')
+# #73: the team page's body after its hero, in order: what you get (three steps), where your agents run, the closing call.
+TEAM_PARTS = ('What you get', 'Where your agents run', 'Plan your factory with us.')
+TEAM_STEPS = ('A call to plan your setup', 'We install OpenWiz with you', 'Your first fleet ships')
+# The site footer (#73): one snippet, which the build adds at each site page's one slot (not the app's). Its links, in order.
+FOOTER = (ROOT / 'footer.html').read_text()
+FOOTER_SLOT = '<!-- footer.html -->\n'
+FOOTER_LINKS = (('/drivers/', 'Drivers'), ('/changelog/', 'Changelog'), ('https://github.com/openwizdev/openwiz#readme', 'Docs'),
+                ('/app/', 'The app'), ('/team/', 'For teams'), ('https://github.com/openwizdev/openwiz', 'GitHub'),
+                ('https://x.com/openwiz', 'X @openwiz'))
+FOOTER_LINE = 'Apache-2.0. Owned by no one.'
+# The only external link off GitHub: OpenWiz's own X account, in the footer.
+X_ACCOUNT = 'https://x.com/openwiz'
+
+
+def with_footer(html):
+    assert html.count(FOOTER_SLOT) == 1, 'a site page needs exactly one footer slot'
+    return html.replace(FOOTER_SLOT, FOOTER)
 
 
 def with_cta(html):
@@ -283,6 +300,7 @@ class Page(HTMLParser):
         self.links = []
         self.inline_scripts = 0
         self.books = []
+        self.x_links = 0
         self.stylesheets, self.scripts = [], []
         self.feed(text)
 
@@ -295,6 +313,11 @@ class Page(HTMLParser):
             # The booking link may leave the site: check_team checks it, on the team page only, instead of check_ref.
             # Only this element's href is exempt; check_site refuses a booking link on any other page.
             self.books.append(attrs.get('href') or '')
+            attrs = {key: value for key, value in attrs.items() if key != 'href'}
+        elif tag == 'a' and attrs.get('href') == X_ACCOUNT:
+            # #75 R3: OpenWiz's X account, only as a link a visitor follows (check_site allows one, the footer's);
+            # anywhere else, as a resource or in CSS, check_ref refuses it like any external URL.
+            self.x_links += 1
             attrs = {key: value for key, value in attrs.items() if key != 'href'}
         for key in ('href', 'src', 'poster'):
             if attrs.get(key):
@@ -477,6 +500,7 @@ def check_site(root):
         # The social card: an absolute URL on the site that resolves to a built file.
         assert page.social and all(s.startswith(SITE_URL) and s.removeprefix(SITE_URL).split('?')[0] in STATIC for s in page.social), 'social image must be a built file on the site'
         assert path == root / TEAM_PAGE or not page.books, f'a booking link outside the team page: {path.name}'
+        assert page.x_links == 1, f'one X link per page, the footer\'s: {path.relative_to(root)} has {page.x_links}'
         for ref in page.refs:
             check_ref(root, path, ref, pages, page.favicons)
         for ref in css_refs(path.read_text()):
@@ -571,6 +595,7 @@ def check_site(root):
     check_changelog(landing, changelog)
     check_releases(releases)
     check_team({name: (root / name).read_text() for name in PAGES}, {name: pages[root / name] for name in PAGES})
+    check_footer({name: (root / name).read_text() for name in PAGES})
     main = re.search(r'<main\b[^>]*>[\s\S]*?</main>', changelog)
     assert main and sha256(main[0].encode()).hexdigest() == CHANGELOG_MAIN, 'changelog content changed; review explicitly before updating its snapshot'
 
@@ -822,7 +847,10 @@ def check_drivers(landing, changelog, drivers, page):
         f'the drivers description must not say every driver passes: {description[0]}'
     assert not DRIVER_JARGON.search(description[0]), f'a jargon count in the drivers description: {description[0]}'
     assert not re.search(r'grok bot[^.;]*\bpass', description[0], re.I), f'Grok Bot has not passed: {description[0]}'
-    assert not page.scripts and not page.inline_scripts, 'the drivers page reads completely without scripts'
+    # #75 R1: the page itself reads without scripts; it loads only the site's own two (GSAP, then site.js), as every site
+    # page does, for the shared footer's star count and Wizes.
+    assert page.scripts == Page(landing).scripts and not page.inline_scripts, \
+        'the drivers page loads only the site\'s footer scripts (GSAP, site.js), never its own'
     main = re.search(r'<main\b[^>]*>[\s\S]*?</main>', drivers)
     assert main, 'the drivers page needs its main'
     main = main[0]
@@ -1038,8 +1066,10 @@ def check_team(htmls, pages):
         bar = top_bar(html)
         assert bar.count('class="nav-team"') == 1 and bar.count(CTA_LINK) == 1, f'the {name} top bar needs its one buy button to /team/'
         assert html.count('class="nav-team"') == 1, f'the {name} page needs exactly one buy button'
+    # Two Book a call links, the hero's and the closing one (#73), both on the team page with the one booking value.
     books = [(name, href) for name, page in pages.items() for href in page.books]
-    assert len(books) == 1 and books[0][0] == TEAM_PAGE, f'the site needs exactly one booking link, on the team page: {books}'
+    assert len(books) == 2 and all(name == TEAM_PAGE for name, _ in books), f'the site needs its two booking links, both on the team page: {books}'
+    assert books[0][1] == books[1][1], f'both booking links share the one booking value: {books}'
     href = books[0][1]
     if href == BOOK_PLACEHOLDER:
         assert 'book' in pages[TEAM_PAGE].ids, 'the booking placeholder needs its id on the team page'
@@ -1050,6 +1080,31 @@ def check_team(htmls, pages):
     for text in TEAM_COPY:
         assert text in flat, f'missing team page copy: {text}'
     assert not re.search(r'[$€£]\s*\d|\bper (?:month|seat|user)\b', flat, re.I), 'the team page shows no price'
+    labels = re.findall(r'<a [^>]*data-book[^>]*>([^<]*)</a>', htmls[TEAM_PAGE])
+    assert labels == ['Book a call', 'Book a call'], f'team page copy: both booking links read Book a call: {labels}'
+    parts = [plain(h) for h in re.findall(r'<h2\b[^>]*>([\s\S]*?)</h2>', htmls[TEAM_PAGE].split('<footer', 1)[0])]
+    assert parts == list(TEAM_PARTS), f'the team page sections, in order: {parts}'
+    steps = re.search(r'<ol class="team-steps">([\s\S]*?)</ol>', htmls[TEAM_PAGE])
+    assert steps and [plain(h) for h in re.findall(r'<h3>([\s\S]*?)</h3>', steps[1])] == list(TEAM_STEPS), \
+        f'What you get: its three steps, in order: {TEAM_STEPS}'
+    run = re.search(r'<ul class="team-drivers">([\s\S]*?)</ul>', htmls[TEAM_PAGE])
+    assert run and re.findall(r'href="([^"]*)"', run[1]) and set(re.findall(r'href="([^"]*)"', run[1])) == {'/drivers/'}, \
+        'Where your agents run: its drivers link to /drivers/'
+
+
+def check_footer(htmls):
+    """#73: every site page has the one footer from footer.html, once, at its end: both link groups in order, the small
+    line, the wordmark and the twelve Wizes."""
+    for name, html in htmls.items():
+        assert html.count('<footer') == 1 and html.count(FOOTER) == 1, f'the {name} page needs the one site footer'
+        assert html.rstrip().endswith(FOOTER + '</body></html>'), f'the {name} page ends with the site footer'
+    links = [(href, plain(text)) for href, text in re.findall(r'<a [^>]*href="([^"]*)"[^>]*>([\s\S]*?)</a>', FOOTER)]
+    assert tuple(links) == FOOTER_LINKS, f'the footer links, in order: {links}'
+    groups = [plain(h) for h in re.findall(r'<h2>([\s\S]*?)</h2>', FOOTER)]
+    assert groups == ['Product', 'Company'], f'the footer link groups: {groups}'
+    assert FOOTER_LINE in plain(FOOTER), f'the footer says {FOOTER_LINE}'
+    assert '<p class="footer-wordmark">OpenWiz</p>' in FOOTER, 'the footer shows the wordmark'
+    assert FOOTER.count('class="family-wiz"') == 12, 'the footer has the twelve Wizes'
 
 
 def check_drivers_nav(css, pages):
@@ -1085,6 +1140,11 @@ def check_driver_css(css):
             if 'host-mark' in one and one != '.drivers-page .host-mark img' and re.search(r'img|host-(?:icon|tile|lockup)\b', one):
                 assert not re.search(r'(?<![-\w])(?:height|max-height|width)\s*:\s*\d', body), \
                     f'a host mark sized apart from its slot, so the pills are uneven: {one}'
+    # #74 R1: an official mark shows whole, as its file draws it: no rounded corners, clip or crop on a logo image.
+    for sel, body in re.findall(r'([^{}]+)\{([^{}]*)\}', css):
+        if re.search(r'host-(?:tile|lockup|icon)\b|spot-logo|driver-logo|host-mark img', sel):
+            assert not re.search(r'(?<![-\w])(?:border-radius|clip-path|overflow|object-fit|mask)\s*:', body), \
+                f'a logo clipped or cropped; official marks show whole: {sel.strip()}'
     phone = [b for q, b in re.findall(r'@media\s*\(max-width:\s*(\d+)px\)\s*\{((?:[^{}]*\{[^{}]*\})*)[^{}]*\}', css) if int(q) <= 760]
     ratios = [r for block in phone for body in css_rules(block, '.drivers-page .proof-scene')
               for r in re.findall(r'aspect-ratio\s*:\s*(\d+(?:\.\d+)?)\s*/\s*(\d+(?:\.\d+)?)', body)]
@@ -1171,6 +1231,7 @@ def check_app(root, names, pages):
     """The app's page: fingerprinted Ember and scripts only, no inline script, local links, its manifest, its CSP."""
     page = Page((root / APP_PAGE).read_text())
     assert not page.books, 'a booking link outside the team page: the app'
+    assert not page.x_links, 'one X link per page, the footer\'s: the app has one'
     assert not set(page.refs) & {f'/{name}' for name in HASHED}, 'the app uses an unfingerprinted style or script'
     assert page.stylesheets == [f'/{names[APP_STYLE]}'], 'the app must apply exactly the fingerprinted ember.css'
     assert page.scripts == [ref for name in APP_SCRIPTS for ref in [f'/{v}' for v, (_, before) in APP_VENDOR.items() if before == name] + [f'/{names[name]}']], \
