@@ -26,9 +26,9 @@ test('a fixture site and docs folder build exactly the expected sources and pass
     passages: [
       { source: 0, text: 'Bring your own everything.\nA synthetic landing line & a second clause.\nFirst point\nSecond point' },
       { source: 1, text: 'Questions\nWhat is a synthetic kernel?\nThe small core everything else plugs into.' },
-      { source: 1, text: 'What does it cost?\nNothing; it\'s free & open.' },
+      { source: 1, text: 'What does it cost?\nNothing; it\'s free & open &#x110000;' },
       { source: 2, text: 'Synthetic OpenWiz\nThe synthetic kernel for agent factories. See the install guide.' },
-      { source: 2, text: 'Quick start\nRun one line to install it.' },
+      { source: 2, text: 'Quick start\nRun one line to install it. Notes stay in the private record, never on GitHub.' },
       { source: 3, text: 'Install\nNeed · Why\nGit · Records\nsynthetic install --yes\nStep one\nStep two' },
     ],
   });
@@ -38,7 +38,7 @@ test('the index holds only public pages and docs: never the app, page chrome, sc
   const text = serialize(await buildIndex({ site, docs }));
   for (const kept of ['First point', 'What does it cost?', 'Quick start', 'Step two']) assert.ok(text.includes(kept), `the index must hold: ${kept}`);
   for (const never of ['SYNTHETIC-APP-SHELL', 'SYNTHETIC-FLEET-INTERNAL', 'SYNTHETIC-EVIDENCE-LOG', 'SYNTHETIC-AGENT-RULES',
-    'SYNTHETIC-TEXT-NOTE', 'script text', '.x{color', 'Top bar link', 'Footer words', 'Icon title', 'a comment', 'example.invalid', 'synthetic decision', 'private record']) {
+    'SYNTHETIC-TEXT-NOTE', 'script text', '.x{color', 'Top bar link', 'Footer words', 'Icon title', 'a comment', 'example.invalid', 'synthetic decision', '[private record]']) {
     assert.ok(!text.includes(never), `the index must not hold: ${never}`);
   }
 });
@@ -114,6 +114,8 @@ test('a refresh copies only README.md and the top-level docs, without private-re
     assert.equal(await readFile(join(target, 'commit.txt'), 'utf8'), `${COMMIT}\n`);
     const install = await readFile(join(target, 'docs/install.md'), 'utf8');
     assert.ok(install.includes('Step two') && !install.toLowerCase().includes('private record'), 'the pointer line is dropped, the rest kept');
+    const readme = await readFile(join(target, 'README.md'), 'utf8');
+    assert.ok(readme.includes('Notes stay in the private record, never on GitHub.'), 'prose naming a private record is no pointer: kept');
     await checkSnapshot(target);
   } finally {
     await rm(dir, { recursive: true, force: true });

@@ -7,3 +7,4 @@
 ## Quick start
 
 Run `one line` to install it.
+Notes stay in the private record, never on GitHub.

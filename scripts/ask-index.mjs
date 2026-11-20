@@ -2,8 +2,12 @@
 // It gathers the built site's public pages (every index.html but the app's) and OpenWiz's public docs (README.md and
 // the top-level docs/*.md of an OpenWiz checkout) into short plain-text passages, each pointing at its source page.
 // Plain text only, no embeddings and no dependency: the function scores these passages by keyword.
-import { readdir, readFile } from 'node:fs/promises';
+// Cloudflare's build has no OpenWiz checkout, so the docs come from ask-docs/, a reviewed snapshot refreshed by hand:
+//   node scripts/ask-index.mjs --refresh <an OpenWiz checkout>
+import { execFileSync } from 'node:child_process';
+import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const SCHEMA = 'openwiz.ask-a-wiz.index.v1';
 const SITE = 'https://openwiz.dev/';
@@ -12,13 +16,18 @@ const PREFIXES = [SITE, 'https://github.com/openwizdev/'];
 const MAX_PASSAGE = 1200; // code points
 const MAX_FIELD = 200;
 const MAX_BYTES = 2_000_000;
+// A pointer to a private record, in either public form ("[private record](url)" or "Private record: url"): a line
+// holding one is never copied or indexed.
+const PRIVATE = /\[private record\]\(|private record: *https?:/i;
 
 const ENTITIES = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', mdash: '—', ndash: '–', middot: '·', hellip: '…', rsquo: '’', lsquo: '‘', rdquo: '”', ldquo: '“' };
 const decode = text => text.replace(/&(#x[0-9a-f]+|#[0-9]+|[a-z]+);/gi, (all, name) =>
-  name[0] === '#' ? String.fromCodePoint(parseInt(name.slice(1).replace(/^x/i, '0x'))) : ENTITIES[name.toLowerCase()] ?? all);
+  name[0] === '#' ? point(Number(name.slice(1).replace(/^x/i, '0x')), all) : ENTITIES[name.toLowerCase()] ?? all);
+const point = (code, all) => code <= 0x10ffff ? String.fromCodePoint(code) : all; // an impossible character stays as written
 const squash = text => text.replace(/\s+/g, ' ').trim();
 const length = text => [...text].length;
 const cut = (text, max) => [...text].slice(0, max).join('');
+const byName = (a, b) => (a < b ? -1 : a > b ? 1 : 0); // the same order on every machine
 
 // A page's blocks: its <main> (or <body>) without scripts, styles, pictures and page chrome; headings marked.
 function htmlBlocks(html) {
@@ -42,7 +51,7 @@ function markdownBlocks(markdown) {
     .replace(/(\*\*|__|`)/g, '')));
   const blocks = [];
   let fenced = false, open = false;
-  for (const line of markdown.replace(/<!--[\s\S]*?-->/g, '').split('\n')) {
+  for (const line of markdown.replace(/<!--[\s\S]*?-->/g, '').split('\n').filter(line => !PRIVATE.test(line))) {
     if (/^\s*(```|~~~)/.test(line)) { fenced = !fenced; open = false; continue; }
     if (fenced) { blocks.push({ heading: false, text: squash(line) }); open = false; continue; }
     const heading = line.match(/^#{1,6}\s+(.*)$/);
@@ -99,7 +108,7 @@ function passages(blocks) {
 
 async function files(dir, keep, rel = '') {
   const found = [];
-  for (const entry of (await readdir(join(dir, rel), { withFileTypes: true })).sort((a, b) => a.name.localeCompare(b.name))) {
+  for (const entry of (await readdir(join(dir, rel), { withFileTypes: true })).sort((a, b) => byName(a.name, b.name))) {
     const path = rel ? `${rel}/${entry.name}` : entry.name;
     if (entry.isDirectory()) found.push(...await files(dir, keep, path));
     else if (entry.isFile() && keep(path)) found.push(path);
@@ -112,7 +121,7 @@ export async function buildIndex({ site, docs } = {}) {
   const pages = [];
   if (site) {
     const html = await files(site, path => /(^|\/)index\.html$/.test(path) && !path.startsWith('app/'));
-    for (const path of html.sort((a, b) => a.split('/').length - b.split('/').length || a.localeCompare(b))) {
+    for (const path of html.sort((a, b) => a.split('/').length - b.split('/').length || byName(a, b))) {
       const text = await readFile(join(site, path), 'utf8');
       const title = squash(decode(text.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i)?.[1] ?? ''));
       const url = SITE + path.replace(/index\.html$/, '');
@@ -167,7 +176,48 @@ export function checkIndex(index) {
 // The file's text: JSON with every non-ASCII character escaped, so it reads the same in any encoding.
 export const serialize = index => JSON.stringify(index).replace(/[\u007f-￿]/g, c => `\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`);
 
-// Stubs for the snapshot's red run.
-export async function checkSnapshot() {}
-export async function refreshSnapshot(checkout, target) { await (await import("node:fs/promises")).mkdir(target, { recursive: true }); }
-export const snapshotIndex = async site => serialize(await buildIndex({ site }));
+
+// The snapshot holds exactly commit.txt (the OpenWiz commit it was taken from), README.md and top-level docs/*.md.
+const SNAPSHOT_FILE = /^(README\.md|docs\/[^/]+\.md)$/;
+const local = place => place instanceof URL ? fileURLToPath(place) : place;
+
+// Copies an OpenWiz checkout's public README.md and top-level docs/*.md into `target`, replacing what was there,
+// without private-record lines, and names the commit they came from.
+export async function refreshSnapshot(checkout, target, commit) {
+  await rm(target, { recursive: true, force: true });
+  await mkdir(join(target, 'docs'), { recursive: true });
+  const names = ['README.md', ...(await readdir(join(checkout, 'docs'), { withFileTypes: true }))
+    .filter(entry => entry.isFile() && entry.name.endsWith('.md')).map(entry => `docs/${entry.name}`)];
+  for (const name of names) {
+    const text = await readFile(join(checkout, name), 'utf8');
+    await writeFile(join(target, name), text.split('\n').filter(line => !PRIVATE.test(line)).join('\n'));
+  }
+  await writeFile(join(target, 'commit.txt'), `${commit}\n`);
+}
+
+// Throws unless `dir` is exactly a snapshot: its commit named, only README.md and top-level docs/*.md, no
+// private-record line, and so never docs/agents/, docs/evidence/, docs/adr/ or AGENTS.md.
+export async function checkSnapshot(dir) {
+  const fail = why => { throw new Error(`ask docs: ${why}`); };
+  const commit = await readFile(join(local(dir), 'commit.txt'), 'utf8').catch(() => fail('no commit.txt'));
+  if (!/^[0-9a-f]{40}\n$/.test(commit)) fail('commit.txt must name one full OpenWiz commit');
+  const found = await files(local(dir), () => true);
+  if (!found.includes('README.md')) fail('no README.md');
+  for (const name of found) {
+    if (name === 'commit.txt') continue;
+    if (!SNAPSHOT_FILE.test(name)) fail(`only README.md and top-level docs/*.md belong here, not ${name}`);
+    if (PRIVATE.test(await readFile(join(local(dir), name), 'utf8'))) fail(`a private-record line in ${name}`);
+  }
+}
+
+// The build's one step: the index of the built `site` and the checked `snapshot`, as the file's text.
+export async function snapshotIndex(site, snapshot) {
+  await checkSnapshot(snapshot);
+  return serialize(await buildIndex({ site: local(site), docs: local(snapshot) }));
+}
+
+if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1] && process.argv[2] === '--refresh' && process.argv[3]) {
+  const commit = execFileSync('git', ['-C', process.argv[3], 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+  await refreshSnapshot(process.argv[3], fileURLToPath(new URL('../ask-docs/', import.meta.url)), commit);
+  console.log(`ask-docs/: refreshed from OpenWiz ${commit}; review the diff before committing`);
+}
