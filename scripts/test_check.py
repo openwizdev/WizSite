@@ -509,9 +509,25 @@ class Checks(unittest.TestCase):
             'the terms': ('team/index.html', lambda t: re.sub(r'<ul class="team-terms"[^>]*>[\s\S]*?</ul>', '', t)),
             'the terms ': ('team/index.html', lambda t: t.replace('<li>A small, real change of your choice.</li>', '', 1)),
             'the terms: under the first Book a call': ('team/index.html', lambda t: re.sub(
-                r'(<a class="team-book" id="book"[^>]*>Book a call</a>)\s*(<ul class="team-terms"[^>]*>[\s\S]*?</ul>)', r'\2\1', t)),
+                r'(<a class="team-book" id="book"[^>]*>Book a call</a>)\s*(<p class="team-terms-label"[\s\S]*?</ul>)', r'\2\1', t)),
+            # #88, round 3: the terms label, Minute 30 as the destination, the proof as cards and curly apostrophes.
+            'the terms label': ('team/index.html', lambda t: re.sub(r'<p class="team-terms-label"[^>]*>[\s\S]*?</p>\s*', '', t)),
+            'the terms label ': ('team/index.html', lambda t: t.replace('>How the call works</p>', '>The terms</p>', 1)),
+            'the terms label  ': ('team/index.html', lambda t: t.replace('aria-labelledby="team-terms-label"', 'aria-labelledby="team-when"', 1)),
+            'highlights Minute 30 only': ('team/index.html', lambda t: t.replace('<li class="team-step-end"><h3>Minute 30', '<li><h3>Minute 30', 1)
+                                          .replace('<li><h3>Minute 20', '<li class="team-step-end"><h3>Minute 20', 1)),
+            'highlights Minute 30 only ': ('team/index.html', lambda t: t.replace('<li><h3>Minute 0', '<li class="team-step-end"><h3>Minute 0', 1)),
+            'the proof: two cards': ('team/index.html', lambda t: re.sub(r'\s*<li class="team-proof-card">\s*<p>[\s\S]*?</li>', '', t, count=1)),
+            'card 1 is one link to /drivers/': ('team/index.html', lambda t: t.replace('class="team-proof-drivers" href="/drivers/"', 'class="team-proof-drivers" href="/"', 1)),
+            'card 1 shows the three drivers': ('team/index.html', lambda t: re.sub(r'<img class="team-proof-tile"[^>]*>', '', t, count=1)),
+            'card 1 shows the three drivers ': ('team/index.html', lambda t: t.replace('>Passed 5 of 5 checks<', '>Passed<', 1)),
+            'card 1 ends with': ('team/index.html', lambda t: t.replace('Grok Bot: coming soon', 'Grok Bot is coming soon', 1)),
+            'card 2 tells the story': ('team/index.html', lambda t: re.sub(r'<p>(Our Drivers page was built[^<]*)</p>', r'<p><a href="/drivers/">\1</a></p>', t, count=1)),
+            'card 2 tells the story ': ('team/index.html', lambda t: t.replace('a council of judges picked one,', 'judges picked one,', 1)),
+            'curly apostrophes': ('team/index.html', lambda t: t.replace('aria-label="Who it’s for and pricing"', 'aria-label="Who it\'s for and pricing"', 1)),
+            'curly apostrophes ': ('team/index.html', lambda t: t.replace(' No checkout.', ' No checkout. It\'s simple.', 1)),
             'the ships line': ('team/index.html', lambda t: re.sub(r'<p class="team-ships">[\s\S]*?</p>', '', t)),
-            'hides none of its copy': ('team/index.html', lambda t: t.replace('<ul class="team-terms"', '<ul class="team-terms" hidden', 1)),
+            'hides none of its copy': ('team/index.html', lambda t: t.replace('<p class="team-lead"', '<p class="team-lead" hidden', 1)),
             'folds nothing away': ('team/index.html', lambda t: t.replace('<ol class="team-steps">', '<details><summary>Timeline</summary><ol class="team-steps">', 1).replace('</ol>', '</ol></details>', 1)),
             'embeds no video': ('team/index.html', lambda t: t.replace('</main>', '<video src="/art/spec-video.mp4" preload="none"></video></main>', 1)),
             'the boat poster': ('team/index.html', lambda t: t.replace(' loading="lazy"', '', 1)),
@@ -522,7 +538,7 @@ class Checks(unittest.TestCase):
             'never uses: guarantee': ('team/index.html', lambda t: t.replace('Bring the ones you already use.', 'Bring the ones you already use. We guarantee it.', 1)),
             'the team page sections': ('team/index.html', lambda t: t.replace('>Where your agents run</h2>', '>Hosts</h2>', 1)),
             'the team page sections ': ('team/index.html', lambda t: re.sub(r'<section class="team-part team-when wrap"[\s\S]*?</section>\n', '', t)),
-            'four marks': ('team/index.html', lambda t: t.replace('<li><h3>Minute 30</h3><p>A pull request ships.</p></li>', '', 1)),
+            'four marks': ('team/index.html', lambda t: t.replace('<li class="team-step-end"><h3>Minute 30</h3><p>A pull request ships.</p></li>', '', 1)),
             'four marks ': ('team/index.html', lambda t: t.replace('<h3>Minute 10</h3>', '<h3>Minute 15</h3>', 1)),
             'link to /drivers/': ('team/index.html', lambda t: t.replace('<li><a href="/drivers/">Cloudroom</a></li>', '<li>Cloudroom</li><li><a href="/">x</a></li>', 1)),
             # #73: the one site footer on every page.
@@ -607,6 +623,8 @@ class Checks(unittest.TestCase):
             'links off the site': lambda f: f.replace('href="/team/#book"', 'href="https://example.com/"', 1),
             'heading and its line': lambda f: f.replace('The short ones are here.', 'More.', 1),
             'no form or input': lambda f: f.replace('<p>The open source', '<input><p>The open source', 1),
+            # #88: the last answer's approved words.
+            'the last answer': lambda f: f.replace('Your first fleet ships on it.', 'Your first fleet runs in a day.', 1),
         }.items():
             broken = change(FAQ)
             top = re.sub(r'<(/?)h3\b', r'<\1h2', re.sub(r'<(/?)h2\b', r'<\1h1', broken))

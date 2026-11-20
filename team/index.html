@@ -51,10 +51,11 @@
     <p class="team-lead">A 30-minute call with Jake, who builds OpenWiz. We connect it to your repo and the coding agent you already use, you pick one small change, and your first fleet ships it on your workflow.</p>
     <!-- The booking link: this href is its one value; the closing Book a call repeats it exactly. -->
     <a class="team-book" id="book" data-book href="https://cal.com/openwiz-jake/setup">Book a call</a>
-    <ul class="team-terms" aria-label="How the call works">
+    <p class="team-terms-label" id="team-terms-label">How the call works</p>
+    <ul class="team-terms" aria-labelledby="team-terms-label">
       <li>A small, real change of your choice.</li>
       <li>On a repository with working CI and a signed-in coding agent (Claude Code or Codex).</li>
-      <li>If it hasn't shipped in 30 minutes, Jake stays on until it does.</li>
+      <li>If it hasn’t shipped in 30 minutes, Jake stays on until it does.</li>
     </ul>
   </div>
   <a href="https://x.com/openwiz" class="team-poster"><figure><img src="/art/team-boat-poster.webp" alt="Wizards on a boat: the fleet that built the Drivers page" width="1280" height="720" loading="lazy"><figcaption>Watch the fleet build it (49 s, on X)</figcaption></figure></a>
@@ -65,19 +66,29 @@
     <li><h3>Minute 0</h3><p>We connect your repo and your agents.</p></li>
     <li><h3>Minute 10</h3><p>You answer a few questions about your change.</p></li>
     <li><h3>Minute 20</h3><p>Your agents build it.</p></li>
-    <li><h3>Minute 30</h3><p>A pull request ships.</p></li>
+    <li class="team-step-end"><h3>Minute 30</h3><p>A pull request ships.</p></li>
   </ol>
   <p class="team-ships">Ships means a pull request opens on your repo, built by your agents and passing your CI. Merging is your call.</p>
 </section>
 <section class="team-part wrap" aria-labelledby="team-proof">
   <h2 id="team-proof">Proof</h2>
   <ul class="team-proof">
-    <li><a href="/drivers/">Three drivers passed all five checks: your computer or VPS, Cloudroom and boat.dev. Grok Bot is coming soon.</a></li>
-    <li><a href="/drivers/">Our Drivers page was built the same way: a fleet of agents drew six designs, a council of judges picked one, and it merged in one night.</a></li>
+    <li class="team-proof-card">
+      <a class="team-proof-drivers" href="/drivers/">
+        <span class="team-proof-host"><span class="team-proof-mark"><img class="team-proof-icon" src="/drivers/logos/monitor.svg" alt="Computer icon" width="24" height="24" loading="lazy"><span>Your computer or VPS</span></span><span class="team-proof-pass">Passed 5 of 5 checks</span></span>
+        <span class="team-proof-host"><span class="team-proof-mark"><img class="team-proof-tile" src="/drivers/logos/cloudroom.png" alt="Cloudroom logo" width="256" height="256" loading="lazy"><span>Cloudroom</span></span><span class="team-proof-pass">Passed 5 of 5 checks</span></span>
+        <span class="team-proof-host"><span class="team-proof-mark"><img class="team-proof-lockup" src="/drivers/logos/boat-dev.svg" alt="boat.dev" width="390" height="109" loading="lazy"></span><span class="team-proof-pass">Passed 5 of 5 checks</span></span>
+        <span class="team-proof-soon">Grok Bot: coming soon</span>
+      </a>
+    </li>
+    <li class="team-proof-card">
+      <p>Our Drivers page was built the same way: a fleet of agents drew six designs, a council of judges picked one, and it merged in one night.</p>
+      <a class="team-proof-link" href="/drivers/">See the Drivers page</a>
+    </li>
   </ul>
 </section>
-<section class="team-part team-fit wrap" aria-label="Who it's for and pricing">
-  <div><h2>Who it's for</h2><p>Solo builders and small teams who already use Claude Code or Codex.</p></div>
+<section class="team-part team-fit wrap" aria-label="Who it’s for and pricing">
+  <div><h2>Who it’s for</h2><p>Solo builders and small teams who already use Claude Code or Codex.</p></div>
   <div><h2>Pricing</h2><p>Custom pricing. No checkout.</p></div>
 </section>
 <section class="team-part wrap" aria-labelledby="team-run">

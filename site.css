@@ -445,33 +445,51 @@ body.landing > main { flex: 1 0 auto; }
 @keyframes drivers-d-near { to { transform: translateY(-10%); } }
 
 /* The team page (openwiz.dev/team, #63, #73; design P, #81): the hero with the terms under Book a call and the boat
-   poster as its first picture, then the timeline, proof, who it's for and pricing, where your agents run, the closing call. */
-.team { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: clamp(28px, 4.5vw, 64px); align-items: center; padding-block: clamp(28px, 4.5vw, 64px); }
-.team-kicker { color: var(--brass); font: 600 13px/1 var(--ow-font-sans); letter-spacing: .06em; text-transform: uppercase; }
+   poster as its first picture, then the timeline, proof, who it's for and pricing, where your agents run, the closing call.
+   Round 3 (#88): the poster column at most 42% of the content width, the terms at body size under a small label, one
+   coral thing on the first screen (Book a call), Minute 30 the one highlighted stop, and the proof as cards. */
+.team { display: grid; grid-template-columns: minmax(0, 58fr) minmax(0, 42fr); gap: clamp(28px, 4.5vw, 64px); align-items: center; padding-block: clamp(28px, 4.5vw, 64px); }
+.team-kicker { color: var(--sea); font: 600 13px/1 var(--ow-font-sans); letter-spacing: .06em; text-transform: uppercase; }
 .team h1 { margin-top: 14px; max-width: 15ch; font-size: clamp(34px, 4.4vw, 60px); font-weight: 760; line-height: 1.02; letter-spacing: -.045em; text-wrap: balance; }
 .team-lead { margin-top: 18px; max-width: 44ch; color: #e1d7cb; font-size: clamp(17px, 1.5vw, 19px); line-height: 1.45; letter-spacing: -.01em; }
 .team-book { display: inline-flex; align-items: center; min-height: 48px; margin-top: 24px; padding: 0 22px; border-radius: 10px; background: var(--brass); color: var(--on-brass); font-size: 16px; font-weight: 650; }
 .team-book:hover { background: var(--brass-hi); }
-.team-terms { display: grid; gap: 6px; max-width: 46ch; margin: 16px 0 0; padding: 0; list-style: none; color: var(--ink); font-size: 15px; line-height: 1.4; }
+.team-terms-label { margin-top: 22px; color: var(--grey2); font: 600 13px/1 var(--ow-font-sans); letter-spacing: .06em; text-transform: uppercase; }
+.team-terms { display: grid; gap: 8px; max-width: 46ch; margin: 12px 0 0; padding: 0; list-style: none; color: var(--ink); font-size: 17px; line-height: 1.45; }
 .team-terms li { position: relative; padding-left: 18px; }
 .team-terms li::before { content: ""; position: absolute; left: 0; top: .55em; width: 7px; height: 7px; border-radius: 50%; background: var(--sea); }
 .team-poster { display: block; color: var(--ink); }
 .team-poster figure { margin: 0; }
 .team-poster img { display: block; width: 100%; height: auto; border: 1px solid var(--line); border-radius: var(--round); }
-.team-poster figcaption { margin-top: 12px; font-size: 15px; font-weight: 600; text-decoration: underline; text-decoration-color: var(--brass); text-underline-offset: 4px; }
+.team-poster figcaption { margin-top: 12px; font-size: 16px; font-weight: 600; text-decoration: underline; text-decoration-color: var(--grey); text-underline-offset: 4px; }
 .team-poster:hover img { border-color: var(--edge); }
-.team-poster:hover figcaption { color: var(--brass-hi); }
+.team-poster:hover figcaption { text-decoration-color: var(--ink); }
 .team-part { padding-block: clamp(36px, 5vw, 64px); border-top: 1px solid var(--line); }
 .team-part h2 { font-size: clamp(28px, 3vw, 40px); font-weight: 740; line-height: 1.1; letter-spacing: -.04em; }
 .team-steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin: 28px 0 0; padding: 0; list-style: none; }
 .team-steps li { position: relative; padding: 30px 8px 0 0; border-top: 2px solid var(--edge); }
-.team-steps li::before { content: ""; position: absolute; top: -8px; left: 0; width: 14px; height: 14px; border-radius: 50%; background: var(--brass); }
-.team-steps h3 { margin: 0; color: var(--brass); font: 600 15px/1.2 var(--ow-font-mono); letter-spacing: 0; }
-.team-steps p { margin-top: 8px; color: var(--ink); font-size: 18px; line-height: 1.4; }
+.team-steps li::before { content: ""; position: absolute; top: -8px; left: 0; width: 14px; height: 14px; border-radius: 50%; background: var(--edge); }
+.team-steps h3 { margin: 0; color: var(--grey); font: 600 15px/1.2 var(--ow-font-mono); letter-spacing: 0; }
+.team-steps p { margin-top: 8px; color: var(--grey2); font-size: 18px; line-height: 1.4; }
+.team-steps .team-step-end::before { background: var(--brass); box-shadow: 0 0 0 4px rgb(255 143 128 / 22%); }
+.team-steps .team-step-end h3 { color: var(--brass); }
+.team-steps .team-step-end p { color: var(--ink); font-weight: 650; }
 .team-ships { margin-top: 28px; max-width: 70ch; color: var(--grey2); font-size: 16px; }
 .team-proof { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 24px 0 0; padding: 0; list-style: none; }
-.team-proof a { display: block; height: 100%; padding: 22px 24px; border: 1px solid var(--line); border-radius: var(--round); background: var(--panel); color: var(--ink); font-size: 17px; line-height: 1.5; }
-.team-proof a:hover { border-color: var(--edge); text-decoration: none; }
+.team-proof-card { display: flex; flex-direction: column; justify-content: space-between; gap: 16px; padding: 22px 24px; border: 1px solid var(--line); border-radius: var(--round); background: var(--panel); color: var(--ink); font-size: 17px; line-height: 1.5; }
+.team-proof-card:has(.team-proof-drivers) { padding: 0; }
+.team-proof-card:has(.team-proof-drivers:hover) { border-color: var(--edge); }
+.team-proof-drivers { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; align-content: center; height: 100%; padding: 22px 24px; border-radius: inherit; }
+.team-proof-host { display: grid; gap: 8px; align-content: start; }
+.team-proof-mark { display: flex; align-items: center; gap: 8px; height: 28px; font-weight: 600; font-size: 15px; line-height: 1.2; }
+.team-proof-mark img { display: block; flex: none; width: auto; height: 24px; }
+.team-proof-mark .team-proof-lockup { height: 26px; }
+.team-proof-icon { filter: invert(1); opacity: .92; }
+.team-proof-tile { border-radius: 6px; }
+.team-proof-pass { color: var(--grey2); font-size: 15px; }
+.team-proof-soon { grid-column: 1 / -1; color: var(--grey); font-size: 15px; }
+.team-proof-link { width: fit-content; color: var(--ink); font-weight: 600; text-decoration: underline; text-decoration-color: var(--grey); text-underline-offset: 4px; }
+.team-proof-link:hover { text-decoration-color: var(--ink); }
 .team-fit { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px clamp(28px, 5vw, 72px); }
 .team-fit p { margin-top: 12px; color: var(--grey2); font-size: 18px; }
 .team-run-lead { margin-top: 12px; max-width: 52ch; color: var(--grey2); }
@@ -482,6 +500,10 @@ body.landing > main { flex: 1 0 auto; }
 .team-more { display: inline-flex; align-items: center; min-height: 44px; margin-top: 16px; color: var(--grey2); font-size: 15px; text-decoration: underline; text-decoration-color: var(--brass); text-underline-offset: 4px; }
 .team-close { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 32px; }
 .team-close .team-book { margin-top: 0; }
+/* #88: one route to booking on /team/: the top bar's link here is this page, so it is a plain nav link, not a second
+   coral button. Every other page keeps its button; header-cta.html is unchanged. */
+.team-page .nav-team { padding: 0; border-radius: 0; background: none; color: var(--grey2); font-weight: 450; }
+.team-page .nav-team:hover { background: none; color: var(--ink); }
 @media (max-width: 850px) {
   .team { grid-template-columns: 1fr; padding-top: 20px; }
   .team-steps { grid-template-columns: 1fr; gap: 0; padding-left: 7px; }
@@ -489,6 +511,17 @@ body.landing > main { flex: 1 0 auto; }
   .team-steps li:last-child { padding-bottom: 0; border-left-color: transparent; }
   .team-steps li::before { top: 0; left: -8px; }
   .team-proof, .team-fit { grid-template-columns: 1fr; }
+}
+/* #88: on desktop the hero is the first screen (under the 76 px top bar and its line), so the timeline's coral Minute 30
+   starts below it and Book a call is the one coral thing in view. */
+@media (min-width: 851px) {
+  .team { min-height: calc(100svh - 77px); align-content: center; }
+}
+@media (max-width: 560px) {
+  .team-book { display: flex; justify-content: center; width: 100%; min-height: 52px; }
+  .team-terms { font-size: 16px; }
+  .team-proof-drivers { grid-template-columns: 1fr; gap: 18px; }
+  .team-proof-host { gap: 4px; }
 }
 /* The Questions (#76): one section from faq.html on the landing, /team and /faq. Two columns on desktop (the heading,
    then the rows), one on phones. Flat rows: the question, a thin chevron and a 1px rule. A row's button opens its
