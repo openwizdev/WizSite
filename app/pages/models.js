@@ -227,13 +227,9 @@
     if (!data) return el.replaceChildren(OW.ui.placeholder('Reading GitHub…'));
     // A field GitHub refused or failed (an error at its path) is a failed read, never a missing file.
     const failed = field => (feed.errors || []).find(e => Array.isArray(e?.path) && e.path[0] === 'repository' && e.path[1] === field);
-    const failedText = (field, file) => {
-      const error = failed(field);
-      return error?.type === 'FORBIDDEN'
-        ? `GitHub refused to read ${file} (${error.message || 'not accessible'}). The OpenWiz Viewer may not have access to this repository's files, so this is unknown, not missing.`
-        : `GitHub couldn't read ${file}, so it is unknown, not missing. The app tries again on its own, or press Refresh now.`;
-    };
-    if (failed('fleet')) return el.replaceChildren(OW.ui.unknown(failedText('fleet', 'docs/agents/fleet.md')));
+    // One plain line, and the command that shows the models instead (a private repository the Viewer can't read).
+    const failedText = (field, file) => `GitHub ${failed(field)?.type === 'FORBIDDEN' ? 'refused to read' : 'couldn\'t read'} ${file}, so the app can't show it here; run \`openwiz models show\` in the repository instead.`;
+    if (failed('fleet')) return el.replaceChildren(h('div', { class: 'models' }, h('div', { class: 'unknown models-unread' }, failedText('fleet', 'docs/agents/fleet.md'))));
     if (!data.fleet) {
       return el.replaceChildren(OW.ui.unknown('This repository has no docs/agents/fleet.md on its default branch, so its models aren\'t set. Ask your agent to run the setup skill, which writes it.'));
     }
@@ -247,7 +243,7 @@
     let snapshot = null;
     let snapshotNote = null;
     if (failed('offered')) {
-      snapshotNote = h('div', { class: 'notice bad' }, h('span', {}, h('b', {}, 'No choices: '), failedText('offered', 'docs/agents/models-offered.json')));
+      snapshotNote = h('div', { class: 'notice bad models-unread' }, h('span', {}, failedText('offered', 'docs/agents/models-offered.json')));
     } else if (!data.offered) {
       snapshotNote = h('div', { class: 'notice' }, h('span', {}, h('b', {}, 'No list of offered models yet. '), MAKE));
     } else {
