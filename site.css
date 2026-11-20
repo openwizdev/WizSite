@@ -167,28 +167,32 @@ code,.v{font-family:var(--ow-font-mono)}
    the frame. The grill and the live app are two aligned rows directly above and below it. */
 .moments { padding-block: clamp(48px, 7vw, 100px); }
 .moments h2 { font-size: clamp(34px, 5vw, 62px); letter-spacing: -.06em; line-height: 1; }
-.moment-stage { position: relative; isolation: isolate; margin-top: clamp(20px, 3vw, 32px); padding: clamp(14px, 3.4vw, 48px) clamp(12px, 4vw, 56px); overflow: hidden; border-radius: var(--round); background: #0a1222; box-shadow: inset 0 0 0 1px rgb(150 180 230 / 16%); }
-.moment-art { position: absolute; inset: 0; z-index: -3; width: 100%; height: 100%; object-fit: cover; object-position: 62% 50%; filter: grayscale(1) contrast(1.35) brightness(1.6); }
+.moment-stage { position: relative; isolation: isolate; margin-top: clamp(20px, 3vw, 32px); padding: clamp(14px, 3.4vw, 48px) clamp(12px, 4vw, 56px); overflow: hidden; border-radius: var(--round); background: #08101f; box-shadow: inset 0 0 0 1px rgb(150 180 230 / 14%); }
+/* The painting as a cool blue engraving: flattened to grey with low contrast, then inked blue by the two layers below. */
+.moment-art { position: absolute; inset: 0; z-index: -3; width: 100%; height: 100%; object-fit: cover; object-position: 62% 50%; filter: grayscale(1) contrast(1.12) brightness(1.3); }
 .moment-stage::before, .moment-stage::after { content: ""; position: absolute; inset: 0; pointer-events: none; }
+/* Multiply: a fine dither, a light cross-hatch, the scrims (edges, and the bands behind the step rows), then the blue ink. */
 .moment-stage::before { z-index: -2; mix-blend-mode: multiply; background:
-  radial-gradient(circle, rgb(255 255 255 / 0%) 0 .7px, rgb(40 60 100 / 35%) 1.1px) 0 0 / 3px 3px,
-  repeating-linear-gradient(-28deg, rgb(30 46 80 / 55%) 0 1px, rgb(255 255 255 / 0%) 1px 3px),
-  var(--moment-shade, linear-gradient(rgb(255 255 255 / 0%) 72%, rgb(40 52 80) 92%)),
-  radial-gradient(ellipse 80% 75% at 55% 45%, rgb(255 255 255 / 0%) 45%, rgb(90 110 150 / 80%)), #a9c2ea; }
-.moment-stage::after { z-index: -1; mix-blend-mode: screen; background: #0b1528; }
+  radial-gradient(circle, rgb(255 255 255 / 0%) 0 .6px, rgb(36 54 92 / 30%) 1px) 0 0 / 2px 2px,
+  repeating-linear-gradient(-28deg, rgb(28 42 76 / 50%) 0 1px, rgb(255 255 255 / 0%) 1px 3px),
+  repeating-linear-gradient(62deg, rgb(28 42 76 / 22%) 0 1px, rgb(255 255 255 / 0%) 1px 5px),
+  var(--moment-shade, linear-gradient(rgb(46 60 92) 0 9%, rgb(255 255 255 / 0%) 20% 76%, rgb(46 60 92) 88%, rgb(34 46 74))),
+  radial-gradient(ellipse 70% 62% at 56% 46%, rgb(255 255 255 / 0%) 36%, rgb(70 88 128 / 85%) 78%, rgb(44 58 92)), #93acd8; }
+/* Screen: lifts the blacks to a deep navy so the engraving never reads as pure black ink. */
+.moment-stage::after { z-index: -1; mix-blend-mode: screen; background: #09132a; }
 @media (min-width: 901px) { .moment-art { transform: translateX(-6%) scale(1.15); transform-origin: 60% 50%; } }
 .moment-stage ol { position: relative; z-index: 1; display: grid; gap: 10px; max-width: 840px; margin: 0 auto; padding: 0; list-style: none; }
 .moment-stage li { min-width: 0; }
 .moments h3 { margin: 0; font-size: clamp(15px, 1.3vw, 19px); font-weight: 600; letter-spacing: -.015em; line-height: 1.3; }
 .moment-num { display: inline-grid; place-items: center; flex: none; width: 24px; height: 24px; border: 1px solid rgb(190 210 240 / 45%); border-radius: 50%; color: #d6e2f5; font: 500 11px/1 var(--ow-font-mono); }
 /* Steps 1 and 3: one row each, number and title on the left, the real link on the right edge. */
-.moment-step { position: relative; display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 10px 18px 10px 14px; border-radius: 12px; background: rgb(7 11 20 / 82%); box-shadow: 0 0 0 1px rgb(190 210 240 / 16%); }
+.moment-step { position: relative; display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 10px 18px 10px 14px; border-radius: 12px; background: rgb(7 11 21 / 86%); box-shadow: 0 0 0 1px rgb(168 196 240 / 18%), 0 0 40px 8px rgb(6 10 22 / 55%); }
 .moment-step h3 { margin-right: auto; }
 .moment-link, .spec-link { color: #e9f0fb; font-size: 15px; white-space: nowrap; text-decoration: underline; text-decoration-color: rgb(190 210 240 / 50%); text-underline-offset: 4px; }
 .moment-link:hover, .spec-link:hover { text-decoration-color: currentColor; }
 .moment-step .moment-link::after { content: " →"; }
 /* Step 2, the clip: the caption sits on a scrim inside the bottom of the frame. */
-.spec-frame { position: relative; overflow: hidden; border-radius: 14px; background: #0b111c; box-shadow: 0 0 0 1px rgb(190 210 240 / 22%), 0 30px 80px -20px rgb(0 0 0 / 85%), 0 0 120px rgb(80 120 200 / 18%); }
+.spec-frame { position: relative; overflow: hidden; border-radius: 14px; background: #0b111c; box-shadow: 0 0 0 1px rgb(168 196 240 / 30%), inset 0 1px 0 rgb(200 220 250 / 14%), 0 2px 6px rgb(2 6 14 / 50%), 0 24px 60px -16px rgb(2 6 16 / 90%), 0 0 90px -10px rgb(90 130 210 / 16%); }
 .spec-video { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover; background: #0b111c; }
 .spec-video:not([controls]) { cursor: pointer; }
 .spec-video:focus-visible { outline: 2px solid var(--orchid); outline-offset: -2px; }
@@ -208,7 +212,7 @@ code,.v{font-family:var(--ow-font-mono)}
 .spec-play[hidden] { display: none; }
 .spec-play svg { width: 14px; height: 14px; fill: currentColor; }
 @media (max-width: 900px) {
-  .moment-stage { --moment-shade: linear-gradient(rgb(30 40 64) 0 16%, rgb(255 255 255 / 0%) 34% 56%, rgb(30 40 64) 74%); }
+  .moment-stage { --moment-shade: linear-gradient(rgb(34 46 74) 0 16%, rgb(255 255 255 / 0%) 32% 58%, rgb(34 46 74) 74%); }
 }
 @media (max-width: 600px) {
   /* On a phone the clip is too short to cover: the caption tucks under its quiet lower edge, still one card. */
