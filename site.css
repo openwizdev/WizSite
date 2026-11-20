@@ -168,6 +168,7 @@ code,.v{font-family:var(--ow-font-mono)}
 .moment-screen strong { font-size: 15px; }
 .chat-screen p:not(.screen-label) { width: fit-content; padding: 5px 8px; border-radius: 6px; background: #322b25; }
 .chat-screen p:nth-child(odd):not(.screen-label) { align-self: flex-end; background: #45312d; }
+.spec-screen ul { padding-left: 15px; margin: 0; color: var(--grey2); }
 .ship-screen p:not(.screen-label) { padding: 4px 7px; border: 1px solid var(--line); border-radius: 5px; color: #d4c8ba; }
 .landing-footer { overflow: hidden; border-top: 1px solid var(--line); background: #221e1a; }
 .footer-links { justify-content: center; padding-top: 24px; }
@@ -253,15 +254,13 @@ code,.v{font-family:var(--ow-font-mono)}
 .demo-pause[aria-pressed="true"] { color: var(--sea); }
 /* #1351: with Pause motion shown, the stage keeps room below the window so the control never covers it. */
 .product-stage:has(> .demo-pause:not([hidden])) { padding-bottom: clamp(50px, 5vw, 66px); }
-.moment-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 2px; margin-top: 8px; }
+.moment-heading { display: flex; align-items: center; justify-content: space-between; gap: 2px; margin-top: 8px; }
 .moment-heading h3 { margin: 4px; }
 .spec-sample { margin: 6px 4px 0; }
 .moment-copy { margin: 0 4px 4px; color: var(--grey2); font-size: 12px; }
-.spec-play { display: inline-flex; flex: none; align-items: center; gap: 3px; }
-.spec-play[hidden] { display: none; }
-.spec-play svg { width: 15px; height: 15px; fill: currentColor; }
-.spec-video { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 8px; background: #1b1816; }
-.spec-link { color: var(--ink); white-space: nowrap; }
+.spec-play svg { width: 17px; height: 17px; fill: currentColor; vertical-align: middle; }
+.spec-video { display: block; width: 100%; min-height: 174px; border-radius: 8px; background: #1b1816; }
+.spec-video[hidden] { display: none; }
 .wiz-eye { position: absolute; display: none; width: 7%; aspect-ratio: 1; border-radius: 50%; transform: translate(-50%, -50%); background: radial-gradient(circle at 35% 30%, #fff3d8, #e1bd8d); }
 .family.is-playing .wiz-eye { display: grid; place-items: center; }
 .wiz-eye i { width: 37%; aspect-ratio: 1; border-radius: 50%; background: #251912; }
@@ -273,7 +272,9 @@ code,.v{font-family:var(--ow-font-mono)}
   .product-hero .app-entry { gap: 6px 12px; }
   .app-entry .app-lead, .app-entry .home-screen { font-size: 13px; }
   .demo-progress { left: 8px; }
+  .spec-video { min-height: 162px; }
 }
+.spec-screen[hidden] { display: none; }
 
 @media (min-width: 961px) and (max-width: 1279px) { :root { --m: 48px; } }
 @media (max-width: 480px) {
