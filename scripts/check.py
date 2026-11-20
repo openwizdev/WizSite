@@ -791,7 +791,7 @@ def check_drivers(landing, changelog, drivers, page):
     reader = Text(main)
     readings = [reader.joined(), reader.spaced()] + reader.shown
     for reading in readings:
-        found = DRIVER_JARGON.search(re.sub(r'\s+', ' ', reading))
+        found = DRIVER_JARGON.search(re.sub(r'\b5 of 5\b', 'the kit result', re.sub(r'\s+', ' ', reading)))  # #66: the one count in digits
         assert not found, f'a jargon count on the drivers page: {found[0]!r}'
         for number in re.findall(r'\d+', reading):
             assert number in DRIVER_NUMBERS, f'invented number on the drivers page: {number}'
@@ -950,9 +950,9 @@ def check_driver_results(drivers, main, outline):
         f'boat.dev is one of three: under its five checks, the spotlight says {DRIVER_ALSO!r}: {also}'
     rest = re.sub(rf'<article class="driver[^"]*" id="{DRIVER_COMING}"[\s\S]*?</article>', '', main)
     rest = re.sub(rf'<li data-host="{DRIVER_COMING}"[\s\S]*?</li>', '', rest)
-    stale = DRIVER_STALE.search(plain(rest) + ' ' + ' '.join(re.findall(r'content="([^"]*)"', drivers)))
+    stale = DRIVER_STALE.search(re.sub(r'\s+', ' ', re.sub(r'<[^>]+>', ' ', rest)) + ' ' + ' '.join(re.findall(r'content="([^"]*)"', drivers)))
     assert not stale, f'a stale driver state word on the drivers page: {stale[0]!r}'
-    only = re.search(r'\bonly (?:boat\.dev|one)\b[^.]*\bpass|\bboat\.dev is the only\b', plain(drivers), re.I)
+    only = re.search(r'\bonly (?:boat\.dev|one)\b[^.]*\bpass|\bboat\.dev is the only\b', re.sub(r'\s+', ' ', re.sub(r'<[^>]+>', ' ', unescape(drivers))), re.I)
     assert not only, f'boat.dev is never the only one that passed: {only[0]!r}'
 
 

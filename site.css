@@ -315,14 +315,14 @@ code,.v{font-family:var(--ow-font-mono)}
 .drivers-page .host-mark img { display: block; width: auto; height: 100%; }
 .drivers-page .host-mark .host-tile { border-radius: 4px; }
 .drivers-page .host-state { padding-left: 8px; border-left: 1px solid rgb(242 194 123 / 28%); color: #cbbfae; font-size: 13px; font-weight: 450; }
-.drivers-page [data-host="boat-dev"] .host-state { color: var(--gold); }
+.drivers-page [data-state="passed"] .host-state { color: var(--gold); }
 .drivers-page .host-icon { filter: invert(1); opacity: .92; }
 .drivers-page .voyage-pass { display: inline-flex; align-items: center; min-height: 44px; margin-top: 12px; color: var(--ink); font-size: 15px; text-decoration: underline; text-decoration-color: rgb(242 194 123 / 60%); text-underline-offset: 4px; text-shadow: 0 1px 14px rgb(0 0 0 / 70%); }
 .drivers-page .voyage-pass:hover { text-decoration-color: var(--gold); }
 /* Kit states: always a word plus an icon shape, never colour alone. */
 .drivers-page .kit-icon { flex: none; width: 16px; height: 16px; }
-.drivers-page .proof-check .kit-icon circle { fill: var(--gold); }
-.drivers-page .proof-check .kit-icon path { fill: none; stroke: var(--ground); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.drivers-page .proof-check .kit-icon circle, .drivers-page .driver-kit.passed .kit-icon circle { fill: var(--gold); }
+.drivers-page .proof-check .kit-icon path, .drivers-page .driver-kit.passed .kit-icon path { fill: none; stroke: var(--ground); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .drivers-page .progress .kit-icon circle { fill: none; stroke: var(--orchid); stroke-width: 1.5; }
 .drivers-page .progress .kit-icon path { fill: var(--orchid); }
 .drivers-page .unrun .kit-icon circle { fill: none; stroke: var(--grey); stroke-width: 1.5; stroke-dasharray: 2.4 2.2; }
@@ -338,6 +338,9 @@ code,.v{font-family:var(--ow-font-mono)}
 .drivers-page .spot-logo { display: block; width: auto; height: clamp(36px, 3.4vw, 48px); }
 .drivers-page .hero .driver-line { margin-top: 20px; color: var(--ink); font-size: clamp(22px, 2.2vw, 30px); font-weight: 680; line-height: 1.15; letter-spacing: -.035em; }
 .drivers-page .driver-date { margin-top: 8px; color: var(--grey2); font-size: 15px; line-height: 1.4; }
+.drivers-page .driver-date a { color: inherit; text-decoration: underline; text-decoration-color: rgb(242 194 123 / 45%); text-underline-offset: 3px; }
+.drivers-page .driver-date a:hover { text-decoration-color: var(--gold); }
+.drivers-page .proof-also { max-width: 44ch; margin-top: 16px; padding-top: 14px; border-top: 1px solid #ffffff14; color: #e1d7cb; font-size: 15px; line-height: 1.5; }
 .drivers-page .proof-lead { max-width: 44ch; margin-top: 12px; color: #e1d7cb; font-size: 16px; line-height: 1.5; }
 .drivers-page .proof-checks { display: grid; margin: 20px 0 0; padding: 0; list-style: none; }
 .drivers-page .proof-check { display: grid; grid-template-columns: 16px minmax(0, 1fr) auto; column-gap: 10px; row-gap: 4px; align-items: center; padding: 12px 0; border-top: 1px solid #ffffff14; }
@@ -349,12 +352,13 @@ code,.v{font-family:var(--ow-font-mono)}
 .drivers-page .more-drivers h2 { font-size: clamp(28px, 3.4vw, 42px); font-weight: 720; line-height: 1.05; letter-spacing: -.045em; }
 .drivers-page .driver-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin: 22px 0 0; padding: 0; list-style: none; }
 .drivers-page .driver-list > li { display: flex; }
-.drivers-page .driver-list .driver { display: grid; grid-template-rows: auto 1fr auto; gap: 12px; width: 100%; padding: 20px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); }
+.drivers-page .driver-list .driver { display: flex; flex-direction: column; gap: 12px; width: 100%; padding: 20px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); }
 .drivers-page .driver-list .driver-name { display: flex; align-items: center; gap: 10px; min-height: 32px; margin: 0; font-size: 20px; font-weight: 660; line-height: 1.2; letter-spacing: -.03em; }
 .drivers-page .driver-logo { flex: none; width: 28px; height: 28px; }
 .drivers-page .driver-logo.host-tile { border-radius: 7px; }
 .drivers-page .driver-list .driver-line { color: var(--grey2); font-size: 15px; line-height: 1.45; }
-.drivers-page .driver-kit { display: flex; align-items: center; gap: 8px; padding-top: 12px; border-top: 1px solid var(--line); color: var(--ink); font-size: 14px; line-height: 1.4; white-space: nowrap; }
+.drivers-page .driver-list .driver-date { margin-top: -6px; font-size: 14px; }
+.drivers-page .driver-kit { display: flex; margin-top: auto; align-items: center; gap: 8px; padding-top: 12px; border-top: 1px solid var(--line); color: var(--ink); font-size: 14px; line-height: 1.4; white-space: nowrap; }
 /* Write your own driver: the four commands and the fifth check, token. */
 .drivers-page .own-driver { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: clamp(24px, 5vw, 72px); align-items: start; margin-bottom: clamp(56px, 8vw, 112px); padding: clamp(24px, 4vw, 48px); border: 1px solid var(--line); border-radius: 16px; background: var(--panel); }
 .drivers-page .own-driver h2 { font-size: clamp(28px, 3.4vw, 42px); font-weight: 720; line-height: 1.05; letter-spacing: -.045em; }

@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="A driver connects OpenWiz to wherever your agents run: your computer, a VPS, Cloudroom, boat.dev. Drivers answer the same four commands and take the same five-check test; boat.dev passed all five checks on a real account."><title>Drivers — OpenWiz</title><link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48"><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><meta property="og:image" content="https://openwiz.dev/brand/og.png?v=2"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="OpenWiz"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="https://openwiz.dev/brand/og.png?v=2"><link rel="preload" href="/fonts/Geist-var.woff2" as="font" type="font/woff2" crossorigin><link rel="preload" href="/art/drivers-d-sea.webp" as="image" type="image/webp"><link rel="stylesheet" href="/tokens.css"><link rel="stylesheet" href="/site.css"></head>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="A driver connects OpenWiz to wherever your agents run: your computer, a VPS, Cloudroom, boat.dev. Drivers answer the same four commands and take the same five-check test: boat.dev, Cloudroom and your own computer or VPS passed all five checks; Grok Bot is coming soon."><title>Drivers — OpenWiz</title><link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48"><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><meta property="og:image" content="https://openwiz.dev/brand/og.png?v=2"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="OpenWiz"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="https://openwiz.dev/brand/og.png?v=2"><link rel="preload" href="/fonts/Geist-var.woff2" as="font" type="font/woff2" crossorigin><link rel="preload" href="/art/drivers-d-sea.webp" as="image" type="image/webp"><link rel="stylesheet" href="/tokens.css"><link rel="stylesheet" href="/site.css"></head>
 <body class="landing drivers-page">
 <a class="skip" href="#main">Skip to content</a>
 <header class="landing-nav wrap">
@@ -57,10 +57,10 @@
         <p class="voyage-sub">OpenWiz's agents build software from tickets, and every driver answers the same four commands and passes the same five-check test.</p>
       </div>
       <ul class="host-marks" aria-label="Where drivers run today">
-        <li data-host="vps"><span class="host-mark"><img class="host-icon" src="/drivers/logos/monitor.svg" alt="Computer icon" width="24" height="24"></span><span class="host-name">Your computer or VPS</span> <span class="host-state">being fixed</span></li>
-        <li data-host="cloudroom"><span class="host-mark"><img class="host-tile" src="/drivers/logos/cloudroom.png" alt="Cloudroom logo" width="256" height="256"></span><span class="host-name">Cloudroom</span> <span class="host-state">works today</span></li>
-        <li data-host="boat-dev"><span class="host-mark"><img class="host-lockup" src="/drivers/logos/boat-dev.svg" alt="boat.dev" width="390" height="109"></span> <span class="host-state">passed</span></li>
-        <li data-host="grok-bot"><span class="host-name">Grok Bot</span> <span class="host-state">coming soon</span></li>
+        <li data-host="vps" data-state="passed"><span class="host-mark"><img class="host-icon" src="/drivers/logos/monitor.svg" alt="Computer icon" width="24" height="24"></span><span class="host-name">Your computer or VPS</span> <span class="host-state">passed 5 of 5</span></li>
+        <li data-host="cloudroom" data-state="passed"><span class="host-mark"><img class="host-tile" src="/drivers/logos/cloudroom.png" alt="Cloudroom logo" width="256" height="256"></span><span class="host-name">Cloudroom</span> <span class="host-state">passed 5 of 5</span></li>
+        <li data-host="boat-dev" data-state="passed"><span class="host-mark"><img class="host-lockup" src="/drivers/logos/boat-dev.svg" alt="boat.dev" width="390" height="109"></span> <span class="host-state">passed 5 of 5</span></li>
+        <li data-host="grok-bot" data-state="coming soon"><span class="host-name">Grok Bot</span> <span class="host-state">coming soon</span></li>
       </ul>
       <a class="voyage-pass" href="#boat-dev">See boat.dev's five passed checks</a>
     </div>
@@ -70,7 +70,7 @@
       <div class="proof-copy">
         <h2 class="driver-name" id="boat-dev-name"><img class="spot-logo" src="/drivers/logos/boat-dev.svg" alt="boat.dev" width="390" height="109"></h2>
         <p class="driver-line">Passed all five checks</p>
-        <p class="driver-date">On a real account, <time datetime="2026-11-19">2026-11-19</time></p>
+        <p class="driver-date"><a href="https://github.com/openwizdev/OpenWiz/pull/1444">On a real account, <time datetime="2026-11-19">2026-11-19</time></a></p>
         <p class="proof-lead">Each check is one thing the test watched boat.dev do on its real host.</p>
         <ol class="proof-checks">
           <li class="proof-check" data-check="version" data-state="passed"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7"/><path d="M4.6 8.3l2.3 2.3 4.5-4.8"/></svg><code class="proof-name">version</code><span class="proof-state">passed</span><span class="proof-line">It names the kernel's records version, and prints its schema unchanged.</span></li>
@@ -79,6 +79,7 @@
           <li class="proof-check" data-check="stop" data-state="passed"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7"/><path d="M4.6 8.3l2.3 2.3 4.5-4.8"/></svg><code class="proof-name">stop</code><span class="proof-state">passed</span><span class="proof-line">It ended the run: a wake after it was refused, and nothing the run started still runs.</span></li>
           <li class="proof-check" data-check="token" data-state="passed"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7"/><path d="M4.6 8.3l2.3 2.3 4.5-4.8"/></svg><code class="proof-name">token</code><span class="proof-state">passed</span><span class="proof-line">No credential appeared in its output, command lines or environment, and it refused a token field.</span></li>
         </ol>
+        <p class="proof-also">Cloudroom and your own computer or VPS passed the same five checks on <time datetime="2026-11-20">2026-11-20</time>.</p>
       </div>
       <div class="proof-scene">
         <img class="proof-art" src="/art/drivers-c-boat.webp" alt="Oil painting of the Wiz crew's ship in cutaway at night: on its three decks, Wizes steer and read, write at desks, and tend a brass engine" width="1672" height="941" loading="lazy">
@@ -91,15 +92,17 @@
       <li>
       <article class="driver" id="vps" aria-labelledby="vps-name">
         <h3 class="driver-name" id="vps-name"><img class="driver-logo host-icon" src="/drivers/logos/monitor.svg" alt="Computer or VPS icon" width="24" height="24"><span>Your own computer or VPS</span></h3>
-        <p class="driver-line">Being fixed: its kit run is in progress</p>
-        <p class="driver-kit progress" data-state="in progress"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/><path d="M8 1.75a6.25 6.25 0 010 12.5z"/></svg><span>Kit: in progress</span></p>
+        <p class="driver-line">Passed the kit on a Linux PC</p>
+        <p class="driver-date"><a href="https://github.com/openwizdev/OpenWiz/pull/1455#issuecomment-7034588211">Kit run, <time datetime="2026-11-20">2026-11-20</time></a></p>
+        <p class="driver-kit passed" data-state="passed"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7"/><path d="M4.6 8.3l2.3 2.3 4.5-4.8"/></svg><span>Kit: passed, 5 of 5</span></p>
       </article>
       </li>
       <li>
       <article class="driver" id="cloudroom" aria-labelledby="cloudroom-name">
         <h3 class="driver-name" id="cloudroom-name"><img class="driver-logo host-tile" src="/drivers/logos/cloudroom.png" alt="Cloudroom logo" width="256" height="256"><span>Cloudroom</span></h3>
-        <p class="driver-line">Works today: built real pull requests for OpenWiz; kit run next</p>
-        <p class="driver-kit unrun" data-state="not yet run"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/></svg><span>Kit: not run yet</span></p>
+        <p class="driver-line">Passed the kit, run from a Cloudroom cloud thread against real Cloudroom</p>
+        <p class="driver-date"><a href="https://github.com/openwizdev/OpenWiz/pull/1458#issuecomment-7034556153">Kit run, <time datetime="2026-11-20">2026-11-20</time></a></p>
+        <p class="driver-kit passed" data-state="passed"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7"/><path d="M4.6 8.3l2.3 2.3 4.5-4.8"/></svg><span>Kit: passed, 5 of 5</span></p>
       </article>
       </li>
       <li>

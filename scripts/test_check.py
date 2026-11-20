@@ -623,12 +623,12 @@ class Checks(unittest.TestCase):
         # Grok Bot's card without the generic icon, with a brand mark instead, or any compact card off the shared header
         # structure; item 7, a token explanation without the scoped words, or a broader claim than the run inspected.
         page = 'drivers/index.html'
-        pill = '<li data-host="boat-dev">'
+        pill = '<li data-host="boat-dev" data-state="passed">'
         for old, new, error in (
                 ('<span class="host-state">passed 5 of 5</span>', '', 'works today in words'),
                 ('<span class="host-state">passed 5 of 5</span>', '<span class="host-state">works</span>', 'passed 5 of 5'),
                 ('<span class="host-state">coming soon</span>', '<span class="host-state">soon</span>', 'coming soon'),
-                ('<li data-host="vps">', '<li data-host="computer">', 'host pills, in order'),
+                ('<li data-host="vps" data-state="passed">', '<li data-host="computer" data-state="passed">', 'host pills, in order'),
                 ('<span class="host-mark"><img class="host-lockup"', '<span class="host-mark"></span><img class="host-lockup"', 'fixed-height slot'),
                 (pill, pill + '<span class="host-mark"><img src="/drivers/logos/boat-dev.svg" alt="boat.dev"></span>', 'fixed-height slot'),
                 ('<span class="host-name">Grok Bot</span>', '<span class="host-name">Grok</span>', 'names its host'),
