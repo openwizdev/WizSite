@@ -188,7 +188,16 @@ class Checks(unittest.TestCase):
                 (lambda t: t.replace('<h3>Watch your spec</h3>', '<h3>Watch it ship</h3>'), 'three moments'),
                 (lambda t: t.replace('<h3>Watch it ship</h3>', '<h3>Approve the plan</h3><h3>Watch it ship</h3>'), 'three moments'),
                 (lambda t: t.replace('Steer the build from the narrated video.', 'Watch the video.'), 'steering copy'),
-                (lambda t: t.replace('>Silent sample</p>', '>Spec video</p>'), 'labeled as a silent sample'),
+                (lambda t: t.replace('The real spec of an OpenWiz-built to-do app', 'A sample spec'), "to-do app's real spec"),
+                # Catches: a moment that loses, comments out or mistargets its link to the real to-do run (J267).
+                (lambda t: t.replace('<a class="moment-link" href="https://github.com/openwizdev/todo-demo/issues/1#issuecomment-7037022878">See its questions</a>', ''), 'Answer a few questions moment must link'),
+                (lambda t: t.replace('issuecomment-7037022878', 'issuecomment-7037022879'), 'unexpected repository link'),
+                (lambda t: t.replace('<a class="moment-link" href="https://github.com/openwizdev/todo-demo/issues/1">the spec</a>', '<!-- <a class="moment-link" href="https://github.com/openwizdev/todo-demo/issues/1">the spec</a> -->'), 'Watch your spec moment must link'),
+                (lambda t: t.replace('<a class="moment-link" href="https://openwizdev.github.io/todo-demo/">Open the to-do app</a>', ''), 'Watch it ship moment must link'),
+                (lambda t: t.replace('https://openwizdev.github.io/todo-demo/', 'https://openwizdev.github.io/other/'), 'unexpected external URL'),
+                (lambda t: t.replace('https://github.com/openwizdev/todo-demo/issues/1"', 'https://github.com/openwizdev/todo-demo/issues/2"'), 'unexpected repository link'),
+                (lambda t: re.sub(r'(<li>\s*<div class="moment-screen chat-screen">.*?</li>)', r'<!-- \1 -->', t, count=1, flags=re.S), 'Answer a few questions moment must link'),
+                (lambda t: re.sub(r'(<li>\s*<div class="moment-screen ship-screen">.*?</li>)', r'<!-- \1 -->', t, count=1, flags=re.S), 'Watch it ship moment must link'),
                 (lambda t: t.replace('</main>', '<p>Add a dark mode toggle</p></main>'), 'old example'),
                 (lambda t: t.replace('Oil painting of Wiz scholars studying a to-do list', ''), 'painting without a description')):
             with self.subTest(error=error), tempfile.TemporaryDirectory() as temp:
@@ -361,6 +370,25 @@ class Checks(unittest.TestCase):
                  'motion controls must wait'),
                 (lambda t: t.replace('preload="none"', 'preload="none" autoplay', 1),
                  'recording must be opt-in')):
+            with self.subTest(error=error), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp) / 'dist'
+                shutil.copytree(ROOT / 'dist', root)
+                landing = root / 'index.html'
+                text = landing.read_text()
+                changed = change(text)
+                self.assertNotEqual(changed, text)
+                landing.write_text(changed)
+                with self.assertRaisesRegex(AssertionError, error):
+                    check_site(root)
+
+    def test_spec_video_poster_captions_and_link(self):
+        # Catches: the spec video losing its poster, captions, plain link or lazy, muted inline start (#1405).
+        for change, error in (
+                (lambda t: re.sub(r' poster="[^"]*"', '', t, count=1), 'spec video needs a pinned poster'),
+                (lambda t: re.sub(r'<track [^>]*>', '', t, count=1), 'spec video needs default captions'),
+                (lambda t: t.replace('class="spec-link"', 'class="spec-link" hidden', 1), 'plain link to the spec video'),
+                (lambda t: t.replace(' muted', '', 1), 'spec video must start muted inline'),
+                (lambda t: t.replace('preload="none"', 'preload="auto"', 1), 'recording must be opt-in')):
             with self.subTest(error=error), tempfile.TemporaryDirectory() as temp:
                 root = Path(temp) / 'dist'
                 shutil.copytree(ROOT / 'dist', root)

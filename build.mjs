@@ -42,7 +42,7 @@ const hashed = ['tokens.css', 'site.css', 'site.js', 'faq.js', vendor[0], ...app
 const brand = ['favicon.ico', 'favicon.svg', 'apple-touch-icon.png', 'brand/openwiz-lockup.svg', 'brand/og.png'];
 // The app's own mark and icons, cream on charcoal (J194, #1326): the brand mark, its favicons and a Wiz of the family.
 const appBrand = ['app/mark.svg', 'app/icon.svg', 'app/icon.ico', 'app/icon-180.png', 'app/wiz-reviewer.svg'];
-const files = ['_headers', 'app/manifest.webmanifest', ...appBrand, ...art, ...driverLogos, 'art/spec-demo.webm', 'art/spec-video.mp4', 'art/spec-video.vtt', 'art/spec-poster.webp', ...vendor.slice(1), ...brand, 'fonts/Geist-var.woff2', 'fonts/GeistMono-var.woff2', 'fonts/OFL.txt'];
+const files = ['_headers', 'app/manifest.webmanifest', ...appBrand, ...art, ...driverLogos, 'art/todo-spec.mp4', 'art/todo-spec.vtt', 'art/spec-video.mp4', 'art/spec-video.vtt', ...vendor.slice(1), ...brand, 'fonts/Geist-var.woff2', 'fonts/GeistMono-var.woff2', 'fonts/OFL.txt'];
 // The Changelog's entries (#78), one per public release, from changelog/releases/*.json. They show once the landing's
 // install switch reads live (RL2), so the page and the install box go live together.
 const releases = await readReleases();
