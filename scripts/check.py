@@ -9,7 +9,13 @@ import subprocess
 from urllib.parse import unquote, urlsplit
 
 ROOT = Path(__file__).resolve().parents[1]
-# Reviewed artwork and the sample spec recording. Pin them after checking the visual content and metadata.
+# J267: the landing's three moments link the real to-do run, in moment order: its grill, its spec, the live app.
+TODO_LINKS = (
+    'https://github.com/openwizdev/todo-demo/issues/1#issuecomment-7037022878',
+    'https://github.com/openwizdev/todo-demo/issues/1',
+    'https://openwizdev.github.io/todo-demo/',
+)
+# Reviewed artwork and the spec video. Pin them after checking the visual content and metadata.
 ART_HASHES = {
     'art/era-2-grill.webp': 'efaf213c3f389c8feb2f9d0436e94b1f9241d0ecf3cc3e793385d34f11cd11dd',
     'art/family-01.webp': '14532efb522eb7129ced9e1093f4b0321b1f00459301f059f2d9b5a8c2a7161f',
@@ -31,9 +37,14 @@ ART_HASHES = {
     'art/hero-renaissance-frames.webp': '04192a312129777ab9b4ee43ea632d04c6b725938b6feb7d134db4fcfdfd4cec',
     'art/hero-samurai-frames.webp': '3a6eef42bfd2fc6f7b8e847d4355d75c283425a274b5fb9c95c3404f580725c5',
     'art/hero-steam-frames.webp': '20f057c963be16ebc3cabbf1d2ab849e2e8144d29a3e419344a867eef2c41f3c',
-    'art/spec-demo.webm': '6619ae77a13229d9056037e5bc793d48f7fc98490d068c2b6e4f58426a8fac22',
+    # The landing's spec video (#70, J267): the to-do app's real spec (openwizdev/todo-demo #1), narrated with captions,
+    # its poster and captions; local voice, no paid service; every frame privacy-scanned.
+    'art/todo-spec.mp4': '52bb1fa94a154e17270f7512db19efcedae921e4769a28742bc8a36093d1c732',
+    'art/todo-spec-poster.webp': '9f68e7ab1f17ea97659a085072500055adcd11c8ffd737231f1db114924dc963',
+    'art/todo-spec.vtt': '47e9ffb41081dd72f541110c43312521a8dd92f1c8e58c11092ecd0daa74eee2',
     # OpenWiz's model config spec video (#1802), off the landing (J267) but still served at its URL for #1802's links.
     'art/spec-video.mp4': 'feb357b9a80453d676123a31285a36c34b5873e102ed58c95728bfd6315bfe16',
+    # The model config video's poster frame and captions (#1405), still served for OpenWiz #1802's links (J267).
     'art/spec-poster.webp': '4922f6d265ed8c0c57dead86a62288c94d97159dda34f95969db0ee42b72fdc4',
     'art/spec-video.vtt': '570f5621ff3d84152587612d1be5d78ba5e0fbf6a7da306088a5897c755dc09d',
     # The drivers page, variant D (#50): the night sea and the Wiz family's ship, painted layers of its hero.
@@ -334,6 +345,8 @@ class Page(HTMLParser):
         self.buttons = []
         self.images = []
         self.videos = []
+        self.tracks = []
+        self.links = []
         self.inline_scripts = 0
         self.books = []
         self.x_links = 0
@@ -364,6 +377,10 @@ class Page(HTMLParser):
             self.images.append(attrs)
         if tag == 'video':
             self.videos.append(attrs)
+        if tag == 'track':
+            self.tracks.append(attrs)
+        if tag == 'a':
+            self.links.append(attrs)
         if tag == 'script' and not attrs.get('src'):
             self.inline_scripts += 1
         # Only references the browser applies: an enabled stylesheet for all media, a script of a runnable type.
@@ -475,6 +492,9 @@ def check_ref(root, source, ref, pages, favicons=()):
         assert ref in ('/favicon.ico', '/favicon.svg', '/app/icon.ico', '/app/icon.svg'), 'unexpected favicon'
     url = urlsplit(ref)
     if url.scheme or url.netloc:
+        # The to-do run the landing's moments follow (J267): only its exact grill, spec and live app links.
+        if ref in TODO_LINKS:
+            return
         assert url.scheme == 'https' and url.netloc == 'github.com', 'unexpected external URL'
         assert re.match(r'^/openwizdev/(?:openwiz|OpenWiz|WizSkills|WizPlugins)(?:/|$)', url.path), 'unexpected repository link'
         assert not url.username and not url.password and not url.query, 'unexpected external URL parts'
@@ -505,7 +525,13 @@ def check_site(root):
     assert not page.inline_scripts, 'landing motion must wait for both external scripts'
     assert len(page.videos) == 1, 'expected one spec recording'
     clip = page.videos[0]
-    assert clip.get('preload') == 'none' and 'autoplay' not in clip and 'hidden' in clip, 'spec recording must be opt-in'
+    # The spec video (#1405) loads only when it first plays, and site.js starts it muted inline, never with sound;
+    # its poster, default captions and a plain link to the video show without any script.
+    assert clip.get('preload') == 'none' and 'autoplay' not in clip, 'spec recording must be opt-in'
+    assert 'muted' in clip and 'playsinline' in clip, 'spec video must start muted inline'
+    assert clip.get('poster', '').removeprefix('/') in ART, 'spec video needs a pinned poster'
+    assert any(t.get('kind') == 'captions' and 'default' in t and t.get('src', '').removeprefix('/') in ART for t in page.tracks), 'spec video needs default captions'
+    assert any(a.get('href') == clip.get('src') and 'hidden' not in a for a in page.links), 'needs a plain link to the spec video'
     for attrs in page.buttons:
         if attrs.get('class') in ('demo-pause', 'spec-play'):
             assert 'hidden' in attrs, 'motion controls must wait for both scripts'
@@ -575,7 +601,15 @@ def check_site(root):
     captions = re.findall(r'<h3>([^<]+)</h3>', landing)
     assert tuple(captions) == moments, 'the three moments must appear in order'
     assert 'Steer the build from the narrated video.' in flat, 'spec video steering copy is missing'
-    assert 'Silent sample' in flat, 'the landing clip must be labeled as a silent sample'
+    assert 'The real spec of an OpenWiz-built to-do app' in flat, 'the spec video must say it is the to-do app\'s real spec'
+    # J267: the three moments point at the real to-do run: its grill, its spec and the live app.
+    hrefs = {}
+    # Comments hide markup from visitors, so a commented-out card or link counts as missing.
+    for block in re.findall(r'<li[^>]*>\s*(?:<div class="moment-screen|<video).*?</li>', re.sub(r'<!--.*?-->', '', landing, flags=re.S), re.S):
+        found = Page(block)
+        hrefs[re.search(r'<h3>([^<]+)</h3>', block)[1]] = {a.get('href') for a in found.links}
+    for card, link in zip(moments, TODO_LINKS):
+        assert link in hrefs.get(card, ()), f'the {card} moment must link the real to-do run: {link}'
     # Owner cuts (round 6): obvious notes stay off the page.
     for text in ('Illustration, not live data', 'Building in public'):
         assert text.lower() not in flat.lower(), f'cut copy is back: {text}'
@@ -1360,10 +1394,8 @@ def check_art(name, data):
         check_webp(data)
     elif name.endswith('.vtt'):
         assert data.startswith(b'WEBVTT') and data.decode('utf-8'), 'invalid WebVTT captions'
-    elif name.endswith('.mp4'):
-        assert data[4:8] == b'ftyp' and data[8:12] in (b'isom', b'mp42'), 'invalid MP4 header'
     else:
-        assert data[:4] == b'\x1a\x45\xdf\xa3' and b'webm' in data[:64], 'invalid WebM header'
+        assert data[4:8] == b'ftyp' and data[8:12] in (b'isom', b'mp42'), 'invalid MP4 header'
     assert not any(marker.encode() in data.lower() for marker in DENYLIST), f'private marker in {name}'
 
 
@@ -1375,7 +1407,7 @@ def check_privacy(path, data):
         assert sha256(data).hexdigest() == FONT_HASHES[font], 'unreviewed font or licence'
     if path.endswith('.woff2'):
         assert font in FONT_HASHES, 'unreviewed binary font'
-    if path.endswith(('.webp', '.webm', '.mp4', '.vtt')):
+    if path.endswith(('.webp', '.mp4', '.vtt')):
         check_art(font, data)
     if path.endswith(('.png', '.ico')):
         pinned = DOC_HASHES.get(path) or ICON_HASHES.get(font) or DRIVER_LOGOS.get(font, (None,))[0]
@@ -1385,7 +1417,7 @@ def check_privacy(path, data):
         check_vector(data)
     if font in DRIVER_LOGOS:
         assert sha256(data).hexdigest() == DRIVER_LOGOS[font][0], f'a drivers logo changed bytes: {path}'
-    binary = path.endswith(('.webp', '.webm', '.mp4', '.png', '.ico')) or (font in FONT_HASHES and font.endswith('.woff2'))
+    binary = path.endswith(('.webp', '.mp4', '.png', '.ico')) or (font in FONT_HASHES and font.endswith('.woff2'))
     text = path + '\n' + ('' if binary else data.decode('utf-8'))
     # The owner's copy rule covers every text file, this checker included (it builds the word from parts).
     assert not any(word in text.lower() for word in BANNED_COPY), f'banned word in {path}'
