@@ -261,9 +261,18 @@
     fleet: object(expression: "HEAD:docs/agents/fleet.md") { ... on Blob { text } }
   }
 }`;
+  // The Models feed (MD6): fleet.md's model settings and the offered-models snapshot beside it (models.v1).
+  const MODELS = `query Models($owner: String!, $name: String!) {
+  rateLimit { limit remaining resetAt }
+  repository(owner: $owner, name: $name) {
+    fleet: object(expression: "HEAD:docs/agents/fleet.md") { ... on Blob { text } }
+    offered: object(expression: "HEAD:docs/agents/models-offered.json") { ... on Blob { text } }
+  }
+}`;
   const feeds = {
     specs: { label: 'Specs', every: 10 * 60 * 1000, query: SPECS, more: specTickets },
     agents: { label: 'Agents', every: 2 * 60 * 1000, query: AGENTS },
+    models: { label: 'Models', every: 10 * 60 * 1000, query: MODELS },
   };
   for (const feed of Object.values(feeds)) Object.assign(feed, { state: 'loading', data: null, readAt: null, failedAt: null, timer: null, busy: false });
 

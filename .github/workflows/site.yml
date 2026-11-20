@@ -27,3 +27,5 @@ jobs:
         run: npm run test:functions
       - name: Test the app in a browser against recorded GitHub answers
         run: npm run test:app
+      - name: Test the Models page against the models contract's fixtures
+        run: node --test tests/models-page.test.mjs

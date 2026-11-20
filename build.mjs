@@ -34,7 +34,7 @@ const faq = await readFile(new URL('faq.html', root), 'utf8');
 const faqTop = faq.replace(/<(\/?)h2\b/g, '<$1h1').replace(/<(\/?)h3\b/g, '<$1h2');
 const withFaq = html => html.replace('<!-- faq.html -->\n', faq).replace('<!-- faq.html h1 -->\n', faqTop);
 // The app (openwiz.dev/app): its design system, data layer, page modules and shell, fingerprinted like the site's.
-const app = ['app/ember.css', 'app/data.js', 'app/ui.js', 'app/pages/you.js', 'app/pages/specs.js', 'app/pages/spec.js', 'app/pages/agents.js', 'app/palette.js', 'app/shell.js'];
+const app = ['app/ember.css', 'app/data.js', 'app/ui.js', 'app/pages/you.js', 'app/pages/specs.js', 'app/pages/spec.js', 'app/pages/agents.js', 'app/pages/models.js', 'app/palette.js', 'app/shell.js'];
 // Pinned npm dependencies (package.json, exact version), copied from node_modules with their licence; the version is in
 // the name, so a new version always gets a new URL. Dagre lays out a spec's ticket graph (AP6).
 const npmVendor = { 'app/vendor/dagre-3.1.3.min.js': 'node_modules/@dagrejs/dagre/dist/dagre.min.js', 'app/vendor/dagre-LICENSE.txt': 'node_modules/@dagrejs/dagre/LICENSE' };
