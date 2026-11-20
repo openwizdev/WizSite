@@ -107,6 +107,45 @@ describe('the Models page reader', () => {
       assert.throws(() => models.offered(broken), models.Refused);
     }
   });
+
+  // catches (review R3): a snapshot that breaks its pinned schema (openwiz.models-offered.v1) still supplying
+  // choices: a harness without its name, a model with no effort, an unknown key, a broken recommendation.
+  test('a snapshot that breaks its schema is refused whole, never offered', async () => {
+    const good = await json(new URL('models-offered.json', FIX));
+    const broken = [
+      s => { delete s.harnesses[0].harness; },
+      s => { s.harnesses[0].models[1].efforts = []; },
+      s => { s.harnesses[0].models[0].efforts.push(''); },
+      s => { s.harnesses[1].provider = ''; },
+      s => { s.harnesses[0].extra = true; },
+      s => { s.extra = true; },
+      s => { delete s.unavailable; },
+      s => { s.unavailable[0].reason = 'gone'; },
+      s => { s.label = 'from somewhere'; },
+      s => { s.read_at = -1; },
+      s => { s.read_at = 1.5; },
+      s => { delete s.recommended.orchestrator; },
+      s => { s.recommended.builder.offered = 'yes'; },
+      s => { delete s.recommended.builder.choice.names; },
+      s => { s.recommended.reviewer.choice.model = 'vendor//demo'; },
+      s => { s.recommended.reviewer.choice.family = 'other'; },
+      s => { s.recommended.reviewer.source = ''; },
+      s => { s.recommended.fixer = s.recommended.builder; },
+      s => { s.state = { kind: 'offered', reason: 'not_ready' }; },
+      s => { s.harnesses = {}; },
+    ];
+    assert.doesNotThrow(() => models.offered(JSON.stringify(good)));
+    for (const [i, breakIt] of broken.entries()) {
+      const copy = structuredClone(good);
+      breakIt(copy);
+      assert.throws(() => models.offered(JSON.stringify(copy)), models.Refused, `case ${i} taken: ${breakIt}`);
+    }
+    const none = { ...structuredClone(good), state: { kind: 'no_options', reason: 'read_failed', text: 'CloudRoom did not answer.' } };
+    assert.throws(() => models.offered(JSON.stringify(none)), models.Refused);
+    const nullChoice = structuredClone(good);
+    nullChoice.recommended.orchestrator = { choice: null, source: 'no fleet.md read', offered: false };
+    assert.doesNotThrow(() => models.offered(JSON.stringify(nullChoice)));
+  });
 });
 
 // ---- The page, in a real browser ----------------------------------------------------------------------------------
@@ -164,10 +203,11 @@ const TYPES = { html: 'text/html; charset=utf-8', css: 'text/css', js: 'text/jav
 const blob = value => (value === null ? null : { text: value });
 
 // GitHub as the app sees it: the sign-in, the picker's lists, and each feed's GraphQL read. `files` is what
-// HEAD:docs/agents/<name> holds for the Models read (null: no such file); `modelsStatus` other than 200 fails it.
+// HEAD:docs/agents/<name> holds for the Models read (null: no such file); `modelsStatus` other than 200 fails it;
+// `forbidden` names the fields GitHub refuses.
 class World {
-  constructor({ fleet, offered, modelsStatus = 200 }) {
-    Object.assign(this, { fleet, offered, modelsStatus, log: [], problems: [] });
+  constructor({ fleet, offered, modelsStatus = 200, forbidden = [] }) {
+    Object.assign(this, { fleet, offered, modelsStatus, forbidden, log: [], problems: [] });
   }
 
   async answer(request) {
@@ -195,7 +235,13 @@ class World {
       const rateLimit = { limit: 5000, remaining: 4800, resetAt: '2099-01-01T00:00:00Z' };
       if (/^\s*query\s+Models\b/.test(query)) {
         if (this.modelsStatus !== 200) return { status: this.modelsStatus, json: { message: 'Server Error' } };
-        return { status: 200, json: { data: { rateLimit, repository: { fleet: blob(this.fleet), offered: blob(this.offered) } } } };
+        // A field GitHub refuses (an App without contents access) comes back null, with a FORBIDDEN error at its path.
+        const repository = { fleet: blob(this.fleet), offered: blob(this.offered) };
+        const errors = this.forbidden.map(field => {
+          repository[field] = null;
+          return { type: 'FORBIDDEN', path: ['repository', field], message: 'Resource not accessible by integration' };
+        });
+        return { status: 200, json: { data: { rateLimit, repository }, ...(errors.length ? { errors } : {}) } };
       }
       return { status: 200, json: { data: { rateLimit, repository: { issues: { totalCount: 0, nodes: [] },
         specIssues: { totalCount: 0, nodes: [] }, youIssues: { totalCount: 0, nodes: [] }, fleet: null } } } };
@@ -389,6 +435,69 @@ describe('the Models page in the app', () => {
     const shown = await page.run(`[...document.querySelectorAll('.models .notice')].map(n => n.innerText.replace(/\\s+/g, ' ').trim())`);
     for (const w of warnings) assert.ok(shown.includes(w.text), `not shown: ${w.text}`);
     readOnly(world);
+    await page.close();
+  });
+
+  // catches (review R1): GitHub refusing the file reads (an App without contents access, as on a private repository)
+  // shown as a missing fleet.md with setup advice, or a refused snapshot shown as "none yet".
+  test('a refused file read is a failed read, never a missing file, and offers no choice', async () => {
+    const fleet = await text(new URL('one-table/fleet.md', FIX));
+    let world = new World({ fleet, offered, forbidden: ['fleet', 'offered'] });
+    let page = await modelsPage(browser, world);
+    let body = await page.text();
+    assert.match(body, /GitHub refused to read docs\/agents\/fleet\.md/);
+    assert.doesNotMatch(body, /has no docs\/agents\/fleet\.md|setup skill/);
+    assert.equal(await page.run(`document.querySelectorAll('.models .card').length`), 0);
+    await page.close();
+
+    world = new World({ fleet, offered, forbidden: ['offered'] });
+    page = await modelsPage(browser, world);
+    body = await page.text();
+    assert.match(body, /GitHub refused to read docs\/agents\/models-offered\.json/);
+    assert.doesNotMatch(body, /No list of offered models yet/);
+    await page.click('Change', '.models .card.builder');
+    assert.equal(await page.run(`document.querySelectorAll('.models .picker li button').length`), 0);
+    readOnly(world);
+    await page.close();
+  });
+
+  // catches (review R2): after a failed refresh the old read's choices stay selectable, or a hand-off copied from a
+  // snapshot that a newer read no longer has stays shown as the line to paste.
+  test('a failed refresh offers no choice and drops the old hand-off; so does a refresh that finds no snapshot', async () => {
+    const fleet = await text(new URL('one-table/fleet.md', FIX));
+    for (const after of [{ modelsStatus: 502 }, { offered: null }]) {
+      const world = new World({ fleet, offered });
+      const page = await modelsPage(browser, world);
+      await page.click('Change', '.models .card.builder');
+      await page.click('Sonnet 5.5 High on Claude Code', '.models .card.builder .picker');
+      await page.until(`document.querySelector('.models .card.builder .handoff')`, 'the line shown');
+      Object.assign(world, after);
+      const before = await page.run('OW.data.feeds.models.failedAt || OW.data.feeds.models.readAt');
+      await page.run(`OW.data.refreshAll()`);
+      await page.until(`(OW.data.feeds.models.failedAt || OW.data.feeds.models.readAt) !== ${before} && !OW.data.feeds.models.busy`, 'the refresh');
+      assert.equal(await page.run(`document.querySelectorAll('.models .handoff').length`), 0, `old hand-off kept after ${JSON.stringify(after)}`);
+      if (!(await page.run(`document.querySelector('.models .card.builder .picker')`))) await page.click('Change', '.models .card.builder');
+      assert.equal(await page.run(`document.querySelectorAll('.models .picker li button').length`), 0, `choices offered after ${JSON.stringify(after)}`);
+      assert.match(await page.text(), after.modelsStatus ? /Refresh now/ : /openwiz models list --save/);
+      await page.close();
+    }
+  });
+
+  // catches (review R4): a clipboard write that finishes after the user left the page redrawing the Models cards
+  // into another page's body.
+  test('a copy that finishes after leaving the page never draws Models into another page', async () => {
+    const world = new World({ fleet: await text(new URL('one-table/fleet.md', FIX)), offered });
+    const page = await modelsPage(browser, world);
+    await page.run(`(() => { navigator.clipboard.writeText = () => new Promise(resolve => { window.releaseCopy = resolve; }); })()`);
+    await page.click('Change', '.models .card.builder');
+    await page.click('Sonnet 5.5 High on Claude Code', '.models .card.builder .picker');
+    await page.until('window.releaseCopy', 'the copy started');
+    await page.run(`location.hash = '#/agents'`);
+    await page.until(`document.querySelector('main h1').textContent === 'Agents'`, 'the Agents page');
+    await page.run('window.releaseCopy()');
+    await page.run('new Promise(resolve => setTimeout(resolve, 300))');
+    assert.equal(await page.run(`document.querySelector('main h1').textContent`), 'Agents');
+    assert.equal(await page.run(`document.querySelectorAll('main .models, main .card.builder').length`), 0);
     await page.close();
   });
 
