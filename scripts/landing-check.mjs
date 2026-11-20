@@ -407,10 +407,26 @@ async function buy(page, where, path) {
 
 // #73: every site page's one footer: its link groups shown inside the window, the wordmark whole (no glyph cut by the
 // footer's edge), the Wizes right under it, and the footer's bottom at or below the window's bottom on short pages.
-async function footer(page, where) {
-  const facts = await page.evaluate(`(() => { ${HELPERS}
+async function footer(page, where, mode) {
+  const facts = await page.evaluate(`(async () => { ${HELPERS}
     const footer = document.querySelector('footer.landing-footer');
     const mark = footer.querySelector('.footer-wordmark');
+    // #75 R2: the painted Wizes, not their boxes: each shown Wiz's top opaque row, from its untransformed place.
+    footer.scrollIntoView({ block: 'end', behavior: 'instant' });
+    const shownWizes = [...footer.querySelectorAll('.family-wiz')].filter(shown);
+    await Promise.all(shownWizes.map(wiz => wiz.querySelector('img').decode().catch(() => {})));
+    const row = footer.querySelector('.family');
+    const painted = Math.min(...shownWizes.map(wiz => {
+      const img = wiz.querySelector('img');
+      const canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth; canvas.height = img.naturalHeight;
+      const context = canvas.getContext('2d');
+      context.drawImage(img, 0, 0);
+      const { data } = context.getImageData(0, 0, canvas.width, canvas.height);
+      let first = canvas.height;
+      for (let i = 3; i < data.length; i += 4) if (data[i] > 24) { first = Math.floor((i - 3) / 4 / canvas.width); break; }
+      return row.getBoundingClientRect().top + wiz.offsetTop - row.offsetTop + img.offsetTop + first * img.offsetHeight / canvas.height;
+    }));
     const range = document.createRange();
     range.selectNodeContents(mark);
     const text = range.getBoundingClientRect();
@@ -426,19 +442,22 @@ async function footer(page, where) {
     const links = [...footer.querySelectorAll('.footer-groups a')];
     return {
       count: document.querySelectorAll('footer').length,
+      buttons: footer.querySelectorAll('.family-wiz[role="button"]').length,
       links: links.length, inside: links.every(a => shown(a) && a.getBoundingClientRect().left >= 0 && a.getBoundingClientRect().right <= innerWidth),
       line: shown(footer.querySelector('.footer-line')),
       dbg: [glyphs.left, f.left, glyphs.right, f.right, glyphs.bottom, m.bottom, f.bottom].map(Math.round),
       whole: glyphs.left >= f.left && glyphs.right <= f.right && glyphs.bottom <= m.bottom + 1 && m.bottom <= f.bottom,
-      gap: Math.round(family.top - m.bottom),
+      gap: Math.round(painted - glyphs.bottom),
       bottom: Math.round(f.bottom + scrollY), height: document.documentElement.scrollHeight, inner: innerHeight,
     };
   })()`);
   expect(facts.count === 1, where, `one footer (${facts.count})`);
+  // #75 R1: with JavaScript on, every page's footer Wizes answer focus and clicks, the landing's and /drivers/ alike.
+  expect(facts.buttons === (mode === 'no JavaScript' ? 0 : 12), where, `the footer Wizes are not the landing's (${facts.buttons} of 12 respond)`);
   expect(facts.links === 7 && facts.inside, where, 'the footer link groups are not all shown inside the window');
   expect(facts.line, where, 'the footer lacks its Apache-2.0 line');
   expect(facts.whole, where, `the footer wordmark is clipped (ink and box: ${facts.dbg})`);
-  expect(facts.gap <= 24, where, `a ${facts.gap}px gap between the wordmark and the Wizes`);
+  expect(facts.gap >= 0 && facts.gap <= 16, where, `a ${facts.gap}px painted gap between the wordmark's ink and the Wizes (0 to 16)`);
   expect(facts.bottom >= facts.inner && facts.bottom >= facts.height - 1, where, `the footer ends at ${facts.bottom}px, above the window's bottom (${facts.inner}px)`);
 }
 
@@ -468,7 +487,7 @@ async function main() {
           try {
             await buy(other, `${path} ${where}`, path);
             await chrome(other, `${path} ${where}`, name);
-            await footer(other, `${path} ${where}`);
+            await footer(other, `${path} ${where}`, name);
             if (process.env.SHOTS && name === 'motion' && path !== '/' && (width === 390 || width === 1280)) {
               await other.shot(join(process.env.SHOTS, `${path.slice(1, -1)}-${width}.png`));
             }
@@ -484,7 +503,7 @@ async function main() {
         const other = await open(browser, origin, width, 800, MODES.motion, path);
         try {
           await buy(other, `${path} ${width}px, motion`, path);
-          await footer(other, `${path} ${width}px, motion`);
+          await footer(other, `${path} ${width}px, motion`, 'motion');
         } finally {
           await other.close();
         }

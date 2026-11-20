@@ -188,7 +188,7 @@ body.landing > main { flex: 1 0 auto; }
 .footer-groups a:hover { color: var(--ink); text-underline-offset: 4px; }
 .footer-github span { padding-left: 8px; border-left: 1px solid var(--line); font-variant-numeric: tabular-nums; }
 .footer-wordmark { margin: clamp(16px, 3vw, 32px) 0 0; color: #cfc6b8; text-align: center; font-size: min(19vw, 280px); font-weight: 780; line-height: .87; letter-spacing: -.095em; padding: 0 .09em .09em 0; }
-.family { display: flex; justify-content: center; max-width: 1480px; margin: 7px auto clamp(-48px, -3vw, -10px); padding: 8px 8px 0; overflow: hidden; }
+.family { display: flex; justify-content: center; max-width: 1480px; margin: max(-20px, calc(-6px - .9vw)) auto clamp(-48px, -3vw, -10px); padding: 8px 8px 0; overflow: hidden; }
 .family-wiz { position: relative; flex: 0 0 8.5%; margin-inline: -.08%; aspect-ratio: 1; }
 .family-wiz img { position: relative; display: block; width: 100%; height: auto; }
 /* Owner's fix 2: the Wizes become buttons once the script runs; nothing shows until one is used. */

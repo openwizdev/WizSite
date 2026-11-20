@@ -287,6 +287,7 @@ class Page(HTMLParser):
         self.videos = []
         self.inline_scripts = 0
         self.books = []
+        self.x_links = 0
         self.stylesheets, self.scripts = [], []
         self.feed(text)
 
@@ -299,6 +300,11 @@ class Page(HTMLParser):
             # The booking link may leave the site: check_team checks it, on the team page only, instead of check_ref.
             # Only this element's href is exempt; check_site refuses a booking link on any other page.
             self.books.append(attrs.get('href') or '')
+            attrs = {key: value for key, value in attrs.items() if key != 'href'}
+        elif tag == 'a' and attrs.get('href') == X_ACCOUNT:
+            # #75 R3: OpenWiz's X account, only as a link a visitor follows (check_site allows one, the footer's);
+            # anywhere else, as a resource or in CSS, check_ref refuses it like any external URL.
+            self.x_links += 1
             attrs = {key: value for key, value in attrs.items() if key != 'href'}
         for key in ('href', 'src', 'poster'):
             if attrs.get(key):
@@ -419,8 +425,6 @@ def check_ref(root, source, ref, pages, favicons=()):
         # Only the reviewed logo-pack favicons (checked as local files below).
         assert ref in ('/favicon.ico', '/favicon.svg', '/app/icon.ico', '/app/icon.svg'), 'unexpected favicon'
     url = urlsplit(ref)
-    if ref == X_ACCOUNT:
-        return
     if url.scheme or url.netloc:
         assert url.scheme == 'https' and url.netloc == 'github.com', 'unexpected external URL'
         assert re.match(r'^/openwizdev/(?:openwiz|OpenWiz|WizSkills|WizPlugins)(?:/|$)', url.path), 'unexpected repository link'
@@ -470,6 +474,7 @@ def check_site(root):
         # The social card: an absolute URL on the site that resolves to a built file.
         assert page.social and all(s.startswith(SITE_URL) and s.removeprefix(SITE_URL).split('?')[0] in STATIC for s in page.social), 'social image must be a built file on the site'
         assert path == root / TEAM_PAGE or not page.books, f'a booking link outside the team page: {path.name}'
+        assert page.x_links == 1, f'one X link per page, the footer\'s: {path.relative_to(root)} has {page.x_links}'
         for ref in page.refs:
             check_ref(root, path, ref, pages, page.favicons)
         for ref in css_refs(path.read_text()):
@@ -808,7 +813,10 @@ def check_drivers(landing, changelog, drivers, page):
         f'the drivers description must not say every driver passes: {description[0]}'
     assert not DRIVER_JARGON.search(description[0]), f'a jargon count in the drivers description: {description[0]}'
     assert not re.search(r'grok bot[^.;]*\bpass', description[0], re.I), f'Grok Bot has not passed: {description[0]}'
-    assert not page.scripts and not page.inline_scripts, 'the drivers page reads completely without scripts'
+    # #75 R1: the page itself reads without scripts; it loads only the site's own two (GSAP, then site.js), as every site
+    # page does, for the shared footer's star count and Wizes.
+    assert page.scripts == Page(landing).scripts and not page.inline_scripts, \
+        'the drivers page loads only the site\'s footer scripts (GSAP, site.js), never its own'
     main = re.search(r'<main\b[^>]*>[\s\S]*?</main>', drivers)
     assert main, 'the drivers page needs its main'
     main = main[0]
@@ -1189,6 +1197,7 @@ def check_app(root, names, pages):
     """The app's page: fingerprinted Ember and scripts only, no inline script, local links, its manifest, its CSP."""
     page = Page((root / APP_PAGE).read_text())
     assert not page.books, 'a booking link outside the team page: the app'
+    assert not page.x_links, 'one X link per page, the footer\'s: the app has one'
     assert not set(page.refs) & {f'/{name}' for name in HASHED}, 'the app uses an unfingerprinted style or script'
     assert page.stylesheets == [f'/{names[APP_STYLE]}'], 'the app must apply exactly the fingerprinted ember.css'
     assert page.scripts == [ref for name in APP_SCRIPTS for ref in [f'/{v}' for v, (_, before) in APP_VENDOR.items() if before == name] + [f'/{names[name]}']], \

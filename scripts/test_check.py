@@ -508,8 +508,8 @@ class Checks(unittest.TestCase):
             'three steps': ('team/index.html', lambda t: t.replace('<li><h3>Your first fleet ships</h3><p>A real change, in a day.</p></li>', '', 1)),
             'link to /drivers/': ('team/index.html', lambda t: t.replace('<li><a href="/drivers/">Cloudroom</a></li>', '<li>Cloudroom</li><li><a href="/">x</a></li>', 1)),
             # #73: the one site footer on every page.
-            'the one site footer': ('drivers/index.html', lambda t: t.replace(FOOTER, '', 1)),
-            'the one site footer ': ('changelog/index.html', lambda t: t.replace('</main>', '</main>' + FOOTER, 1)),
+            'the one site footer|one X link per page': ('drivers/index.html', lambda t: t.replace(FOOTER, '', 1)),
+            'the one site footer|one X link per page ': ('changelog/index.html', lambda t: t.replace('</main>', '</main>' + FOOTER, 1)),
             'the one site footer  ': ('index.html', lambda t: t.replace('X @openwiz', 'X', 1)),
         }
         for message, (page, change) in refused.items():
@@ -535,9 +535,26 @@ class Checks(unittest.TestCase):
             html = '<html><body><!-- footer.html -->\n</body></html>'.replace('<!-- footer.html -->\n', broken)
             with self.subTest(message=message), mock.patch.object(check, 'FOOTER', broken), self.assertRaisesRegex(AssertionError, message.strip()):
                 check.check_footer({'index.html': html})
-        with self.assertRaisesRegex(AssertionError, 'unexpected external URL'):
-            check_ref(ROOT, ROOT / 'index.html', 'https://x.com/someone', {})
-        check_ref(ROOT, ROOT / 'index.html', 'https://x.com/openwiz', {})
+        # #75 R3: the X account is a footer link only: never a resource, a CSS url() or a second link.
+        for url in ('https://x.com/someone', 'https://x.com/openwiz'):
+            with self.subTest(url=url), self.assertRaisesRegex(AssertionError, 'unexpected external URL'):
+                check_ref(ROOT, ROOT / 'site.css', url, {})
+        for message, (page, old, new) in {
+            'unexpected external URL': ('team/index.html', '</main>', '<img src="https://x.com/openwiz" alt=""></main>'),
+            'unexpected external URL ': ('index.html', '</head>', '<link rel="preload" href="https://x.com/openwiz" as="image"></head>'),
+            'one X link per page': ('changelog/index.html', '</main>', '<a href="https://x.com/openwiz">X</a></main>'),
+            'one X link per page ': ('drivers/index.html', '<a href="https://x.com/openwiz">X @openwiz</a>', '<a href="/">X @openwiz</a>'),
+            'one X link per page, the footer\'s: the app': ('app/index.html', '</body>', '<a href="https://x.com/openwiz">X</a></body>'),
+        }.items():
+            with tempfile.TemporaryDirectory() as temp, self.subTest(message=message):
+                root = Path(temp) / 'dist'
+                shutil.copytree(ROOT / 'dist', root)
+                path = root / page
+                text = path.read_text()
+                assert old in text, old
+                path.write_text(text.replace(old, new, 1))
+                with self.assertRaisesRegex(AssertionError, message.strip()):
+                    check_site(root)
 
     def test_drivers_page(self):
         # Catches (#50, #62): the drivers page dropped from the build or its checks; a card missing, reordered or with
@@ -557,7 +574,8 @@ class Checks(unittest.TestCase):
                 ('drivers/index.html', ' aria-current="page">Drivers', '>Drivers', 'aria-current'),
                 ('drivers/index.html', '</main>', '<p>Used by 300 teams.</p></main>', 'invented number'),
                 ('drivers/index.html', '</main>', '<p hidden>Later.</p></main>', 'without a script|waits for a script'),
-                ('drivers/index.html', '</head>', '<script>1</script></head>', 'without scripts'),
+                ('drivers/index.html', '</head>', '<script>1</script></head>', 'never its own'),
+                ('drivers/index.html', '</head>', '<script src="/drivers/logos/bot.svg"></script></head>', 'never its own'),
                 ('index.html', '<a class="nav-drivers" href="/drivers/">Drivers</a>', '', 'identical to the landing|landing top bar needs one Drivers'),
                 ('changelog/index.html', '<a class="nav-drivers" href="/drivers/">Drivers</a>', '', 'Changelog top bar needs one Drivers')):
             self.broken(name, old, new, error)
