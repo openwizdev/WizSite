@@ -41,6 +41,8 @@ ART_HASHES = {
     'art/drivers-d-ship.webp': '885dd800aae2e75d45f2b88e1e69232bbf987df44beec9fa8070d4354b64cd04',
     # Round 2F (#56): variant C's painted cutaway of the Wiz crew's ship (#49), beside boat.dev's five checks.
     'art/drivers-c-boat.webp': '39fd43d08aa36bce84e964699d493a03af090499a63dffbfaa43e61804b7e1ef',
+    # The team page's proof (#79): the boat video's poster, a link to the post on X; the video itself is never hosted.
+    'art/team-boat-poster.webp': '656c0c75f92a17390beda0d8afb45be3f9164330357635295998406dad3a69d4',
 }
 ART = set(ART_HASHES)
 # Logo pack (#1350: the dark-cream mark). Raster icons and the social card are pinned by hash like the art; a new picture needs review.
@@ -115,11 +117,29 @@ TOP_BAR_END = '  </nav>\n</header>'
 # only value. Until the real link is set it is this in-page placeholder; otherwise it must be an https URL.
 TEAM_PAGE = 'team/index.html'
 BOOK_PLACEHOLDER = '#book'
-TEAM_COPY = ('We set up your agent factory with you.', 'Your repos, your models, your machines. First fleet running in a day.',
-             'Solo builders and small teams.', 'Custom pricing.', 'Book a call')
-# #73: the team page's body after its hero, in order: what you get (three steps), where your agents run, the closing call.
-TEAM_PARTS = ('What you get', 'Where your agents run', 'Plan your factory with us.')
-TEAM_STEPS = ('A call to plan your setup', 'We install OpenWiz with you', 'Your first fleet ships')
+# #79 (round 2, design A): the frozen copy, word for word: the hero, the terms, the "ships" line, proof, the facts, the close.
+TEAM_HEADLINE = 'Book 30 minutes. Leave with a shipped pull request.'
+TEAM_TERMS = ('A small, real change of your choice.',
+              'On a repository with working CI and a signed-in coding agent (Claude Code or Codex).',
+              "If it hasn't shipped in 30 minutes, Jake stays on until it does.")
+TEAM_SHIPS = 'Ships means a pull request opens on your repo, built by your agents and passing your CI. Merging is your call.'
+TEAM_COPY = ('For solo builders and small teams', TEAM_HEADLINE,
+             'A 30-minute call with Jake, who builds OpenWiz. We connect it to your repo and the coding agent you already use, '
+             'you pick one small change, and your first fleet ships it on your workflow.',
+             'Book a call', *TEAM_TERMS, TEAM_SHIPS,
+             'Three drivers passed all five checks: your computer or VPS, Cloudroom and boat.dev. Grok Bot is coming soon.',
+             'Our Drivers page was built the same way: a fleet of agents drew six designs, a council of judges picked one, '
+             'and it merged in one night.',
+             'Watch the fleet build it (49 s, on X)',
+             'Solo builders and small teams who already use Claude Code or Codex.', 'Custom pricing. No checkout.')
+# The team page's headings, in order: the terms and the timeline in the hero, then proof, where your agents run, the close.
+TEAM_PARTS = ('How the call works', 'The 30 minutes, roughly', 'Proof', 'Where your agents run', 'Your first fleet ships on the call.')
+# The timeline's four stops, in order: its mark, then its line.
+TEAM_STEPS = (('Minute 0', 'We connect your repo and your agents.'), ('Minute 10', 'You answer a few questions about your change.'),
+              ('Minute 20', 'Your agents build it.'), ('Minute 30', 'A pull request ships.'))
+TEAM_POSTER = ('/art/team-boat-poster.webp', 'Wizards on a boat: the fleet that built the Drivers page')
+# Words the team page never uses (#79).
+TEAM_NEVER = ('install', 'guarantee', 'Wizes')
 # The site footer (#73): one snippet, which the build adds at each site page's one slot (not the app's). Its links, in order.
 FOOTER = (ROOT / 'footer.html').read_text()
 FOOTER_SLOT = '<!-- footer.html -->\n'
@@ -474,7 +494,9 @@ def check_site(root):
         # The social card: an absolute URL on the site that resolves to a built file.
         assert page.social and all(s.startswith(SITE_URL) and s.removeprefix(SITE_URL).split('?')[0] in STATIC for s in page.social), 'social image must be a built file on the site'
         assert path == root / TEAM_PAGE or not page.books, f'a booking link outside the team page: {path.name}'
-        assert page.x_links == 1, f'one X link per page, the footer\'s: {path.relative_to(root)} has {page.x_links}'
+        # The team page has one more (#79): its proof's boat poster, which check_team pins to the X post.
+        x_links = 2 if path == root / TEAM_PAGE else 1
+        assert page.x_links == x_links, f'one X link per page, the footer\'s: {path.relative_to(root)} has {page.x_links}'
         for ref in page.refs:
             check_ref(root, path, ref, pages, page.favicons)
         for ref in css_refs(path.read_text()):
@@ -1048,11 +1070,32 @@ def check_team(htmls, pages):
     assert not re.search(r'[$€£]\s*\d|\bper (?:month|seat|user)\b', flat, re.I), 'the team page shows no price'
     labels = re.findall(r'<a [^>]*data-book[^>]*>([^<]*)</a>', htmls[TEAM_PAGE])
     assert labels == ['Book a call', 'Book a call'], f'team page copy: both booking links read Book a call: {labels}'
-    parts = [plain(h) for h in re.findall(r'<h2\b[^>]*>([\s\S]*?)</h2>', htmls[TEAM_PAGE].split('<footer', 1)[0])]
+    main = htmls[TEAM_PAGE].split('<footer', 1)[0]
+    assert plain(re.search(r'<h1>([\s\S]*?)</h1>', main)[1]) == TEAM_HEADLINE, f'the team page headline: {TEAM_HEADLINE}'
+    for word in TEAM_NEVER:
+        assert not re.search(rf'\b{word}', plain(main), re.I), f'a word the team page never uses: {word}'
+    parts = [plain(h) for h in re.findall(r'<h2\b[^>]*>([\s\S]*?)</h2>', main)]
     assert parts == list(TEAM_PARTS), f'the team page sections, in order: {parts}'
-    steps = re.search(r'<ol class="team-steps">([\s\S]*?)</ol>', htmls[TEAM_PAGE])
-    assert steps and [plain(h) for h in re.findall(r'<h3>([\s\S]*?)</h3>', steps[1])] == list(TEAM_STEPS), \
-        f'What you get: its three steps, in order: {TEAM_STEPS}'
+    # #79: the terms, the "ships" line and the timeline are plain, visible text in the hero, never hidden or collapsed.
+    hero = re.search(r'<div class="team wrap">([\s\S]*?)</div>\n<section', main)
+    assert hero, 'the team page hero'
+    assert not re.search(r'\bhidden\b|<details|aria-hidden="true"[^>]*>[^<]*\w', hero[1]), 'the terms and the timeline stay visible'
+    terms = re.search(r'<ul class="team-terms">([\s\S]*?)</ul>', hero[1])
+    assert terms and [plain(t) for t in re.findall(r'<li>([\s\S]*?)</li>', terms[1])] == list(TEAM_TERMS), \
+        f'How the call works: its three terms, in order, under the first Book a call: {TEAM_TERMS}'
+    assert hero[1].index('data-book') < hero[1].index('class="team-terms"'), 'How the call works: the terms sit under the first Book a call'
+    steps = re.search(r'<ol class="team-steps">([\s\S]*?)</ol>', hero[1])
+    found = steps and [(plain(m), plain(t)) for m, t in re.findall(r'<li\b[^>]*><span class="team-minute">([\s\S]*?)</span>'
+                                                                  r'<p>([\s\S]*?)</p></li>', steps[1])]
+    assert found == list(TEAM_STEPS), f'The 30 minutes, roughly: its four stops, in order: {TEAM_STEPS}'
+    assert TEAM_SHIPS in plain(hero[1]), 'the "ships" line sits in the hero, by the timeline'
+    # The boat video is a poster linking to the post on X: its pinned image, sized and lazy, and no video on the page.
+    poster = re.search(rf'<a class="team-film" href="{re.escape(X_ACCOUNT)}">\s*(<img [^>]*>)', main)
+    image = poster and dict(re.findall(r'([\w-]+)="([^"]*)"', poster[1]))
+    assert image and (image.get('src'), image.get('alt')) == TEAM_POSTER and image.get('loading') == 'lazy' \
+        and image.get('width', '').isdigit() and image.get('height', '').isdigit(), \
+        f'Proof: the boat poster, sized and lazy, links to the post on X: {TEAM_POSTER}'
+    assert not re.search(r'<video|<iframe|\.(?:mp4|webm|mov)\b', main), 'Proof: the boat video is a link, never hosted or embedded'
     run = re.search(r'<ul class="team-drivers">([\s\S]*?)</ul>', htmls[TEAM_PAGE])
     assert run and re.findall(r'href="([^"]*)"', run[1]) and set(re.findall(r'href="([^"]*)"', run[1])) == {'/drivers/'}, \
         'Where your agents run: its drivers link to /drivers/'
