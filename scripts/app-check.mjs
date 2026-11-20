@@ -953,6 +953,84 @@ async function main() {
       await page.close();
     });
 
+    // ---- AP17 (#1579): the pulse and the Agents card's pull request tell the truth (WizSite #34, R1 and R2) ----
+
+    // A status note on spec 40's ticket #43 as the Agents read gives it: its id, its state and its last edit.
+    const note43 = (id, state, updatedAt) => ({ databaseId: id, createdAt: '2030-01-01T00:00:00Z', updatedAt, author: { login: 'factory-bot[bot]' },
+      body: `<!-- openwiz:status v1 -->\nagent: builder\nstate: ${state}\nharness: Synthetic Harness\nmodel: Synthetic Model\nskills: build-ticket@0.1.2\nstep: a synthetic step\ntime: ${updatedAt}` });
+    const ticketOf = (number, comments, totalCount = comments.length) => ({ number, title: `Synthetic ticket ${number}`, url: `https://github.com/acme/factory/issues/${number}`,
+      state: 'OPEN', updatedAt: comments[0]?.updatedAt || '2030-01-01T00:00:00Z', comments: { totalCount, nodes: comments }, closedByPullRequestsReferences: { totalCount: 0, nodes: [] } });
+    const minutesAgo = n => new Date(Date.now() - n * 60 * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z');
+    const pulseWorld = (agents, gate) => {
+      let specsRead;
+      const specsDone = new Promise(resolve => { specsRead = resolve; });
+      const world = ap7World({
+        tickets: repository => {
+          for (const ticket of repository.s40.subIssues.nodes) for (const c of ticket?.comments?.nodes || []) {
+            c.body = c.body.replace('\nstep:', '\nskills: build-ticket@0.1.2\nstep:');
+            if (c.databaseId === 9009 || c.databaseId === 9007) c.updatedAt = minutesAgo(5); // working in the Specs read, 5 minutes ago
+          }
+          specsRead();
+        },
+        agents,
+      });
+      if (gate) {
+        // The Agents read answers only after the Specs read did, so it is the newer snapshot.
+        const answer = world.graphql.Agents;
+        world.graphql.Agents = async () => { await specsDone; await new Promise(r => setTimeout(r, 300)); return answer(); };
+      }
+      return world;
+    };
+    const pulsingOn = async (world, page) => {
+      await page.until(`document.querySelectorAll('main .graph [data-ticket]').length === 10`, 'the ticket graph');
+      await page.until(`OW.data.feeds.agents.readAt && OW.data.feeds.specs.readAt && OW.data.feeds.specs.data?.specs`, 'both reads');
+      await settle(page, 300);
+      return page.run(`[...document.querySelectorAll('main .graph [data-pulse]')].map(c => c.dataset.ticket).sort()`);
+    };
+
+    await check('AP17 pulse: a note working in the Specs read and done in a newer Agents read shows no pulse', async () => {
+      // catches: the pulse unioning working claims from both snapshots, so an older Specs read keeps "Agent working" on.
+      const world = pulseWorld(repository => { repository.issues.nodes.unshift(ticketOf(43, [note43(9009, 'done', minutesAgo(1))])); });
+      const page = await ap6Open(world, '#/specs/40');
+      const pulsing = await pulsingOn(world, page);
+      assert(JSON.stringify(pulsing) === JSON.stringify(['42']), `pulsing tickets: ${JSON.stringify(pulsing)}`);
+      checkRequestLog(world);
+      await page.close();
+    });
+
+    await check('AP17 pulse: a newer Agents read that covers a deleted note drops its pulse; one that does not reach it keeps it', async () => {
+      // catches: a deleted working note pulsing on from the older Specs read, or a note the newer read never reached being dropped.
+      const full = Array.from({ length: 20 }, (_, i) => ({ databaseId: 9900 + i, body: 'An ordinary comment.', createdAt: '2030-01-01T00:00:00Z',
+        updatedAt: minutesAgo(1), author: { login: 'factory-bot[bot]' } }));
+      const world = pulseWorld(repository => {
+        repository.issues.nodes.unshift(ticketOf(43, [], 0), ticketOf(42, full, 25)); // #43's note is gone; #42's window stops short of its note
+      }, true);
+      const page = await ap6Open(world, '#/specs/40');
+      const pulsing = await pulsingOn(world, page);
+      assert(JSON.stringify(pulsing) === JSON.stringify(['42']), `pulsing tickets: ${JSON.stringify(pulsing)}`);
+      checkRequestLog(world);
+      await page.close();
+    });
+
+    await check('AP17 Agents: a note naming PR #12 that GitHub does not return links PR #12, with its facts unknown', async () => {
+      // catches: the card swapping in the ticket's other pull request (#99) beside the preview of the PR the note names.
+      const world = ap7World({ agents: repository => {
+        const pr = repository.issues.nodes.find(issue => issue.number === 70).closedByPullRequestsReferences;
+        pr.nodes = [{ ...pr.nodes[0], url: 'https://github.com/acme/site/pull/99', reviewDecision: 'APPROVED' }];
+      } });
+      const page = await ap6Open(world, '#/agents');
+      await page.until(`document.querySelector('main article.card[data-note="7001"]')`, 'the builder\'s card');
+      const links = await page.run(`[...document.querySelectorAll('main article.card[data-note="7001"] a')].map(a => a.getAttribute('href'))`);
+      assert(JSON.stringify(links) === JSON.stringify(['https://github.com/acme/factory/issues/70', 'https://github.com/acme/site/pull/12',
+        'https://12.example-site.pages.dev/app/']), `the builder's links: ${JSON.stringify(links)}`);
+      const text = await page.run(`document.querySelector('main article.card[data-note="7001"]').innerText.replace(/\\s+/g, ' ')`);
+      assert(/Pull request #12: [^·]*unknown/.test(text) && !/#99|approved|open,/.test(text), `the builder's pull request: ${text}`);
+      const second = await page.run(`document.querySelector('main article.card[data-note="7005"]').innerText.replace(/\\s+/g, ' ')`);
+      assert(/Pull request #99: open, approved/.test(second), `a note naming no PR loses the ticket's pull request: ${second}`);
+      checkRequestLog(world);
+      await page.close();
+    });
+
     await check('AP7 keyboard: 3 opens Agents; Tab walks each card\'s ticket, pull request and preview with visible focus; a refresh keeps it', async () => {
       const world = ap7World();
       const page = await ap6Open(world);
