@@ -98,7 +98,7 @@ async function launch() {
     socket.close();
     child.kill();
     await new Promise(resolve => child.exitCode !== null ? resolve() : child.once('exit', resolve));
-    await rm(profile, { recursive: true, force: true });
+    await rm(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   };
   return { send, listeners, close };
 }

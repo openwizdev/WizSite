@@ -118,6 +118,11 @@
     <div class="own-copy">
       <h2 id="own-title">Write your own driver</h2>
       <p>A driver is one small program, in any language, that answers four commands. Pass the same five-check test on your real host and it can join. OpenWiz never touches a login.</p>
+      <div class="install-box" data-install="live">
+        <p class="install-hint">Paste this into your agent</p>
+        <div class="install-row"><span aria-hidden="true">›_</span><code class="install-line">Write an OpenWiz driver for my host with the write-driver skill: https://github.com/openwizdev/WizSkills/tree/main/skills/write-driver</code><button class="btn install" type="button" disabled>Copy</button></div>
+      </div>
+      <p>Your agent writes a driver for your host from the template and runs the same test on your real host. It asks before any step that could cost money or start a machine, never handles a login, and tells you how long it took.</p>
       <ul class="own-links">
         <li><a href="https://github.com/openwizdev/OpenWiz/blob/main/kernel/driver.v1.md">The contract <span>kernel/driver.v1.md</span></a></li>
         <li><a href="https://github.com/openwizdev/OpenWiz/tree/main/kernel/driver-kit">The test <span>kernel/driver-kit/</span></a></li>
