@@ -196,8 +196,8 @@ class Checks(unittest.TestCase):
                 (lambda t: t.replace('<a class="moment-link" href="https://openwizdev.github.io/todo-demo/">Open the to-do app</a>', ''), 'Watch it ship moment must link'),
                 (lambda t: t.replace('https://openwizdev.github.io/todo-demo/', 'https://openwizdev.github.io/other/'), 'unexpected external URL'),
                 (lambda t: t.replace('https://github.com/openwizdev/todo-demo/issues/1"', 'https://github.com/openwizdev/todo-demo/issues/2"'), 'unexpected repository link'),
-                (lambda t: re.sub(r'(<li>\s*<div class="moment-screen chat-screen">.*?</li>)', r'<!-- \1 -->', t, count=1, flags=re.S), 'Answer a few questions moment must link'),
-                (lambda t: re.sub(r'(<li>\s*<div class="moment-screen ship-screen">.*?</li>)', r'<!-- \1 -->', t, count=1, flags=re.S), 'Watch it ship moment must link'),
+                (lambda t: re.sub(r'(<li class="moment-step moment-grill">.*?</li>)', r'<!-- \1 -->', t, count=1, flags=re.S), 'Answer a few questions moment must link'),
+                (lambda t: re.sub(r'(<li class="moment-step moment-ship">.*?</li>)', r'<!-- \1 -->', t, count=1, flags=re.S), 'Watch it ship moment must link'),
                 (lambda t: t.replace('</main>', '<p>Add a dark mode toggle</p></main>'), 'old example'),
                 (lambda t: t.replace('Oil painting of Wiz scholars studying a to-do list', ''), 'painting without a description')):
             with self.subTest(error=error), tempfile.TemporaryDirectory() as temp:

@@ -115,33 +115,31 @@
   </section>
   <section class="moments wrap" aria-labelledby="moments-title">
     <h2 id="moments-title">From idea to shipped.</h2>
-    <ol>
-      <li>
-        <div class="moment-screen chat-screen">
-          <p class="screen-label">Build a to-do app</p>
-          <p>Where should tasks live?</p><p>One list for now.</p>
-          <p>Keep completed tasks visible?</p><p>Yes, greyed out.</p>
-        </div>
-        <h3>Answer a few questions</h3>
-        <p class="moment-copy">The real grill behind the to-do app. <a class="moment-link" href="https://github.com/openwizdev/todo-demo/issues/1#issuecomment-7037022878">See its questions</a></p>
-      </li>
-      <li class="spec-moment">
-        <video class="spec-video" src="/art/todo-spec.mp4" poster="/art/todo-spec-poster.webp" preload="none" muted playsinline loop controls aria-label="The to-do app's narrated spec video">
-          <track kind="captions" src="/art/todo-spec.vtt" srclang="en" label="English" default>
-        </video>
-        <p class="screen-label spec-sample">Spec · To-do app</p>
-        <div class="moment-heading"><h3>Watch your spec</h3><button class="spec-play" type="button" hidden><svg aria-hidden="true" viewBox="0 0 16 16"><path d="M5 3l8 5-8 5z"/></svg>Play with sound</button></div>
-        <p class="moment-copy">Steer the build from the narrated video. The real spec of an OpenWiz-built to-do app. <a class="spec-link" href="/art/todo-spec.mp4">Open the video</a> · <a class="moment-link" href="https://github.com/openwizdev/todo-demo/issues/1">the spec</a></p>
-      </li>
-      <li>
-        <div class="moment-screen ship-screen">
-          <p class="screen-label">To-do app</p><strong>Today</strong>
-          <p>✓ Sketch the first screen</p><p>✓ Add a task</p><p>□ Make a cup of tea</p>
-        </div>
-        <h3>Watch it ship</h3>
-        <p class="moment-copy">Built by the fleet, live now. <a class="moment-link" href="https://openwizdev.github.io/todo-demo/">Open the to-do app</a></p>
-      </li>
-    </ol>
+    <p class="moments-sub">Steer the build from the narrated video.</p>
+    <div class="moment-stage">
+      <img class="moment-art" src="/art/drivers-c-boat.webp" alt="" width="1672" height="941" loading="lazy" decoding="async">
+      <ol>
+        <li class="moment-step moment-grill">
+          <span class="moment-num" aria-hidden="true">1</span>
+          <h3>Answer a few questions</h3>
+          <a class="moment-link" href="https://github.com/openwizdev/todo-demo/issues/1#issuecomment-7037022878">See its questions</a>
+        </li>
+        <li class="spec-moment">
+          <div class="spec-frame">
+            <video class="spec-video" src="/art/todo-spec.mp4" poster="/art/todo-spec-poster.webp" preload="none" muted playsinline loop controls aria-label="The to-do app's narrated spec video">
+              <track kind="captions" src="/art/todo-spec.vtt" srclang="en" label="English" default>
+            </video>
+          </div>
+          <div class="moment-heading"><span class="moment-num" aria-hidden="true">2</span><h3>Watch your spec</h3><button class="spec-play" type="button" hidden><svg aria-hidden="true" viewBox="0 0 16 16"><path d="M5 3l8 5-8 5z"/></svg>Play with sound</button></div>
+          <p class="moment-copy">The real spec of an OpenWiz-built to-do app. <a class="spec-link" href="/art/todo-spec.mp4">Open the video</a> · <a class="moment-link" href="https://github.com/openwizdev/todo-demo/issues/1">the spec</a></p>
+        </li>
+        <li class="moment-step moment-ship">
+          <span class="moment-num" aria-hidden="true">3</span>
+          <h3>Watch it ship</h3>
+          <a class="moment-link" href="https://openwizdev.github.io/todo-demo/">Open the to-do app</a>
+        </li>
+      </ol>
+    </div>
   </section>
 <!-- faq.html -->
 </main>
