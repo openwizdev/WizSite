@@ -380,7 +380,9 @@ def check_site(root):
     check_install(landing, pages[root / 'index.html'])
     assert not re.search(r'\b\d{4}-\d{2}-\d{2}\b', words), 'dated landing promise'
     changelog, releases = split_releases((root / 'changelog/index.html').read_text())
-    assert not re.search(r'(?<![\d.])\d+\.\d+\.\d+(?![\d.])', flat), 'release version mentioned on the landing'
+    # #1674 (J264): the install box's one version label (check_install reads it exactly) is the only version allowed.
+    unlabelled = flat.replace(INSTALL_VERSION, ' ', 1)
+    assert not re.search(r'(?<![\d.])\d+\.\d+\.\d+(?![\d.])', unlabelled), 'release version mentioned on the landing'
     for name in VECTORS:
         check_vector((root / name).read_bytes())
     total = 0
@@ -461,6 +463,7 @@ INSTALL_LINE = 'Install OpenWiz from github.com/openwizdev/OpenWiz'
 INSTALL_HINT = 'Paste this into your agent'
 INSTALL_BUTTON = 'Copy · coming soon'
 INSTALL_SWITCH = ('coming-soon', 'live')
+INSTALL_VERSION = 'OpenWiz 0.01 0.1.0'  # the public name with its semver small beside it (#1674, J264)
 
 
 def check_install(landing, page):
@@ -472,6 +475,8 @@ def check_install(landing, page):
     assert switch and switch[1] in INSTALL_SWITCH, f'the install box needs its one switch, data-install = {" or ".join(INSTALL_SWITCH)}'
     lines = re.findall(r'<code class="install-line">([^<]*)</code>', box)
     assert lines == [INSTALL_LINE], f'the install line must read exactly: {INSTALL_LINE}'
+    versions = re.findall(r'<p class="install-version">([\s\S]*?)</p>', landing)
+    assert [flat(v) for v in versions] == [INSTALL_VERSION] and versions[0] in box, f'the install box must show {INSTALL_VERSION}'
     hints = re.findall(r'<p class="install-hint">([\s\S]*?)</p>', box)
     assert [flat(h) for h in hints] == [INSTALL_HINT], f'the install box must say: {INSTALL_HINT}'
     labels = re.findall(r'<button class="btn install"[^>]*>([\s\S]*?)</button>', landing)
