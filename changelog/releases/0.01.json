@@ -1,0 +1,12 @@
+{
+  "name": "0.01",
+  "semver": "0.1.0",
+  "date": "2026-11-21",
+  "headline": "Run your agents anywhere.",
+  "bullets": [
+    "Three drivers: your own computer, Cloudroom and boat.dev.",
+    "One line sets up a fleet on your repo.",
+    "Watch every spec and agent at openwiz.dev/app."
+  ],
+  "notes": "https://github.com/openwizdev/OpenWiz/releases/tag/v0.1.0"
+}

@@ -1,6 +1,6 @@
 """Dependency-free checks for this site's literal HTML/CSS and public source."""
 from hashlib import sha256
-from html import unescape
+from html import escape, unescape
 from html.parser import HTMLParser
 from pathlib import Path
 import json
@@ -238,20 +238,24 @@ STORY_COPY = ('Build a to-do app', 'Bring any agent', 'Sign in with GitHub', 'Pu
 OLD_EXAMPLE = ('dark mode', 'dark-mode')
 MOTION_OK = '@media (prefers-reduced-motion:no-preference)'
 PHONE_QUERY = re.compile(r'\(max-width:[0-9]+px\)')
-# The Changelog (#1363): named Changelog everywhere; a small picture of how the repositories fit together opens
-# the page, then one "What exists today" section with one part per public repository, each opening with two or
-# three plain sentences. Private repositories appear at most as "private records and tools". No release entry,
-# version number or date: the old release list stays on GitHub's releases. Its reviewed text is pinned below.
-CHANGELOG_MAIN = 'a41401f686dd700c766358c47d89375a89f1faad74b668574d35cf5c0ac45567'
+# The Changelog (#78): named Changelog everywhere; its source page is the title and one line, and nothing else in its
+# main (no version number or date: those come only from the release data). Private repositories are never named.
+# Its reviewed text is pinned below. The repository map and What exists today moved to docs/repos.md.
+CHANGELOG_MAIN = '53ec7d0b87a84daf1ad319c06ed75ea810e35bd269496612631b7d4f5750d1dc'
 CHANGELOG_LINKS = ('/changelog/', '/changelog')
 PUBLIC_REPOS = ('OpenWiz', 'WizSkills', 'WizLoops', 'WizPlugins', 'WizSite')
 PUBLIC_WIZ_NAMES = set(PUBLIC_REPOS) | {'WizBar'}  # WizBar is WizPlugins' plugin, not a repository
-TODAY = 'What exists today'
-# The generated Releases section (#1364): build.mjs adds it last in the Changelog's main, between these markers, from
-# each versioned repository's published release notes. The page's reviewed rules and pin apply without it; the
-# section has its own rules (check_releases), one part per versioned repository, in this order.
+# The generated entries (#78): build.mjs adds them last in the Changelog's main, between these markers, from one data
+# file per public release in RELEASE_DIR. check_release_data checks each file; check_releases checks the built section
+# against them and the landing's install switch: no entry until it reads live (RL2), then every entry, newest first.
 RELEASES = ('<!-- releases:start -->', '<!-- releases:end -->')
-RELEASE_REPOS = ('OpenWiz', 'WizSkills', 'WizLoops')
+RELEASE_DIR = ROOT / 'changelog/releases'
+RELEASE_FIELDS = ('name', 'semver', 'date', 'headline', 'bullets', 'notes')
+RELEASE_BULLETS = (1, 6)  # a human-readable number: about 2 to 5, never none and never more than 6
+RELEASE_BULLET_MAX = 120  # characters
+RELEASE_HEADLINE_MAX = 80  # characters: one line
+PRE_RELEASES = 'https://github.com/openwizdev/OpenWiz/releases'
+MONTHS = ('Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec')
 # The drivers page (openwiz.dev/drivers, #50; round 3H, #62): boat.dev's spotlight card first, then the other three
 # drivers' compact cards, in this order, each with its status line (the ticket's facts, word for word). #66's facts
 # (2026-11-20): boat.dev, Cloudroom and your own computer or VPS each passed the kit, five of five; Grok Bot is coming soon.
@@ -644,7 +648,7 @@ def check_site(root):
     check_drivers(landing, changelog, (root / DRIVERS_PAGE).read_text(), pages[root / DRIVERS_PAGE])
     check_drivers_nav((root / names['site.css']).read_text(), {name: (root / name).read_text() for name in PAGES})
     check_changelog(landing, changelog)
-    check_releases(releases)
+    check_releases(releases, read_releases(), install_switch(landing) == 'live')
     check_team({name: (root / name).read_text() for name in PAGES}, {name: pages[root / name] for name in PAGES})
     check_footer({name: (root / name).read_text() for name in PAGES})
     check_faq({name: (root / name).read_text() for name in PAGES}, {name: pages[root / name] for name in PAGES}, names)
@@ -745,8 +749,9 @@ def check_install(landing, page):
 
 
 def check_changelog(landing, changelog):
-    """The Changelog's name, its picture first, one What exists today with a part per public repository, and no
-    release history. `landing` and `changelog` are the two pages' HTML."""
+    """The Changelog's name, and its source page: the title, one line, and nothing else in its main; no version number
+    or date there, and no private repository named. `landing` and `changelog` are the two pages' HTML (the Changelog
+    without its generated section)."""
     home = Outline(landing)
     labels = [text for href, text in home.links if href in CHANGELOG_LINKS]
     assert labels == ['Changelog', 'Changelog'], f'the landing nav and footer must each link the Changelog: {labels}'
@@ -757,41 +762,28 @@ def check_changelog(landing, changelog):
             assert not re.search(r'ship\s*log', reading, re.I), 'the page is called Changelog, never ship log'
     page = Outline(changelog)
     assert page.title == 'Changelog — OpenWiz', 'the changelog page title must be Changelog'
-    items = page.items
-    kinds = [kind for kind, _, _ in items]
-    assert kinds[:1] == ['h1'] and items[0][2] == 'Changelog', 'the changelog heading must be Changelog'
-    today = [i for i, (kind, _, text) in enumerate(items) if kind == 'h2' and text == TODAY]
-    assert len(today) == 1 and kinds.count('h2') == 1, f'exactly one {TODAY} section'
-    figures = [i for i, kind in enumerate(kinds) if kind == 'figure']
-    # Right after the heading (and its lead, which the outline doesn't list), before anything else.
-    assert figures == [1] and today[0] > 1 and 'repo-map' in (items[1][1].get('class') or '').split(), 'the repository picture opens the page, before What exists today'
-    svg = [attrs for kind, attrs, _ in items if kind == 'svg']
-    assert len(svg) == 1 and svg[0].get('role') == 'img' and (svg[0].get('aria-label') or '').strip(), 'the picture is one labelled SVG'
-    parts = [i for i, kind in enumerate(kinds) if kind == 'part']
-    assert parts and parts[0] > today[0], 'the repository parts sit inside What exists today'
-    names = []
-    for at, end in zip(parts, parts[1:] + [len(items)]):
-        body = items[at + 1:end]
-        assert [k for k, _, _ in body[:2]] == ['h3', 'intro'], 'each part opens with its repository heading, then its plain lines'
-        name = body[0][2].split()[0] if body[0][2] else ''
-        assert name in PUBLIC_REPOS, f'a part names a repository that is not public: {name!r}'
-        count = len(sentences(body[1][2]))
-        assert 2 <= count <= 3, f'{name} opens with {count} sentences, not two or three'
-        names.append(name)
-    assert sorted(names) == sorted(PUBLIC_REPOS), f'one part per public repository: {names}'
+    kinds = [kind for kind, _, _ in page.items]
+    assert kinds[:1] == ['h1'] and page.items[0][2] == 'Changelog', 'the changelog heading must be Changelog'
+    assert kinds == ['h1'], f'the changelog is its title, one line and the release entries, nothing else: {kinds}'
     main = re.search(r'<main\b[^>]*>([\s\S]*?)</main>', changelog)[1]
+    assert len(re.findall(r'<p class="lead">', main)) == 1 and re.fullmatch(r'<h1>Changelog</h1><p class="lead">[^<]*</p>', main), \
+        'the changelog is its title, one line and the release entries, nothing else'
+    check_public_names(main)
     reader = Text(main)
-    readings = [reader.joined(), reader.spaced()] + reader.attrs
-    for reading in readings:
-        # Fail closed: every Wiz name is a public one. Text read joined can run a name into the next name or
-        # into a lowercase word, never into a capital: "WizSkillsthe" passes, "WizVault" and "WizSiteOps" fail.
-        public = '(?:' + '|'.join(sorted(PUBLIC_WIZ_NAMES)) + ')+(?:[a-z][A-Za-z]*)?'
-        for name in re.findall(r'\bWiz[A-Z][A-Za-z]*', reading):
-            assert re.fullmatch(public, name), f'a private repository is named; say "private records and tools": {name}'
-        assert not re.search(r'\d+\.\d+|\b(?:19|20)\d\d\b', reading), 'no version number or date on the changelog'
-    assert not re.search(r'<time\b|releases/tag/|class="rel"', main), 'no release entry on the changelog'
+    for reading in [reader.joined(), reader.spaced()] + reader.attrs:
+        assert not re.search(r'\d+\.\d+|\b(?:19|20)\d\d\b', reading), 'no version number or date outside the release entries'
     for style in page.styles:
         check_motion(style)
+
+
+def check_public_names(html):
+    """Fail closed: every Wiz name is a public one. Text read joined can run a name into the next name or into a
+    lowercase word, never into a capital: "WizSkillsthe" passes, "WizVault" and "WizSiteOps" fail."""
+    reader = Text(html)
+    public = '(?:' + '|'.join(sorted(PUBLIC_WIZ_NAMES)) + ')+(?:[a-z][A-Za-z]*)?'
+    for reading in [reader.joined(), reader.spaced()] + reader.attrs:
+        for name in re.findall(r'\bWiz[A-Z][A-Za-z]*', reading):
+            assert re.fullmatch(public, name), f'a private repository is named; say "private records and tools": {name}'
 
 
 class DriverOutline(HTMLParser):
@@ -1310,55 +1302,121 @@ def split_releases(built):
     return before + after, section
 
 
+def install_switch(landing):
+    found = re.findall(r'<div class="install-box" data-install="([^"]*)"', landing)
+    assert len(found) == 1, 'the landing needs exactly one install box switch'
+    return found[0]
+
+
+def read_releases(folder=RELEASE_DIR):
+    """Every release data file, checked, as {file name: data}."""
+    files = sorted(folder.glob('*.json'))
+    assert sorted(p.name for p in folder.iterdir()) == [p.name for p in files], f'only release data files in {folder.name}/'
+    out = {}
+    for path in files:
+        try:
+            data = json.loads(path.read_text())
+        except ValueError as error:
+            raise AssertionError(f'{path.name}: not JSON: {error}') from None
+        check_release_data(path.name, data)
+        out[path.name] = data
+    names = [d['name'] for d in out.values()]
+    versions = [d['semver'] for d in out.values()]
+    assert len(set(names)) == len(names) and len(set(versions)) == len(versions), 'each release once'
+    return out
+
+
+def semver(text):
+    return tuple(map(int, text.split('.')))
+
+
+def check_release_data(file, data):
+    """One release: its public name (also the file name), semver from 0.1.0 on, date, a one-line headline, a short
+    list of plain bullets (1 to 6, each at most 120 characters) and the link to its full notes on GitHub."""
+    assert isinstance(data, dict), f'{file}: one release object'
+    missing = [k for k in RELEASE_FIELDS if k not in data or data[k] in (None, '', [])]
+    assert not missing, f'{file}: missing {", ".join(missing)}'
+    assert sorted(data) == sorted(RELEASE_FIELDS), f'{file}: unexpected fields {sorted(set(data) - set(RELEASE_FIELDS))}'
+    text = [data[k] for k in RELEASE_FIELDS if k != 'bullets']
+    assert all(isinstance(v, str) for v in text) and isinstance(data['bullets'], list), f'{file}: fields are text, bullets a list'
+    assert re.fullmatch(r'0\.\d\d|[1-9]\d*\.\d\d', data['name']) and file == f'{data["name"]}.json', \
+        f'{file}: the public name is like 0.01 and names the file'
+    assert re.fullmatch(r'\d+\.\d+\.\d+', data['semver']) and semver(data['semver']) >= (0, 1, 0), f'{file}: semver from 0.1.0 on'
+    assert re.fullmatch(r'20\d\d-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])', data['date']), f'{file}: date as YYYY-MM-DD'
+    assert len(data['headline']) <= RELEASE_HEADLINE_MAX and '\n' not in data['headline'], f'{file}: a one-line headline'
+    bullets = data['bullets']
+    low, high = RELEASE_BULLETS
+    assert low <= len(bullets) <= high, f'{file}: {len(bullets)} bullets; a short list of {low} to {high}'
+    for bullet in bullets:
+        assert isinstance(bullet, str) and bullet.strip(), f'{file}: an empty bullet'
+        assert len(bullet) <= RELEASE_BULLET_MAX, f'{file}: a bullet over {RELEASE_BULLET_MAX} characters: {bullet[:40]}...'
+        assert '\n' not in bullet, f'{file}: one line per bullet'
+    assert data['notes'] == f'https://github.com/openwizdev/OpenWiz/releases/tag/v{data["semver"]}', \
+        f'{file}: the notes link is the release on GitHub, https://github.com/openwizdev/OpenWiz/releases/tag/v{data["semver"]}'
+    check_public_names(escape(' '.join(text + bullets)))  # data is text: escaped, as the page shows it
+
+
 class ReleaseOutline(HTMLParser):
-    """The generated section's tags, heading, and each part's repository, entry titles and state."""
+    """The generated section's tags, its entries (name, small line, date, headline, bullets, links) and its last line."""
     def __init__(self, text):
         super().__init__(convert_charrefs=True)
-        self.tags, self.h2, self.parts, self.reading = [], [], [], None
+        self.tags, self.entries, self.pre, self.at = [], [], None, None
         self.feed(text)
 
     def handle_starttag(self, tag, attrs):
         attrs = dict(attrs)
         classes = (attrs.get('class') or '').split()
         self.tags.append((tag, attrs))
-        if 'release-part' in classes:
-            self.parts.append({'repo': attrs.get('data-repo'), 'titles': [], 'states': []})
-        elif self.parts and tag == 'p' and ({'no-release', 'read'} & set(classes)):
-            self.parts[-1]['states'].append('no-release' if 'no-release' in classes else 'missing')
-        if tag in ('h2', 'h4'):
-            self.reading = [tag, '']
-
-    def handle_data(self, data):
-        if self.reading:
-            self.reading[1] += data
+        if tag == 'article':
+            self.entries.append({'name': '', 'small': '', 'date': None, 'headline': '', 'bullets': [], 'links': []})
+        elif tag == 'p' and 'pre' in classes:
+            self.pre = {'text': '', 'links': []}
+        if tag == 'time' and self.entries:
+            self.entries[-1]['date'] = attrs.get('datetime')
+        if tag == 'a':
+            (self.pre or self.entries[-1])['links'].append(attrs.get('href'))
+        if tag == 'li':
+            self.entries[-1]['bullets'].append('')
+        self.at = 'small' if tag == 'small' else 'name' if tag == 'h2' else 'headline' if 'headline' in classes else 'li' if tag == 'li' else self.at
 
     def handle_endtag(self, tag):
-        if self.reading and self.reading[0] == tag:
-            text = re.sub(r'\s+', ' ', self.reading[1]).strip()
-            (self.h2 if tag == 'h2' else self.parts[-1]['titles'] if self.parts else self.h2).append(text)
-            self.reading = None
+        if tag in ('h2', 'small', 'p', 'li'):
+            self.at = 'name' if tag == 'small' else None
+
+    def handle_data(self, data):
+        if self.pre is not None:
+            self.pre['text'] += data
+        elif self.at == 'li':
+            self.entries[-1]['bullets'][-1] += data
+        elif self.at:
+            self.entries[-1][self.at] += data
 
 
-def check_releases(section):
-    """The generated Releases section: one part per versioned repository in order, each with its releases newest
-    first or exactly one of "no release yet" and missing; release notes are text only."""
+def check_releases(section, releases, live):
+    """The generated entries: none until the landing's install switch reads live, then one per release file, newest
+    first by semver, each exactly its data; then one line pointing at the earlier pre-releases on GitHub."""
     outline = ReleaseOutline(section)
-    assert outline.h2 == ['Releases'], 'the generated section is headed Releases'
-    assert [p['repo'] for p in outline.parts] == list(RELEASE_REPOS), f'one release part per versioned repository: {[p["repo"] for p in outline.parts]}'
-    allowed = {'section', 'h2', 'h3', 'h4', 'span', 'p', 'article', 'time', 'div', 'ul', 'li', 'code', 'strong'}
+    allowed = {'section': {'class', 'aria-label'}, 'article': {'class', 'aria-labelledby'}, 'h2': {'id'}, 'small': set(),
+               'time': {'datetime'}, 'p': {'class'}, 'ul': set(), 'li': set(), 'a': {'href'}}
     for tag, attrs in outline.tags:
-        assert tag in allowed, f'unexpected element in the generated releases: {tag}'
-        assert set(attrs) <= {'class', 'id', 'data-repo', 'aria-labelledby', 'datetime'}, f'unexpected attribute in the generated releases: {sorted(attrs)}'
-    for part in outline.parts:
-        repo, titles, states = part['repo'], part['titles'], part['states']
-        assert bool(titles) != bool(states) and len(states) <= 1, f'{repo}: releases, or one of no release yet and missing'
-        versions = []
-        for title in titles:
-            found = re.fullmatch(rf'{repo} (\d+)\.(\d+)\.(\d+)', title)
-            assert found, f'{repo}: unexpected release title {title!r}'
-            versions.append(tuple(map(int, found.groups())))
-        assert versions == sorted(versions, reverse=True) and len(set(versions)) == len(versions), f'{repo}: releases newest first, each once'
-        assert all(v >= (0, 1, 0) for v in versions), f'{repo}: releases from 0.1.0 on'
+        assert tag in allowed, f'unexpected element in the release entries: {tag}'
+        assert set(attrs) <= allowed[tag], f'unexpected attribute in the release entries: {tag} {sorted(attrs)}'
+    assert outline.tags[:1] == [('section', {'class': 'releases', 'aria-label': 'Releases'})], 'the entries sit in one Releases section'
+    want = sorted(releases.values(), key=lambda d: semver(d['semver']), reverse=True) if live else []
+    assert len(outline.entries) == len(want), f'{len(outline.entries)} entries shown; the data and the install switch say {len(want)}'
+    for got, data in zip(outline.entries, want):
+        flat = lambda t: re.sub(r'\s+', ' ', t).strip()
+        y, m, d = map(int, data['date'].split('-'))
+        assert (flat(got['name']), flat(got['small'])) == (data['name'], f'· {MONTHS[m - 1]} {d}, {y} ({data["semver"]})'), \
+            f'{data["name"]}: the entry is headed by its public name, its date and semver small beside it, newest first'
+        assert got['date'] == data['date'], f'{data["name"]}: the entry\'s date'
+        assert flat(got['headline']) == data['headline'], f'{data["name"]}: the entry\'s headline'
+        assert [flat(b) for b in got['bullets']] == data['bullets'], f'{data["name"]}: the entry\'s bullets'
+        assert got['links'] == [data['notes']], f'{data["name"]}: one link, to the full notes on GitHub'
+    assert outline.pre and outline.pre['links'] == [PRE_RELEASES], 'the entries end with one line linking the pre-releases on GitHub'
+    if not want:
+        # Never claim an unreleased version: before the switch reads live, the line alone, with no version or date.
+        assert not re.search(r'\d+\.\d+|\b(?:19|20)\d\d\b', Text(section).joined()), 'no release version shows before the install switch reads live'
 
 
 def check_app(root, names, pages):

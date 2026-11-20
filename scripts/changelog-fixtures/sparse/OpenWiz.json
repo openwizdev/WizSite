@@ -1,4 +1,0 @@
-[
-  {"tag_name": "v0.0.12", "name": "OpenWiz 0.0.12", "draft": false, "prerelease": true, "published_at": "2031-02-01T10:00:00Z", "body": "- Before the first release."},
-  {"tag_name": "v0.1.0", "name": "OpenWiz 0.1.0", "draft": false, "prerelease": false, "published_at": "2031-03-01T10:00:00Z", "body": "- Notes without a ships-with list."}
-]
