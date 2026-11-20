@@ -1547,6 +1547,8 @@ async function main() {
         await page.until(`[...document.querySelectorAll('aside.side button')].some(b => b.textContent.trim() === 'acme/site')`, 'the repository list in the sidebar');
         const kept = await page.run(`({ shell: !!document.querySelector('aside.side nav.main'), h1: document.querySelector('main h1')?.textContent.trim(), hash: location.hash })`);
         assert(kept.shell && kept.h1 === title && kept.hash === route, `opening the list left the page: ${JSON.stringify(kept)}`);
+        const listed = await page.run(`document.querySelector('aside.side .repo-list').innerText.trim().split(/\\n+/)`);
+        assert(listed[0] === 'acme/factory' && !listed.includes('null'), `the repository list reads ${JSON.stringify(listed)}`);
         const before = world.log.length;
         await page.run(`[...document.querySelectorAll('aside.side button')].find(b => b.textContent.trim() === 'acme/site').click()`);
         await page.until(`[...document.querySelectorAll('aside.side button.repo')].some(b => b.textContent.includes('acme/site'))`, 'the sidebar on acme/site');

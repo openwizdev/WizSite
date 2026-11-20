@@ -141,12 +141,12 @@
           h('button', { class: 'btn', type: 'button', onclick: fill }, icon('refresh'), 'Try again'));
       }
       if (data.auth.session() !== session || list.hidden) return;
-      list.replaceChildren(
+      list.replaceChildren(...[
         found.complete ? null : h('p', { class: 'bad' }, 'Only part of your repositories could be read, so some may be missing.'),
         h('ul', { class: 'repos' }, found.repos.map(r => h('li', {},
           h('button', { type: 'button', 'aria-current': r.full === picked.full ? 'true' : null, onclick: () => { close(); switchTo(r.full); } }, r.full),
           h('span', { class: 'tag' }, r.private ? 'Private' : 'Public')))),
-        h('p', {}, h('a', { href: 'https://github.com/settings/installations', target: '_blank', rel: 'noreferrer' }, 'Choose repositories on GitHub')));
+        h('p', {}, h('a', { href: 'https://github.com/settings/installations', target: '_blank', rel: 'noreferrer' }, 'Choose repositories on GitHub'))].filter(Boolean));
       list.querySelector('button[aria-current]')?.focus();
     };
     const button = h('button', { class: 'repo', type: 'button', 'aria-expanded': 'false', 'aria-controls': list.id,
