@@ -5,6 +5,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
+import { execFileSync } from 'node:child_process';
+import { cp } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildIndex, checkIndex, checkSnapshot, refreshSnapshot, serialize, snapshotIndex } from '../scripts/ask-index.mjs';
@@ -29,7 +31,7 @@ test('a fixture site and docs folder build exactly the expected sources and pass
       { source: 1, text: 'What does it cost?\nNothing; it\'s free & open &#x110000;' },
       { source: 2, text: 'Synthetic OpenWiz\nThe synthetic kernel for agent factories. See the install guide.' },
       { source: 2, text: 'Quick start\nRun one line to install it. Notes stay in the private record, never on GitHub.' },
-      { source: 3, text: 'Install\nNeed · Why\nGit · Records\nsynthetic install --yes\nStep one\nStep two' },
+      { source: 3, text: 'Install\nNeed · Why\nGit · Records\nsynthetic install --yes\nStep one\nStep two\nRun python3 -I <build>/runtime/setup.py, then read <state>/setup/state.json in your release.' },
     ],
   });
 });
@@ -96,7 +98,17 @@ test('the contract\'s own index fixture passes the check, and every broken form 
 
 // The snapshot (ask-docs/): OpenWiz's public README.md and top-level docs/*.md, named by the commit they came from.
 const SNAPSHOT = fileURLToPath(new URL('../ask-docs/', import.meta.url));
-const COMMIT = 'c0ffee0000000000000000000000000000000001'; // synthetic
+
+// A throwaway Git checkout of the fixture docs folder, with one commit by a synthetic author.
+async function checkout() {
+  const dir = await mkdtemp(join(tmpdir(), 'ask-openwiz-'));
+  await cp(docs, dir, { recursive: true });
+  const git = (...args) => execFileSync('git', ['-C', dir, '-c', 'user.name=Synthetic', '-c', 'user.email=synthetic@example.invalid', ...args], { encoding: 'utf8' }).trim();
+  git('init', '-q');
+  git('add', '-A');
+  git('commit', '-q', '-m', 'synthetic docs');
+  return { dir, commit: git('rev-parse', 'HEAD') };
+}
 
 test('the shipped snapshot names its OpenWiz commit and passes its own check', async () => {
   assert.match(await readFile(join(SNAPSHOT, 'commit.txt'), 'utf8').catch(() => 'missing'), /^[0-9a-f]{40}\n$/, 'commit.txt names a full commit');
@@ -105,20 +117,27 @@ test('the shipped snapshot names its OpenWiz commit and passes its own check', a
   assert.ok(index.sources.some(s => s.url === `${DOC}README.md`), 'the index holds the snapshot\'s README');
 });
 
-test('a refresh copies only README.md and the top-level docs, without private-record lines, and names the commit', async () => {
+test('a refresh copies only the named commit\'s README.md and top-level docs, without private-record lines', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'ask-docs-'));
+  const openwiz = await checkout();
   try {
+    // After the commit: an unpublished edit to a tracked doc, and untracked drafts. Neither is the named commit.
+    await writeFile(join(openwiz.dir, 'docs/install.md'), 'SYNTHETIC-UNPUBLISHED-EDIT\n', { flag: 'a' });
+    await writeFile(join(openwiz.dir, 'docs/draft.md'), '# Draft\n\nSYNTHETIC-UNTRACKED-DRAFT\n');
     const target = join(dir, 'ask-docs');
-    await refreshSnapshot(docs, target, COMMIT);
+    await refreshSnapshot(openwiz.dir, target, openwiz.commit);
     assert.deepEqual(await listed(target), ['README.md', 'commit.txt', 'docs/install.md']);
-    assert.equal(await readFile(join(target, 'commit.txt'), 'utf8'), `${COMMIT}\n`);
+    assert.equal(await readFile(join(target, 'commit.txt'), 'utf8'), `${openwiz.commit}\n`);
     const install = await readFile(join(target, 'docs/install.md'), 'utf8');
+    assert.ok(!install.includes('SYNTHETIC-UNPUBLISHED-EDIT'), 'only the committed text is copied');
     assert.ok(install.includes('Step two') && !install.toLowerCase().includes('private record'), 'the pointer line is dropped, the rest kept');
     const readme = await readFile(join(target, 'README.md'), 'utf8');
     assert.ok(readme.includes('Notes stay in the private record, never on GitHub.'), 'prose naming a private record is no pointer: kept');
     await checkSnapshot(target);
+    await assert.rejects(refreshSnapshot(openwiz.dir, join(dir, 'other'), 'c0ffee0000000000000000000000000000000001'), 'an unknown commit is refused');
   } finally {
     await rm(dir, { recursive: true, force: true });
+    await rm(openwiz.dir, { recursive: true, force: true });
   }
 });
 
@@ -132,10 +151,11 @@ test('the snapshot check refuses internal folders, AGENTS.md, other files, a pri
     'a private-record line': ['docs/extra.md', '# Extra\n\nSource: a synthetic decision ([private record](https://github.com/synthetic-records/archive/issues/1)).\n'],
     'a bad commit name': ['commit.txt', 'main\n'],
   };
+  const openwiz = await checkout();
   for (const [name, [path, text]] of Object.entries(planted)) {
     const dir = await mkdtemp(join(tmpdir(), 'ask-docs-'));
     try {
-      await refreshSnapshot(docs, dir, COMMIT);
+      await refreshSnapshot(openwiz.dir, dir, openwiz.commit);
       await mkdir(join(dir, path, '..'), { recursive: true });
       await writeFile(join(dir, path), text);
       await assert.rejects(checkSnapshot(dir), /ask docs/, `must refuse ${name}`);
@@ -146,11 +166,12 @@ test('the snapshot check refuses internal folders, AGENTS.md, other files, a pri
   }
   const empty = await mkdtemp(join(tmpdir(), 'ask-docs-'));
   try {
-    await refreshSnapshot(docs, empty, COMMIT);
+    await refreshSnapshot(openwiz.dir, empty, openwiz.commit);
     await rm(join(empty, 'commit.txt'));
     await assert.rejects(checkSnapshot(empty), /ask docs/, 'must refuse a snapshot without its commit');
   } finally {
     await rm(empty, { recursive: true, force: true });
+    await rm(openwiz.dir, { recursive: true, force: true });
   }
 });
 
