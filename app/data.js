@@ -372,6 +372,11 @@
       }
     }
     if (!complete && !stop) stop = 'limit'; // AGENT_PAGES ran out
+    // A ticket GitHub gave without its pull requests shows them as unknown, and the read stays partial until a read
+    // gives them (AP22b, review R1). Errors under a pull request GitHub did give stay on that card only.
+    for (const number of fetched) {
+      if (issues.get(number).closedByPullRequestsReferences == null) errors.push({ message: `#${number}'s pull requests couldn't be read` });
+    }
     // The tickets kept from earlier reads keep showing their pull requests: those facts (state, review, checks) change
     // without the ticket being updated, so each read asks for them again (review R1).
     if (!full && !stop) {
