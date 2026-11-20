@@ -34,8 +34,7 @@ function showHero(gsap, paused, signal) {
   const mascot = demo.querySelector('.hero-sprite');
   const smoke = demo.querySelector('.hero-smoke');
   const fleet = [...demo.querySelectorAll('.hero-fleet span')];
-  const pulse = demo.querySelector('.work-pulse');
-  const ring = pulse.querySelector('circle');
+  const builder = demo.querySelector('.ticket-builder');
   const stillStatus = status.textContent;
   const stillTickets = tickets.map(ticket => [ticket.className, ticket.querySelector('small').textContent]);
   const stillNumbers = metrics.map(metric => metric.textContent);
@@ -66,9 +65,8 @@ function showHero(gsap, paused, signal) {
     }
     metrics.forEach((metric, i) => { metric.textContent = counts[i]; });
     steps.forEach((step, i) => step.classList.toggle('active', i <= index));
-    const active = tickets.find(ticket => ticket.matches('.building, .review'));
-    pulse.style.visibility = active ? 'visible' : 'hidden';
-    active?.append(pulse);
+    // Nothing downstream exists before its step: the stylesheet greys out the spec and tickets until then.
+    demo.dataset.scene = index;
     setCrew(index, 0);
   };
 
@@ -103,8 +101,8 @@ function showHero(gsap, paused, signal) {
         setFrame(mascot, sheet, 0);
         setCrew(index, 0);
       }, [], at + 2.19);
-      timeline.fromTo(ring, { scale: .65, opacity: .45 }, {
-        scale: 1.3, opacity: .08, duration: .8, repeat: 2, ease: 'power1.out',
+      timeline.fromTo(builder, { rotation: -10 }, {
+        rotation: 8, duration: .32, repeat: 7, yoyo: true, ease: 'sine.inOut', transformOrigin: '50% 85%',
       }, at + .1);
       // The smoke belongs to the outgoing costume. Hide the mascot only on the occlusion frame.
       timeline.call(() => {
@@ -149,9 +147,8 @@ function showHero(gsap, paused, signal) {
     });
     metrics.forEach((metric, i) => { metric.textContent = stillNumbers[i]; });
     steps.forEach(step => step.classList.remove('active'));
-    tickets[1].append(pulse);
-    pulse.removeAttribute('style');
-    ring.removeAttribute('style');
+    delete demo.dataset.scene;
+    builder.removeAttribute('style');
   }, { once: true });
   return update;
 }
@@ -223,9 +220,6 @@ function followPointer(gsap, paused, signal) {
 function enableMotion(gsap) {
   const preference = matchMedia('(prefers-reduced-motion: no-preference)');
   const pause = document.querySelector('.demo-pause');
-  const play = document.querySelector('.spec-play');
-  const video = document.querySelector('.spec-video');
-  const still = document.querySelector('.spec-screen');
   let controller;
 
   const configure = () => {
@@ -233,11 +227,12 @@ function enableMotion(gsap) {
     if (!preference.matches) return;
     controller = new AbortController();
     const { signal } = controller;
-    const isPaused = () => pause.getAttribute('aria-pressed') === 'true';
-    const updateHero = showHero(gsap, isPaused, signal);
+    const isPaused = () => pause?.getAttribute('aria-pressed') === 'true';
+    // Every site page shares the footer's eyes; only the landing has the hero demo and its Pause motion.
     const updateEyes = followPointer(gsap, isPaused, signal);
+    if (!pause) return;
+    const updateHero = showHero(gsap, isPaused, signal);
     pause.hidden = false;
-    play.hidden = false;
     pause.addEventListener('click', () => {
       const paused = !isPaused();
       pause.setAttribute('aria-pressed', String(paused));
@@ -245,28 +240,175 @@ function enableMotion(gsap) {
       updateHero();
       updateEyes();
     }, { signal });
-    play.addEventListener('click', async () => {
-      video.hidden = false;
-      still.hidden = true;
-      try {
-        video.currentTime = 0;
-        await video.play();
-        if (!signal.aborted) video.focus();
-      } catch {
-        video.hidden = true;
-        still.hidden = false;
-      }
-    }, { signal });
-    signal.addEventListener('abort', () => {
-      pause.hidden = true;
-      play.hidden = true;
-      video.pause();
-      video.hidden = true;
-      still.hidden = false;
-    }, { once: true });
+    signal.addEventListener('abort', () => { pause.hidden = true; }, { once: true });
   };
   preference.addEventListener('change', configure);
   configure();
+}
+
+// The footer Wizes react, one at a time and briefly; at rest the footer is unchanged. With reduced motion, Pause
+// motion or no GSAP, a click is a still pose change (another costume) and the line, nothing moves.
+const FAMILY = [
+  ['Cave Wiz', 'era', 'thinking…', 'cave'], ['Builder Wiz', 'builder', 'building…'], ['Reviewer Wiz', 'reviewer', 'looks good!'],
+  ['Samurai Wiz', 'era', 'building…', 'samurai'], ['Astronaut Wiz', 'orchestrator', 'shipped!'], ['Reviewer Wiz', 'reviewer', 'looks good!'],
+  ['Orchestrator Wiz', 'orchestrator', 'next ticket!'], ['Builder Wiz', 'builder', 'building…'], ['Orchestrator Wiz', 'orchestrator', 'next ticket!'],
+  ['Reviewer Wiz', 'reviewer', 'looks good!'], ['Builder Wiz', 'builder', 'building…'], ['Orchestrator Wiz', 'orchestrator', 'next ticket!'],
+];
+const POOF = '/art/hero-cave-frames.webp';
+
+function enableFamily(gsap) {
+  const family = document.querySelector('.family');
+  const wizes = [...family.children];
+  const preference = matchMedia('(prefers-reduced-motion: no-preference)');
+  const pause = document.querySelector('.demo-pause');
+  const moving = () => !!gsap && preference.matches && pause?.getAttribute('aria-pressed') !== 'true';
+  const line = document.createElement('span');
+  line.className = 'wiz-line';
+  line.setAttribute('role', 'status');
+  // The one reaction running now: its Wiz, and its timeline or timer. Every new reaction ends it first.
+  let current = null;
+
+  family.removeAttribute('aria-hidden');
+  family.setAttribute('role', 'group');
+  family.setAttribute('aria-label', 'The Wiz family');
+  wizes.forEach((wiz, i) => {
+    wiz.tabIndex = 0;
+    wiz.setAttribute('role', 'button');
+    wiz.setAttribute('aria-label', FAMILY[i][0]);
+    const sprite = document.createElement('span');
+    sprite.className = 'wiz-sprite';
+    sprite.setAttribute('aria-hidden', 'true');
+    wiz.append(sprite);
+  });
+
+  const picture = index => `/art/family-${String(index + 1).padStart(2, '0')}.webp`;
+  const frame = (wiz, sheet, index) => {
+    const sprite = wiz.querySelector('.wiz-sprite');
+    sprite.style.backgroundImage = `url("${sheet}")`;
+    sprite.style.backgroundPositionX = `${index * 100 / 8}%`;
+    sprite.style.display = 'block';
+  };
+  // A costume change lasts only for its reaction; the Wiz keeps its own picture and name at rest.
+  const wear = (wiz, index) => { wiz.querySelector('img').src = picture(index); };
+  const release = () => {
+    if (!current) return;
+    const { wiz, timeline, timer } = current;
+    current = null;
+    timeline?.kill();
+    clearTimeout(timer);
+    gsap?.killTweensOf([wiz, line]);
+    if (gsap) gsap.set(wiz, { clearProps: 'transform' });
+    wiz.querySelector('.wiz-sprite').removeAttribute('style');
+    wiz.classList.remove('is-acting');
+    wear(wiz, wizes.indexOf(wiz));
+    line.style.visibility = 'hidden';
+  };
+  const say = (wiz, text) => {
+    line.textContent = text;
+    line.removeAttribute('style');
+    wiz.append(line);
+  };
+  // Starts one short reaction (under a second) on one Wiz, ending any other first.
+  const react = (wiz, build, text) => {
+    release();
+    const timeline = gsap.timeline({ onComplete: () => { if (current?.timeline === timeline) release(); } });
+    current = { wiz, timeline };
+    build(timeline);
+    if (text) {
+      say(wiz, text);
+      timeline.fromTo(line, { autoAlpha: 1 }, { autoAlpha: 0, duration: .2, immediateRender: false }, .6);
+    }
+  };
+
+  const act = wiz => {
+    const index = wizes.indexOf(wiz);
+    const [, role, text, era] = FAMILY[index];
+    if (!moving()) {
+      // A still pose: another costume for a moment, with this Wiz's own line, then back.
+      release();
+      current = { wiz, timer: setTimeout(release, 900) };
+      wear(wiz, (index + 1) % FAMILY.length);
+      say(wiz, text);
+      return;
+    }
+    if (Math.random() < .2) {
+      // Now and then a poof, from the hero's own smoke frames, into another costume and back.
+      const other = (index + 1 + Math.floor(Math.random() * (FAMILY.length - 1))) % FAMILY.length;
+      react(wiz, timeline => timeline
+        .call(() => frame(wiz, POOF, 6), [], 0)
+        .call(() => { frame(wiz, POOF, 7); wear(wiz, other); }, [], .08)
+        .call(() => frame(wiz, POOF, 8), [], .16)
+        .call(() => frame(wiz, POOF, 6), [], .5)
+        .call(() => { frame(wiz, POOF, 7); wear(wiz, index); }, [], .58)
+        .call(() => frame(wiz, POOF, 8), [], .66)
+        .call(() => { wiz.querySelector('.wiz-sprite').removeAttribute('style'); }, [], .76), 'poof!');
+      return;
+    }
+    react(wiz, timeline => {
+      if (role === 'era') {
+        // The era Wizes play their work frames from the hero's sprite sheet.
+        timeline.call(() => wiz.classList.add('is-acting'), [], 0);
+        [2, 3, 4, 5].forEach((n, i) => timeline.call(() => frame(wiz, `/art/hero-${era}-frames.webp`, n), [], i * .14));
+        timeline.call(() => { wiz.classList.remove('is-acting'); wiz.querySelector('.wiz-sprite').removeAttribute('style'); }, [], .6);
+      } else if (role === 'builder') {
+        timeline.to(wiz, { rotation: 7, y: 3, duration: .09, yoyo: true, repeat: 5, transformOrigin: '50% 90%', ease: 'power1.in' });
+      } else if (role === 'reviewer') {
+        timeline.to(wiz, { scale: 1.07, rotation: -4, duration: .18, transformOrigin: '50% 90%' })
+          .to(wiz, { rotation: 4, duration: .2 }).to(wiz, { scale: 1, rotation: 0, duration: .16 });
+      } else {
+        timeline.to(wiz, { rotation: -9, duration: .11, yoyo: true, repeat: 5, transformOrigin: '50% 90%', ease: 'sine.inOut' });
+      }
+    }, text);
+  };
+  // Hover and focus: a short wave on that Wiz only; moving on ends it at once.
+  const wave = wiz => {
+    if (!moving() || current?.wiz === wiz) return;
+    react(wiz, timeline => timeline.to(wiz, { rotation: -6, duration: .12, yoyo: true, repeat: 3,
+      transformOrigin: '50% 90%', ease: 'sine.inOut' }));
+  };
+  // Entering the footer: the Wiz nearest the pointer hops once toward it.
+  const perk = event => {
+    if (event.pointerType === 'touch' || !moving()) return;
+    const boxes = wizes.map(wiz => [wiz, wiz.getBoundingClientRect()]).filter(([, box]) => box.width);
+    const [wiz, box] = boxes.reduce((best, item) =>
+      Math.abs(event.clientX - item[1].left - item[1].width / 2) < Math.abs(event.clientX - best[1].left - best[1].width / 2) ? item : best);
+    const toward = Math.sign(event.clientX - box.left - box.width / 2);
+    react(wiz, timeline => timeline
+      .to(wiz, { y: -5, rotation: toward * 3, duration: .15, transformOrigin: '50% 90%', ease: 'power2.out' })
+      .to(wiz, { y: 0, rotation: 0, duration: .2, ease: 'power2.in' }));
+  };
+
+  for (const wiz of wizes) {
+    wiz.addEventListener('click', () => act(wiz));
+    wiz.addEventListener('keydown', event => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      event.preventDefault();
+      act(wiz);
+    });
+    wiz.addEventListener('pointerenter', event => { if (event.pointerType !== 'touch') wave(wiz); });
+    wiz.addEventListener('focus', () => { if (wiz.matches(':focus-visible')) wave(wiz); });
+  }
+  document.querySelector('.landing-footer').addEventListener('pointerenter', perk);
+}
+
+// The silent spec sample plays only on request, so it stays available with reduced motion on or GSAP blocked.
+function enableVideo() {
+  const play = document.querySelector('.spec-play');
+  const video = document.querySelector('.spec-video');
+  const still = document.querySelector('.spec-screen');
+  play.hidden = false;
+  play.addEventListener('click', async () => {
+    video.hidden = false;
+    still.hidden = true;
+    try {
+      video.currentTime = 0;
+      await video.play();
+      video.focus();
+    } catch {
+      video.hidden = true;
+      still.hidden = false;
+    }
+  });
 }
 
 // The install box (#1357): Copy works only once index.html's switch says live; until then it stays disabled.
@@ -292,4 +434,6 @@ function enableCopy() {
 
 enableCopy();
 showStars().catch(() => {});
+if (document.querySelector('.spec-play')) enableVideo();
+enableFamily(window.gsap);
 if (window.gsap) enableMotion(window.gsap);

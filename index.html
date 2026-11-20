@@ -64,13 +64,20 @@
           <div class="window-main">
             <div class="window-title"><span>Specs / To-do app</span><h2>Build a to-do app</h2></div>
             <dl class="window-metrics"><div><dt>Need you</dt><dd>0</dd></div><div><dt>Building</dt><dd>1</dd></div><div><dt>In review</dt><dd>1</dd></div><div><dt>Merged</dt><dd>1</dd></div></dl>
-            <div class="ticket-graph" role="group" aria-label="To-do app tickets">
-              <div class="ember-ticket merged">Task list<small>Merged</small></div>
-              <svg class="ticket-arrow" aria-hidden="true" viewBox="0 0 16 16"><path d="M2 8h11m-4-4 4 4-4 4"/></svg>
-              <div class="ember-ticket building">Add a task<small>Building</small><svg class="work-pulse" aria-hidden="true" viewBox="0 0 20 20"><circle class="pulse-ring" cx="10" cy="10" r="8"/><circle cx="10" cy="10" r="3.5"/></svg></div>
-              <svg class="ticket-arrow" aria-hidden="true" viewBox="0 0 16 16"><path d="M2 8h11m-4-4 4 4-4 4"/></svg>
-              <div class="ember-ticket review">Save tasks<small>In review</small></div>
-            </div>
+            <section class="window-spec" aria-label="Spec">
+              <h3 class="window-label">Spec</h3>
+              <p class="spec-summary">One list: add a task, mark it complete, keep tasks after reload.</p>
+              <p class="window-waiting">Waiting for your answers</p>
+            </section>
+            <section class="window-tickets" aria-label="Tickets">
+              <h3 class="window-label">Tickets</h3>
+              <ol class="ticket-list">
+                <li class="ember-ticket merged"><span class="ticket-number">#12</span><span class="ticket-title">Task list</span><small class="ticket-chip">Merged</small></li>
+                <li class="ember-ticket building"><span class="ticket-number">#13</span><span class="ticket-title">Add a task</span><small class="ticket-chip">Building</small><svg class="ticket-builder" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" aria-hidden="true"><g fill="#cfc6b8"><path d="M132 222 Q132 204 153 204 H359 Q380 204 380 226 V292 Q380 324 351 344 H161 Q132 324 132 292Z"/><path d="M147 320 Q170 342 208 344 H304 Q345 340 366 319 Q364 383 326 405 L305 388 283 427 260 395 239 427 216 388 194 405 Q153 378 147 320Z"/><path d="M149 204 L220 76 Q256 12 292 76 L363 204Z"/><path d="M96 198 Q96 184 113 184 H399 Q416 184 416 201 V219 Q416 234 399 234 H113 Q96 234 96 219Z"/></g><g fill="#1b1916"><circle cx="218" cy="270" r="27"/><circle cx="294" cy="270" r="27"/><path d="M195 315 Q195 307 205 307 H307 Q317 307 317 317 V330 H195Z"/></g><g fill="#cfc6b8"><path d="M128 178 Q137 132 183 116 L201 145 Q256 125 311 145 L329 116 Q375 132 384 178 L402 195 H110Z"/><path d="M133 183 H379" fill="none" stroke="#1b1916" stroke-width="10"/><path d="M379 279 L397 260 Q407 250 417 260 L424 267 406 286 438 318 424 332 391 300 371 320 359 308Z"/><circle cx="229" cy="266" r="7"/><circle cx="283" cy="275" r="7"/><path d="M222 311h8v32h-8zm30 0h8v32h-8zm30 0h8v32h-8z"/></g></svg></li>
+                <li class="ember-ticket review"><span class="ticket-number">#14</span><span class="ticket-title">Save tasks</span><small class="ticket-chip">In review</small></li>
+              </ol>
+              <p class="window-waiting">Waiting for the spec</p>
+            </section>
             <div class="demo-progress" aria-hidden="true">
               <p class="demo-status">Building the to-do app</p>
               <div class="demo-steps"><i></i><i></i><i></i><i></i><i></i></div>

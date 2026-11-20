@@ -122,7 +122,7 @@ code,.v{font-family:var(--ow-font-mono)}
 .window-sidebar > * { padding: 4px 6px; }
 .window-sidebar strong { color: var(--ink); }
 .window-sidebar .selected { border-radius: 5px; background: #342d27; color: var(--ink); }
-.window-main { position: relative; min-width: 0; padding: 14px 13px 80px; }
+.window-main { position: relative; min-width: 0; padding: 14px 13px clamp(84px, 10vw + 6px, 150px); }
 .window-title > span, .screen-label { color: #c2b2a5; font: 10px/1.4 var(--ow-font-mono); }
 .window-title h2 { font-size: clamp(17px, 2vw, 24px); letter-spacing: -.045em; }
 .window-metrics { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 4px; margin: 12px 0; }
@@ -131,13 +131,26 @@ code,.v{font-family:var(--ow-font-mono)}
 .window-metrics dd { margin: 0; font-size: 16px; font-weight: 650; }
 .window-metrics div:nth-child(2) dd, .ember-ticket.building small { color: var(--sea); }
 .window-metrics div:nth-child(3) dd, .ember-ticket.review small { color: var(--orchid); }
-.ticket-graph { display: grid; grid-template-columns: minmax(0,1fr) 11px minmax(0,1fr) 11px minmax(0,1fr); gap: 3px; align-items: center; }
-.ember-ticket { position: relative; padding: 7px; border: 1px solid #55483e; border-radius: 6px; background: #342d27; color: var(--ink); font-size: 11px; line-height: 1.2; }
-.ember-ticket small { display: block; margin-top: 4px; color: #c8baaf; font-size: 9px; }
-.ember-ticket.merged small { color: #b9d7a5; }
-.ticket-arrow { width: 100%; fill: none; stroke: #a09385; }
-.work-pulse { position: absolute; top: -7px; right: -5px; width: 16px; fill: var(--sea); overflow: visible; }
-.pulse-ring { opacity: .25; transform-origin: center; transform-box: fill-box; }
+.window-label { margin: 10px 0 5px; color: #c2b2a5; font: 600 9px/1 var(--ow-font-mono); letter-spacing: .08em; text-transform: uppercase; }
+.spec-summary { padding: 6px 8px; border: 1px solid #55483e; border-left: 3px solid var(--brass); border-radius: 6px; background: #342d27; font-size: 11px; line-height: 1.35; }
+.window-waiting { display: none; align-items: center; padding: 6px 8px; border: 1px dashed #55483e; border-radius: 6px; color: #9d8f83; font: 10px var(--ow-font-mono); }
+.window-spec .window-waiting { min-height: 32px; }
+.window-tickets .window-waiting { min-height: 62px; }
+.ticket-list { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 6px; margin: 0; padding: 0; list-style: none; }
+.ember-ticket { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 3px; min-width: 0; padding: 6px 7px 7px; border: 1px solid #55483e; border-radius: 6px; background: #342d27; color: var(--ink); font-size: 11px; line-height: 1.2; box-shadow: 0 2px 0 #1b1816; }
+.ticket-number { color: #c2b2a5; font: 600 9px var(--ow-font-mono); }
+.ticket-title { max-width: 100%; font-weight: 600; }
+.ticket-chip { padding: 1px 6px; border-radius: 999px; background: #4a4038; color: #d8cabd; font-size: 9px; font-weight: 600; line-height: 1.5; }
+.ember-ticket.merged .ticket-chip { background: #34452c; color: #c9e6b5; }
+.ember-ticket.building .ticket-chip { background: #23463d; color: var(--sea); }
+.ember-ticket.review .ticket-chip { background: #43334b; color: var(--orchid); }
+.ember-ticket.building { border-color: #4f8c7b; }
+.ticket-builder { position: absolute; top: -14px; right: -6px; width: 30px; height: 30px; padding: 2px; border: 1px solid #4f8c7b; border-radius: 50%; background: #1b1916; }
+.ember-ticket:not(.building) .ticket-builder { display: none; }
+/* The demo steps through the road; nothing downstream exists before its step (the still shows the build step). */
+.product-window[data-scene="0"] .spec-summary, .product-window:is([data-scene="0"],[data-scene="1"]) .ticket-list { display: none; }
+.product-window[data-scene="0"] .window-spec .window-waiting, .product-window:is([data-scene="0"],[data-scene="1"]) .window-tickets .window-waiting { display: flex; }
+.product-window[data-scene="0"] .window-spec .window-label, .product-window:is([data-scene="0"],[data-scene="1"]) .window-tickets .window-label { opacity: .5; }
 .demo-status { color: #c8baaf; font: 10px var(--ow-font-mono); }
 .hero-wiz { position: absolute; width: clamp(76px, 9vw, 130px); height: auto; right: 0; bottom: 0; pointer-events: none; }
 .agent-row { display: flex; justify-content: center; flex-wrap: wrap; align-items: center; gap: 12px 34px; padding-block: 22px 30px; border-bottom: 1px solid var(--line); }
@@ -160,14 +173,22 @@ code,.v{font-family:var(--ow-font-mono)}
 .landing-footer { overflow: hidden; border-top: 1px solid var(--line); background: #221e1a; }
 .footer-links { justify-content: center; padding-top: 24px; }
 .footer-wordmark { margin: 16px 0 0; color: #cfc6b8; text-align: center; font-size: min(19vw, 280px); font-weight: 780; line-height: .87; letter-spacing: -.095em; padding-right: .09em; }
-.family { display: flex; justify-content: center; max-width: 1480px; margin: 15px auto clamp(-48px, -3vw, -10px); padding-inline: 8px; overflow: hidden; }
+.family { display: flex; justify-content: center; max-width: 1480px; margin: 7px auto clamp(-48px, -3vw, -10px); padding: 8px 8px 0; overflow: hidden; }
 .family-wiz { position: relative; flex: 0 0 8.5%; margin-inline: -.08%; aspect-ratio: 1; }
 .family-wiz img { position: relative; display: block; width: 100%; height: auto; }
+/* Owner's fix 2: the Wizes become buttons once the script runs; nothing shows until one is used. */
+.family-wiz[role="button"] { cursor: pointer; border-radius: 12px; }
+.family-wiz:focus-visible { outline: 2px solid var(--orchid); outline-offset: -2px; }
+.wiz-sprite { position: absolute; inset: 0; display: none; background-size: 900% 100%; pointer-events: none; }
+.family-wiz.is-acting img, .family-wiz.is-acting .wiz-eye { visibility: hidden; }
+.wiz-line { position: absolute; z-index: 2; top: 2%; left: 50%; transform: translateX(-50%); padding: 2px 8px; border-radius: 999px; background: var(--ink); color: var(--ground); font: 650 11px/1.5 var(--ow-font-sans); white-space: nowrap; pointer-events: none; }
 @media (max-width: 850px) {
   .product-hero { grid-template-columns: 1fr; }
   .hero-copy h1 { max-width: 13ch; }
   .product-stage { padding: clamp(12px, 4vw, 32px); }
-  .moments ol { grid-template-columns: repeat(2,minmax(0,1fr)); }
+}
+@media (max-width: 600px) {
+  .moments ol { grid-template-columns: 1fr; }
 }
 @media (max-width: 480px) {
   .landing-nav { min-height: 65px; }
@@ -176,11 +197,15 @@ code,.v{font-family:var(--ow-font-mono)}
   .window-sidebar { padding-inline: 3px; font-size: 9px; }
   .window-main { padding-inline: 8px; }
   .window-metrics dt { font-size: 8px; }
-  .ticket-graph { gap: 2px; grid-template-columns: minmax(0,1fr) 7px minmax(0,1fr) 7px minmax(0,1fr); }
+  .ticket-list { gap: 4px; }
   .ember-ticket { padding: 5px; font-size: 9px; }
-  .ember-ticket small { font-size: 8px; }
+  .ticket-chip { padding-inline: 4px; font-size: 8px; }
+  .ticket-builder { width: 22px; height: 22px; top: -10px; right: -5px; }
+  .spec-summary { font-size: 9.5px; }
   .moment-screen { min-height: 162px; padding: 8px; font-size: 10px; }
-  .family { display: grid; grid-template-columns: repeat(6,minmax(0,1fr)); }
+  .family { padding-inline: 0; margin-bottom: -14px; }
+  .family-wiz { flex-basis: 16%; }
+  .family-wiz:nth-child(-n+3), .family-wiz:nth-child(n+10) { display: none; }
 }
 
 .app-entry{margin-top:28px;padding-top:24px;border-top:1px solid var(--line)}
@@ -227,6 +252,8 @@ code,.v{font-family:var(--ow-font-mono)}
 .demo-pause, .spec-play { min-height: 34px; padding: 0 8px; border: 1px solid var(--edge); border-radius: 6px; background: var(--ground); color: var(--ink); font: 550 12px var(--ow-font-sans); cursor: pointer; }
 .demo-pause { position: absolute; right: 10px; bottom: 8px; }
 .demo-pause[aria-pressed="true"] { color: var(--sea); }
+/* #1351: with Pause motion shown, the stage keeps room below the window so the control never covers it. */
+.product-stage:has(> .demo-pause:not([hidden])) { padding-bottom: clamp(50px, 5vw, 66px); }
 .moment-heading { display: flex; align-items: center; justify-content: space-between; gap: 2px; margin-top: 8px; }
 .moment-heading h3 { margin: 4px; }
 .spec-sample { margin: 6px 4px 0; }
