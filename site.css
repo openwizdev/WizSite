@@ -98,6 +98,9 @@ code,.v{font-family:var(--ow-font-mono)}
 .github-star { gap: 8px; min-height: 40px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; }
 .github-star span { border-left: 1px solid var(--line); padding-left: 8px; font-variant-numeric: tabular-nums; }
 .sign-in { padding: 8px 14px; border-radius: 8px; background: #cfc6b8; color: var(--ground); font-weight: 650; white-space: nowrap; }
+.nav-team { padding: 8px 14px; border-radius: 8px; background: var(--brass); color: var(--on-brass); font-weight: 650; white-space: nowrap; }
+.landing-nav .nav-team:hover { background: var(--brass-hi); text-decoration: none; }
+.nav-team-short { display: none; }
 .landing-nav a:hover, .footer-links a:hover { text-decoration: underline; text-underline-offset: 4px; }
 .product-hero { display: grid; grid-template-columns: minmax(0, .86fr) minmax(0, 1.25fr); gap: clamp(22px, 4vw, 60px); align-items: center; padding-block: clamp(40px, 6vw, 84px) 32px; }
 .hero-copy h1 { max-width: 8ch; font-size: clamp(52px, 6vw, 96px); font-weight: 760; line-height: .98; letter-spacing: -.06em; }
@@ -282,8 +285,19 @@ code,.v{font-family:var(--ow-font-mono)}
   .landing-brand svg { width: 28px; height: 28px; }
   .landing-nav nav { gap: 8px; }
   .landing-nav .sign-in { padding-inline: 10px; }
+  .landing-nav .nav-team { padding-inline: 10px; }
+  /* #63: room for the buy button: the brand shows its mark alone (its name stays for screen readers). */
+  .landing-nav .landing-brand { gap: 0; font-size: 0; }
+  .nav-team-long { display: none; }
+  .nav-team-short { display: inline; }
   .hero-copy h1 { font-size: clamp(44px, 13vw, 52px); }
   .ember-ticket { overflow-wrap: anywhere; }
+}
+@media (max-width: 360px) {
+  .landing-nav nav { gap: 6px; }
+  .landing-nav .sign-in, .landing-nav .nav-team { padding-inline: 8px; }
+  .landing-nav .github-star { padding-inline: 8px; }
+  .landing-nav .github-star span { display: none; }
 }
 
 /* The drivers page (openwiz.dev/drivers, #50), variant D: the cinematic voyage. A painted night sea and the Wiz family's
@@ -422,3 +436,20 @@ code,.v{font-family:var(--ow-font-mono)}
 @keyframes drivers-d-lantern { 0% { opacity: .75; } 100% { opacity: 1; } }
 @keyframes drivers-d-far { to { transform: translateY(6%); } }
 @keyframes drivers-d-near { to { transform: translateY(-10%); } }
+
+/* The team page (openwiz.dev/team, #63): one screen, what you get and one Book a call button. */
+.team { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: clamp(28px, 5vw, 72px); align-items: center; padding-block: clamp(36px, 6vw, 84px); }
+.team-kicker { color: var(--brass); font: 600 13px/1 var(--ow-font-sans); letter-spacing: .06em; text-transform: uppercase; }
+.team h1 { margin-top: 16px; max-width: 13ch; font-size: clamp(40px, 5vw, 68px); font-weight: 760; line-height: 1; letter-spacing: -.05em; }
+.team-lead { margin-top: 20px; max-width: 30ch; color: #e1d7cb; font-size: clamp(18px, 1.8vw, 22px); line-height: 1.4; letter-spacing: -.02em; }
+.team-facts { display: flex; flex-wrap: wrap; gap: 12px 40px; margin-top: 28px; }
+.team-facts dt { color: var(--grey); font-size: 13px; }
+.team-facts dd { margin: 4px 0 0; color: var(--ink); font-size: 16px; font-weight: 550; }
+.team-book { display: inline-flex; align-items: center; min-height: 48px; margin-top: 32px; padding: 0 22px; border-radius: 10px; background: var(--brass); color: var(--on-brass); font-size: 16px; font-weight: 650; }
+.team-book:hover { background: var(--brass-hi); }
+.team-note { margin-top: 12px; color: var(--grey); font-size: 14px; }
+.team-art { width: 100%; height: auto; border: 1px solid var(--line); border-radius: var(--round); }
+@media (max-width: 850px) {
+  .team { grid-template-columns: 1fr; }
+  .team-art { order: -1; }
+}

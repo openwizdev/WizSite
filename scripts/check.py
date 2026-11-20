@@ -85,15 +85,32 @@ def fingerprint(name, data):
     return re.sub(r'\.(css|js)$', rf'.{sha256(data).hexdigest()[:10]}.\1', name)
 
 
-def fingerprinted_page(html):
+def fingerprinted_page(html, cta=False):
     for name, hashed in FINGERPRINTS.items():
         html = html.replace(f'"/{name}"', f'"/{hashed}"')
-    return html
+    return with_cta(html) if cta else html
+
+
+# The header's one buy button (#63): one snippet, which the build adds to every site page's top bar (not the app's).
+CTA = (ROOT / 'header-cta.html').read_text()
+CTA_LINK = '<a class="nav-team" href="/team/">'
+TOP_BAR_END = '  </nav>\n</header>'
+# The team page (openwiz.dev/team, #63) and its one booking link: the href of its one data-book link is the link's
+# only value. Until the real link is set it is this in-page placeholder; otherwise it must be an https URL.
+TEAM_PAGE = 'team/index.html'
+BOOK_PLACEHOLDER = '#book'
+TEAM_COPY = ('We set up your agent factory with you.', 'Your repos, your models, your machines. First fleet running in a day.',
+             'Solo builders and small teams.', 'Custom pricing.', 'Book a call')
+
+
+def with_cta(html):
+    assert html.count(TOP_BAR_END) == 1, 'a site page needs exactly one top bar'
+    return html.replace(TOP_BAR_END, CTA + TOP_BAR_END)
 
 
 FINGERPRINTS = {name: fingerprint(name, (ROOT / name).read_bytes()) for name in HASHED}
 STATIC = {
-    'index.html', 'changelog/index.html', 'drivers/index.html', '_headers', APP_PAGE, 'app/manifest.webmanifest',
+    'index.html', 'changelog/index.html', 'drivers/index.html', 'team/index.html', '_headers', APP_PAGE, 'app/manifest.webmanifest',
     'fonts/Geist-var.woff2', 'fonts/GeistMono-var.woff2', 'fonts/OFL.txt',
 } | ART | set(ICON_HASHES) | set(VECTORS) | (set(VENDOR_HASHES) - {GSAP}) | set(APP_VENDOR)
 RUNTIME = STATIC | set(FINGERPRINTS.values())
@@ -121,7 +138,7 @@ FONT_HASHES = {
     'fonts/GeistMono-var.woff2': '55419aa06f58adcd7f145c6c920e56936416f17e528f60efc6032ffa4269972b',
     'fonts/OFL.txt': 'c683bfbcc7e087f5d37a54ef628f10387c451a83ddc459b151403a164ac46c90',
 }
-PAGES = ('index.html', 'changelog/index.html', 'drivers/index.html')
+PAGES = ('index.html', 'changelog/index.html', 'drivers/index.html', TEAM_PAGE)
 ALL_PAGES = PAGES + (APP_PAGE,)
 # The to-do example and both app entry points stay visible in the static landing page.
 STORY_COPY = ('Build a to-do app', 'Bring any agent', 'Sign in with GitHub', 'Put the app on your phone')
@@ -194,6 +211,7 @@ class Page(HTMLParser):
         self.images = []
         self.videos = []
         self.inline_scripts = 0
+        self.books = []
         self.stylesheets, self.scripts = [], []
         self.feed(text)
 
@@ -202,6 +220,10 @@ class Page(HTMLParser):
         if 'id' in attrs:
             assert attrs['id'] not in self.ids, 'duplicate HTML id'
             self.ids.add(attrs['id'])
+        if tag == 'a' and 'data-book' in attrs:
+            # The booking link may leave the site; check_book checks it instead of check_ref.
+            self.books.append(attrs.get('href') or '')
+            attrs = {key: value for key, value in attrs.items() if key != 'href'}
         for key in ('href', 'src', 'poster'):
             if attrs.get(key):
                 self.refs.append(attrs[key])
@@ -453,6 +475,7 @@ def check_site(root):
     check_drivers_nav((root / names['site.css']).read_text(), {name: (root / name).read_text() for name in PAGES})
     check_changelog(landing, changelog)
     check_releases(releases)
+    check_team({name: (root / name).read_text() for name in PAGES}, {name: pages[root / name] for name in PAGES})
     main = re.search(r'<main\b[^>]*>[\s\S]*?</main>', changelog)
     assert main and sha256(main[0].encode()).hexdigest() == CHANGELOG_MAIN, 'changelog content changed; review explicitly before updating its snapshot'
 
@@ -756,6 +779,27 @@ def check_driver_proof(main):
     assert not twice, f'a picture shown twice on the drivers page: {twice}'
 
 
+def check_team(htmls, pages):
+    """#63: every site page's top bar has the one buy button to /team/; the team page has its copy, no price, and the
+    site's one booking link: the placeholder (an id on the page) or an https URL with no credentials."""
+    for name, html in htmls.items():
+        bar = top_bar(html)
+        assert bar.count('class="nav-team"') == 1 and bar.count(CTA_LINK) == 1, f'the {name} top bar needs its one buy button to /team/'
+        assert html.count('class="nav-team"') == 1, f'the {name} page needs exactly one buy button'
+    books = [(name, href) for name, page in pages.items() for href in page.books]
+    assert len(books) == 1 and books[0][0] == TEAM_PAGE, f'the site needs exactly one booking link, on the team page: {books}'
+    href = books[0][1]
+    if href == BOOK_PLACEHOLDER:
+        assert 'book' in pages[TEAM_PAGE].ids, 'the booking placeholder needs its id on the team page'
+    else:
+        url = urlsplit(href)
+        assert url.scheme == 'https' and url.netloc and not url.username and not url.password, f'the booking link must be https: {href}'
+    flat = re.sub(r'\s+', ' ', unescape(re.sub(r'<[^>]*>', ' ', htmls[TEAM_PAGE])))
+    for text in TEAM_COPY:
+        assert text in flat, f'missing team page copy: {text}'
+    assert not re.search(r'[$€£]\s*\d|\bper (?:month|seat|user)\b', flat, re.I), 'the team page shows no price'
+
+
 def check_drivers_nav(css, pages):
     """#59 R1: every page's one Drivers nav link stays shown at every width: none of its classes is hidden by a
     display: none rule inside a media query, so the phone header keeps it visible and focusable."""
@@ -921,7 +965,7 @@ def main():
         built = (output / name).read_text()
         if name == 'changelog/index.html':
             built = split_releases(built)[0]
-        assert fingerprinted_page((ROOT / name).read_text()) == built, f'export differs: {name}'
+        assert fingerprinted_page((ROOT / name).read_text(), cta=name != APP_PAGE) == built, f'export differs: {name}'
     paths = subprocess.check_output(['git', 'ls-files', '-z', '--cached', '--others', '--exclude-standard'], cwd=ROOT).decode().split('\0')
     for name in set(paths) - {''}:
         path = ROOT / name
