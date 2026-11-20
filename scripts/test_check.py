@@ -1,6 +1,7 @@
 """Synthetic negative cases for link/resource and privacy gates; no browser tools."""
 from pathlib import Path
 import shutil
+import subprocess
 import tempfile
 import unittest
 from unittest import mock
@@ -287,6 +288,32 @@ class Checks(unittest.TestCase):
             with self.subTest(error=error), self.assertRaisesRegex(AssertionError, error):
                 check_releases(section)
 
+    def test_named_release_headline_passes_the_release_check(self):
+        # catches (#46 R1): the release check refusing the headline the generator writes for an OpenWiz release named
+        # "OpenWiz 0.NN" (its public name, its semver small beside it), so CI fails once that release is published;
+        # and the exception reaching further: a public name on another repository or without its semver, a semver
+        # beside a semver headline, a public name of another shape, an unlabelled small, a small outside the
+        # headline, or named releases out of version order.
+        done = subprocess.run(['node', str(ROOT / 'scripts/changelog.mjs'), '--fixtures', str(ROOT / 'scripts/changelog-fixtures/named')],
+                              capture_output=True, text=True, timeout=60)
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertIn('<h4>OpenWiz 0.01 <small class="semver">0.1.0</small></h4>', done.stdout)
+        check_releases(done.stdout)
+        named = RELEASES.replace('<h4>OpenWiz 0.1.10</h4>', '<h4>OpenWiz 0.02 <small class="semver">0.1.10</small></h4>')
+        check_releases(named)
+        for section, error in (
+                (named.replace('<h4>OpenWiz 0.02 <small', '<h4>WizSkills 0.02 <small'), 'unexpected release title'),
+                (named.replace('<h4>OpenWiz 0.1.2</h4>', '<h4>OpenWiz 0.01</h4>'), 'unexpected release title'),
+                (named.replace('<h4>OpenWiz 0.1.2</h4>', '<h4>OpenWiz 0.1.2 <small class="semver">0.1.2</small></h4>'), 'unexpected release title'),
+                (named.replace('OpenWiz 0.02 <small', 'OpenWiz 0.2 <small'), 'unexpected release title'),
+                (named.replace('OpenWiz 0.02 <small', 'OpenWiz 0.02 beta <small'), 'unexpected release title'),
+                (named.replace('<small class="semver">0.1.10</small>', '<small class="semver">0.01</small>'), 'unexpected release title'),
+                (named.replace('<small class="semver">', '<small>'), 'unexpected element'),
+                (named.replace('<strong>y</strong>', '<small class="semver">y</small>'), 'unexpected element'),
+                (named.replace('<small class="semver">0.1.10</small>', '<small class="semver">0.1.1</small>'), 'newest first')):
+            with self.subTest(section=section), self.assertRaisesRegex(AssertionError, error):
+                check_releases(section)
+
     def test_landing_starts_in_still_mode(self):
         # Catches: an early inline script, a visible broken motion control or an autoplaying clip.
         for change, error in (
@@ -438,6 +465,54 @@ class Checks(unittest.TestCase):
                     root = Path(temp) / 'dist'
                     shutil.copytree(ROOT / 'dist', root)
                     (root / 'index.html').write_text(variant.replace(good, bad, 1))
+                    with self.assertRaises(AssertionError):
+                        check_site(root)
+
+    def test_install_version_label_is_the_only_version_on_the_landing(self):
+        """#1674 (J264): the install box shows the public name with its semver small beside it, reading exactly
+        OpenWiz 0.01 0.1.0, in either switch state. That one label is the only release version the landing may
+        mention; each case below plants one break, and each must fail."""
+        # catches: the label's semver or public name drifting, the label missing or doubled, the guard's exception
+        # widening to let a version through anywhere else on the landing, in the box or outside it, and the label
+        # moved out of the box with its text left behind in a comment (#46 R2).
+        label = '<p class="install-version">OpenWiz 0.01 <small>0.1.0</small></p>'
+        text = (ROOT / 'dist/index.html').read_text()
+        self.assertEqual(text.count(label), 1, label)
+        shipped = re.findall(r'data-install="[^"]*"', text)
+        self.assertEqual(len(shipped), 1, 'one install switch')
+        hint = '<p class="install-hint">'
+        breaks = [
+            (label, label.replace('0.1.0', '0.1.1')),
+            (label, label.replace('0.01', '0.02')),
+            (label, label.replace('OpenWiz 0.01', 'OpenWiz')),
+            (label, ''),
+            (label, label + label),
+            (hint, '<p>0.1.0</p>' + hint),
+            ('</main>', '<p>Now 0.1.0</p></main>'),
+            ('</main>', '<p>OpenWiz 0.01 <small>0.1.0</small></p></main>'),
+        ]
+        # #46 R2: the label moved out of the box, its text left behind in a comment where it was, or only moved.
+        moved = lambda variant, trace: variant.replace(label, trace, 1).replace('</main>', label + '</main>', 1)
+        relocations = ['<!-- OpenWiz 0.01 <small>0.1.0</small>. -->', f'<!-- {label} -->', '']
+        for state in INSTALL_SWITCH:
+            variant = text.replace(shipped[0], f'data-install="{state}"')
+            with self.subTest(state=state), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp) / 'dist'
+                shutil.copytree(ROOT / 'dist', root)
+                (root / 'index.html').write_text(variant)
+                check_site(root)
+            for good, bad in breaks:
+                with self.subTest(state=state, bad=bad), tempfile.TemporaryDirectory() as temp:
+                    root = Path(temp) / 'dist'
+                    shutil.copytree(ROOT / 'dist', root)
+                    (root / 'index.html').write_text(variant.replace(good, bad, 1))
+                    with self.assertRaises(AssertionError):
+                        check_site(root)
+            for trace in relocations:
+                with self.subTest(state=state, moved=trace), tempfile.TemporaryDirectory() as temp:
+                    root = Path(temp) / 'dist'
+                    shutil.copytree(ROOT / 'dist', root)
+                    (root / 'index.html').write_text(moved(variant, trace))
                     with self.assertRaises(AssertionError):
                         check_site(root)
 

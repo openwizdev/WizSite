@@ -1,0 +1,10 @@
+[
+  {
+    "tag_name": "v0.1.0",
+    "name": 5,
+    "draft": false,
+    "prerelease": false,
+    "published_at": "2031-03-01T10:00:00Z",
+    "body": "- A sample line."
+  }
+]

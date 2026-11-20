@@ -1,0 +1,24 @@
+F.......
+======================================================================
+FAIL: test_a_public_name_headlines_an_openwiz_release_with_its_semver_small (scripts.test_changelog.Generator.test_a_public_name_headlines_an_openwiz_release_with_its_semver_small)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "scripts/test_changelog.py", line 125, in test_a_public_name_headlines_an_openwiz_release_with_its_semver_small
+    self.assertEqual(headlines(openwiz), [('OpenWiz 0.1.3', None), ('OpenWiz 0.1.2', None),
+AssertionError: Lists differ: [('Op[36 chars]', None), ('OpenWiz 0.1.1', None), ('OpenWiz 0.1.0', None)] != [('Op[36 chars]', None), ('OpenWiz 0.02', '0.1.1'), ('OpenWiz 0.01', '0.1.0')]
+
+First differing element 2:
+('OpenWiz 0.1.1', None)
+('OpenWiz 0.02', '0.1.1')
+
+  [('OpenWiz 0.1.3', None),
+   ('OpenWiz 0.1.2', None),
+-  ('OpenWiz 0.1.1', None),
+-  ('OpenWiz 0.1.0', None)]
++  ('OpenWiz 0.02', '0.1.1'),
++  ('OpenWiz 0.01', '0.1.0')]
+
+----------------------------------------------------------------------
+Ran 8 tests in 0.856s
+
+FAILED (failures=1)

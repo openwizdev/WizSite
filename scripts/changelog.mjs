@@ -33,8 +33,9 @@ export function releases(answer) {
     const tag = /^v?(\d+)\.(\d+)\.(\d+)$/.exec(release.tag_name);
     const day = typeof release.published_at === 'string' && /^(\d{4}-\d{2}-\d{2})T/.exec(release.published_at);
     if (!tag || !day || !(release.body === null || typeof release.body === 'string')) return null;
+    if (!(release.name === undefined || release.name === null || typeof release.name === 'string')) return null;
     const version = tag.slice(1, 4).map(Number);
-    if (compare(version, FIRST) >= 0) out.push({ version, day: day[1], body: release.body ?? '' });
+    if (compare(version, FIRST) >= 0) out.push({ version, day: day[1], body: release.body ?? '', name: release.name ?? '' });
   }
   return out.sort((a, b) => compare(b.version, a.version));
 }
@@ -97,7 +98,11 @@ function entry(repo, release) {
   const shipped = repo !== 'OpenWiz' ? ''
     : ships ? `<div class="ships"><p>Ships with</p><ul>${ships.map(item => `<li>${inline(item)}</li>`).join('')}</ul></div>`
       : '<p class="ships missing">Its notes don’t list the versions it ships with.</p>';
-  return `<article class="release"><h4>${repo} ${version}</h4><p class="released">Released <time datetime="${release.day}">${release.day}</time></p>${shipped}<div class="notes">${notes(rest)}</div></article>`;
+  // A public name (J264): an OpenWiz release named exactly "OpenWiz 0.NN" is headlined by that name, with its
+  // semver small beside it; every other release keeps its semver headline.
+  const named = repo === 'OpenWiz' && /^OpenWiz 0\.\d{2}$/.test(release.name);
+  const headline = named ? `${esc(release.name)} <small class="semver">${version}</small>` : `${repo} ${version}`;
+  return `<article class="release"><h4>${headline}</h4><p class="released">Released <time datetime="${release.day}">${release.day}</time></p>${shipped}<div class="notes">${notes(rest)}</div></article>`;
 }
 
 // The generated section. `found` maps each repository to its releases, or null for a read that failed.

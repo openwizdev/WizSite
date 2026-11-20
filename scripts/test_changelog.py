@@ -35,7 +35,7 @@ class Releases(HTMLParser):
         if 'release-part' in classes:
             self.parts.append({'repo': attrs.get('data-repo'), 'state': None, 'entries': []})
         elif tag == 'article' and 'release' in classes:
-            self.parts[-1]['entries'].append({'title': '', 'ships': None, 'notes': ''})
+            self.parts[-1]['entries'].append({'title': '', 'semver': None, 'ships': None, 'notes': ''})
         elif 'ships' in classes and 'missing' in classes:
             self.parts[-1]['entries'][-1]['ships'] = 'missing'
         elif 'ships' in classes:
@@ -59,6 +59,8 @@ class Releases(HTMLParser):
         entry = self.parts[-1]['entries'][-1]
         if self.stack and self.stack[-1][0] == 'h4':
             entry['title'] += data
+        elif self.stack[-2:-1] and self.stack[-2][0] == 'h4' and self.stack[-1] == ('small', ['semver']):
+            entry['semver'] = (entry['semver'] or '') + data
         elif self.inside('ships') and self.stack[-1][0] == 'li':
             entry['ships'].append(data.strip())
         elif self.inside('notes'):
@@ -66,7 +68,12 @@ class Releases(HTMLParser):
 
 
 def titles(part):
-    return [e['title'] for e in part['entries']]
+    return [e['title'].strip() for e in part['entries']]
+
+
+def headlines(part):
+    """Each entry's headline and the semver shown small beside it (None when there is none)."""
+    return [(e['title'].strip(), e['semver']) for e in part['entries']]
 
 
 class Generator(unittest.TestCase):
@@ -106,6 +113,22 @@ class Generator(unittest.TestCase):
         self.assertEqual(out.parts[0]['entries'][0]['ships'], 'missing')
         # A published release whose tag is no version fails its part closed, never dropped from the history.
         self.assertEqual([(p['state'], p['entries']) for p in out.parts[1:]], [('missing', []), ('no release yet', [])])
+
+    def test_a_public_name_headlines_an_openwiz_release_with_its_semver_small(self):
+        # catches (#1674, J264): an OpenWiz release named "OpenWiz 0.NN" still headlined by its semver, or shown
+        # without its semver beside it; a name that only starts like one ("OpenWiz 0.03 beta") or an unnamed release
+        # taking a public name; another repository's release headlined by a release name; and a name of the wrong
+        # type read as no name instead of failing its part closed.
+        out = Releases(generate('--fixtures', FIXTURES / 'named'))
+        self.assertEqual([p['repo'] for p in out.parts], REPOS)
+        openwiz, skills, loops = out.parts
+        self.assertEqual(headlines(openwiz), [('OpenWiz 0.1.3', None), ('OpenWiz 0.1.2', None),
+                                              ('OpenWiz 0.02', '0.1.1'), ('OpenWiz 0.01', '0.1.0')])
+        self.assertEqual(headlines(skills), [('WizSkills 0.1.0', None)])
+        self.assertEqual((loops['state'], loops['entries']), ('missing', []))
+        # The full fixture's releases are named by their semver ("OpenWiz 0.1.0"): their headlines stay as they were.
+        full = Releases(generate('--fixtures', FIXTURES / 'full'))
+        self.assertEqual(headlines(full.parts[0]), [('OpenWiz 0.1.1', None), ('OpenWiz 0.1.0', None)])
 
     def test_failed_reads_show_as_missing_never_as_no_history(self):
         # catches: an API error object, an absent answer or a malformed release read as an empty history or as

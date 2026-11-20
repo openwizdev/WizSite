@@ -436,10 +436,13 @@ def check_site(root):
             assert (attrs.get('alt') or '').strip(), f'painting without a description: {attrs.get("src")}'
     check_motion((root / names['site.css']).read_text())
     check_driver_css((root / names['site.css']).read_text())
-    check_install(landing, pages[root / 'index.html'])
+    unlabelled = check_install(landing, pages[root / 'index.html'])
     assert not re.search(r'\b\d{4}-\d{2}-\d{2}\b', words), 'dated landing promise'
     changelog, releases = split_releases((root / 'changelog/index.html').read_text())
-    assert not re.search(r'(?<![\d.])\d+\.\d+\.\d+(?![\d.])', flat), 'release version mentioned on the landing'
+    # #1674 (J264): the install box's one version label (check_install reads it exactly and returns the landing
+    # without that element) is the only version allowed.
+    unlabelled = re.sub(r'\s+', ' ', unescape(re.sub(r'<[^>]*>', '', re.sub(r'<br>', ' ', unlabelled))))
+    assert not re.search(r'(?<![\d.])\d+\.\d+\.\d+(?![\d.])', unlabelled), 'release version mentioned on the landing'
     for name in VECTORS:
         check_vector((root / name).read_bytes())
     total = 0
@@ -527,6 +530,7 @@ INSTALL_LINE = 'Install OpenWiz from github.com/openwizdev/OpenWiz'
 INSTALL_HINT = 'Paste this into your agent'
 INSTALL_BUTTON = 'Copy · coming soon'
 INSTALL_SWITCH = ('coming-soon', 'live')
+INSTALL_VERSION = 'OpenWiz 0.01 0.1.0'  # the public name with its semver small beside it (#1674, J264)
 
 
 def check_install(landing, page):
@@ -538,6 +542,9 @@ def check_install(landing, page):
     assert switch and switch[1] in INSTALL_SWITCH, f'the install box needs its one switch, data-install = {" or ".join(INSTALL_SWITCH)}'
     lines = re.findall(r'<code class="install-line">([^<]*)</code>', box)
     assert lines == [INSTALL_LINE], f'the install line must read exactly: {INSTALL_LINE}'
+    # #1674: the version label is the box's first element, the only one of its class on the landing (#46 R2).
+    label = re.search(r'<div class="install-box"[^>]*>\s*(<p class="install-version">([^<]*<small>[^<]*</small>)</p>)', landing)
+    assert label and landing.count('install-version') == 1 and flat(label[2]) == INSTALL_VERSION, f'the install box must show {INSTALL_VERSION}'
     hints = re.findall(r'<p class="install-hint">([\s\S]*?)</p>', box)
     assert [flat(h) for h in hints] == [INSTALL_HINT], f'the install box must say: {INSTALL_HINT}'
     labels = re.findall(r'<button class="btn install"[^>]*>([\s\S]*?)</button>', landing)
@@ -551,6 +558,7 @@ def check_install(landing, page):
     reader = Text(rest)
     for reading in [reader.joined(), reader.spaced()] + reader.shown:
         assert not re.search(r'install|coming soon|paid plans|works today', re.sub(r'\s+', ' ', reading), re.I), 'unsettled landing claim or a second install mention'
+    return landing[:label.start(1)] + landing[label.end(1):]
 
 
 def check_changelog(landing, changelog):
@@ -805,7 +813,7 @@ class ReleaseOutline(HTMLParser):
     """The generated section's tags, heading, and each part's repository, entry titles and state."""
     def __init__(self, text):
         super().__init__(convert_charrefs=True)
-        self.tags, self.h2, self.parts, self.reading = [], [], [], None
+        self.tags, self.h2, self.parts, self.reading, self.semver = [], [], [], None, None
         self.feed(text)
 
     def handle_starttag(self, tag, attrs):
@@ -817,16 +825,26 @@ class ReleaseOutline(HTMLParser):
         elif self.parts and tag == 'p' and ({'no-release', 'read'} & set(classes)):
             self.parts[-1]['states'].append('no-release' if 'no-release' in classes else 'missing')
         if tag in ('h2', 'h4'):
-            self.reading = [tag, '']
+            self.reading = [tag, '', None]
+        # #1674 (J264): a public-name headline carries its semver in one labelled small, inside the h4 only.
+        if tag == 'small':
+            assert self.reading and self.reading[0] == 'h4' and self.reading[2] is None and attrs == {'class': 'semver'}, \
+                'unexpected element in the generated releases: a small outside a headline, unlabelled or repeated'
+            self.semver, self.reading[2] = True, ''
 
     def handle_data(self, data):
-        if self.reading:
+        if self.reading and self.semver:
+            self.reading[2] += data
+        elif self.reading:
             self.reading[1] += data
 
     def handle_endtag(self, tag):
-        if self.reading and self.reading[0] == tag:
+        if tag == 'small':
+            self.semver = None
+        elif self.reading and self.reading[0] == tag:
             text = re.sub(r'\s+', ' ', self.reading[1]).strip()
-            (self.h2 if tag == 'h2' else self.parts[-1]['titles'] if self.parts else self.h2).append(text)
+            title = text if tag == 'h2' or self.reading[2] is None else (text, self.reading[2].strip())
+            (self.h2 if tag == 'h2' else self.parts[-1]['titles'] if self.parts else self.h2).append(title)
             self.reading = None
 
 
@@ -836,7 +854,7 @@ def check_releases(section):
     outline = ReleaseOutline(section)
     assert outline.h2 == ['Releases'], 'the generated section is headed Releases'
     assert [p['repo'] for p in outline.parts] == list(RELEASE_REPOS), f'one release part per versioned repository: {[p["repo"] for p in outline.parts]}'
-    allowed = {'section', 'h2', 'h3', 'h4', 'span', 'p', 'article', 'time', 'div', 'ul', 'li', 'code', 'strong'}
+    allowed = {'section', 'h2', 'h3', 'h4', 'span', 'p', 'article', 'time', 'div', 'ul', 'li', 'code', 'strong', 'small'}
     for tag, attrs in outline.tags:
         assert tag in allowed, f'unexpected element in the generated releases: {tag}'
         assert set(attrs) <= {'class', 'id', 'data-repo', 'aria-labelledby', 'datetime'}, f'unexpected attribute in the generated releases: {sorted(attrs)}'
@@ -845,7 +863,9 @@ def check_releases(section):
         assert bool(titles) != bool(states) and len(states) <= 1, f'{repo}: releases, or one of no release yet and missing'
         versions = []
         for title in titles:
-            found = re.fullmatch(rf'{repo} (\d+)\.(\d+)\.(\d+)', title)
+            # An OpenWiz release named "OpenWiz 0.NN" is headlined by that name, its semver small beside it (J264).
+            found = re.fullmatch(rf'{repo} (\d+)\.(\d+)\.(\d+)', title) if isinstance(title, str) else \
+                repo == 'OpenWiz' and re.fullmatch(r'OpenWiz 0\.\d{2}', title[0]) and re.fullmatch(r'(\d+)\.(\d+)\.(\d+)', title[1])
             assert found, f'{repo}: unexpected release title {title!r}'
             versions.append(tuple(map(int, found.groups())))
         assert versions == sorted(versions, reverse=True) and len(set(versions)) == len(versions), f'{repo}: releases newest first, each once'
