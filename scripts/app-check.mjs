@@ -1462,7 +1462,8 @@ async function main() {
       // #30 blocks #43 from outside spec 40: Enter opens spec 40 and focuses #30's card there.
       await paletteOpen(page);
       await find(page, '#30', '#30');
-      assert(/outside/i.test((await palette(page)).active), `the outside blocker's result does not say it is outside: ${(await palette(page)).active}`);
+      const blocker = (await palette(page)).options.filter(o => o.includes('#30 #30'));
+      assert(blocker.length === 1 && /outside #40/.test(blocker[0]), `the outside blocker's results: ${JSON.stringify(blocker)}`);
       await page.key('Enter');
       await page.until(`location.hash === '#/specs/40' && document.activeElement.dataset.ticket === '30'`, 'Enter on the outside blocker to focus its card');
       assert(await visibleFocus(page), "the outside blocker's card has focus but no visible focus ring");

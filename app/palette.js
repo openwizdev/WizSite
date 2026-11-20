@@ -29,23 +29,26 @@
     out.push(...actions());
     const seen = OW.factory.model(feeds);
     const tickets = new Map();
+    const ticket = (t, spec, where) => ({ kind: 'ticket', id: `ticket:${t.key}`, title: `#${t.number} ${t.title}`,
+      detail: `${STATES[t.state]?.word || 'Unknown'} · ${where} #${spec.number} ${spec.title}`, go: `#/specs/${spec.number}`,
+      focus: `main .graph [data-focus="${CSS.escape(`ticket:${t.key}`)}"]`, url: t.url });
     for (const spec of seen?.specs || []) {
       out.push({ kind: 'spec', id: `spec:${spec.number}`, title: `#${spec.number} ${spec.title}`,
         detail: spec.total ? `${spec.done} of ${spec.total} tickets done` : '', go: `#/specs/${spec.number}`, focus: 'main .spec-title', url: spec.url });
-      for (const t of spec.graph?.tickets || []) {
-        if (t.gap || t.outside || tickets.has(t.key)) continue;
-        tickets.set(t.key, { kind: 'ticket', id: `ticket:${t.key}`, title: `#${t.number} ${t.title}`,
-          detail: `${STATES[t.state]?.word || 'Unknown'} · in #${spec.number} ${spec.title}`, go: `#/specs/${spec.number}`,
-          focus: `main .graph [data-focus="${CSS.escape(`ticket:${t.key}`)}"]`, url: t.url });
-      }
+      for (const t of spec.graph?.tickets || []) if (!t.outside && !tickets.has(t.key)) tickets.set(t.key, ticket(t, spec, 'in'));
     }
-    // Tickets marked for the user that no spec's graph holds: they open on GitHub. (An agent's ticket is its agent's
+    // A readable blocker a graph draws outside its spec, when no spec holds it (its own spec wins); never a placeholder.
+    for (const spec of seen?.specs || []) {
+      for (const t of spec.graph?.tickets || []) if (t.outside && !t.gap && !tickets.has(t.key)) tickets.set(t.key, ticket(t, spec, 'outside'));
+    }
+    // Tickets marked for the user that no spec's graph holds: their card on You. (An agent's ticket is its agent's
     // result: Enter goes to its card, Shift Enter opens the ticket.)
-    const loose = (number, title, url, detail) => {
-      const key = `${home}#${number}`;
-      if (!tickets.has(key)) tickets.set(key, { kind: 'ticket', id: `ticket:${key}`, title: `#${number} ${title}`, detail, url });
-    };
-    for (const item of seen?.you || []) if (item.kind === 'ticket') loose(item.number, item.title, item.url, 'Marked for you · opens on GitHub');
+    for (const item of seen?.you || []) {
+      const key = `${home}#${item.number}`;
+      if (item.kind !== 'ticket' || tickets.has(key)) continue;
+      tickets.set(key, { kind: 'ticket', id: `ticket:${key}`, title: `#${item.number} ${item.title}`, detail: 'Marked for you', go: '#/you',
+        focus: `main [data-focus="${CSS.escape(`item:${item.url}`)}"]`, url: item.url });
+    }
     const agents = OW.agents.picture(feeds.agents, home);
     const rows = agents?.broken ? [] : [...(agents?.now || []), ...(agents?.day || [])];
     out.push(...tickets.values());
