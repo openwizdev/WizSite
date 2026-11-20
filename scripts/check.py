@@ -1067,8 +1067,6 @@ def check_team(htmls, pages):
         url = urlsplit(href)
         assert url.scheme == 'https' and url.netloc and not url.username and not url.password, f'the booking link must be https: {href}'
     flat = re.sub(r'\s+', ' ', unescape(re.sub(r'<[^>]*>', ' ', htmls[TEAM_PAGE])))
-    for text in TEAM_COPY:
-        assert text in flat, f'missing team page copy: {text}'
     assert not re.search(r'[$€£]\s*\d|\bper (?:month|seat|user)\b', flat, re.I), 'the team page shows no price'
     labels = re.findall(r'<a [^>]*data-book[^>]*>([^<]*)</a>', htmls[TEAM_PAGE])
     assert labels == ['Book a call', 'Book a call'], f'team page copy: both booking links read Book a call: {labels}'
@@ -1085,7 +1083,6 @@ def check_team(htmls, pages):
     assert terms and [plain(t) for t in re.findall(r'<li>([\s\S]*?)</li>', terms[1])] == list(TEAM_TERMS), \
         f'the terms: three exact lines right under the hero button: {TEAM_TERMS}'
     assert hero.index('data-book') < hero.index('class="team-terms"'), 'the terms: under the first Book a call'
-    assert TEAM_SHIPS in plain(hero), 'the ships line sits with the terms'
     assert 'wizes' not in plain(hero).lower(), 'no Wizes in the team hero'
     poster = re.findall(r'<a [^>]*href="https://x\.com/openwiz"[^>]*>([\s\S]*?)</a>', hero)
     images = [dict(re.findall(r'([a-z-]+)="([^"]*)"', img)) for img in re.findall(r'<img\b[^>]*>', poster[0])] if len(poster) == 1 else []
@@ -1097,9 +1094,14 @@ def check_team(htmls, pages):
     steps = re.search(r'<ol class="team-steps">([\s\S]*?)</ol>', main)
     found = re.findall(r'<li><h3>([\s\S]*?)</h3><p>([\s\S]*?)</p></li>', steps[1]) if steps else []
     assert [(plain(m), plain(t)) for m, t in found] == list(TEAM_STEPS), f'The 30 minutes, roughly: its four marks, in order: {TEAM_STEPS}'
+    ships = re.search(r'</ol>\s*<p class="team-ships">([\s\S]*?)</p>', main)
+    assert ships and plain(ships[1]) == TEAM_SHIPS, 'the ships line: right under the timeline'
     shown = re.sub(r'\s+', ' ', unescape(re.sub(r'<[^>]*>', ' ', main)))
     assert not TEAM_NEVER.search(shown), f'a word the team page never uses: {TEAM_NEVER.search(shown)[0]}'
     assert not re.search(r'\bhidden\b|aria-hidden', main.split('<main', 1)[1]), 'the team page hides none of its copy'
+    # Last, so a broken part above fails on its own line first: the rest of the round 1 copy, word for word.
+    for text in TEAM_COPY:
+        assert text in flat, f'missing team page copy: {text}'
     run = re.search(r'<ul class="team-drivers">([\s\S]*?)</ul>', htmls[TEAM_PAGE])
     assert run and re.findall(r'href="([^"]*)"', run[1]) and set(re.findall(r'href="([^"]*)"', run[1])) == {'/drivers/'}, \
         'Where your agents run: its drivers link to /drivers/'

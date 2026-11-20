@@ -444,25 +444,36 @@ body.landing > main { flex: 1 0 auto; }
 @keyframes drivers-d-far { to { transform: translateY(6%); } }
 @keyframes drivers-d-near { to { transform: translateY(-10%); } }
 
-/* The team page (openwiz.dev/team, #63, #73): the hero, then what you get, where your agents run and a closing Book a call. */
-.team { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: clamp(28px, 5vw, 72px); align-items: center; padding-block: clamp(36px, 6vw, 84px); }
+/* The team page (openwiz.dev/team, #63, #73; design P, #81): the hero with the terms under Book a call and the boat
+   poster as its first picture, then the timeline, proof, who it's for and pricing, where your agents run, the closing call. */
+.team { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: clamp(28px, 4.5vw, 64px); align-items: center; padding-block: clamp(28px, 4.5vw, 64px); }
 .team-kicker { color: var(--brass); font: 600 13px/1 var(--ow-font-sans); letter-spacing: .06em; text-transform: uppercase; }
-.team h1 { margin-top: 16px; max-width: 13ch; font-size: clamp(40px, 5vw, 68px); font-weight: 760; line-height: 1; letter-spacing: -.05em; }
-.team-lead { margin-top: 20px; max-width: 30ch; color: #e1d7cb; font-size: clamp(18px, 1.8vw, 22px); line-height: 1.4; letter-spacing: -.02em; }
-.team-facts { display: flex; flex-wrap: wrap; gap: 12px 40px; margin-top: 28px; }
-.team-facts dt { color: var(--grey); font-size: 13px; }
-.team-facts dd { margin: 4px 0 0; color: var(--ink); font-size: 16px; font-weight: 550; }
-.team-book { display: inline-flex; align-items: center; min-height: 48px; margin-top: 32px; padding: 0 22px; border-radius: 10px; background: var(--brass); color: var(--on-brass); font-size: 16px; font-weight: 650; }
+.team h1 { margin-top: 14px; max-width: 15ch; font-size: clamp(34px, 4.4vw, 60px); font-weight: 760; line-height: 1.02; letter-spacing: -.045em; text-wrap: balance; }
+.team-lead { margin-top: 18px; max-width: 44ch; color: #e1d7cb; font-size: clamp(17px, 1.5vw, 19px); line-height: 1.45; letter-spacing: -.01em; }
+.team-book { display: inline-flex; align-items: center; min-height: 48px; margin-top: 24px; padding: 0 22px; border-radius: 10px; background: var(--brass); color: var(--on-brass); font-size: 16px; font-weight: 650; }
 .team-book:hover { background: var(--brass-hi); }
-.team-note { margin-top: 12px; color: var(--grey); font-size: 14px; }
-.team-art { width: 100%; height: auto; border: 1px solid var(--line); border-radius: var(--round); }
+.team-terms { display: grid; gap: 6px; max-width: 46ch; margin: 16px 0 0; padding: 0; list-style: none; color: var(--ink); font-size: 15px; line-height: 1.4; }
+.team-terms li { position: relative; padding-left: 18px; }
+.team-terms li::before { content: ""; position: absolute; left: 0; top: .55em; width: 7px; height: 7px; border-radius: 50%; background: var(--sea); }
+.team-poster { display: block; color: var(--ink); }
+.team-poster figure { margin: 0; }
+.team-poster img { display: block; width: 100%; height: auto; border: 1px solid var(--line); border-radius: var(--round); }
+.team-poster figcaption { margin-top: 12px; font-size: 15px; font-weight: 600; text-decoration: underline; text-decoration-color: var(--brass); text-underline-offset: 4px; }
+.team-poster:hover img { border-color: var(--edge); }
+.team-poster:hover figcaption { color: var(--brass-hi); }
 .team-part { padding-block: clamp(36px, 5vw, 64px); border-top: 1px solid var(--line); }
 .team-part h2 { font-size: clamp(28px, 3vw, 40px); font-weight: 740; line-height: 1.1; letter-spacing: -.04em; }
-.team-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 28px; padding: 0; list-style: none; counter-reset: step; }
-.team-steps li { padding: 24px; border: 1px solid var(--line); border-radius: var(--round); background: var(--panel); counter-increment: step; }
-.team-steps li::before { content: counter(step); display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: var(--brass); color: var(--on-brass); font-weight: 700; font-size: 15px; }
-.team-steps h3 { margin: 18px 0 0; font-size: 19px; font-weight: 680; letter-spacing: -.02em; line-height: 1.25; }
-.team-steps p { margin-top: 8px; color: var(--grey2); font-size: 16px; }
+.team-steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin: 28px 0 0; padding: 0; list-style: none; }
+.team-steps li { position: relative; padding: 30px 8px 0 0; border-top: 2px solid var(--edge); }
+.team-steps li::before { content: ""; position: absolute; top: -8px; left: 0; width: 14px; height: 14px; border-radius: 50%; background: var(--brass); }
+.team-steps h3 { margin: 0; color: var(--brass); font: 600 15px/1.2 var(--ow-font-mono); letter-spacing: 0; }
+.team-steps p { margin-top: 8px; color: var(--ink); font-size: 18px; line-height: 1.4; }
+.team-ships { margin-top: 28px; max-width: 70ch; color: var(--grey2); font-size: 16px; }
+.team-proof { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 24px 0 0; padding: 0; list-style: none; }
+.team-proof a { display: block; height: 100%; padding: 22px 24px; border: 1px solid var(--line); border-radius: var(--round); background: var(--panel); color: var(--ink); font-size: 17px; line-height: 1.5; }
+.team-proof a:hover { border-color: var(--edge); text-decoration: none; }
+.team-fit { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px clamp(28px, 5vw, 72px); }
+.team-fit p { margin-top: 12px; color: var(--grey2); font-size: 18px; }
 .team-run-lead { margin-top: 12px; max-width: 52ch; color: var(--grey2); }
 .team-drivers { display: flex; flex-wrap: wrap; gap: 12px; margin: 24px 0 0; padding: 0; list-style: none; }
 .team-drivers a { display: inline-flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 18px; border: 1px solid var(--line); border-radius: 999px; background: var(--panel); color: var(--ink); font-weight: 600; }
@@ -472,7 +483,10 @@ body.landing > main { flex: 1 0 auto; }
 .team-close { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 32px; }
 .team-close .team-book { margin-top: 0; }
 @media (max-width: 850px) {
-  .team { grid-template-columns: 1fr; }
-  .team-art { order: -1; }
-  .team-steps { grid-template-columns: 1fr; }
+  .team { grid-template-columns: 1fr; padding-top: 20px; }
+  .team-steps { grid-template-columns: 1fr; gap: 0; padding-left: 7px; }
+  .team-steps li { padding: 0 0 22px 24px; border-top: 0; border-left: 2px solid var(--edge); }
+  .team-steps li:last-child { padding-bottom: 0; border-left-color: transparent; }
+  .team-steps li::before { top: 0; left: -8px; }
+  .team-proof, .team-fit { grid-template-columns: 1fr; }
 }
