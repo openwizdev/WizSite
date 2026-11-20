@@ -486,8 +486,8 @@ class Checks(unittest.TestCase):
         for name, old, new, error in (
                 ('drivers/index.html', 'id="cloudroom"', 'id="cloud"', 'four driver cards'),
                 ('drivers/index.html', '<span>Grok Bot</span></h3>', '<span>Grok</span></h3>', 'four driver cards'),
-                ('drivers/index.html', 'Being fixed: its kit run is in progress', 'Being fixed: almost done', 'driver facts'),
-                ('drivers/index.html', 'Being fixed: its kit run is in progress', 'Being fixed: kit run next', 'driver facts'),
+                ('drivers/index.html', 'Passed the kit on a Linux PC', 'Passed the kit on a Mac', 'driver facts'),
+                ('drivers/index.html', 'Passed the kit, run from a Cloudroom cloud thread', 'Passed the kit, run from a laptop', 'driver facts'),
                 ('drivers/index.html', boat, boat.replace(' hero', ''), 'boat.dev is the hero|spotlight'),
                 ('drivers/index.html', '<article class="driver" id="grok-bot"', '<article class="driver hero" id="grok-bot"', 'boat.dev is the hero'),
                 ('drivers/index.html', 'href="https://github.com/openwizdev/OpenWiz/tree/main/adapters/template"', 'href="https://github.com/openwizdev/WizSkills"', 'only to the public OpenWiz'),
@@ -567,9 +567,10 @@ class Checks(unittest.TestCase):
                 ('<span>Kit: not run yet</span></p>', '<span>Kit: not run yet</span></p><ul>' + row + '</ul>', 'no per-check rows'),
                 ('<span>Kit: not run yet</span></p>', '<span>Kit: not run yet</span></p><ol><li class="proof-check" data-check="token">x</li></ol>', 'one kit line, never per-check rows'),
                 ('<span>Kit: not run yet</span>', '<span>Kit: not run yet. Its kit run comes next.</span>', 'one kit line must read'),
-                ('data-state="in progress"><svg', 'data-state="passed"><svg', 'one kit line must read'),
+                ('<span>Kit: passed, 5 of 5</span>', '<span>Kit: passed</span>', 'one kit line must read'),
+                ('<p class="driver-kit passed" data-state="passed">', '<p class="driver-kit passed" data-state="not yet run">', 'one kit line must read'),
                 ('<h2 id="more-title">More drivers</h2>', '<h2 id="more-title">More drivers</h2><p>4 words, 5 checks in the kit</p>', 'jargon count'),
-                ('<h2 id="more-title">More drivers</h2>', '<h2 id="more-title">More drivers</h2><p>1 passed, 5 of 5</p>', 'jargon count'),
+                ('<h2 id="more-title">More drivers</h2>', '<h2 id="more-title">More drivers</h2><p>1 passed, 3 of 5</p>', 'jargon count'),
                 ('Drivers answer the same four commands', 'Drivers answer 4 words', 'jargon count'),
                 ('<h2 id="more-title">More drivers</h2>', '<h2 id="more-title">More drivers</h2><p>boat.dev passed all five checks.</p>', 'at most 2 times'),
                 ('<div class="own-token"><dt><code>token</code></dt>', '<div class="own-token"><dt><code>tokens</code></dt>', 'fifth check, token'),
@@ -624,8 +625,8 @@ class Checks(unittest.TestCase):
         page = 'drivers/index.html'
         pill = '<li data-host="boat-dev">'
         for old, new, error in (
-                ('<span class="host-state">works today</span>', '', 'works today in words'),
-                ('<span class="host-state">being fixed</span>', '<span class="host-state">works</span>', 'being fixed'),
+                ('<span class="host-state">passed 5 of 5</span>', '', 'works today in words'),
+                ('<span class="host-state">passed 5 of 5</span>', '<span class="host-state">works</span>', 'passed 5 of 5'),
                 ('<span class="host-state">coming soon</span>', '<span class="host-state">soon</span>', 'coming soon'),
                 ('<li data-host="vps">', '<li data-host="computer">', 'host pills, in order'),
                 ('<span class="host-mark"><img class="host-lockup"', '<span class="host-mark"></span><img class="host-lockup"', 'fixed-height slot'),
@@ -657,6 +658,36 @@ class Checks(unittest.TestCase):
                 ('\n@media (max-width: 760px) { .drivers-page .proof-scene { order: -1; } }\n', 'keeps its reading order')):
             self.broken(page, '', '', error, css=bad)
 
+    def test_drivers_kit_results(self):
+        # Catches (#66 facts, 2026-11-20): boat.dev, Cloudroom or your own computer or VPS shown as anything but passed
+        # (in a host pill, a card's status sentence, its kit line or state, its date or its public evidence link), Grok
+        # Bot shown as passed anywhere, a stale state word back ("being fixed", "works today", "kit run next", "in
+        # progress", "not run yet" outside Grok Bot), the spotlight losing its line that the other two passed the same
+        # five checks, or a claim that boat.dev is the only one that passed.
+        page = 'drivers/index.html'
+        vps, cloud, boat, grok = (f'<li data-host="{k}" data-state="' for k in ('vps', 'cloudroom', 'boat-dev', 'grok-bot'))
+        for old, new, error in (
+                (vps + 'passed">', vps + 'being fixed">', "pill's state is 'passed'|shown as anything but passed"),
+                (cloud + 'passed">', cloud + 'works today">', "pill's state is 'passed'|shown as anything but passed"),
+                (boat + 'passed">', boat + 'coming soon">', "pill's state is 'passed'|shown as anything but passed"),
+                (grok + 'coming soon">', grok + 'passed">', "pill's state is 'coming soon'|never shown as passed"),
+                ('<span class="host-state">coming soon</span>', '<span class="host-state">passed 5 of 5</span>', 'coming soon'),
+                ('<span>Kit: not run yet</span>', '<span>Kit: passed, 5 of 5</span>', 'one kit line must read|never shown as passed'),
+                ('<p class="driver-kit unrun" data-state="not yet run">', '<p class="driver-kit passed" data-state="passed">', 'one kit line must read|never shown as passed'),
+                ('<p class="driver-kit passed" data-state="passed">', '<p class="driver-kit unrun" data-state="passed">', 'shown as anything but passed in its kit line'),
+                ('Coming soon: listed when its driver lands', 'Coming soon: passed the kit', 'driver facts|never shown as passed'),
+                ('Kit run, <time datetime="2026-11-20">2026-11-20</time>', 'Kit run, <time datetime="2026-11-21">2026-11-21</time>', 'dates its kit run 2026-11-20|invented number'),
+                ('<a href="https://github.com/openwizdev/OpenWiz/pull/1455#issuecomment-7034588211">', '<a href="https://github.com/openwizdev/OpenWiz/pull/1458#issuecomment-7034556153">', 'linked to its public evidence'),
+                ('<a href="https://github.com/openwizdev/OpenWiz/pull/1444">', '<a href="https://github.com/openwizdev/OpenWiz">', 'spotlight date links to its public evidence'),
+                ('</ol>\n        <p class="proof-also">', '</ol>\n        <p class="proof-other">', 'boat.dev is one of three'),
+                ('passed the same five checks on <time', 'may pass the same five checks on <time', 'boat.dev is one of three'),
+                ('<h2 id="more-title">More drivers</h2>', '<h2 id="more-title">More drivers</h2><p>Cloudroom is being fixed.</p>', 'stale driver state word'),
+                ('<h2 id="more-title">More drivers</h2>', '<h2 id="more-title">More drivers</h2><p>Kit: in progress</p>', 'stale driver state word'),
+                ('<h2 id="more-title">More drivers</h2>', '<h2 id="more-title">More drivers</h2><p>Its kit run is next; not run yet.</p>', 'stale driver state word'),
+                ('Passed the kit on a Linux PC', 'Works today on a Linux PC', 'driver facts|status sentence says so'),
+                ('<h2 id="more-title">More drivers</h2>', '<h2 id="more-title">More drivers</h2><p>Only boat.dev has passed.</p>', 'never the only one')):
+            self.broken(page, old, new, error)
+
     def test_drivers_nav_and_description(self):
         # Catches (#59 R1): a Drivers nav link the phone breakpoint hides (display: none, so not shown or focusable at
         # 390 px) on the landing, the Changelog or the drivers page. Catches (#59 R2, #62): a description saying every
@@ -673,7 +704,8 @@ class Checks(unittest.TestCase):
                     check_site(root)
         self.broken('', '', '', 'hidden on phones', css='\n@media (max-width: 480px) { .landing-nav .nav-drivers { display: none; } }\n')
         for old, new, error in (
-                ('boat.dev passed all five checks', 'boat.dev passed', 'must say boat.dev passed all five checks'),
+                ('boat.dev, Cloudroom and your own computer or VPS passed all five checks', 'boat.dev passed all five checks', 'must say boat.dev, Cloudroom and your own computer or VPS passed'),
+                ('Grok Bot is coming soon', 'Grok Bot is coming soon, and Grok Bot passed too', 'Grok Bot has not passed'),
                 ('A driver connects', 'Every driver passes the kit. A driver connects', 'must not say every driver passes'),
                 ('Drivers answer the same four commands', 'Drivers answer 4 words', 'jargon count')):
             with self.subTest(error=error), tempfile.TemporaryDirectory() as temp:

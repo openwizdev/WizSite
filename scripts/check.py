@@ -155,18 +155,32 @@ TODAY = 'What exists today'
 RELEASES = ('<!-- releases:start -->', '<!-- releases:end -->')
 RELEASE_REPOS = ('OpenWiz', 'WizSkills', 'WizLoops')
 # The drivers page (openwiz.dev/drivers, #50; round 3H, #62): boat.dev's spotlight card first, then the other three
-# drivers' compact cards, in this order, each with its status line (the ticket's facts, word for word).
+# drivers' compact cards, in this order, each with its status line (the ticket's facts, word for word). #66's facts
+# (2026-11-20): boat.dev, Cloudroom and your own computer or VPS each passed the kit, five of five; Grok Bot is coming soon.
 DRIVERS_PAGE = 'drivers/index.html'
 DRIVERS_LINKS = ('/drivers/', '/drivers')
 DRIVERS = (
     ('boat-dev', 'boat.dev', 'Passed all five checks', 'passed'),
-    ('vps', 'Your own computer or VPS', 'Being fixed: its kit run is in progress', 'in progress'),
-    ('cloudroom', 'Cloudroom', 'Works today: built real pull requests for OpenWiz; kit run next', 'not yet run'),
+    ('vps', 'Your own computer or VPS', 'Passed the kit on a Linux PC', 'passed'),
+    ('cloudroom', 'Cloudroom', 'Passed the kit, run from a Cloudroom cloud thread against real Cloudroom', 'passed'),
     ('grok-bot', 'Grok Bot', 'Coming soon: listed when its driver lands', 'not yet run'),
 )
 DRIVER_HERO = 'boat-dev'
 # Round 3 final (#66 item 4): the spotlight's clean headline, then the date on its own metadata line under it.
 DRIVER_DATE = 'On a real account, 2026-11-19'
+# #66 facts: the drivers that passed the kit, each with its date and its public evidence; and the one still to come.
+# The spotlight stays boat.dev's, and says under its five checks that the other two passed the same ones.
+DRIVER_PASSED = {
+    'boat-dev': ('2026-11-19', 'https://github.com/openwizdev/OpenWiz/pull/1444'),
+    'cloudroom': ('2026-11-20', 'https://github.com/openwizdev/OpenWiz/pull/1458#issuecomment-7034556153'),
+    'vps': ('2026-11-20', 'https://github.com/openwizdev/OpenWiz/pull/1455#issuecomment-7034588211'),
+}
+DRIVER_COMING = 'grok-bot'
+DRIVER_ALSO = 'Cloudroom and your own computer or VPS passed the same five checks on 2026-11-20.'
+DRIVER_CARD_DATE = 'Kit run, {}'
+# Words that described the three passing drivers before they passed; none may come back anywhere on the page. "not run
+# yet" stays only on Grok Bot's card.
+DRIVER_STALE = re.compile(r'being fixed|works today|kit run next|in progress|not (?:yet )?run(?: yet)?|kit run (?:comes )?next', re.I)
 DRIVER_WORDS = ('version', 'start', 'wake', 'stop')
 KIT_CHECKS = ('version', 'start', 'wake', 'stop', 'token')
 KIT_STATES = ('passed', 'in progress', 'not yet run')
@@ -174,23 +188,25 @@ KIT_STATES = ('passed', 'in progress', 'not yet run')
 # line fits one line at 1440; Cloudroom's status sentence says its kit run comes next, so "works" and "not run yet"
 # never read as a conflict.
 DRIVER_KIT_LINES = {
-    'vps': 'Kit: in progress',
-    'cloudroom': 'Kit: not run yet',
+    'vps': 'Kit: passed, 5 of 5',
+    'cloudroom': 'Kit: passed, 5 of 5',
     'grok-bot': 'Kit: not run yet',
 }
 # #66 item 2: the hero's host pills, in order, each saying in words what works today; every mark sits in one
-# fixed-height slot (Grok Bot has no mark: its name in text).
+# fixed-height slot (Grok Bot has no mark: its name in text). #66 facts: three passed, five of five; Grok Bot is coming.
 HOST_PILLS = (
-    ('vps', 'Your computer or VPS', 'being fixed'),
-    ('cloudroom', 'Cloudroom', 'works today'),
-    ('boat-dev', 'boat.dev', 'passed'),
-    ('grok-bot', 'Grok Bot', 'coming soon'),
+    ('vps', 'Your computer or VPS', 'passed 5 of 5', 'passed'),
+    ('cloudroom', 'Cloudroom', 'passed 5 of 5', 'passed'),
+    ('boat-dev', 'boat.dev', 'passed 5 of 5', 'passed'),
+    ('grok-bot', 'Grok Bot', 'coming soon', 'coming soon'),
 )
-# Every number the page shows comes from these facts: boat.dev's date and the contract's v1. Counts are said in words (#62 item 4).
-DRIVER_NUMBERS = {'2026', '11', '19', '1'}
-# #62 item 4: no jargon counts ("4 words", "5 checks in the kit", "1 passed, 5 of 5"), and the five-of-five result
-# said at most twice on the page: the hero's one link and boat.dev's spotlight.
-DRIVER_JARGON = re.compile(r'\b\d+\s+(?:drivers?|words?|checks?|commands?|passed)\b|\b\d+\s+of\s+\d+\b', re.I)
+# Every number the page shows comes from these facts: the kit dates, the contract's v1 and the kit's result, 5 of 5.
+# Other counts are said in words (#62 item 4).
+DRIVER_NUMBERS = {'2026', '11', '19', '20', '1', '5'}
+# #62 item 4: no jargon counts ("4 words", "5 checks in the kit", "1 passed", "3 of 5"), and the five-of-five result
+# said at most twice in words on the page: the hero's one link and boat.dev's spotlight. #66 facts: the kit's own
+# result, "5 of 5", is the one count shown in digits, in the host pills and the kit lines.
+DRIVER_JARGON = re.compile(r'\b\d+\s+(?:drivers?|words?|checks?|commands?|passed)\b|\b(?!5 of 5\b)\d+\s+of\s+\d+\b', re.I)
 DRIVER_RESULT = re.compile(r'\ball five checks\b|\bfive passed checks\b|\bfive of five\b', re.I)
 DRIVER_RESULT_MAX = 2
 # #62 item 1: what a driver is, in plain words, in the hero above every card: two sentences at most. #66 item 1: under
@@ -216,7 +232,8 @@ DRIVER_MIN_FONT = 12  # px: no drivers-page text smaller
 DRIVER_LABEL_TRACKING = 0.06  # em: the least tracking on an uppercase drivers-page label
 OWN_DRIVER = 'Write your own driver'
 OPENWIZ_REPO = 'https://github.com/openwizdev/OpenWiz'
-DRIVER_DESCRIPTION = 'boat.dev passed all five checks'  # the meta description names the one driver that passed (#59 R2)
+# The meta description names the drivers that passed (#59 R2; #66 facts: all three, and Grok Bot coming soon).
+DRIVER_DESCRIPTION = 'boat.dev, Cloudroom and your own computer or VPS passed all five checks; Grok Bot is coming soon'
 DRIVER_ART_BUDGET = 400_000  # bytes: the drivers page's own art (art/drivers-*.webp)
 
 
@@ -741,6 +758,7 @@ def check_drivers(landing, changelog, drivers, page):
     assert not re.search(r'\b(each|every)\b[^.]*\bpass', description[0], re.I), \
         f'the drivers description must not say every driver passes: {description[0]}'
     assert not DRIVER_JARGON.search(description[0]), f'a jargon count in the drivers description: {description[0]}'
+    assert not re.search(r'grok bot[^.;]*\bpass', description[0], re.I), f'Grok Bot has not passed: {description[0]}'
     assert not page.scripts and not page.inline_scripts, 'the drivers page reads completely without scripts'
     main = re.search(r'<main\b[^>]*>[\s\S]*?</main>', drivers)
     assert main, 'the drivers page needs its main'
@@ -769,6 +787,7 @@ def check_drivers(landing, changelog, drivers, page):
             f'{name}: the compact cards share one header structure (icon or logo, then the name): {heading[1] if heading else None!r}'
     check_driver_proof(main)
     check_host_pills(main)
+    check_driver_results(drivers, main, outline)
     reader = Text(main)
     readings = [reader.joined(), reader.spaced()] + reader.shown
     for reading in readings:
@@ -881,18 +900,60 @@ def check_host_pills(main):
     sits alone in the pill's fixed-height mark slot."""
     marks = re.search(r'<ul class="host-marks"[^>]*>([\s\S]*?)</ul>', main)
     assert marks, 'the hero needs its host pills'
-    pills = re.findall(r'<li data-host="([^"]*)">([\s\S]*?)</li>', marks[1])
+    pills = re.findall(r'<li data-host="([^"]*)" data-state="([^"]*)">([\s\S]*?)</li>', marks[1])
     assert [p[0] for p in pills] == [p[0] for p in HOST_PILLS] and len(pills) == marks[1].count('<li'), \
         f'the host pills, in order: {[p[0] for p in pills]}'
-    for (key, body), (_, name, state) in zip(pills, HOST_PILLS):
+    for (key, kind, body), (_, name, state, want) in zip(pills, HOST_PILLS):
         states = re.findall(r'<span class="host-state">([^<]*)</span>', body)
         assert states == [state], f'the {name} pill says what works today in words, {state!r}: {states}'
+        assert kind == want, f'the {name} pill\'s state is {want!r}: {kind!r}'
         slots = re.findall(r'<span class="host-mark">(<img\b[^>]*>)</span>', body)
         assert len(re.findall(r'<img\b', body)) == len(slots) == (0 if key == DRIVER_GENERIC_ICON[0] else 1), \
             f'the {name} pill\'s mark sits alone in its fixed-height slot: {body.strip()[:120]!r}'
         shown = plain(re.sub(r'<span class="host-state">[^<]*</span>', '', body)) or \
             ' '.join(re.findall(r'\balt="([^"]*)"', body))
         assert shown == name, f'the {name} pill names its host: {shown!r}'
+
+
+def check_driver_results(drivers, main, outline):
+    """#66 facts: boat.dev, Cloudroom and your own computer or VPS are shown as passed everywhere the page states a
+    result (pill, card or spotlight, kit line, date and its public evidence), and Grok Bot never as passed; no word that
+    described them before they passed comes back; boat.dev is never the only one said to have passed."""
+    pills = dict((k, (s, b)) for k, s, b in re.findall(r'<li data-host="([^"]*)" data-state="([^"]*)">([\s\S]*?)</li>', main))
+    cards = {c['id']: c for c in outline.cards}
+    for key, (date, evidence) in DRIVER_PASSED.items():
+        name = cards[key]['name'] if key in cards else key
+        assert pills.get(key, ('',))[0] == 'passed', f'{name} passed the kit: shown as anything but passed in its pill: {pills.get(key)}'
+        card = re.search(rf'<article class="driver[^"]*" id="{key}"[\s\S]*?</article>', main)
+        assert card, f'{name} needs its card'
+        card = card[0]
+        assert re.search(r'^(?:Passed\b)', cards[key]['line']), f'{name} passed the kit: its status sentence says so: {cards[key]["line"]!r}'
+        if key != DRIVER_HERO:
+            assert cards[key]['kit_state'] == 'passed' and re.search(r'<p class="driver-kit passed"', card), \
+                f'{name} passed the kit: shown as anything but passed in its kit line: {cards[key]["kit_state"]!r}'
+            dated = re.findall(r'<p class="driver-date"><a href="([^"]+)">([\s\S]*?)</a></p>', card)
+            assert [(href, plain(text)) for href, text in dated] == [(evidence, DRIVER_CARD_DATE.format(date))], \
+                f'{name}: its card dates its kit run {date}, linked to its public evidence: {dated}'
+        else:
+            assert re.search(rf'<p class="driver-date"><a href="{re.escape(evidence)}">', card), \
+                f'{name}: its spotlight date links to its public evidence {evidence}'
+        assert f'datetime="{date}"' in card, f'{name}: its kit run is dated {date}'
+        stale = DRIVER_STALE.search(plain(card) + ' ' + plain(pills.get(key, ('', ''))[1]))
+        assert not stale, f'{name} passed the kit: no stale state word: {stale[0]!r}'
+    coming = re.search(rf'<article class="driver[^"]*" id="{DRIVER_COMING}"[\s\S]*?</article>', main)
+    assert pills.get(DRIVER_COMING, ('',))[0] == 'coming soon' and coming and cards[DRIVER_COMING]['kit_state'] != 'passed' \
+        and not re.search(r'\bpass', plain(coming[0]) + ' ' + pills[DRIVER_COMING][1], re.I), \
+        f'Grok Bot has not run the kit: never shown as passed'
+    spot = re.search(r'<section class="spotlight[\s\S]*?</section>', main)[0]
+    also = re.findall(r'</ol>\s*<p class="proof-also">([\s\S]*?)</p>', spot)
+    assert [plain(a) for a in also] == [DRIVER_ALSO], \
+        f'boat.dev is one of three: under its five checks, the spotlight says {DRIVER_ALSO!r}: {also}'
+    rest = re.sub(rf'<article class="driver[^"]*" id="{DRIVER_COMING}"[\s\S]*?</article>', '', main)
+    rest = re.sub(rf'<li data-host="{DRIVER_COMING}"[\s\S]*?</li>', '', rest)
+    stale = DRIVER_STALE.search(plain(rest) + ' ' + ' '.join(re.findall(r'content="([^"]*)"', drivers)))
+    assert not stale, f'a stale driver state word on the drivers page: {stale[0]!r}'
+    only = re.search(r'\bonly (?:boat\.dev|one)\b[^.]*\bpass|\bboat\.dev is the only\b', plain(drivers), re.I)
+    assert not only, f'boat.dev is never the only one that passed: {only[0]!r}'
 
 
 def check_driver_token(drivers, main):
