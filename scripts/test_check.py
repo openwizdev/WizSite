@@ -591,6 +591,40 @@ class Checks(unittest.TestCase):
                 with self.assertRaisesRegex(AssertionError, error):
                     check_site(root)
 
+    def test_drivers_nav_and_description(self):
+        # Catches (#59 R1): a Drivers nav link the phone breakpoint hides (display: none, so not shown or focusable at
+        # 390 px) on the landing, the Changelog or the drivers page. Catches (#59 R2): a description saying every driver
+        # passes the kit, when only boat.dev passed 5 of 5.
+        for name in ('index.html', 'changelog/index.html', 'drivers/index.html'):
+            with self.subTest(page=name), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp) / 'dist'
+                shutil.copytree(ROOT / 'dist', root)
+                page = root / name
+                text = page.read_text()
+                self.assertIn('<a class="nav-drivers" href="/drivers/"', text)
+                page.write_text(text.replace('<a class="nav-drivers" href="/drivers/"', '<a class="nav-log" href="/drivers/"', 1))
+                with mock.patch('check.check_drivers'), self.assertRaisesRegex(AssertionError, 'hidden on phones'):
+                    check_site(root)
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / 'dist'
+            shutil.copytree(ROOT / 'dist', root)
+            edit_built(root, 'site.css', lambda t: t + '\n@media (max-width: 480px) { .landing-nav .nav-drivers { display: none; } }\n')
+            with self.assertRaisesRegex(AssertionError, 'hidden on phones'):
+                check_site(root)
+        for old, new, error in (
+                ('boat.dev passed 5 of 5', 'boat.dev passed', 'must say boat.dev passed 5 of 5'),
+                ('Drivers plug', 'Every driver passes the kit. Drivers plug', 'must not say every driver passes')):
+            with self.subTest(error=error), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp) / 'dist'
+                shutil.copytree(ROOT / 'dist', root)
+                page = root / 'drivers/index.html'
+                text = page.read_text()
+                head = text[:text.index('</head>')]
+                self.assertIn(old, head)
+                page.write_text(text.replace(old, new, 1))
+                with self.assertRaisesRegex(AssertionError, error):
+                    check_site(root)
+
     def test_logo_pack(self):
         # Catches: a lockup that ships live text or a font reference (the wordmark font must never ship),
         # an unreviewed icon picture, and a social card URL that points off the site or at a missing file.

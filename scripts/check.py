@@ -179,6 +179,7 @@ DRIVER_LABEL_TRACKING = 0.06  # em: the least tracking on an uppercase drivers-p
 DRIVER_MIN_FONT = 12  # px: no drivers-page text smaller
 OWN_DRIVER = 'Write your own driver'
 OPENWIZ_REPO = 'https://github.com/openwizdev/OpenWiz'
+DRIVER_DESCRIPTION = 'boat.dev passed 5 of 5'  # the page's meta description names the one driver that passed (#59 R2)
 DRIVER_ART_BUDGET = 400_000  # bytes: the drivers page's own art (art/drivers-*.webp)
 
 
@@ -449,6 +450,7 @@ def check_site(root):
     unused = sorted(name for name in drivers_art if f'/{name}' not in (root / DRIVERS_PAGE).read_text())
     assert not unused, f'unused drivers art: {unused}'
     check_drivers(landing, changelog, (root / DRIVERS_PAGE).read_text(), pages[root / DRIVERS_PAGE])
+    check_drivers_nav((root / names['site.css']).read_text(), {name: (root / name).read_text() for name in PAGES})
     check_changelog(landing, changelog)
     check_releases(releases)
     main = re.search(r'<main\b[^>]*>[\s\S]*?</main>', changelog)
@@ -677,6 +679,11 @@ def check_drivers(landing, changelog, drivers, page):
         links = [text for href, text in Outline(top_bar(html)).links if href in DRIVERS_LINKS]
         assert links == ['Drivers'], f'the {name} top bar needs one Drivers nav link: {links}'
     assert re.search(r'<body class="[^"]*\bdrivers-page\b', drivers), 'the drivers page body is scoped .drivers-page'
+    description = re.findall(r'<meta name="description" content="([^"]*)"', drivers)
+    assert len(description) == 1 and DRIVER_DESCRIPTION in description[0], \
+        f'the drivers description must say {DRIVER_DESCRIPTION}: {description}'
+    assert not re.search(r'\b(each|every|all)\b[^.]*\bpass', description[0], re.I), \
+        f'the drivers description must not say every driver passes: {description[0]}'
     assert not page.scripts and not page.inline_scripts, 'the drivers page reads completely without scripts'
     main = re.search(r'<main\b[^>]*>[\s\S]*?</main>', drivers)
     assert main, 'the drivers page needs its main'
@@ -747,6 +754,22 @@ def check_driver_proof(main):
     images = re.findall(r'<img\b[^>]*\bsrc="([^"]+)"', main)
     twice = sorted({src for src in images if images.count(src) > 1})
     assert not twice, f'a picture shown twice on the drivers page: {twice}'
+
+
+def check_drivers_nav(css, pages):
+    """#59 R1: every page's one Drivers nav link stays shown at every width: none of its classes is hidden by a
+    display: none rule inside a media query, so the phone header keeps it visible and focusable."""
+    hidden = set()
+    for block in re.findall(r'@media[^{]*\{((?:[^{}]*\{[^{}]*\})*)[^{}]*\}', css):
+        for selectors, body in re.findall(r'([^{}]+)\{([^{}]*)\}', block):
+            if re.search(r'display\s*:\s*none', body):
+                for selector in selectors.split(','):
+                    hidden.update(re.findall(r'\.([\w-]+)', selector.strip().split()[-1]))
+    for name, html in pages.items():
+        found = re.findall(r'<a ([^>]*)href="/drivers/"[^>]*>Drivers</a>', top_bar(html))
+        assert len(found) == 1, f'the {name} top bar needs one Drivers nav link'
+        classes = set((re.search(r'class="([^"]*)"', found[0]) or [None, ''])[1].split())
+        assert not classes & hidden, f'the {name} Drivers nav link is hidden on phones by {sorted(classes & hidden)}'
 
 
 def check_driver_css(css):
