@@ -962,13 +962,14 @@ async function main() {
       state: 'OPEN', updatedAt: comments[0]?.updatedAt || '2030-01-01T00:00:00Z', comments: { totalCount, nodes: comments }, closedByPullRequestsReferences: { totalCount: 0, nodes: [] } });
     const minutesAgo = n => new Date(Date.now() - n * 60 * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z');
     // Spec 40 as both reads first give it (#42 and #43 working); then only the Agents read comes again, with `later`.
-    const pulseWorld = later => {
+    const pulseWorld = (later, specs = () => {}) => {
       let changed = false;
       const world = ap7World({
         tickets: repository => {
           for (const ticket of repository.s40.subIssues.nodes) for (const c of ticket?.comments?.nodes || []) {
             c.body = c.body.replace('\nstep:', '\nskills: build-ticket@0.1.2\nstep:');
             if (c.databaseId === 9009 || c.databaseId === 9007) c.updatedAt = minutesAgo(5); // working in the Specs read, 5 minutes ago
+            specs(c);
           }
         },
         agents: repository => { if (changed) later(repository); },
@@ -979,11 +980,11 @@ async function main() {
     const idle = `OW.data.feeds.agents.readAt && OW.data.feeds.specs.readAt && OW.data.feeds.specs.data?.specs && !OW.data.feeds.agents.busy && !OW.data.feeds.specs.busy`;
     const pulsing = page => page.run(`[...document.querySelectorAll('main .graph [data-pulse]')].map(c => c.dataset.ticket).sort()`);
     // Open spec 40, see both reads' pulse, then read Agents again (as its two-minute schedule does) and give the pulse.
-    const pulseAfterAgents = async world => {
+    const pulseAfterAgents = async (world, before = ['42', '43']) => {
       const page = await ap6Open(world, '#/specs/40');
       await page.until(`document.querySelectorAll('main .graph [data-ticket]').length === 10 && ${idle}`, 'the ticket graph and both reads');
       const first = await pulsing(page);
-      assert(JSON.stringify(first) === JSON.stringify(['42', '43']), `pulsing before the newer Agents read: ${JSON.stringify(first)}`);
+      assert(JSON.stringify(first) === JSON.stringify(before), `pulsing before the newer Agents read: ${JSON.stringify(first)}`);
       world.later();
       const specsAt = await page.run(`OW.data.feeds.specs.readAt`);
       await page.run(`(() => { OW.data.feeds.agents.readAt = 1; document.dispatchEvent(new Event('visibilitychange')); })()`);
@@ -1010,6 +1011,56 @@ async function main() {
       });
       const [page, now] = await pulseAfterAgents(world);
       assert(JSON.stringify(now) === JSON.stringify(['42']), `pulsing tickets: ${JSON.stringify(now)}`);
+      checkRequestLog(world);
+      await page.close();
+    });
+
+    // Review round 1 of WizSite #41 (R1, R2): reads that overlap, and a newer read whose record authors can't be read.
+    // Both feeds are read again at once; the Specs answer, captured first, is held until the browser has taken the Agents one.
+    const overlapping = async (world, page) => {
+      let release;
+      const held = new Promise(resolve => { release = resolve; });
+      const answer = world.graphql.SpecTickets;
+      world.graphql.SpecTickets = async () => { const captured = await answer(); await held; return captured; };
+      world.later();
+      const agentsAt = await page.run(`OW.data.feeds.agents.readAt`);
+      await page.run(`OW.data.refreshAll()`);
+      await page.until(`OW.data.feeds.agents.readAt > ${agentsAt} && OW.data.feeds.specs.busy`, 'the Agents answer, with Specs still out');
+      release();
+      await page.until(`OW.data.feeds.specs.readAt > OW.data.feeds.agents.readAt && ${idle}`, 'the held Specs answer');
+      world.graphql.SpecTickets = answer;
+    };
+
+    await check('AP17 pulse: an older Specs answer that arrives after a newer Agents read never restores a deleted note', async () => {
+      // catches: snapshots ordered by when the browser took them, so a held Specs answer brings back a note the Agents read showed deleted.
+      const world = pulseWorld(repository => { repository.issues.nodes.unshift(ticketOf(43, [], 0)); });
+      const page = await ap6Open(world, '#/specs/40');
+      await page.until(`document.querySelectorAll('main .graph [data-ticket]').length === 10 && ${idle}`, 'the ticket graph and both reads');
+      await overlapping(world, page);
+      const held = await pulsing(page);
+      assert(JSON.stringify(held) === JSON.stringify(['42']), `pulsing after the held Specs answer: ${JSON.stringify(held)}`);
+      // An Agents read on its own settles the order: the note stays gone.
+      const specsAt = await page.run(`OW.data.feeds.specs.readAt`);
+      await page.run(`(() => { OW.data.feeds.agents.readAt = 1; document.dispatchEvent(new Event('visibilitychange')); })()`);
+      await page.until(`OW.data.feeds.agents.readAt > ${specsAt} && ${idle}`, 'a fresh Agents read');
+      const settled = await pulsing(page);
+      assert(JSON.stringify(settled) === JSON.stringify(['42']), `pulsing after a fresh Agents read: ${JSON.stringify(settled)}`);
+      checkRequestLog(world);
+      await page.close();
+    });
+
+    await check('AP17 pulse: a note first seen in an Agents read without record authors never pulses, as its card is unknown', async () => {
+      // catches: the older Specs read's record authors vouching for a note only the newer, unverifiable Agents read has.
+      const world = pulseWorld(repository => {
+        repository.fleet = null;
+        repository.issues.nodes.unshift(ticketOf(43, [note43(9009, 'working', minutesAgo(1))]));
+      }, c => { if (c.databaseId === 9009) c.body = c.body.replace('state: working', 'state: done'); });
+      const [page, now] = await pulseAfterAgents(world, ['42']);
+      assert(JSON.stringify(now) === JSON.stringify(['42']), `pulsing tickets: ${JSON.stringify(now)}`);
+      await page.go(`${SITE}/app/#/agents`);
+      await page.until(`document.querySelector('main article.card[data-note="9009"]')`, 'the note\'s card');
+      const status = await page.run(`document.querySelector('main article.card[data-note="9009"]').dataset.status`);
+      assert(status === 'unknown', `the note's card says ${status}`);
       checkRequestLog(world);
       await page.close();
     });
