@@ -388,7 +388,7 @@ export async function handle(context, options = {}) {
   let finished = false;
   let release;
   keep(new Promise(resolve => { release = resolve; }));
-  const timer = setTimeout(() => stop(), upstreamTimeout);
+  const timer = setTimeout(() => { stop(); finish(); }, upstreamTimeout);
   function stop() {
     abort.abort();
     reader?.cancel().catch(() => {});
