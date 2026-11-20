@@ -1,6 +1,6 @@
 """Dependency-free checks for this site's literal HTML/CSS and public source."""
 from hashlib import sha256
-from html import unescape
+from html import escape, unescape
 from html.parser import HTMLParser
 from pathlib import Path
 import json
@@ -9,7 +9,13 @@ import subprocess
 from urllib.parse import unquote, urlsplit
 
 ROOT = Path(__file__).resolve().parents[1]
-# Reviewed artwork and the sample spec recording. Pin them after checking the visual content and metadata.
+# J267: the landing's three moments link the real to-do run, in moment order: its grill, its spec, the live app.
+TODO_LINKS = (
+    'https://github.com/openwizdev/todo-demo/issues/1#issuecomment-7037022878',
+    'https://github.com/openwizdev/todo-demo/issues/1',
+    'https://openwizdev.github.io/todo-demo/',
+)
+# Reviewed artwork and the spec video. Pin them after checking the visual content and metadata.
 ART_HASHES = {
     'art/era-2-grill.webp': 'efaf213c3f389c8feb2f9d0436e94b1f9241d0ecf3cc3e793385d34f11cd11dd',
     'art/family-01.webp': '14532efb522eb7129ced9e1093f4b0321b1f00459301f059f2d9b5a8c2a7161f',
@@ -31,9 +37,14 @@ ART_HASHES = {
     'art/hero-renaissance-frames.webp': '04192a312129777ab9b4ee43ea632d04c6b725938b6feb7d134db4fcfdfd4cec',
     'art/hero-samurai-frames.webp': '3a6eef42bfd2fc6f7b8e847d4355d75c283425a274b5fb9c95c3404f580725c5',
     'art/hero-steam-frames.webp': '20f057c963be16ebc3cabbf1d2ab849e2e8144d29a3e419344a867eef2c41f3c',
-    'art/spec-demo.webm': '6619ae77a13229d9056037e5bc793d48f7fc98490d068c2b6e4f58426a8fac22',
+    # The landing's spec video (#70, J267): the to-do app's real spec (openwizdev/todo-demo #1), narrated with captions,
+    # its poster and captions; local voice, no paid service; every frame privacy-scanned.
+    'art/todo-spec.mp4': '52bb1fa94a154e17270f7512db19efcedae921e4769a28742bc8a36093d1c732',
+    'art/todo-spec-poster.webp': '9f68e7ab1f17ea97659a085072500055adcd11c8ffd737231f1db114924dc963',
+    'art/todo-spec.vtt': '47e9ffb41081dd72f541110c43312521a8dd92f1c8e58c11092ecd0daa74eee2',
     # OpenWiz's model config spec video (#1802), off the landing (J267) but still served at its URL for #1802's links.
     'art/spec-video.mp4': 'feb357b9a80453d676123a31285a36c34b5873e102ed58c95728bfd6315bfe16',
+    # The model config video's poster frame and captions (#1405), still served for OpenWiz #1802's links (J267).
     'art/spec-poster.webp': '4922f6d265ed8c0c57dead86a62288c94d97159dda34f95969db0ee42b72fdc4',
     'art/spec-video.vtt': '570f5621ff3d84152587612d1be5d78ba5e0fbf6a7da306088a5897c755dc09d',
     # The drivers page, variant D (#50): the night sea and the Wiz family's ship, painted layers of its hero.
@@ -41,6 +52,8 @@ ART_HASHES = {
     'art/drivers-d-ship.webp': '885dd800aae2e75d45f2b88e1e69232bbf987df44beec9fa8070d4354b64cd04',
     # Round 2F (#56): variant C's painted cutaway of the Wiz crew's ship (#49), beside boat.dev's five checks.
     'art/drivers-c-boat.webp': '39fd43d08aa36bce84e964699d493a03af090499a63dffbfaa43e61804b7e1ef',
+    # Team page round 2 (#81): the boat video's poster frame, linking to the video on X.
+    'art/team-boat-poster.webp': '656c0c75f92a17390beda0d8afb45be3f9164330357635295998406dad3a69d4',
 }
 ART = set(ART_HASHES)
 # Logo pack (#1350: the dark-cream mark). Raster icons and the social card are pinned by hash like the art; a new picture needs review.
@@ -115,14 +128,43 @@ TOP_BAR_END = '  </nav>\n</header>'
 # only value. Until the real link is set it is this in-page placeholder; otherwise it must be an https URL.
 TEAM_PAGE = 'team/index.html'
 BOOK_PLACEHOLDER = '#book'
-TEAM_COPY = ('We set up your agent factory with you.', 'Your repos, your models, your machines. First fleet running in a day.',
-             'Solo builders and small teams.', 'Custom pricing.', 'Book a call')
-# #73: the team page's body after its hero, in order: what you get (three steps), where your agents run, the closing call.
-TEAM_PARTS = ('What you get', 'Where your agents run', 'Questions', 'Plan your factory with us.')
-TEAM_STEPS = ('A call to plan your setup', 'We install OpenWiz with you', 'Your first fleet ships')
+# Team page round 2, design P (#81): the round 1 copy, word for word, with headline A. Round 3, candidate 2 (#89):
+# curly apostrophes, the terms under their label, the timeline in the hero and Proof as three cards.
+TEAM_HEADLINE = 'Book 30 minutes. Leave with a shipped pull request.'
+TEAM_TERMS = ('A small, real change of your choice.',
+              'On a repository with working CI and a signed-in coding agent (Claude Code or Codex).',
+              "If it hasn’t shipped in 30 minutes, Jake stays on until it does.")
+TEAM_TERMS_LABEL = 'How the call works'
+TEAM_SHIPS = 'Ships means a pull request opens on your repo, built by your agents and passing your CI. Merging is your call.'
+TEAM_COPY = ('For solo builders and small teams', TEAM_HEADLINE,
+             'A 30-minute call with Jake, who builds OpenWiz. We connect it to your repo and the coding agent you already '
+             'use, you pick one small change, and your first fleet ships it on your workflow.',
+             *TEAM_TERMS, TEAM_SHIPS,
+             TEAM_TERMS_LABEL, 'Grok Bot: coming soon', 'See how drivers work',
+             'Our Drivers page was built the same way: a fleet of agents drew six designs, a council of judges picked one, '
+             'and it merged in one night.', 'See the Drivers page',
+             'Watch the fleet build it (49 s, on X)',
+             'Solo builders and small teams who already use Claude Code or Codex.', 'Custom pricing. No checkout.', 'Book a call')
+# The hero, then its sections in order: the timeline, proof, who it's for, pricing, the Questions (#76), the closing call.
+# #89: the timeline is the hero's second column, and Proof's first card carries the drivers, so the page has no separate
+# where-your-agents-run section.
+TEAM_PARTS = ('The 30 minutes, roughly', 'Proof', 'Who it’s for', 'Pricing', 'Questions', 'Your first fleet ships on the call.')
+TEAM_STEPS = (('Minute 0', 'We connect your repo and your agents.'),
+              ('Minute 10', 'You answer a few questions about your change.'),
+              ('Minute 20', 'Your agents build it.'), ('Minute 30', 'A pull request ships.'))
+# #89: Proof's first card, the drivers that passed: its heading, what the five checks are (as /drivers/ names them), then
+# each logo (as /drivers/ ships it) with its result under it.
+TEAM_PASSED_HEADING = 'Three drivers passed all five checks'
+TEAM_PASSED_ABOUT = 'The same test for every place your agents run: version, start, wake, stop and token.'
+TEAM_PASSED = ('/drivers/logos/monitor.svg', '/drivers/logos/cloudroom.png', '/drivers/logos/boat-dev.svg')
+TEAM_PASSED_LINE = '5 of 5'
+# The boat video's poster: a picture linking to the X post, never an embedded or hosted video.
+TEAM_POSTER = '/art/team-boat-poster.webp'
+TEAM_POSTER_ALT = 'Wizards on a boat: the fleet that built the Drivers page'
+TEAM_NEVER = re.compile(r'\binstall|\bguarantee', re.I)
 # #1851: Report a problem opens GitHub's new-issue form on openwizdev/openwiz with the feedback template
 # (contracts/feedback-loop.v1.md: .github/ISSUE_TEMPLATE/feedback.yml). The only external URL with a query; nothing
-# else may ride along, so no words leave openwiz.dev. In the footer of every site page, and once in the changelog.
+# else may ride along, so no words leave openwiz.dev. In the footer of every site page.
 REPORT_LINK = 'https://github.com/openwizdev/openwiz/issues/new?template=feedback.yml'
 # The site footer (#73): one snippet, which the build adds at each site page's one slot (not the app's). Its links, in order.
 FOOTER = (ROOT / 'footer.html').read_text()
@@ -143,6 +185,8 @@ FAQ_ON = {'index.html': FAQ, TEAM_PAGE: FAQ, FAQ_PAGE: FAQ_TOP}
 FAQ_TITLE = ('Questions', 'The short ones are here.')
 FAQ_QUESTIONS = ('What is OpenWiz?', 'What is a kernel?', 'What do I need to run it?', 'Where do my agents run?',
                  'Does OpenWiz see my code or my logins?', 'What does it cost?', 'Can you set it up for my team?')
+# #89: the last answer, word for word (the team page's offer).
+FAQ_LAST = 'Yes. Book a 30-minute call. Your first fleet ships on it.'
 
 
 def with_footer(html):
@@ -198,20 +242,24 @@ STORY_COPY = ('Build a to-do app', 'Bring any agent', 'Sign in with GitHub', 'Pu
 OLD_EXAMPLE = ('dark mode', 'dark-mode')
 MOTION_OK = '@media (prefers-reduced-motion:no-preference)'
 PHONE_QUERY = re.compile(r'\(max-width:[0-9]+px\)')
-# The Changelog (#1363): named Changelog everywhere; a small picture of how the repositories fit together opens
-# the page, then one "What exists today" section with one part per public repository, each opening with two or
-# three plain sentences. Private repositories appear at most as "private records and tools". No release entry,
-# version number or date: the old release list stays on GitHub's releases. Its reviewed text is pinned below.
-CHANGELOG_MAIN = '8e7a1d7cd523512fd9463ae6f5a8b31ddb1af1152d3c5828b2839b542cabba0b'
+# The Changelog (#78): named Changelog everywhere; its source page is the title and one line, and nothing else in its
+# main (no version number or date: those come only from the release data). Private repositories are never named.
+# Its reviewed text is pinned below. The repository map and What exists today moved to docs/repos.md.
+CHANGELOG_MAIN = '53ec7d0b87a84daf1ad319c06ed75ea810e35bd269496612631b7d4f5750d1dc'
 CHANGELOG_LINKS = ('/changelog/', '/changelog')
 PUBLIC_REPOS = ('OpenWiz', 'WizSkills', 'WizLoops', 'WizPlugins', 'WizSite')
 PUBLIC_WIZ_NAMES = set(PUBLIC_REPOS) | {'WizBar'}  # WizBar is WizPlugins' plugin, not a repository
-TODAY = 'What exists today'
-# The generated Releases section (#1364): build.mjs adds it last in the Changelog's main, between these markers, from
-# each versioned repository's published release notes. The page's reviewed rules and pin apply without it; the
-# section has its own rules (check_releases), one part per versioned repository, in this order.
+# The generated entries (#78): build.mjs adds them last in the Changelog's main, between these markers, from one data
+# file per public release in RELEASE_DIR. check_release_data checks each file; check_releases checks the built section
+# against them and the landing's install switch: no entry until it reads live (RL2), then every entry, newest first.
 RELEASES = ('<!-- releases:start -->', '<!-- releases:end -->')
-RELEASE_REPOS = ('OpenWiz', 'WizSkills', 'WizLoops')
+RELEASE_DIR = ROOT / 'changelog/releases'
+RELEASE_FIELDS = ('name', 'semver', 'date', 'headline', 'bullets', 'notes')
+RELEASE_BULLETS = (1, 6)  # a human-readable number: about 2 to 5, never none and never more than 6
+RELEASE_BULLET_MAX = 120  # characters
+RELEASE_HEADLINE_MAX = 80  # characters: one line
+PRE_RELEASES = 'https://github.com/openwizdev/OpenWiz/releases'
+MONTHS = ('Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec')
 # The drivers page (openwiz.dev/drivers, #50; round 3H, #62): boat.dev's spotlight card first, then the other three
 # drivers' compact cards, in this order, each with its status line (the ticket's facts, word for word). #66's facts
 # (2026-11-20): boat.dev, Cloudroom and your own computer or VPS each passed the kit, five of five; Grok Bot is coming soon.
@@ -305,6 +353,8 @@ class Page(HTMLParser):
         self.buttons = []
         self.images = []
         self.videos = []
+        self.tracks = []
+        self.links = []
         self.inline_scripts = 0
         self.books = []
         self.x_links = 0
@@ -341,6 +391,10 @@ class Page(HTMLParser):
             self.images.append(attrs)
         if tag == 'video':
             self.videos.append(attrs)
+        if tag == 'track':
+            self.tracks.append(attrs)
+        if tag == 'a':
+            self.links.append(attrs)
         if tag == 'script' and not attrs.get('src'):
             self.inline_scripts += 1
         # Only references the browser applies: an enabled stylesheet for all media, a script of a runnable type.
@@ -452,6 +506,9 @@ def check_ref(root, source, ref, pages, favicons=()):
         assert ref in ('/favicon.ico', '/favicon.svg', '/app/icon.ico', '/app/icon.svg'), 'unexpected favicon'
     url = urlsplit(ref)
     if url.scheme or url.netloc:
+        # The to-do run the landing's moments follow (J267): only its exact grill, spec and live app links.
+        if ref in TODO_LINKS:
+            return
         assert url.scheme == 'https' and url.netloc == 'github.com', 'unexpected external URL'
         assert re.match(r'^/openwizdev/(?:openwiz|OpenWiz|WizSkills|WizPlugins)(?:/|$)', url.path), 'unexpected repository link'
         assert not url.username and not url.password and not url.query, 'unexpected external URL parts'
@@ -482,7 +539,13 @@ def check_site(root):
     assert not page.inline_scripts, 'landing motion must wait for both external scripts'
     assert len(page.videos) == 1, 'expected one spec recording'
     clip = page.videos[0]
-    assert clip.get('preload') == 'none' and 'autoplay' not in clip and 'hidden' in clip, 'spec recording must be opt-in'
+    # The spec video (#1405) loads only when it first plays, and site.js starts it muted inline, never with sound;
+    # its poster, default captions and a plain link to the video show without any script.
+    assert clip.get('preload') == 'none' and 'autoplay' not in clip, 'spec recording must be opt-in'
+    assert 'muted' in clip and 'playsinline' in clip, 'spec video must start muted inline'
+    assert clip.get('poster', '').removeprefix('/') in ART, 'spec video needs a pinned poster'
+    assert any(t.get('kind') == 'captions' and 'default' in t and t.get('src', '').removeprefix('/') in ART for t in page.tracks), 'spec video needs default captions'
+    assert any(a.get('href') == clip.get('src') and 'hidden' not in a for a in page.links), 'needs a plain link to the spec video'
     for attrs in page.buttons:
         if attrs.get('class') in ('demo-pause', 'spec-play'):
             assert 'hidden' in attrs, 'motion controls must wait for both scripts'
@@ -500,12 +563,13 @@ def check_site(root):
         # The social card: an absolute URL on the site that resolves to a built file.
         assert page.social and all(s.startswith(SITE_URL) and s.removeprefix(SITE_URL).split('?')[0] in STATIC for s in page.social), 'social image must be a built file on the site'
         assert path == root / TEAM_PAGE or not page.books, f'a booking link outside the team page: {path.name}'
-        assert page.x_links == 1, f'one X link per page, the footer\'s: {path.relative_to(root)} has {page.x_links}'
+        # #81: the team page's boat poster links to the X post too, beside the footer's X link.
+        x_links = 2 if path == root / TEAM_PAGE else 1
+        assert page.x_links == x_links, f'one X link per page, the footer\'s: {path.relative_to(root)} has {page.x_links}'
         for ref in page.refs:
             check_ref(root, path, ref, pages, page.favicons)
         # After check_ref, so a changed Report a problem URL is refused as an external URL first.
-        wanted = 2 if path == root / 'changelog/index.html' else 1
-        assert page.report_links == wanted, f'Report a problem link: {path.relative_to(root)} has {page.report_links}, not {wanted}'
+        assert page.report_links == 1, f'Report a problem link: {path.relative_to(root)} has {page.report_links}, not 1'
         for ref in css_refs(path.read_text()):
             check_ref(root, path, ref, pages)
     for path in root.glob('*.css'):
@@ -553,7 +617,15 @@ def check_site(root):
     captions = re.findall(r'<h3>([^<]+)</h3>', landing)
     assert tuple(captions) == moments, 'the three moments must appear in order'
     assert 'Steer the build from the narrated video.' in flat, 'spec video steering copy is missing'
-    assert 'Silent sample' in flat, 'the landing clip must be labeled as a silent sample'
+    assert 'The real spec of an OpenWiz-built to-do app' in flat, 'the spec video must say it is the to-do app\'s real spec'
+    # J267: the three moments point at the real to-do run: its grill, its spec and the live app.
+    hrefs = {}
+    # Comments hide markup from visitors, so a commented-out card or link counts as missing.
+    for block in re.findall(r'<li[^>]*>\s*(?:<div class="moment-screen|<video).*?</li>', re.sub(r'<!--.*?-->', '', landing, flags=re.S), re.S):
+        found = Page(block)
+        hrefs[re.search(r'<h3>([^<]+)</h3>', block)[1]] = {a.get('href') for a in found.links}
+    for card, link in zip(moments, TODO_LINKS):
+        assert link in hrefs.get(card, ()), f'the {card} moment must link the real to-do run: {link}'
     # Owner cuts (round 6): obvious notes stay off the page.
     for text in ('Illustration, not live data', 'Building in public'):
         assert text.lower() not in flat.lower(), f'cut copy is back: {text}'
@@ -588,7 +660,7 @@ def check_site(root):
     check_drivers(landing, changelog, (root / DRIVERS_PAGE).read_text(), pages[root / DRIVERS_PAGE])
     check_drivers_nav((root / names['site.css']).read_text(), {name: (root / name).read_text() for name in PAGES})
     check_changelog(landing, changelog)
-    check_releases(releases)
+    check_releases(releases, read_releases(), install_switch(landing) == 'live')
     check_team({name: (root / name).read_text() for name in PAGES}, {name: pages[root / name] for name in PAGES})
     check_footer({name: (root / name).read_text() for name in PAGES})
     check_faq({name: (root / name).read_text() for name in PAGES}, {name: pages[root / name] for name in PAGES}, names)
@@ -689,8 +761,9 @@ def check_install(landing, page):
 
 
 def check_changelog(landing, changelog):
-    """The Changelog's name, its picture first, one What exists today with a part per public repository, and no
-    release history. `landing` and `changelog` are the two pages' HTML."""
+    """The Changelog's name, and its source page: the title, one line, and nothing else in its main; no version number
+    or date there, and no private repository named. `landing` and `changelog` are the two pages' HTML (the Changelog
+    without its generated section)."""
     home = Outline(landing)
     labels = [text for href, text in home.links if href in CHANGELOG_LINKS]
     assert labels == ['Changelog', 'Changelog'], f'the landing nav and footer must each link the Changelog: {labels}'
@@ -701,41 +774,28 @@ def check_changelog(landing, changelog):
             assert not re.search(r'ship\s*log', reading, re.I), 'the page is called Changelog, never ship log'
     page = Outline(changelog)
     assert page.title == 'Changelog — OpenWiz', 'the changelog page title must be Changelog'
-    items = page.items
-    kinds = [kind for kind, _, _ in items]
-    assert kinds[:1] == ['h1'] and items[0][2] == 'Changelog', 'the changelog heading must be Changelog'
-    today = [i for i, (kind, _, text) in enumerate(items) if kind == 'h2' and text == TODAY]
-    assert len(today) == 1 and kinds.count('h2') == 1, f'exactly one {TODAY} section'
-    figures = [i for i, kind in enumerate(kinds) if kind == 'figure']
-    # Right after the heading (and its lead, which the outline doesn't list), before anything else.
-    assert figures == [1] and today[0] > 1 and 'repo-map' in (items[1][1].get('class') or '').split(), 'the repository picture opens the page, before What exists today'
-    svg = [attrs for kind, attrs, _ in items if kind == 'svg']
-    assert len(svg) == 1 and svg[0].get('role') == 'img' and (svg[0].get('aria-label') or '').strip(), 'the picture is one labelled SVG'
-    parts = [i for i, kind in enumerate(kinds) if kind == 'part']
-    assert parts and parts[0] > today[0], 'the repository parts sit inside What exists today'
-    names = []
-    for at, end in zip(parts, parts[1:] + [len(items)]):
-        body = items[at + 1:end]
-        assert [k for k, _, _ in body[:2]] == ['h3', 'intro'], 'each part opens with its repository heading, then its plain lines'
-        name = body[0][2].split()[0] if body[0][2] else ''
-        assert name in PUBLIC_REPOS, f'a part names a repository that is not public: {name!r}'
-        count = len(sentences(body[1][2]))
-        assert 2 <= count <= 3, f'{name} opens with {count} sentences, not two or three'
-        names.append(name)
-    assert sorted(names) == sorted(PUBLIC_REPOS), f'one part per public repository: {names}'
+    kinds = [kind for kind, _, _ in page.items]
+    assert kinds[:1] == ['h1'] and page.items[0][2] == 'Changelog', 'the changelog heading must be Changelog'
+    assert kinds == ['h1'], f'the changelog is its title, one line and the release entries, nothing else: {kinds}'
     main = re.search(r'<main\b[^>]*>([\s\S]*?)</main>', changelog)[1]
+    assert len(re.findall(r'<p class="lead">', main)) == 1 and re.fullmatch(r'<h1>Changelog</h1><p class="lead">[^<]*</p>', main), \
+        'the changelog is its title, one line and the release entries, nothing else'
+    check_public_names(main)
     reader = Text(main)
-    readings = [reader.joined(), reader.spaced()] + reader.attrs
-    for reading in readings:
-        # Fail closed: every Wiz name is a public one. Text read joined can run a name into the next name or
-        # into a lowercase word, never into a capital: "WizSkillsthe" passes, "WizVault" and "WizSiteOps" fail.
-        public = '(?:' + '|'.join(sorted(PUBLIC_WIZ_NAMES)) + ')+(?:[a-z][A-Za-z]*)?'
-        for name in re.findall(r'\bWiz[A-Z][A-Za-z]*', reading):
-            assert re.fullmatch(public, name), f'a private repository is named; say "private records and tools": {name}'
-        assert not re.search(r'\d+\.\d+|\b(?:19|20)\d\d\b', reading), 'no version number or date on the changelog'
-    assert not re.search(r'<time\b|releases/tag/|class="rel"', main), 'no release entry on the changelog'
+    for reading in [reader.joined(), reader.spaced()] + reader.attrs:
+        assert not re.search(r'\d+\.\d+|\b(?:19|20)\d\d\b', reading), 'no version number or date outside the release entries'
     for style in page.styles:
         check_motion(style)
+
+
+def check_public_names(html):
+    """Fail closed: every Wiz name is a public one. Text read joined can run a name into the next name or into a
+    lowercase word, never into a capital: "WizSkillsthe" passes, "WizVault" and "WizSiteOps" fail."""
+    reader = Text(html)
+    public = '(?:' + '|'.join(sorted(PUBLIC_WIZ_NAMES)) + ')+(?:[a-z][A-Za-z]*)?'
+    for reading in [reader.joined(), reader.spaced()] + reader.attrs:
+        for name in re.findall(r'\bWiz[A-Z][A-Za-z]*', reading):
+            assert re.fullmatch(public, name), f'a private repository is named; say "private records and tools": {name}'
 
 
 class DriverOutline(HTMLParser):
@@ -1074,19 +1134,68 @@ def check_team(htmls, pages):
         url = urlsplit(href)
         assert url.scheme == 'https' and url.netloc and not url.username and not url.password, f'the booking link must be https: {href}'
     flat = re.sub(r'\s+', ' ', unescape(re.sub(r'<[^>]*>', ' ', htmls[TEAM_PAGE])))
-    for text in TEAM_COPY:
-        assert text in flat, f'missing team page copy: {text}'
     assert not re.search(r'[$€£]\s*\d|\bper (?:month|seat|user)\b', flat, re.I), 'the team page shows no price'
     labels = re.findall(r'<a [^>]*data-book[^>]*>([^<]*)</a>', htmls[TEAM_PAGE])
     assert labels == ['Book a call', 'Book a call'], f'team page copy: both booking links read Book a call: {labels}'
-    parts = [plain(h) for h in re.findall(r'<h2\b[^>]*>([\s\S]*?)</h2>', htmls[TEAM_PAGE].split('<footer', 1)[0])]
+    main = htmls[TEAM_PAGE].split('<footer', 1)[0]
+    parts = [plain(h) for h in re.findall(r'<h2\b[^>]*>([\s\S]*?)</h2>', main)]
     assert parts == list(TEAM_PARTS), f'the team page sections, in order: {parts}'
-    steps = re.search(r'<ol class="team-steps">([\s\S]*?)</ol>', htmls[TEAM_PAGE])
-    assert steps and [plain(h) for h in re.findall(r'<h3>([\s\S]*?)</h3>', steps[1])] == list(TEAM_STEPS), \
-        f'What you get: its three steps, in order: {TEAM_STEPS}'
-    run = re.search(r'<ul class="team-drivers">([\s\S]*?)</ul>', htmls[TEAM_PAGE])
-    assert run and re.findall(r'href="([^"]*)"', run[1]) and set(re.findall(r'href="([^"]*)"', run[1])) == {'/drivers/'}, \
-        'Where your agents run: its drivers link to /drivers/'
+    h1 = re.findall(r'<h1\b[^>]*>([\s\S]*?)</h1>', main)
+    assert [plain(h) for h in h1] == [TEAM_HEADLINE], f'the team page headline: {h1}'
+    # #81: the hero holds the headline, the first Book a call and the three terms right under it, under their label (#89).
+    # #89: its second column is the timeline; the poster is in Proof.
+    hero = re.search(r'<div class="team wrap">([\s\S]*?)\n</div>\n', main)
+    assert hero, 'the team page needs its hero'
+    hero = hero[1]
+    terms = re.search(r'<ul class="team-terms"[^>]*>([\s\S]*?)</ul>', hero)
+    assert terms and [plain(t) for t in re.findall(r'<li>([\s\S]*?)</li>', terms[1])] == list(TEAM_TERMS), \
+        f'the terms: three exact lines right under the hero button: {TEAM_TERMS}'
+    assert hero.index('data-book') < hero.index('class="team-terms"'), 'the terms: under the first Book a call'
+    label = re.search(r'<p class="team-label" id="([^"]+)">([^<]*)</p>\s*<ul class="team-terms" aria-labelledby="([^"]+)"', hero)
+    assert label and label[2] == TEAM_TERMS_LABEL and label[1] == label[3], f'the terms: under their label, {TEAM_TERMS_LABEL}'
+    assert 'wizes' not in plain(hero).lower(), 'no Wizes in the team hero'
+    assert 'class="team-steps"' in hero and hero.index('class="team-terms"') < hero.index('class="team-steps"'), \
+        'the timeline: in the hero, after the terms'
+    assert 'x.com' not in hero and '<img' not in hero, 'the hero shows no poster: it is in Proof'
+    proof = re.search(r'<section class="team-part wrap" aria-labelledby="team-proof">([\s\S]*?)</section>', main)
+    assert proof, 'Proof: its section'
+    proof = proof[1]
+    cards = re.findall(r'<li class="team-card">([\s\S]*?)</li>\n', proof)
+    assert len(cards) == 3 and proof.count('<li') == 3, f'Proof: three cards: {len(cards)}'
+    passed = re.fullmatch(r'\s*<h3>([^<]*)</h3>\s*<p>([^<]*)</p>\s*<div class="team-logos">([\s\S]*?)</div>\s*'
+                          r'<p class="team-soon">Grok Bot: coming soon</p>\s*<a href="/drivers/">See how drivers work</a>\s*', cards[0])
+    logos = re.findall(r'<img\b[^>]*src="([^"]*)"[^>]*>\s*(?:<span>[^<]*</span>\s*)?<small>([^<]*)</small>', passed[3]) if passed else []
+    assert passed and (passed[1], passed[2]) == (TEAM_PASSED_HEADING, TEAM_PASSED_ABOUT) \
+        and [src for src, _ in logos] == list(TEAM_PASSED) and all(line == TEAM_PASSED_LINE for _, line in logos), \
+        f'Proof: the first card: {TEAM_PASSED_HEADING}, what the checks are, the three drivers\u2019 logos with ' \
+        f'{TEAM_PASSED_LINE} under each, Grok Bot coming soon and See how drivers work, to /drivers/'
+    built = re.fullmatch(r'\s*<p>([^<]*)</p>\s*<a href="/drivers/">See the Drivers page</a>\s*', cards[1])
+    assert built and built[1].startswith('Our Drivers page was built the same way'), \
+        'Proof: the second card says how the Drivers page was built, with its one link, See the Drivers page'
+    poster = re.findall(r'<a [^>]*href="https://x\.com/openwiz"[^>]*>([\s\S]*?)</a>', cards[2])
+    images = [dict(re.findall(r'([a-z-]+)="([^"]*)"', img)) for img in re.findall(r'<img\b[^>]*>', poster[0])] if len(poster) == 1 else []
+    assert len(images) == 1 and images[0].get('src') == TEAM_POSTER and images[0].get('alt') == TEAM_POSTER_ALT \
+        and images[0].get('width') == '1280' and images[0].get('height') == '720' and images[0].get('loading') == 'lazy', \
+        f'the boat poster: Proof\u2019s third card, one sized, lazy picture linking to the X post: {images}'
+    assert 'Watch the fleet build it (49 s, on X)' in plain(poster[0]), 'the boat poster: its label is its caption'
+    assert not re.search(r'<(?:video|iframe|embed|object|details)\b', main.replace(FAQ, '')), 'the team page embeds no video and folds nothing away'
+    steps = re.search(r'<ol class="team-steps">([\s\S]*?)</ol>', main)
+    found = re.findall(r'<li( class="team-end")?><h3>([\s\S]*?)</h3><p>([\s\S]*?)</p></li>', steps[1]) if steps else []
+    assert [(plain(m), plain(t)) for _, m, t in found] == list(TEAM_STEPS), f'The 30 minutes, roughly: its four marks, in order: {TEAM_STEPS}'
+    assert [bool(end) for end, _, _ in found] == [False, False, False, True] and steps[1].count('team-end') == 1, \
+        'The 30 minutes, roughly: Minute 30 is its one highlighted stop'
+    ships = re.search(r'</ol>\s*<p class="team-ships">([\s\S]*?)</p>', main)
+    assert ships and plain(ships[1]) == TEAM_SHIPS, 'the ships line: right under the timeline'
+    # This page's own copy, without the shared Questions (#76), which check_faq owns.
+    own = main.replace(FAQ, '')
+    shown = re.sub(r'\s+', ' ', unescape(re.sub(r'<[^>]*>', ' ', own)))
+    assert not TEAM_NEVER.search(shown), f'a word the team page never uses: {TEAM_NEVER.search(shown)[0]}'
+    assert "'" not in shown and "'" not in ' '.join(re.findall(r'aria-label="([^"]*)"', own)), \
+        'the team page uses curly apostrophes'
+    assert not re.search(r'\bhidden\b|aria-hidden', own.split('<main', 1)[1]), 'the team page hides none of its copy'
+    # Last, so a broken part above fails on its own line first: the rest of the round 1 copy, word for word.
+    for text in TEAM_COPY:
+        assert text in flat, f'missing team page copy: {text}'
 
 
 def check_footer(htmls):
@@ -1132,6 +1241,7 @@ def check_faq(htmls, pages, names):
         assert plain(answer), f'a question without its answer: {plain(question)}'
         for href in re.findall(r'href="([^"]*)"', answer):
             assert href.startswith('/'), f'an answer links off the site: {href}'
+    assert rows and plain(rows[-1][3]) == FAQ_LAST, f'the Questions\u2019 last answer: {FAQ_LAST}'
     assert not re.search(r'<(?:form|input|textarea)\b', FAQ), 'part 1 asks nothing: no form or input in the Questions'
 
 
@@ -1204,55 +1314,121 @@ def split_releases(built):
     return before + after, section
 
 
+def install_switch(landing):
+    found = re.findall(r'<div class="install-box" data-install="([^"]*)"', landing)
+    assert len(found) == 1, 'the landing needs exactly one install box switch'
+    return found[0]
+
+
+def read_releases(folder=RELEASE_DIR):
+    """Every release data file, checked, as {file name: data}."""
+    files = sorted(folder.glob('*.json'))
+    assert sorted(p.name for p in folder.iterdir()) == [p.name for p in files], f'only release data files in {folder.name}/'
+    out = {}
+    for path in files:
+        try:
+            data = json.loads(path.read_text())
+        except ValueError as error:
+            raise AssertionError(f'{path.name}: not JSON: {error}') from None
+        check_release_data(path.name, data)
+        out[path.name] = data
+    names = [d['name'] for d in out.values()]
+    versions = [d['semver'] for d in out.values()]
+    assert len(set(names)) == len(names) and len(set(versions)) == len(versions), 'each release once'
+    return out
+
+
+def semver(text):
+    return tuple(map(int, text.split('.')))
+
+
+def check_release_data(file, data):
+    """One release: its public name (also the file name), semver from 0.1.0 on, date, a one-line headline, a short
+    list of plain bullets (1 to 6, each at most 120 characters) and the link to its full notes on GitHub."""
+    assert isinstance(data, dict), f'{file}: one release object'
+    missing = [k for k in RELEASE_FIELDS if k not in data or data[k] in (None, '', [])]
+    assert not missing, f'{file}: missing {", ".join(missing)}'
+    assert sorted(data) == sorted(RELEASE_FIELDS), f'{file}: unexpected fields {sorted(set(data) - set(RELEASE_FIELDS))}'
+    text = [data[k] for k in RELEASE_FIELDS if k != 'bullets']
+    assert all(isinstance(v, str) for v in text) and isinstance(data['bullets'], list), f'{file}: fields are text, bullets a list'
+    assert re.fullmatch(r'0\.\d\d|[1-9]\d*\.\d\d', data['name']) and file == f'{data["name"]}.json', \
+        f'{file}: the public name is like 0.01 and names the file'
+    assert re.fullmatch(r'\d+\.\d+\.\d+', data['semver']) and semver(data['semver']) >= (0, 1, 0), f'{file}: semver from 0.1.0 on'
+    assert re.fullmatch(r'20\d\d-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])', data['date']), f'{file}: date as YYYY-MM-DD'
+    assert len(data['headline']) <= RELEASE_HEADLINE_MAX and '\n' not in data['headline'], f'{file}: a one-line headline'
+    bullets = data['bullets']
+    low, high = RELEASE_BULLETS
+    assert low <= len(bullets) <= high, f'{file}: {len(bullets)} bullets; a short list of {low} to {high}'
+    for bullet in bullets:
+        assert isinstance(bullet, str) and bullet.strip(), f'{file}: an empty bullet'
+        assert len(bullet) <= RELEASE_BULLET_MAX, f'{file}: a bullet over {RELEASE_BULLET_MAX} characters: {bullet[:40]}...'
+        assert '\n' not in bullet, f'{file}: one line per bullet'
+    assert data['notes'] == f'https://github.com/openwizdev/OpenWiz/releases/tag/v{data["semver"]}', \
+        f'{file}: the notes link is the release on GitHub, https://github.com/openwizdev/OpenWiz/releases/tag/v{data["semver"]}'
+    check_public_names(escape(' '.join(text + bullets)))  # data is text: escaped, as the page shows it
+
+
 class ReleaseOutline(HTMLParser):
-    """The generated section's tags, heading, and each part's repository, entry titles and state."""
+    """The generated section's tags, its entries (name, small line, date, headline, bullets, links) and its last line."""
     def __init__(self, text):
         super().__init__(convert_charrefs=True)
-        self.tags, self.h2, self.parts, self.reading = [], [], [], None
+        self.tags, self.entries, self.pre, self.at = [], [], None, None
         self.feed(text)
 
     def handle_starttag(self, tag, attrs):
         attrs = dict(attrs)
         classes = (attrs.get('class') or '').split()
         self.tags.append((tag, attrs))
-        if 'release-part' in classes:
-            self.parts.append({'repo': attrs.get('data-repo'), 'titles': [], 'states': []})
-        elif self.parts and tag == 'p' and ({'no-release', 'read'} & set(classes)):
-            self.parts[-1]['states'].append('no-release' if 'no-release' in classes else 'missing')
-        if tag in ('h2', 'h4'):
-            self.reading = [tag, '']
-
-    def handle_data(self, data):
-        if self.reading:
-            self.reading[1] += data
+        if tag == 'article':
+            self.entries.append({'name': '', 'small': '', 'date': None, 'headline': '', 'bullets': [], 'links': []})
+        elif tag == 'p' and 'pre' in classes:
+            self.pre = {'text': '', 'links': []}
+        if tag == 'time' and self.entries:
+            self.entries[-1]['date'] = attrs.get('datetime')
+        if tag == 'a':
+            (self.pre or self.entries[-1])['links'].append(attrs.get('href'))
+        if tag == 'li':
+            self.entries[-1]['bullets'].append('')
+        self.at = 'small' if tag == 'small' else 'name' if tag == 'h2' else 'headline' if 'headline' in classes else 'li' if tag == 'li' else self.at
 
     def handle_endtag(self, tag):
-        if self.reading and self.reading[0] == tag:
-            text = re.sub(r'\s+', ' ', self.reading[1]).strip()
-            (self.h2 if tag == 'h2' else self.parts[-1]['titles'] if self.parts else self.h2).append(text)
-            self.reading = None
+        if tag in ('h2', 'small', 'p', 'li'):
+            self.at = 'name' if tag == 'small' else None
+
+    def handle_data(self, data):
+        if self.pre is not None:
+            self.pre['text'] += data
+        elif self.at == 'li':
+            self.entries[-1]['bullets'][-1] += data
+        elif self.at:
+            self.entries[-1][self.at] += data
 
 
-def check_releases(section):
-    """The generated Releases section: one part per versioned repository in order, each with its releases newest
-    first or exactly one of "no release yet" and missing; release notes are text only."""
+def check_releases(section, releases, live):
+    """The generated entries: none until the landing's install switch reads live, then one per release file, newest
+    first by semver, each exactly its data; then one line pointing at the earlier pre-releases on GitHub."""
     outline = ReleaseOutline(section)
-    assert outline.h2 == ['Releases'], 'the generated section is headed Releases'
-    assert [p['repo'] for p in outline.parts] == list(RELEASE_REPOS), f'one release part per versioned repository: {[p["repo"] for p in outline.parts]}'
-    allowed = {'section', 'h2', 'h3', 'h4', 'span', 'p', 'article', 'time', 'div', 'ul', 'li', 'code', 'strong'}
+    allowed = {'section': {'class', 'aria-label'}, 'article': {'class', 'aria-labelledby'}, 'h2': {'id'}, 'small': set(),
+               'time': {'datetime'}, 'p': {'class'}, 'ul': set(), 'li': set(), 'a': {'href'}}
     for tag, attrs in outline.tags:
-        assert tag in allowed, f'unexpected element in the generated releases: {tag}'
-        assert set(attrs) <= {'class', 'id', 'data-repo', 'aria-labelledby', 'datetime'}, f'unexpected attribute in the generated releases: {sorted(attrs)}'
-    for part in outline.parts:
-        repo, titles, states = part['repo'], part['titles'], part['states']
-        assert bool(titles) != bool(states) and len(states) <= 1, f'{repo}: releases, or one of no release yet and missing'
-        versions = []
-        for title in titles:
-            found = re.fullmatch(rf'{repo} (\d+)\.(\d+)\.(\d+)', title)
-            assert found, f'{repo}: unexpected release title {title!r}'
-            versions.append(tuple(map(int, found.groups())))
-        assert versions == sorted(versions, reverse=True) and len(set(versions)) == len(versions), f'{repo}: releases newest first, each once'
-        assert all(v >= (0, 1, 0) for v in versions), f'{repo}: releases from 0.1.0 on'
+        assert tag in allowed, f'unexpected element in the release entries: {tag}'
+        assert set(attrs) <= allowed[tag], f'unexpected attribute in the release entries: {tag} {sorted(attrs)}'
+    assert outline.tags[:1] == [('section', {'class': 'releases', 'aria-label': 'Releases'})], 'the entries sit in one Releases section'
+    want = sorted(releases.values(), key=lambda d: semver(d['semver']), reverse=True) if live else []
+    assert len(outline.entries) == len(want), f'{len(outline.entries)} entries shown; the data and the install switch say {len(want)}'
+    for got, data in zip(outline.entries, want):
+        flat = lambda t: re.sub(r'\s+', ' ', t).strip()
+        y, m, d = map(int, data['date'].split('-'))
+        assert (flat(got['name']), flat(got['small'])) == (data['name'], f'· {MONTHS[m - 1]} {d}, {y} ({data["semver"]})'), \
+            f'{data["name"]}: the entry is headed by its public name, its date and semver small beside it, newest first'
+        assert got['date'] == data['date'], f'{data["name"]}: the entry\'s date'
+        assert flat(got['headline']) == data['headline'], f'{data["name"]}: the entry\'s headline'
+        assert [flat(b) for b in got['bullets']] == data['bullets'], f'{data["name"]}: the entry\'s bullets'
+        assert got['links'] == [data['notes']], f'{data["name"]}: one link, to the full notes on GitHub'
+    assert outline.pre and outline.pre['links'] == [PRE_RELEASES], 'the entries end with one line linking the pre-releases on GitHub'
+    if not want:
+        # Never claim an unreleased version: before the switch reads live, the line alone, with no version or date.
+        assert not re.search(r'\d+\.\d+|\b(?:19|20)\d\d\b', Text(section).joined()), 'no release version shows before the install switch reads live'
 
 
 def check_app(root, names, pages):
@@ -1289,10 +1465,8 @@ def check_art(name, data):
         check_webp(data)
     elif name.endswith('.vtt'):
         assert data.startswith(b'WEBVTT') and data.decode('utf-8'), 'invalid WebVTT captions'
-    elif name.endswith('.mp4'):
-        assert data[4:8] == b'ftyp' and data[8:12] in (b'isom', b'mp42'), 'invalid MP4 header'
     else:
-        assert data[:4] == b'\x1a\x45\xdf\xa3' and b'webm' in data[:64], 'invalid WebM header'
+        assert data[4:8] == b'ftyp' and data[8:12] in (b'isom', b'mp42'), 'invalid MP4 header'
     assert not any(marker.encode() in data.lower() for marker in DENYLIST), f'private marker in {name}'
 
 
@@ -1304,7 +1478,7 @@ def check_privacy(path, data):
         assert sha256(data).hexdigest() == FONT_HASHES[font], 'unreviewed font or licence'
     if path.endswith('.woff2'):
         assert font in FONT_HASHES, 'unreviewed binary font'
-    if path.endswith(('.webp', '.webm', '.mp4', '.vtt')):
+    if path.endswith(('.webp', '.mp4', '.vtt')):
         check_art(font, data)
     if path.endswith(('.png', '.ico')):
         pinned = DOC_HASHES.get(path) or ICON_HASHES.get(font) or DRIVER_LOGOS.get(font, (None,))[0]
@@ -1314,7 +1488,7 @@ def check_privacy(path, data):
         check_vector(data)
     if font in DRIVER_LOGOS:
         assert sha256(data).hexdigest() == DRIVER_LOGOS[font][0], f'a drivers logo changed bytes: {path}'
-    binary = path.endswith(('.webp', '.webm', '.mp4', '.png', '.ico')) or (font in FONT_HASHES and font.endswith('.woff2'))
+    binary = path.endswith(('.webp', '.mp4', '.png', '.ico')) or (font in FONT_HASHES and font.endswith('.woff2'))
     text = path + '\n' + ('' if binary else data.decode('utf-8'))
     # The owner's copy rule covers every text file, this checker included (it builds the word from parts).
     assert not any(word in text.lower() for word in BANNED_COPY), f'banned word in {path}'

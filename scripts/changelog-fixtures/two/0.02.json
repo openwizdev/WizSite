@@ -1,0 +1,8 @@
+{
+  "name": "0.02",
+  "semver": "0.1.10",
+  "date": "2031-02-03",
+  "headline": "Two <em>things</em>.",
+  "bullets": ["Lists <script>sample</script> threads & specs.", "Another.", "Costs $$ and keeps $& and $1 as typed, with averyveryverylongidentifierthatmustwrapatthreehundredtwentypixels."],
+  "notes": "https://github.com/openwizdev/OpenWiz/releases/tag/v0.1.10"
+}

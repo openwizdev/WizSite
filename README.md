@@ -32,7 +32,8 @@ Then open http://127.0.0.1:8800.
 
 - **The landing page** (`index.html`) shows one build, start to finish, with the Wiz crew.
 - **The app** (`app/`) reads GitHub's API from your browser through the read-only [OpenWiz Viewer](https://github.com/apps/openwiz-viewer) GitHub App. It never writes. The sign-in helper (`functions/`) swaps GitHub's code for your token and hands it straight back.
-- **The Changelog** (`changelog/`) says what exists today, and lists every release of OpenWiz, WizSkills and WizLoops, read from GitHub at build time.
+- **The Changelog** (`changelog/`) lists what each public release lets you do, newest first, from one data file per release in `changelog/releases/`.
+- **The repositories:** how they fit together and what each one does is in [docs/repos.md](docs/repos.md).
 - **Deploy:** Cloudflare Pages builds `main`. Changes merge after green CI and a review from another model family.
 
 The full build, check and deploy notes are in [docs/maintaining.md](docs/maintaining.md).

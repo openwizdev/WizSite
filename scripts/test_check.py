@@ -1,13 +1,15 @@
 """Synthetic negative cases for link/resource and privacy gates; no browser tools."""
 from pathlib import Path
+import json
 import shutil
+import subprocess
 import tempfile
 import unittest
 from unittest import mock
 
 import re
 
-from check import CTA, FAQ, FOOTER, FINGERPRINTS, HASHED, INSTALL_SWITCH, ROOT, Page, check_changelog, check_releases, split_releases, check_motion, check_privacy, check_ref, check_site, check_vector, check_webp, fingerprint
+from check import CTA, FAQ, FOOTER, FINGERPRINTS, HASHED, INSTALL_SWITCH, ROOT, Page, check_changelog, check_release_data, check_releases, read_releases, split_releases, check_motion, check_privacy, check_ref, check_site, check_vector, check_webp, fingerprint
 
 
 def edit_built(root, name, change):
@@ -27,21 +29,33 @@ def edit_built(root, name, change):
 # A synthetic landing and changelog, valid as they stand; each case below plants one break.
 LANDING = ('<html><head><title>OpenWiz</title></head><body><header><nav><a href="/changelog/">Changelog</a></nav></header>'
            '<main><h1>Bring your own everything.</h1></main><footer><a href="/changelog/">Changelog</a></footer></body></html>')
-PART = ('<section class="part" id="{id}"><h3>{name} <span>openwizdev/{name}</span></h3>'
-        '<p class="intro">{name} is one part. It does one thing.</p><ul><li>One thing works.</li></ul></section>')
-CHANGELOG = ('<html><head><title>Changelog — OpenWiz</title><style>.part{color:red}</style></head><body><main id="main">'
-             '<h1>Changelog</h1><p class="lead">How the repositories fit together.</p>'
-             '<figure class="repo-map"><svg role="img" aria-label="OpenWiz in the middle; private records and tools aside" viewBox="0 0 10 10"><text>OpenWiz</text></svg></figure>'
-             '<section class="today"><h2>What exists today</h2>'
-             + ''.join(PART.format(id=n.lower(), name=n) for n in ('OpenWiz', 'WizSkills', 'WizLoops', 'WizPlugins', 'WizSite'))
-             + '</section></main></body></html>')
+CHANGELOG = ('<html><head><title>Changelog — OpenWiz</title><style>.release{color:red}</style></head><body><main id="main">'
+             '<h1>Changelog</h1><p class="lead">What each public release lets you do.</p></main></body></html>')
+# Two synthetic releases (#78), their data and their built section, newest first.
+DATA = {
+    '0.01.json': {'name': '0.01', 'semver': '0.1.2', 'date': '2031-01-02', 'headline': 'One thing.',
+                  'bullets': ['First line.', 'Second line.'], 'notes': 'https://github.com/openwizdev/OpenWiz/releases/tag/v0.1.2'},
+    '0.02.json': {'name': '0.02', 'semver': '0.1.10', 'date': '2031-02-03', 'headline': 'Two things.',
+                  'bullets': ['A <b> line & more.', 'Another.', 'Costs $$ and keeps $& as typed.'], 'notes': 'https://github.com/openwizdev/OpenWiz/releases/tag/v0.1.10'},
+}
+ENTRY = ('<article class="release" aria-labelledby="v{id}"><h2 id="v{id}">{name} <small>· <time datetime="{date}">{day}</time> ({semver})</small></h2>'
+         '<p class="headline">{headline}</p><ul>{bullets}</ul><p class="notes"><a href="{notes}">Full notes on GitHub</a></p></article>')
+PRE = 'https://github.com/openwizdev/OpenWiz/releases'
+LIVE = ('<section class="releases" aria-label="Releases">'
+        + ENTRY.format(id='0-02', name='0.02', date='2031-02-03', day='Feb 3, 2031', semver='0.1.10', headline='Two things.',
+                       bullets='<li>A &lt;b&gt; line &amp; more.</li><li>Another.</li><li>Costs $$ and keeps $&amp; as typed.</li>', notes=DATA['0.02.json']['notes'])
+        + ENTRY.format(id='0-01', name='0.01', date='2031-01-02', day='Jan 2, 2031', semver='0.1.2', headline='One thing.',
+                       bullets='<li>First line.</li><li>Second line.</li>', notes=DATA['0.01.json']['notes'])
+        + f'<p class="pre">Earlier pre-releases are on <a href="{PRE}">GitHub</a>.</p></section>')
+SOON = f'<section class="releases" aria-label="Releases"><p class="pre">No public release yet. The pre-releases are on <a href="{PRE}">GitHub</a>.</p></section>'
 
-RELEASE = '<article class="release"><h4>{repo} {v}</h4><p class="released">Released <time datetime="2031-01-01">2031-01-01</time></p><div class="notes"><ul><li><code>x</code> <strong>y</strong></li></ul></div></article>'
-RELEASES = ('<section class="releases" id="releases" aria-labelledby="releases-h"><h2 id="releases-h">Releases</h2><p class="note">Generated.</p>'
-            '<section class="release-part" id="openwiz-releases" data-repo="OpenWiz"><h3>OpenWiz <span>openwizdev/OpenWiz</span></h3>'
-            + RELEASE.format(repo='OpenWiz', v='0.1.10') + RELEASE.format(repo='OpenWiz', v='0.1.2') + '</section>'
-            '<section class="release-part" id="wizskills-releases" data-repo="WizSkills"><h3>WizSkills</h3><p class="no-release">No release yet.</p></section>'
-            '<section class="release-part" id="wizloops-releases" data-repo="WizLoops"><h3>WizLoops</h3><p class="missing read">Missing.</p></section></section>')
+
+def with_switch(state):
+    """The built Changelog as the build writes it when the landing's install switch reads `state`."""
+    built = (ROOT / 'dist/changelog/index.html').read_text()
+    section = subprocess.run(['node', str(ROOT / 'scripts/changelog.mjs'), '--switch', state], capture_output=True, text=True, check=True).stdout
+    before, rest = built.split('<!-- releases:start -->')
+    return before + '<!-- releases:start -->' + section + '<!-- releases:end -->' + rest.split('<!-- releases:end -->')[1]
 
 
 class Checks(unittest.TestCase):
@@ -174,7 +188,16 @@ class Checks(unittest.TestCase):
                 (lambda t: t.replace('<h3>Watch your spec</h3>', '<h3>Watch it ship</h3>'), 'three moments'),
                 (lambda t: t.replace('<h3>Watch it ship</h3>', '<h3>Approve the plan</h3><h3>Watch it ship</h3>'), 'three moments'),
                 (lambda t: t.replace('Steer the build from the narrated video.', 'Watch the video.'), 'steering copy'),
-                (lambda t: t.replace('>Silent sample</p>', '>Spec video</p>'), 'labeled as a silent sample'),
+                (lambda t: t.replace('The real spec of an OpenWiz-built to-do app', 'A sample spec'), "to-do app's real spec"),
+                # Catches: a moment that loses, comments out or mistargets its link to the real to-do run (J267).
+                (lambda t: t.replace('<a class="moment-link" href="https://github.com/openwizdev/todo-demo/issues/1#issuecomment-7037022878">See its questions</a>', ''), 'Answer a few questions moment must link'),
+                (lambda t: t.replace('issuecomment-7037022878', 'issuecomment-7037022879'), 'unexpected repository link'),
+                (lambda t: t.replace('<a class="moment-link" href="https://github.com/openwizdev/todo-demo/issues/1">the spec</a>', '<!-- <a class="moment-link" href="https://github.com/openwizdev/todo-demo/issues/1">the spec</a> -->'), 'Watch your spec moment must link'),
+                (lambda t: t.replace('<a class="moment-link" href="https://openwizdev.github.io/todo-demo/">Open the to-do app</a>', ''), 'Watch it ship moment must link'),
+                (lambda t: t.replace('https://openwizdev.github.io/todo-demo/', 'https://openwizdev.github.io/other/'), 'unexpected external URL'),
+                (lambda t: t.replace('https://github.com/openwizdev/todo-demo/issues/1"', 'https://github.com/openwizdev/todo-demo/issues/2"'), 'unexpected repository link'),
+                (lambda t: re.sub(r'(<li>\s*<div class="moment-screen chat-screen">.*?</li>)', r'<!-- \1 -->', t, count=1, flags=re.S), 'Answer a few questions moment must link'),
+                (lambda t: re.sub(r'(<li>\s*<div class="moment-screen ship-screen">.*?</li>)', r'<!-- \1 -->', t, count=1, flags=re.S), 'Watch it ship moment must link'),
                 (lambda t: t.replace('</main>', '<p>Add a dark mode toggle</p></main>'), 'old example'),
                 (lambda t: t.replace('Oil painting of Wiz scholars studying a to-do list', ''), 'painting without a description')):
             with self.subTest(error=error), tempfile.TemporaryDirectory() as temp:
@@ -229,63 +252,114 @@ class Checks(unittest.TestCase):
             with self.subTest(changelog=error), self.assertRaisesRegex(AssertionError, error):
                 check_changelog(LANDING, changelog)
 
-    def test_changelog_picture_parts_and_no_history(self):
-        # Catches: the picture missing, unlabelled or after What exists today; a second section of the same
-        # kind; a repository part without its two or three opening sentences, missing, or doubled; a private
-        # repository named; and a release entry, version number or date coming back.
-        figure = CHANGELOG[CHANGELOG.index('<figure'):CHANGELOG.index('</figure>') + 9]
-        no_figure = CHANGELOG.replace(figure, '')
-        wizsite = PART.format(id='wizsite', name='WizSite')
+    def test_changelog_is_its_title_one_line_and_entries(self):
+        # Catches (#78): the repository picture, What exists today or any other section back on the page; a second
+        # line; a private repository named; a version number or date written into the page instead of the data.
         for changelog, error in (
-                (no_figure, 'picture opens the page'),
-                (no_figure.replace('</section></main>', figure + '</section></main>'), 'picture opens the page'),
-                (CHANGELOG.replace(' aria-label="OpenWiz in the middle; private records and tools aside"', ''), 'labelled SVG'),
-                (CHANGELOG.replace('</section></main>', '<h2>What exists today</h2></section></main>'), 'exactly one What exists today'),
-                (CHANGELOG.replace('<h2>What exists today</h2>', '<h2>Coming soon</h2>'), 'exactly one What exists today'),
-                (CHANGELOG.replace('WizSite is one part. It does one thing.', 'WizSite is one part.'), 'not two or three'),
-                (CHANGELOG.replace('WizSite is one part. It does one thing.', 'One. Two. Three. Four.'), 'not two or three'),
-                (CHANGELOG.replace('<p class="intro">WizSite', '<p>WizSite'), 'plain lines'),
-                (CHANGELOG.replace(wizsite, ''), 'one part per public repository'),
-                (CHANGELOG.replace(wizsite, wizsite + wizsite.replace('id="wizsite"', 'id="again"')), 'one part per public repository'),
-                (CHANGELOG.replace(wizsite, PART.format(id='wizvault', name='WizVault')), 'not public'),
-                (CHANGELOG.replace('One thing works.', 'WizVault keeps the scores.'), 'private repository is named'),
-                (CHANGELOG.replace('One thing works.', 'Wiz<b>Room</b> keeps the scores.'), 'private repository is named'),
-                (CHANGELOG.replace('One thing works.', 'WizSiteOps deploys it.'), 'private repository is named'),
-                (CHANGELOG.replace('One thing works.', 'Released in 0.0.12.'), 'version number or date'),
-                (CHANGELOG.replace('One thing works.', 'Shipped on Nov 16, 2026.'), 'version number or date'),
-                (CHANGELOG.replace('One thing works.', '<time datetime="x">Last week</time>'), 'no release entry'),
-                (CHANGELOG.replace('One thing works.', '<a href="https://github.com/openwizdev/OpenWiz/releases/tag/vX">Notes</a>'), 'no release entry'),
-                (CHANGELOG.replace('.part{color:red}', '.part{transition:opacity .2s}'), 'motion outside')):
+                (CHANGELOG.replace('</main>', '<figure class="repo-map"><svg role="img" aria-label="x"></svg></figure></main>'), 'nothing else'),
+                (CHANGELOG.replace('</main>', '<h2>What exists today</h2></main>'), 'nothing else'),
+                (CHANGELOG.replace('</main>', '<section class="part"><h3>OpenWiz</h3></section></main>'), 'nothing else'),
+                (CHANGELOG.replace('</main>', '<p class="lead">Again.</p></main>'), 'nothing else'),
+                (CHANGELOG.replace('</main>', '<ul><li>More.</li></ul></main>'), 'nothing else'),
+                (CHANGELOG.replace('lets you do.', 'lets you do in WizVault.'), 'private repository is named'),
+                (CHANGELOG.replace('lets you do.', 'lets you do in Wiz<b>Room</b>.'), 'private repository is named|nothing else'),
+                (CHANGELOG.replace('lets you do.', 'lets you do, since 0.01.'), 'version number or date'),
+                (CHANGELOG.replace('lets you do.', 'lets you do, since 2026.'), 'version number or date'),
+                (CHANGELOG.replace('.release{color:red}', '.release{transition:opacity .2s}'), 'motion outside')):
             with self.subTest(error=error, at=changelog[-120:]), self.assertRaisesRegex(AssertionError, error):
                 check_changelog(LANDING, changelog)
 
+    def test_release_data(self):
+        # Catches (#78): a release file with no bullets, more than 6, an empty bullet or one over 120 characters; a
+        # missing, non-GitHub or wrong-version notes link; a missing field or an extra one; a public name that doesn't
+        # name its file; a semver before 0.1.0; a bad date; a multi-line headline; a private repository named.
+        for name, data in DATA.items():
+            check_release_data(name, data)
+        one = DATA['0.01.json']
+        for change, error in (
+                ({'bullets': []}, 'missing bullets'),
+                ({'bullets': ['Line.'] * 7}, '7 bullets'),
+                ({'bullets': ['Line.', '']}, 'empty bullet'),
+                ({'bullets': ['Line.', 'x' * 121]}, 'over 120 characters'),
+                ({'bullets': ['Line.', 'Two\nlines.']}, 'one line per bullet'),
+                ({'bullets': ['Line.', 'Runs on WizVault.']}, 'private repository is named'),
+                ({'bullets': ['Line.', 'Runs on <WizVault>.']}, 'private repository is named'),
+                ({'headline': 'Runs on <b>WizVault</b>.'}, 'private repository is named'),
+                ({'notes': ''}, 'missing notes'),
+                ({'notes': None}, 'missing notes'),
+                ({'notes': 'https://example.com/v0.1.2'}, 'notes link'),
+                ({'notes': 'https://github.com/openwizdev/OpenWiz/releases/tag/v0.1.3'}, 'notes link'),
+                ({'headline': ''}, 'missing headline'),
+                ({'headline': 'x' * 81}, 'one-line headline'),
+                ({'name': '0.02'}, 'names the file'),
+                ({'name': 'v1'}, 'names the file'),
+                ({'semver': '0.0.17', 'notes': 'https://github.com/openwizdev/OpenWiz/releases/tag/v0.0.17'}, 'from 0.1.0'),
+                ({'date': 'Nov 21'}, 'YYYY-MM-DD'),
+                ({'bullets': 'One line.'}, 'bullets a list'),
+                ({'extra': 'x'}, 'unexpected fields')):
+            with self.subTest(error=error), self.assertRaisesRegex(AssertionError, error):
+                check_release_data('0.01.json', {**one, **change})
+        missing = dict(one)
+        del missing['notes']
+        with self.assertRaisesRegex(AssertionError, 'missing notes'):
+            check_release_data('0.01.json', missing)
+        with tempfile.TemporaryDirectory() as temp:
+            folder = Path(temp)
+            for name, data in DATA.items():
+                (folder / name).write_text(json.dumps(data))
+            self.assertEqual(read_releases(folder), DATA)
+            (folder / '0.03.json').write_text(json.dumps({**one, 'name': '0.03'}))
+            with self.assertRaisesRegex(AssertionError, 'each release once'):
+                read_releases(folder)
+            (folder / '0.03.json').write_text('{')
+            with self.assertRaisesRegex(AssertionError, 'not JSON'):
+                read_releases(folder)
+            (folder / '0.03.json').unlink()
+            (folder / 'notes.md').write_text('x')
+            with self.assertRaisesRegex(AssertionError, 'only release data files'):
+                read_releases(folder)
+        # The shipped data passes.
+        read_releases()
+
     def test_generated_releases(self):
-        # catches: a build without the generated section, or with it twice or outside main; a part missing, renamed
-        # or out of order; releases out of version order or repeated; a part showing both releases and a state, or
-        # nothing; and markup from release notes (a link, a script, an inline handler) reaching the page.
-        page = CHANGELOG.replace('</main>', '<!-- releases:start -->' + RELEASES + '<!-- releases:end --></main>')
-        self.assertEqual(split_releases(page), (CHANGELOG, RELEASES))
-        check_releases(RELEASES)
+        # catches (#78): a build without the generated section, or with it twice or outside main; an entry shown
+        # before the install switch reads live (an unreleased version claimed); an entry missing, extra, out of
+        # version order or differing from its data; a second link; the pre-releases line missing; and markup
+        # (a script, an inline handler, an image) reaching the entries.
+        page = CHANGELOG.replace('</main>', '<!-- releases:start -->' + LIVE + '<!-- releases:end --></main>')
+        self.assertEqual(split_releases(page), (CHANGELOG, LIVE))
+        check_releases(LIVE, DATA, True)
+        check_releases(SOON, DATA, False)
+        check_releases(SOON, {}, True)
         for built in (CHANGELOG, page.replace('</main>', '</main><!-- releases:start --><!-- releases:end -->'),
                       page.replace('<!-- releases:end --></main>', '<!-- releases:end --><p>after</p></main>')):
             with self.subTest(built=built[-80:]), self.assertRaises(AssertionError):
                 split_releases(built)
-        for section, error in (
-                (RELEASES.replace('>Releases<', '>Ship<'), 'headed Releases'),
-                (RELEASES.replace('data-repo="WizLoops"', 'data-repo="WizVault"'), 'per versioned repository'),
-                (RELEASES.replace('data-repo="WizSkills"', 'data-repo="X"').replace('data-repo="OpenWiz"', 'data-repo="WizSkills"').replace('data-repo="X"', 'data-repo="OpenWiz"'), 'per versioned repository'),
-                (RELEASES.replace('0.1.10', '0.1.1'), 'newest first'),
-                (RELEASES.replace('0.1.10', '0.1.2'), 'newest first'),
-                (RELEASES.replace('0.1.10', '0.0.9').replace('0.1.2', '0.0.8'), 'from 0.1.0'),
-                (RELEASES.replace('<p class="no-release">No release yet.</p>', ''), 'one of no release yet and missing'),
-                (RELEASES.replace('<p class="missing read">Missing.</p>', '<p class="missing read">Missing.</p><p class="no-release">No.</p>'), 'one of'),
-                (RELEASES.replace('<p class="no-release">No release yet.</p>', RELEASE.format(repo='WizSkills', v='1.0.0') + '<p class="no-release">No.</p>'), 'one of'),
-                (RELEASES.replace('<h4>OpenWiz 0.1.2</h4>', '<h4>WizSkills 0.1.2</h4>'), 'unexpected release title'),
-                (RELEASES.replace('<strong>y</strong>', '<a href="https://example.com/">y</a>'), 'unexpected element'),
-                (RELEASES.replace('<strong>y</strong>', '<script>y</script>'), 'unexpected element'),
-                (RELEASES.replace('<strong>y</strong>', '<strong onclick="y()">y</strong>'), 'unexpected attribute')):
-            with self.subTest(error=error), self.assertRaisesRegex(AssertionError, error):
-                check_releases(section)
+        first, second = LIVE.removeprefix('<section class="releases" aria-label="Releases">').split('</article>')[:2]
+        for section, live, error in (
+                (LIVE, False, 'entries shown'),
+                (SOON, True, 'entries shown'),
+                (SOON.replace('No public release yet.', 'OpenWiz 0.01 is coming.'), False, 'no release version'),
+                (SOON.replace('No public release yet.', 'Nov 21, 2026.'), False, 'no release version'),
+                (LIVE.replace(first + '</article>', ''), True, 'entries shown'),
+                (LIVE.replace(second + '</article>', second + '</article>' + second + '</article>'), True, 'entries shown'),
+                (LIVE.replace(first + '</article>', '').replace(second + '</article>', second + '</article>' + first + '</article>'), True, 'newest first'),
+                (LIVE.replace('(0.1.10)', '(0.1.11)'), True, 'newest first'),
+                (LIVE.replace('Feb 3, 2031', 'Feb 4, 2031'), True, 'newest first'),
+                (LIVE.replace('datetime="2031-02-03"', 'datetime="2031-02-04"'), True, "entry's date"),
+                (LIVE.replace('Two things.', 'Two things!'), True, "entry's headline"),
+                (LIVE.replace('<li>Another.</li>', ''), True, "entry's bullets"),
+                (LIVE.replace('<li>Another.</li>', '<li>Another.</li><li>Extra.</li>'), True, "entry's bullets"),
+                (LIVE.replace('Full notes on GitHub</a>', 'Full notes</a> <a href="/">here</a>'), True, 'one link'),
+                (LIVE.replace(DATA['0.02.json']['notes'], PRE), True, 'one link'),
+                (LIVE.replace('<p class="pre">Earlier pre-releases are on <a href="' + PRE + '">GitHub</a>.</p>', ''), True, 'pre-releases'),
+                (LIVE.replace(f'<a href="{PRE}">', '<a href="https://github.com/openwizdev/OpenWiz">'), True, 'pre-releases'),
+                (LIVE.replace('<li>Another.</li>', '<li><script>x</script></li>'), True, 'unexpected element'),
+                (LIVE.replace('<li>Another.</li>', '<li><img src="/x.png"></li>'), True, 'unexpected element'),
+                (LIVE.replace('<p class="headline">', '<p class="headline" onclick="x()">'), True, 'unexpected attribute'),
+                (LIVE.replace('<section class="releases" aria-label="Releases">', '<section class="releases">'), True, 'one Releases section')):
+            with self.subTest(error=error, live=live), self.assertRaisesRegex(AssertionError, error):
+                check_releases(section, DATA, live)
 
     def test_landing_starts_in_still_mode(self):
         # Catches: an early inline script, a visible broken motion control or an autoplaying clip.
@@ -296,6 +370,25 @@ class Checks(unittest.TestCase):
                  'motion controls must wait'),
                 (lambda t: t.replace('preload="none"', 'preload="none" autoplay', 1),
                  'recording must be opt-in')):
+            with self.subTest(error=error), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp) / 'dist'
+                shutil.copytree(ROOT / 'dist', root)
+                landing = root / 'index.html'
+                text = landing.read_text()
+                changed = change(text)
+                self.assertNotEqual(changed, text)
+                landing.write_text(changed)
+                with self.assertRaisesRegex(AssertionError, error):
+                    check_site(root)
+
+    def test_spec_video_poster_captions_and_link(self):
+        # Catches: the spec video losing its poster, captions, plain link or lazy, muted inline start (#1405).
+        for change, error in (
+                (lambda t: re.sub(r' poster="[^"]*"', '', t, count=1), 'spec video needs a pinned poster'),
+                (lambda t: re.sub(r'<track [^>]*>', '', t, count=1), 'spec video needs default captions'),
+                (lambda t: t.replace('class="spec-link"', 'class="spec-link" hidden', 1), 'plain link to the spec video'),
+                (lambda t: t.replace(' muted', '', 1), 'spec video must start muted inline'),
+                (lambda t: t.replace('preload="none"', 'preload="auto"', 1), 'recording must be opt-in')):
             with self.subTest(error=error), tempfile.TemporaryDirectory() as temp:
                 root = Path(temp) / 'dist'
                 shutil.copytree(ROOT / 'dist', root)
@@ -408,10 +501,12 @@ class Checks(unittest.TestCase):
         for state in INSTALL_SWITCH:
             switch = f'data-install="{state}"'
             variant = text.replace(f'data-install="{shipped[0]}"', switch)
+            changelog = with_switch(state)  # the Changelog's entries follow the same switch (#78)
             with self.subTest(state=state), tempfile.TemporaryDirectory() as temp:
                 root = Path(temp) / 'dist'
                 shutil.copytree(ROOT / 'dist', root)
                 (root / 'index.html').write_text(variant)
+                (root / 'changelog/index.html').write_text(changelog)
                 check_site(root)  # either value keeps every other rule
             breaks = [
                 (line, line.replace('github.com/openwizdev/OpenWiz', 'https://github.com/openwizdev/OpenWiz')),
@@ -438,6 +533,7 @@ class Checks(unittest.TestCase):
                     root = Path(temp) / 'dist'
                     shutil.copytree(ROOT / 'dist', root)
                     (root / 'index.html').write_text(variant.replace(good, bad, 1))
+                    (root / 'changelog/index.html').write_text(changelog)
                     with self.assertRaises(AssertionError):
                         check_site(root)
 
@@ -499,14 +595,50 @@ class Checks(unittest.TestCase):
             'unexpected external URL': ('team/index.html', lambda t: t.replace('</main>', '<img src="https://cal.com/openwiz-jake/setup" alt=""></main>', 1)),
             'two booking links ': ('team/index.html', lambda t: t.replace('</main>', '<a data-book href="https://cal.com/openwiz-jake/setup">Again</a></main>', 1)),
             'two booking links  ': ('team/index.html', lambda t: re.sub(r'<a class="team-book" data-book[^>]*>Book a call</a>\n</section>', '</section>', t)),
+            'two booking links   ': ('team/index.html', lambda t: re.sub(r'<a class="team-book" id="book" data-book[^>]*>Book a call</a>', '<span id="book"></span>', t)),
             'shows no price': ('team/index.html', lambda t: t.replace('Custom pricing.', 'Custom pricing. From $99 per month.', 1)),
             'team page copy': ('team/index.html', lambda t: t.replace('>Book a call</a>', '>Talk</a>')),
             'team page copy ': ('team/index.html', lambda t: t.replace('>Book a call</a>', '>Talk</a>', 1)),
-            # #73: the team page's body after its hero.
-            'the team page sections': ('team/index.html', lambda t: t.replace('>Where your agents run</h2>', '>Hosts</h2>', 1)),
-            'the team page sections ': ('team/index.html', lambda t: re.sub(r'<section class="team-part wrap" aria-labelledby="team-get">[\s\S]*?</section>\n', '', t)),
-            'three steps': ('team/index.html', lambda t: t.replace('<li><h3>Your first fleet ships</h3><p>A real change, in a day.</p></li>', '', 1)),
-            'link to /drivers/': ('team/index.html', lambda t: t.replace('<li><a href="/drivers/">Cloudroom</a></li>', '<li>Cloudroom</li><li><a href="/">x</a></li>', 1)),
+            'missing team page copy': ('team/index.html', lambda t: t.replace(' No checkout.', '', 1)),
+            # #81, design P: the hero's headline, terms, ships line and poster, then the timeline and the sections.
+            'the team page headline': ('team/index.html', lambda t: t.replace('Leave with a shipped pull request.', 'Leave with a pull request.', 1)),
+            'the terms': ('team/index.html', lambda t: re.sub(r'<ul class="team-terms"[^>]*>[\s\S]*?</ul>', '', t)),
+            'the terms ': ('team/index.html', lambda t: t.replace('<li>A small, real change of your choice.</li>', '', 1)),
+            'the terms: under the first Book a call': ('team/index.html', lambda t: re.sub(
+                r'(<a class="team-book" id="book"[^>]*>Book a call</a>)\s*(<p class="team-label"[\s\S]*?</ul>)', r'\2\1', t)),
+            'the ships line': ('team/index.html', lambda t: re.sub(r'<p class="team-ships">[\s\S]*?</p>', '', t)),
+            'hides none of its copy': ('team/index.html', lambda t: t.replace('<ul class="team-terms" aria-labelledby="team-how">', '<ul class="team-terms" aria-labelledby="team-how" hidden>', 1)),
+            'folds nothing away': ('team/index.html', lambda t: t.replace('<ol class="team-steps">', '<details><summary>Timeline</summary><ol class="team-steps">', 1).replace('</ol>', '</ol></details>', 1)),
+            'embeds no video': ('team/index.html', lambda t: t.replace('</main>', '<video src="/art/spec-video.mp4" preload="none"></video></main>', 1)),
+            'the boat poster': ('team/index.html', lambda t: t.replace(' loading="lazy"', '', 1)),
+            'the boat poster|one X link per page': ('team/index.html', lambda t: t.replace('href="https://x.com/openwiz" class="team-poster"', 'href="/drivers/" class="team-poster"', 1)),
+            'the boat poster: its label': ('team/index.html', lambda t: t.replace('Watch the fleet build it (49 s, on X)', 'Watch it', 1)),
+            'no Wizes in the team hero': ('team/index.html', lambda t: t.replace('For solo builders and small teams</p>', 'For solo builders and small teams. Wizes!</p>', 1)),
+            'never uses: install': ('team/index.html', lambda t: t.replace('No checkout.', 'No checkout. We install it.', 1)),
+            'never uses: guarantee': ('team/index.html', lambda t: t.replace('No checkout.', 'No checkout. We guarantee it.', 1)),
+            'the team page sections': ('team/index.html', lambda t: t.replace('<h2>Pricing</h2>', '<h2>Prices</h2>', 1)),
+            'the team page sections ': ('team/index.html', lambda t: re.sub(r'<section class="team-when"[\s\S]*?</section>\n', '', t)),
+            'four marks': ('team/index.html', lambda t: t.replace('<li class="team-end"><h3>Minute 30</h3><p>A pull request ships.</p></li>', '', 1)),
+            'four marks ': ('team/index.html', lambda t: t.replace('<h3>Minute 10</h3>', '<h3>Minute 15</h3>', 1)),
+            # #89, candidate 2: the terms' label, the timeline in the hero, Minute 30 highlighted, Proof's three cards.
+            'the terms: under their label': ('team/index.html', lambda t: re.sub(r'<p class="team-label"[^>]*>How the call works</p>\s*', '', t, count=1)),
+            'the terms: under their label ': ('team/index.html', lambda t: t.replace('>How the call works</p>', '>How it works</p>', 1)),
+            'the timeline: in the hero': ('team/index.html', lambda t: re.sub(r'(\n  <section class="team-when"[\s\S]*?</section>)(\n</div>\n)', r'\2\1\n', t, count=1)),
+            'the hero shows no poster': ('team/index.html', lambda t: t.replace('<p class="team-kicker">', '<img src="/art/team-boat-poster.webp" alt="" width="1280" height="720"><p class="team-kicker">', 1)),
+            'Minute 30 is its one highlighted stop': ('team/index.html', lambda t: t.replace('<li class="team-end">', '<li>', 1)),
+            'Minute 30 is its one highlighted stop ': ('team/index.html', lambda t: t.replace('<li><h3>Minute 0</h3>', '<li class="team-end"><h3>Minute 0</h3>', 1)),
+            'curly apostrophes': ('team/index.html', lambda t: t.replace('No checkout.', "No checkout. It's quick.", 1)),
+            'curly apostrophes ': ('team/index.html', lambda t: t.replace('aria-label="Who it\u2019s for and pricing"', 'aria-label="Who it\'s for and pricing"', 1)),
+            'Proof: three cards': ('team/index.html', lambda t: re.sub(r'<li class="team-card">\s*<p>Our Drivers page[\s\S]*?</li>\n', '', t, count=1)),
+            'Proof: the first card': ('team/index.html', lambda t: t.replace('<small>5 of 5</small>', '', 1)),
+            'Proof: the first card   ': ('team/index.html', lambda t: t.replace('<h3>Three drivers passed all five checks</h3>', '<h3>Three drivers passed</h3>', 1)),
+            'Proof: the first card    ': ('team/index.html', lambda t: t.replace('version, start, wake, stop and token.', 'version and start.', 1)),
+            # #89: no repeated drivers: a where-your-agents-run section again is refused.
+            'the team page sections  ': ('team/index.html', lambda t: t.replace('<section class="team-part team-close', '<section class="team-part wrap"><h2>Where your agents run</h2></section>\n<section class="team-part team-close', 1)),
+            'Proof: the first card ': ('team/index.html', lambda t: t.replace('Grok Bot: coming soon', 'Grok Bot', 1)),
+            'Proof: the first card  ': ('team/index.html', lambda t: t.replace('<a href="/drivers/">See how drivers work</a>', '<a href="/">See how drivers work</a>', 1)),
+            'Proof: the second card': ('team/index.html', lambda t: t.replace('>See the Drivers page</a>', '>Drivers</a>', 1)),
+            'the boat poster: Proof': ('team/index.html', lambda t: re.sub(r'<li class="team-card"><a href="https://x\.com/openwiz"[\s\S]*?</li>\n', '<li class="team-card"><a href="https://x.com/openwiz" class="team-poster">Watch the fleet build it (49 s, on X)</a></li>\n', t, count=1)),
             # #73: the one site footer on every page.
             'the one site footer|one X link per page': ('drivers/index.html', lambda t: t.replace(FOOTER, '', 1)),
             'the one site footer|one X link per page ': ('changelog/index.html', lambda t: t.replace('</main>', '</main>' + FOOTER, 1)),
@@ -543,6 +675,7 @@ class Checks(unittest.TestCase):
             'unexpected external URL': ('team/index.html', '</main>', '<img src="https://x.com/openwiz" alt=""></main>'),
             'unexpected external URL ': ('index.html', '</head>', '<link rel="preload" href="https://x.com/openwiz" as="image"></head>'),
             'one X link per page': ('changelog/index.html', '</main>', '<a href="https://x.com/openwiz">X</a></main>'),
+            'one X link per page, the footer\'s: team': ('team/index.html', '</main>', '<a href="https://x.com/openwiz">X</a></main>'),
             'one X link per page ': ('drivers/index.html', '<a href="https://x.com/openwiz">X @openwiz</a>', '<a href="/">X @openwiz</a>'),
             'one X link per page, the footer\'s: the app': ('app/index.html', '</body>', '<a href="https://x.com/openwiz">X</a></body>'),
         }.items():
@@ -559,15 +692,13 @@ class Checks(unittest.TestCase):
     def test_report_a_problem_link(self):
         """#1851: openwiz.dev's Report a problem link opens GitHub's new-issue form on openwizdev/OpenWiz with the
         feedback template (contracts/feedback-loop.v1.md: template .github/ISSUE_TEMPLATE/feedback.yml; the exact link
-        is the planner's answer on #1851), in the footer of every site page and once in the changelog's main.
-        Catches: the link missing from the footer or the changelog, pointing at another repository or template, or
+        is the planner's answer on #1851), in the footer of every site page, the changelog's included.
+        Catches: the link missing from a page's footer, pointing at another repository or template, or
         carrying anything more (a prefilled title or body would send words from openwiz.dev)."""
         form = '<a href="https://github.com/openwizdev/openwiz/issues/new?template=feedback.yml">Report a problem</a>'
-        for page, count in {'index.html': 1, 'drivers/index.html': 1, 'team/index.html': 1, 'faq/index.html': 1, 'changelog/index.html': 2, 'app/index.html': 0}.items():
+        for page, count in {'index.html': 1, 'drivers/index.html': 1, 'team/index.html': 1, 'faq/index.html': 1, 'changelog/index.html': 1, 'app/index.html': 0}.items():
             with self.subTest(page=page):
                 self.assertEqual((ROOT / 'dist' / page).read_text().count(form), count)
-        main = re.search(r'<main\b[^>]*>[\s\S]*?</main>', (ROOT / 'dist/changelog/index.html').read_text())[0]
-        self.assertEqual(main.count(form), 1)
         href = 'https://github.com/openwizdev/openwiz/issues/new?template=feedback.yml'
         for message, (page, old, new) in {
             'Report a problem link': ('changelog/index.html', form, 'Report a problem'),
@@ -620,6 +751,8 @@ class Checks(unittest.TestCase):
             'open and disabled until faq.js runs ': lambda f: f.replace('aria-expanded="true"', 'aria-expanded="false"', 1),
             'a button that names its answer ': lambda f: f.replace('aria-controls="faq-a2"', 'aria-controls="faq-a1"', 1),
             'links off the site': lambda f: f.replace('href="/team/#book"', 'href="https://example.com/"', 1),
+            # #89: the last answer, word for word.
+            'last answer': lambda f: f.replace('Your first fleet ships on it.', 'Your first fleet runs in a day.', 1),
             'heading and its line': lambda f: f.replace('The short ones are here.', 'More.', 1),
             'no form or input': lambda f: f.replace('<p>The open source', '<input><p>The open source', 1),
         }.items():

@@ -1,17 +1,14 @@
-"""The changelog generator (#1364): fixture release notes become one part per versioned repository, newest first,
-patches included, with each OpenWiz entry's shipped versions; a failed read shows as missing, never as no history."""
+"""The changelog generator (#78): one data file per public release becomes one short entry, newest first by semver,
+shown only once the landing's install switch reads live; before that, one line pointing at the pre-releases."""
 from html.parser import HTMLParser
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-import json
 import re
 import subprocess
-import threading
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
-FIXTURES = ROOT / 'scripts/changelog-fixtures'
-REPOS = ['OpenWiz', 'WizSkills', 'WizLoops']
+TWO = ROOT / 'scripts/changelog-fixtures/two'
+PRE = 'https://github.com/openwizdev/OpenWiz/releases'
 
 
 def generate(*args):
@@ -20,159 +17,94 @@ def generate(*args):
     return done.stdout
 
 
-class Releases(HTMLParser):
-    """The generated section read back as data: each part's repository, state, entries, shipped versions and notes."""
+class Entries(HTMLParser):
+    """The generated section read back as data: each entry's heading, small line, headline, bullets and links."""
     def __init__(self, text):
         super().__init__(convert_charrefs=True)
-        self.parts, self.tags, self.stack, self.text = [], [], [], ''
+        self.entries, self.tags, self.pre, self.at, self.text = [], [], None, None, ''
         self.feed(text)
 
     def handle_starttag(self, tag, attrs):
         attrs = dict(attrs)
         classes = (attrs.get('class') or '').split()
         self.tags.append(tag)
-        self.stack.append((tag, classes))
-        if 'release-part' in classes:
-            self.parts.append({'repo': attrs.get('data-repo'), 'state': None, 'entries': []})
-        elif tag == 'article' and 'release' in classes:
-            self.parts[-1]['entries'].append({'title': '', 'ships': None, 'notes': ''})
-        elif 'ships' in classes and 'missing' in classes:
-            self.parts[-1]['entries'][-1]['ships'] = 'missing'
-        elif 'ships' in classes:
-            self.parts[-1]['entries'][-1]['ships'] = []
-        elif 'no-release' in classes:
-            self.parts[-1]['state'] = 'no release yet'
-        elif 'missing' in classes and 'read' in classes:
-            self.parts[-1]['state'] = 'missing'
+        if tag == 'article':
+            self.entries.append({'h2': '', 'small': '', 'headline': '', 'bullets': [], 'links': []})
+        elif tag == 'p' and 'pre' in classes:
+            self.pre = {'text': '', 'links': []}
+        if tag == 'a':
+            (self.pre or self.entries[-1])['links'].append(attrs['href'])
+        if tag == 'li':
+            self.entries[-1]['bullets'].append('')
+        self.at = {'h2': 'h2', 'small': 'small', 'li': 'li'}.get(tag) or ('headline' if 'headline' in classes else self.at)
 
     def handle_endtag(self, tag):
-        while self.stack and self.stack.pop()[0] != tag:
-            pass
-
-    def inside(self, cls):
-        return any(cls in classes for _, classes in self.stack)
+        if tag in ('h2', 'small', 'p', 'li'):
+            self.at = 'h2' if tag == 'small' else None
 
     def handle_data(self, data):
         self.text += data
-        if not self.parts or not self.parts[-1]['entries']:
-            return
-        entry = self.parts[-1]['entries'][-1]
-        if self.stack and self.stack[-1][0] == 'h4':
-            entry['title'] += data
-        elif self.inside('ships') and self.stack[-1][0] == 'li':
-            entry['ships'].append(data.strip())
-        elif self.inside('notes'):
-            entry['notes'] += data
-
-
-def titles(part):
-    return [e['title'] for e in part['entries']]
+        if self.pre is not None:
+            self.pre['text'] += data
+        elif self.at == 'li':
+            self.entries[-1]['bullets'][-1] += data
+        elif self.at:
+            self.entries[-1][self.at] += data
 
 
 class Generator(unittest.TestCase):
-    def test_full_notes_render_per_repository_newest_first_with_patches(self):
-        # catches: parts in the wrong order or missing, string-sorted versions (0.1.2 above 0.1.10), a dropped patch,
-        # drafts, pre-releases (0.3.0 here) or pre-0.1.0 releases on the page, and an empty repository rendered as nothing.
-        out = Releases(generate('--fixtures', FIXTURES / 'full'))
-        self.assertEqual([p['repo'] for p in out.parts], REPOS)
-        openwiz, skills, loops = out.parts
-        self.assertEqual(titles(openwiz), ['OpenWiz 0.1.1', 'OpenWiz 0.1.0'])
-        self.assertEqual(titles(skills), ['WizSkills 0.1.10', 'WizSkills 0.1.2', 'WizSkills 0.1.0'])
-        self.assertEqual((loops['state'], loops['entries']), ('no release yet', []))
-        self.assertEqual([p['state'] for p in (openwiz, skills)], [None, None])
-        self.assertEqual([e['ships'] for e in skills['entries']], [None] * 3)  # only OpenWiz ships other versions
-        self.assertIn('the tenth patch', skills['entries'][0]['notes'])
-        self.assertIn('a patch line', skills['entries'][1]['notes'])
+    def test_live_shows_every_entry_newest_first(self):
+        # catches: entries sorted as text (0.1.2 above 0.1.10), a date in the wrong form, the public name or semver
+        # missing from the heading, a bullet dropped, a second link, and the pre-releases line missing.
+        out = Entries(generate('--releases', TWO, '--switch', 'live'))
+        self.assertEqual([(e['h2'].strip(), e['small']) for e in out.entries],
+                         [('0.02', '· Feb 3, 2031 (0.1.10)'), ('0.01', '· Jan 2, 2031 (0.1.2)')])
+        self.assertEqual(out.entries[1]['headline'], 'One thing.')
+        self.assertEqual(out.entries[1]['bullets'], ['First line.', 'Second line.'])
+        self.assertEqual([e['links'] for e in out.entries], [['https://github.com/openwizdev/OpenWiz/releases/tag/v0.1.10'],
+                                                             ['https://github.com/openwizdev/OpenWiz/releases/tag/v0.1.2']])
+        self.assertEqual(out.pre, {'text': 'Earlier pre-releases are on GitHub.', 'links': [PRE]})
 
-    def test_openwiz_entry_lists_the_versions_it_ships_with(self):
-        # catches: shipped versions not read from the notes, read from the wrong release, or duplicated in the notes;
-        # and a cumulative release body repeating an older version's section under the newer entry.
-        out = Releases(generate('--fixtures', FIXTURES / 'full'))
-        self.assertEqual([p['repo'] for p in out.parts], REPOS)
-        openwiz = out.parts[0]
-        patch, first = openwiz['entries']
-        self.assertEqual(patch['ships'], ['WizSkills 0.1.3', 'records.v1', 'sample-driver 2.0.1'])
-        self.assertEqual(first['ships'], ['WizSkills 0.1.2', 'records.v1', 'sample-driver 2.0.0'])
-        self.assertIn('Fixes the sample fleet reading.', re.sub(r'\s+', ' ', patch['notes']))
-        self.assertNotIn('older section', patch['notes'])
-        self.assertNotIn('sample-driver', patch['notes'] + first['notes'])
+    def test_before_live_no_version_is_claimed(self):
+        # catches: an entry, a version number or a date shown while the install switch still reads coming-soon.
+        for state in ('coming-soon', 'anything-else'):
+            out = Entries(generate('--releases', TWO, '--switch', state))
+            self.assertEqual(out.entries, [])
+            self.assertEqual(out.pre['links'], [PRE])
+            self.assertNotRegex(out.text, r'\d')
 
-    def test_openwiz_entry_without_a_ships_with_list_says_so(self):
-        # catches: an OpenWiz entry whose notes list no versions shown with an empty list, or silently without one;
-        # and a published release with an unreadable tag silently left out of an otherwise complete history.
-        out = Releases(generate('--fixtures', FIXTURES / 'sparse'))
-        self.assertEqual([p['repo'] for p in out.parts], REPOS)
-        self.assertEqual(titles(out.parts[0]), ['OpenWiz 0.1.0'])
-        self.assertEqual(out.parts[0]['entries'][0]['ships'], 'missing')
-        # A published release whose tag is no version fails its part closed, never dropped from the history.
-        self.assertEqual([(p['state'], p['entries']) for p in out.parts[1:]], [('missing', []), ('no release yet', [])])
-
-    def test_failed_reads_show_as_missing_never_as_no_history(self):
-        # catches: an API error object, an absent answer or a malformed release read as an empty history or as
-        # "no release yet", and a bad release silently dropped from an otherwise rendered list.
-        out = Releases(generate('--fixtures', FIXTURES / 'failed'))
-        self.assertEqual([p['repo'] for p in out.parts], REPOS)
-        self.assertEqual([(p['state'], p['entries']) for p in out.parts], [('missing', [])] * 3)
-        self.assertNotIn('No release yet', out.text)
-
-    def test_notes_are_text_never_markup(self):
-        # catches: release notes injected into the page as HTML (a script tag in a note), and links carried out.
-        html = generate('--fixtures', FIXTURES / 'full')
-        out = Releases(html)
+    def test_text_is_text_never_markup(self):
+        # catches: a data file's words injected into the page as HTML.
+        html = generate('--releases', TWO, '--switch', 'live')
+        out = Entries(html)
         self.assertNotIn('script', out.tags)
-        self.assertNotIn('a', out.tags)
-        self.assertIn('Lists <script>sample</script> threads & specs.', out.text)
+        self.assertNotIn('em', out.tags)
+        self.assertEqual(out.entries[0]['headline'], 'Two <em>things</em>.')
+        self.assertEqual(out.entries[0]['bullets'][0], 'Lists <script>sample</script> threads & specs.')
 
-    def test_reads_every_page_and_marks_an_http_failure_missing(self):
-        # catches: only the first page of 100 releases read, a non-200 answer (even one whose body is a list) and a
-        # 200 answer that isn't a list each treated as no releases.
-        releases = [{'tag_name': f'v1.0.{n}', 'name': '', 'draft': False, 'prerelease': False,
-                     'published_at': '2031-05-01T00:00:00Z', 'body': f'- Patch {n}.'} for n in range(101)]
+    def test_defaults_read_the_shipped_data_and_the_landing_switch(self):
+        # catches: the build reading a different switch than the landing's install box, or other data than
+        # changelog/releases; and a network read coming back.
+        state = re.search(r'<div class="install-box" data-install="([^"]*)"', (ROOT / 'index.html').read_text())[1]
+        self.assertEqual(generate(), generate('--releases', ROOT / 'changelog/releases', '--switch', state))
+        live = Entries(generate('--switch', 'live'))
+        self.assertEqual([e['h2'].strip() for e in live.entries][-1:], ['0.01'])
+        source = (ROOT / 'scripts/changelog.mjs').read_text()
+        self.assertNotRegex(source, r'\bfetch\(|https?\.request|api\.github\.com')
 
-        class GitHub(BaseHTTPRequestHandler):
-            def do_GET(self):
-                path, _, query = self.path.partition('?')
-                page = int(re.search(r'(?:^|&)page=(\d+)', query)[1])
-                if path == '/repos/openwizdev/WizSkills/releases':
-                    body, status = json.dumps(releases[(page - 1) * 100:page * 100]), 200
-                elif path == '/repos/openwizdev/WizLoops/releases':
-                    body, status = '{"message": "Not a list"}', 200
-                else:
-                    body, status = '[]', 500
-                self.send_response(status)
-                self.send_header('Content-Type', 'application/json')
-                self.end_headers()
-                self.wfile.write(body.encode())
-
-            def log_message(self, *args):
-                pass
-
-        server = ThreadingHTTPServer(('127.0.0.1', 0), GitHub)
-        threading.Thread(target=server.serve_forever, daemon=True).start()
-        try:
-            out = Releases(generate('--api', f'http://127.0.0.1:{server.server_port}'))
-        finally:
-            server.shutdown()
-            server.server_close()
-        self.assertEqual([p['repo'] for p in out.parts], REPOS)
-        openwiz, skills, loops = out.parts
-        self.assertEqual(openwiz['state'], 'missing')
-        self.assertEqual(titles(skills), [f'WizSkills 1.0.{n}' for n in range(100, -1, -1)])
-        self.assertEqual((loops['state'], loops['entries']), ('missing', []))
-
-    def test_page_keeps_what_exists_today_and_adds_releases_after_it(self):
-        # catches: the merged What exists today section changed or moved, the parts placed outside the page's
-        # main, before What exists today, or twice.
+    def test_page_gets_the_section_once_at_the_end_of_main(self):
+        # catches: the page's own text changed, the section placed outside main or twice.
         source = (ROOT / 'changelog/index.html').read_text()
-        page = generate('--fixtures', FIXTURES / 'full', ROOT / 'changelog/index.html')
+        page = generate('--releases', TWO, '--switch', 'live', ROOT / 'changelog/index.html')
         start, end = '<!-- releases:start -->', '<!-- releases:end -->'
         self.assertEqual((page.count(start), page.count(end)), (1, 1))
         before, rest = page.split(start)
         section, after = rest.split(end)
         self.assertEqual(before + after, source)
         self.assertTrue(after.startswith('</main>'))
-        self.assertIn('What exists today', before)
-        self.assertEqual([p['repo'] for p in Releases(section).parts], REPOS)
+        self.assertEqual(len(Entries(section).entries), 2)
+        # A bullet with replacement patterns ($$, $&, $1) stays exactly as written (#82 R1).
+        self.assertIn('Costs $$ and keeps $&amp; and $1 as typed', page)
 
 
 if __name__ == '__main__':
