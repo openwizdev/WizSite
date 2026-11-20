@@ -54,33 +54,34 @@
       <p class="voyage-kicker">Drivers</p>
       <div class="drivers-explainer">
         <h1 id="voyage-title">A driver connects OpenWiz to wherever your agents run.</h1>
-        <p class="voyage-sub">Every driver answers the same four commands, <code>version</code>, <code>start</code>, <code>wake</code> and <code>stop</code>, and must pass the same five-check test on its real host: one check for each command, and <code>token</code>, which proves no credential leaks.</p>
+        <p class="voyage-sub">OpenWiz's agents build software from tickets, and every driver answers the same four commands and passes the same five-check test.</p>
       </div>
       <ul class="host-marks" aria-label="Where drivers run today">
-        <li><img class="host-icon" src="/drivers/logos/monitor.svg" alt="Computer icon" width="24" height="24"><span>Your computer or VPS</span></li>
-        <li><img class="host-tile" src="/drivers/logos/cloudroom.png" alt="Cloudroom logo" width="256" height="256"><span>Cloudroom</span></li>
-        <li><img class="host-lockup" src="/drivers/logos/boat-dev.svg" alt="boat.dev" width="390" height="109"></li>
-        <li><span>Grok Bot</span></li>
+        <li data-host="vps"><span class="host-mark"><img class="host-icon" src="/drivers/logos/monitor.svg" alt="Computer icon" width="24" height="24"></span><span class="host-name">Your computer or VPS</span> <span class="host-state">being fixed</span></li>
+        <li data-host="cloudroom"><span class="host-mark"><img class="host-tile" src="/drivers/logos/cloudroom.png" alt="Cloudroom logo" width="256" height="256"></span><span class="host-name">Cloudroom</span> <span class="host-state">works today</span></li>
+        <li data-host="boat-dev"><span class="host-mark"><img class="host-lockup" src="/drivers/logos/boat-dev.svg" alt="boat.dev" width="390" height="109"></span> <span class="host-state">passed</span></li>
+        <li data-host="grok-bot"><span class="host-name">Grok Bot</span> <span class="host-state">coming soon</span></li>
       </ul>
-      <a class="voyage-pass" href="#boat-dev"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7"/><path d="M4.6 8.3l2.3 2.3 4.5-4.8"/></svg><span>See <b>boat.dev</b>'s five passed checks</span></a>
+      <a class="voyage-pass" href="#boat-dev">See boat.dev's five passed checks</a>
     </div>
   </section>
   <section class="spotlight wrap" aria-labelledby="boat-dev-name">
     <article class="driver hero" id="boat-dev" aria-labelledby="boat-dev-name">
-      <div class="proof-scene">
-        <img class="proof-art" src="/art/drivers-c-boat.webp" alt="Oil painting of the Wiz crew's ship in cutaway at night: on its three decks, Wizes steer and read, write at desks, and tend a brass engine" width="1672" height="941" loading="lazy">
-      </div>
       <div class="proof-copy">
         <h2 class="driver-name" id="boat-dev-name"><img class="spot-logo" src="/drivers/logos/boat-dev.svg" alt="boat.dev" width="390" height="109"></h2>
-        <p class="driver-line">Passed all five checks on a real account, 2026-11-19</p>
+        <p class="driver-line">Passed all five checks</p>
+        <p class="driver-date">On a real account, <time datetime="2026-11-19">2026-11-19</time></p>
         <p class="proof-lead">Each check is one thing the test watched boat.dev do on its real host.</p>
         <ol class="proof-checks">
           <li class="proof-check" data-check="version" data-state="passed"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7"/><path d="M4.6 8.3l2.3 2.3 4.5-4.8"/></svg><code class="proof-name">version</code><span class="proof-state">passed</span><span class="proof-line">It names the kernel's records version, and prints its schema unchanged.</span></li>
           <li class="proof-check" data-check="start" data-state="passed"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7"/><path d="M4.6 8.3l2.3 2.3 4.5-4.8"/></svg><code class="proof-name">start</code><span class="proof-state">passed</span><span class="proof-line">It answered a run id, and the agent's status note appeared on a throwaway ticket.</span></li>
           <li class="proof-check" data-check="wake" data-state="passed"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7"/><path d="M4.6 8.3l2.3 2.3 4.5-4.8"/></svg><code class="proof-name">wake</code><span class="proof-state">passed</span><span class="proof-line">It reached the same run again: that note was edited, never a second one.</span></li>
           <li class="proof-check" data-check="stop" data-state="passed"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7"/><path d="M4.6 8.3l2.3 2.3 4.5-4.8"/></svg><code class="proof-name">stop</code><span class="proof-state">passed</span><span class="proof-line">It ended the run: a wake after it was refused, and nothing the run started still runs.</span></li>
-          <li class="proof-check" data-check="token" data-state="passed"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7"/><path d="M4.6 8.3l2.3 2.3 4.5-4.8"/></svg><code class="proof-name">token</code><span class="proof-state">passed</span><span class="proof-line">No credential showed in its output, command lines or environment, and it refused a token field.</span></li>
+          <li class="proof-check" data-check="token" data-state="passed"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7"/><path d="M4.6 8.3l2.3 2.3 4.5-4.8"/></svg><code class="proof-name">token</code><span class="proof-state">passed</span><span class="proof-line">No credential appeared in its output, command lines or environment, and it refused a token field.</span></li>
         </ol>
+      </div>
+      <div class="proof-scene">
+        <img class="proof-art" src="/art/drivers-c-boat.webp" alt="Oil painting of the Wiz crew's ship in cutaway at night: on its three decks, Wizes steer and read, write at desks, and tend a brass engine" width="1672" height="941" loading="lazy">
       </div>
     </article>
   </section>
@@ -97,13 +98,13 @@
       <li>
       <article class="driver" id="cloudroom" aria-labelledby="cloudroom-name">
         <h3 class="driver-name" id="cloudroom-name"><img class="driver-logo host-tile" src="/drivers/logos/cloudroom.png" alt="Cloudroom logo" width="256" height="256"><span>Cloudroom</span></h3>
-        <p class="driver-line">Works today: built real pull requests for OpenWiz</p>
-        <p class="driver-kit unrun" data-state="not yet run"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/></svg><span>Kit: not run yet. Its kit run comes next.</span></p>
+        <p class="driver-line">Works today: built real pull requests for OpenWiz; kit run next</p>
+        <p class="driver-kit unrun" data-state="not yet run"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/></svg><span>Kit: not run yet</span></p>
       </article>
       </li>
       <li>
       <article class="driver" id="grok-bot" aria-labelledby="grok-bot-name">
-        <h3 class="driver-name" id="grok-bot-name"><span>Grok Bot</span></h3>
+        <h3 class="driver-name" id="grok-bot-name"><img class="driver-logo host-icon" src="/drivers/logos/bot.svg" alt="Generic bot icon" width="24" height="24"><span>Grok Bot</span></h3>
         <p class="driver-line">Coming soon: listed when its driver lands</p>
         <p class="driver-kit unrun" data-state="not yet run"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/></svg><span>Kit: not run yet</span></p>
       </article>
@@ -126,7 +127,7 @@
       <div><dt><code>start</code></dt><dd>runs one agent on one ticket and answers a run id</dd></div>
       <div><dt><code>wake</code></dt><dd>reaches the same run again</dd></div>
       <div><dt><code>stop</code></dt><dd>ends everything the run started</dd></div>
-      <div class="own-token"><dt><code>token</code></dt><dd>the fifth check, not a command: it proves no credential leaks, none in the driver's output, command lines or environment, and it refuses a token field</dd></div>
+      <div class="own-token"><dt><code>token</code></dt><dd>the fifth check, not a command: it passes when no credential appeared in its output, command lines or environment, and it refused a token field</dd></div>
     </dl>
   </section>
 </main>

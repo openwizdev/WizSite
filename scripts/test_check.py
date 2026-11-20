@@ -560,9 +560,9 @@ class Checks(unittest.TestCase):
         for old, new, error in (
                 (explainer, '<div class="drivers-intro">', 'one explainer of what a driver is'),
                 ('five-check test.</p>', 'five-check test. It is free. It is fast.</p>', 'two sentences at most'),
-                ('the same four commands', 'the same commands', 'explainer must name'),
+                ('every driver answers the same four commands', 'every driver answers the same commands', 'explainer must name'),
                 ('build software from tickets', 'build software', 'explainer must name'),
-                ('the same four commands', 'the same four commands (<code>version</code>, <code>start</code>, <code>wake</code>, <code>stop</code>)', 'stays out of the hero'),
+                ('every driver answers the same four commands', 'every driver answers the same four commands (<code>version</code>, <code>start</code>, <code>wake</code>, <code>stop</code>)', 'stays out of the hero'),
                 ('five-check test.</p>', 'five-check test, token included.</p>', 'stays out of the hero'),
                 ('<span>Kit: not run yet</span></p>', '<span>Kit: not run yet</span></p><ul>' + row + '</ul>', 'no per-check rows'),
                 ('<span>Kit: not run yet</span></p>', '<span>Kit: not run yet</span></p><ol><li class="proof-check" data-check="token">x</li></ol>', 'one kit line, never per-check rows'),
@@ -635,10 +635,10 @@ class Checks(unittest.TestCase):
                 ('<p class="driver-line">Passed all five checks</p>', '<p class="driver-line">Passed all five checks on a real account, 2026-11-19</p>', 'driver facts|own date line'),
                 ('On a real account, <time', 'Real account, <time', 'own date line'),
                 ('src="/drivers/logos/bot.svg" alt="Generic bot icon"', 'src="/drivers/logos/monitor.svg" alt="Generic computer icon"', 'only the generic icon'),
-                ('<img class="driver-logo host-icon" src="/drivers/logos/bot.svg" alt="Generic bot icon" width="24" height="24">', '', 'one header structure'),
+                ('<img class="driver-logo host-icon" src="/drivers/logos/bot.svg" alt="Generic bot icon" width="24" height="24">', '', 'only the generic icon'),
                 ('<span>Cloudroom</span></h3>', 'Cloudroom</h3>', 'one header structure'),
                 ('No credential appeared in its output', 'No credential showed in its output', 'explains what it proved|token check inspected'),
-                ('it passes when no credential appeared', 'it passes when no secret appeared', 'token check inspected'),
+                ('appeared in its output, command lines or environment, and it refused a token field</dd>', 'appeared in its output</dd>', 'token check inspected'),
                 ('</main>', '<p>The token check proves no credential leaks.</p></main>', 'broader token claim')):
             self.broken(page, old, new, error)
         with tempfile.TemporaryDirectory() as temp:  # the painting moved back above the mark and the checks

@@ -290,7 +290,10 @@ code,.v{font-family:var(--ow-font-mono)}
    ship behind the headline. Still and complete without scripts or motion; the bob and the parallax run only with motion
    allowed. Round 3H (#62): the headline explains what a driver is, with the hosts' marks under it; boat.dev's spotlight
    (its five passed checks beside the crew's cutaway) follows the hero; then the other three drivers in one compact row,
-   each with one kit line. One sans for prose and headings, mono only for the command words, no text under 12 px. */
+   each with one kit line. One sans for prose and headings, mono only for the command words, no text under 12 px.
+   Round 3 final (#66): a shorter hero; even host pills, each mark scaled inside one fixed-height slot and each saying
+   in words what works today; a quiet text link to the proof; on a phone the spotlight's mark, result and checks lead
+   and its painting follows, shorter. */
 .drivers-page { --gold: #f2c27b; --night: #0f0d0b; }
 .drivers-page .voyage { position: relative; isolation: isolate; display: flex; flex-direction: column; min-height: min(84svh, 820px); overflow: hidden; background: var(--night); }
 .drivers-page .voyage-art { position: absolute; z-index: -1; inset: 0; }
@@ -304,35 +307,37 @@ code,.v{font-family:var(--ow-font-mono)}
 .drivers-page .voyage-copy { position: relative; z-index: 3; padding-block: clamp(48px, 9vh, 112px) 48px; }
 .drivers-page .voyage-kicker { color: var(--gold); font: 600 13px/1 var(--ow-font-sans); letter-spacing: .14em; text-transform: uppercase; }
 .drivers-page .voyage h1 { max-width: 15ch; margin-top: 16px; font-size: clamp(36px, 4.9vw, 72px); font-weight: 740; line-height: 1.02; letter-spacing: -.045em; text-shadow: 0 2px 30px rgb(0 0 0 / 60%); }
-.drivers-page .voyage-sub { max-width: 46ch; margin-top: 20px; color: #ece3d6; font-size: clamp(16px, 1.35vw, 19px); line-height: 1.5; letter-spacing: -.01em; text-shadow: 0 1px 14px rgb(0 0 0 / 70%); }
+.drivers-page .voyage-sub { max-width: 46ch; text-wrap: pretty; margin-top: 20px; color: #ece3d6; font-size: clamp(16px, 1.35vw, 19px); line-height: 1.5; letter-spacing: -.01em; text-shadow: 0 1px 14px rgb(0 0 0 / 70%); }
 .drivers-page .voyage-sub code { color: var(--gold); font-size: .92em; }
 .drivers-page .host-marks { display: flex; flex-wrap: wrap; gap: 8px 10px; max-width: 46rem; margin: 26px 0 0; padding: 0; list-style: none; }
 .drivers-page .host-marks li { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 6px 14px; border: 1px solid rgb(242 194 123 / 24%); border-radius: 999px; background: rgb(15 13 11 / 76%); color: #ece3d6; font: 500 15px/1.2 var(--ow-font-sans); white-space: nowrap; }
-.drivers-page .host-marks .host-icon { width: 20px; height: 20px; }
-.drivers-page .host-marks .host-tile { width: 22px; height: 22px; border-radius: 5px; }
-.drivers-page .host-marks .host-lockup { width: auto; height: 20px; margin-block: 2px; }
+.drivers-page .host-mark { display: inline-flex; flex: none; align-items: center; height: 18px; }
+.drivers-page .host-mark img { display: block; width: auto; height: 100%; }
+.drivers-page .host-mark .host-tile { border-radius: 4px; }
+.drivers-page .host-state { padding-left: 8px; border-left: 1px solid rgb(242 194 123 / 28%); color: #cbbfae; font-size: 13px; font-weight: 450; }
+.drivers-page [data-host="boat-dev"] .host-state { color: var(--gold); }
 .drivers-page .host-icon { filter: invert(1); opacity: .92; }
-.drivers-page .voyage-pass { display: inline-flex; align-items: center; gap: 10px; min-height: 44px; margin-top: 22px; padding: 8px 16px 8px 12px; border: 1px solid rgb(242 194 123 / 45%); border-radius: 999px; background: rgb(15 13 11 / 78%); color: var(--ink); font-size: 15px; text-decoration: underline; text-decoration-color: rgb(242 194 123 / 55%); text-underline-offset: 4px; }
-.drivers-page .voyage-pass b { color: var(--gold); font-weight: 650; }
-.drivers-page .voyage-pass:hover { border-color: var(--gold); text-decoration-color: var(--gold); }
-.drivers-page .voyage-pass .kit-icon { width: 20px; height: 20px; }
+.drivers-page .voyage-pass { display: inline-flex; align-items: center; min-height: 44px; margin-top: 12px; color: var(--ink); font-size: 15px; text-decoration: underline; text-decoration-color: rgb(242 194 123 / 60%); text-underline-offset: 4px; text-shadow: 0 1px 14px rgb(0 0 0 / 70%); }
+.drivers-page .voyage-pass:hover { text-decoration-color: var(--gold); }
 /* Kit states: always a word plus an icon shape, never colour alone. */
 .drivers-page .kit-icon { flex: none; width: 16px; height: 16px; }
-.drivers-page :is(.voyage-pass, .proof-check) .kit-icon circle { fill: var(--gold); }
-.drivers-page :is(.voyage-pass, .proof-check) .kit-icon path { fill: none; stroke: var(--ground); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.drivers-page .proof-check .kit-icon circle { fill: var(--gold); }
+.drivers-page .proof-check .kit-icon path { fill: none; stroke: var(--ground); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .drivers-page .progress .kit-icon circle { fill: none; stroke: var(--orchid); stroke-width: 1.5; }
 .drivers-page .progress .kit-icon path { fill: var(--orchid); }
 .drivers-page .unrun .kit-icon circle { fill: none; stroke: var(--grey); stroke-width: 1.5; stroke-dasharray: 2.4 2.2; }
-/* boat.dev's spotlight: its official mark, the result in words and the five checks, beside the crew's cutaway. */
+/* boat.dev's spotlight: its official mark, the result in words and the five checks, beside the crew's cutaway. The copy
+   comes first in the page, so it leads on a phone; on desktop the painting takes the left column. */
 .drivers-page .spotlight { margin-top: clamp(8px, 2vw, 24px); }
 .drivers-page .driver.hero { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); overflow: hidden; border: 1px solid #7c6140; border-radius: 16px; background: #110f0d; box-shadow: 0 0 0 1px rgb(242 194 123 / 10%), 0 30px 80px rgb(255 150 60 / 7%); }
-.drivers-page .proof-scene { position: relative; min-height: 100%; }
-.drivers-page .proof-scene::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent 70%, #110f0d); pointer-events: none; }
-.drivers-page .proof-art { display: block; width: 100%; height: 100%; object-fit: cover; object-position: 66% 50%; }
-.drivers-page .proof-copy { padding: clamp(24px, 3.4vw, 48px) clamp(22px, 3vw, 44px); }
+.drivers-page .proof-scene { position: relative; grid-row: 1; grid-column: 1; min-height: 100%; }
+.drivers-page .proof-scene::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent 88%, #110f0d); pointer-events: none; }
+.drivers-page .proof-art { position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: cover; object-position: 80% 50%; }
+.drivers-page .proof-copy { grid-row: 1; grid-column: 2; padding: clamp(24px, 3.4vw, 48px) clamp(22px, 3vw, 44px); }
 .drivers-page .hero .driver-name { margin: 0; }
 .drivers-page .spot-logo { display: block; width: auto; height: clamp(36px, 3.4vw, 48px); }
 .drivers-page .hero .driver-line { margin-top: 20px; color: var(--ink); font-size: clamp(22px, 2.2vw, 30px); font-weight: 680; line-height: 1.15; letter-spacing: -.035em; }
+.drivers-page .driver-date { margin-top: 8px; color: var(--grey2); font-size: 15px; line-height: 1.4; }
 .drivers-page .proof-lead { max-width: 44ch; margin-top: 12px; color: #e1d7cb; font-size: 16px; line-height: 1.5; }
 .drivers-page .proof-checks { display: grid; margin: 20px 0 0; padding: 0; list-style: none; }
 .drivers-page .proof-check { display: grid; grid-template-columns: 16px minmax(0, 1fr) auto; column-gap: 10px; row-gap: 4px; align-items: center; padding: 12px 0; border-top: 1px solid #ffffff14; }
@@ -349,7 +354,7 @@ code,.v{font-family:var(--ow-font-mono)}
 .drivers-page .driver-logo { flex: none; width: 28px; height: 28px; }
 .drivers-page .driver-logo.host-tile { border-radius: 7px; }
 .drivers-page .driver-list .driver-line { color: var(--grey2); font-size: 15px; line-height: 1.45; }
-.drivers-page .driver-kit { display: flex; align-items: center; gap: 8px; padding-top: 12px; border-top: 1px solid var(--line); color: var(--ink); font-size: 14px; line-height: 1.4; }
+.drivers-page .driver-kit { display: flex; align-items: center; gap: 8px; padding-top: 12px; border-top: 1px solid var(--line); color: var(--ink); font-size: 14px; line-height: 1.4; white-space: nowrap; }
 /* Write your own driver: the four commands and the fifth check, token. */
 .drivers-page .own-driver { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: clamp(24px, 5vw, 72px); align-items: start; margin-bottom: clamp(56px, 8vw, 112px); padding: clamp(24px, 4vw, 48px); border: 1px solid var(--line); border-radius: 16px; background: var(--panel); }
 .drivers-page .own-driver h2 { font-size: clamp(28px, 3.4vw, 42px); font-weight: 720; line-height: 1.05; letter-spacing: -.045em; }
@@ -368,8 +373,9 @@ code,.v{font-family:var(--ow-font-mono)}
 
 @media (max-width: 1100px) {
   .drivers-page .driver.hero { grid-template-columns: 1fr; }
+  .drivers-page :is(.proof-scene, .proof-copy) { grid-row: auto; grid-column: auto; }
   .drivers-page .proof-scene { aspect-ratio: 1672 / 941; min-height: 0; }
-  .drivers-page .proof-scene::after { background: linear-gradient(transparent 72%, #110f0d); }
+  .drivers-page .proof-scene::after { background: linear-gradient(#110f0d, transparent 22%); }
 }
 @media (max-width: 860px) {
   .drivers-page .driver-list { grid-template-columns: 1fr; }
@@ -386,6 +392,8 @@ code,.v{font-family:var(--ow-font-mono)}
   .drivers-page .host-marks { margin-top: 18px; }
   .drivers-page .host-marks li { min-height: 36px; padding: 5px 12px; font-size: 14px; }
   .drivers-page .own-driver { grid-template-columns: 1fr; }
+  .drivers-page .proof-scene { aspect-ratio: 16 / 7; }
+  .drivers-page .proof-art { object-position: 62% 58%; }
 }
 @media (max-width: 640px) {
   .drivers-page .driver-list .driver { padding: 18px; }
@@ -398,7 +406,8 @@ code,.v{font-family:var(--ow-font-mono)}
     .drivers-page .voyage-sea { animation: drivers-d-far linear both; animation-timeline: scroll(root); animation-range: 0 100vh; }
     .drivers-page .voyage-ship-wrap { animation: drivers-d-near linear both; animation-timeline: scroll(root); animation-range: 0 100vh; }
   }
-  .drivers-page .voyage-pass, .drivers-page .driver { transition: border-color .18s; }
+  .drivers-page .driver { transition: border-color .18s; }
+  .drivers-page .voyage-pass { transition: text-decoration-color .18s; }
 }
 @keyframes drivers-d-bob { 0% { transform: translateY(0) rotate(-.6deg); } 100% { transform: translateY(-1.4%) rotate(.7deg); } }
 @keyframes drivers-d-lantern { 0% { opacity: .75; } 100% { opacity: 1; } }

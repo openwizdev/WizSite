@@ -724,7 +724,7 @@ def top_bar(html):
 def check_drivers(landing, changelog, drivers, page):
     """The drivers page (#50, round 3H #62): the landing's exact top bar with Drivers current; the explainer of what a
     driver is in the hero, above every card; boat.dev's spotlight first, then the three other drivers' compact cards
-    in order with their exact facts and one kit line each; real logos, Grok Bot in text only; no jargon counts; the
+    in order with their exact facts and one kit line each; real logos, Grok Bot's name in text with only a generic icon; no jargon counts; the
     Write your own driver section linking only the public OpenWiz repository; no script; no invented number."""
     bar = top_bar(drivers)
     current = re.findall(r'<a [^>]*aria-current="page"[^>]*>([^<]*)</a>', bar)
@@ -761,14 +761,14 @@ def check_drivers(landing, changelog, drivers, page):
             assert not card['proofs'], f'{name}: a pending card shows one kit line, never per-check rows: {card["proofs"]}'
             assert (card['kit'], card['kit_state']) == (DRIVER_KIT_LINES[key], state), \
                 f'{name}: its one kit line must read {DRIVER_KIT_LINES[key]!r} ({state}): {card["kit"]!r} ({card["kit_state"]})'
-            # #66 item 6: all three compact cards share one header structure: a generic icon or logo, then the name.
-            heading = re.search(rf'<h3 class="driver-name" id="{key}-name">([\s\S]*?)</h3>', main)
-            assert heading and re.fullmatch(rf'<img class="driver-logo[^"]*" src="/drivers/logos/[^"]+" alt="[^"]+"[^>]*><span>{re.escape(name)}</span>', heading[1].strip()), \
-                f'{name}: the compact cards share one header structure (icon or logo, then the name): {heading[1] if heading else None!r}'
     check_driver_logos(main, outline)
+    for key, name, _, _ in DRIVERS[1:]:
+        # #66 item 6: all three compact cards share one header structure: a generic icon or logo, then the name.
+        heading = re.search(rf'<h3 class="driver-name" id="{key}-name">([\s\S]*?)</h3>', main)
+        assert heading and re.fullmatch(rf'<img class="driver-logo[^"]*" src="/drivers/logos/[^"]+" alt="[^"]+"[^>]*><span>{re.escape(name)}</span>', heading[1].strip()), \
+            f'{name}: the compact cards share one header structure (icon or logo, then the name): {heading[1] if heading else None!r}'
     check_driver_proof(main)
     check_host_pills(main)
-    check_driver_token(drivers, main)
     reader = Text(main)
     readings = [reader.joined(), reader.spaced()] + reader.shown
     for reading in readings:
@@ -785,8 +785,9 @@ def check_drivers(landing, changelog, drivers, page):
     own = re.search(r'<dl class="own-words">([\s\S]*?)</dl>', main)
     rows = re.findall(r'<dt><code>([^<]*)</code></dt><dd>([\s\S]*?)</dd>', own[1]) if own else []
     assert [r[0] for r in rows] == list(KIT_CHECKS) and 'credential' in plain(rows[-1][1]), \
-        f'{OWN_DRIVER} lists the four commands and the fifth check, token, proving no credential leaks: {rows}'
+        f'{OWN_DRIVER} lists the four commands and the fifth check, token, with the credential it checks for: {rows}'
     assert not Outline(drivers).styles, 'the drivers page keeps its styles in site.css'
+    check_driver_token(drivers, main)
 
 
 def plain(html):
@@ -815,7 +816,7 @@ def check_driver_explainer(main):
 
 def check_driver_logos(main, outline):
     """#62 item 2: every logo on the page is a pinned official file, used with alt text naming its host; every pinned
-    logo is used; Grok Bot shows no logo at all, and no Grok picture appears anywhere."""
+    logo is used; Grok Bot shows no Grok or xAI mark, only its generic icon (#66), and no Grok picture appears anywhere."""
     used = set()
     for attrs in re.findall(r'<img\b([^>]*)>', main):
         src = (re.search(r'\bsrc="([^"]*)"', attrs) or [None, ''])[1]
@@ -827,12 +828,12 @@ def check_driver_logos(main, outline):
             host = DRIVER_LOGOS[name][1]
             assert host.lower() in alt.lower(), f'the logo {src} needs alt text naming {host}: {alt!r}'
             used.add(name)
-    assert used == set(DRIVER_LOGOS), f'unused drivers logos: {sorted(set(DRIVER_LOGOS) - used)}'
     key, icon = DRIVER_GENERIC_ICON
     for card in outline.cards:
         if card['id'] == key:
             assert [src for src, _ in card['images']] == [f'/{icon}'] and not card['svgs'], \
                 f'no Grok logo: {card["name"]} shows only the generic icon {icon}: {card["images"]}, {card["svgs"]} other pictures'
+    assert used == set(DRIVER_LOGOS), f'unused drivers logos: {sorted(set(DRIVER_LOGOS) - used)}'
     assert not any('grok' in name.lower() for name in DRIVER_LOGOS), 'no Grok logo file'
 
 
