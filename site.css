@@ -303,10 +303,10 @@ code,.v{font-family:var(--ow-font-mono)}
 .drivers-page .voyage-pass .kit-icon { width: 20px; height: 20px; }
 
 /* The painting: full bleed, its dusk sky rising behind the copy; the frame keeps the painting's own shape on wide
-   screens, so each pin's place is a share of the painting. */
+   screens, so each pin's place is a share of the painting. The left shade follows the copy's column (the .wrap edge). */
 .drivers-page .harbour { position: relative; z-index: 1; aspect-ratio: 1672 / 830; margin: 0; overflow: hidden; }
 .drivers-page .harbour::before, .drivers-page .harbour::after { content: ""; position: absolute; z-index: 1; inset: 0; pointer-events: none; }
-.drivers-page .harbour::before { background: linear-gradient(rgb(15 13 11 / 60%) 0%, rgb(15 13 11 / 20%) 30%, transparent 50%), linear-gradient(90deg, rgb(15 13 11 / 88%) 0%, rgb(15 13 11 / 78%) 28%, rgb(15 13 11 / 50%) 40%, transparent 56%); }
+.drivers-page .harbour::before { background: linear-gradient(rgb(15 13 11 / 60%) 0%, rgb(15 13 11 / 20%) 30%, transparent 50%), linear-gradient(90deg, rgb(15 13 11 / 88%) 0%, rgb(15 13 11 / 80%) calc(max(var(--m), 50% - 620px) + 340px), rgb(15 13 11 / 55%) calc(max(var(--m), 50% - 620px) + 560px), transparent calc(max(var(--m), 50% - 620px) + 800px)); }
 .drivers-page .harbour::after { top: auto; height: 20%; background: linear-gradient(transparent, var(--ground)); }
 .drivers-page .harbour-frame { position: relative; aspect-ratio: 1672 / 941; transform-origin: 56% 62%; }
 .drivers-page .harbour-art { display: block; width: 100%; height: 100%; object-fit: cover; }
