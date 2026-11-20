@@ -47,14 +47,15 @@ describe('the Models page reader', () => {
   before(async () => { models = await loadModels(); });
 
   // catches: a role read from the wrong row or table, a follow rule applied wrongly, the older tables' Reviewer or
-  // Fixer taken from the wrong family, or a stale older table winning over the Models table.
+  // Fixer taken from the wrong family, a stale older table winning over the Models table, or an older table left out
+  // of step with the Models table read silently (its older_table_kept warning missing or worded otherwise).
   for (const name of CASES) {
     test(`${name}: every role reads as the contract's show fixture says`, async () => {
       const show = await json(new URL(`${name}/show.json`, FIX));
       const read = models.read(await text(new URL(`${name}/fleet.md`, FIX)));
       assert.equal(read.form, show.read);
       assert.deepEqual(JSON.parse(JSON.stringify(read.roles)), show.roles);
-      assert.deepEqual([...read.warnings], show.warnings.filter(w => w.kind === 'same_family').map(w => w.text));
+      assert.deepEqual([...read.warnings], show.warnings.map(w => w.text));
     });
   }
 
@@ -375,6 +376,18 @@ describe('the Models page in the app', () => {
       await page.shot(join(process.env.SHOTS, 'models-laptop.png'), 1440, 1960, false);
       await page.shot(join(process.env.SHOTS, 'models-phone.png'), 390, 2000, true);
     }
+    readOnly(world);
+    await page.close();
+  });
+
+  // catches: an older table that fleets still start from, left out of step with the Models table, not shown on the
+  // page (the planner's ruling: the mismatch is never silent).
+  test('both forms: an older table kept out of step is named on the page', async () => {
+    const world = new World({ fleet: await text(new URL('both/fleet.md', FIX)), offered });
+    const page = await modelsPage(browser, world);
+    const { warnings } = await json(new URL('both/show.json', FIX));
+    const shown = await page.run(`[...document.querySelectorAll('.models .notice')].map(n => n.innerText.replace(/\\s+/g, ' ').trim())`);
+    for (const w of warnings) assert.ok(shown.includes(w.text), `not shown: ${w.text}`);
     readOnly(world);
     await page.close();
   });
