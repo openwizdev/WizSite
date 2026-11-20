@@ -6,7 +6,7 @@ import unittest
 
 import re
 
-from check import FINGERPRINTS, HASHED, INSTALL_SWITCH, ROOT, Page, check_changelog, check_releases, split_releases, check_motion, check_privacy, check_ref, check_site, check_vector, check_webp, fingerprint
+from check import DRIVERS_PAGE, FINGERPRINTS, check_drivers, HASHED, INSTALL_SWITCH, ROOT, Page, check_changelog, check_releases, split_releases, check_motion, check_privacy, check_ref, check_site, check_vector, check_webp, fingerprint
 
 
 def edit_built(root, name, change):
@@ -18,7 +18,7 @@ def edit_built(root, name, change):
     new = fingerprint(name, data)
     old.unlink()
     (root / new).write_bytes(data)
-    for page in ('index.html', 'changelog/index.html', 'app/index.html'):
+    for page in ('index.html', 'changelog/index.html', DRIVERS_PAGE, 'app/index.html'):
         path = root / page
         path.write_text(path.read_text().replace(f'"/{was}"', f'"/{new}"'))
 
@@ -496,6 +496,39 @@ class Checks(unittest.TestCase):
             (root / 'brand/openwiz-lockup.svg').write_bytes(logo.replace(b'</svg>', b'<text>OpenWiz</text></svg>'))
             with self.assertRaises(AssertionError):
                 check_site(root)
+
+    def test_drivers_page(self):
+        # Catches (#49): a card out of order or missing, a status line that says more or less than the ticket's facts,
+        # a missing word, a kit check shown by colour alone or with the wrong state, boat.dev not the hero (or not
+        # alone), a top bar that drifts from the landing's, a missing Drivers link, a link off OpenWiz, and a missing
+        # Write your own driver section.
+        root = ROOT / 'dist'
+        landing, changelog, drivers = ((root / name).read_text() for name in ('index.html', 'changelog/index.html', DRIVERS_PAGE))
+        check_drivers(landing, changelog, drivers)
+        own = '<h3 id="driver-own">Your own computer or VPS</h3>'
+        cloud = '<h3 id="driver-cloudroom">Cloudroom</h3>'
+        for name, change, error in (
+                ('order', lambda d: d.replace(own, 'X').replace(cloud, own).replace('X', cloud), 'in order'),
+                ('status', lambda d: d.replace('built real pull requests for OpenWiz', 'built 40 pull requests for OpenWiz', 1), 'status line'),
+                ('words', lambda d: d.replace('<li><code>wake</code></li>', '', 1), 'four words'),
+                ('colour', lambda d: d.replace('<span class="sr-only">: passed</span>', '', 1), 'not colour alone'),
+                ('state', lambda d: d.replace('data-check="token" data-state="not-run"', 'data-check="token" data-state="passed"', 1), 'must show'),
+                ('hero', lambda d: d.replace('driver-card is-hero', 'driver-card', 1), 'hero'),
+                ('two heroes', lambda d: d.replace('<article class="driver-card"', '<article class="driver-card is-hero"', 1), 'hero'),
+                ('top bar', lambda d: d.replace('aria-label="Sign in with GitHub">Sign in</a>', 'aria-label="Sign in with GitHub">Log in</a>', 1), 'top bar'),
+                ('current', lambda d: d.replace(' aria-current="page"', '', 1), 'current'),
+                ('off site', lambda d: d.replace('</section>\n</main>', '<a href="https://github.com/openwizdev/WizSkills">x</a></section>\n</main>', 1), 'only to OpenWiz'),
+                ('own', lambda d: d.replace('>Write your own driver</h2>', '>Build a driver</h2>', 1), 'Write your own driver')):
+            with self.subTest(name=name):
+                changed = change(drivers)
+                self.assertNotEqual(changed, drivers)
+                with self.assertRaisesRegex(AssertionError, error):
+                    check_drivers(landing, changelog, changed)
+        no_link = lambda page: page.replace('<a class="nav-log" href="/drivers/">Drivers</a>', '', 1)
+        for pages in ((no_link(landing), changelog, no_link(drivers)), (landing, no_link(changelog), drivers),
+                      (no_link(landing), no_link(changelog), no_link(drivers))):
+            with self.subTest(pages='no Drivers link'), self.assertRaisesRegex(AssertionError, 'top bar'):
+                check_drivers(*pages)
 
 if __name__ == '__main__':
     unittest.main()

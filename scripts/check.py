@@ -88,7 +88,7 @@ def fingerprinted_page(html):
 
 FINGERPRINTS = {name: fingerprint(name, (ROOT / name).read_bytes()) for name in HASHED}
 STATIC = {
-    'index.html', 'changelog/index.html', '_headers', APP_PAGE, 'app/manifest.webmanifest',
+    'index.html', 'changelog/index.html', 'drivers/index.html', '_headers', APP_PAGE, 'app/manifest.webmanifest',
     'fonts/Geist-var.woff2', 'fonts/GeistMono-var.woff2', 'fonts/OFL.txt',
 } | ART | set(ICON_HASHES) | set(VECTORS) | (set(VENDOR_HASHES) - {GSAP}) | set(APP_VENDOR)
 RUNTIME = STATIC | set(FINGERPRINTS.values())
@@ -116,7 +116,9 @@ FONT_HASHES = {
     'fonts/GeistMono-var.woff2': '55419aa06f58adcd7f145c6c920e56936416f17e528f60efc6032ffa4269972b',
     'fonts/OFL.txt': 'c683bfbcc7e087f5d37a54ef628f10387c451a83ddc459b151403a164ac46c90',
 }
-PAGES = ('index.html', 'changelog/index.html')
+# The Drivers page (#49) is a site page like the other two: tokens.css then site.css, the shared links, copy and privacy rules.
+DRIVERS_PAGE = 'drivers/index.html'
+PAGES = ('index.html', 'changelog/index.html', DRIVERS_PAGE)
 ALL_PAGES = PAGES + (APP_PAGE,)
 # The to-do example and both app entry points stay visible in the static landing page.
 STORY_COPY = ('Build a to-do app', 'Bring any agent', 'Sign in with GitHub', 'Put the app on your phone')
@@ -137,6 +139,24 @@ TODAY = 'What exists today'
 # section has its own rules (check_releases), one part per versioned repository, in this order.
 RELEASES = ('<!-- releases:start -->', '<!-- releases:end -->')
 RELEASE_REPOS = ('OpenWiz', 'WizSkills', 'WizLoops')
+# The Drivers page (#49, variant C: the kernel diagram). One card per driver, in this order, each with its status line
+# word for word (the ticket's facts, nothing more), the driver's four words, and the kit's five checks, each shown as a
+# word and a shape, never colour alone. boat.dev is the hero. The landing's exact top bar, with Drivers current, and a
+# Drivers link in the landing's and the Changelog's top bars. "Write your own driver" links only to OpenWiz.
+DRIVERS = {
+    'Your own computer or VPS': ('Being fixed: its kit run is in progress', 'in-progress'),
+    'Cloudroom': ('Works today: built real pull requests for OpenWiz', 'not-run'),
+    'boat.dev': ('Passed the kit, 5 of 5, on a real account (2026-11-19)', 'passed'),
+    'Grok Bot': ('Coming soon: listed when its driver lands', 'not-run'),
+}
+DRIVER_WORDS = ('version', 'start', 'wake', 'stop')
+KIT_CHECKS = ('version', 'start', 'wake', 'stop', 'token')
+KIT_STATES = {'passed': 'passed', 'in-progress': 'in progress', 'not-run': 'not yet run'}
+DRIVERS_LINKS = ('/drivers/', '/drivers')
+OPENWIZ_REPO = 'https://github.com/openwizdev/OpenWiz'
+DRIVER_SOURCES = ('/blob/main/kernel/driver.v1.md', '/tree/main/kernel/driver-kit', '/tree/main/adapters/template')
+DRIVERS_ART = 'art/drivers-c-'
+DRIVERS_ART_BUDGET = 400_000  # bytes: this variant's own art, inside ART_BUDGET
 
 
 class Page(HTMLParser):
@@ -400,6 +420,8 @@ def check_site(root):
         total += len(data)
     assert total <= ART_BUDGET, f'art is {total} bytes, over the {ART_BUDGET} budget'
     check_changelog(landing, changelog)
+    check_drivers(landing, changelog, (root / DRIVERS_PAGE).read_text())
+    assert sum(len((root / n).read_bytes()) for n in ART if n.startswith(DRIVERS_ART)) <= DRIVERS_ART_BUDGET, 'the drivers art is over its budget'
     check_releases(releases)
     main = re.search(r'<main\b[^>]*>[\s\S]*?</main>', changelog)
     assert main and sha256(main[0].encode()).hexdigest() == CHANGELOG_MAIN, 'changelog content changed; review explicitly before updating its snapshot'
@@ -545,6 +567,54 @@ def check_changelog(landing, changelog):
     assert not re.search(r'<time\b|releases/tag/|class="rel"', main), 'no release entry on the changelog'
     for style in page.styles:
         check_motion(style)
+
+
+def top_bar(page):
+    bars = re.findall(r'<header class="landing-nav wrap">[\s\S]*?</header>', page)
+    assert len(bars) == 1, 'each site page has the landing\'s one top bar'
+    return bars[0]
+
+
+def flat_text(html):
+    return re.sub(r'\s+', ' ', unescape(re.sub(r'<[^>]*>', '', html))).strip()
+
+
+def check_drivers(landing, changelog, drivers):
+    """The Drivers page (#49): the landing's top bar with Drivers current, its cards and facts, and its one way out."""
+    bars = {name: top_bar(page) for name, page in (('landing', landing), ('changelog', changelog), ('drivers', drivers))}
+    plain = {name: bar.replace(' aria-current="page"', '') for name, bar in bars.items()}
+    assert plain['drivers'] == plain['landing'] == plain['changelog'], 'the top bar must be the landing\'s, on every page'
+    for name, bar in plain.items():
+        labels = [text for href, text in Outline(bar).links if href in DRIVERS_LINKS]
+        assert labels == ['Drivers'], f'the {name} top bar needs one Drivers link: {labels}'
+    current = re.findall(r'<a [^>]*aria-current="page"[^>]*>', bars['drivers'])
+    assert len(current) == 1 and 'href="/drivers/"' in current[0], 'the Drivers page marks only Drivers as current'
+    page = Outline(drivers)
+    assert page.title == 'Drivers — OpenWiz', 'the drivers page title must be Drivers — OpenWiz'
+    main = re.search(r'<main\b[^>]*>([\s\S]*?)</main>', drivers)
+    assert main, 'the drivers page has one main'
+    main = main[1]
+    cards = re.findall(r'<article class="driver-card([^"]*)"[^>]*>([\s\S]*?)</article>', main)
+    names = [flat_text((re.search(r'<h3[^>]*>([\s\S]*?)</h3>', body) or ['', ''])[1]) for _, body in cards]
+    assert names == list(DRIVERS), f'one card per driver, in order: {names}'
+    for (classes, body), name in zip(cards, names):
+        status, state = DRIVERS[name]
+        line = re.findall(r'<p class="driver-status"[^>]*>([\s\S]*?)</p>', body)
+        assert [flat_text(l) for l in line] == [status], f'{name}: the status line must read exactly: {status}'
+        words = re.findall(r'<li[^>]*><code>([^<]*)</code></li>', (re.search(r'<ul class="driver-words"[^>]*>([\s\S]*?)</ul>', body) or ['', ''])[1])
+        assert tuple(words) == DRIVER_WORDS, f'{name}: the four words, in order: {words}'
+        checks = re.findall(r'<li data-check="([^"]*)" data-state="([^"]*)"[^>]*>([\s\S]*?)</li>', body)
+        assert tuple(c for c, _, _ in checks) == KIT_CHECKS, f'{name}: the kit\'s five checks, in order'
+        for check, shown, item in checks:
+            assert shown == state, f'{name}: {check} must show {state}'
+            assert '<svg' in item and flat_text(item).endswith(f'{check}: {KIT_STATES[state]}'), f'{name}: {check} needs its word and a shape, not colour alone'
+        assert ('is-hero' in classes.split()) == (name == 'boat.dev'), 'boat.dev, and only boat.dev, is the hero'
+    own = re.findall(r'<section class="write-own"[^>]*>([\s\S]*?)</section>', main)
+    assert len(own) == 1 and re.search(r'<h2[^>]*>Write your own driver</h2>', own[0]), 'one Write your own driver section'
+    hrefs = re.findall(r'href="([^"]*)"', own[0])
+    assert all(OPENWIZ_REPO + source in hrefs for source in DRIVER_SOURCES), 'link the contract, the kit and the template'
+    for href in re.findall(r'href="([^"]*)"', main):
+        assert href.startswith('#') or href == OPENWIZ_REPO or href.startswith(OPENWIZ_REPO + '/'), f'the drivers page links only to OpenWiz: {href}'
 
 
 def split_releases(built):
