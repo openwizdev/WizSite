@@ -463,7 +463,7 @@ class Checks(unittest.TestCase):
                 root = Path(temp) / 'dist'
                 shutil.copytree(ROOT / 'dist', root)
                 landing = root / 'index.html'
-                landing.write_text(landing.read_text().replace('content="https://openwiz.dev/brand/og.png"', f'content="{new}"', 1))
+                landing.write_text(landing.read_text().replace('content="https://openwiz.dev/brand/og.png?v=2"', f'content="{new}"', 1))
                 with self.assertRaises(AssertionError):
                     check_site(root)
         with tempfile.TemporaryDirectory() as temp:
