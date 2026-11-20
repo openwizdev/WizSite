@@ -7,11 +7,12 @@
 //
 //   node scripts/app-check.mjs            (after npm run build; CHROME=/path/to/chrome to pick the browser)
 //   SHOTS=dir node scripts/app-check.mjs  also saves the shell on a laptop and a phone as PNGs, for review
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { cp, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const ROOT = new URL('../', import.meta.url);
 const DIST = new URL('dist/', ROOT);
@@ -348,6 +349,36 @@ function checkRequestLog(world) {
 async function signIn(page, world) {
   await page.go(`${SITE}/app/?code=c0de&state=${STATE}`);
   await page.until(`document.body.innerText.includes('acme/factory')`, 'the repository picker');
+}
+
+async function releaseSwitchAlone() {
+  const temp = await mkdtemp(join(tmpdir(), 'switch-copy-'));
+  try {
+    const root = fileURLToPath(ROOT).replace(/\/$/, '');
+    const copy = join(temp, 'site');
+    await cp(root, copy, { recursive: true, filter: src => src === root || !['.git', 'dist', 'node_modules', '__pycache__'].includes(basename(src)) });
+    await symlink(join(root, 'node_modules'), join(copy, 'node_modules'));
+    // npm run check lists the site's files through git; the linked node_modules is not one of them.
+    const git = spawnSync('git', ['init', '-q'], { cwd: copy });
+    assert(git.status === 0, 'git init failed in the copy');
+    await writeFile(join(copy, '.git/info/exclude'), '/node_modules\n');
+    const landing = join(copy, 'index.html');
+    const text = await readFile(landing, 'utf8');
+    const switches = text.match(/data-install="(coming-soon|live)"/g) || [];
+    assert(switches.length === 1, `the landing has no single install switch: ${JSON.stringify(switches)}`);
+    await writeFile(landing, text.replace(switches[0], 'data-install="live"'));
+    const failed = [];
+    for (const step of ['build', 'check', 'test', 'test:functions', 'test:app']) {
+      const run = spawnSync('npm', ['run', step], { cwd: copy, env: { ...process.env, WIZSITE_SWITCH_COPY: '1' }, encoding: 'utf8', maxBuffer: 64 << 20 });
+      if (run.status !== 0) {
+        const out = `${run.stdout || ''}${run.stderr || ''}${run.error ? run.error.message : ''}`;
+        failed.push(`npm run ${step}:\n${out.split('\n').filter(line => !line.startsWith('PASS ')).join('\n').slice(-2000)}`);
+      }
+    }
+    assert(failed.length === 0, `with the switch on, CI fails:\n${failed.join('\n')}`);
+  } finally {
+    await rm(temp, { recursive: true, force: true });
+  }
 }
 
 async function main() {
@@ -1563,6 +1594,11 @@ async function main() {
     });
   } finally {
     await browser.close();
+  }
+  // #1573: the release's one documented change alone passes CI. A copy of the site gets only data-install set to live,
+  // then CI's own steps run on it; inside the copy this check is skipped, so the copy's test:app doesn't recurse.
+  if (!process.env.WIZSITE_SWITCH_COPY) {
+    await check('#1573 the release switch alone passes CI: a copy with only data-install set to live passes every CI step', releaseSwitchAlone);
   }
   console.log(results.join('\n'));
   const failed = results.filter(line => line.startsWith('FAIL')).length;
