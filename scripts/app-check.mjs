@@ -1586,6 +1586,31 @@ async function main() {
       await page.close();
     });
 
+    await check('AP22b (#2027): a refresh that can\'t give a ticket\'s pull requests shows them as unknown, and the read as partial', async () => {
+      const world = ap7World();
+      const page = await ap6Open(world, '#/agents');
+      await page.until(`/checks running/.test(document.querySelector('main article.card[data-note="7001"]')?.innerText || '')`, 'the builder card, checks running');
+      const fleet = (await fixture('ap7-agents.json')).data.repository.fleet;
+      world.graphql.Agents = async () => ({ status: 200, json: { data: { rateLimit: { limit: 5000, remaining: 4790, resetAt: '2099-01-01T00:00:00Z' },
+        repository: { issues: { totalCount: 0, pageInfo: { hasNextPage: false, endCursor: null }, nodes: [] }, fleet } } } });
+      // GitHub answers #70's alias with an error and no pull-request list.
+      world.graphql.AgentPulls = async body => {
+        const answer = { data: { rateLimit: { limit: 5000, remaining: 4780, resetAt: '2099-01-01T00:00:00Z' }, repository: {} },
+          errors: [{ message: 'Something went wrong', path: ['repository', 'i70', 'closedByPullRequestsReferences'] }] };
+        for (const [, n] of String(body.query).matchAll(/i(\d+): issue\(number: \d+\)/g)) {
+          answer.data.repository[`i${n}`] = n === '70' ? { closedByPullRequestsReferences: null } : null;
+        }
+        return { status: 200, json: answer };
+      };
+      await page.run(`(() => { OW.data.feeds.agents.readAt = 1; document.dispatchEvent(new Event('visibilitychange')); })()`);
+      await page.until(`OW.data.feeds.agents.readAt > 1 && !OW.data.feeds.agents.busy`, 'the next Agents read');
+      const card = await page.run(`document.querySelector('main article.card[data-note="7001"]').innerText.replace(/\\s+/g, ' ')`);
+      assert(/Pull request #12: its state is unknown/.test(card) && !/checks running|checks pass/.test(card), `the card keeps old facts: ${card}`);
+      assert(/Part of this read failed/.test(await page.text()), 'a refresh GitHub refused shows no partial-read notice');
+      checkRequestLog(world);
+      await page.close();
+    });
+
     await check('AP22 R4: an error the read can\'t place shows the failure banner, never a count blamed on GitHub\'s limit', async () => {
       const world = ap7World();
       const fixed = world.graphql.Agents;
