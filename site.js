@@ -296,6 +296,31 @@ function specVideo() {
   };
   sound.addEventListener('click', listen);
   video.addEventListener('click', () => { if (!video.controls) listen(); });
+  liveCaptions(video);
+}
+
+// The spec video's captions, drawn in its reel caption instead of over the frame: the track stays loaded but hidden,
+// and each cue's text is set in .spec-live as it comes, muted or with sound, controls or not. If the visitor turns the
+// browser's own captions on (or off) from the player's menu, that choice wins and the line steps aside.
+function liveCaptions(video) {
+  const line = document.querySelector('.spec-live');
+  const track = [...video.textTracks].find(t => t.kind === 'captions');
+  if (!line || !track) return;
+  let mode = 'hidden';
+  let started = false; // the line takes its room only once the first cue arrives, so the poster stays bare
+  track.mode = mode;
+  const show = () => {
+    const cue = track.mode === 'hidden' ? track.activeCues?.[0] : null;
+    if (cue) started = true;
+    line.hidden = !started || mode !== 'hidden';
+    line.textContent = cue ? cue.text.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim() : '';
+  };
+  track.addEventListener('cuechange', show);
+  video.textTracks.addEventListener('change', () => {
+    if (track.mode === mode) return;
+    mode = track.mode;
+    show();
+  });
 }
 
 // The footer Wizes react, one at a time and briefly; at rest the footer is unchanged. With reduced motion, Pause

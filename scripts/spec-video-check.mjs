@@ -140,11 +140,13 @@ const FACTS = `(() => {
   const sound = moment?.querySelector('.spec-play');
   const link = [...moment?.querySelectorAll('a[href]') || []].find(a => /\\.(webm|mp4)$/.test(a.getAttribute('href')));
   const track = video && [...video.textTracks].find(t => t.kind === 'captions');
+  const live = moment?.querySelector('.spec-live');
   return {
     video: shown(video), poster: !!video?.getAttribute('poster'), playing: !!video && !video.paused && !video.ended,
     muted: !!video?.muted, autoplay: !!video?.autoplay, preload: video?.getAttribute('preload'),
     sound: shown(sound) && /sound/i.test(sound.textContent + (sound.getAttribute('aria-label') || '')),
     link: shown(link), cues: track ? (track.cues?.length || 0) : -1, captions: track ? track.mode : 'none',
+    live: shown(live) ? live.textContent.trim() : '',
     sideways: document.documentElement.scrollWidth > innerWidth,
     inside: !moment || [...moment.querySelectorAll('video, .spec-play, a')].filter(shown).every(el => {
       const r = el.getBoundingClientRect(), m = moment.getBoundingClientRect();
@@ -161,6 +163,9 @@ const until = async (page, test, ms = 5000) => {
     await new Promise(resolve => setTimeout(resolve, 100));
   }
 };
+// Captions reach the visitor: the browser draws them, or (with this site's script) the track is hidden and the reel
+// caption's live line carries the active cue's text.
+const captioned = f => f.cues > 0 && (f.captions === 'showing' || (f.captions === 'hidden' && f.live.length > 0));
 const loadedVideo = page => page.requests.some(url => VIDEO.test(url));
 
 const failures = [];
@@ -186,6 +191,8 @@ async function moment(page, where, name, width) {
   if (ambient) {
     expect(facts.playing && facts.muted, where, 'in view, the video does not play muted inline');
     expect(loadedVideo(page), where, 'in view, the video never loads');
+    facts = await until(page, captioned, 5000);
+    expect(captioned(facts), where, `muted, the captions do not reach the visitor (${facts.captions}, ${facts.cues} cues, "${facts.live}")`);
   } else {
     expect(!facts.playing, where, `with ${name}, the video plays without being asked`);
   }
@@ -202,7 +209,10 @@ async function moment(page, where, name, width) {
     facts = await until(page, f => f.playing, 5000);
     expect(facts.playing && facts.muted, where, 'back in view, the video does not resume muted');
   }
-  if (!scripted) return;
+  if (!scripted) {
+    expect(facts.captions === 'showing', where, `with no script the browser does not draw the captions (${facts.captions})`);
+    return;
+  }
   const at = await page.evaluate(`(() => { const r = ${MOMENT}.querySelector('.spec-play').getBoundingClientRect();
     return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
   await page.click(at.x, at.y);
@@ -214,8 +224,9 @@ async function moment(page, where, name, width) {
     if (!focused) await new Promise(r => setTimeout(r, 100));
   }
   expect(focused, where, '"Play with sound" leaves focus on the button instead of the player');
-  facts = await until(page, f => f.cues > 0, 3000);
-  expect(facts.captions === 'showing' && facts.cues > 0, where, `captions are not showing (${facts.captions}, ${facts.cues} cues)`);
+  facts = await until(page, captioned, 5000);
+  expect(captioned(facts), where, `captions are not showing (${facts.captions}, ${facts.cues} cues, "${facts.live}")`);
+  expect(facts.captions === 'hidden', where, 'the browser draws the captions over the frame as well as the live line');
   await page.evaluate('scrollTo(0, 0), true');
   facts = await until(page, () => false, 800);
   expect(facts.playing && !facts.muted, where, 'once asked for, playback with sound is taken over by the scroll');

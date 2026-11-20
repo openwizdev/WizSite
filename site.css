@@ -193,11 +193,15 @@ code,.v{font-family:var(--ow-font-mono)}
 .spec-video:not([controls]) { cursor: pointer; }
 .spec-video:focus-visible { outline: 2px solid var(--orchid); outline-offset: -2px; }
 .spec-video::cue { color: #fff; background: rgba(15, 17, 21, .85); }
-.spec-caption { position: absolute; inset: auto 0 0; display: grid; gap: 6px; padding: 56px clamp(16px, 2.4vw, 28px) clamp(16px, 2vw, 24px); background: linear-gradient(rgb(11 17 28 / 0%), rgb(11 17 28 / 88%) 42%, #0b111c); pointer-events: none; }
+.spec-caption { position: absolute; inset: auto 0 0; display: grid; gap: 6px; padding: 56px clamp(16px, 2.4vw, 28px) clamp(16px, 2vw, 24px); background: linear-gradient(rgb(11 17 28 / 0%), rgb(11 17 28 / 96%) 24%, #0b111c); pointer-events: none; }
 .spec-caption > * { pointer-events: auto; }
 /* Once the visitor takes over (or without this site's script) the native controls show: the caption steps below. */
 .spec-video[controls] + .spec-caption { position: static; padding-top: 16px; background: #0b111c; }
 .spec-video[controls] + .spec-caption .spec-play { display: none; }
+/* With this site's script the track is hidden and its live cue is set here, above the title, like a reel's
+   auto-captions: one or two clean lines, sat on the title, room for two kept so the caption block does not jump between cues. */
+.spec-live { display: flex; align-items: flex-end; min-height: 2.7em; margin: 0 0 2px; color: #fff; font-size: clamp(16px, 1.6vw, 20px); font-weight: 600; letter-spacing: -.01em; line-height: 1.35; text-wrap: balance; text-shadow: 0 1px 12px rgb(0 0 0 / 70%); }
+.spec-live[hidden] { display: none; }
 .spec-title { display: flex; align-items: center; gap: 12px; }
 .spec-title h3 { font-size: clamp(18px, 1.8vw, 24px); }
 .moment-copy { margin: 0; color: #b9c6da; font-size: 14px; }
