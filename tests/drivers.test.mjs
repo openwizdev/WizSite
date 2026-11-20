@@ -16,23 +16,6 @@ const COPY_LINE = 'Write an OpenWiz driver for my host with the write-driver ski
 const ROOT = new URL('..', import.meta.url).pathname;
 const DIST = join(ROOT, 'dist');
 
-const entities = { amp: '&', lt: '<', gt: '>', quot: '"', '#39': "'", apos: "'" };
-const text = html => html.replace(/<[^>]*>/g, '').replace(/&(amp|lt|gt|quot|#39|apos);/g, (_, name) => entities[name]);
-
-function ownPart(html) {
-  const parts = html.match(/<section class="own-driver[^"]*"[\s\S]*?<\/section>/g) ?? [];
-  assert.equal(parts.length, 1, 'one Write your own driver part');
-  return parts[0];
-}
-
-test('the Write your own driver part shows exactly the contract\'s copy line, once, with a live Copy button', async () => {
-  const own = ownPart(await readFile(join(ROOT, 'drivers/index.html'), 'utf8'));
-  const lines = [...own.matchAll(/<code class="install-line">([\s\S]*?)<\/code>/g)].map(m => text(m[1]));
-  assert.deepEqual(lines, [COPY_LINE]);
-  assert.match(own, /<div class="install-box" data-install="live">/, 'the box is live, so site.js enables its Copy');
-  assert.equal((own.match(/<button class="btn install" type="button"[^>]*>/g) ?? []).length, 1, 'one Copy button');
-});
-
 // ---- The browser, against the built site ---------------------------------------------------------------------
 
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml',
@@ -103,7 +86,7 @@ async function launch() {
   return { send, listeners, close };
 }
 
-test('Copy on the Drivers page puts exactly the contract\'s copy line on the clipboard', async () => {
+test('the Write your own driver part shows the contract\'s copy line once, and Copy puts exactly the contract\'s copy line on the clipboard', async () => {
   assert.ok(existsSync(join(DIST, 'drivers/index.html')), 'run npm run build first');
   const server = await serve();
   const origin = `http://127.0.0.1:${server.address().port}`;
@@ -128,19 +111,18 @@ test('Copy on the Drivers page puts exactly the contract\'s copy line on the cli
     await page('Page.navigate', { url: `${origin}/drivers/` });
     await loaded;
     const evaluate = async expression => (await page('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true })).result.value;
-    const button = 'document.querySelector(".own-driver button.install")';
-    const box = await evaluate(`(() => { const b = ${button}; if (!b || b.disabled) return null;
+    // What the reader sees: every copy line in the Write your own driver part, as rendered.
+    assert.deepEqual(await evaluate('[...document.querySelectorAll(".own-driver .install-line")].map(e => e.innerText)'), [COPY_LINE]);
+    const box = await evaluate(`(() => { const all = document.querySelectorAll('.own-driver button.install');
+      if (all.length !== 1 || all[0].disabled) return null; const b = all[0];
+      window.copied = new Promise(resolve => new MutationObserver(() => resolve(b.textContent)).observe(b, { childList: true, characterData: true, subtree: true }));
       b.scrollIntoView({ block: 'center' }); const r = b.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`);
-    assert.ok(box, 'the Write your own driver part has an enabled Copy button once site.js runs');
+    assert.ok(box, 'the Write your own driver part has one Copy button, enabled once site.js runs');
     for (const type of ['mousePressed', 'mouseReleased']) {
       await page('Input.dispatchMouseEvent', { type, x: box.x, y: box.y, button: 'left', clickCount: 1 });
     }
-    let label;
-    for (let i = 0; i < 50 && label !== 'Copied'; i++) {
-      label = await evaluate(`${button}.textContent`);
-      if (label !== 'Copied') await new Promise(resolve => setTimeout(resolve, 20));
-    }
-    assert.equal(label, 'Copied');
+    // site.js relabels the button once the clipboard write settles: wait for that change (5 s at most), then read it.
+    assert.equal(await evaluate('Promise.race([window.copied, new Promise(r => setTimeout(() => r("no change"), 5000))])'), 'Copied');
     assert.equal(await evaluate('navigator.clipboard.readText()'), COPY_LINE);
   } finally {
     await browser.close();
