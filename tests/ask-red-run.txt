@@ -75,3 +75,21 @@
 ✖ failing tests:
     actual: 'still pending',
     expected: 'settled',
+
+# Review round 1 red run (R1 key in a successful answer, R2 redirect followed, R3 previous-day rows after midnight) at dd47ff6
+✖ R1: a successful answer that carries the key, whole or split across pieces, never shows it or any of its pieces
+✖ R2: a redirect from OpenRouter is not followed: one call, upstream_error, the question sent nowhere else
+✖ R3: a previous day's write delayed past midnight leaves no row of that day behind
+✖ R3: a call is counted on the newest day the store holds, even when this request's clock is behind
+ℹ tests 4
+ℹ pass 0
+ℹ fail 4
+✖ failing tests:
+    actual: false,
+    expected: true,
+    actual: [ 'https://openrouter.ai/api/v1/chat/completions', 'https://example.invalid/collect' ],
+    expected: [ 'https://openrouter.ai/api/v1/chat/completions' ],
+    actual: [ { day: '2026-01-15', salt: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' } ],
+    expected: [],
+    actual: 1,
+    expected: 0,

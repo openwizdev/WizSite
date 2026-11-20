@@ -52,8 +52,26 @@ function fakeD1(store, { fails = false, hang = false, rival = null, failWhen = n
     first: async column => { await gate(); const row = exec(sql, values)[0] ?? null; return column && row ? row[column] : row; },
     run: async () => { await gate(); return { success: true, results: exec(sql, values), meta: {} }; },
   });
+  const binding = (wait = null) => ({
+    prepare: sql => statement(sql),
+    batch: async statements => {
+      if (wait) { const until = wait; wait = null; await until; }
+      await gate();
+      db.exec('BEGIN');
+      try {
+        const out = statements.map(s => ({ success: true, results: exec(s.sql, s.values), meta: {} }));
+        db.exec('COMMIT');
+        return out;
+      } catch (error) {
+        db.exec('ROLLBACK');
+        throw error;
+      }
+    },
+  });
   return {
     log,
+    // The same database through a binding whose first batch runs only once `until` settles: a delayed write.
+    delayed: until => binding(until),
     binding: {
       prepare: sql => statement(sql),
       batch: async statements => {
@@ -127,7 +145,15 @@ beforeEach(() => {
     const call = { url: String(url instanceof Request ? url.url : url), method: init.method, headers: new Headers(init.headers), body: init.body, signal: init.signal };
     calls.push(call);
     if (!answer) throw new Error('unexpected upstream call');
-    return answer(call);
+    const response = await answer(call);
+    // Like fetch: a redirect is followed, re-sending the same request, unless the request says redirect: 'manual'
+    // (or 'error', which fails).
+    const to = response.headers.get('Location');
+    if (to && response.status >= 300 && response.status < 400) {
+      if (init.redirect === 'error') throw new TypeError('redirect refused');
+      if ((init.redirect ?? 'follow') === 'follow') return globalThis.fetch(new URL(to, call.url).toString(), init);
+    }
+    return response;
   };
   logs = [];
   for (const level of ['log', 'info', 'warn', 'error', 'debug', 'trace']) {
@@ -453,6 +479,83 @@ test('an upstream that stalls mid-answer times out: text, then upstream_error, r
   assert.equal(out.response.status, 200);
   assert.deepEqual(events(out.body).map(e => e.type), ['text', 'refused']);
   assert.equal(out.store.counters.find(r => r.key === 'spend').count, 63610);
+});
+
+test('R1: a successful answer that carries the key, whole or split across pieces, never shows it or any of its pieces', async () => {
+  const split = (text, at) => at.reduce((out, n, i) => [...out, text.slice(i ? at[i - 1] : 0, n)], []).concat(text.slice(at.at(-1)));
+  const leak = `Synthetic answer that goes on long enough to be sent, then: ${KEY} and more text after it.`;
+  const at = leak.indexOf(KEY);
+  for (const chunks of [
+    [leak],
+    split(leak, [at + 4]),
+    split(leak, [at + 4, at + 9, at + 15]),
+    split(leak, [at, at + KEY.length]),
+    ['Synthetic first piece long enough to send. ', ...split(`then ${KEY} at the end`, [8, 12, 20])],
+  ]) {
+    answer = upstreamAnswer({ chunks, cost: 0.0001 });
+    const out = await run(withCase());
+    assert.ok(!out.body.includes(KEY), `the key in the body: ${chunks.join('|')}`);
+    // No sent piece overlaps the key: every text event comes before the key's first character.
+    const keyAt = chunks.join('').indexOf(KEY);
+    const sent = events(out.body).filter(e => e.type === 'text').map(e => e.text);
+    assert.ok(sent.join('').length <= keyAt, `a piece holding part of the key was sent: ${JSON.stringify(sent)}`);
+    assert.deepEqual(sent, chunks.slice(0, sent.length), 'the pieces sent are the answer\'s own pieces, in order');
+    assert.equal(events(out.body).at(-1).type, 'refused', 'the answer ends as upstream_error');
+    assert.equal(events(out.body).at(-1).reason, 'upstream_error');
+    assert.ok(!events(out.body).some(e => e.type === 'done'));
+    assert.equal(out.store.counters.find(r => r.key === 'spend').count, 63610, 'the reservation stays');
+  }
+});
+
+test('R2: a redirect from OpenRouter is not followed: one call, upstream_error, the question sent nowhere else', async () => {
+  for (const status of [301, 302, 303, 307, 308]) {
+    calls.length = 0;
+    answer = call => call.url === UPSTREAM
+      ? new Response(null, { status, headers: { Location: 'https://example.invalid/collect' } })
+      : upstreamAnswer({ chunks: ['Synthetic answer from somewhere else.'], cost: 0.0001 })();
+    const out = await run(withCase());
+    assert.deepEqual(calls.map(c => c.url), [UPSTREAM], `status ${status}: only OpenRouter is called`);
+    assert.equal(out.response.status, 502);
+    assert.match(out.body, /"reason":"upstream_error"/);
+    assert.equal(out.store.counters.find(r => r.key === 'spend').count, 63610);
+  }
+});
+
+test('R3: a previous day\'s write delayed past midnight leaves no row of that day behind', async () => {
+  // Request A starts at 23:59:59 and its first store batch is delayed; request B, after midnight, runs to the end;
+  // then A's batch commits. Both questions match no passage, so neither writes again.
+  const store = fakeD1({ salts: [], counters: [] });
+  let release;
+  const held = new Promise(resolve => { release = resolve; });
+  const asking = (now, binding, salt) => {
+    const c = withCase({ now, request: ask('What is the price of a unicorn?') });
+    const env = { ...c.settings, ASSETS: assets(), ASK_A_WIZ_COUNTERS: binding };
+    const pending = [];
+    return handle({ request: new Request(`${SITE}/api/ask`, { method: 'POST', headers: c.request.headers, body: c.request.body }), env, waitUntil: p => pending.push(p) },
+      { clock: () => new Date(now), salt: () => salt, rank: () => [] }).then(async response => { await response.text(); await Promise.all(pending); return response; });
+  };
+  const a = asking('2026-01-15T23:59:59+00:00', store.delayed(held), 'a'.repeat(64));
+  const b = await asking('2026-01-16T00:00:01+00:00', store.binding, 'b'.repeat(64));
+  assert.equal(b.status, 200);
+  release();
+  await a;
+  const after = store.dump();
+  assert.deepEqual(after.salts.filter(s => s.day < '2026-01-16'), [], 'no previous-day salt');
+  assert.deepEqual(after.counters.filter(c => c.day < '2026-01-16'), [], 'no previous-day counter');
+  assert.deepEqual(after.salts, [{ day: '2026-01-16', salt: 'b'.repeat(64) }]);
+});
+
+test('R3: a call is counted on the newest day the store holds, even when this request\'s clock is behind', async () => {
+  // Another request already wrote the next day and used its whole call cap: this one, on the old day, must not
+  // slip a call through on a day that is about to be pruned.
+  const c = withCase({ now: '2026-01-15T23:59:58+00:00', store: { salts: [], counters: [{ day: '2026-01-16', key: 'cap', count: 200 }] } });
+  answer = upstreamAnswer({ chunks: ['Synthetic answer that must not be sent.'], cost: 0.0001 });
+  const out = await run(c);
+  assert.equal(calls.length, 0, 'no model call');
+  assert.equal(out.response.status, 429);
+  assert.match(out.body, /"reason":"daily_cap"/);
+  assert.equal(out.response.headers.get('Retry-After'), String(86400 + 2), 'until the end of that newest day');
+  assert.deepEqual(out.store.counters.filter(r => r.day < '2026-01-16'), []);
 });
 
 test('a visitor who stops the stream cancels the upstream call, and the reservation stays', async () => {
