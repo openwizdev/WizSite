@@ -203,12 +203,6 @@
 
   // ---- The page ----
 
-  // The shell draws a page's icon from OW.ui.icon; this page brings its own (three stacked layers).
-  const baseIcon = OW.ui.icon;
-  OW.ui.icon = name => (name === 'models'
-    ? OW.ui.h('svg', { class: 'ic', viewBox: '0 0 24 24', 'aria-hidden': 'true' }, OW.ui.h('path', { d: 'm12 3 9 5-9 5-9-5ZM3 12l9 5 9-5M3 16l9 5 9-5' }))
-    : baseIcon(name));
-
   const MAKE = 'Ask your agent to run `openwiz models list --save` and commit docs/agents/models-offered.json; the choices your harnesses offer then show here.';
   const shown = { repo: null, open: null, picked: {} }; // for one repository: the open picker and each role's picked line
 
