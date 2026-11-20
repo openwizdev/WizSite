@@ -1,10 +1,10 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="The OpenWiz changelog: how the repositories fit together, what exists today, and every release."><title>Changelog — OpenWiz</title><link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48"><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><meta property="og:image" content="https://openwiz.dev/brand/og.png"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="OpenWiz"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="https://openwiz.dev/brand/og.png"><link rel="preload" href="/fonts/Geist-var.woff2" as="font" type="font/woff2" crossorigin><link rel="stylesheet" href="/tokens.css"><link rel="stylesheet" href="/site.css"><style>
-/* The Changelog's own styles (#1363). The landing page never loads them. */
-.changelog{padding:64px 0 0}
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="The OpenWiz changelog: how the repositories fit together, what exists today, and every release."><title>Changelog — OpenWiz</title><link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48"><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><meta property="og:image" content="https://openwiz.dev/brand/og.png?v=2"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="OpenWiz"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="https://openwiz.dev/brand/og.png?v=2"><link rel="preload" href="/fonts/Geist-var.woff2" as="font" type="font/woff2" crossorigin><link rel="stylesheet" href="/tokens.css"><link rel="stylesheet" href="/site.css"><script src="/vendor/gsap-3.15.1.min.js" defer></script><script src="/site.js" defer></script><style>
+/* The Changelog's own styles (#1363), in the landing's type and spacing (#1355). The landing page never loads them. */
+.changelog{padding-block:clamp(40px,6vw,84px) clamp(48px,7vw,100px)}
 .today,.releases{max-width:880px}
-.changelog h1{font-size:64px;font-weight:700;line-height:.98;letter-spacing:-.045em}
-.changelog .lead{margin-top:16px;max-width:720px;font-size:19px;color:var(--grey2)}
+.changelog h1{font-size:clamp(44px,6vw,80px);font-weight:760;line-height:.98;letter-spacing:-.06em}
+.changelog .lead{margin-top:18px;max-width:720px;font-size:clamp(17px,1.6vw,21px);line-height:1.45;letter-spacing:-.02em;color:#e1d7cb}
 .changelog a:not(.plain){color:var(--ink);text-decoration:underline;text-decoration-color:var(--brass);text-underline-offset:4px}
 .repo-map{margin:40px 0 0;max-width:460px}
 .repo-map svg{display:block;width:100%;height:auto;font-family:var(--ow-font-sans)}
@@ -19,9 +19,9 @@
 .repo-map .label{fill:var(--grey);font-size:11px}
 .repo-map .quiet{fill:var(--grey);font-size:12px}
 .repo-map figcaption{margin-top:12px;font-size:15px;color:var(--grey)}
-.changelog h2{margin-top:56px;font-size:30px}
+.changelog h2{margin-top:56px;font-size:clamp(26px,3vw,36px);font-weight:720;line-height:1.05;letter-spacing:-.045em}
 .changelog .note{margin-top:8px;color:var(--grey);font-size:16px}
-.part,.release-part{margin-top:28px;padding:24px 28px;border-radius:16px;background:var(--panel);box-shadow:inset 0 0 0 1px var(--edge)}
+.part,.release-part{margin-top:24px;padding:22px 24px;border:1px solid var(--line);border-radius:12px;background:var(--panel)}
 .part h3,.release-part h3{margin:0;display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px;font:650 24px/1.25 var(--ow-font-sans);letter-spacing:-.02em}
 .part h3 span,.release-part h3 span{font:400 14px/1.4 var(--ow-font-mono);letter-spacing:0;color:var(--grey)}
 .part .intro{margin-top:10px;font-size:18px;color:var(--ink)}
@@ -45,19 +45,75 @@
 .release code{font-size:.92em;color:#ffd0c8;overflow-wrap:anywhere}
 .part code{font-size:.92em;color:#ffd0c8;white-space:nowrap}
 @media (max-width:960px){
-  .changelog{padding-top:32px}
-  .changelog h1{font-size:42px}
-  .changelog .lead{font-size:16.5px}
   .repo-map{margin-top:28px}
-  .changelog h2{margin-top:40px;font-size:24px}
-  .part,.release-part{margin-top:20px;padding:18px 18px 20px;border-radius:14px}
+  .changelog h2{margin-top:40px}
+  .part,.release-part{margin-top:18px;padding:16px 16px 18px}
   .part h3,.release-part h3{font-size:20px}
   .part .intro{font-size:16.5px}
   .part ul{font-size:15px}
 }
 </style></head>
-<body class="changelog-page"><a class="skip" href="#main">Skip to content</a>
-<header class="top wrap"><a class="brand" href="/"><img src="/brand/openwiz-lockup.svg" alt="OpenWiz" width="140" height="40"></a><nav aria-label="Main navigation"><a href="/" >Home</a><a href="https://github.com/openwizdev/openwiz">GitHub ↗</a></nav></header>
+<body class="landing changelog-page"><a class="skip" href="#main">Skip to content</a>
+<header class="landing-nav wrap">
+  <a class="landing-brand" href="/"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" aria-hidden="true" width="34" height="34">
+    <defs><mask id="cutouts" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512">
+      <rect width="512" height="512" fill="white"/><g fill="black"><path d="M132 234 Q132 210 158 210 H354 Q380 210 380 236 V293
+ C380 322 368 345 348 358 H164 C144 344 132 322 132 293 Z"/><path d="M148 325 C151 362 164 390 186 410 L207 391 L228 438
+      L247 405 L264 461 L283 405 L304 438 L325 391 L346 410
+      C368 388 379 358 380 325 C351 346 324 353 294 353 H220
+      C192 353 167 345 148 325 Z"/></g>
+      <g fill="white"><path d="M132 234 Q132 210 158 210 H354 Q380 210 380 236 V293
+ C380 322 368 345 348 358 H164 C144 344 132 322 132 293 Z"/><path d="M148 325 C151 362 164 390 186 410 L207 391 L228 438
+      L247 405 L264 461 L283 405 L304 438 L325 391 L346 410
+      C368 388 379 358 380 325 C351 346 324 353 294 353 H220
+      C192 353 167 345 148 325 Z"/></g>
+      <g fill="black"><circle cx="219" cy="278" r="30"/><circle cx="291" cy="278" r="30"/><path d="M190 323 Q190 312 202 312 H310 Q322 312 322 324 V342 Q322 354 310 354 H202 Q190 354 190 342 Z"/></g>
+    </mask><mask id="hatcut" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512">
+      <rect width="512" height="512" fill="white"/><g fill="black"><path d="M154 222 L228 81 C249 40 281 25 313 30 C357 36 385 73 384 111
+ C383 139 367 154 350 145 C336 138 342 110 323 96 C307 84 288 91 278 106
+ L328 222 Z"/></g>
+      <g fill="white"><path d="M154 222 L228 81 C249 40 281 25 313 30 C357 36 385 73 384 111
+ C383 139 367 154 350 145 C336 138 342 110 323 96 C307 84 288 91 278 106
+ L328 222 Z"/></g>
+    </mask></defs>
+    <g fill="#cfc6b8" color="#cfc6b8">
+      <g mask="url(#cutouts)"><path d="M132 234 Q132 210 158 210 H354 Q380 210 380 236 V293
+ C380 322 368 345 348 358 H164 C144 344 132 322 132 293 Z"/><path d="M148 325 C151 362 164 390 186 410 L207 391 L228 438
+      L247 405 L264 461 L283 405 L304 438 L325 391 L346 410
+      C368 388 379 358 380 325 C351 346 324 353 294 353 H220
+      C192 353 167 345 148 325 Z"/></g>
+      <circle cx="230" cy="273" r="8"/><circle cx="280" cy="284" r="8"/><path d="M220 313 V353 H228 V313 Z M252 313 V353 H260 V313 Z
+ M284 313 V353 H292 V313 Z"/>
+      <path d="M154 222 L228 81 C249 40 281 25 313 30 C357 36 385 73 384 111
+ C383 139 367 154 350 145 C336 138 342 110 323 96 C307 84 288 91 278 106
+ L328 222 Z" mask="url(#hatcut)"/><path d="M96 210 Q96 190 117 190 H395 Q416 190 416 210 V228 Q416 246 397 246 H115 Q96 246 96 228 Z"/>
+    </g></svg>OpenWiz</a>
+  <nav aria-label="Main navigation">
+    <a class="nav-drivers" href="/drivers/">Drivers</a>
+    <a class="nav-log" href="/changelog/" aria-current="page">Changelog</a>
+    <a class="github-star" href="https://github.com/openwizdev/openwiz" aria-label="Star on GitHub"><svg aria-hidden="true" viewBox="0 0 16 16" width="17" height="17" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg><span data-stars hidden></span></a>
+    <a class="sign-in" href="/app/" aria-label="Sign in with GitHub">Sign in</a>
+  </nav>
+</header>
 <main id="main" class="wrap changelog"><h1>Changelog</h1><p class="lead">How the OpenWiz repositories fit together, and what each one does today. Older release notes stay on <a href="https://github.com/openwizdev/OpenWiz/releases">GitHub’s releases</a>.</p><figure class="repo-map"><svg role="img" aria-label="How the repositories fit together. WizSkills gives OpenWiz a pinned release of the skills agents follow, and WizLoops gives it loop files. OpenWiz, the command and kernel, drives your agents’ threads in Cloudroom and reads your specs and tickets on GitHub. WizPlugins shows WizBar inside Cloudroom, and WizSite’s app at openwiz.dev reads GitHub. Private records and tools sit apart." viewBox="0 0 360 390" width="360" height="390"><rect class="box" x="4" y="4" width="168" height="52" rx="10"/><text class="name" x="88" y="27" text-anchor="middle">WizSkills</text><text class="sub" x="88" y="45" text-anchor="middle">the skills agents follow</text><rect class="box" x="188" y="4" width="168" height="52" rx="10"/><text class="name" x="272" y="27" text-anchor="middle">WizLoops</text><text class="sub" x="272" y="45" text-anchor="middle">loops as files</text><path class="edge" d="M88 56V96"/><path class="head" d="M83 89L88 96L93 89Z"/><text class="label" x="97" y="80">a pinned release</text><path class="edge" d="M272 56V96"/><path class="head" d="M267 89L272 96L277 89Z"/><text class="label" x="281" y="80">loop files</text><rect class="box core" x="4" y="96" width="352" height="52" rx="10"/><text class="name" x="180" y="119" text-anchor="middle">OpenWiz</text><text class="sub" x="180" y="137" text-anchor="middle">the command and kernel</text><path class="edge" d="M88 148V188"/><path class="head" d="M83 181L88 188L93 181Z"/><text class="label" x="97" y="172">drives</text><path class="edge" d="M272 148V188"/><path class="head" d="M267 181L272 188L277 181Z"/><text class="label" x="281" y="172">reads</text><rect class="host" x="4" y="188" width="168" height="52" rx="10"/><text class="name" x="88" y="211" text-anchor="middle">Cloudroom</text><text class="sub" x="88" y="229" text-anchor="middle">your agents’ threads</text><rect class="host" x="188" y="188" width="168" height="52" rx="10"/><text class="name" x="272" y="211" text-anchor="middle">GitHub</text><text class="sub" x="272" y="229" text-anchor="middle">your specs and tickets</text><path class="edge" d="M88 240V280"/><path class="head" d="M83 247L88 240L93 247Z"/><text class="label" x="97" y="264">shows inside</text><path class="edge" d="M272 240V280"/><path class="head" d="M267 247L272 240L277 247Z"/><text class="label" x="281" y="264">the app reads</text><rect class="box" x="4" y="280" width="168" height="52" rx="10"/><text class="name" x="88" y="303" text-anchor="middle">WizPlugins</text><text class="sub" x="88" y="321" text-anchor="middle">WizBar in Cloudroom</text><rect class="box" x="188" y="280" width="168" height="52" rx="10"/><text class="name" x="272" y="303" text-anchor="middle">WizSite</text><text class="sub" x="272" y="321" text-anchor="middle">openwiz.dev and its app</text><rect class="private" x="4" y="352" width="352" height="34" rx="10"/><text class="quiet" x="180" y="373" text-anchor="middle">Private records and tools</text></svg><figcaption>Cloudroom and GitHub, dashed, are where your agents and your work live.</figcaption></figure><section class="today" aria-labelledby="today-h"><h2 id="today-h">What exists today</h2><p class="note">Written from the merged code in each public repository. Nothing here is a plan.</p><section class="part" id="openwiz" aria-labelledby="openwiz-h"><h3 id="openwiz-h">OpenWiz <span>openwizdev/OpenWiz</span></h3><p class="intro">OpenWiz is the factory’s command and kernel. It reads and drives your coding agents’ threads in Cloudroom, and reads your fleets’ specs and tickets on GitHub. It pins a WizSkills release and reads WizLoops’ loop files.</p><ul><li><code>openwiz ls</code> and <code>openwiz show</code> list and open your Cloudroom threads, and only read.</li><li><code>openwiz send</code> sends one message to a thread, queued or as a steer. <code>openwiz new</code> starts one new thread, and only with <code>--yes</code>. Both can attach files.</li><li><code>openwiz fleets</code> and <code>openwiz fleet</code> show your fleets and each spec’s progress, read from GitHub.</li><li><code>openwiz loop</code> checks loop files, shows what would change, creates or updates one Cloudroom loop, and writes your live loops back to files.</li><li><code>openwiz help --agent</code> lists every command for scripts and agents, and most commands give one clean result with <code>--json</code>.</li><li><code>openwiz-server</code> serves a web view on your own computer: your threads, fleets, the plan, decisions waiting on you, and loops.</li><li><code>openwiz-service</code> keeps that web view running on a PC and runs its registered jobs on a schedule.</li></ul><p class="where">Prebuilt pre-releases for macOS and Linux are on <a href="https://github.com/openwizdev/OpenWiz/releases">OpenWiz’s GitHub releases</a>, and trail main. Most of this is tested on synthetic fixtures only.</p></section><section class="part" id="wizskills" aria-labelledby="wizskills-h"><h3 id="wizskills-h">WizSkills <span>openwizdev/WizSkills</span></h3><p class="intro">WizSkills holds the skills: plain instructions, with their scripts and tests, that a coding agent follows. With them, agents grill an idea, plan it into tickets, then build, review and merge each ticket as a fleet.</p><ul><li>One Claude Code plugin, <code>openwiz</code>, installed pinned to a release; <code>install.sh</code> installs the same release for Codex or any other agent.</li><li><code>grill</code>, <code>build-ticket</code>, <code>review-ticket</code> and <code>launch-fleet</code>: question an idea, build one ticket, review its pull request, and run the fleet.</li><li>Helpers for the work around it: <code>wayfind</code>, <code>research</code>, <code>diagnose</code>, <code>where-are-we</code>, <code>handoff</code> and <code>triage</code>.</li></ul><p class="where">Each release has its own notes on <a href="https://github.com/openwizdev/WizSkills/releases">WizSkills’ GitHub releases</a>.</p></section><section class="part" id="wizloops" aria-labelledby="wizloops-h"><h3 id="wizloops-h">WizLoops <span>openwizdev/WizLoops</span></h3><p class="intro">WizLoops keeps an agent’s loops as files: one Markdown file per loop, saying when it wakes, what it checks first and what the agent is told. It holds the format, a starter catalog and the rules for Cloudroom, and no code. OpenWiz’s <code>openwiz loop</code> commands read these files.</p><ul><li>The loop file format, with its JSON schema and fixtures.</li><li>Five starter loops: <code>fleet-check</code>, <code>hourly-status</code>, <code>morning-digest</code>, <code>stall-sweep</code> and <code>workflow-kick</code>.</li><li>The Cloudroom adapter rules: what maps to a Cloudroom loop, and what is refused rather than faked.</li><li>CI checks every catalog loop and fixture with <code>openwiz loop validate</code>.</li></ul><p class="where">Cloudroom is the only adapter so far.</p></section><section class="part" id="wizplugins" aria-labelledby="wizplugins-h"><h3 id="wizplugins-h">WizPlugins <span>openwizdev/WizPlugins</span></h3><p class="intro">WizPlugins holds plugins that show the factory inside Cloudroom. Its one plugin so far, WizBar, is a sidebar of your agents’ threads with their issues, pull requests and child threads.</p><ul><li>WizBar’s cards link each thread’s issue or pull request and count its child threads; hover to list them.</li><li>A running count with a stats panel, and drag to pin.</li><li>Every WizBar action is also a <code>room-cli wizbar</code> command with JSON.</li></ul><p class="where">Not in the plugin marketplace yet: <a href="https://github.com/openwizdev/WizPlugins">install it from source</a>. Fixture tests prove it; its check on a real Cloudroom is still open.</p></section><section class="part" id="wizsite" aria-labelledby="wizsite-h"><h3 id="wizsite-h">WizSite <span>openwizdev/WizSite</span></h3><p class="intro">WizSite is openwiz.dev: the landing page, this changelog and the app. It is a static site on Cloudflare Pages with one small sign-in helper, and the app reads GitHub from your browser.</p><ul><li><a href="/">The landing page</a> walks through a sample to-do build and the agents OpenWiz works with. Its Install button says coming soon.</li><li><a href="/app/">openwiz.dev/app</a>: sign in with GitHub through the read-only OpenWiz Viewer app, pick a repository, and put the app on your phone’s home screen.</li><li>You shows what needs you: counts of work needing you, building, in review and merged, then the specs to confirm, plans to approve and tickets waiting on you, each linked to GitHub.</li><li>Specs shows each open spec’s progress, and each spec’s page draws its ticket graph.</li><li>The Agents page is a placeholder for now.</li></ul></section></section></main>
-<footer class="foot-site wrap"><a class="brand" href="/"><img src="/brand/openwiz-lockup.svg" alt="OpenWiz" width="140" height="40"></a><div><a href="/">Home</a><a href="https://github.com/openwizdev/openwiz">GitHub ↗</a></div></footer>
+<footer class="landing-footer">
+  <div class="wrap">
+    <div class="footer-links"><a href="/changelog/">Changelog</a><a href="https://github.com/openwizdev/openwiz#readme">Docs</a><a class="github-star" href="https://github.com/openwizdev/openwiz" aria-label="Star on GitHub"><svg aria-hidden="true" viewBox="0 0 16 16" width="17" height="17" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg><span data-stars hidden></span></a></div>
+    <p class="footer-wordmark">OpenWiz</p>
+  </div>
+  <div class="family" aria-hidden="true">
+    <span class="family-wiz"><img src="/art/family-01.webp" alt="" width="160" height="160" loading="lazy"><span class="wiz-eye"><i></i></span><span class="wiz-eye"><i></i></span></span>
+    <span class="family-wiz"><img src="/art/family-02.webp" alt="" width="160" height="160" loading="lazy"><span class="wiz-eye"><i></i></span><span class="wiz-eye"><i></i></span></span>
+    <span class="family-wiz"><img src="/art/family-03.webp" alt="" width="160" height="160" loading="lazy"><span class="wiz-eye"><i></i></span><span class="wiz-eye"><i></i></span></span>
+    <span class="family-wiz"><img src="/art/family-04.webp" alt="" width="160" height="160" loading="lazy"><span class="wiz-eye"><i></i></span><span class="wiz-eye"><i></i></span></span>
+    <span class="family-wiz"><img src="/art/family-05.webp" alt="" width="160" height="160" loading="lazy"><span class="wiz-eye"><i></i></span><span class="wiz-eye"><i></i></span></span>
+    <span class="family-wiz"><img src="/art/family-06.webp" alt="" width="160" height="160" loading="lazy"><span class="wiz-eye"><i></i></span><span class="wiz-eye"><i></i></span></span>
+    <span class="family-wiz"><img src="/art/family-07.webp" alt="" width="160" height="160" loading="lazy"><span class="wiz-eye"><i></i></span><span class="wiz-eye"><i></i></span></span>
+    <span class="family-wiz"><img src="/art/family-08.webp" alt="" width="160" height="160" loading="lazy"><span class="wiz-eye"><i></i></span><span class="wiz-eye"><i></i></span></span>
+    <span class="family-wiz"><img src="/art/family-09.webp" alt="" width="160" height="160" loading="lazy"><span class="wiz-eye"><i></i></span><span class="wiz-eye"><i></i></span></span>
+    <span class="family-wiz"><img src="/art/family-10.webp" alt="" width="160" height="160" loading="lazy"><span class="wiz-eye"><i></i></span><span class="wiz-eye"><i></i></span></span>
+    <span class="family-wiz"><img src="/art/family-11.webp" alt="" width="160" height="160" loading="lazy"><span class="wiz-eye"><i></i></span><span class="wiz-eye"><i></i></span></span>
+    <span class="family-wiz"><img src="/art/family-12.webp" alt="" width="160" height="160" loading="lazy"><span class="wiz-eye"><i></i></span><span class="wiz-eye"><i></i></span></span>
+  </div>
+</footer>
 </body></html>

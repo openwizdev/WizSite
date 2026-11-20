@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="Bring your own everything. The open source factory layer for coding agents, ADEs, compute and always-on bots."><title>OpenWiz — Bring your own everything.</title><link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48"><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><meta property="og:image" content="https://openwiz.dev/brand/og.png"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="OpenWiz"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="https://openwiz.dev/brand/og.png"><link rel="preload" href="/fonts/Geist-var.woff2" as="font" type="font/woff2" crossorigin><link rel="stylesheet" href="/tokens.css"><link rel="stylesheet" href="/site.css"><script src="/vendor/gsap-3.15.1.min.js" defer></script><script src="/site.js" defer></script></head>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="Bring your own everything. The open source factory layer for coding agents, ADEs, compute and always-on bots."><title>OpenWiz — Bring your own everything.</title><link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48"><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><meta property="og:image" content="https://openwiz.dev/brand/og.png?v=2"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="OpenWiz"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="https://openwiz.dev/brand/og.png?v=2"><link rel="preload" href="/fonts/Geist-var.woff2" as="font" type="font/woff2" crossorigin><link rel="stylesheet" href="/tokens.css"><link rel="stylesheet" href="/site.css"><script src="/vendor/gsap-3.15.1.min.js" defer></script><script src="/site.js" defer></script></head>
 <body class="landing">
 <a class="skip" href="#main">Skip to content</a>
 <header class="landing-nav wrap">
@@ -37,6 +37,7 @@
  L328 222 Z" mask="url(#hatcut)"/><path d="M96 210 Q96 190 117 190 H395 Q416 190 416 210 V228 Q416 246 397 246 H115 Q96 246 96 228 Z"/>
     </g></svg>OpenWiz</a>
   <nav aria-label="Main navigation">
+    <a class="nav-drivers" href="/drivers/">Drivers</a>
     <a class="nav-log" href="/changelog/">Changelog</a>
     <a class="github-star" href="https://github.com/openwizdev/openwiz" aria-label="Star on GitHub"><svg aria-hidden="true" viewBox="0 0 16 16" width="17" height="17" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg><span data-stars hidden></span></a>
     <a class="sign-in" href="/app/" aria-label="Sign in with GitHub">Sign in</a>
@@ -65,13 +66,20 @@
           <div class="window-main">
             <div class="window-title"><span>Specs / To-do app</span><h2>Build a to-do app</h2></div>
             <dl class="window-metrics"><div><dt>Need you</dt><dd>0</dd></div><div><dt>Building</dt><dd>1</dd></div><div><dt>In review</dt><dd>1</dd></div><div><dt>Merged</dt><dd>1</dd></div></dl>
-            <div class="ticket-graph" role="group" aria-label="To-do app tickets">
-              <div class="ember-ticket merged">Task list<small>Merged</small></div>
-              <svg class="ticket-arrow" aria-hidden="true" viewBox="0 0 16 16"><path d="M2 8h11m-4-4 4 4-4 4"/></svg>
-              <div class="ember-ticket building">Add a task<small>Building</small><svg class="work-pulse" aria-hidden="true" viewBox="0 0 20 20"><circle class="pulse-ring" cx="10" cy="10" r="8"/><circle cx="10" cy="10" r="3.5"/></svg></div>
-              <svg class="ticket-arrow" aria-hidden="true" viewBox="0 0 16 16"><path d="M2 8h11m-4-4 4 4-4 4"/></svg>
-              <div class="ember-ticket review">Save tasks<small>In review</small></div>
-            </div>
+            <section class="window-spec" aria-label="Spec">
+              <h3 class="window-label">Spec</h3>
+              <p class="spec-summary">One list: add a task, mark it complete, keep tasks after reload.</p>
+              <p class="window-waiting">Waiting for your answers</p>
+            </section>
+            <section class="window-tickets" aria-label="Tickets">
+              <h3 class="window-label">Tickets</h3>
+              <ol class="ticket-list">
+                <li class="ember-ticket merged"><span class="ticket-number">#12</span><span class="ticket-title">Task list</span><small class="ticket-chip">Merged</small></li>
+                <li class="ember-ticket building"><span class="ticket-number">#13</span><span class="ticket-title">Add a task</span><small class="ticket-chip">Building</small><svg class="ticket-builder" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" aria-hidden="true"><g fill="#cfc6b8"><path d="M132 222 Q132 204 153 204 H359 Q380 204 380 226 V292 Q380 324 351 344 H161 Q132 324 132 292Z"/><path d="M147 320 Q170 342 208 344 H304 Q345 340 366 319 Q364 383 326 405 L305 388 283 427 260 395 239 427 216 388 194 405 Q153 378 147 320Z"/><path d="M149 204 L220 76 Q256 12 292 76 L363 204Z"/><path d="M96 198 Q96 184 113 184 H399 Q416 184 416 201 V219 Q416 234 399 234 H113 Q96 234 96 219Z"/></g><g fill="#1b1916"><circle cx="218" cy="270" r="27"/><circle cx="294" cy="270" r="27"/><path d="M195 315 Q195 307 205 307 H307 Q317 307 317 317 V330 H195Z"/></g><g fill="#cfc6b8"><path d="M128 178 Q137 132 183 116 L201 145 Q256 125 311 145 L329 116 Q375 132 384 178 L402 195 H110Z"/><path d="M133 183 H379" fill="none" stroke="#1b1916" stroke-width="10"/><path d="M379 279 L397 260 Q407 250 417 260 L424 267 406 286 438 318 424 332 391 300 371 320 359 308Z"/><circle cx="229" cy="266" r="7"/><circle cx="283" cy="275" r="7"/><path d="M222 311h8v32h-8zm30 0h8v32h-8zm30 0h8v32h-8z"/></g></svg></li>
+                <li class="ember-ticket review"><span class="ticket-number">#14</span><span class="ticket-title">Save tasks</span><small class="ticket-chip">In review</small></li>
+              </ol>
+              <p class="window-waiting">Waiting for the spec</p>
+            </section>
             <div class="demo-progress" aria-hidden="true">
               <p class="demo-status">Building the to-do app</p>
               <div class="demo-steps"><i></i><i></i><i></i><i></i><i></i></div>
