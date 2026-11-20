@@ -31,6 +31,8 @@ ART_HASHES = {
     'art/hero-renaissance-frames.webp': '04192a312129777ab9b4ee43ea632d04c6b725938b6feb7d134db4fcfdfd4cec',
     'art/hero-samurai-frames.webp': '3a6eef42bfd2fc6f7b8e847d4355d75c283425a274b5fb9c95c3404f580725c5',
     'art/hero-steam-frames.webp': '20f057c963be16ebc3cabbf1d2ab849e2e8144d29a3e419344a867eef2c41f3c',
+    # The Drivers page, variant A (#47): the Wiz crew's painted ship, generated through Codex's image tool.
+    'art/drivers-a-ship.webp': '8ac9970ef0b9da29ad4741922753ee32163df8e9a5dac242979f97f977947023',
     'art/spec-demo.webm': '6619ae77a13229d9056037e5bc793d48f7fc98490d068c2b6e4f58426a8fac22',
 }
 ART = set(ART_HASHES)
@@ -88,7 +90,7 @@ def fingerprinted_page(html):
 
 FINGERPRINTS = {name: fingerprint(name, (ROOT / name).read_bytes()) for name in HASHED}
 STATIC = {
-    'index.html', 'changelog/index.html', '_headers', APP_PAGE, 'app/manifest.webmanifest',
+    'index.html', 'changelog/index.html', 'drivers/index.html', '_headers', APP_PAGE, 'app/manifest.webmanifest',
     'fonts/Geist-var.woff2', 'fonts/GeistMono-var.woff2', 'fonts/OFL.txt',
 } | ART | set(ICON_HASHES) | set(VECTORS) | (set(VENDOR_HASHES) - {GSAP}) | set(APP_VENDOR)
 RUNTIME = STATIC | set(FINGERPRINTS.values())
@@ -116,7 +118,7 @@ FONT_HASHES = {
     'fonts/GeistMono-var.woff2': '55419aa06f58adcd7f145c6c920e56936416f17e528f60efc6032ffa4269972b',
     'fonts/OFL.txt': 'c683bfbcc7e087f5d37a54ef628f10387c451a83ddc459b151403a164ac46c90',
 }
-PAGES = ('index.html', 'changelog/index.html')
+PAGES = ('index.html', 'changelog/index.html', 'drivers/index.html')
 ALL_PAGES = PAGES + (APP_PAGE,)
 # The to-do example and both app entry points stay visible in the static landing page.
 STORY_COPY = ('Build a to-do app', 'Bring any agent', 'Sign in with GitHub', 'Put the app on your phone')
@@ -148,13 +150,119 @@ DRIVERS = (
     ('Grok Bot', 'Coming soon: listed when its driver lands', 'not yet run'),
 )
 
+DRIVERS_PAGE = 'drivers/index.html'
+DRIVER_WORDS = ('version', 'start', 'wake', 'stop')
+KIT_CHECKS = ('version', 'start', 'wake', 'stop', 'token')
+DRIVERS_LINKS = ('/drivers/', '/drivers')
+DRIVERS_REPO = 'https://github.com/openwizdev/OpenWiz'
+DRIVERS_NUMBERS = {'1', '4', '5', '2026-11-19'}  # v1, four words, five checks, 5 of 5, the kit run's date
+DRIVERS_ART_SHARE = 400_000  # bytes: variant A's art/drivers-a-*.webp together
+
+
+class DriverCards(HTMLParser):
+    """Each article.driver: its name, classes, status line, four words and kit checks (name, result, text)."""
+    def __init__(self, text):
+        super().__init__(convert_charrefs=True)
+        self.cards, self.reading, self.depth, self.list = [], None, 0, None
+        self.feed(text)
+
+    def handle_starttag(self, tag, attrs):
+        attrs = dict(attrs)
+        classes = (attrs.get('class') or '').split()
+        if tag == 'article' and 'driver' in classes:
+            self.cards.append({'name': attrs.get('data-driver'), 'classes': classes, 'h3': '', 'status': '',
+                               'words': [], 'kit': None, 'checks': []})
+            self.reading, self.list = None, None
+            return
+        if not self.cards:
+            return
+        card = self.cards[-1]
+        if self.reading:
+            self.depth += tag not in ('br', 'img', 'path', 'circle', 'rect', 'line')
+            return
+        if tag == 'ul' and ({'kit', 'words'} & set(classes)):
+            self.list = 'kit' if 'kit' in classes else 'words'
+            if self.list == 'kit':
+                card['kit'] = attrs.get('data-result')
+        elif tag == 'h3':
+            self.reading, self.depth = ['h3', tag], 0
+        elif tag == 'p' and 'status' in classes:
+            self.reading, self.depth = ['status', tag], 0
+        elif tag == 'li' and self.list == 'kit':
+            card['checks'].append([attrs.get('data-check'), attrs.get('data-result'), ''])
+            self.reading, self.depth = ['check', tag], 0
+        elif tag == 'li' and self.list == 'words':
+            card['words'].append('')
+            self.reading, self.depth = ['word', tag], 0
+
+    def handle_endtag(self, tag):
+        if not self.reading:
+            if tag == 'ul':
+                self.list = None
+            return
+        if self.depth and tag not in ('br', 'img', 'path', 'circle', 'rect', 'line'):
+            self.depth -= 1
+        elif tag == self.reading[1]:
+            self.reading = None
+
+    def handle_data(self, data):
+        if not self.reading:
+            return
+        card = self.cards[-1]
+        kind = self.reading[0]
+        if kind in ('h3', 'status'):
+            card[kind] += data
+        elif kind == 'word':
+            card['words'][-1] += data
+        else:
+            card['checks'][-1][2] += data
+
+
+def nav_links(html):
+    header = re.search(r'<header class="landing-nav[\s\S]*?</header>', html)
+    assert header, 'missing the landing top bar'
+    return header[0], Outline(header[0]).links
+
 
 def check_drivers(landing, changelog, drivers):
-    pass
+    """The Drivers page (#47): its cards and their facts, the hero, the write-your-own section, the landing's top bar
+    with Drivers current, a Drivers link on the landing and Changelog, no scripts needed, and no invented numbers."""
+    flat = lambda s: re.sub(r'\s+', ' ', s).strip()
+    for html in (landing, changelog):
+        links = [text for href, text in nav_links(html)[1] if href in DRIVERS_LINKS]
+        assert links == ['Drivers'], f'the landing and Changelog top bars each need one Drivers link: {links}'
+    bar, _ = nav_links(landing)
+    want = re.sub(r'(<a [^>]*href="/drivers/")', r'\1 aria-current="page"', bar, count=1)
+    assert nav_links(drivers)[0] == want, "the Drivers page's top bar must be the landing's, with Drivers marked current"
+    cards = DriverCards(drivers).cards
+    found = [(c['name'], flat(c['h3']), flat(c['status'])) for c in cards]
+    assert found == [(n, n, s) for n, s, _ in DRIVERS], f'the driver cards must be, in order, exactly: {found}'
+    for card, (name, _, result) in zip(cards, DRIVERS):
+        assert [flat(w) for w in card['words']] == list(DRIVER_WORDS), f'{name}: each card shows the four words'
+        assert [c[0] for c in card['checks']] == list(KIT_CHECKS), f"{name}: each card shows the kit's five checks"
+        assert card['kit'] == result and all(c[1] == result for c in card['checks']), f'{name}: a kit result beyond the facts'
+        assert all(result in flat(c[2]).lower() for c in card['checks']), f'{name}: each kit result must read in words, never colour alone'
+    heroes = [c['name'] for c in cards if 'hero' in c['classes']]
+    assert heroes == ['boat.dev'], f'boat.dev must be the one hero card: {heroes}'
+    main = re.search(r'<main\b[^>]*>([\s\S]*?)</main>', drivers)
+    assert main, 'the Drivers page needs its main'
+    outline = Outline('<main>' + main[1] + '</main>')
+    assert [text for kind, _, text in outline.items if kind == 'h2'].count('Write your own driver') == 1, 'one Write your own driver section'
+    external = [href for href, _ in outline.links if urlsplit(href).scheme]
+    assert external and all(h == DRIVERS_REPO or h.startswith(DRIVERS_REPO + '/') for h in external), \
+        f'the Drivers page links only to the public OpenWiz repository: {external}'
+    page = Page(drivers)
+    assert not page.scripts and not page.inline_scripts, 'the Drivers page must read in full without scripts'
+    reader = Text(main[1])
+    for reading in [reader.spaced()] + reader.shown:
+        numbers = set(re.findall(r'\d+(?:-\d+)*', reading))
+        assert numbers <= DRIVERS_NUMBERS, f'an unsourced number on the Drivers page: {sorted(numbers - DRIVERS_NUMBERS)}'
 
 
 def check_drivers_art(sizes):
-    pass
+    """Variant A's own art (art/drivers-a-*.webp) stays within its 400 KB share of the art budget."""
+    total = sum(size for name, size in sizes.items() if name.startswith('art/drivers-a-'))
+    assert total <= DRIVERS_ART_SHARE, f'drivers art is {total} bytes, over its 400 KB share'
 
 
 class Page(HTMLParser):
@@ -417,6 +525,8 @@ def check_site(root):
         check_art(name, data)
         total += len(data)
     assert total <= ART_BUDGET, f'art is {total} bytes, over the {ART_BUDGET} budget'
+    check_drivers_art({name: len((root / name).read_bytes()) for name in ART})
+    check_drivers(landing, split_releases((root / 'changelog/index.html').read_text())[0], (root / DRIVERS_PAGE).read_text())
     check_changelog(landing, changelog)
     check_releases(releases)
     main = re.search(r'<main\b[^>]*>[\s\S]*?</main>', changelog)

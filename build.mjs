@@ -10,7 +10,7 @@ const root = new URL('./', import.meta.url);
 const output = new URL('dist/', root);
 const vendor = ['vendor/gsap-3.15.1.min.js', 'vendor/GSAP-LICENSE.txt', 'vendor/LOBE-ICONS-LICENSE.txt'];
 const art = (await readdir(new URL('art/', root))).filter(name => name.endsWith('.webp')).sort().map(name => `art/${name}`);
-const pages = ['index.html', 'changelog/index.html', 'app/index.html'];
+const pages = ['index.html', 'changelog/index.html', 'app/index.html', 'drivers/index.html'];  // drivers: #47
 // The app (openwiz.dev/app): its design system, data layer, page modules and shell, fingerprinted like the site's.
 const app = ['app/ember.css', 'app/data.js', 'app/ui.js', 'app/pages/you.js', 'app/pages/specs.js', 'app/pages/spec.js', 'app/pages/agents.js', 'app/palette.js', 'app/shell.js'];
 // Pinned npm dependencies (package.json, exact version), copied from node_modules with their licence; the version is in
