@@ -20,7 +20,7 @@ test('a fixture site and docs folder build exactly the expected sources and pass
     sources: [
       { title: 'Synthetic Home — OpenWiz', url: 'https://openwiz.dev/' },
       { title: 'Synthetic Questions', url: 'https://openwiz.dev/faq/' },
-      { title: 'Synthetic OpenWiz', url: `${DOC}README.md` },
+      { title: 'OpenWiz README', url: `${DOC}README.md` },
       { title: 'Install', url: `${DOC}docs/install.md` },
     ],
     passages: [
