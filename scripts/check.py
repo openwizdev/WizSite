@@ -129,21 +129,24 @@ TEAM_COPY = ('For solo builders and small teams', TEAM_HEADLINE,
              'A 30-minute call with Jake, who builds OpenWiz. We connect it to your repo and the coding agent you already '
              'use, you pick one small change, and your first fleet ships it on your workflow.',
              *TEAM_TERMS, TEAM_SHIPS,
-             TEAM_TERMS_LABEL, 'Grok Bot: coming soon',
+             TEAM_TERMS_LABEL, 'Grok Bot: coming soon', 'See how drivers work',
              'Our Drivers page was built the same way: a fleet of agents drew six designs, a council of judges picked one, '
              'and it merged in one night.', 'See the Drivers page',
              'Watch the fleet build it (49 s, on X)',
              'Solo builders and small teams who already use Claude Code or Codex.', 'Custom pricing. No checkout.', 'Book a call')
-# The hero, then its sections in order: the timeline, proof, who it's for, pricing, where your agents run, the closing call.
-# #76: the Questions (faq.html) sit after where your agents run. #89: the timeline is the hero's second column.
-TEAM_PARTS = ('The 30 minutes, roughly', 'Proof', 'Who it’s for', 'Pricing', 'Where your agents run', 'Questions',
-              'Your first fleet ships on the call.')
+# The hero, then its sections in order: the timeline, proof, who it's for, pricing, the Questions (#76), the closing call.
+# #89: the timeline is the hero's second column, and Proof's first card carries the drivers, so the page has no separate
+# where-your-agents-run section.
+TEAM_PARTS = ('The 30 minutes, roughly', 'Proof', 'Who it’s for', 'Pricing', 'Questions', 'Your first fleet ships on the call.')
 TEAM_STEPS = (('Minute 0', 'We connect your repo and your agents.'),
               ('Minute 10', 'You answer a few questions about your change.'),
               ('Minute 20', 'Your agents build it.'), ('Minute 30', 'A pull request ships.'))
-# #89: Proof's first card, the drivers that passed: each logo (as /drivers/ ships it) with its result under it.
+# #89: Proof's first card, the drivers that passed: its heading, what the five checks are (as /drivers/ names them), then
+# each logo (as /drivers/ ships it) with its result under it.
+TEAM_PASSED_HEADING = 'Three drivers passed all five checks'
+TEAM_PASSED_ABOUT = 'The same test for every place your agents run: version, start, wake, stop and token.'
 TEAM_PASSED = ('/drivers/logos/monitor.svg', '/drivers/logos/cloudroom.png', '/drivers/logos/boat-dev.svg')
-TEAM_PASSED_LINE = 'Passed 5 of 5 checks'
+TEAM_PASSED_LINE = '5 of 5'
 # The boat video's poster: a picture linking to the X post, never an embedded or hosted video.
 TEAM_POSTER = '/art/team-boat-poster.webp'
 TEAM_POSTER_ALT = 'Wizards on a boat: the fleet that built the Drivers page'
@@ -1121,11 +1124,13 @@ def check_team(htmls, pages):
     proof = proof[1]
     cards = re.findall(r'<li class="team-card">([\s\S]*?)</li>\n', proof)
     assert len(cards) == 3 and proof.count('<li') == 3, f'Proof: three cards: {len(cards)}'
-    passed = re.fullmatch(r'\s*<a href="/drivers/" class="team-passed">([\s\S]*)</a>\s*', cards[0])
-    logos = re.findall(r'<img\b[^>]*src="([^"]*)"[^>]*>\s*(?:<span>[^<]*</span>\s*)?<small>([^<]*)</small>', passed[1]) if passed else []
-    assert [src for src, _ in logos] == list(TEAM_PASSED) and all(line == TEAM_PASSED_LINE for _, line in logos) \
-        and 'Grok Bot: coming soon' in plain(passed[1]), \
-        f'Proof: the first card links to /drivers/ with the three drivers\u2019 logos, {TEAM_PASSED_LINE} under each, and Grok Bot coming soon'
+    passed = re.fullmatch(r'\s*<h3>([^<]*)</h3>\s*<p>([^<]*)</p>\s*<div class="team-logos">([\s\S]*?)</div>\s*'
+                          r'<p class="team-soon">Grok Bot: coming soon</p>\s*<a href="/drivers/">See how drivers work</a>\s*', cards[0])
+    logos = re.findall(r'<img\b[^>]*src="([^"]*)"[^>]*>\s*(?:<span>[^<]*</span>\s*)?<small>([^<]*)</small>', passed[3]) if passed else []
+    assert passed and (passed[1], passed[2]) == (TEAM_PASSED_HEADING, TEAM_PASSED_ABOUT) \
+        and [src for src, _ in logos] == list(TEAM_PASSED) and all(line == TEAM_PASSED_LINE for _, line in logos), \
+        f'Proof: the first card: {TEAM_PASSED_HEADING}, what the checks are, the three drivers\u2019 logos with ' \
+        f'{TEAM_PASSED_LINE} under each, Grok Bot coming soon and See how drivers work, to /drivers/'
     built = re.fullmatch(r'\s*<p>([^<]*)</p>\s*<a href="/drivers/">See the Drivers page</a>\s*', cards[1])
     assert built and built[1].startswith('Our Drivers page was built the same way'), \
         'Proof: the second card says how the Drivers page was built, with its one link, See the Drivers page'
@@ -1153,9 +1158,6 @@ def check_team(htmls, pages):
     # Last, so a broken part above fails on its own line first: the rest of the round 1 copy, word for word.
     for text in TEAM_COPY:
         assert text in flat, f'missing team page copy: {text}'
-    run = re.search(r'<ul class="team-drivers">([\s\S]*?)</ul>', htmls[TEAM_PAGE])
-    assert run and re.findall(r'href="([^"]*)"', run[1]) and set(re.findall(r'href="([^"]*)"', run[1])) == {'/drivers/'}, \
-        'Where your agents run: its drivers link to /drivers/'
 
 
 def check_footer(htmls):
