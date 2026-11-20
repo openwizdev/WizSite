@@ -377,11 +377,12 @@ def check_site(root):
         if attrs.get('src') == '/art/era-2-grill.webp':
             assert (attrs.get('alt') or '').strip(), f'painting without a description: {attrs.get("src")}'
     check_motion((root / names['site.css']).read_text())
-    check_install(landing, pages[root / 'index.html'])
+    unlabelled = check_install(landing, pages[root / 'index.html'])
     assert not re.search(r'\b\d{4}-\d{2}-\d{2}\b', words), 'dated landing promise'
     changelog, releases = split_releases((root / 'changelog/index.html').read_text())
-    # #1674 (J264): the install box's one version label (check_install reads it exactly) is the only version allowed.
-    unlabelled = flat.replace(INSTALL_VERSION, ' ', 1)
+    # #1674 (J264): the install box's one version label (check_install reads it exactly and returns the landing
+    # without that element) is the only version allowed.
+    unlabelled = re.sub(r'\s+', ' ', unescape(re.sub(r'<[^>]*>', '', re.sub(r'<br>', ' ', unlabelled))))
     assert not re.search(r'(?<![\d.])\d+\.\d+\.\d+(?![\d.])', unlabelled), 'release version mentioned on the landing'
     for name in VECTORS:
         check_vector((root / name).read_bytes())
@@ -475,8 +476,9 @@ def check_install(landing, page):
     assert switch and switch[1] in INSTALL_SWITCH, f'the install box needs its one switch, data-install = {" or ".join(INSTALL_SWITCH)}'
     lines = re.findall(r'<code class="install-line">([^<]*)</code>', box)
     assert lines == [INSTALL_LINE], f'the install line must read exactly: {INSTALL_LINE}'
-    versions = re.findall(r'<p class="install-version">([\s\S]*?)</p>', landing)
-    assert [flat(v) for v in versions] == [INSTALL_VERSION] and versions[0] in box, f'the install box must show {INSTALL_VERSION}'
+    # #1674: the version label is the box's first element, the only one of its class on the landing (#46 R2).
+    label = re.search(r'<div class="install-box"[^>]*>\s*(<p class="install-version">([^<]*<small>[^<]*</small>)</p>)', landing)
+    assert label and landing.count('install-version') == 1 and flat(label[2]) == INSTALL_VERSION, f'the install box must show {INSTALL_VERSION}'
     hints = re.findall(r'<p class="install-hint">([\s\S]*?)</p>', box)
     assert [flat(h) for h in hints] == [INSTALL_HINT], f'the install box must say: {INSTALL_HINT}'
     labels = re.findall(r'<button class="btn install"[^>]*>([\s\S]*?)</button>', landing)
@@ -490,6 +492,7 @@ def check_install(landing, page):
     reader = Text(rest)
     for reading in [reader.joined(), reader.spaced()] + reader.shown:
         assert not re.search(r'install|coming soon|paid plans|works today', re.sub(r'\s+', ' ', reading), re.I), 'unsettled landing claim or a second install mention'
+    return landing[:label.start(1)] + landing[label.end(1):]
 
 
 def check_changelog(landing, changelog):
