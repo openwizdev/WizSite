@@ -157,6 +157,12 @@ const ROWS = `[...document.querySelectorAll('section.faq .faq-rows > *')].map(ro
   bold: !!row.querySelector('.faq-a b'),
   buttons: [...row.querySelectorAll('.faq-ask-actions button')].filter(b => b.getClientRects().length).map(b => b.textContent.trim()) }))`;
 const rows = page => page.evaluate(ROWS);
+// What a screen reader is told: the FAQ's one polite status line, and where focus is.
+const told = page => page.evaluate(`document.querySelector('section.faq [aria-live="polite"]')?.textContent.trim()`);
+const focused = page => page.evaluate(`(e => e === document.body ? 'the page' : e.tagName === 'INPUT' ? 'input' : e.textContent.trim())(document.activeElement)`);
+const waitFake = async (test, what) => {
+  for (const t0 = Date.now(); !test(); await new Promise(resolve => setTimeout(resolve, 20))) if (Date.now() - t0 > 5000) throw new Error(`timed out: ${what}`);
+};
 const probeOn = () => { fake.probe = { status: 200, body: PROBE_ON }; };
 
 test('with the switch off the FAQ shows no input row, and asks nothing', async () => {
@@ -199,6 +205,7 @@ test('an answer streams in, becomes a normal FAQ row, and a fresh input row appe
     await page.until(`document.querySelector('.faq-ask .faq-a')?.innerText.includes('Synthetic answer: OpenWiz')`, 'the first piece');
     let seen = (await rows(page)).at(-1);
     assert.deepEqual([seen.q, seen.input, seen.buttons], ['What does OpenWiz run?', false, ['Stop']]);
+    assert.equal(await focused(page), 'Stop', 'focus moves to Stop, never to the page');
     assert.deepEqual(fake.asked.at(-1).body, { question: 'What does OpenWiz run?' });
     assert.equal(fake.asked.at(-1).origin, origin);
     fake.release();
@@ -211,6 +218,8 @@ test('an answer streams in, becomes a normal FAQ row, and a fresh input row appe
     assert.match(done.a, /^Synthetic answer: OpenWiz runs a fleet of coding agents from one approved plan\.\s+Sources: Questions, OpenWiz README$/);
     assert.deepEqual(done.links, []);
     assert.deepEqual([all.at(-1).ask, all.at(-1).input, all.at(-1).q], [true, true, '']);
+    assert.equal(await focused(page), 'input', 'focus moves to the fresh input');
+    assert.equal(await told(page), 'Synthetic answer: OpenWiz runs a fleet of coding agents from one approved plan.');
     assert.equal(await page.evaluate(`new Set([...document.querySelectorAll('.faq-rows .faq-q')].map(h => h.tagName)).size`), 1, 'one heading level');
     assert.equal(await page.evaluate(`(() => { const b = document.querySelectorAll('.faq-rows .faq-q button'); return b[b.length - 1].getAttribute('aria-expanded'); })()`), 'true');
     await page.ask('Is markup shown?');
@@ -232,8 +241,9 @@ test('stop ends the stream, shows nothing as finished, and retry asks again', as
   await page.until(`document.querySelector('.faq-ask .faq-a')?.innerText.includes('Synthetic answer')`);
   await page.press('Stop');
   await page.until(`!document.querySelector('.faq-ask .faq-a')?.innerText.includes('Synthetic answer')`, 'the partial answer gone');
-  await new Promise(resolve => setTimeout(resolve, 200));
-  assert.equal(fake.closed, 1, 'the stream was closed');
+  await waitFake(() => fake.closed === 1, 'the stream closed');
+  assert.equal(await focused(page), 'Retry');
+  assert.equal(await told(page), 'Stopped.');
   let seen = (await rows(page)).at(-1);
   assert.deepEqual([seen.ask, seen.q, seen.buttons], [true, 'What does OpenWiz run?', ['Retry', 'Edit']]);
   assert.match(seen.a, /Stopped/);
@@ -256,6 +266,7 @@ test('refusals and the not-covered answer show in the row\'s own style', async (
   await page.until(`document.querySelector('.faq-ask .faq-a')?.innerText.includes('too long')`);
   let seen = (await rows(page)).at(-1);
   assert.deepEqual([seen.a, seen.buttons], ['That question is too long. Keep it to 300 characters or fewer.', ['Edit']]);
+  assert.deepEqual([await focused(page), await told(page)], ['Edit', seen.a]);
   await page.press('Edit');
   await page.until(`document.querySelector('.faq-ask input')?.value === 'A synthetic question that is too long'`, 'the question back to edit');
   await page.evaluate(`document.querySelector('.faq-ask input').select()`);
@@ -267,7 +278,30 @@ test('refusals and the not-covered answer show in the row\'s own style', async (
   await page.until(`document.querySelectorAll('.faq-rows > .faq-row').length === 9`, 'the not-covered row');
   seen = (await rows(page)).at(-2);
   assert.deepEqual([seen.q, seen.a.startsWith(NOT_COVERED_TEXT), seen.links], ['Why did it fail?', true, LINKS.map(l => [l.label, l.href])]);
+  assert.equal(await told(page), NOT_COVERED_TEXT);
   await page.shot('refused-then-not-covered');
+  await page.close();
+});
+
+test('a stream that breaks the contract\'s shape is never shown as an answer', async () => {
+  // catches: a reader that accepts any event (an unknown type or key, an answer with no sources or done, text after
+  // the end, a not-covered answer with other links), turning a broken or foreign stream into a finished-looking row.
+  probeOn();
+  const text = line({ type: 'text', text: 'Synthetic text. ' }), sources = ANSWER[3], done = ANSWER[4];
+  const bad = [[line({ type: 'text', text: 'Synthetic text. ', html: '<b>x</b>' }), sources, done], [text, line({ type: 'note' }), sources, done],
+    [text, done], [text, sources, text, done], [text, line({ type: 'sources', sources: [] }), done],
+    [line({ type: 'not_covered', text: NOT_COVERED_TEXT, links: [LINKS[0], { label: 'GitHub issues', href: 'https://example.com/' }] })],
+    [line({ type: 'not_covered', text: 'Synthetic other text.', links: LINKS })], [text, refused('too_long', 'Synthetic.')], ['not json\n']];
+  for (const lines of bad) fake.answers.push({ lines });
+  const page = await open('/faq/');
+  await page.until(`document.querySelector('.faq-ask input')`);
+  await page.ask('A synthetic question');
+  for (const [n, lines] of bad.entries()) {
+    await page.until(`document.querySelector('.faq-ask')?.dataset.state === 'ended'`, `bad stream ${n}`);
+    const seen = (await rows(page)).at(-1);
+    assert.deepEqual([seen.a, seen.buttons, (await rows(page)).length], ['The answer didn\u2019t finish. Try again.', ['Retry', 'Edit'], 8], `bad stream ${n}: ${lines.join('')}`);
+    if (n < bad.length - 1) await page.press('Retry');
+  }
   await page.close();
 });
 
