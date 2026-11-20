@@ -4,7 +4,7 @@ Which comments stay in our code, how CI keeps new ones out, and how a repository
 
 **Contract and checker first** (#1816, CC1 of spec #1815). Each repository's own ticket (CC2, CC6, CC8, CC9, CC11, CC12) carries a byte-identical copy of this file and the checker and wires the diff mode into its CI; all but CC2 also cut that repository's comments, and CC3 to CC5 cut OpenWiz's by area; CC7 gives review-ticket its comment pass; CC10 draws the count report in the war room.
 
-Authority: spec #1815, from Jake's comment-cut decisions (J238, C1 to C3), 2026-11-19 and 2026-11-20 ([private record](https://github.com/jparker2006/ClosedWiz/issues/3065#issuecomment-7034782715)).
+Authority: spec #1815, from Jake's comment-cut decisions (J238, C1 to C3), 2026-11-19 and 2026-11-20 (private record: the [pointer](open-development.v1.md#the-pointer) to issue 3065, comment 7034782715).
 
 ## Words
 
@@ -28,7 +28,7 @@ Only these kinds. The checker reads each one from its form, so the form is the r
 | A constraint from outside our code | The block starts `External:` and holds a link to something that isn't ours (not `github.com/openwizdev/` or `github.com/jparker2006/`) | `# External: the vendor API rounds timeouts down, https://example.com/vendor/issues/7` |
 | Public API docs a published documentation build renders | A doc comment of its own language (Rust `///`, `//!`, `/** */`, `/*! */`; JavaScript and TypeScript `/** */` only; Python's standalone strings, docstrings included; CSS has none) in a path the repository names with `--docs`. A repository with no published documentation build names none | `/// Returns the answer.` under `--docs crates/sdk/` |
 | A security or data-loss warning | The block starts `SECURITY:`, `SAFETY:`, `PRIVACY:` or `DATA LOSS:` and says something after it | `// SAFETY: the buffer outlives every reader.` |
-| A private-record pointer | The block holds a pointer in the [open development contract's form](open-development.v1.md#the-pointer) | `# Private record: https://github.com/jparker2006/ClosedWiz/issues/9001#issuecomment-9000000001` |
+| A private-record pointer | The block holds a pointer in the [open development contract's form](open-development.v1.md#the-pointer) | `# Private record: https://github.com/jparker2006/<private repository>/issues/9001#issuecomment-9000000001`, with the private repository's name in place of `<private repository>` |
 
 The form proves only the shape. Whether the outside constraint is real, the warning true and the docs really published is the reviewer's to judge (CC7's comment pass); a block that wears a form it hasn't earned is a review finding.
 
@@ -135,6 +135,7 @@ Every repository carries `contracts/comments.v1.md` and `tools/comment-check/che
 
 - The checker reads forms, not meaning: a false `External:` or a stale warning passes it. CC7's review pass reads the meaning.
 - Comments inside string literals (a script held in a Rust raw string or a JavaScript template literal) are not seen. YAML block scalars other than `run:` are treated as text.
+- Shell's reader fails safe: a double-quoted command substitution it can't be sure of (one holding a backtick, `case`, a here-document or an unquoted inner `$(`) holds no comment, nor does the rest of the line its quote closes on, and a file that ends inside a quote or a quoted substitution has no comment from its first quoted substitution on. A real comment there goes unchecked and uncounted, because failing valid shell costs more than missing a comment the reviewer still reads.
 - JavaScript's `/` is read as a regular expression after an operator, an opening bracket, `}` or a keyword such as `return`, and as division otherwise; rare code can fool it. JSX text is read as code, so a `//` in it reads as a comment.
 - `.gitattributes` marks are read with `git check-attr --source`, Git 2.40 or later; an older Git reads none.
 
