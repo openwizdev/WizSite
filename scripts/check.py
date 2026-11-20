@@ -63,17 +63,19 @@ GSAP = 'vendor/gsap-3.15.1.min.js'
 VENDOR_HASHES = {
     'vendor/GSAP-LICENSE.txt': '791e7d34e6718aad2bd3e20fa5240a4c0e47d73ee3ca31424652cca52fe9acf0',
     'vendor/LOBE-ICONS-LICENSE.txt': 'add9d7531d1b21646317a8958e38fc727506fa39d24bdecb44154d943c82753a',
-    # Lucide (ISC): the drivers page's one generic icon, drivers/logos/monitor.svg (#62).
+    # Lucide (ISC): the drivers page's generic icons, drivers/logos/monitor.svg (#62) and drivers/logos/bot.svg (#66).
     'vendor/LUCIDE-LICENSE.txt': 'b495047bd93a9b06913511076f504daba17d5bbeb3e0650f3bb53a4220329c57',
     'vendor/gsap-3.15.1.min.js': '3d1bea374ab1b703cc5c4105358eec63c4465efdc573931dc116e34a0a190c1b',
 }
 
 # #62 item 2: real logos, each the owner's official file, unaltered (pinned to the downloaded original's sha256), small,
-# same-origin, with alt text naming its host. Grok Bot is text only: xAI's brand terms require permission for its marks.
+# same-origin, with alt text naming its host. No Grok or xAI mark: xAI's brand terms require permission for its marks, so
+# Grok Bot's name is text, and its card shows one neutral generic icon (#66 item 6).
 DRIVER_LOGOS = {
     'drivers/logos/boat-dev.svg': ('9a103b949a566589486527567cda9051c9e2c81aa32e723b332df63067fca533', 'boat.dev'),
     'drivers/logos/cloudroom.png': ('357d4b00935ff9b9ebf676e9dbe35ddd22af82b3e62a0fcafd59341b6b702592', 'Cloudroom'),
     'drivers/logos/monitor.svg': ('9ef659c8515c6afe223a2d60407e7472b086593516f892963569692342ef2189', 'computer'),
+    'drivers/logos/bot.svg': ('dcc04dfbe4330e73de3a093bc7b692ac9c373b6a40f41f38c0b05e746c99a250', 'bot'),
 }
 
 HASHED = ('tokens.css', 'site.css', GSAP, 'site.js')
@@ -157,22 +159,33 @@ RELEASE_REPOS = ('OpenWiz', 'WizSkills', 'WizLoops')
 DRIVERS_PAGE = 'drivers/index.html'
 DRIVERS_LINKS = ('/drivers/', '/drivers')
 DRIVERS = (
-    ('boat-dev', 'boat.dev', 'Passed all five checks on a real account, 2026-11-19', 'passed'),
+    ('boat-dev', 'boat.dev', 'Passed all five checks', 'passed'),
     ('vps', 'Your own computer or VPS', 'Being fixed: its kit run is in progress', 'in progress'),
-    ('cloudroom', 'Cloudroom', 'Works today: built real pull requests for OpenWiz', 'not yet run'),
+    ('cloudroom', 'Cloudroom', 'Works today: built real pull requests for OpenWiz; kit run next', 'not yet run'),
     ('grok-bot', 'Grok Bot', 'Coming soon: listed when its driver lands', 'not yet run'),
 )
 DRIVER_HERO = 'boat-dev'
+# Round 3 final (#66 item 4): the spotlight's clean headline, then the date on its own metadata line under it.
+DRIVER_DATE = 'On a real account, 2026-11-19'
 DRIVER_WORDS = ('version', 'start', 'wake', 'stop')
 KIT_CHECKS = ('version', 'start', 'wake', 'stop', 'token')
 KIT_STATES = ('passed', 'in progress', 'not yet run')
-# Round 3H (#62): a pending driver shows one kit line, never five identical rows. Cloudroom's says its run comes next,
-# so "works" and "not run yet" never read as a conflict.
+# Round 3H (#62): a pending driver shows one kit line, never five identical rows. Round 3 final (#66 item 6): each kit
+# line fits one line at 1440; Cloudroom's status sentence says its kit run comes next, so "works" and "not run yet"
+# never read as a conflict.
 DRIVER_KIT_LINES = {
     'vps': 'Kit: in progress',
-    'cloudroom': 'Kit: not run yet. Its kit run comes next.',
+    'cloudroom': 'Kit: not run yet',
     'grok-bot': 'Kit: not run yet',
 }
+# #66 item 2: the hero's host pills, in order, each saying in words what works today; every mark sits in one
+# fixed-height slot (Grok Bot has no mark: its name in text).
+HOST_PILLS = (
+    ('vps', 'Your computer or VPS', 'being fixed'),
+    ('cloudroom', 'Cloudroom', 'works today'),
+    ('boat-dev', 'boat.dev', 'passed'),
+    ('grok-bot', 'Grok Bot', 'coming soon'),
+)
 # Every number the page shows comes from these facts: boat.dev's date and the contract's v1. Counts are said in words (#62 item 4).
 DRIVER_NUMBERS = {'2026', '11', '19', '1'}
 # #62 item 4: no jargon counts ("4 words", "5 checks in the kit", "1 passed, 5 of 5"), and the five-of-five result
@@ -180,9 +193,10 @@ DRIVER_NUMBERS = {'2026', '11', '19', '1'}
 DRIVER_JARGON = re.compile(r'\b\d+\s+(?:drivers?|words?|checks?|commands?|passed)\b|\b\d+\s+of\s+\d+\b', re.I)
 DRIVER_RESULT = re.compile(r'\ball five checks\b|\bfive passed checks\b|\bfive of five\b', re.I)
 DRIVER_RESULT_MAX = 2
-# #62 item 1: what a driver is, in plain words, in the hero above every card: two sentences at most, naming the four
-# commands and the five-check test with its token check.
-DRIVER_EXPLAINER_WORDS = ('driver', 'version', 'start', 'wake', 'stop', 'five', 'token', 'credential')
+# #62 item 1: what a driver is, in plain words, in the hero above every card: two sentences at most. #66 item 1: under
+# the headline, first what OpenWiz's agents do, then the same four commands and five-check test; the command-by-command
+# detail stays in the spotlight and Write your own driver, never in the hero.
+DRIVER_EXPLAINER_WORDS = ('driver', 'agents', 'tickets', 'four commands', 'five-check test')
 # The five checks as boat.dev passed them, each with what passing it proved, in plain words from kernel/driver.v1.md
 # section 3; the spotlight is the page's one list of them.
 PROOF_LINES = (
@@ -190,10 +204,14 @@ PROOF_LINES = (
     ('start', 'It answered a run id, and the agent\'s status note appeared on a throwaway ticket.'),
     ('wake', 'It reached the same run again: that note was edited, never a second one.'),
     ('stop', 'It ended the run: a wake after it was refused, and nothing the run started still runs.'),
-    ('token', 'No credential showed in its output, command lines or environment, and it refused a token field.'),
+    ('token', 'No credential appeared in its output, command lines or environment, and it refused a token field.'),
 )
+# #66 item 7: wherever token is explained, say only what the run inspected; no broader claim.
+TOKEN_CLAIM = 'no credential appeared in its output, command lines or environment, and it refused a token field'
+TOKEN_BROAD = re.compile(r'credentials? leaks?|leaks? no credential|never leaks?|proves? no credential|no credential (?:can|will|ever)', re.I)
 DRIVER_LOGO_MAX = 30_000  # bytes, each logo
-DRIVER_TEXT_ONLY = 'grok-bot'
+# #66 item 6: Grok Bot's card shows only a neutral generic icon from the same open-licence set, never a Grok or xAI mark.
+DRIVER_GENERIC_ICON = ('grok-bot', 'drivers/logos/bot.svg')
 DRIVER_MIN_FONT = 12  # px: no drivers-page text smaller
 DRIVER_LABEL_TRACKING = 0.06  # em: the least tracking on an uppercase drivers-page label
 OWN_DRIVER = 'Write your own driver'
@@ -743,8 +761,14 @@ def check_drivers(landing, changelog, drivers, page):
             assert not card['proofs'], f'{name}: a pending card shows one kit line, never per-check rows: {card["proofs"]}'
             assert (card['kit'], card['kit_state']) == (DRIVER_KIT_LINES[key], state), \
                 f'{name}: its one kit line must read {DRIVER_KIT_LINES[key]!r} ({state}): {card["kit"]!r} ({card["kit_state"]})'
+            # #66 item 6: all three compact cards share one header structure: a generic icon or logo, then the name.
+            heading = re.search(rf'<h3 class="driver-name" id="{key}-name">([\s\S]*?)</h3>', main)
+            assert heading and re.fullmatch(rf'<img class="driver-logo[^"]*" src="/drivers/logos/[^"]+" alt="[^"]+"[^>]*><span>{re.escape(name)}</span>', heading[1].strip()), \
+                f'{name}: the compact cards share one header structure (icon or logo, then the name): {heading[1] if heading else None!r}'
     check_driver_logos(main, outline)
     check_driver_proof(main)
+    check_host_pills(main)
+    check_driver_token(drivers, main)
     reader = Text(main)
     readings = [reader.joined(), reader.spaced()] + reader.shown
     for reading in readings:
@@ -783,6 +807,10 @@ def check_driver_explainer(main):
     assert 1 <= len(sentences) <= 2, f'the driver explainer is two sentences at most: {sentences}'
     missing = [word for word in DRIVER_EXPLAINER_WORDS if not re.search(rf'\b{word}', text, re.I)]
     assert not missing, f'the driver explainer must name {missing}'
+    agents, commands = text.lower().find('agents', text.find('.') + 1), text.lower().find('four commands')
+    assert 0 <= agents < commands, 'under the headline, the driver explainer first says what OpenWiz\'s agents do, then the four commands'
+    listed = [word for word in KIT_CHECKS if re.search(rf'\b{word}\b', text)] + re.findall(r'<code\b', found[0])
+    assert not listed, f'the command-by-command detail stays out of the hero\'s explainer: {listed}'
 
 
 def check_driver_logos(main, outline):
@@ -800,9 +828,11 @@ def check_driver_logos(main, outline):
             assert host.lower() in alt.lower(), f'the logo {src} needs alt text naming {host}: {alt!r}'
             used.add(name)
     assert used == set(DRIVER_LOGOS), f'unused drivers logos: {sorted(set(DRIVER_LOGOS) - used)}'
+    key, icon = DRIVER_GENERIC_ICON
     for card in outline.cards:
-        if card['id'] == DRIVER_TEXT_ONLY:
-            assert not card['images'] and not card['svgs'], f'no Grok logo: {card["name"]} is text only'
+        if card['id'] == key:
+            assert [src for src, _ in card['images']] == [f'/{icon}'] and not card['svgs'], \
+                f'no Grok logo: {card["name"]} shows only the generic icon {icon}: {card["images"]}, {card["svgs"]} other pictures'
     assert not any('grok' in name.lower() for name in DRIVER_LOGOS), 'no Grok logo file'
 
 
@@ -833,9 +863,47 @@ def check_driver_proof(main):
         assert name == [check] and [plain(s) for s in said] == [line] and state == ['passed'], \
             f'{check}: the proof row names the check, says passed in words and explains what it proved: {line!r}'
     assert re.search(r'<img class="proof-art" src="/art/drivers-[^"]+" alt="[^"]+"', spot), 'the spotlight shows a painting of the crew'
+    # #66 item 4: the mark, the clean headline, the date on its own line and the five checks come before the painting,
+    # so on a phone they lead and the painting follows as the supporting image.
+    assert spot.index('class="proof-copy"') < spot.index('class="proof-scene"'), \
+        'the spotlight\'s mark, result and five checks come before its painting (phone order)'
+    head = re.search(r'<p class="driver-line">([^<]*)</p>\s*<p class="driver-date">([\s\S]*?)</p>', spot)
+    assert head and head[1] == DRIVERS[0][2] and plain(head[2]) == DRIVER_DATE, \
+        f'the spotlight\'s headline reads {DRIVERS[0][2]!r}, then its own date line {DRIVER_DATE!r}: {head.groups() if head else None}'
     images = [src for src in re.findall(r'<img\b[^>]*\bsrc="([^"]+)"', main) if src.startswith('/art/')]
     twice = sorted({src for src in images if images.count(src) > 1})
     assert not twice, f'a painting shown twice on the drivers page: {twice}'
+
+
+def check_host_pills(main):
+    """#66 item 2: the hero's host pills, in order, each with its availability in words; every mark (Grok Bot has none)
+    sits alone in the pill's fixed-height mark slot."""
+    marks = re.search(r'<ul class="host-marks"[^>]*>([\s\S]*?)</ul>', main)
+    assert marks, 'the hero needs its host pills'
+    pills = re.findall(r'<li data-host="([^"]*)">([\s\S]*?)</li>', marks[1])
+    assert [p[0] for p in pills] == [p[0] for p in HOST_PILLS] and len(pills) == marks[1].count('<li'), \
+        f'the host pills, in order: {[p[0] for p in pills]}'
+    for (key, body), (_, name, state) in zip(pills, HOST_PILLS):
+        states = re.findall(r'<span class="host-state">([^<]*)</span>', body)
+        assert states == [state], f'the {name} pill says what works today in words, {state!r}: {states}'
+        slots = re.findall(r'<span class="host-mark">(<img\b[^>]*>)</span>', body)
+        assert len(re.findall(r'<img\b', body)) == len(slots) == (0 if key == DRIVER_GENERIC_ICON[0] else 1), \
+            f'the {name} pill\'s mark sits alone in its fixed-height slot: {body.strip()[:120]!r}'
+        shown = plain(re.sub(r'<span class="host-state">[^<]*</span>', '', body)) or \
+            ' '.join(re.findall(r'\balt="([^"]*)"', body))
+        assert shown == name, f'the {name} pill names its host: {shown!r}'
+
+
+def check_driver_token(drivers, main):
+    """#66 item 7: wherever token is explained (boat.dev's token row and Write your own driver's), say what the run
+    inspected, in the scoped words, and nowhere make a broader claim."""
+    rows = re.findall(r'data-check="token"[^>]*>([\s\S]*?)</li>', main) + \
+        re.findall(r'<dt><code>token</code></dt><dd>([\s\S]*?)</dd>', main)
+    assert len(rows) == 2, f'token is explained in the spotlight and in Write your own driver: {len(rows)}'
+    for row in rows:
+        assert TOKEN_CLAIM in plain(row).lower(), f'say what the token check inspected: {TOKEN_CLAIM!r}: {plain(row)!r}'
+    broad = TOKEN_BROAD.search(re.sub(r'\s+', ' ', plain(drivers)) + ' ' + ' '.join(re.findall(r'content="([^"]*)"', drivers)))
+    assert not broad, f'a broader token claim than the run inspected: {broad[0]!r}'
 
 
 def check_drivers_nav(css, pages):
@@ -854,8 +922,31 @@ def check_drivers_nav(css, pages):
         assert not classes & hidden, f'the {name} Drivers nav link is hidden on phones by {sorted(classes & hidden)}'
 
 
+def css_rules(css, selector):
+    return [body for sel, body in re.findall(r'([^{}]+)\{([^{}]*)\}', css) if selector in [s.strip() for s in sel.split(',')]]
+
+
 def check_driver_css(css):
-    """Round 2F (#56): no drivers-page text under DRIVER_MIN_FONT px."""
+    """Round 2F (#56): no drivers-page text under DRIVER_MIN_FONT px. Round 3 final (#66): every host pill's mark is
+    scaled inside one fixed-height slot; on a phone the spotlight's painting follows as a shorter image."""
+    slot = [re.search(r'(?<![-\w])height\s*:\s*(\d+)px', body) for body in css_rules(css, '.drivers-page .host-mark')]
+    assert any(slot), 'the host pills need one fixed-height mark slot (.drivers-page .host-mark { height: …px })'
+    fill = css_rules(css, '.drivers-page .host-mark img')
+    assert any(re.search(r'(?<![-\w])height\s*:\s*100%', body) for body in fill), 'each host mark scales to its slot\'s height'
+    for sel, body in re.findall(r'([^{}]+)\{([^{}]*)\}', css):
+        for one in sel.split(','):
+            one = one.strip()
+            if 'host-mark' in one and one != '.drivers-page .host-mark img' and re.search(r'img|host-(?:icon|tile|lockup)\b', one):
+                assert not re.search(r'(?<![-\w])(?:height|max-height|width)\s*:\s*\d', body), \
+                    f'a host mark sized apart from its slot, so the pills are uneven: {one}'
+    phone = [b for q, b in re.findall(r'@media\s*\(max-width:\s*(\d+)px\)\s*\{((?:[^{}]*\{[^{}]*\})*)[^{}]*\}', css) if int(q) <= 760]
+    ratios = [r for block in phone for body in css_rules(block, '.drivers-page .proof-scene')
+              for r in re.findall(r'aspect-ratio\s*:\s*(\d+(?:\.\d+)?)\s*/\s*(\d+(?:\.\d+)?)', body)]
+    assert ratios and float(ratios[-1][0]) / float(ratios[-1][1]) > 1672 / 941, \
+        f'on a phone the spotlight\'s painting follows as a shorter supporting image: {ratios}'
+    for sel, body in re.findall(r'([^{}]+)\{([^{}]*)\}', css):
+        if re.search(r'\.proof-(?:scene|copy)\b', sel):
+            assert not re.search(r'(?<![-\w])order\s*:', body), f'the spotlight keeps its reading order on a phone: {sel.strip()}'
     for rule in re.findall(r'[^{}]*\.drivers-page[^{}]*\{[^{}]*\}', css):
         for size in re.findall(r'font(?:-size)?\s*:[^;}]*?(\d+(?:\.\d+)?)px', rule):
             assert float(size) >= DRIVER_MIN_FONT, f'drivers-page text under {DRIVER_MIN_FONT}px: {rule.strip()[:120]}'

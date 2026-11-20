@@ -487,7 +487,7 @@ class Checks(unittest.TestCase):
                 ('drivers/index.html', 'id="cloudroom"', 'id="cloud"', 'four driver cards'),
                 ('drivers/index.html', '<span>Grok Bot</span></h3>', '<span>Grok</span></h3>', 'four driver cards'),
                 ('drivers/index.html', 'Being fixed: its kit run is in progress', 'Being fixed: almost done', 'driver facts'),
-                ('drivers/index.html', 'on a real account, 2026-11-19</p>', 'on a real account</p>', 'driver facts'),
+                ('drivers/index.html', 'Being fixed: its kit run is in progress', 'Being fixed: kit run next', 'driver facts'),
                 ('drivers/index.html', boat, boat.replace(' hero', ''), 'boat.dev is the hero|spotlight'),
                 ('drivers/index.html', '<article class="driver" id="grok-bot"', '<article class="driver hero" id="grok-bot"', 'boat.dev is the hero'),
                 ('drivers/index.html', 'href="https://github.com/openwizdev/OpenWiz/tree/main/adapters/template"', 'href="https://github.com/openwizdev/WizSkills"', 'only to the public OpenWiz'),
@@ -559,19 +559,21 @@ class Checks(unittest.TestCase):
         grok = '<h3 class="driver-name" id="grok-bot-name">'
         for old, new, error in (
                 (explainer, '<div class="drivers-intro">', 'one explainer of what a driver is'),
-                ('which proves no credential leaks.</p>', 'which proves no credential leaks. It is free. It is fast.</p>', 'two sentences at most'),
-                ('<code>wake</code> and <code>stop</code>', '<code>stop</code>', 'explainer must name'),
-                (', and <code>token</code>, which proves no credential leaks', '', 'explainer must name'),
+                ('five-check test.</p>', 'five-check test. It is free. It is fast.</p>', 'two sentences at most'),
+                ('the same four commands', 'the same commands', 'explainer must name'),
+                ('build software from tickets', 'build software', 'explainer must name'),
+                ('the same four commands', 'the same four commands (<code>version</code>, <code>start</code>, <code>wake</code>, <code>stop</code>)', 'stays out of the hero'),
+                ('five-check test.</p>', 'five-check test, token included.</p>', 'stays out of the hero'),
                 ('<span>Kit: not run yet</span></p>', '<span>Kit: not run yet</span></p><ul>' + row + '</ul>', 'no per-check rows'),
                 ('<span>Kit: not run yet</span></p>', '<span>Kit: not run yet</span></p><ol><li class="proof-check" data-check="token">x</li></ol>', 'one kit line, never per-check rows'),
-                ('Kit: not run yet. Its kit run comes next.', 'Kit: not run yet', 'one kit line must read'),
+                ('<span>Kit: not run yet</span>', '<span>Kit: not run yet. Its kit run comes next.</span>', 'one kit line must read'),
                 ('data-state="in progress"><svg', 'data-state="passed"><svg', 'one kit line must read'),
                 ('<h2 id="more-title">More drivers</h2>', '<h2 id="more-title">More drivers</h2><p>4 words, 5 checks in the kit</p>', 'jargon count'),
                 ('<h2 id="more-title">More drivers</h2>', '<h2 id="more-title">More drivers</h2><p>1 passed, 5 of 5</p>', 'jargon count'),
                 ('Drivers answer the same four commands', 'Drivers answer 4 words', 'jargon count'),
                 ('<h2 id="more-title">More drivers</h2>', '<h2 id="more-title">More drivers</h2><p>boat.dev passed all five checks.</p>', 'at most 2 times'),
                 ('<div class="own-token"><dt><code>token</code></dt>', '<div class="own-token"><dt><code>tokens</code></dt>', 'fifth check, token'),
-                ('alt="Cloudroom logo" width="256"', 'alt="" width="256"', 'alt text naming Cloudroom'),
+                ('alt="Cloudroom logo" width="256"', 'alt="" width="256"', 'alt text naming Cloudroom|names its host'),
                 (grok, grok + '<img src="/drivers/logos/cloudroom.png" alt="Grok Bot logo">', 'no Grok logo'),
                 (grok, grok + '<svg viewBox="0 0 8 8"><circle cx="4" cy="4" r="4"/></svg>', 'no Grok logo'),
                 ('</main>', '<img src="/favicon.svg" alt="Grok"></main>', 'no Grok logo')):
@@ -594,7 +596,7 @@ class Checks(unittest.TestCase):
             path.write_text(text.replace(spot, '').replace('<section class="own-driver', spot.strip() + '\n  <section class="own-driver', 1))
             with self.assertRaisesRegex(AssertionError, 'boat.dev first'):
                 check_site(root)
-        for logo in ('drivers/logos/boat-dev.svg', 'drivers/logos/cloudroom.png', 'drivers/logos/monitor.svg'):
+        for logo in ('drivers/logos/boat-dev.svg', 'drivers/logos/cloudroom.png', 'drivers/logos/monitor.svg', 'drivers/logos/bot.svg'):
             with self.subTest(logo=logo), tempfile.TemporaryDirectory() as temp:  # a logo recoloured or re-saved
                 root = Path(temp) / 'dist'
                 shutil.copytree(ROOT / 'dist', root)
@@ -611,6 +613,49 @@ class Checks(unittest.TestCase):
             with self.subTest(extra=extra), mock.patch.dict('check.DRIVER_LOGOS', {extra: ('0' * 64, 'Extra')}), \
                     self.assertRaisesRegex(AssertionError, error):
                 check_driver_logos(main, DriverOutline(main))
+
+    def test_drivers_round_3_final(self):
+        # Catches (#66): item 2, a host pill without its availability in words, with the wrong words, out of order, or
+        # with its mark outside the fixed-height slot or sized apart from it (the boat.dev mark larger than the rest);
+        # item 4, the spotlight's painting before its mark and checks (phone order), the date back in the headline or
+        # missing, the phone painting no shorter than the art, or a CSS order that moves the painting first; item 6,
+        # Grok Bot's card without the generic icon, with a brand mark instead, or any compact card off the shared header
+        # structure; item 7, a token explanation without the scoped words, or a broader claim than the run inspected.
+        page = 'drivers/index.html'
+        pill = '<li data-host="boat-dev">'
+        for old, new, error in (
+                ('<span class="host-state">works today</span>', '', 'works today in words'),
+                ('<span class="host-state">being fixed</span>', '<span class="host-state">works</span>', 'being fixed'),
+                ('<span class="host-state">coming soon</span>', '<span class="host-state">soon</span>', 'coming soon'),
+                ('<li data-host="vps">', '<li data-host="computer">', 'host pills, in order'),
+                ('<span class="host-mark"><img class="host-lockup"', '<span class="host-mark"></span><img class="host-lockup"', 'fixed-height slot'),
+                (pill, pill + '<span class="host-mark"><img src="/drivers/logos/boat-dev.svg" alt="boat.dev"></span>', 'fixed-height slot'),
+                ('<span class="host-name">Grok Bot</span>', '<span class="host-name">Grok</span>', 'names its host'),
+                ('<p class="driver-date">', '<p class="driver-meta">', 'own date line'),
+                ('<p class="driver-line">Passed all five checks</p>', '<p class="driver-line">Passed all five checks on a real account, 2026-11-19</p>', 'driver facts|own date line'),
+                ('On a real account, <time', 'Real account, <time', 'own date line'),
+                ('src="/drivers/logos/bot.svg" alt="Generic bot icon"', 'src="/drivers/logos/monitor.svg" alt="Generic computer icon"', 'only the generic icon'),
+                ('<img class="driver-logo host-icon" src="/drivers/logos/bot.svg" alt="Generic bot icon" width="24" height="24">', '', 'one header structure'),
+                ('<span>Cloudroom</span></h3>', 'Cloudroom</h3>', 'one header structure'),
+                ('No credential appeared in its output', 'No credential showed in its output', 'explains what it proved|token check inspected'),
+                ('it passes when no credential appeared', 'it passes when no secret appeared', 'token check inspected'),
+                ('</main>', '<p>The token check proves no credential leaks.</p></main>', 'broader token claim')):
+            self.broken(page, old, new, error)
+        with tempfile.TemporaryDirectory() as temp:  # the painting moved back above the mark and the checks
+            root = Path(temp) / 'dist'
+            shutil.copytree(ROOT / 'dist', root)
+            path = root / page
+            text = path.read_text()
+            scene = re.search(r'\s*<div class="proof-scene">[\s\S]*?</div>', text)[0]
+            path.write_text(text.replace(scene, '').replace('<div class="proof-copy">', scene.strip() + '<div class="proof-copy">', 1))
+            with self.assertRaisesRegex(AssertionError, 'come before its painting'):
+                check_site(root)
+        for bad, error in (
+                ('\n.drivers-page .host-marks .host-lockup { height: 26px; }\n', 'sized apart from its slot'),
+                ('\n.drivers-page .host-mark .host-tile { width: 30px; }\n', 'sized apart from its slot'),
+                ('\n@media (max-width: 760px) { .drivers-page .proof-scene { aspect-ratio: 1 / 1; } }\n', 'shorter supporting image'),
+                ('\n@media (max-width: 760px) { .drivers-page .proof-scene { order: -1; } }\n', 'keeps its reading order')):
+            self.broken(page, '', '', error, css=bad)
 
     def test_drivers_nav_and_description(self):
         # Catches (#59 R1): a Drivers nav link the phone breakpoint hides (display: none, so not shown or focusable at
