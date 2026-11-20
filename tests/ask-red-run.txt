@@ -57,3 +57,12 @@
 ℹ pass 1
 ℹ fail 53
 ✖ failing tests:
+
+# R1 red run: a body repeating the question key (raw or escaped) is read, not refused as bad_request
+✖ every malformed request is bad_request, counts nothing and calls nothing (48.502766ms)
+ℹ tests 1
+ℹ pass 0
+ℹ fail 1
+✖ failing tests:
+    actual: 502,
+    expected: 400,

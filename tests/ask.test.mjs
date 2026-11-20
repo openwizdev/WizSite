@@ -333,6 +333,8 @@ test('every malformed request is bad_request, counts nothing and calls nothing',
     { ...ok, body: '' }, { ...ok, body: 'not json' }, { ...ok, body: '[]' }, { ...ok, body: '"question"' }, { ...ok, body: 'null' },
     { ...ok, body: '{}' }, { ...ok, body: '{"question": 1}' }, { ...ok, body: '{"question": null}' },
     { ...ok, body: '{"question": "a", "extra": 1}' }, { ...ok, body: '{"Question": "a"}' },
+    { ...ok, body: '{"question": "a", "question": "b"}' }, { ...ok, body: '{"question": "a", "\\u0071uestion": "b"}' },
+    { ...ok, body: '{"question": ["a"]}' }, { ...ok, body: '{"question": "a"} {}' },
     { ...ok, body: '{"question": "   \\n\\t  "}' }, { ...ok, body: '{"question": ""}' },
     { ...ok, body: JSON.stringify({ question: 'a'.repeat(200) }).padEnd(4097, ' ') },
   ];
