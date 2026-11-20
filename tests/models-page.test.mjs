@@ -438,15 +438,17 @@ describe('the Models page in the app', () => {
     await page.close();
   });
 
-  // catches (review R1): GitHub refusing the file reads (an App without contents access, as on a private repository)
-  // shown as a missing fleet.md with setup advice, or a refused snapshot shown as "none yet".
+  // catches (review R1, planner's ruling): GitHub refusing the file reads (a private repository the Viewer can't
+  // read) shown as a missing fleet.md with setup advice, or a refused snapshot as "none yet", or either without the
+  // command that shows the models instead (`openwiz models show`), or with any model shown.
   test('a refused file read is a failed read, never a missing file, and offers no choice', async () => {
     const fleet = await text(new URL('one-table/fleet.md', FIX));
     let world = new World({ fleet, offered, forbidden: ['fleet', 'offered'] });
     let page = await modelsPage(browser, world);
     let body = await page.text();
     assert.match(body, /GitHub refused to read docs\/agents\/fleet\.md/);
-    assert.doesNotMatch(body, /has no docs\/agents\/fleet\.md|setup skill/);
+    assert.match(await page.run(`document.querySelector('.models-unread')?.innerText || ''`), /openwiz models show/);
+    assert.doesNotMatch(body, /has no docs\/agents\/fleet\.md|setup skill|Opus|Sol/);
     assert.equal(await page.run(`document.querySelectorAll('.models .card').length`), 0);
     await page.close();
 
@@ -454,6 +456,7 @@ describe('the Models page in the app', () => {
     page = await modelsPage(browser, world);
     body = await page.text();
     assert.match(body, /GitHub refused to read docs\/agents\/models-offered\.json/);
+    assert.match(await page.run(`document.querySelector('.models .notice.models-unread')?.innerText || ''`), /openwiz models show/);
     assert.doesNotMatch(body, /No list of offered models yet/);
     await page.click('Change', '.models .card.builder');
     assert.equal(await page.run(`document.querySelectorAll('.models .picker li button').length`), 0);
