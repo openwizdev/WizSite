@@ -450,9 +450,11 @@ export async function handle(context, options = {}) {
   const report = {};
   const pieces = answerPieces(reader, report);
 
-  // The answer's pieces arrive in `queue` and leave it whole, in order. A piece leaves only once at least
-  // key length - 1 characters have arrived after it (or the stream has ended), so a key spread over any number of
-  // pieces is caught before any piece holding part of it is sent. `received` is all the text that has arrived.
+  // The answer's pieces arrive in `queue` and leave it whole, in order. The last key length - 1 characters that
+  // arrived are always examined: from the first of them that could begin the key (what follows it is a start of
+  // the key), the text is held, and a piece leaves only when it ends before that point. The whole key arriving
+  // ends the answer. On any failure, timeout or cancel, held text is discarded, never sent: no part of the key
+  // ever reaches the visitor. `received` is all the text that has arrived.
   const queue = [];
   let received = '';
   let state = 'open'; // open, done (at [DONE]), failed (an error, a timeout or a cancel) or leaked (the key arrived)
@@ -469,7 +471,13 @@ export async function handle(context, options = {}) {
     }
   }
   const queued = () => queue.reduce((sum, piece) => sum + piece.length, 0);
-  const ready = () => queue.length > 0 && (state !== 'open' || queued() - queue[0].length >= lookahead);
+  const heldFrom = () => {
+    for (let at = Math.max(0, received.length - lookahead); at < received.length; at++) if (config.key.startsWith(received.slice(at))) return at;
+    return received.length;
+  };
+  // The next piece may leave: the answer ended complete without the key, or the piece ends before the held text.
+  const ready = () => queue.length > 0 && state !== 'leaked' && state !== 'failed' &&
+    (state === 'done' || received.length - queued() + queue[0].length <= heldFrom());
 
   // Hold back the answer's start until it can't be NOT_COVERED, or the answer ends.
   while (state === 'open' && received.trimStart().length < HOLD) await receive();
@@ -488,13 +496,13 @@ export async function handle(context, options = {}) {
   }
   // The first piece must be safe to send before the answer's status is set.
   while (state === 'open' && !ready()) await receive();
-  if (state === 'leaked' || !queue.length || bytes(queue[0]) > MAX_ANSWER_BYTES) {
+  if (!ready() || bytes(queue[0]) > MAX_ANSWER_BYTES) {
     if (state === 'done') finish(report.cost); else { stop(); finish(); }
     return refuse('upstream_error');
   }
 
   // The answer: text pieces that fit whole within MAX_ANSWER_BYTES, then sources and done; an error after some
-  // text sends the text that arrived safely, then upstream_error.
+  // text discards whatever is held and ends with upstream_error.
   let sent = 0;
   let closed = false;
   const body = new ReadableStream({
@@ -508,7 +516,7 @@ export async function handle(context, options = {}) {
       };
       for (;;) {
         if (closed) return;
-        if (state === 'leaked') return end(refused('upstream_error'));
+        if (state === 'leaked' || state === 'failed') return end(refused('upstream_error'));
         if (ready()) {
           const piece = queue.shift();
           if (sent + bytes(piece) > MAX_ANSWER_BYTES) return end(refused('upstream_error'));
@@ -519,7 +527,6 @@ export async function handle(context, options = {}) {
           emit(line({ type: 'sources', sources: sourcesOf(used) }));
           return end(line({ type: 'done' }), report.cost ?? null);
         }
-        if (state === 'failed') return end(refused('upstream_error'));
         await receive();
       }
     },
