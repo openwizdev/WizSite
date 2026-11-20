@@ -521,7 +521,7 @@ class Checks(unittest.TestCase):
                 ('drivers/index.html', '<span class="proof-state">passed</span>', '<span class="proof-state"></span>', 'says passed in words'),
                 ('drivers/index.html', 'that note was edited, never a second one.', 'it works.', 'explains what it proved'),
                 ('drivers/index.html', '<img class="proof-art" src="/art/drivers-c-boat.webp"', '<img class="proof-art-x" src="/art/drivers-c-boat.webp"', 'painting of the crew'),
-                ('drivers/index.html', '<img class="proof-art" src="/art/drivers-c-boat.webp"', '<img class="proof-art" src="/art/drivers-d-ship.webp"', 'shown twice'),
+                ('drivers/index.html', '</main>', '<img src="/art/drivers-d-ship.webp" alt="The ship again"></main>', 'shown twice'),
                 ('drivers/index.html', '<p class="driver-kit-note">Kit: not run yet</p>', '', 'kit note'),
                 ('drivers/index.html', '</main>', '<p class="driver-kit-note">x</p></main>', 'kit note|four driver cards')):
             with self.subTest(name=name, error=error), tempfile.TemporaryDirectory() as temp:

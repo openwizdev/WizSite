@@ -54,7 +54,10 @@
       <p class="voyage-kicker">Drivers</p>
       <h1 id="voyage-title">Run your agents anywhere.</h1>
       <p class="voyage-sub">A driver plugs a place that runs agents into OpenWiz: your own computer, a VPS, a cloud sandbox. One small program, four words, five checks.</p>
-      <a class="voyage-pass" href="#boat-dev"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7"/><path d="M4.6 8.3l2.3 2.3 4.5-4.8"/></svg><span><b>boat.dev</b> passed the kit, 5 of 5</span></a>
+      <ul class="drivers-chips" aria-label="In numbers">
+        <li><b>4</b> drivers</li><li><b>4</b> words</li><li><b>5</b> checks in the kit</li><li><b>1</b> passed, 5 of 5</li>
+      </ul>
+      <a class="voyage-pass" href="#boat-proof"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7"/><path d="M4.6 8.3l2.3 2.3 4.5-4.8"/></svg><span>See what <b>boat.dev</b>'s five checks proved</span></a>
     </div>
   </section>
   <section class="fleet wrap" aria-labelledby="fleet-title">
@@ -87,12 +90,13 @@
     <article class="driver" id="cloudroom" aria-labelledby="cloudroom-name">
       <h3 class="driver-name" id="cloudroom-name">Cloudroom</h3>
       <p class="driver-line">Works today: built real pull requests for OpenWiz</p>
+      <p class="driver-kit-note">Kit: not run yet</p>
       <div class="driver-words">
         <h4>Its four words</h4>
         <ul><li><code class="word">version</code></li><li><code class="word">start</code></li><li><code class="word">wake</code></li><li><code class="word">stop</code></li></ul>
       </div>
       <div class="kit unrun">
-        <h4>Test kit <span>Not yet run</span></h4>
+        <h4>Test kit <span>Not run yet</span></h4>
         <ul>
           <li class="kit-check" data-check="version" data-state="not yet run"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/></svg><span class="kit-name">version</span> <span class="kit-state">not yet run</span></li>
           <li class="kit-check" data-check="start" data-state="not yet run"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/></svg><span class="kit-name">start</span> <span class="kit-state">not yet run</span></li>
@@ -105,7 +109,6 @@
     </li>
     <li>
     <article class="driver hero" id="boat-dev" aria-labelledby="boat-dev-name">
-      <img class="hero-card-art" src="/art/drivers-d-ship.webp" alt="" width="1100" height="765" loading="lazy">
       <h3 class="driver-name" id="boat-dev-name">boat.dev</h3>
       <p class="driver-line">Passed the kit, 5 of 5, on a real account (2026-11-19)</p>
       <p class="hero-score" aria-hidden="true"><b>5</b><span>of 5</span></p>
@@ -134,7 +137,7 @@
         <ul><li><code class="word">version</code></li><li><code class="word">start</code></li><li><code class="word">wake</code></li><li><code class="word">stop</code></li></ul>
       </div>
       <div class="kit unrun">
-        <h4>Test kit <span>Not yet run</span></h4>
+        <h4>Test kit <span>Not run yet</span></h4>
         <ul>
           <li class="kit-check" data-check="version" data-state="not yet run"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/></svg><span class="kit-name">version</span> <span class="kit-state">not yet run</span></li>
           <li class="kit-check" data-check="start" data-state="not yet run"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/></svg><span class="kit-name">start</span> <span class="kit-state">not yet run</span></li>
@@ -146,6 +149,23 @@
     </article>
     </li>
     </ol>
+  </section>
+  <section class="boat-proof wrap" id="boat-proof" aria-labelledby="proof-title">
+    <div class="proof-scene">
+      <img class="proof-art" src="/art/drivers-c-boat.webp" alt="Oil painting of the Wiz crew's ship in cutaway at night: on its three decks, Wizes steer and read, write at desks, and tend a brass engine" width="1672" height="941" loading="lazy">
+    </div>
+    <div class="proof-copy">
+      <p class="proof-kicker">The hero driver</p>
+      <h2 id="proof-title">boat.dev passed the kit, 5 of 5.</h2>
+      <p class="proof-lead">On a real account, on 2026-11-19. Each check is one thing the kit watched boat.dev do on its real host.</p>
+      <ol class="proof-checks">
+        <li class="proof-check" data-check="version" data-state="passed"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7"/><path d="M4.6 8.3l2.3 2.3 4.5-4.8"/></svg><code class="proof-name">version</code><span class="proof-state">passed</span><span class="proof-line">It names the kernel's records version, and prints its schema unchanged.</span></li>
+        <li class="proof-check" data-check="start" data-state="passed"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7"/><path d="M4.6 8.3l2.3 2.3 4.5-4.8"/></svg><code class="proof-name">start</code><span class="proof-state">passed</span><span class="proof-line">It answered a run id, and the agent's status note appeared on a throwaway ticket.</span></li>
+        <li class="proof-check" data-check="wake" data-state="passed"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7"/><path d="M4.6 8.3l2.3 2.3 4.5-4.8"/></svg><code class="proof-name">wake</code><span class="proof-state">passed</span><span class="proof-line">It reached the same run again: that note was edited, never a second one.</span></li>
+        <li class="proof-check" data-check="stop" data-state="passed"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7"/><path d="M4.6 8.3l2.3 2.3 4.5-4.8"/></svg><code class="proof-name">stop</code><span class="proof-state">passed</span><span class="proof-line">It ended the run: a wake after it was refused, and nothing the run started still runs.</span></li>
+        <li class="proof-check" data-check="token" data-state="passed"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7"/><path d="M4.6 8.3l2.3 2.3 4.5-4.8"/></svg><code class="proof-name">token</code><span class="proof-state">passed</span><span class="proof-line">No credential showed in its output, command lines or environment, and it refused a token field.</span></li>
+      </ol>
+    </div>
   </section>
   <section class="own-driver wrap" aria-labelledby="own-title">
     <div class="own-copy">
