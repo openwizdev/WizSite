@@ -24,10 +24,13 @@ const BASE = await read('answer.json'); // a valid on-switch request, settings a
 // The fake D1: the binding's API (prepare, bind, first, all, run, batch) over an in-memory SQLite. `fails` makes
 // every operation fail; `hang` makes every operation never finish; `rival` is a salt another first request
 // stores just before this request's salt insert.
-function fakeD1(store, { fails = false, hang = false, rival = null, failWhen = null } = {}) {
+function fakeD1(store, { fails = false, hang = false, rival = null, failWhen = null, empty = false } = {}) {
   const db = new DatabaseSync(':memory:');
-  db.exec('CREATE TABLE ask_counters (day TEXT, key TEXT, count INTEGER, PRIMARY KEY (day, key))');
-  db.exec('CREATE TABLE ask_salts (day TEXT PRIMARY KEY, salt TEXT NOT NULL)');
+  if (empty) store = { salts: [], counters: [] }; // a database with no tables at all, as a new D1 binding starts
+  else {
+    db.exec('CREATE TABLE ask_counters (day TEXT, key TEXT, count INTEGER, PRIMARY KEY (day, key))');
+    db.exec('CREATE TABLE ask_salts (day TEXT PRIMARY KEY, salt TEXT NOT NULL)');
+  }
   for (const s of store.salts) db.prepare('INSERT INTO ask_salts VALUES (?, ?)').run(s.day, s.salt);
   for (const c of store.counters) db.prepare('INSERT INTO ask_counters VALUES (?, ?, ?)').run(c.day, c.key, c.count);
   const log = [];
@@ -652,11 +655,13 @@ test('the store holds only the two tables and the pinned key forms, on a fresh s
   answer = upstreamAnswer({ chunks: ['Synthetic answer on a fresh store.'], cost: 0.0001 });
   const store = { salts: [], counters: [] };
   const c = withCase({ store });
-  const d1 = fakeD1(store); // the fake starts with the tables, so the log shows the function creating them itself
+  const d1 = fakeD1(store, { empty: true }); // no tables: the function must create them itself
   const out = await run(c, { store: d1 });
+  assert.equal(out.response.status, 200);
+  assert.deepEqual(events(out.body).map(e => e.type), ['text', 'sources', 'done']);
   assert.deepEqual(out.store.tables, ['ask_counters', 'ask_salts']);
-  assert.ok(out.storeLog.some(sql => /CREATE TABLE IF NOT EXISTS ask_counters/i.test(sql)));
-  assert.ok(out.storeLog.some(sql => /CREATE TABLE IF NOT EXISTS ask_salts/i.test(sql)));
+  assert.deepEqual(out.store.counters.map(r => [r.key.replace(/[0-9a-f]{32}/, '<hash>'), r.count]).sort(),
+    [['cap', 1], ['spend', 100], ['visitor:<hash>:14', 1]], 'the question, the call and its settled cost are counted');
   for (const row of out.store.counters) assert.match(row.key, /^(cap|spend|visitor:[0-9a-f]{32}:([01][0-9]|2[0-3]))$/);
   for (const row of out.store.salts) assert.match(row.salt, /^[0-9a-f]{64}$/);
   const all = JSON.stringify(out.store);

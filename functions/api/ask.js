@@ -156,18 +156,34 @@ async function readLimited(stream, max) {
 // ---- The store --------------------------------------------------------------------------------------------------
 
 // Every store operation is one D1 batch (one transaction) that first deletes earlier days' rows from both tables,
-// and fails if D1 errs or takes longer than `timeout` ms.
+// and fails if D1 errs or takes longer than `timeout` ms. It ends by deleting every row older than the newest day
+// either table holds, in the same transaction: a batch for a day that has already ended (one delayed past
+// midnight) can read and count, but leaves nothing of that day behind. Each write also reports that newest day.
+const NEWEST = 'SELECT max(day) FROM (SELECT day FROM ask_counters UNION ALL SELECT day FROM ask_salts)';
 function counters(db, timeout) {
   const prune = day => [
     db.prepare('DELETE FROM ask_counters WHERE day < ?').bind(day),
     db.prepare('DELETE FROM ask_salts WHERE day < ?').bind(day),
   ];
-  const write = (day, statements, setup = []) => {
+  const cutoff = [
+    db.prepare(`DELETE FROM ask_counters WHERE day < (${NEWEST})`),
+    db.prepare(`DELETE FROM ask_salts WHERE day < (${NEWEST})`),
+    db.prepare(`${NEWEST.replace('max(day)', 'max(day) AS newest')}`),
+  ];
+  let newest = '';
+  const write = async (day, statements, setup = []) => {
     let timer;
     const late = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('store timeout')), timeout); });
-    return Promise.race([db.batch([...setup, ...prune(day), ...statements]), late]).finally(() => clearTimeout(timer));
+    const all = [...setup, ...prune(day), ...statements, ...cutoff];
+    const results = await Promise.race([db.batch(all), late]).finally(() => clearTimeout(timer));
+    if (!Array.isArray(results) || results.length !== all.length) throw new Error('store: no result');
+    const seen = results.at(-1)?.results?.[0]?.newest;
+    if (typeof seen === 'string' && seen > newest) newest = seen;
+    return results.slice(setup.length + 2, setup.length + 2 + statements.length);
   };
   return {
+    // The newest day any write has seen in the store: a day that has begun, even if this request's clock says not.
+    newest: () => newest,
     // The day's salt: a fresh one is offered, and the stored one (whoever stored it first) is used.
     async salt(day, fresh) {
       const results = await write(day, [
@@ -214,7 +230,7 @@ async function visitorHash(salt, ip) {
 const utcDay = time => time.toISOString().slice(0, 10);
 const utcHour = time => time.toISOString().slice(11, 13);
 const untilHourEnds = time => Math.ceil((3_600_000 - (time.getTime() % 3_600_000)) / 1000);
-const untilDayEnds = time => Math.ceil((86_400_000 - (time.getTime() % 86_400_000)) / 1000);
+const untilDayEnds = (time, day = utcDay(time)) => Math.ceil((Date.parse(`${day}T00:00:00Z`) + 86_400_000 - time.getTime()) / 1000);
 
 // ---- The index and the passages ---------------------------------------------------------------------------------
 
@@ -373,10 +389,12 @@ export async function handle(context, options = {}) {
   let sentOn = day;
   try {
     if (!await reserve(day)) return refuse('daily_cap', untilDayEnds(now));
+    // The call is counted on the day it is sent: the clock's day, or a newer day the store already holds.
     const dispatch = clock();
-    if (utcDay(dispatch) !== day) {
-      sentOn = utcDay(dispatch);
-      if (!await reserve(sentOn)) return refuse('daily_cap', untilDayEnds(dispatch));
+    const later = [utcDay(dispatch), store.newest()].sort().at(-1);
+    if (later > day) {
+      sentOn = later;
+      if (!await reserve(sentOn)) return refuse('daily_cap', untilDayEnds(dispatch, sentOn));
     }
   } catch {
     return refuse('store_error');
@@ -398,7 +416,7 @@ export async function handle(context, options = {}) {
     if (finished) return;
     finished = true;
     clearTimeout(timer);
-    const settled = cost === undefined ? Promise.resolve() : store.settle(sentOn, config.callMax, micro(cost * 1_000_000));
+    const settled = cost === undefined || cost === null ? Promise.resolve() : store.settle(sentOn, config.callMax, micro(cost * 1_000_000));
     settled.catch(() => {}).then(() => release());
   }
 
@@ -417,6 +435,7 @@ export async function handle(context, options = {}) {
         messages: [{ role: 'system', content: SYSTEM }, { role: 'user', content }],
       }),
       signal: abort.signal,
+      redirect: 'manual', // a redirect is a refusal: the question goes only to OpenRouter, under its privacy rules
     });
   } catch {
     finish();
@@ -431,78 +450,78 @@ export async function handle(context, options = {}) {
   const report = {};
   const pieces = answerPieces(reader, report);
 
-  // Hold back the answer's start until it can't be NOT_COVERED, or the answer ends.
-  const held = [];
-  let start = '';
-  let ended = false;
-  try {
-    while (start.trimStart().length < HOLD) {
+  // The answer's pieces arrive in `queue` and leave it whole, in order. A piece leaves only once at least
+  // key length - 1 characters have arrived after it (or the stream has ended), so a key spread over any number of
+  // pieces is caught before any piece holding part of it is sent. `received` is all the text that has arrived.
+  const queue = [];
+  let received = '';
+  let state = 'open'; // open, done (at [DONE]), failed (an error, a timeout or a cancel) or leaked (the key arrived)
+  const lookahead = config.key.length - 1;
+  async function receive() {
+    try {
       const next = await pieces.next();
-      if (next.done) { ended = true; break; }
-      held.push(next.value);
-      start += next.value;
+      if (next.done) { state = 'done'; return; }
+      queue.push(next.value);
+      received += next.value;
+      if (received.includes(config.key)) state = 'leaked';
+    } catch {
+      state = 'failed';
     }
-  } catch {
+  }
+  const queued = () => queue.reduce((sum, piece) => sum + piece.length, 0);
+  const ready = () => queue.length > 0 && (state !== 'open' || queued() - queue[0].length >= lookahead);
+
+  // Hold back the answer's start until it can't be NOT_COVERED, or the answer ends.
+  while (state === 'open' && received.trimStart().length < HOLD) await receive();
+  if (state === 'leaked' || state === 'failed') {
     stop();
     finish();
     return refuse('upstream_error');
   }
-  if (start.trimStart().startsWith(SENTINEL)) {
+  if (received.trimStart().startsWith(SENTINEL)) {
     // The model's not-covered answer; the rest of the stream is read only for its reported cost.
     keep((async () => {
-      try {
-        if (!ended) for await (const _ of pieces) { /* discarded */ }
-        finish(report.cost);
-      } catch {
-        finish();
-      }
+      while (state === 'open') await receive();
+      if (state === 'done') finish(report.cost); else { stop(); finish(); }
     })());
     return new Response(line(NOT_COVERED), { headers: NDJSON });
   }
-  if (!held.length || bytes(held[0]) > MAX_ANSWER_BYTES) {
-    if (ended) finish(report.cost); else { stop(); finish(); }
+  // The first piece must be safe to send before the answer's status is set.
+  while (state === 'open' && !ready()) await receive();
+  if (state === 'leaked' || !queue.length || bytes(queue[0]) > MAX_ANSWER_BYTES) {
+    if (state === 'done') finish(report.cost); else { stop(); finish(); }
     return refuse('upstream_error');
   }
 
-  // The answer: text pieces that fit whole within MAX_ANSWER_BYTES, then sources and done.
+  // The answer: text pieces that fit whole within MAX_ANSWER_BYTES, then sources and done; an error after some
+  // text sends the text that arrived safely, then upstream_error.
   let sent = 0;
   let closed = false;
   const body = new ReadableStream({
     async pull(controller) {
       const emit = text => { if (!closed) controller.enqueue(encoder.encode(text)); };
-      const close = () => { if (!closed) { closed = true; controller.close(); } };
-      let piece;
-      if (held.length) piece = held.shift();
-      else if (ended) piece = null;
-      else {
-        try {
-          const next = await pieces.next();
-          piece = next.done ? null : next.value;
-          if (next.done) ended = true;
-        } catch {
-          emit(refused('upstream_error'));
-          close();
-          stop();
-          finish();
-          return;
+      const end = (last, cost) => {
+        emit(last);
+        if (!closed) { closed = true; controller.close(); }
+        if (cost === undefined) stop();
+        finish(cost);
+      };
+      for (;;) {
+        if (closed) return;
+        if (state === 'leaked') return end(refused('upstream_error'));
+        if (ready()) {
+          const piece = queue.shift();
+          if (sent + bytes(piece) > MAX_ANSWER_BYTES) return end(refused('upstream_error'));
+          sent += bytes(piece);
+          return emit(line({ type: 'text', text: piece }));
         }
+        if (state === 'done') {
+          emit(line({ type: 'sources', sources: sourcesOf(used) }));
+          return end(line({ type: 'done' }), report.cost ?? null);
+        }
+        if (state === 'failed') return end(refused('upstream_error'));
+        await receive();
       }
-      if (piece === null) {
-        emit(line({ type: 'sources', sources: sourcesOf(used) }));
-        emit(line({ type: 'done' }));
-        close();
-        finish(report.cost);
-        return;
-      }
-      if (sent + bytes(piece) > MAX_ANSWER_BYTES) {
-        emit(refused('upstream_error'));
-        close();
-        stop();
-        finish();
-        return;
-      }
-      sent += bytes(piece);
-      emit(line({ type: 'text', text: piece }));
     },
     cancel() {
       closed = true;
