@@ -499,15 +499,15 @@ class Checks(unittest.TestCase):
             'unexpected external URL': ('team/index.html', lambda t: t.replace('</main>', '<img src="https://cal.com/openwiz-jake/setup" alt=""></main>', 1)),
             'two booking links ': ('team/index.html', lambda t: t.replace('</main>', '<a data-book href="https://cal.com/openwiz-jake/setup">Again</a></main>', 1)),
             'two booking links  ': ('team/index.html', lambda t: re.sub(r'<a class="team-book" data-book[^>]*>Book a call</a>\n</section>', '</section>', t)),
-            'shows no price': ('team/index.html', lambda t: t.replace('Custom pricing.', 'Custom pricing. From $99 per month.', 1)),
+            'shows no price': ('team/index.html', lambda t: t.replace('No checkout.', 'No checkout. From $99 per month.', 1)),
             'team page copy': ('team/index.html', lambda t: t.replace('>Book a call</a>', '>Talk</a>')),
             'team page copy ': ('team/index.html', lambda t: t.replace('>Book a call</a>', '>Talk</a>', 1)),
             # #73, #79: the team page's sections, in order.
             'the team page sections': ('team/index.html', lambda t: t.replace('>Where your agents run</h2>', '>Hosts</h2>', 1)),
-            'the team page sections ': ('team/index.html', lambda t: re.sub(r'<section class="team-part wrap" aria-labelledby="team-proof">[\s\S]*?</section>\n', '', t)),
+            'the team page sections ': ('team/index.html', lambda t: t.replace('<h2 id="team-proof">Proof</h2>', '', 1)),
             'link to /drivers/': ('team/index.html', lambda t: t.replace('<li><a href="/drivers/">Cloudroom</a></li>', '<li>Cloudroom</li><li><a href="/">x</a></li>', 1)),
             # #79: the headline, the terms, the "ships" line and the timeline, word for word and visible.
-            'the team page headline': ('team/index.html', lambda t: t.replace('Leave with a shipped pull request.</h1>', 'Ship a pull request.</h1>', 1)),
+            'the team page headline': ('team/index.html', lambda t: t.replace('Book 30 minutes. Leave with a shipped pull request.</h1>', 'Book 30 minutes.</h1><p>Leave with a shipped pull request.</p>', 1)),
             'missing team page copy: A small': ('team/index.html', lambda t: t.replace('<li>A small, real change of your choice.</li>', '', 1)),
             'missing team page copy: If it hasn': ('team/index.html', lambda t: t.replace('Jake stays on until it does.', 'we try again.', 1)),
             'its three terms': ('team/index.html', lambda t: t.replace('<ul class="team-terms">', '<ul class="team-terms"><li>And more.</li>', 1)),
@@ -520,7 +520,7 @@ class Checks(unittest.TestCase):
             'its four stops': ('team/index.html', lambda t: re.sub(r'<li class="team-stop team-end"><span class="team-minute">Minute 30</span><p>A pull request ships.</p></li>', '', t, count=1)),
             'its four stops ': ('team/index.html', lambda t: t.replace('<span class="team-minute">Minute 10</span>', '<span class="team-minute">Minute 15</span>', 1)),
             'its four stops  ': ('team/index.html', lambda t: re.sub(r'<ol class="team-steps">[\s\S]*?</ol>', '', t, count=1)),
-            'missing team page copy: The 30': ('team/index.html', lambda t: t.replace('The 30 minutes, roughly', 'The 30 minutes', 1)),
+            'the team page sections  ': ('team/index.html', lambda t: t.replace('The 30 minutes, roughly', 'The 30 minutes', 1)),
             'never uses: install': ('team/index.html', lambda t: t.replace('A small, real change of your choice.</li>', 'A small, real change of your choice.</li><li>We install it.</li>', 1)),
             'never uses: guarantee': ('team/index.html', lambda t: t.replace('</main>', '<p>Guaranteed.</p></main>', 1)),
             # #79: the boat poster, a sized and lazy link to the post on X; the video never hosted or embedded.
