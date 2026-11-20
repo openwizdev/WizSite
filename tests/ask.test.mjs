@@ -232,9 +232,11 @@ test('the key never appears in a response, even when OpenRouter echoes it in an 
     () => new Response(sse({ chunks: [], fails: true, after_chunks: 0 }).body),
   ]) {
     answer = reply;
+    calls.length = 0;
     const store = fakeD1(c.store);
     const out = await run(c, { store });
     bodies.push(out);
+    assert.equal(calls.length, 1, 'one attempt, never a retry, whatever went wrong');
     assert.ok(!JSON.stringify(headersOf(out.response)).includes(KEY), 'headers');
     assert.ok(!out.body.includes(KEY), `body: ${out.body}`);
   }
