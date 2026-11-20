@@ -54,7 +54,7 @@ describe('the Models page reader', () => {
       const read = models.read(await text(new URL(`${name}/fleet.md`, FIX)));
       assert.equal(read.form, show.read);
       assert.deepEqual(JSON.parse(JSON.stringify(read.roles)), show.roles);
-      assert.deepEqual(read.warnings, show.warnings.filter(w => w.kind === 'same_family').map(w => w.text));
+      assert.deepEqual([...read.warnings], show.warnings.filter(w => w.kind === 'same_family').map(w => w.text));
     });
   }
 
@@ -91,7 +91,7 @@ describe('the Models page reader', () => {
   // shown when it isn't offered.
   test('the picker offers only the snapshot\'s settable choices, the recommended ones marked', async () => {
     const snapshot = await json(new URL('models-offered.json', FIX));
-    const read = models.offered(JSON.stringify(snapshot));
+    const read = JSON.parse(JSON.stringify(models.offered(JSON.stringify(snapshot))));
     const ids = c => `${c.provider} ${c.model} ${c.effort}`;
     const listed = snapshot.harnesses.flatMap(h => h.models.flatMap(m => m.efforts.map(e => `${h.provider} ${m.model} ${e}`)));
     assert.deepEqual(read.choices.map(ids), listed);
@@ -101,7 +101,7 @@ describe('the Models page reader', () => {
     assert.deepEqual(marked('builder'), ['claude-code claude-opus-5-5 medium']);
     assert.deepEqual(marked('reviewer'), ['codex gpt-6.2-sol medium']);
     snapshot.recommended.reviewer.offered = false;
-    assert.deepEqual(models.offered(JSON.stringify(snapshot)).choices.filter(c => c.recommended.includes('reviewer')), []);
+    assert.equal(models.offered(JSON.stringify(snapshot)).choices.filter(c => c.recommended.includes('reviewer')).length, 0);
     for (const broken of ['{', '{"schema": "openwiz.models-offered.v1"}', JSON.stringify({ ...snapshot, state: { kind: 'no_options' } })]) {
       assert.throws(() => models.offered(broken), models.Refused);
     }
@@ -263,7 +263,7 @@ async function open(browser, world) {
     async shot(path, width, height, mobile) {
       await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: mobile ? 2 : 1, mobile });
       await new Promise(resolve => setTimeout(resolve, 400));
-      const { data } = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true });
+      const { data } = await send('Page.captureScreenshot', { format: 'png' });
       await writeFile(path, Buffer.from(data, 'base64'));
       await send('Emulation.clearDeviceMetricsOverride');
     },
@@ -304,10 +304,11 @@ function readOnly(world) {
 const card = (page, role) => page.run(`(() => { const c = [...document.querySelectorAll('.models .card')]
   .find(c => c.querySelector('h3')?.textContent === ${JSON.stringify(role)}); return c ? c.innerText.replace(/\\s+/g, ' ') : null; })()`);
 
-describe('the Models page in the app', { skip: !existsSync(new URL('index.html', DIST)) && 'dist/ is missing: run npm run build first' }, () => {
+describe('the Models page in the app', () => {
   let browser;
   let offered;
   before(async () => {
+    assert.ok(existsSync(new URL('app/index.html', DIST)), 'dist/ is missing: run npm run build first');
     browser = await launch();
     offered = await text(new URL('models-offered.json', FIX));
   });
@@ -371,8 +372,8 @@ describe('the Models page in the app', { skip: !existsSync(new URL('index.html',
     if (process.env.SHOTS) {
       await page.click('Change', '.models .card.builder');
       await page.click('Sonnet 5.5 High on Claude Code', '.models .card.builder .picker');
-      await page.shot(join(process.env.SHOTS, 'models-laptop.png'), 1440, 900, false);
-      await page.shot(join(process.env.SHOTS, 'models-phone.png'), 390, 844, true);
+      await page.shot(join(process.env.SHOTS, 'models-laptop.png'), 1440, 1960, false);
+      await page.shot(join(process.env.SHOTS, 'models-phone.png'), 390, 2000, true);
     }
     readOnly(world);
     await page.close();
