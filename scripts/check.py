@@ -451,7 +451,8 @@ def check_site(root):
     assert 'The real spec of an OpenWiz-built to-do app' in flat, 'the spec video must say it is the to-do app\'s real spec'
     # J267: the three moments point at the real to-do run: its grill, its spec and the live app.
     hrefs = {}
-    for block in re.findall(r'<li[^>]*>\s*(?:<div class="moment-screen|<video).*?</li>', landing, re.S):
+    # Comments hide markup from visitors, so a commented-out card or link counts as missing.
+    for block in re.findall(r'<li[^>]*>\s*(?:<div class="moment-screen|<video).*?</li>', re.sub(r'<!--.*?-->', '', landing, flags=re.S), re.S):
         found = Page(block)
         hrefs[re.search(r'<h3>([^<]+)</h3>', block)[1]] = {a.get('href') for a in found.links}
     for card, link in zip(moments, TODO_LINKS):
