@@ -357,10 +357,13 @@ async function main() {
     // #1357: the landing's install box. The line is the one the install skill expects, word for word.
     const LINE = 'Install OpenWiz from github.com/openwizdev/OpenWiz';
     const landing = await readFile(new URL('index.html', DIST), 'utf8');
-    // The release's one change: the box's switch from coming-soon to live, served in place of the built landing.
-    const switchedOn = world => {
-      assert(landing.split('data-install="coming-soon"').length === 2, 'the landing has no single coming-soon switch to turn on');
-      world.site['/'] = async () => ({ status: 200, raw: Buffer.from(landing.replace('data-install="coming-soon"', 'data-install="live"')), type: 'html' });
+    // The box's one switch (data-install): each check serves the built landing with the switch set to its state,
+    // so both states are checked whichever value the landing ships (#1573). The release changes only that value.
+    const shipped = landing.match(/data-install="[^"]*"/g) || [];
+    const servedAs = (world, state) => {
+      assert(shipped.length === 1 && ['data-install="coming-soon"', 'data-install="live"'].includes(shipped[0]),
+        `the landing has no single install switch: ${JSON.stringify(shipped)}`);
+      world.site['/'] = async () => ({ status: 200, raw: Buffer.from(landing.replace(shipped[0], `data-install="${state}"`)), type: 'html' });
     };
     const installBox = page => page.run(`(() => { ${LABEL} const box = document.querySelector('.install-box'); const b = box.querySelector('button.install');
       const line = box.querySelector('.install-line'); const hint = box.querySelector('.install-hint');
@@ -370,6 +373,7 @@ async function main() {
 
     await check('#1357 install box before the release: the line and the instruction show, Copy is disabled, coming soon, and copies nothing', async () => {
       const world = new World();
+      servedAs(world, 'coming-soon');
       const page = await open(browser, world);
       await page.go(`${SITE}/`);
       await landed(page);
@@ -388,7 +392,7 @@ async function main() {
 
     await check('#1357 install box switched on: Copy is enabled and puts exactly the install line on the clipboard', async () => {
       const world = new World();
-      switchedOn(world);
+      servedAs(world, 'live');
       const page = await open(browser, world);
       await page.go(`${SITE}/`);
       await landed(page);
@@ -407,7 +411,7 @@ async function main() {
 
     await check('#1357 install box switched on with its script blocked: the line still shows, with no dead Copy button', async () => {
       const world = new World();
-      switchedOn(world);
+      servedAs(world, 'live');
       const script = landing.match(/src="(\/site\.[0-9a-f]{10}\.js)"/)[1];
       world.site[script] = async () => ({ abort: true });
       const page = await open(browser, world);
