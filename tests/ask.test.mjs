@@ -625,6 +625,37 @@ test('a stream nobody reads still ends at the timeout: the upstream call is canc
   assert.equal(store.dump().counters.find(r => r.key === 'spend').count, 63610, 'the reservation stays');
 });
 
+test('R6: a reader who pauses past the deadline then resumes gets only the refusal: no held text, no buffered piece, no done', async () => {
+  // The whole answer, the key's prefix and [DONE] are already buffered when the deadline passes; nothing after the
+  // abort may be sent, not even the safe first piece queued before it.
+  const enc = new TextEncoder();
+  const data = value => `data: ${JSON.stringify(value)}\n\n`;
+  const all = [
+    data({ choices: [{ delta: { content: 'Synthetic safe first piece long enough to send. ' } }] }),
+    data({ choices: [{ delta: { content: KEY.slice(0, -1) } }] }),
+    data({ choices: [{ delta: {}, finish_reason: 'stop' }], usage: { cost: 0.0001 } }),
+    'data: [DONE]\n\n',
+  ].join('');
+  const upstream = { cancelled: false };
+  answer = () => new Response(new ReadableStream({
+    start(c) { c.enqueue(enc.encode(all)); },
+    cancel() { upstream.cancelled = true; },
+  }));
+  const c = withCase();
+  const store = fakeD1(c.store);
+  const pending = [];
+  const env = { ...c.settings, ASSETS: assets(), ASK_A_WIZ_COUNTERS: store.binding };
+  const response = await handle({ request: new Request(`${SITE}/api/ask`, { method: 'POST', headers: c.request.headers, body: c.request.body }), env, waitUntil: p => pending.push(p) },
+    { clock: () => new Date(c.now), rank: () => c.retrieved, upstreamTimeout: 30 });
+  assert.equal(response.status, 200);
+  await Promise.all(pending); // the deadline passed: the upstream call is cancelled and settled
+  assert.equal(upstream.cancelled, true);
+  const body = await response.text();
+  for (let n = 2; n <= KEY.length; n++) assert.ok(!body.includes(KEY.slice(0, n)), `part of the key sent: ${JSON.stringify(body)}`);
+  assert.deepEqual(events(body), [{ type: 'refused', reason: 'upstream_error', message: "Ask a Wiz couldn't answer just now. Try again." }]);
+  assert.equal(store.dump().counters.find(r => r.key === 'spend').count, 63610, 'the reservation stays');
+});
+
 test('an invalid reported cost keeps the whole reservation; a valid one replaces it', async () => {
   for (const [cost, spend] of [[-0.001, 63610], ['0.0001', 63610], [null, 63610], [0, 61000], [0.0000001, 61001], [0.0026, 63600]]) {
     answer = upstreamAnswer({ chunks: ['Synthetic answer with a cost.'], cost });

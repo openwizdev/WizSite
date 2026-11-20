@@ -102,3 +102,13 @@
 ✖ failing tests:
     actual: false,
     expected: true,
+
+# R6 red run at 5c09520: a reader who pauses past the upstream deadline, then resumes, is sent the queued piece, all of the key but its last character, sources and done
+ℹ tests 1
+ℹ pass 0
+ℹ fail 1
+✖ R6: a reader who pauses past the deadline then resumes gets only the refusal: no held text, no buffered piece, no done
+✖ failing tests:
+AssertionError [ERR_ASSERTION]: part of the key sent: "{\"type\":\"text\",\"text\":\"Synthetic safe first piece long enough to send. \"}\n{\"type\":\"text\",\"text\":\"fake-openrouter-ke\"}\n{\"type\":\"sources\",\"sources\":[{\"title\":\"Questions\",\"url\":\"https://openwiz.dev/faq/\"},{\"title\":\"OpenWiz README\",\"url\":\"https://github.com/openwizdev/openwiz#readme\"}]}\n{\"type\":\"done\"}\n"
+    actual: false,
+    expected: true,
