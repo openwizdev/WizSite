@@ -3,7 +3,7 @@
 // the top-level docs/*.md of an OpenWiz checkout) into short plain-text passages, each pointing at its source page.
 // Plain text only, no embeddings and no dependency: the function scores these passages by keyword.
 // Cloudflare's build has no OpenWiz checkout, so the docs come from ask-docs/, a reviewed snapshot refreshed by hand:
-//   node scripts/ask-index.mjs --refresh <an OpenWiz checkout>
+//   node scripts/ask-index.mjs --refresh <an OpenWiz checkout> [<commit>, HEAD by default]
 import { execFileSync } from 'node:child_process';
 import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -18,6 +18,9 @@ const MAX_FIELD = 200;
 const MAX_BYTES = 2_000_000;
 // A pointer to a private record, in either public form ("[private record](url)" or "Private record: url"): a line
 // holding one is never copied or indexed.
+// The HTML a Markdown doc may hold (a picture, a heading, emphasis): only these names are tags, so a placeholder
+// such as <state> in prose stays text.
+const HTML_TAG = /<\/?(?:a|b|i|u|s|em|strong|br|hr|img|picture|source|p|div|span|sup|sub|code|kbd|pre|small|details|summary|h[1-6]|table|thead|tbody|tr|td|th|ul|ol|li|blockquote|video)\b[^>]*>/gi;
 const PRIVATE = /\[private record\]\(|private record: *https?:/i;
 
 const ENTITIES = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', mdash: '—', ndash: '–', middot: '·', hellip: '…', rsquo: '’', lsquo: '‘', rdquo: '”', ldquo: '“' };
@@ -43,12 +46,18 @@ function htmlBlocks(html) {
 
 // A Markdown file's blocks: headings, paragraphs, list items, table rows and code lines, as plain text.
 function markdownBlocks(markdown) {
-  const inline = line => squash(decode(line
+  // Code spans are kept as written (a `<build>/runtime` placeholder is text, not HTML); only the prose around them
+  // loses its HTML tags, link targets and emphasis marks.
+  const prose = text => decode(text
+    .replace(HTML_TAG, '')
+    .replace(/(\*\*|__|`)/g, ''));
+  const inline = line => squash(line
     .replace(/<!--[\s\S]*?-->/g, '')
-    .replace(/<[^>]*>/g, '')
     .replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')
     .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
-    .replace(/(\*\*|__|`)/g, '')));
+    .split(/(`+)([^`]*?)\1/)
+    .map((part, i) => i % 3 === 0 ? prose(part) : i % 3 === 2 ? part : '')
+    .join(''));
   const blocks = [];
   let fenced = false, open = false;
   for (const line of markdown.replace(/<!--[\s\S]*?-->/g, '').split('\n').filter(line => !PRIVATE.test(line))) {
@@ -183,16 +192,22 @@ const local = place => place instanceof URL ? fileURLToPath(place) : place;
 
 // Copies an OpenWiz checkout's public README.md and top-level docs/*.md into `target`, replacing what was there,
 // without private-record lines, and names the commit they came from.
-export async function refreshSnapshot(checkout, target, commit) {
+export async function refreshSnapshot(checkout, target, commit = 'HEAD') {
+  // Only what the named commit tracks: never an unpublished edit or an untracked draft in the checkout.
+  const git = (...args) => execFileSync('git', ['-C', checkout, ...args], { maxBuffer: 64 * 1024 * 1024 });
+  const full = git('rev-parse', '--verify', '--end-of-options', `${commit}^{commit}`).toString().trim();
+  const entries = git('ls-tree', '-z', full, '--', 'README.md', 'docs/').toString().split('\0').filter(Boolean)
+    .map(entry => entry.match(/^(\d+) (\w+) ([0-9a-f]+)\t(.*)$/s))
+    .filter(match => match && /^100(644|755)$/.test(match[1]) && match[2] === 'blob' && SNAPSHOT_FILE.test(match[4]));
+  if (!entries.some(match => match[4] === 'README.md')) throw new Error(`ask docs: no README.md at ${full}`);
   await rm(target, { recursive: true, force: true });
   await mkdir(join(target, 'docs'), { recursive: true });
-  const names = ['README.md', ...(await readdir(join(checkout, 'docs'), { withFileTypes: true }))
-    .filter(entry => entry.isFile() && entry.name.endsWith('.md')).map(entry => `docs/${entry.name}`)];
-  for (const name of names) {
-    const text = await readFile(join(checkout, name), 'utf8');
+  for (const [, , , blob, name] of entries) {
+    const text = git('cat-file', 'blob', blob).toString('utf8');
     await writeFile(join(target, name), text.split('\n').filter(line => !PRIVATE.test(line)).join('\n'));
   }
-  await writeFile(join(target, 'commit.txt'), `${commit}\n`);
+  await writeFile(join(target, 'commit.txt'), `${full}\n`);
+  return full;
 }
 
 // Throws unless `dir` is exactly a snapshot: its commit named, only README.md and top-level docs/*.md, no
@@ -217,7 +232,6 @@ export async function snapshotIndex(site, snapshot) {
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1] && process.argv[2] === '--refresh' && process.argv[3]) {
-  const commit = execFileSync('git', ['-C', process.argv[3], 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
-  await refreshSnapshot(process.argv[3], fileURLToPath(new URL('../ask-docs/', import.meta.url)), commit);
+  const commit = await refreshSnapshot(process.argv[3], fileURLToPath(new URL('../ask-docs/', import.meta.url)), process.argv[4]);
   console.log(`ask-docs/: refreshed from OpenWiz ${commit}; review the diff before committing`);
 }
