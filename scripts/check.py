@@ -173,8 +173,8 @@ DRIVER_KIT_LINES = {
     'cloudroom': 'Kit: not run yet. Its kit run comes next.',
     'grok-bot': 'Kit: not run yet',
 }
-# Every number the page shows comes from these facts: boat.dev's date. Counts are said in words (#62 item 4).
-DRIVER_NUMBERS = {'2026', '11', '19'}
+# Every number the page shows comes from these facts: boat.dev's date and the contract's v1. Counts are said in words (#62 item 4).
+DRIVER_NUMBERS = {'2026', '11', '19', '1'}
 # #62 item 4: no jargon counts ("4 words", "5 checks in the kit", "1 passed, 5 of 5"), and the five-of-five result
 # said at most twice on the page: the hero's one link and boat.dev's spotlight.
 DRIVER_JARGON = re.compile(r'\b\d+\s+(?:drivers?|words?|checks?|commands?|passed)\b|\b\d+\s+of\s+\d+\b', re.I)
@@ -622,6 +622,8 @@ def check_changelog(landing, changelog):
 class DriverOutline(HTMLParser):
     """The drivers page's cards: each card's id, classes, name (its heading's text, or its heading logo's alt), status
     line, kit line and its state, per-check rows, pictures, and every link inside the Write your own driver section."""
+    VOID = ('area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'source', 'track', 'wbr')
+
     def __init__(self, text):
         super().__init__(convert_charrefs=True)
         self.cards, self.own_links, self.own_heading = [], [], None
@@ -631,7 +633,7 @@ class DriverOutline(HTMLParser):
     def handle_starttag(self, tag, attrs):
         attrs = dict(attrs)
         classes = (attrs.get('class') or '').split()
-        if tag not in ('br', 'img', 'meta', 'link', 'path', 'circle', 'rect', 'line', 'input'):
+        if tag not in self.VOID:
             self.depth += 1
         if tag == 'section' and 'own-driver' in classes:
             self.own_depth = self.depth
@@ -651,7 +653,7 @@ class DriverOutline(HTMLParser):
             card['images'].append((attrs.get('src') or '', attrs.get('alt') or ''))
             if self.field and self.field[0] == 'name':
                 self.field.append(attrs.get('alt') or '')
-        elif tag == 'svg':
+        elif tag == 'svg' and 'kit-icon' not in classes:  # a kit state's icon shape is not a logo
             card['svgs'] += 1
         elif tag in ('h2', 'h3') and 'driver-name' in classes:
             self.field = ['name', '']
@@ -665,11 +667,19 @@ class DriverOutline(HTMLParser):
         elif tag == 'li' and 'proof-check' in classes:
             card['proofs'].append(attrs.get('data-check'))
 
+    def handle_startendtag(self, tag, attrs):
+        # A self-closed tag (<path/>, <img/>) opens and closes at once, so the depth stays balanced.
+        self.handle_starttag(tag, attrs)
+        if tag not in self.VOID:
+            self.handle_endtag(tag)
+
     def handle_data(self, data):
         if self.field:
             self.field[1] += data
 
     def handle_endtag(self, tag):
+        if tag in self.VOID:
+            return
         if self.field and tag in ('h2', 'h3', 'p'):
             kind, text, *alts = self.field
             text = re.sub(r'\s+', ' ', text).strip()
@@ -738,10 +748,10 @@ def check_drivers(landing, changelog, drivers, page):
     reader = Text(main)
     readings = [reader.joined(), reader.spaced()] + reader.shown
     for reading in readings:
-        for number in re.findall(r'\d+', reading):
-            assert number in DRIVER_NUMBERS, f'invented number on the drivers page: {number}'
         found = DRIVER_JARGON.search(re.sub(r'\s+', ' ', reading))
         assert not found, f'a jargon count on the drivers page: {found[0]!r}'
+        for number in re.findall(r'\d+', reading):
+            assert number in DRIVER_NUMBERS, f'invented number on the drivers page: {number}'
     said = len(DRIVER_RESULT.findall(re.sub(r'\s+', ' ', reader.spaced())))
     assert 1 <= said <= DRIVER_RESULT_MAX, f'say boat.dev\'s five-of-five result at most {DRIVER_RESULT_MAX} times on the page: {said}'
     assert outline.own_heading == OWN_DRIVER, f'the drivers page needs its {OWN_DRIVER} section'

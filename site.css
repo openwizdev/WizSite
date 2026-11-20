@@ -287,126 +287,108 @@ code,.v{font-family:var(--ow-font-mono)}
 }
 
 /* The drivers page (openwiz.dev/drivers, #50), variant D: the cinematic voyage. A painted night sea and the Wiz family's
-   ship behind the headline, then the four driver cards on the dark ground, boat.dev the hero. Still and complete
-   without scripts or motion; the bob and the parallax run only with motion allowed. Round 2F (#56) adds the evidence
-   chips under the headline and boat.dev's proof section after the cards (the kit's five checks beside the crew's
-   cutaway), sizes the cards to their content and keeps every label at 12 px or more. */
+   ship behind the headline. Still and complete without scripts or motion; the bob and the parallax run only with motion
+   allowed. Round 3H (#62): the headline explains what a driver is, with the hosts' marks under it; boat.dev's spotlight
+   (its five passed checks beside the crew's cutaway) follows the hero; then the other three drivers in one compact row,
+   each with one kit line. One sans for prose and headings, mono only for the command words, no text under 12 px. */
 .drivers-page { --gold: #f2c27b; --night: #0f0d0b; }
-.drivers-page .voyage { position: relative; isolation: isolate; display: flex; flex-direction: column; min-height: min(88svh, 860px); overflow: hidden; background: var(--night); }
+.drivers-page .voyage { position: relative; isolation: isolate; display: flex; flex-direction: column; min-height: min(84svh, 820px); overflow: hidden; background: var(--night); }
 .drivers-page .voyage-art { position: absolute; z-index: -1; inset: 0; }
 .drivers-page .voyage-sea { position: absolute; top: -8%; left: 0; width: 100%; height: 116%; object-fit: cover; object-position: 72% 62%; filter: brightness(1.35) saturate(1.1); }
 .drivers-page .voyage-art::before, .drivers-page .voyage-art::after { content: ""; position: absolute; z-index: 2; inset: 0; pointer-events: none; }
-.drivers-page .voyage-art::before { background: linear-gradient(90deg, rgb(15 13 11 / 78%) 0%, rgb(15 13 11 / 42%) 38%, transparent 62%); }
+.drivers-page .voyage-art::before { background: linear-gradient(90deg, rgb(15 13 11 / 84%) 0%, rgb(15 13 11 / 56%) 40%, transparent 66%); }
 .drivers-page .voyage-art::after { top: auto; height: 22%; background: linear-gradient(transparent, var(--ground)); }
 .drivers-page .voyage-glow { position: absolute; z-index: 1; right: 4%; bottom: 6%; width: min(64vw, 900px); aspect-ratio: 1.6; background: radial-gradient(closest-side, rgb(255 170 80 / 16%), transparent); pointer-events: none; }
-.drivers-page .voyage-ship-wrap { position: absolute; z-index: 1; right: clamp(-40px, 1vw, 40px); bottom: 7%; width: min(56vw, 860px); }
+.drivers-page .voyage-ship-wrap { position: absolute; z-index: 1; right: clamp(-40px, 1vw, 40px); bottom: 7%; width: min(52vw, 820px); }
 .drivers-page .voyage-ship { display: block; width: 100%; height: auto; filter: drop-shadow(0 24px 40px rgb(0 0 0 / 55%)); transform-origin: 50% 90%; }
-.drivers-page .voyage-copy { position: relative; z-index: 3; padding-block: clamp(56px, 11vh, 132px) 48px; }
-.drivers-page .voyage-kicker { color: var(--gold); font: 600 13px/1 var(--ow-font-mono); letter-spacing: .14em; text-transform: uppercase; }
-.drivers-page .voyage h1 { max-width: 9ch; margin-top: 18px; font-size: clamp(50px, 7.4vw, 116px); font-weight: 760; line-height: .95; letter-spacing: -.06em; text-shadow: 0 2px 30px rgb(0 0 0 / 60%); }
-.drivers-page .voyage-sub { max-width: 36ch; margin-top: 22px; color: #e6dccf; font-size: clamp(17px, 1.5vw, 21px); line-height: 1.45; letter-spacing: -.02em; text-shadow: 0 1px 14px rgb(0 0 0 / 70%); }
-.drivers-page .voyage-pass { display: inline-flex; align-items: center; gap: 10px; min-height: 44px; margin-top: 30px; padding: 8px 16px 8px 12px; border: 1px solid rgb(242 194 123 / 45%); border-radius: 999px; background: rgb(15 13 11 / 78%); color: var(--ink); font-size: 15px; }
+.drivers-page .voyage-copy { position: relative; z-index: 3; padding-block: clamp(48px, 9vh, 112px) 48px; }
+.drivers-page .voyage-kicker { color: var(--gold); font: 600 13px/1 var(--ow-font-sans); letter-spacing: .14em; text-transform: uppercase; }
+.drivers-page .voyage h1 { max-width: 15ch; margin-top: 16px; font-size: clamp(36px, 4.9vw, 72px); font-weight: 740; line-height: 1.02; letter-spacing: -.045em; text-shadow: 0 2px 30px rgb(0 0 0 / 60%); }
+.drivers-page .voyage-sub { max-width: 46ch; margin-top: 20px; color: #ece3d6; font-size: clamp(16px, 1.35vw, 19px); line-height: 1.5; letter-spacing: -.01em; text-shadow: 0 1px 14px rgb(0 0 0 / 70%); }
+.drivers-page .voyage-sub code { color: var(--gold); font-size: .92em; }
+.drivers-page .host-marks { display: flex; flex-wrap: wrap; gap: 8px 10px; max-width: 46rem; margin: 26px 0 0; padding: 0; list-style: none; }
+.drivers-page .host-marks li { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 6px 14px; border: 1px solid rgb(242 194 123 / 24%); border-radius: 999px; background: rgb(15 13 11 / 76%); color: #ece3d6; font: 500 15px/1.2 var(--ow-font-sans); white-space: nowrap; }
+.drivers-page .host-marks .host-icon { width: 20px; height: 20px; }
+.drivers-page .host-marks .host-tile { width: 22px; height: 22px; border-radius: 5px; }
+.drivers-page .host-marks .host-lockup { width: auto; height: 20px; margin-block: 2px; }
+.drivers-page .host-icon { filter: invert(1); opacity: .92; }
+.drivers-page .voyage-pass { display: inline-flex; align-items: center; gap: 10px; min-height: 44px; margin-top: 22px; padding: 8px 16px 8px 12px; border: 1px solid rgb(242 194 123 / 45%); border-radius: 999px; background: rgb(15 13 11 / 78%); color: var(--ink); font-size: 15px; text-decoration: underline; text-decoration-color: rgb(242 194 123 / 55%); text-underline-offset: 4px; }
 .drivers-page .voyage-pass b { color: var(--gold); font-weight: 650; }
-.drivers-page .voyage-pass:hover { border-color: var(--gold); }
+.drivers-page .voyage-pass:hover { border-color: var(--gold); text-decoration-color: var(--gold); }
 .drivers-page .voyage-pass .kit-icon { width: 20px; height: 20px; }
-.drivers-page .drivers-chips { display: flex; flex-wrap: wrap; gap: 8px; max-width: 40rem; margin: 24px 0 0; padding: 0; list-style: none; }
-.drivers-page .drivers-chips li { padding: 6px 12px; border: 1px solid rgb(242 194 123 / 30%); border-radius: 999px; background: rgb(15 13 11 / 72%); color: #e6dccf; font: 500 13px/1.3 var(--ow-font-mono); }
-.drivers-page .drivers-chips b { margin-right: 4px; color: var(--gold); font-weight: 650; }
-
+/* Kit states: always a word plus an icon shape, never colour alone. */
 .drivers-page .kit-icon { flex: none; width: 16px; height: 16px; }
-.drivers-page :is(.passed, .voyage-pass, .proof-check) .kit-icon circle { fill: var(--gold); }
-.drivers-page :is(.passed, .voyage-pass, .proof-check) .kit-icon path { fill: none; stroke: var(--ground); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.drivers-page :is(.voyage-pass, .proof-check) .kit-icon circle { fill: var(--gold); }
+.drivers-page :is(.voyage-pass, .proof-check) .kit-icon path { fill: none; stroke: var(--ground); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .drivers-page .progress .kit-icon circle { fill: none; stroke: var(--orchid); stroke-width: 1.5; }
 .drivers-page .progress .kit-icon path { fill: var(--orchid); }
 .drivers-page .unrun .kit-icon circle { fill: none; stroke: var(--grey); stroke-width: 1.5; stroke-dasharray: 2.4 2.2; }
-
-.drivers-page .fleet { padding-block: clamp(40px, 6vw, 88px) clamp(48px, 7vw, 100px); }
-.drivers-page .fleet-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 10px 32px; }
-.drivers-page .fleet-head h2 { font-size: clamp(32px, 4.4vw, 56px); font-weight: 720; line-height: 1; letter-spacing: -.055em; }
-.drivers-page .fleet-head p { max-width: 62ch; color: var(--grey2); font-size: 15px; }
-.drivers-page .kit-key { display: inline-flex; align-items: center; gap: 5px; margin-right: 10px; color: var(--ink); white-space: nowrap; }
-.drivers-page .driver-list { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.55fr) minmax(0, 1fr); gap: 14px; align-items: start; margin: 28px 0 0; padding: 0; list-style: none; }
-.drivers-page .driver { position: relative; isolation: isolate; display: flex; flex-direction: column; gap: 14px; padding: 20px; overflow: hidden; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); }
-.drivers-page .driver-head { display: flex; flex-direction: column; gap: 14px; }
-.drivers-page .driver-name { margin: 0; font-size: 22px; font-weight: 680; line-height: 1.15; letter-spacing: -.035em; }
-.drivers-page .driver-line { color: var(--grey2); font-size: 15px; line-height: 1.45; }
-.drivers-page .driver-kit-note { margin-top: -8px; color: var(--grey2); font: 500 13px/1.4 var(--ow-font-mono); }
-.drivers-page .driver h4 { margin: 0 0 8px; color: var(--grey); font: 600 12px/1.3 var(--ow-font-mono); letter-spacing: .08em; text-transform: uppercase; }
-.drivers-page .driver-words ul, .drivers-page .kit ul { margin: 0; padding: 0; list-style: none; }
-.drivers-page .driver-words ul { display: flex; flex-wrap: wrap; gap: 6px; }
-.drivers-page .word { display: inline-block; padding: 3px 8px; border: 1px solid var(--edge); border-radius: 6px; color: #e1d7cb; font-size: 13px; }
-.drivers-page .kit { padding-top: 14px; border-top: 1px solid var(--line); }
-.drivers-page .kit h4 { display: flex; justify-content: space-between; gap: 8px; }
-.drivers-page .kit h4 span { color: var(--ink); letter-spacing: .08em; }
-.drivers-page .kit ul { display: grid; gap: 6px; }
-.drivers-page .kit-check { display: flex; align-items: center; gap: 8px; font-size: 14px; }
-.drivers-page .kit-name { font-family: var(--ow-font-mono); color: var(--ink); }
-.drivers-page .kit-state { margin-left: auto; color: var(--grey2); font-size: 13px; }
-.drivers-page .driver.hero { border-color: #7c6140; background: radial-gradient(120% 70% at 70% 0%, rgb(242 160 80 / 18%), transparent 70%), #1d1813; box-shadow: 0 0 0 1px rgb(242 194 123 / 14%), 0 30px 80px rgb(255 150 60 / 9%); }
-.drivers-page .hero .driver-name { padding-right: 112px; font-size: 30px; text-shadow: 0 2px 14px rgb(15 13 11 / 85%); }
-.drivers-page .hero .driver-line { color: #eadfce; }
-.drivers-page .hero-score { position: absolute; top: 16px; right: 18px; display: flex; align-items: baseline; gap: 6px; padding: 6px 12px; border-radius: 12px; background: rgb(15 13 11 / 80%); color: var(--gold); }
-.drivers-page .hero-score b { font-size: 44px; font-weight: 760; line-height: 1; letter-spacing: -.05em; }
-.drivers-page .hero-score span { font-size: 15px; font-weight: 600; }
-.drivers-page .hero .kit { border-top-color: #4d3d2c; }
-/* Final (#59): boat.dev's card keeps one kit line, linking to its proof section; the five checks live only there. */
-.drivers-page .kit-proof { display: inline-flex; align-items: center; gap: 8px; min-height: 32px; color: var(--gold); font: 600 14px/1.3 var(--ow-font-mono); text-decoration: underline; text-decoration-color: rgb(242 194 123 / 45%); text-underline-offset: 4px; }
-.drivers-page .kit-proof:hover { text-decoration-color: var(--gold); }
-/* Final (#59): the cards share the list's rows (name and status, words, kit), so every Test kit block starts at one height. */
-@supports (grid-template-rows: subgrid) {
-  .drivers-page .driver-list > li { display: grid; grid-row: span 3; grid-template-rows: subgrid; }
-  .drivers-page .driver { display: grid; grid-row: span 3; grid-template-rows: subgrid; align-content: start; }
-}
-
-.drivers-page .boat-proof { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); margin-bottom: clamp(48px, 7vw, 96px); padding: 0; overflow: hidden; border: 1px solid #7c6140; border-radius: 16px; background: #110f0d; box-shadow: 0 0 0 1px rgb(242 194 123 / 10%), 0 30px 80px rgb(255 150 60 / 7%); }
+/* boat.dev's spotlight: its official mark, the result in words and the five checks, beside the crew's cutaway. */
+.drivers-page .spotlight { margin-top: clamp(8px, 2vw, 24px); }
+.drivers-page .driver.hero { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); overflow: hidden; border: 1px solid #7c6140; border-radius: 16px; background: #110f0d; box-shadow: 0 0 0 1px rgb(242 194 123 / 10%), 0 30px 80px rgb(255 150 60 / 7%); }
 .drivers-page .proof-scene { position: relative; min-height: 100%; }
 .drivers-page .proof-scene::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent 70%, #110f0d); pointer-events: none; }
 .drivers-page .proof-art { display: block; width: 100%; height: 100%; object-fit: cover; object-position: 66% 50%; }
 .drivers-page .proof-copy { padding: clamp(24px, 3.4vw, 48px) clamp(22px, 3vw, 44px); }
-.drivers-page .proof-kicker { color: var(--gold); font: 600 13px/1 var(--ow-font-mono); letter-spacing: .14em; text-transform: uppercase; }
-.drivers-page .proof-copy h2 { margin-top: 14px; font-size: clamp(28px, 3.2vw, 44px); font-weight: 740; line-height: 1.02; letter-spacing: -.05em; }
-.drivers-page .proof-lead { max-width: 44ch; margin-top: 14px; color: #e1d7cb; font-size: 16px; line-height: 1.5; }
-.drivers-page .proof-checks { display: grid; margin: 22px 0 0; padding: 0; list-style: none; }
+.drivers-page .hero .driver-name { margin: 0; }
+.drivers-page .spot-logo { display: block; width: auto; height: clamp(36px, 3.4vw, 48px); }
+.drivers-page .hero .driver-line { margin-top: 20px; color: var(--ink); font-size: clamp(22px, 2.2vw, 30px); font-weight: 680; line-height: 1.15; letter-spacing: -.035em; }
+.drivers-page .proof-lead { max-width: 44ch; margin-top: 12px; color: #e1d7cb; font-size: 16px; line-height: 1.5; }
+.drivers-page .proof-checks { display: grid; margin: 20px 0 0; padding: 0; list-style: none; }
 .drivers-page .proof-check { display: grid; grid-template-columns: 16px minmax(0, 1fr) auto; column-gap: 10px; row-gap: 4px; align-items: center; padding: 12px 0; border-top: 1px solid #ffffff14; }
 .drivers-page .proof-name { color: var(--ink); font-size: 15px; font-weight: 600; }
-.drivers-page .proof-state { color: var(--gold); font: 500 13px/1 var(--ow-font-mono); }
+.drivers-page .proof-state { color: var(--gold); font: 500 14px/1 var(--ow-font-sans); }
 .drivers-page .proof-line { grid-column: 2 / -1; color: var(--grey2); font-size: 15px; line-height: 1.45; }
-
+/* More drivers: one compact row, each card a logo and name, one status sentence and one kit line, all one height. */
+.drivers-page .more-drivers { padding-block: clamp(44px, 6vw, 80px) clamp(48px, 7vw, 96px); }
+.drivers-page .more-drivers h2 { font-size: clamp(28px, 3.4vw, 42px); font-weight: 720; line-height: 1.05; letter-spacing: -.045em; }
+.drivers-page .driver-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin: 22px 0 0; padding: 0; list-style: none; }
+.drivers-page .driver-list > li { display: flex; }
+.drivers-page .driver-list .driver { display: grid; grid-template-rows: auto 1fr auto; gap: 12px; width: 100%; padding: 20px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); }
+.drivers-page .driver-list .driver-name { display: flex; align-items: center; gap: 10px; min-height: 32px; margin: 0; font-size: 20px; font-weight: 660; line-height: 1.2; letter-spacing: -.03em; }
+.drivers-page .driver-logo { flex: none; width: 28px; height: 28px; }
+.drivers-page .driver-logo.host-tile { border-radius: 7px; }
+.drivers-page .driver-list .driver-line { color: var(--grey2); font-size: 15px; line-height: 1.45; }
+.drivers-page .driver-kit { display: flex; align-items: center; gap: 8px; padding-top: 12px; border-top: 1px solid var(--line); color: var(--ink); font-size: 14px; line-height: 1.4; }
+/* Write your own driver: the four commands and the fifth check, token. */
 .drivers-page .own-driver { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: clamp(24px, 5vw, 72px); align-items: start; margin-bottom: clamp(56px, 8vw, 112px); padding: clamp(24px, 4vw, 48px); border: 1px solid var(--line); border-radius: 16px; background: var(--panel); }
-.drivers-page .own-driver h2 { font-size: clamp(28px, 3.4vw, 42px); font-weight: 720; line-height: 1.05; letter-spacing: -.05em; }
+.drivers-page .own-driver h2 { font-size: clamp(28px, 3.4vw, 42px); font-weight: 720; line-height: 1.05; letter-spacing: -.045em; }
 .drivers-page .own-copy > p { max-width: 46ch; margin-top: 14px; color: var(--grey2); font-size: 16px; }
 .drivers-page .own-links { display: grid; gap: 2px; margin: 18px 0 0; padding: 0; list-style: none; }
-.drivers-page .own-links a { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; min-height: 40px; padding-block: 8px; color: var(--ink); text-decoration: underline; text-decoration-color: var(--brass); text-underline-offset: 4px; }
-.drivers-page .own-links code { color: var(--grey); font-size: 13px; }
+.drivers-page .own-links a { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; min-height: 40px; padding-block: 8px; color: var(--ink); text-decoration: underline; text-decoration-color: rgb(242 194 123 / 60%); text-underline-offset: 4px; }
+.drivers-page .own-links a:hover { text-decoration-color: var(--gold); }
+.drivers-page .own-links span { color: var(--grey); font-size: 14px; }
 .drivers-page .own-words { display: grid; gap: 0; margin: 0; }
 .drivers-page .own-words div { display: grid; grid-template-columns: 88px minmax(0, 1fr); gap: 12px; padding: 14px 0; border-top: 1px solid var(--line); }
 .drivers-page .own-words div:first-child { border-top: 0; padding-top: 4px; }
 .drivers-page .own-words dt code { color: var(--gold); font-size: 15px; }
 .drivers-page .own-words dd { margin: 0; color: #e1d7cb; font-size: 15px; }
+.drivers-page .own-words .own-token { border-top-style: dashed; }
 .drivers-page .drivers-footer .footer-wordmark { padding-bottom: 8px; }
 
 @media (max-width: 1100px) {
-  .drivers-page .driver-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .drivers-page .driver-list > li:nth-child(n+3) { grid-column: span 2; }
-  .drivers-page .boat-proof { grid-template-columns: 1fr; }
+  .drivers-page .driver.hero { grid-template-columns: 1fr; }
   .drivers-page .proof-scene { aspect-ratio: 1672 / 941; min-height: 0; }
   .drivers-page .proof-scene::after { background: linear-gradient(transparent 72%, #110f0d); }
 }
+@media (max-width: 860px) {
+  .drivers-page .driver-list { grid-template-columns: 1fr; }
+}
 @media (max-width: 760px) {
-  .drivers-page .voyage { min-height: 0; padding-bottom: min(78vw, 520px); }
+  .drivers-page .voyage { min-height: 0; padding-bottom: min(70vw, 480px); }
   .drivers-page .voyage-sea { object-position: 80% 60%; }
-  .drivers-page .voyage-art::before { background: linear-gradient(rgb(15 13 11 / 72%) 0%, rgb(15 13 11 / 40%) 45%, transparent 70%); }
-  .drivers-page .voyage-ship-wrap { right: -6vw; bottom: 4%; width: min(104vw, 640px); }
+  .drivers-page .voyage-art::before { background: linear-gradient(rgb(15 13 11 / 80%) 0%, rgb(15 13 11 / 58%) 55%, transparent 80%); }
+  .drivers-page .voyage-ship-wrap { right: -6vw; bottom: 3%; width: min(100vw, 620px); }
   .drivers-page .voyage-glow { width: 110vw; }
-  .drivers-page .voyage-copy { padding-block: 40px 12px; }
+  .drivers-page .voyage-copy { padding-block: 28px 12px; }
+  .drivers-page .voyage h1 { max-width: 14ch; margin-top: 12px; }
+  .drivers-page .voyage-sub { margin-top: 14px; }
+  .drivers-page .host-marks { margin-top: 18px; }
+  .drivers-page .host-marks li { min-height: 36px; padding: 5px 12px; font-size: 14px; }
   .drivers-page .own-driver { grid-template-columns: 1fr; }
 }
 @media (max-width: 640px) {
-  .drivers-page .driver-list { grid-template-columns: 1fr; }
-  .drivers-page .driver-list > li:nth-child(n+3) { grid-column: auto; }
-  .drivers-page .hero-score { top: 12px; right: 12px; }
-  .drivers-page .hero .driver-name { padding-right: 100px; font-size: 26px; }
-  .drivers-page .driver { padding: 18px; }
+  .drivers-page .driver-list .driver { padding: 18px; }
   .drivers-page .own-words div { grid-template-columns: 76px minmax(0, 1fr); }
 }
 @media (prefers-reduced-motion:no-preference) {

@@ -462,22 +462,33 @@ class Checks(unittest.TestCase):
                 with self.assertRaises(AssertionError):
                     check_site(root)
 
+    def broken(self, name, old, new, error, css=None):
+        """A build copy with one planted break (a page edit, or a site.css addition) must fail check_site with error."""
+        with self.subTest(name=name, old=old[:60], error=error), tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / 'dist'
+            shutil.copytree(ROOT / 'dist', root)
+            if css:
+                edit_built(root, 'site.css', lambda t: t + css)
+            else:
+                page = root / name
+                text = page.read_text()
+                self.assertIn(old, text)
+                page.write_text(text.replace(old, new, 1))
+            with self.assertRaisesRegex(AssertionError, error):
+                check_site(root)
+
     def test_drivers_page(self):
-        # Catches (#50): the drivers page dropped from the build or its checks; a card missing, reordered or with its
-        # facts, words or kit result changed; a kit state shown by colour or icon alone; boat.dev losing the hero, or a
-        # second hero; a link off the public OpenWiz repository; a top bar that drifts from the landing's or loses its
-        # current page; a Drivers link missing on the landing or Changelog; a script, a hidden part, an invented number;
-        # and variant D's art over its budget.
+        # Catches (#50, #62): the drivers page dropped from the build or its checks; a card missing, reordered or with
+        # its facts changed; boat.dev losing the hero, or a second hero; a link off the public OpenWiz repository; a top
+        # bar that drifts from the landing's or loses its current page; a Drivers link missing on the landing or
+        # Changelog; a script, a hidden part, an invented number; and the drivers art over its budget.
         boat = '<article class="driver hero" id="boat-dev"'
         for name, old, new, error in (
                 ('drivers/index.html', 'id="cloudroom"', 'id="cloud"', 'four driver cards'),
-                ('drivers/index.html', '>Grok Bot</h3>', '>Grok</h3>', 'four driver cards'),
+                ('drivers/index.html', '<span>Grok Bot</span></h3>', '<span>Grok</span></h3>', 'four driver cards'),
                 ('drivers/index.html', 'Being fixed: its kit run is in progress', 'Being fixed: almost done', 'driver facts'),
-                ('drivers/index.html', 'on a real account (2026-11-19)', 'on a real account', 'driver facts'),
-                ('drivers/index.html', '<code class="word">wake</code>', '<code class="word">ping</code>', 'four words'),
-                ('drivers/index.html', 'data-check="token" data-state="in progress"', 'data-check="token" data-state="passed"', 'kit result'),
-                ('drivers/index.html', '<span class="kit-state">in progress</span>', '<span class="kit-state"></span>', 'says its state in words'),
-                ('drivers/index.html', boat, boat.replace(' hero', ''), 'boat.dev is the hero'),
+                ('drivers/index.html', 'on a real account, 2026-11-19</p>', 'on a real account</p>', 'driver facts'),
+                ('drivers/index.html', boat, boat.replace(' hero', ''), 'boat.dev is the hero|spotlight'),
                 ('drivers/index.html', '<article class="driver" id="grok-bot"', '<article class="driver hero" id="grok-bot"', 'boat.dev is the hero'),
                 ('drivers/index.html', 'href="https://github.com/openwizdev/OpenWiz/tree/main/adapters/template"', 'href="https://github.com/openwizdev/WizSkills"', 'only to the public OpenWiz'),
                 ('drivers/index.html', '>Changelog</a>', '>Changes</a>', 'identical to the landing'),
@@ -487,15 +498,7 @@ class Checks(unittest.TestCase):
                 ('drivers/index.html', '</head>', '<script>1</script></head>', 'without scripts'),
                 ('index.html', '<a class="nav-drivers" href="/drivers/">Drivers</a>', '', 'identical to the landing|landing top bar needs one Drivers'),
                 ('changelog/index.html', '<a class="nav-drivers" href="/drivers/">Drivers</a>', '', 'Changelog top bar needs one Drivers')):
-            with self.subTest(name=name, error=error), tempfile.TemporaryDirectory() as temp:
-                root = Path(temp) / 'dist'
-                shutil.copytree(ROOT / 'dist', root)
-                page = root / name
-                text = page.read_text()
-                self.assertIn(old, text)
-                page.write_text(text.replace(old, new, 1))
-                with self.assertRaisesRegex(AssertionError, error):
-                    check_site(root)
+            self.broken(name, old, new, error)
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp) / 'dist'
             shutil.copytree(ROOT / 'dist', root)
@@ -505,42 +508,28 @@ class Checks(unittest.TestCase):
         with mock.patch('check.DRIVER_ART_BUDGET', 1000), self.assertRaisesRegex(AssertionError, 'the drivers art'):
             check_site(ROOT / 'dist')
 
-    def test_drivers_round_2f(self):
-        # Catches (#56): the evidence chips missing, moved below the cards or with a number changed; boat.dev's proof
-        # section missing, before the cards, or with a check missing, reordered, not passed, without its state in words
-        # or without its plain line; the crew painting dropped; a picture shown twice (the ship in the hero and again in
-        # the card); Cloudroom's kit note gone; drivers art left unused; and drivers-page text under 12 px.
-        chips = '<ul class="drivers-chips" aria-label="In numbers">'
-        for name, old, new, error in (
-                ('drivers/index.html', chips, '<ul class="other-chips">', 'evidence chips'),
-                ('drivers/index.html', '<li><b>4</b> words</li>', '<li><b>3</b> words</li>', 'evidence chips must read'),
-                ('drivers/index.html', 'class="boat-proof', 'class="boat-other', 'one boat.dev proof section'),
-                ('drivers/index.html', '<h2 id="proof-title">boat.dev passed the kit, 5 of 5.</h2>', '<h2 id="proof-title">boat.dev passed.</h2>', 'titled'),
-                ('drivers/index.html', 'class="proof-check" data-check="wake" data-state="passed"', 'class="proof-check" data-check="wake" data-state="in progress"', 'each passed'),
-                ('drivers/index.html', 'class="proof-check" data-check="start"', 'class="proof-check" data-check="begin"', 'each passed'),
-                ('drivers/index.html', '<span class="proof-state">passed</span>', '<span class="proof-state"></span>', 'says passed in words'),
-                ('drivers/index.html', 'that note was edited, never a second one.', 'it works.', 'explains what it proved'),
-                ('drivers/index.html', '<img class="proof-art" src="/art/drivers-c-boat.webp"', '<img class="proof-art-x" src="/art/drivers-c-boat.webp"', 'painting of the crew'),
-                ('drivers/index.html', '</main>', '<img src="/art/drivers-d-ship.webp" alt="The ship again"></main>', 'shown twice'),
-                ('drivers/index.html', '<p class="driver-kit-note">Kit: not run yet</p>', '', 'kit note'),
-                ('drivers/index.html', '</main>', '<p class="driver-kit-note">x</p></main>', 'kit note|four driver cards')):
-            with self.subTest(name=name, error=error), tempfile.TemporaryDirectory() as temp:
-                root = Path(temp) / 'dist'
-                shutil.copytree(ROOT / 'dist', root)
-                page = root / name
-                text = page.read_text()
-                self.assertIn(old, text)
-                page.write_text(text.replace(old, new, 1))
-                with self.assertRaisesRegex(AssertionError, error):
-                    check_site(root)
+    def test_drivers_spotlight(self):
+        # Catches (#56, #62): boat.dev's spotlight missing, after the other drivers, or with a check missing, reordered,
+        # not passed, without its state in words or without its plain line; the crew painting dropped; a painting shown
+        # twice; drivers art left unused; drivers-page text under 12 px; an uppercase label tracked too tight.
+        page = 'drivers/index.html'
+        for old, new, error in (
+                ('class="spotlight', 'class="boat-other', 'one boat.dev spotlight'),
+                ('class="proof-check" data-check="wake" data-state="passed"', 'class="proof-check" data-check="wake" data-state="in progress"', 'each passed'),
+                ('class="proof-check" data-check="start"', 'class="proof-check" data-check="begin"', 'five checks in order|each passed'),
+                ('<span class="proof-state">passed</span>', '<span class="proof-state"></span>', 'says passed in words'),
+                ('that note was edited, never a second one.', 'it works.', 'explains what it proved'),
+                ('<img class="proof-art" src="/art/drivers-c-boat.webp"', '<img class="proof-art-x" src="/art/drivers-c-boat.webp"', 'painting of the crew'),
+                ('</main>', '<img src="/art/drivers-d-ship.webp" alt="The ship again"></main>', 'shown twice')):
+            self.broken(page, old, new, error)
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp) / 'dist'
             shutil.copytree(ROOT / 'dist', root)
-            page = root / 'drivers/index.html'
-            text = page.read_text()
-            section = re.search(r'\s*<section class="boat-proof[\s\S]*?</section>', text)[0]
-            page.write_text(text.replace(section, '').replace('<section class="fleet', section.strip() + '<section class="fleet', 1))
-            with self.assertRaisesRegex(AssertionError, 'follows the four cards'):
+            path = root / page
+            text = path.read_text()
+            section = re.search(r'\s*<section class="spotlight[\s\S]*?</section>', text)[0]
+            path.write_text(text.replace(section, '').replace('<section class="own-driver', section.strip() + '<section class="own-driver', 1))
+            with self.assertRaisesRegex(AssertionError, 'boat.dev first|right after the hero'):
                 check_site(root)
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp) / 'dist'
@@ -551,50 +540,82 @@ class Checks(unittest.TestCase):
                     mock.patch('check.STATIC', set(__import__('check').STATIC) | {'art/drivers-x-unused.webp'}), \
                     self.assertRaisesRegex(AssertionError, 'unused drivers art'):
                 check_site(root)
-        for bad in ('\n.drivers-page .kit h4 { font: 600 11px/1.3 monospace; }\n', '\n.drivers-page .x { font-size: 10px; }\n'):
-            with self.subTest(css=bad), tempfile.TemporaryDirectory() as temp:
-                root = Path(temp) / 'dist'
-                shutil.copytree(ROOT / 'dist', root)
-                edit_built(root, 'site.css', lambda t: t + bad)
-                with self.assertRaisesRegex(AssertionError, 'under 12px'):
-                    check_site(root)
-
-    def test_drivers_final(self):
-        # Catches (#59): boat.dev's card listing the kit's five checks again beside the proof section (a duplicate list),
-        # or losing its one "Kit: passed, 5 of 5" line, its link to the proof section, its four words or its 5 of 5 mark;
-        # and an uppercase drivers-page label under 12 px or tracked tighter than .06em.
-        proof_line = '<a class="kit-proof" href="#boat-proof">'
-        row = ('<li class="kit-check" data-check="token" data-state="passed"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true">'
-               '<circle cx="8" cy="8" r="7"/></svg><span class="kit-name">token</span> <span class="kit-state">passed</span></li>')
-        for old, new, error in (
-                (proof_line, '<ul>' + row + '</ul>' + proof_line, 'five checks appear only in the proof'),
-                (proof_line, proof_line.replace('#boat-proof', '#boat-dev'), 'links to the proof section'),
-                ('<span>Kit: passed, 5 of 5</span>', '<span>Kit: passed</span>', 'Kit: passed, 5 of 5'),
-                ('<p class="hero-score" aria-hidden="true"><b>5</b><span>of 5</span></p>', '', '5 of 5 mark')):
-            with self.subTest(error=error), tempfile.TemporaryDirectory() as temp:
-                root = Path(temp) / 'dist'
-                shutil.copytree(ROOT / 'dist', root)
-                page = root / 'drivers/index.html'
-                text = page.read_text()
-                self.assertIn(old, text)
-                page.write_text(text.replace(old, new, 1))
-                with self.assertRaisesRegex(AssertionError, error):
-                    check_site(root)
         for bad, error in (
+                ('\n.drivers-page .driver-kit { font: 600 11px/1.3 monospace; }\n', 'under 12px'),
+                ('\n.drivers-page .x { font-size: 10px; }\n', 'under 12px'),
                 ('\n.drivers-page .x-label { font: 600 12px/1 monospace; letter-spacing: .02em; text-transform: uppercase; }\n', 'tracking'),
-                ('\n.drivers-page .x-label { font: 600 12px/1 monospace; text-transform: uppercase; }\n', 'tracking'),
-                ('\n.drivers-page .kit h4 span { letter-spacing: .03em; }\n', 'tracking')):
-            with self.subTest(css=bad), tempfile.TemporaryDirectory() as temp:
+                ('\n.drivers-page .x-label { font: 600 12px/1 monospace; text-transform: uppercase; }\n', 'tracking')):
+            self.broken(page, '', '', error, css=bad)
+
+    def test_drivers_round_3h(self):
+        # Catches (#62): the explainer of what a driver is missing, out of the hero, below the cards, over two sentences
+        # or without the four commands and token; a pending card showing per-check rows, or its one kit line changed;
+        # a jargon count back ("4 words", "5 of 5", "1 passed"); the five-of-five result said more than twice; Write
+        # your own driver without its token row; a logo that changed bytes, lost its alt or is unpinned; a pinned logo
+        # left unused; any Grok logo; a passing driver after the pending ones (phone order).
+        page = 'drivers/index.html'
+        explainer = '<div class="drivers-explainer">'
+        row = '<li class="kit-check" data-check="token" data-state="not yet run">token not yet run</li>'
+        grok = '<h3 class="driver-name" id="grok-bot-name">'
+        for old, new, error in (
+                (explainer, '<div class="drivers-intro">', 'one explainer of what a driver is'),
+                ('which proves no credential leaks.</p>', 'which proves no credential leaks. It is free. It is fast.</p>', 'two sentences at most'),
+                ('<code>wake</code> and <code>stop</code>', '<code>stop</code>', 'explainer must name'),
+                (', and <code>token</code>, which proves no credential leaks', '', 'explainer must name'),
+                ('<span>Kit: not run yet</span></p>', '<span>Kit: not run yet</span></p><ul>' + row + '</ul>', 'no per-check rows'),
+                ('<span>Kit: not run yet</span></p>', '<span>Kit: not run yet</span></p><ol><li class="proof-check" data-check="token">x</li></ol>', 'one kit line, never per-check rows'),
+                ('Kit: not run yet. Its kit run comes next.', 'Kit: not run yet', 'one kit line must read'),
+                ('data-state="in progress"><svg', 'data-state="passed"><svg', 'one kit line must read'),
+                ('<h2 id="more-title">More drivers</h2>', '<h2 id="more-title">More drivers</h2><p>4 words, 5 checks in the kit</p>', 'jargon count'),
+                ('<h2 id="more-title">More drivers</h2>', '<h2 id="more-title">More drivers</h2><p>1 passed, 5 of 5</p>', 'jargon count'),
+                ('Drivers answer the same four commands', 'Drivers answer 4 words', 'jargon count'),
+                ('<h2 id="more-title">More drivers</h2>', '<h2 id="more-title">More drivers</h2><p>boat.dev passed all five checks.</p>', 'at most 2 times'),
+                ('<div class="own-token"><dt><code>token</code></dt>', '<div class="own-token"><dt><code>tokens</code></dt>', 'fifth check, token'),
+                ('alt="Cloudroom logo" width="256"', 'alt="" width="256"', 'alt text naming Cloudroom'),
+                (grok, grok + '<img src="/drivers/logos/cloudroom.png" alt="Grok Bot logo">', 'no Grok logo'),
+                (grok, grok + '<svg viewBox="0 0 8 8"><circle cx="4" cy="4" r="4"/></svg>', 'no Grok logo'),
+                ('</main>', '<img src="/favicon.svg" alt="Grok"></main>', 'no Grok logo')):
+            self.broken(page, old, new, error)
+        with tempfile.TemporaryDirectory() as temp:  # the explainer moved below the cards
+            root = Path(temp) / 'dist'
+            shutil.copytree(ROOT / 'dist', root)
+            path = root / page
+            text = path.read_text()
+            block = re.search(r'<div class="drivers-explainer">[\s\S]*?</div>', text)[0]
+            path.write_text(text.replace(block, '').replace('</ul>\n  </section>\n  <section class="own-driver', '</ul>' + block + '\n  </section>\n  <section class="own-driver', 1))
+            with self.assertRaisesRegex(AssertionError, 'sits in the hero|above the cards'):
+                check_site(root)
+        with tempfile.TemporaryDirectory() as temp:  # the passing driver after a pending one
+            root = Path(temp) / 'dist'
+            shutil.copytree(ROOT / 'dist', root)
+            path = root / page
+            text = path.read_text()
+            spot = re.search(r'\s*<section class="spotlight[\s\S]*?</section>', text)[0]
+            path.write_text(text.replace(spot, '').replace('<section class="own-driver', spot.strip() + '\n  <section class="own-driver', 1))
+            with self.assertRaisesRegex(AssertionError, 'boat.dev first'):
+                check_site(root)
+        for logo in ('drivers/logos/boat-dev.svg', 'drivers/logos/cloudroom.png', 'drivers/logos/monitor.svg'):
+            with self.subTest(logo=logo), tempfile.TemporaryDirectory() as temp:  # a logo recoloured or re-saved
                 root = Path(temp) / 'dist'
                 shutil.copytree(ROOT / 'dist', root)
-                edit_built(root, 'site.css', lambda t: t + bad)
-                with self.assertRaisesRegex(AssertionError, error):
+                (root / logo).write_bytes((root / logo).read_bytes() + b'\n')
+                with self.assertRaisesRegex(AssertionError, 'logo changed bytes'):
                     check_site(root)
+                with self.assertRaisesRegex(AssertionError, 'logo changed bytes|unreviewed picture'):
+                    check_privacy(logo, (ROOT / logo).read_bytes().replace(b'</svg>', b'<!-- x --></svg>') if logo.endswith('.svg') else b'\x89PNG tampered')
+        from check import check_driver_logos, DriverOutline
+        html = (ROOT / 'dist' / page).read_text()
+        main = re.search(r'<main\b[^>]*>[\s\S]*?</main>', html)[0]
+        check_driver_logos(main, DriverOutline(main))
+        for extra, error in (('drivers/logos/extra.svg', 'unused drivers logos'), ('drivers/logos/grok.svg', 'unused drivers logos|no Grok logo')):
+            with self.subTest(extra=extra), mock.patch.dict('check.DRIVER_LOGOS', {extra: ('0' * 64, 'Extra')}), \
+                    self.assertRaisesRegex(AssertionError, error):
+                check_driver_logos(main, DriverOutline(main))
 
     def test_drivers_nav_and_description(self):
         # Catches (#59 R1): a Drivers nav link the phone breakpoint hides (display: none, so not shown or focusable at
-        # 390 px) on the landing, the Changelog or the drivers page. Catches (#59 R2): a description saying every driver
-        # passes the kit, when only boat.dev passed 5 of 5.
+        # 390 px) on the landing, the Changelog or the drivers page. Catches (#59 R2, #62): a description saying every
+        # driver passes, losing boat.dev's result, or carrying a jargon count.
         for name in ('index.html', 'changelog/index.html', 'drivers/index.html'):
             with self.subTest(page=name), tempfile.TemporaryDirectory() as temp:
                 root = Path(temp) / 'dist'
@@ -605,15 +626,11 @@ class Checks(unittest.TestCase):
                 page.write_text(text.replace('<a class="nav-drivers" href="/drivers/"', '<a class="nav-log" href="/drivers/"', 1))
                 with mock.patch('check.check_drivers'), self.assertRaisesRegex(AssertionError, 'hidden on phones'):
                     check_site(root)
-        with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp) / 'dist'
-            shutil.copytree(ROOT / 'dist', root)
-            edit_built(root, 'site.css', lambda t: t + '\n@media (max-width: 480px) { .landing-nav .nav-drivers { display: none; } }\n')
-            with self.assertRaisesRegex(AssertionError, 'hidden on phones'):
-                check_site(root)
+        self.broken('', '', '', 'hidden on phones', css='\n@media (max-width: 480px) { .landing-nav .nav-drivers { display: none; } }\n')
         for old, new, error in (
-                ('boat.dev passed 5 of 5', 'boat.dev passed', 'must say boat.dev passed 5 of 5'),
-                ('Drivers plug', 'Every driver passes the kit. Drivers plug', 'must not say every driver passes')):
+                ('boat.dev passed all five checks', 'boat.dev passed', 'must say boat.dev passed all five checks'),
+                ('A driver connects', 'Every driver passes the kit. A driver connects', 'must not say every driver passes'),
+                ('Drivers answer the same four commands', 'Drivers answer 4 words', 'jargon count')):
             with self.subTest(error=error), tempfile.TemporaryDirectory() as temp:
                 root = Path(temp) / 'dist'
                 shutil.copytree(ROOT / 'dist', root)
