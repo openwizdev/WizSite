@@ -4,7 +4,7 @@
 // change always gets a new URL: no visitor can pair new HTML with an old cached stylesheet or script.
 import { copyFile, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
-import { readAll, render, summary, withReleases } from './scripts/changelog.mjs';
+import { installSwitch, readReleases, render, summary, withReleases } from './scripts/changelog.mjs';
 
 const root = new URL('./', import.meta.url);
 const output = new URL('dist/', root);
@@ -38,10 +38,11 @@ const brand = ['favicon.ico', 'favicon.svg', 'apple-touch-icon.png', 'brand/open
 // The app's own mark and icons, cream on charcoal (J194, #1326): the brand mark, its favicons and a Wiz of the family.
 const appBrand = ['app/mark.svg', 'app/icon.svg', 'app/icon.ico', 'app/icon-180.png', 'app/wiz-reviewer.svg'];
 const files = ['_headers', 'app/manifest.webmanifest', ...appBrand, ...art, ...driverLogos, 'art/spec-demo.webm', 'art/spec-video.mp4', 'art/spec-video.vtt', 'art/spec-poster.webp', ...vendor.slice(1), ...brand, 'fonts/Geist-var.woff2', 'fonts/GeistMono-var.woff2', 'fonts/OFL.txt'];
-// The Changelog's release parts (#1364), generated from each release's published notes on GitHub at this build.
-// A failed read shows its part as missing; the build never fails on it.
-const releases = await readAll();
-console.log(`Changelog releases: ${summary(releases)}`);
+// The Changelog's entries (#78), one per public release, from changelog/releases/*.json. They show once the landing's
+// install switch reads live (RL2), so the page and the install box go live together.
+const releases = await readReleases();
+const live = installSwitch(await readFile(new URL('index.html', root), 'utf8')) === 'live';
+console.log(`Changelog releases: ${summary(releases, live)}`);
 await rm(output, { recursive: true, force: true });
 const put = async (name, data) => {
   const target = new URL(name, output);
@@ -59,7 +60,7 @@ for (const page of pages) {
   let html = await readFile(new URL(page, root), 'utf8');
   for (const [file, name] of Object.entries(names)) html = html.replaceAll(`"/${file}"`, `"/${name}"`);
   if (page !== 'app/index.html') html = withFooter(withCta(html));
-  if (page === 'changelog/index.html') html = withReleases(html, render(releases));
+  if (page === 'changelog/index.html') html = withReleases(html, render(releases, live));
   await put(page, html);
 }
 for (const [file, source] of Object.entries(npmVendor)) await put(file, await readFile(new URL(source, root)));

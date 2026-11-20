@@ -13,7 +13,7 @@ npm run check
 npm test
 ```
 
-`npm run build` copies the public runtime files (pages, fingerprinted styles and scripts, fonts, approved artwork, the sample spec video, vendor licences and the logo files) into `dist/`. The checks require that build first. `npm run check` checks JavaScript syntax, exact build contents, local links and fragments, HTML/CSS resources, font signatures and OFL licences, landing copy, the Changelog (its name, picture, parts and reviewed content), and private markers. `npm test` exercises those gates with synthetic broken links, missing resources and private markers.
+`npm run build` copies the public runtime files (pages, fingerprinted styles and scripts, fonts, approved artwork, the sample spec video, vendor licences and the logo files) into `dist/`. The checks require that build first. `npm run check` checks JavaScript syntax, exact build contents, local links and fragments, HTML/CSS resources, font signatures and OFL licences, landing copy, the Changelog (its name, reviewed content and release data), and private markers. `npm test` exercises those gates with synthetic broken links, missing resources and private markers.
 
 To preview locally:
 
@@ -29,41 +29,27 @@ Changes merge after green CI and one review from the other model family. No per-
 
 ## The Changelog's releases
 
-Nobody writes the Changelog's release entries by hand. At every build, `scripts/changelog.mjs` reads the published releases of the three versioned repositories (OpenWiz, WizSkills and WizLoops) from GitHub's public API, unauthenticated, and `build.mjs` adds them to `/changelog/` as a *Releases* section after *What exists today*. It holds one part per repository, in that order. Each part lists every published release from 0.1.0 on, patches included, newest first by version. Each entry shows that release's own notes. WizSkills' notes are its Changesets notes. Drafts, pre-releases and releases before 0.1.0 stay on GitHub.
+`/changelog` lists one short entry per public release, newest first by semver. Each entry is one data file, `changelog/releases/<public name>.json`, which `build.mjs` reads (through `scripts/changelog.mjs`) and writes into the page; nothing is read from the network.
 
-- **OpenWiz entries list the versions they ship with,** read from a `**Ships with**` line in that release's notes and the list items under it (for example `- WizSkills 0.1.2`). An OpenWiz release whose notes have no such list says so.
-- **A part with no release from 0.1.0 on** says "No release yet".
-- **A failed read** says the part is missing: a network error, a non-200 answer, an answer that isn't a list of releases, or a published release whose tag isn't a plain version such as `v1.2.3`. The build never fails on it and never shows an empty history.
-- **Notes are text.** They are escaped. Code and bold keep their look, and links keep only their words.
+```json
+{
+  "name": "0.01",
+  "semver": "0.1.0",
+  "date": "2026-11-21",
+  "headline": "Run your agents anywhere.",
+  "bullets": ["Three drivers: your own computer, Cloudroom and boat.dev.", "..."],
+  "notes": "https://github.com/openwizdev/OpenWiz/releases/tag/v0.1.0"
+}
+```
 
-The generator's tests (`scripts/test_changelog.py`, run by `npm test`) use the synthetic release lists in `scripts/changelog-fixtures/`. To see the section a fixture case produces, run `node scripts/changelog.mjs --fixtures scripts/changelog-fixtures/full`.
+- **One entry:** the public name as its heading with the date and semver small beside it ("0.01 · Nov 21, 2026 (0.1.0)"), a one-line headline of what it lets you do, a short list of plain bullets, and one link to the full notes on GitHub.
+- **A human-readable number of bullets:** aim for 2 to 5. The check refuses none, more than 6, a bullet over 120 characters, a headline over 80, a notes link that isn't that release's page on GitHub (`.../releases/tag/v<semver>`), a public name that doesn't name its file, or a semver before 0.1.0.
+- **Who writes it:** an agent drafts each entry from the release's merged pull requests; Jake approves the words before it publishes.
+- **The switch:** the entries sit behind the landing install box's switch (`data-install` in `index.html`). While it reads `coming-soon`, the page shows no entry, only one line linking OpenWiz's pre-releases on GitHub, so it never claims an unreleased version. When RL2 flips it to `live` as OpenWiz 0.1.0 publishes, every entry shows, so the install box and the Changelog go live together. After that, adding a release's file is publishing its entry: merge it when the release is out.
 
-### Owner step: rebuild on each release
+The generator's tests (`scripts/test_changelog.py`, run by `npm test`) use the synthetic data in `scripts/changelog-fixtures/`. To see the section either switch state produces, run `node scripts/changelog.mjs --switch live` (or `--switch coming-soon`).
 
-A release can trigger a rebuild through a Cloudflare Pages deploy hook. This repository doesn't configure one. Setting it up is the owner's step, once the first versioned release ships:
-
-1. In the Cloudflare dashboard, open the WizSite Pages project, then **Settings → Builds → Deploy hooks**. Add a hook named `release` for the `main` branch, and copy its URL. The URL is a secret: anyone who has it can start a build.
-2. In each releasing repository (OpenWiz, WizSkills and WizLoops), add the URL as an Actions secret named `WIZSITE_DEPLOY_HOOK`.
-3. In each of them, add a workflow that posts to the hook when a release is published:
-
-   ```yaml
-   name: Rebuild openwiz.dev
-   on:
-     release:
-       types: [published]
-   permissions: {}
-   jobs:
-     rebuild:
-       runs-on: ubuntu-latest
-       steps:
-         - run: curl -fsS -X POST "$HOOK"
-           env:
-             HOOK: ${{ secrets.WIZSITE_DEPLOY_HOOK }}
-   ```
-
-4. Publish a release, or re-run the workflow, and check that a new production deployment starts in Pages and that `/changelog/` lists the release.
-
-Without the hook, the Changelog changes only when WizSite itself next deploys.
+The repository map and the *What exists today* text that used to open the page are in [docs/repos.md](repos.md), with the map as `docs/repo-map.svg`.
 
 ## Site assets
 
@@ -75,7 +61,7 @@ The landing page opens on an Ember-style OpenWiz window that walks through one t
 
 Every site page shares one **footer**, `footer.html`, which the build adds at each page's `<!-- footer.html -->` slot, so no page keeps its own copy: two link groups (Product: Drivers, Changelog, Docs, the app; Company: For teams, GitHub with its star count, X @openwiz), the line "Apache-2.0. Owned by no one.", the wordmark shown whole and the twelve Wizes. Short pages pin it to the bottom of the window. Every site page loads GSAP and `site.js` for it, `/drivers` included, so the star count and the Wizes behave the same everywhere; `/drivers` itself still reads completely without them. The check refuses a page without it or with a second footer; the browser check refuses a clipped wordmark, a painted gap of more than 16 px between its ink and the Wizes, or a footer that ends above the window's bottom. The X account is the one external link allowed off GitHub, and only as the footer's link: never a resource, a CSS `url()` or a second link.
 
-`/changelog` is the **Changelog**. A small picture of how the public repositories fit together opens it, then one *What exists today* section: one part per public repository, each opening with two or three plain sentences, then what a person can use now, written from merged code. Private repositories appear only as "private records and tools". *What exists today* holds no release entries, version numbers or dates. After it, the build adds a generated *Releases* section; see below.
+`/changelog` is the **Changelog**: its title, one line, then one short entry per public release, newest first; see *The Changelog's releases* above. Its main holds no version number or date of its own, and never names a private repository.
 
 The logo files are the favicons (`favicon.ico` with 16, 32 and 48 px images, `favicon.svg`, `apple-touch-icon.png`), the header lockup `brand/openwiz-lockup.svg` and the 1200×630 social card `brand/og.png` (the lockup on the site ground, rendered from the SVG). The lockup's wordmark is converted to outlines: the SVG has no text and no font reference, and the check refuses one that does, so the wordmark font never ships.
 
