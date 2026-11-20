@@ -174,7 +174,7 @@ class Checks(unittest.TestCase):
                 (lambda t: t.replace('<h3>Watch your spec</h3>', '<h3>Watch it ship</h3>'), 'three moments'),
                 (lambda t: t.replace('<h3>Watch it ship</h3>', '<h3>Approve the plan</h3><h3>Watch it ship</h3>'), 'three moments'),
                 (lambda t: t.replace('Steer the build from the narrated video.', 'Watch the video.'), 'steering copy'),
-                (lambda t: t.replace('>Silent sample</p>', '>Spec video</p>'), 'labeled as a silent sample'),
+                (lambda t: t.replace("A real spec from OpenWiz's own factory", 'A sample spec'), "real spec from OpenWiz's own factory"),
                 (lambda t: t.replace('</main>', '<p>Add a dark mode toggle</p></main>'), 'old example'),
                 (lambda t: t.replace('Oil painting of Wiz scholars studying a to-do list', ''), 'painting without a description')):
             with self.subTest(error=error), tempfile.TemporaryDirectory() as temp:
