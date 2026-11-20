@@ -154,11 +154,14 @@ DRIVER_HERO = 'boat-dev'
 DRIVER_WORDS = ('version', 'start', 'wake', 'stop')
 KIT_CHECKS = ('version', 'start', 'wake', 'stop', 'token')
 KIT_STATES = ('passed', 'in progress', 'not yet run')
-# Every number the page shows comes from these facts: boat.dev's 5 of 5 and its date, and the contract's v1.
-DRIVER_NUMBERS = {'5', '2026', '11', '19', '1'}
+# The numbered berths on the hero painting (#55), one per card in card order; each card repeats its number.
+DRIVER_BERTHS = ('Workshop', 'Cloud pier', 'The boat', 'Empty berth')
+# Every number the page shows comes from these facts: boat.dev's 5 of 5 and its date, the contract's v1, and the
+# berth numbers 1 to 4.
+DRIVER_NUMBERS = {'5', '2026', '11', '19', '1', '2', '3', '4'}
 OWN_DRIVER = 'Write your own driver'
 OPENWIZ_REPO = 'https://github.com/openwizdev/OpenWiz'
-DRIVER_ART_BUDGET = 400_000  # bytes: variant D's own art (art/drivers-d-*.webp)
+DRIVER_ART_BUDGET = 400_000  # bytes: the drivers page's own art (art/drivers-*.webp)
 
 
 class Page(HTMLParser):
@@ -421,8 +424,8 @@ def check_site(root):
         check_art(name, data)
         total += len(data)
     assert total <= ART_BUDGET, f'art is {total} bytes, over the {ART_BUDGET} budget'
-    variant = sum(len((root / name).read_bytes()) for name in ART if name.startswith('art/drivers-d-'))
-    assert variant <= DRIVER_ART_BUDGET, f'variant D art is {variant} bytes, over its {DRIVER_ART_BUDGET} budget'
+    variant = sum(len((root / name).read_bytes()) for name in ART if name.startswith('art/drivers-'))
+    assert variant <= DRIVER_ART_BUDGET, f'drivers art is {variant} bytes, over its {DRIVER_ART_BUDGET} budget'
     check_drivers(landing, changelog, (root / DRIVERS_PAGE).read_text(), pages[root / DRIVERS_PAGE])
     check_changelog(landing, changelog)
     check_releases(releases)
@@ -573,12 +576,13 @@ def check_changelog(landing, changelog):
 
 
 class DriverOutline(HTMLParser):
-    """The drivers page's cards: each card's id, classes, name, status line, words and kit checks with their states,
-    and every link inside the Write your own driver section."""
+    """The drivers page's cards: each card's id, classes, name, berth number, status line, words and kit checks with
+    their states; the painting's berth pins (each pin's link and text); and every link inside the Write your own driver
+    section."""
     def __init__(self, text):
         super().__init__(convert_charrefs=True)
-        self.cards, self.own_links, self.own_heading = [], [], None
-        self.field, self.depth, self.own_depth = None, 0, None
+        self.cards, self.own_links, self.own_heading, self.pins = [], [], None, []
+        self.field, self.depth, self.own_depth, self.pins_depth = None, 0, None, None
         self.feed(text)
 
     def handle_starttag(self, tag, attrs):
@@ -592,8 +596,16 @@ class DriverOutline(HTMLParser):
             self.own_links.append(attrs.get('href'))
         if self.own_depth and tag == 'h2':
             self.field = ['own-heading', '']
+        if tag == 'ol' and 'berth-pins' in classes:
+            self.pins_depth = self.depth
+        if self.pins_depth and tag == 'a':
+            self.pins.append([attrs.get('href'), ''])
+            self.field = ['pin', '']
         if tag == 'article' and 'driver' in classes:
-            self.cards.append({'id': attrs.get('id'), 'classes': classes, 'name': '', 'line': '', 'words': [], 'checks': []})
+            self.cards.append({'id': attrs.get('id'), 'classes': classes, 'name': '', 'berth': [], 'line': '',
+                               'words': [], 'checks': []})
+        elif self.cards and tag == 'b' and 'berth-no' in classes:
+            self.field = ['berth', '']
         elif self.cards and tag == 'h3' and 'driver-name' in classes:
             self.field = ['name', '']
         elif self.cards and tag == 'p' and 'driver-line' in classes:
@@ -609,11 +621,15 @@ class DriverOutline(HTMLParser):
             self.field[1] += data
 
     def handle_endtag(self, tag):
-        if self.field and tag in ('h2', 'h3', 'p', 'code', 'li'):
+        if self.field and tag in ('h2', 'h3', 'p', 'code', 'li', 'a', 'b') and (tag == 'a') == (self.field[0] == 'pin'):
             kind, text = self.field
             text = re.sub(r'\s+', ' ', text).strip()
             if kind == 'own-heading':
                 self.own_heading = text
+            elif kind == 'pin':
+                self.pins[-1][1] = text
+            elif kind == 'berth':
+                self.cards[-1]['berth'].append(text)
             elif kind == 'word':
                 self.cards[-1]['words'].append(text)
             elif kind == 'check':
@@ -623,6 +639,8 @@ class DriverOutline(HTMLParser):
             self.field = None
         if tag == 'section' and self.own_depth == self.depth:
             self.own_depth = None
+        if tag == 'ol' and self.pins_depth == self.depth:
+            self.pins_depth = None
         self.depth -= 1
 
 
@@ -635,7 +653,8 @@ def top_bar(html):
 def check_drivers(landing, changelog, drivers, page):
     """The drivers page (#50): the landing's exact top bar with Drivers current, the four driver cards in order with
     their exact facts, words and kit results, boat.dev the hero, the Write your own driver section linking only the
-    public OpenWiz repository, no script, and no number beyond its facts. A Drivers nav link on the other pages."""
+    public OpenWiz repository, no script, and no number beyond its facts. A Drivers nav link on the other pages.
+    Round 2E (#55): the hero painting's four numbered berth pins link their cards, and each card repeats its number."""
     bar = top_bar(drivers)
     current = re.findall(r'<a [^>]*aria-current="page"[^>]*>([^<]*)</a>', bar)
     assert current == ['Drivers'] and re.search(r'<a class="nav-log" href="/drivers/" aria-current="page">Drivers</a>', bar), \
@@ -652,7 +671,11 @@ def check_drivers(landing, changelog, drivers, page):
     outline = DriverOutline(main[0])
     assert [(c['id'], c['name']) for c in outline.cards] == [(d[0], d[1]) for d in DRIVERS], \
         f'four driver cards, in order: {[(c["id"], c["name"]) for c in outline.cards]}'
-    for card, (key, name, line, state) in zip(outline.cards, DRIVERS):
+    pins = [(href, text) for href, text in outline.pins]
+    assert pins == [(f'#{d[0]}', f'{n} {berth}') for n, (d, berth) in enumerate(zip(DRIVERS, DRIVER_BERTHS), 1)], \
+        f'the painting needs its four numbered berth pins, each linking its card, in order: {pins}'
+    for number, (card, (key, name, line, state)) in enumerate(zip(outline.cards, DRIVERS), 1):
+        assert card['berth'] == [str(number)], f'{name}: the card repeats its berth number {number}: {card["berth"]}'
         assert card['line'] == line, f'{name}: the driver facts must read exactly: {line}'
         assert card['words'] == list(DRIVER_WORDS), f'{name}: the four words, in order: {card["words"]}'
         checks = [(c, s) for c, s, _ in card['checks']]

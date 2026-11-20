@@ -467,7 +467,8 @@ class Checks(unittest.TestCase):
         # facts, words or kit result changed; a kit state shown by colour or icon alone; boat.dev losing the hero, or a
         # second hero; a link off the public OpenWiz repository; a top bar that drifts from the landing's or loses its
         # current page; a Drivers link missing on the landing or Changelog; a script, a hidden part, an invented number;
-        # and variant D's art over its budget.
+        # and the drivers art over its budget. Round 2E (#55): a berth pin missing, out of order, renamed or linking the
+        # wrong card, and a card that drops or changes its berth number.
         boat = '<article class="driver hero" id="boat-dev"'
         for name, old, new, error in (
                 ('drivers/index.html', 'id="cloudroom"', 'id="cloud"', 'four driver cards'),
@@ -483,6 +484,11 @@ class Checks(unittest.TestCase):
                 ('drivers/index.html', '>Changelog</a>', '>Changes</a>', 'identical to the landing'),
                 ('drivers/index.html', ' aria-current="page">Drivers', '>Drivers', 'aria-current'),
                 ('drivers/index.html', '</main>', '<p>Used by 300 teams.</p></main>', 'invented number'),
+                ('drivers/index.html', '<li class="pin-4"><a href="#grok-bot"><b>4</b> Empty berth</a></li>', '', 'berth pins'),
+                ('drivers/index.html', '<a href="#cloudroom"><b>2</b> Cloud pier</a>', '<a href="#vps"><b>2</b> Cloud pier</a>', 'berth pins'),
+                ('drivers/index.html', '<b>3</b> The boat</a>', '<b>3</b> Big boat</a>', 'berth pins'),
+                ('drivers/index.html', '<b class="berth-no">2</b>', '<b class="berth-no">4</b>', 'repeats its berth number'),
+                ('drivers/index.html', '<b class="berth-no">1</b>', '', 'repeats its berth number'),
                 ('drivers/index.html', '</main>', '<p hidden>Later.</p></main>', 'without a script|waits for a script'),
                 ('drivers/index.html', '</head>', '<script>1</script></head>', 'without scripts'),
                 ('index.html', '<a class="nav-log" href="/drivers/">Drivers</a>', '', 'identical to the landing|landing top bar needs one Drivers'),
@@ -502,7 +508,7 @@ class Checks(unittest.TestCase):
             (root / 'drivers/index.html').unlink()
             with self.assertRaisesRegex(AssertionError, 'missing build output'):
                 check_site(root)
-        with mock.patch('check.DRIVER_ART_BUDGET', 1000), self.assertRaisesRegex(AssertionError, 'variant D art'):
+        with mock.patch('check.DRIVER_ART_BUDGET', 1000), self.assertRaisesRegex(AssertionError, 'drivers art'):
             check_site(ROOT / 'dist')
 
     def test_logo_pack(self):
