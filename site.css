@@ -92,16 +92,16 @@ code,.v{font-family:var(--ow-font-mono)}
 /* Landing */
 .landing { --m: clamp(18px, 4vw, 68px); --round: 18px; }
 .landing-nav { display: flex; min-height: 76px; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--line); }
-.landing-brand, .landing-nav nav, .github-star, .footer-links { display: flex; align-items: center; }
+.landing-brand, .landing-nav nav, .github-star { display: flex; align-items: center; }
 .landing-brand { gap: 8px; color: #cfc6b8; font-size: 21px; font-weight: 720; letter-spacing: -.04em; }
-.landing-nav nav, .footer-links { gap: clamp(10px, 2vw, 22px); font-size: 14px; color: var(--grey2); }
+.landing-nav nav { gap: clamp(10px, 2vw, 22px); font-size: 14px; color: var(--grey2); }
 .github-star { gap: 8px; min-height: 40px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; }
 .github-star span { border-left: 1px solid var(--line); padding-left: 8px; font-variant-numeric: tabular-nums; }
 .sign-in { padding: 8px 14px; border-radius: 8px; background: #cfc6b8; color: var(--ground); font-weight: 650; white-space: nowrap; }
 .nav-team { padding: 8px 14px; border-radius: 8px; background: var(--brass); color: var(--on-brass); font-weight: 650; white-space: nowrap; }
 .landing-nav .nav-team:hover { background: var(--brass-hi); text-decoration: none; }
 .nav-team-short { display: none; }
-.landing-nav a:hover, .footer-links a:hover { text-decoration: underline; text-underline-offset: 4px; }
+.landing-nav a:hover, .footer-groups a:hover { text-decoration: underline; text-underline-offset: 4px; }
 .product-hero { display: grid; grid-template-columns: minmax(0, .86fr) minmax(0, 1.25fr); gap: clamp(22px, 4vw, 60px); align-items: center; padding-block: clamp(40px, 6vw, 84px) 32px; }
 .hero-copy h1 { max-width: 8ch; font-size: clamp(52px, 6vw, 96px); font-weight: 760; line-height: .98; letter-spacing: -.06em; }
 .landing .sub { margin-top: 22px; color: #e1d7cb; font-size: clamp(18px, 1.8vw, 24px); line-height: 1.4; letter-spacing: -.025em; }
@@ -173,10 +173,22 @@ code,.v{font-family:var(--ow-font-mono)}
 .chat-screen p:nth-child(odd):not(.screen-label) { align-self: flex-end; background: #45312d; }
 .spec-screen ul { padding-left: 15px; margin: 0; color: var(--grey2); }
 .ship-screen p:not(.screen-label) { padding: 4px 7px; border: 1px solid var(--line); border-radius: 5px; color: #d4c8ba; }
+/* The site footer (#73): one snippet on every site page. Short pages pin it to the bottom of the window. The link
+   groups and the small line, then the wordmark whole (its descender inside the box), then the Wizes peeking up. */
+body.landing { display: flex; flex-direction: column; min-height: 100vh; min-height: 100svh; }
+body.landing > main { flex: 1 0 auto; }
 .landing-footer { overflow: hidden; border-top: 1px solid var(--line); background: #221e1a; }
-.footer-links { justify-content: center; padding-top: 24px; }
-.footer-wordmark { margin: 16px 0 0; color: #cfc6b8; text-align: center; font-size: min(19vw, 280px); font-weight: 780; line-height: .87; letter-spacing: -.095em; padding-right: .09em; }
-.family { display: flex; justify-content: center; max-width: 1480px; margin: 7px auto clamp(-48px, -3vw, -10px); padding: 8px 8px 0; overflow: hidden; }
+.footer-top { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 32px 48px; padding-block: 48px 8px; }
+.footer-tag { color: var(--ink); font-size: 17px; font-weight: 650; letter-spacing: -.02em; }
+.footer-line { margin-top: 6px; color: var(--grey); font-size: 14px; }
+.footer-groups { display: flex; gap: 32px clamp(40px, 7vw, 96px); }
+.footer-groups h2 { color: var(--grey); font: 600 12px/1 var(--ow-font-sans); letter-spacing: .08em; text-transform: uppercase; }
+.footer-groups ul { margin: 8px 0 0; padding: 0; list-style: none; }
+.footer-groups a { display: inline-flex; align-items: center; gap: 8px; min-height: 36px; color: var(--grey2); font-size: 15px; }
+.footer-groups a:hover { color: var(--ink); text-underline-offset: 4px; }
+.footer-github span { padding-left: 8px; border-left: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+.footer-wordmark { margin: clamp(16px, 3vw, 32px) 0 0; color: #cfc6b8; text-align: center; font-size: min(19vw, 280px); font-weight: 780; line-height: .87; letter-spacing: -.095em; padding: 0 .09em .09em 0; }
+.family { display: flex; justify-content: center; max-width: 1480px; margin: max(-20px, calc(-6px - .9vw)) auto clamp(-48px, -3vw, -10px); padding: 8px 8px 0; overflow: hidden; }
 .family-wiz { position: relative; flex: 0 0 8.5%; margin-inline: -.08%; aspect-ratio: 1; }
 .family-wiz img { position: relative; display: block; width: 100%; height: auto; }
 /* Owner's fix 2: the Wizes become buttons once the script runs; nothing shows until one is used. */
@@ -330,7 +342,6 @@ code,.v{font-family:var(--ow-font-mono)}
 .drivers-page .host-marks li { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 6px 14px; border: 1px solid rgb(242 194 123 / 24%); border-radius: 999px; background: rgb(15 13 11 / 76%); color: #ece3d6; font: 500 15px/1.2 var(--ow-font-sans); white-space: nowrap; }
 .drivers-page .host-mark { display: inline-flex; flex: none; align-items: center; height: 18px; }
 .drivers-page .host-mark img { display: block; width: auto; height: 100%; }
-.drivers-page .host-mark .host-tile { border-radius: 4px; }
 .drivers-page .host-state { padding-left: 8px; border-left: 1px solid rgb(242 194 123 / 28%); color: #cbbfae; font-size: 13px; font-weight: 450; }
 .drivers-page [data-state="passed"] .host-state { color: var(--gold); }
 .drivers-page .host-icon { filter: invert(1); opacity: .92; }
@@ -372,7 +383,6 @@ code,.v{font-family:var(--ow-font-mono)}
 .drivers-page .driver-list .driver { display: flex; flex-direction: column; gap: 12px; width: 100%; padding: 20px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); }
 .drivers-page .driver-list .driver-name { display: flex; align-items: center; gap: 10px; min-height: 32px; margin: 0; font-size: 20px; font-weight: 660; line-height: 1.2; letter-spacing: -.03em; }
 .drivers-page .driver-logo { flex: none; width: 28px; height: 28px; }
-.drivers-page .driver-logo.host-tile { border-radius: 7px; }
 .drivers-page .driver-list .driver-line { color: var(--grey2); font-size: 15px; line-height: 1.45; }
 .drivers-page .driver-list .driver-date { margin-top: -6px; font-size: 14px; }
 .drivers-page .driver-kit { display: flex; margin-top: auto; align-items: center; gap: 8px; padding-top: 12px; border-top: 1px solid var(--line); color: var(--ink); font-size: 14px; line-height: 1.4; white-space: nowrap; }
@@ -390,7 +400,6 @@ code,.v{font-family:var(--ow-font-mono)}
 .drivers-page .own-words dt code { color: var(--gold); font-size: 15px; }
 .drivers-page .own-words dd { margin: 0; color: #e1d7cb; font-size: 15px; }
 .drivers-page .own-words .own-token { border-top-style: dashed; }
-.drivers-page .drivers-footer .footer-wordmark { padding-bottom: 8px; }
 
 @media (max-width: 1100px) {
   .drivers-page .driver.hero { grid-template-columns: 1fr; }
@@ -435,7 +444,7 @@ code,.v{font-family:var(--ow-font-mono)}
 @keyframes drivers-d-far { to { transform: translateY(6%); } }
 @keyframes drivers-d-near { to { transform: translateY(-10%); } }
 
-/* The team page (openwiz.dev/team, #63): one screen, what you get and one Book a call button. */
+/* The team page (openwiz.dev/team, #63, #73): the hero, then what you get, where your agents run and a closing Book a call. */
 .team { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: clamp(28px, 5vw, 72px); align-items: center; padding-block: clamp(36px, 6vw, 84px); }
 .team-kicker { color: var(--brass); font: 600 13px/1 var(--ow-font-sans); letter-spacing: .06em; text-transform: uppercase; }
 .team h1 { margin-top: 16px; max-width: 13ch; font-size: clamp(40px, 5vw, 68px); font-weight: 760; line-height: 1; letter-spacing: -.05em; }
@@ -447,7 +456,23 @@ code,.v{font-family:var(--ow-font-mono)}
 .team-book:hover { background: var(--brass-hi); }
 .team-note { margin-top: 12px; color: var(--grey); font-size: 14px; }
 .team-art { width: 100%; height: auto; border: 1px solid var(--line); border-radius: var(--round); }
+.team-part { padding-block: clamp(36px, 5vw, 64px); border-top: 1px solid var(--line); }
+.team-part h2 { font-size: clamp(28px, 3vw, 40px); font-weight: 740; line-height: 1.1; letter-spacing: -.04em; }
+.team-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 28px; padding: 0; list-style: none; counter-reset: step; }
+.team-steps li { padding: 24px; border: 1px solid var(--line); border-radius: var(--round); background: var(--panel); counter-increment: step; }
+.team-steps li::before { content: counter(step); display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: var(--brass); color: var(--on-brass); font-weight: 700; font-size: 15px; }
+.team-steps h3 { margin: 18px 0 0; font-size: 19px; font-weight: 680; letter-spacing: -.02em; line-height: 1.25; }
+.team-steps p { margin-top: 8px; color: var(--grey2); font-size: 16px; }
+.team-run-lead { margin-top: 12px; max-width: 52ch; color: var(--grey2); }
+.team-drivers { display: flex; flex-wrap: wrap; gap: 12px; margin: 24px 0 0; padding: 0; list-style: none; }
+.team-drivers a { display: inline-flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 18px; border: 1px solid var(--line); border-radius: 999px; background: var(--panel); color: var(--ink); font-weight: 600; }
+.team-drivers a:hover { border-color: var(--edge); }
+.team-drivers span { color: var(--grey); font-size: 13px; font-weight: 500; }
+.team-more { display: inline-flex; align-items: center; min-height: 44px; margin-top: 16px; color: var(--grey2); font-size: 15px; text-decoration: underline; text-decoration-color: var(--brass); text-underline-offset: 4px; }
+.team-close { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 32px; }
+.team-close .team-book { margin-top: 0; }
 @media (max-width: 850px) {
   .team { grid-template-columns: 1fr; }
   .team-art { order: -1; }
+  .team-steps { grid-template-columns: 1fr; }
 }
