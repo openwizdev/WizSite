@@ -654,6 +654,34 @@ test('R6: a reader who pauses past the deadline then resumes gets only the refus
   for (let n = 2; n <= KEY.length; n++) assert.ok(!body.includes(KEY.slice(0, n)), `part of the key sent: ${JSON.stringify(body)}`);
   assert.deepEqual(events(body), [{ type: 'refused', reason: 'upstream_error', message: "Ask a Wiz couldn't answer just now. Try again." }]);
   assert.equal(store.dump().counters.find(r => r.key === 'spend').count, 63610, 'the reservation stays');
+
+  // A read already in flight at the deadline that still resolves afterwards (here with [DONE]) is ignored: the
+  // visitor gets the piece sent before the deadline, then the refusal, never done.
+  let late;
+  const reads = [data({ choices: [{ delta: { content: 'Synthetic safe first piece long enough to send. ' } }] }), null];
+  answer = () => ({
+    status: 200,
+    headers: new Headers(),
+    body: {
+      getReader: () => ({
+        read: () => {
+          const next = reads.shift();
+          if (next) return Promise.resolve({ done: false, value: enc.encode(next) });
+          return new Promise(resolve => { late = () => resolve({ done: false, value: enc.encode('data: [DONE]\n\n') }); });
+        },
+        cancel: async () => { late?.(); },
+      }),
+      cancel: async () => {},
+    },
+  });
+  const store2 = fakeD1(c.store);
+  const pending2 = [];
+  const reading = await handle({ request: new Request(`${SITE}/api/ask`, { method: 'POST', headers: c.request.headers, body: c.request.body }), env: { ...env, ASK_A_WIZ_COUNTERS: store2.binding }, waitUntil: p => pending2.push(p) },
+    { clock: () => new Date(c.now), rank: () => c.retrieved, upstreamTimeout: 30 });
+  const read = await reading.text();
+  await Promise.all(pending2);
+  assert.deepEqual(events(read).map(e => e.type === 'refused' ? e.reason : e.type), ['text', 'upstream_error']);
+  assert.equal(store2.dump().counters.find(r => r.key === 'spend').count, 63610, 'the reservation stays');
 });
 
 test('an invalid reported cost keeps the whole reservation; a valid one replaces it', async () => {

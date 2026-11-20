@@ -406,7 +406,19 @@ export async function handle(context, options = {}) {
   let finished = false;
   let release;
   keep(new Promise(resolve => { release = resolve; }));
-  const timer = setTimeout(() => { stop(); finish(); }, upstreamTimeout);
+  // The answer's pieces arrive in `queue` and leave it whole, in order (see `ready` below). `received` is all the
+  // text that has arrived. `state` is open, done (at [DONE]), failed (an error, the deadline or a cancel) or
+  // leaked (the key arrived); failed and leaked are final.
+  const queue = [];
+  let received = '';
+  let state = 'open';
+  // The deadline is terminal: whatever is queued, held or still in the parser is dropped, and the next thing the
+  // visitor reads is the refusal.
+  const timer = setTimeout(() => {
+    state = 'failed';
+    stop();
+    finish();
+  }, upstreamTimeout);
   function stop() {
     abort.abort();
     reader?.cancel().catch(() => {});
@@ -450,18 +462,16 @@ export async function handle(context, options = {}) {
   const report = {};
   const pieces = answerPieces(reader, report);
 
-  // The answer's pieces arrive in `queue` and leave it whole, in order. The last key length - 1 characters that
-  // arrived are always examined: from the first of them that could begin the key (what follows it is a start of
-  // the key), the text is held, and a piece leaves only when it ends before that point. The whole key arriving
-  // ends the answer. On any failure, timeout or cancel, held text is discarded, never sent: no part of the key
-  // ever reaches the visitor. `received` is all the text that has arrived.
-  const queue = [];
-  let received = '';
-  let state = 'open'; // open, done (at [DONE]), failed (an error, a timeout or a cancel) or leaked (the key arrived)
+  // The last key length - 1 characters that arrived are always examined: from the first of them that could begin
+  // the key (what follows it is a start of the key), the text is held, and a piece leaves only when it ends before
+  // that point. The whole key arriving ends the answer. On any failure, timeout or cancel, held text is discarded,
+  // never sent: no part of the key ever reaches the visitor.
   const lookahead = config.key.length - 1;
   async function receive() {
+    if (state !== 'open') return;
     try {
       const next = await pieces.next();
+      if (state !== 'open') return; // the deadline passed while the parser worked: its result is dropped
       if (next.done) { state = 'done'; return; }
       queue.push(next.value);
       received += next.value;
@@ -535,6 +545,6 @@ export async function handle(context, options = {}) {
       stop();
       finish();
     },
-  });
+  }, { highWaterMark: 0 }); // nothing is pulled ahead of the visitor's read, so nothing sits past the deadline
   return new Response(body, { headers: NDJSON });
 }
