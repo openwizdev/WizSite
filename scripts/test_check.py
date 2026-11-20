@@ -420,6 +420,43 @@ class Checks(unittest.TestCase):
                     with self.assertRaises(AssertionError):
                         check_site(root)
 
+    def test_install_version_label_is_the_only_version_on_the_landing(self):
+        """#1674 (J264): the install box shows the public name with its semver small beside it, reading exactly
+        OpenWiz 0.01 0.1.0, in either switch state. That one label is the only release version the landing may
+        mention; each case below plants one break, and each must fail."""
+        # catches: the label's semver or public name drifting, the label missing or doubled, and the guard's
+        # exception widening to let a version through anywhere else on the landing, in the box or outside it.
+        label = '<p class="install-version">OpenWiz 0.01 <small>0.1.0</small></p>'
+        text = (ROOT / 'dist/index.html').read_text()
+        self.assertEqual(text.count(label), 1, label)
+        shipped = re.findall(r'data-install="[^"]*"', text)
+        self.assertEqual(len(shipped), 1, 'one install switch')
+        hint = '<p class="install-hint">'
+        breaks = [
+            (label, label.replace('0.1.0', '0.1.1')),
+            (label, label.replace('0.01', '0.02')),
+            (label, label.replace('OpenWiz 0.01', 'OpenWiz')),
+            (label, ''),
+            (label, label + label),
+            (hint, '<p>0.1.0</p>' + hint),
+            ('</main>', '<p>Now 0.1.0</p></main>'),
+            ('</main>', '<p>OpenWiz 0.01 <small>0.1.0</small></p></main>'),
+        ]
+        for state in INSTALL_SWITCH:
+            variant = text.replace(shipped[0], f'data-install="{state}"')
+            with self.subTest(state=state), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp) / 'dist'
+                shutil.copytree(ROOT / 'dist', root)
+                (root / 'index.html').write_text(variant)
+                check_site(root)
+            for good, bad in breaks:
+                with self.subTest(state=state, bad=bad), tempfile.TemporaryDirectory() as temp:
+                    root = Path(temp) / 'dist'
+                    shutil.copytree(ROOT / 'dist', root)
+                    (root / 'index.html').write_text(variant.replace(good, bad, 1))
+                    with self.assertRaises(AssertionError):
+                        check_site(root)
+
     def test_app_page_policy_and_calm(self):
         # catches: the app losing the browser-enforced limit to GitHub and this site, loading an unchecked
         # script, or gaining motion.
