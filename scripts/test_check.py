@@ -1,6 +1,8 @@
 """Synthetic negative cases for link/resource and privacy gates; no browser tools."""
+import os
 from pathlib import Path
 import shutil
+import subprocess
 import tempfile
 import unittest
 
@@ -415,6 +417,29 @@ class Checks(unittest.TestCase):
                 landing.write_text(landing.read_text().replace(good, bad, 1))
                 with self.assertRaises(AssertionError):
                     check_site(root)
+
+    @unittest.skipIf(os.environ.get('WIZSITE_SWITCH_COPY'), 'already inside the switched copy')
+    def test_the_release_switch_alone_passes_ci(self):
+        # catches: checks pinned to the shipped switch value, so the release's one documented change (data-install
+        # from coming-soon to live) fails CI. A copy of the site gets only that change, then CI's own steps run on it.
+        with tempfile.TemporaryDirectory() as temp:
+            copy = Path(temp) / 'site'
+            shutil.copytree(ROOT, copy, ignore=shutil.ignore_patterns('.git', 'dist', 'node_modules', '__pycache__'))
+            (copy / 'node_modules').symlink_to(ROOT / 'node_modules')
+            # npm run check lists the site's files through git; the linked node_modules is not one of them.
+            subprocess.run(['git', 'init', '-q'], cwd=copy, check=True)
+            (copy / '.git/info/exclude').write_text('/node_modules\n')
+            landing = copy / 'index.html'
+            text = landing.read_text()
+            self.assertEqual(text.count('data-install="coming-soon"') + text.count('data-install="live"'), 1)
+            landing.write_text(text.replace('data-install="coming-soon"', 'data-install="live"'))
+            env = dict(os.environ, WIZSITE_SWITCH_COPY='1')
+            failed = {}
+            for step in ('build', 'check', 'test', 'test:functions', 'test:app'):
+                run = subprocess.run(['npm', 'run', step], cwd=copy, env=env, capture_output=True, text=True)
+                if run.returncode:
+                    failed[step] = '\n'.join(l for l in (run.stdout + run.stderr).splitlines() if not l.startswith('PASS '))[-2000:]
+            self.assertEqual(list(failed), [], 'with the switch on, CI fails:\n' + '\n'.join(f'npm run {s}:\n{o}' for s, o in failed.items()))
 
     def test_app_page_policy_and_calm(self):
         # catches: the app losing the browser-enforced limit to GitHub and this site, loading an unchecked
