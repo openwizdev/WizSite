@@ -205,9 +205,10 @@
   //   loading  - not read yet;  ok - read whole;  partial - read, but part failed (missing parts are unknown);
   //   unknown  - never read successfully (the last read failed);  stale - the last read failed, the data is older.
 
-  // Specs: the factory titles each spec "<version> spec: <name>" (plan-graph) and gives it no label, so they are found by
-  // GitHub's issue search on the title or a spec label, then kept only if the title says "spec:" or the label is there
-  // (specsOf). Looking for the label alone found no spec on OpenWiz, and the You tiles read 0 (#1266 F1).
+  // Specs: an open issue with sub-issues (its tickets), a spec label, or a "<version> spec: <name>" title (plan-graph's,
+  // before its tickets exist), and never a wayfind map. The factory gives specs no label: looking for the label alone
+  // found no spec on OpenWiz, and the You tiles read 0 (#1266 F1). GitHub's issue search finds them; specsOf keeps the
+  // ones that really are specs, since the search's "in:title spec" also matches a title that only mentions one.
   const SPECS = `query Specs($owner: String!, $name: String!, $specs: String!) {
   rateLimit { limit remaining resetAt }
   specSearch: search(query: $specs, type: ISSUE_ADVANCED, first: 100) {
@@ -265,17 +266,21 @@
   }
 }`;
   const SPEC_TITLE = /(^|\s)spec:\s/i;
-  // The search's open issues that are specs, newest first, as data.specIssues: {totalCount, nodes}. Search results it
-  // didn't return still count toward totalCount, so a list GitHub gave only part of stays partial.
+  const SPEC_SEARCH = full => `repo:${full} is:issue state:open (has:sub-issue OR label:spec OR in:title spec) -label:wayfind:map sort:updated-desc`;
+  // The search's open issues that are specs, newest first, as data.specIssues: {totalCount, nodes}. A result GitHub
+  // didn't give (past the page, or null with an error) counts toward totalCount, so the list stays partial and the
+  // tiles show "N+"; a result GitHub gave that isn't a spec is left out of both.
   function specsOf(search) {
     if (!search || !Array.isArray(search.nodes)) return null;
-    const nodes = search.nodes.filter(issue => Number.isSafeInteger(issue?.number)
-      && (SPEC_TITLE.test(issue.title || '') || (issue.labels?.nodes || []).some(label => label?.name === 'spec')));
-    return { totalCount: nodes.length + Math.max(0, (search.totalCount ?? 0) - search.nodes.length), nodes };
+    const given = search.nodes.filter(issue => Number.isSafeInteger(issue?.number));
+    const labels = issue => (issue.labels?.nodes || []).map(label => label?.name);
+    const nodes = given.filter(issue => !labels(issue).includes('wayfind:map')
+      && (issue.subIssuesSummary?.total > 0 || labels(issue).includes('spec') || SPEC_TITLE.test(issue.title || '')));
+    return { totalCount: nodes.length + Math.max(0, (search.totalCount ?? 0) - given.length), nodes };
   }
   const feeds = {
     specs: { label: 'Specs', every: 10 * 60 * 1000, query: SPECS, more: specTickets,
-      variables: picked => ({ specs: `repo:${picked.full} is:issue state:open (in:title spec OR label:spec) sort:updated-desc` }),
+      variables: picked => ({ specs: SPEC_SEARCH(picked.full) }),
       shape: (data, answer) => { data.specIssues = specsOf(answer.specSearch); } },
     agents: { label: 'Agents', every: 2 * 60 * 1000, query: AGENTS },
   };

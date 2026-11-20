@@ -1,6 +1,6 @@
 // The Specs page, and the model of the factory that You, Specs and each spec's page read.
 //
-// The Specs feed (OW.data.feeds.specs) holds two GitHub reads. The first: `specIssues` (open specs: titled "spec:" or labelled spec),
+// The Specs feed (OW.data.feeds.specs) holds two GitHub reads. The first: `specIssues` (open specs: with sub-issues, labelled spec or titled "spec:"),
 // `youIssues` (open issues labelled needs-info or ready-for-human), each with its total, and `fleet` (the repository's
 // docs/agents/fleet.md, whose Record authors row says whose notes and decision records count). The second: `specs`,
 // each open spec's recent comments and its tickets with their state, labels, blocked-by links, closing pull requests
@@ -354,7 +354,7 @@
     const missing = seen.partialSpecs
       ? OW.ui.unknown('GitHub gave only part of the list of specs, so some may be missing. The app tries again on its own, or press Refresh now.') : null;
     if (!seen.specs.length) {
-      return el.replaceChildren(missing || OW.ui.placeholder('No open spec yet. A spec shows here once its issue has the spec label.'));
+      return el.replaceChildren(missing || OW.ui.placeholder('No open spec yet. A spec shows here once its issue has tickets (sub-issues), a "spec:" title or the spec label.'));
     }
     el.replaceChildren(...[missing, h('div', { class: 'cards' }, seen.specs.map(spec => {
       const href = `#/specs/${spec.number}`;
