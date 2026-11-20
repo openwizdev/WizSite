@@ -172,6 +172,10 @@ PROOF_LINES = (
 )
 # A driver that works but whose kit has not run says so plainly, so "works" and "not yet run" never read as a conflict.
 DRIVER_KIT_NOTES = {'cloudroom': 'Kit: not run yet'}
+# Final (#59): boat.dev's card keeps one kit line linking to its proof section, which alone lists the five checks.
+DRIVER_KIT_PROOF = {'boat-dev': ('#boat-proof', 'Kit: passed, 5 of 5')}
+DRIVER_HERO_MARK = '<p class="hero-score" aria-hidden="true"><b>5</b><span>of 5</span></p>'
+DRIVER_LABEL_TRACKING = 0.06  # em: the least tracking on an uppercase drivers-page label
 DRIVER_MIN_FONT = 12  # px: no drivers-page text smaller
 OWN_DRIVER = 'Write your own driver'
 OPENWIZ_REPO = 'https://github.com/openwizdev/OpenWiz'
@@ -614,7 +618,10 @@ class DriverOutline(HTMLParser):
         if self.own_depth and tag == 'h2':
             self.field = ['own-heading', '']
         if tag == 'article' and 'driver' in classes:
-            self.cards.append({'id': attrs.get('id'), 'classes': classes, 'name': '', 'line': '', 'note': None, 'words': [], 'checks': []})
+            self.cards.append({'id': attrs.get('id'), 'classes': classes, 'name': '', 'line': '', 'note': None, 'words': [], 'checks': [], 'proof': None})
+        elif self.cards and tag == 'a' and 'kit-proof' in classes:
+            self.cards[-1]['proof'] = [attrs.get('href'), '']
+            self.field = ['proof', '']
         elif self.cards and tag == 'h3' and 'driver-name' in classes:
             self.field = ['name', '']
         elif self.cards and tag == 'p' and 'driver-line' in classes:
@@ -632,7 +639,7 @@ class DriverOutline(HTMLParser):
             self.field[1] += data
 
     def handle_endtag(self, tag):
-        if self.field and tag in ('h2', 'h3', 'p', 'code', 'li'):
+        if self.field and tag in ('h2', 'h3', 'p', 'code', 'li', 'a'):
             kind, text = self.field
             text = re.sub(r'\s+', ' ', text).strip()
             if kind == 'own-heading':
@@ -641,6 +648,8 @@ class DriverOutline(HTMLParser):
                 self.cards[-1]['words'].append(text)
             elif kind == 'check':
                 self.cards[-1]['checks'][-1][2] = text
+            elif kind == 'proof':
+                self.cards[-1]['proof'][1] = text
             else:
                 self.cards[-1][kind] = text
             self.field = None
@@ -679,12 +688,21 @@ def check_drivers(landing, changelog, drivers, page):
         assert card['line'] == line, f'{name}: the driver facts must read exactly: {line}'
         assert card['words'] == list(DRIVER_WORDS), f'{name}: the four words, in order: {card["words"]}'
         checks = [(c, s) for c, s, _ in card['checks']]
-        assert checks == [(check, state) for check in KIT_CHECKS], f'{name}: kit result must be {state} on the five checks: {checks}'
+        if key in DRIVER_KIT_PROOF:
+            href, said = DRIVER_KIT_PROOF[key]
+            assert not checks, f'{name}: its five checks appear only in the proof section, never again on its card: {checks}'
+            assert card['proof'] and card['proof'][0] == href, f'{name}: its kit line links to the proof section {href}: {card["proof"]}'
+            assert card['proof'][1] == said, f'{name}: its one kit line reads {said!r}: {card["proof"][1]!r}'
+        else:
+            assert card['proof'] is None, f'{name}: only boat.dev links to a proof section'
+            assert checks == [(check, state) for check in KIT_CHECKS], f'{name}: kit result must be {state} on the five checks: {checks}'
         for check, state_, text in card['checks']:
             assert text == f'{check} {state_}', f'{name}: each kit check says its state in words: {text!r}'
         hero = 'hero' in card['classes']
         assert hero == (key == DRIVER_HERO), f'boat.dev is the hero card, and only it: {name}'
         assert card['note'] == DRIVER_KIT_NOTES.get(key), f'{name}: its kit note must read {DRIVER_KIT_NOTES.get(key)!r}: {card["note"]!r}'
+    hero_card = re.search(r'<article class="driver hero"[\s\S]*?</article>', main[0])
+    assert hero_card and DRIVER_HERO_MARK in hero_card[0], 'boat.dev keeps its 5 of 5 mark on its card'
     check_driver_proof(main[0])
     reader = Text(main[0])
     for reading in [reader.joined(), reader.spaced()] + reader.shown:
@@ -736,6 +754,14 @@ def check_driver_css(css):
     for rule in re.findall(r'[^{}]*\.drivers-page[^{}]*\{[^{}]*\}', css):
         for size in re.findall(r'font(?:-size)?\s*:[^;}]*?(\d+(?:\.\d+)?)px', rule):
             assert float(size) >= DRIVER_MIN_FONT, f'drivers-page text under {DRIVER_MIN_FONT}px: {rule.strip()[:120]}'
+        # Final (#59): an uppercase label (its own rule, or a heading's that inherits it) is tracked at least .06em.
+        selector = rule.split('{')[0]
+        if re.search(r'text-transform\s*:\s*uppercase', rule) or re.search(r'\bh4\b', selector):
+            tracking = re.findall(r'letter-spacing\s*:\s*(-?\d*\.?\d+)em', rule)
+            if re.search(r'text-transform\s*:\s*uppercase', rule):
+                assert tracking, f'an uppercase drivers-page label needs its tracking: {rule.strip()[:120]}'
+            for value in tracking:
+                assert float(value) >= DRIVER_LABEL_TRACKING, f'an uppercase drivers-page label needs tracking of {DRIVER_LABEL_TRACKING}em or more: {rule.strip()[:120]}'
 
 
 def split_releases(built):

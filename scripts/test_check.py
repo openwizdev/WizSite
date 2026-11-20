@@ -475,8 +475,8 @@ class Checks(unittest.TestCase):
                 ('drivers/index.html', 'Being fixed: its kit run is in progress', 'Being fixed: almost done', 'driver facts'),
                 ('drivers/index.html', 'on a real account (2026-11-19)', 'on a real account', 'driver facts'),
                 ('drivers/index.html', '<code class="word">wake</code>', '<code class="word">ping</code>', 'four words'),
-                ('drivers/index.html', 'data-check="token" data-state="passed"', 'data-check="token" data-state="in progress"', 'kit result'),
-                ('drivers/index.html', '<span class="kit-state">passed</span>', '<span class="kit-state"></span>', 'says its state in words'),
+                ('drivers/index.html', 'data-check="token" data-state="in progress"', 'data-check="token" data-state="passed"', 'kit result'),
+                ('drivers/index.html', '<span class="kit-state">in progress</span>', '<span class="kit-state"></span>', 'says its state in words'),
                 ('drivers/index.html', boat, boat.replace(' hero', ''), 'boat.dev is the hero'),
                 ('drivers/index.html', '<article class="driver" id="grok-bot"', '<article class="driver hero" id="grok-bot"', 'boat.dev is the hero'),
                 ('drivers/index.html', 'href="https://github.com/openwizdev/OpenWiz/tree/main/adapters/template"', 'href="https://github.com/openwizdev/WizSkills"', 'only to the public OpenWiz'),
@@ -557,6 +557,38 @@ class Checks(unittest.TestCase):
                 shutil.copytree(ROOT / 'dist', root)
                 edit_built(root, 'site.css', lambda t: t + bad)
                 with self.assertRaisesRegex(AssertionError, 'under 12px'):
+                    check_site(root)
+
+    def test_drivers_final(self):
+        # Catches (#59): boat.dev's card listing the kit's five checks again beside the proof section (a duplicate list),
+        # or losing its one "Kit: passed, 5 of 5" line, its link to the proof section, its four words or its 5 of 5 mark;
+        # and an uppercase drivers-page label under 12 px or tracked tighter than .06em.
+        proof_line = '<a class="kit-proof" href="#boat-proof">'
+        row = ('<li class="kit-check" data-check="token" data-state="passed"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true">'
+               '<circle cx="8" cy="8" r="7"/></svg><span class="kit-name">token</span> <span class="kit-state">passed</span></li>')
+        for old, new, error in (
+                (proof_line, '<ul>' + row + '</ul>' + proof_line, 'five checks appear only in the proof'),
+                (proof_line, proof_line.replace('#boat-proof', '#boat-dev'), 'links to the proof section'),
+                ('<span>Kit: passed, 5 of 5</span>', '<span>Kit: passed</span>', 'Kit: passed, 5 of 5'),
+                ('<p class="hero-score" aria-hidden="true"><b>5</b><span>of 5</span></p>', '', '5 of 5 mark')):
+            with self.subTest(error=error), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp) / 'dist'
+                shutil.copytree(ROOT / 'dist', root)
+                page = root / 'drivers/index.html'
+                text = page.read_text()
+                self.assertIn(old, text)
+                page.write_text(text.replace(old, new, 1))
+                with self.assertRaisesRegex(AssertionError, error):
+                    check_site(root)
+        for bad, error in (
+                ('\n.drivers-page .x-label { font: 600 12px/1 monospace; letter-spacing: .02em; text-transform: uppercase; }\n', 'tracking'),
+                ('\n.drivers-page .x-label { font: 600 12px/1 monospace; text-transform: uppercase; }\n', 'tracking'),
+                ('\n.drivers-page .kit h4 span { letter-spacing: .03em; }\n', 'tracking')):
+            with self.subTest(css=bad), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp) / 'dist'
+                shutil.copytree(ROOT / 'dist', root)
+                edit_built(root, 'site.css', lambda t: t + bad)
+                with self.assertRaisesRegex(AssertionError, error):
                     check_site(root)
 
     def test_logo_pack(self):
