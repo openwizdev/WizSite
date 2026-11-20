@@ -105,12 +105,34 @@
     const builder = tables[0];
     const at = { claude: 0, gpt: 1 }[builder.family] ?? refuse('an older Builder of no known family');
     return {
-      orchestrator: { follows: 'builder', choice: builder },
-      builder: { follows: null, choice: builder },
-      reviewer: { follows: null, choice: tables[2 + at] },
-      small_builder: { follows: null, choice: tables[1] },
-      fixer: { follows: null, choice: fixers[at] },
+      roles: {
+        orchestrator: { follows: 'builder', choice: builder },
+        builder: { follows: null, choice: builder },
+        reviewer: { follows: null, choice: tables[2 + at] },
+        small_builder: { follows: null, choice: tables[1] },
+        fixer: { follows: null, choice: fixers[at] },
+      },
+      // The six older rows, in KEPT's order, as written.
+      rows: [tables[0], tables[1], tables[2], tables[3], fixers[0], fixers[1]],
     };
+  }
+
+  // The older rows `set` keeps in step while both forms are present, and what each must equal from the Models table:
+  // the Builder, the Small builder, each family's review (cross-family rule) and fix round (fixer rule); null waits.
+  const KEPT = ['Builder', 'Builder for small tickets', 'Reviewer for Claude-built', 'Reviewer for GPT-built', 'Fixer, Claude', 'Fixer, GPT'];
+  function resolved({ builder, reviewer, small_builder: small, fixer }) {
+    const review = family => [reviewer, builder].find(r => r.choice.family && r.choice.family !== family)?.choice ?? null;
+    const fix = family => [fixer, reviewer].find(r => r.choice.family === family)?.choice ?? null;
+    return [builder.choice, small.choice, review('claude'), review('gpt'), fix('claude'), fix('gpt')];
+  }
+  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  // A kept row's two values: the model ids (or waits); when equal, model and effort; when those are too, all three.
+  function values(now, was) {
+    for (const keys of [['model'], ['model', 'effort'], ['provider', 'model', 'effort']]) {
+      const [a, b] = [now, was].map(c => (c ? keys.map(k => c[k]).join(' ') : 'waits'));
+      if (a !== b) return [a, b];
+    }
+    return [null, null];
   }
 
   // fleet.md's text -> {form, olderPresent, roles: {key: {follows, choice}}, warnings: [text]}, or throws Refused.
@@ -119,12 +141,23 @@
     const olderPresent = OLDER.some(name => lines.includes(`## ${name}`));
     const models = section(lines, 'Models');
     if (!models && !olderPresent) refuse('no model settings');
-    const roles = models ? modelsTable(models) : olderTables(lines);
+    const roles = models ? modelsTable(models) : olderTables(lines).roles;
     const warnings = [];
     const { reviewer, builder } = roles;
     if (reviewer.choice.family && reviewer.choice.family === builder.choice.family) {
       const word = reviewer.choice.family === 'claude' ? 'Claude' : 'GPT';
       warnings.push(`The Reviewer and the Builder are both ${word} models, so reviews of ${word}-built work wait (ADR 0008).`);
+    }
+    // While both forms are present, each older row that differs from what the Models table resolves to is named:
+    // today's fleets still start from it. Unreadable older tables are ignored, as the Models table wins.
+    let older = null;
+    if (models && olderPresent) try { older = olderTables(lines).rows; } catch (error) { if (!(error instanceof Refused)) throw error; }
+    if (older) {
+      resolved(roles).forEach((now, i) => {
+        if (same(now, older[i])) return;
+        const [next, old] = values(now, older[i]);
+        warnings.push(`Models table: ${next}; older ${KEPT[i]} table kept at ${old}; fleets start ${old} until launch-fleet reads the Models table (MD4)`);
+      });
     }
     return { form: models ? 'models_table' : 'older_tables', olderPresent: Boolean(models) && olderPresent, roles, warnings };
   }
