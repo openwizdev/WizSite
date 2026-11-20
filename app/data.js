@@ -205,16 +205,20 @@
   //   loading  - not read yet;  ok - read whole;  partial - read, but part failed (missing parts are unknown);
   //   unknown  - never read successfully (the last read failed);  stale - the last read failed, the data is older.
 
-  const SPECS = `query Specs($owner: String!, $name: String!) {
+  // Specs: an open issue with sub-issues (its tickets), a spec label, or a "<version> spec: <name>" title (plan-graph's,
+  // before its tickets exist), and never a wayfind map. The factory gives specs no label: looking for the label alone
+  // found no spec on OpenWiz, and the You tiles read 0 (#1266 F1). GitHub's issue search finds them; specsOf keeps the
+  // ones that really are specs, since the search's "in:title spec" also matches a title that only mentions one.
+  const SPECS = `query Specs($owner: String!, $name: String!, $specs: String!) {
   rateLimit { limit remaining resetAt }
+  specSearch: search(query: $specs, type: ISSUE_ADVANCED, first: 100) {
+    totalCount: issueCount
+    nodes { ... on Issue { number title url updatedAt labels(first: 20) { nodes { name } } subIssuesSummary { total completed } } }
+  }
   repository(owner: $owner, name: $name) {
     issues(first: 100, states: OPEN, orderBy: {field: UPDATED_AT, direction: DESC}) {
       totalCount
       nodes { number title url updatedAt labels(first: 20) { nodes { name } } subIssuesSummary { total completed } }
-    }
-    specIssues: issues(first: 50, states: OPEN, labels: ["spec"], orderBy: {field: UPDATED_AT, direction: DESC}) {
-      totalCount
-      nodes { number title url updatedAt subIssuesSummary { total completed } }
     }
     youIssues: issues(first: 50, states: OPEN, labels: ["needs-info", "ready-for-human"], orderBy: {field: UPDATED_AT, direction: DESC}) {
       totalCount
@@ -227,7 +231,7 @@
   // their state, labels, blocked-by links, the open pull requests that close them and their most recently edited
   // comments (the agents' status notes). Every list carries its total, so a page can tell a partial list from a whole
   // one. One aliased query for up to SPEC_DETAILS specs (the most recently updated); a spec past that is unknown.
-  const SPEC_DETAILS = 20;
+  const SPEC_DETAILS = 30;
   const RECENT = 'orderBy: {field: UPDATED_AT, direction: DESC}';
   const TICKET = 'number title url state stateReason repository { nameWithOwner }';
   function specTickets(repository) {
@@ -261,8 +265,23 @@
     fleet: object(expression: "HEAD:docs/agents/fleet.md") { ... on Blob { text } }
   }
 }`;
+  const SPEC_TITLE = /(^|\s)spec:\s/i;
+  const SPEC_SEARCH = full => `repo:${full} is:issue state:open (has:sub-issue OR label:spec OR in:title spec) -label:wayfind:map sort:updated-desc`;
+  // The search's open issues that are specs, newest first, as data.specIssues: {totalCount, nodes}. A result GitHub
+  // didn't give (past the page, or null with an error) counts toward totalCount, so the list stays partial and the
+  // tiles show "N+"; a result GitHub gave that isn't a spec is left out of both.
+  function specsOf(search) {
+    if (!search || !Array.isArray(search.nodes)) return null;
+    const given = search.nodes.filter(issue => Number.isSafeInteger(issue?.number));
+    const labels = issue => (issue.labels?.nodes || []).map(label => label?.name);
+    const nodes = given.filter(issue => !labels(issue).includes('wayfind:map')
+      && (issue.subIssuesSummary?.total > 0 || labels(issue).includes('spec') || SPEC_TITLE.test(issue.title || '')));
+    return { totalCount: nodes.length + Math.max(0, (search.totalCount ?? 0) - given.length), nodes };
+  }
   const feeds = {
-    specs: { label: 'Specs', every: 10 * 60 * 1000, query: SPECS, more: specTickets },
+    specs: { label: 'Specs', every: 10 * 60 * 1000, query: SPECS, more: specTickets,
+      variables: picked => ({ specs: SPEC_SEARCH(picked.full) }),
+      shape: (data, answer) => { data.specIssues = specsOf(answer.specSearch); } },
     agents: { label: 'Agents', every: 2 * 60 * 1000, query: AGENTS },
   };
   for (const feed of Object.values(feeds)) Object.assign(feed, { state: 'loading', data: null, readAt: null, failedAt: null, timer: null, busy: false });
@@ -295,12 +314,13 @@
     const mine = generation;
     feed.busy = true;
     try {
-      const response = await github('POST', '/graphql', { query: feed.query, variables: { owner: picked.owner, name: picked.name } });
+      const response = await github('POST', '/graphql', { query: feed.query, variables: { owner: picked.owner, name: picked.name, ...feed.variables?.(picked) } });
       const answer = await response.json().catch(() => null);
       if (mine !== generation) return;
       noteLimit(answer?.data?.rateLimit, response);
       if (!response.ok || !answer?.data?.repository) throw new Error(`GitHub answered ${response.status}`);
       const data = answer.data.repository;
+      feed.shape?.(data, answer.data);
       const errors = [...(answer.errors || [])];
       // A feed's second read (Specs: the running specs' tickets). If it fails, or GitHub's limit is now low, its part
       // is unknown (data.specs is null) and the feed is partial.

@@ -252,6 +252,10 @@ async function open(browser, world) {
       await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: mobile ? 2 : 1, mobile });
       await new Promise(resolve => setTimeout(resolve, 200));
     },
+    // One turn of a mouse wheel at (x, y), as the browser's own input.
+    wheel: (x, y, deltaY) => send('Input.dispatchMouseEvent', { type: 'mouseWheel', x, y, deltaX: 0, deltaY }),
+    // CSS media features as the page sees them, e.g. display-mode: standalone for an app installed to the home screen.
+    media: features => send('Emulation.setEmulatedMedia', { features }),
     async shot(path, width, height, mobile) {
       await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: mobile ? 2 : 1, mobile });
       await new Promise(resolve => setTimeout(resolve, 400));
@@ -625,7 +629,7 @@ async function main() {
       const world = new World();
       world.graphql.Specs = async () => {
         const answer = await fixture('ap6-specs.json');
-        change.specs?.(answer.data.repository);
+        change.specs?.(answer.data.repository, answer.data);
         return { status: 200, json: answer };
       };
       world.graphql.Agents = ok('agents.json');
@@ -663,6 +667,147 @@ async function main() {
         await page.shot(join(process.env.SHOTS, 'you-laptop.png'), 1440, 900, false);
         await page.shot(join(process.env.SHOTS, 'you-phone.png'), 390, 844, true);
       }
+      checkRequestLog(world);
+      await page.close();
+    });
+
+    // AP21 (#1909, F2 of #1266): on a phone, and installed to the home screen, the tab bar stays on the bottom edge.
+    // On the owner's iPhone the document scrolled under a fixed bar, and at the list's end (and in rubber-band
+    // overscroll) iOS drew the bar mid-screen with the page below it. The phone shell is now fixed to the screen and
+    // only its content scrolls, so the document itself never scrolls; the bar ends where the screen does.
+    const tabBarAtEnd = page => page.run(`(() => {
+      const H = window.innerHeight, W = window.innerWidth, bar = document.querySelector('nav.tabs').getBoundingClientRect();
+      const doc = document.scrollingElement;
+      const below = [8, W / 2, W - 8].map(x => document.elementFromPoint(x, H - 1)).filter(e => !e || !e.closest('nav.tabs')).map(e => e ? e.tagName : 'nothing');
+      const cards = [...document.querySelectorAll('main .cards a.card')];
+      // Each must be wholly above the bar, and a tap on its middle must reach it.
+      const clear = el => {
+        if (!el) return false;
+        const r = el.getBoundingClientRect();
+        return r.top >= 0 && r.bottom <= bar.top && el.contains(document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2));
+      };
+      const buttons = [...document.querySelectorAll('.phone-actions button')];
+      return { H, top: bar.top, bottom: bar.bottom, docScrolls: doc.scrollHeight - doc.clientHeight, below,
+        long: doc.scrollHeight > doc.clientHeight || document.querySelector('main').scrollHeight > document.querySelector('main').clientHeight,
+        lastCard: clear(cards[cards.length - 1]), refresh: clear(buttons.find(b => /Refresh/.test(b.textContent))),
+        signOut: clear(buttons.find(b => b.textContent.trim() === 'Sign out')) };
+    })()`);
+    await check('AP21 phone: the tab bar stays on the bottom edge at the end of the You list, installed or not', async () => {
+      const many = Array.from({ length: 14 }, (_, i) => ({ number: 100 + i, title: `A ticket marked for you, number ${i + 1}`,
+        url: `https://github.com/acme/factory/issues/${100 + i}`, updatedAt: '2029-12-01T00:00:00Z', labels: { nodes: [{ name: 'needs-info' }] } }));
+      const world = ap6World({ specs: repository => { repository.youIssues = { totalCount: many.length, nodes: many }; } });
+      const page = await ap6Open(world);
+      await page.until(`document.querySelectorAll('main .cards a.card').length >= 14`, 'the long You list');
+      for (const standalone of [false, true]) {
+        await page.media(standalone ? [{ name: 'display-mode', value: 'standalone' }] : []);
+        // An iPhone's screen, then the same screen with Safari's toolbar shown (a shorter viewport).
+        for (const [width, height] of [[390, 844], [390, 760]]) {
+          await page.size(width, height, true);
+          // Scroll to the list's end as a person does, with the wheel over the list, until nothing moves.
+          for (let i = 0; i < 12; i += 1) await page.wheel(width / 2, height / 2, 1500);
+          await settle(page, 300);
+          const at = await tabBarAtEnd(page);
+          const where = `${standalone ? 'installed' : 'in the browser'}, ${width} x ${height}: ${JSON.stringify(at)}`;
+          assert(at.long, `the You list is not longer than the screen, so this proves nothing: ${where}`);
+          assert(at.docScrolls <= 0, `the document itself scrolls under the tab bar (iOS lifts a fixed bar at its end): ${where}`);
+          assert(Math.abs(at.bottom - at.H) <= 0.5, `the tab bar's bottom edge is not the screen's: ${where}`);
+          assert(at.below.length === 0, `something other than the tab bar is drawn at the screen's bottom edge: ${where}`);
+          assert(at.lastCard && at.refresh && at.signOut, `the last card, Refresh or Sign out can't be reached above the tab bar at the list's end: ${where}`);
+        }
+        if (process.env.SHOTS) await page.shot(join(process.env.SHOTS, `you-phone-end${standalone ? '-installed' : ''}.png`), 390, 844, true);
+      }
+      checkRequestLog(world);
+      await page.close();
+    });
+
+    // AP21 (#1909, F1 of #1266): a spec is an open issue with sub-issues (its tickets), a spec label, or a "<version>
+    // spec: <name>" title, and never a wayfind map; the factory labels specs nothing. The You tiles read Building 0,
+    // In review 0 and Merged 0 on OpenWiz because the app looked only for the label. Here GitHub's advanced issue search
+    // is answered by evaluating the terms it was sent over these issues; the counts are known from ap6-spec-tickets.json.
+    const searchable = async () => {
+      const answer = await fixture('ap6-specs.json');
+      const [s60, s50, s40] = answer.data.specSearch.nodes.map(issue => ({ ...issue, labels: { nodes: [] } }));
+      return [
+        { ...s60, title: '0.1.0 spec: dark mode' }, // no tickets yet: found by its title
+        { ...s50, title: '0.1.0 spec: search' },
+        { ...s40, title: 'Shipping notes' }, // no "spec" in the title: found by its tickets
+        { number: 70, title: 'Wayfind: the spec: map for loops', url: 'https://github.com/acme/factory/issues/70', updatedAt: '2030-01-05T00:00:00Z',
+          labels: { nodes: [{ name: 'wayfind:map' }] }, subIssuesSummary: { total: 5, completed: 4 } },
+        { number: 71, title: 'to-spec step 1 drops a stop (polish for #50, R1)', url: 'https://github.com/acme/factory/issues/71', updatedAt: '2030-01-05T00:00:00Z',
+          labels: { nodes: [] }, subIssuesSummary: { total: 0, completed: 0 } },
+      ];
+    };
+    // GitHub's advanced issue search, for the terms it knows here: repo, is:issue, state:open, sort, a parenthesized OR
+    // of has:sub-issue, label:X and in:title W, and -label:X. Any other term, or the legacy search type, is refused.
+    const searchIssues = (query, type, issues) => {
+      if (type !== 'ISSUE_ADVANCED') return { error: `this search needs type ISSUE_ADVANCED, not ${type}` };
+      const required = ['repo:acme/factory', 'is:issue', 'state:open', 'sort:updated-desc'];
+      let rest = ` ${query} `;
+      for (const term of required) {
+        if (!rest.includes(` ${term} `)) return { error: `the search lacks ${term}` };
+        rest = rest.replace(` ${term} `, ' ');
+      }
+      const not = [];
+      rest = rest.replace(/(^|\s)-label:(\S+)/g, (_, space, name) => { not.push(name); return ' '; });
+      const group = rest.trim().match(/^\((.*)\)$/);
+      if (!group) return { error: `unknown search terms: ${rest.trim()}` };
+      const anyOf = group[1].split(/\s+OR\s+/).map(term => term.trim());
+      const labelled = (issue, name) => issue.labels.nodes.some(l => l.name === name);
+      const tests = anyOf.map(term => term === 'has:sub-issue' ? issue => issue.subIssuesSummary.total > 0
+        : term.startsWith('label:') ? issue => labelled(issue, term.slice(6))
+        : term.startsWith('in:title ') ? issue => new RegExp(`\\b${term.slice(9)}\\b`, 'i').test(issue.title) : null);
+      if (tests.includes(null)) return { error: `unknown search terms: ${group[1]}` };
+      return { nodes: issues.filter(issue => tests.some(test => test(issue)) && !not.some(name => labelled(issue, name))) };
+    };
+    const specWorld = (change = () => {}) => {
+      const world = ap6World();
+      world.searched = [];
+      world.graphql.Specs = async body => {
+        const answer = await fixture('ap6-specs.json');
+        delete answer.data.specSearch;
+        const issues = await searchable();
+        // The old read: open issues labelled spec. None is.
+        if (/labels:\s*\["spec"\]/.test(body.query)) answer.data.repository.specIssues = { totalCount: 0, nodes: [] };
+        const search = body.query.match(/search\(query:\s*\$specs,\s*type:\s*(\w+)/);
+        if (search) {
+          world.searched.push(body.variables.specs);
+          const found = searchIssues(body.variables.specs, search[1], issues);
+          if (found.error) return { status: 200, json: { data: null, errors: [{ message: found.error }] } };
+          answer.data.specSearch = { totalCount: found.nodes.length, nodes: found.nodes };
+          change(answer);
+        }
+        return { status: 200, json: answer };
+      };
+      return world;
+    };
+    const tileValues = page => page.run(`[...document.querySelectorAll('main .tile')].map(t => t.querySelector('.k').textContent + '=' + t.querySelector('.v').textContent)`);
+    await check('AP21 You: specs found by their tickets, a "spec:" title or the label are counted; a wayfind map or a mention is not', async () => {
+      const world = specWorld();
+      const page = await ap6Open(world);
+      await page.until(`[...document.querySelectorAll('main .tile .v')].some(v => /\\d/.test(v.textContent))`, 'the counts');
+      await settle(page, 600);
+      const tiles = await tileValues(page);
+      assert(JSON.stringify(tiles) === JSON.stringify(['Needs you=4', 'Building=1', 'In review=1', 'Merged=3']), `tiles: ${JSON.stringify(tiles)}`);
+      assert(world.searched.length > 0, 'the specs were not searched for');
+      await page.go(`${SITE}/app/#/specs`);
+      await page.until(`document.querySelectorAll('main a.card').length >= 3`, 'the spec cards');
+      await settle(page);
+      const cards = await page.run(`[...document.querySelectorAll('main a.card')].map(a => a.getAttribute('href'))`);
+      assert(JSON.stringify(cards) === JSON.stringify(['#/specs/60', '#/specs/50', '#/specs/40']), `the Specs page lists: ${JSON.stringify(cards)}`);
+      checkRequestLog(world);
+      await page.close();
+    });
+    await check('AP21 You: a spec GitHub returned as null with an error leaves the tiles as lower bounds, never exact', async () => {
+      const world = specWorld(answer => {
+        const at = answer.data.specSearch.nodes.findIndex(issue => issue.number === 40);
+        answer.data.specSearch.nodes[at] = null;
+        answer.errors = [{ message: 'Something went wrong while executing your query.', path: ['specSearch', 'nodes', at] }];
+      });
+      const page = await ap6Open(world);
+      await page.until(`[...document.querySelectorAll('main .tile .v')].some(v => /\\d/.test(v.textContent))`, 'the counts');
+      await settle(page, 600);
+      const tiles = await tileValues(page);
+      assert(JSON.stringify(tiles.slice(1)) === JSON.stringify(['Building=0+', 'In review=0+', 'Merged=2+']), `tiles: ${JSON.stringify(tiles)}`);
       checkRequestLog(world);
       await page.close();
     });
@@ -715,7 +860,7 @@ async function main() {
 
     await check('R4: a list GitHub gave only part of says so, never "nothing needs you"', async () => {
       const world = ap6World({
-        specs: repository => { repository.youIssues = { totalCount: 1, nodes: [] }; repository.specIssues = { totalCount: 2, nodes: [] }; },
+        specs: (repository, data) => { repository.youIssues = { totalCount: 1, nodes: [] }; data.specSearch = { totalCount: 2, nodes: [] }; },
       });
       const page = await ap6Open(world);
       await page.until(`/may be missing/.test(document.querySelector('main').innerText)`, 'the partial-list notice');
