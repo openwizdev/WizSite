@@ -192,7 +192,7 @@ class Checks(unittest.TestCase):
                 # Catches: a moment that loses, comments out or mistargets its link to the real to-do run (J267).
                 (lambda t: t.replace('<a class="moment-link" href="https://github.com/openwizdev/todo-demo/issues/1#issuecomment-7037022878">See its questions</a>', ''), 'Answer a few questions moment must link'),
                 (lambda t: t.replace('issuecomment-7037022878', 'issuecomment-7037022879'), 'unexpected repository link'),
-                (lambda t: t.replace('<a class="moment-link" href="https://github.com/openwizdev/todo-demo/issues/1">the spec</a>', '<!-- <a class="moment-link" href="https://github.com/openwizdev/todo-demo/issues/1">the spec</a> -->'), 'Watch your spec moment must link'),
+                (lambda t: t.replace('<a class="moment-link" href="https://github.com/openwizdev/todo-demo/issues/1">Read the spec</a>', '<!-- <a class="moment-link" href="https://github.com/openwizdev/todo-demo/issues/1">Read the spec</a> -->'), 'Watch your spec moment must link'),
                 (lambda t: t.replace('<a class="moment-link" href="https://openwizdev.github.io/todo-demo/">Open the to-do app</a>', ''), 'Watch it ship moment must link'),
                 (lambda t: t.replace('https://openwizdev.github.io/todo-demo/', 'https://openwizdev.github.io/other/'), 'unexpected external URL'),
                 (lambda t: t.replace('https://github.com/openwizdev/todo-demo/issues/1"', 'https://github.com/openwizdev/todo-demo/issues/2"'), 'unexpected repository link'),

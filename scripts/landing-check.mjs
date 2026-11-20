@@ -198,7 +198,8 @@ async function layout(page, where, width, mode) {
 
 async function playable(page, where) {
   const play = await page.evaluate(`(() => { const r = document.querySelector('.spec-play')?.getBoundingClientRect();
-    return r && r.width ? (scrollTo(0, r.top + scrollY - innerHeight / 2), true) : false; })()`);
+    // scrollIntoView also scrolls the moments' own feed, which snaps one clip at a time on a phone.
+    return r && r.width ? (document.querySelector('.spec-play').scrollIntoView({ block: 'center' }), true) : false; })()`);
   if (!play) return;
   const at = await page.evaluate(`(() => { const r = document.querySelector('.spec-play').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
   await page.click(at.x, at.y);

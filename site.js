@@ -246,15 +246,17 @@ function enableMotion(gsap) {
   configure();
 }
 
-// The "Watch your spec" moment (#1405). The video loads only when it first plays. With motion it plays muted while it
+// The "Watch your spec" clip (#1405). The video loads only when it first plays. With motion it plays muted while it
 // is in view; with reduced motion, Pause motion or the tab hidden it waits on its poster. It never starts with sound on
-// its own: "Play with sound" does that on request, and from then on (or once the visitor uses its own controls) the
-// visitor drives it and scrolling no longer starts or stops it. It needs only this script, not GSAP.
+// its own: "Play with sound" does that on request, and from then on the visitor drives it and scrolling no longer
+// starts or stops it. While it plays muted its native control bar is hidden, so nothing covers the frame; the bar
+// comes back with sound (and stays without this script). It needs only this script, not GSAP.
 function specVideo() {
   const video = document.querySelector('.spec-video');
   const sound = document.querySelector('.spec-play');
   const pause = document.querySelector('.demo-pause');
   if (!video || !sound) return;
+  video.controls = false;
   const calm = matchMedia('(prefers-reduced-motion: reduce)');
   let inView = false;
   let visitor = false; // the visitor has taken over playback
@@ -277,17 +279,22 @@ function specVideo() {
   };
   video.addEventListener('play', take);
   video.addEventListener('pause', take);
+  video.addEventListener('ended', () => { sound.hidden = false; });
   video.addEventListener('volumechange', () => { if (!video.muted) visitor = true; });
   new IntersectionObserver(([entry]) => { inView = entry.isIntersecting; update(); }, { threshold: .5 }).observe(video);
   calm.addEventListener('change', update);
   document.addEventListener('visibilitychange', update);
   pause.addEventListener('click', () => setTimeout(update));
   sound.hidden = false;
+  // Like a feed of short clips, a tap on the muted video turns its sound on too.
+  video.addEventListener('click', () => { if (!visitor) sound.click(); });
   sound.addEventListener('click', () => {
     visitor = true;
     video.muted = false;
     video.loop = false;
+    video.controls = true;
     video.currentTime = 0;
+    sound.hidden = true; // the player's own controls take over; the button returns when the video ends
     // Focus moves into the player, so the keyboard reaches its pause control next, as #32's player did.
     video.play().then(() => video.focus(), () => {});
   });
