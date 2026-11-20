@@ -32,6 +32,9 @@ ART_HASHES = {
     'art/hero-samurai-frames.webp': '3a6eef42bfd2fc6f7b8e847d4355d75c283425a274b5fb9c95c3404f580725c5',
     'art/hero-steam-frames.webp': '20f057c963be16ebc3cabbf1d2ab849e2e8144d29a3e419344a867eef2c41f3c',
     'art/spec-demo.webm': '6619ae77a13229d9056037e5bc793d48f7fc98490d068c2b6e4f58426a8fac22',
+    # The drivers page, variant D (#50): the night sea and the Wiz family's ship, painted layers of its hero.
+    'art/drivers-d-sea.webp': 'f2699bd8fe4763993a492dfac2bdbfc3eae46ec33bae0ab74127ad6ebc6a6285',
+    'art/drivers-d-ship.webp': '885dd800aae2e75d45f2b88e1e69232bbf987df44beec9fa8070d4354b64cd04',
 }
 ART = set(ART_HASHES)
 # Logo pack (#1350: the dark-cream mark). Raster icons and the social card are pinned by hash like the art; a new picture needs review.
@@ -88,7 +91,7 @@ def fingerprinted_page(html):
 
 FINGERPRINTS = {name: fingerprint(name, (ROOT / name).read_bytes()) for name in HASHED}
 STATIC = {
-    'index.html', 'changelog/index.html', '_headers', APP_PAGE, 'app/manifest.webmanifest',
+    'index.html', 'changelog/index.html', 'drivers/index.html', '_headers', APP_PAGE, 'app/manifest.webmanifest',
     'fonts/Geist-var.woff2', 'fonts/GeistMono-var.woff2', 'fonts/OFL.txt',
 } | ART | set(ICON_HASHES) | set(VECTORS) | (set(VENDOR_HASHES) - {GSAP}) | set(APP_VENDOR)
 RUNTIME = STATIC | set(FINGERPRINTS.values())
@@ -116,7 +119,7 @@ FONT_HASHES = {
     'fonts/GeistMono-var.woff2': '55419aa06f58adcd7f145c6c920e56936416f17e528f60efc6032ffa4269972b',
     'fonts/OFL.txt': 'c683bfbcc7e087f5d37a54ef628f10387c451a83ddc459b151403a164ac46c90',
 }
-PAGES = ('index.html', 'changelog/index.html')
+PAGES = ('index.html', 'changelog/index.html', 'drivers/index.html')
 ALL_PAGES = PAGES + (APP_PAGE,)
 # The to-do example and both app entry points stay visible in the static landing page.
 STORY_COPY = ('Build a to-do app', 'Bring any agent', 'Sign in with GitHub', 'Put the app on your phone')
@@ -137,6 +140,25 @@ TODAY = 'What exists today'
 # section has its own rules (check_releases), one part per versioned repository, in this order.
 RELEASES = ('<!-- releases:start -->', '<!-- releases:end -->')
 RELEASE_REPOS = ('OpenWiz', 'WizSkills', 'WizLoops')
+# The drivers page (openwiz.dev/drivers, #50): one card per driver, in this order, each with its status line (the
+# ticket's facts, word for word), the driver's four words and its test-kit result on the kit's five checks.
+DRIVERS_PAGE = 'drivers/index.html'
+DRIVERS_LINKS = ('/drivers/', '/drivers')
+DRIVERS = (
+    ('vps', 'Your own computer or VPS', 'Being fixed: its kit run is in progress', 'in progress'),
+    ('cloudroom', 'Cloudroom', 'Works today: built real pull requests for OpenWiz', 'not yet run'),
+    ('boat-dev', 'boat.dev', 'Passed the kit, 5 of 5, on a real account (2026-11-19)', 'passed'),
+    ('grok-bot', 'Grok Bot', 'Coming soon: listed when its driver lands', 'not yet run'),
+)
+DRIVER_HERO = 'boat-dev'
+DRIVER_WORDS = ('version', 'start', 'wake', 'stop')
+KIT_CHECKS = ('version', 'start', 'wake', 'stop', 'token')
+KIT_STATES = ('passed', 'in progress', 'not yet run')
+# Every number the page shows comes from these facts: boat.dev's 5 of 5 and its date, and the contract's v1.
+DRIVER_NUMBERS = {'5', '2026', '11', '19', '1'}
+OWN_DRIVER = 'Write your own driver'
+OPENWIZ_REPO = 'https://github.com/openwizdev/OpenWiz'
+DRIVER_ART_BUDGET = 400_000  # bytes: variant D's own art (art/drivers-d-*.webp)
 
 
 class Page(HTMLParser):
@@ -399,6 +421,9 @@ def check_site(root):
         check_art(name, data)
         total += len(data)
     assert total <= ART_BUDGET, f'art is {total} bytes, over the {ART_BUDGET} budget'
+    variant = sum(len((root / name).read_bytes()) for name in ART if name.startswith('art/drivers-d-'))
+    assert variant <= DRIVER_ART_BUDGET, f'variant D art is {variant} bytes, over its {DRIVER_ART_BUDGET} budget'
+    check_drivers(landing, changelog, (root / DRIVERS_PAGE).read_text(), pages[root / DRIVERS_PAGE])
     check_changelog(landing, changelog)
     check_releases(releases)
     main = re.search(r'<main\b[^>]*>[\s\S]*?</main>', changelog)
@@ -545,6 +570,106 @@ def check_changelog(landing, changelog):
     assert not re.search(r'<time\b|releases/tag/|class="rel"', main), 'no release entry on the changelog'
     for style in page.styles:
         check_motion(style)
+
+
+class DriverOutline(HTMLParser):
+    """The drivers page's cards: each card's id, classes, name, status line, words and kit checks with their states,
+    and every link inside the Write your own driver section."""
+    def __init__(self, text):
+        super().__init__(convert_charrefs=True)
+        self.cards, self.own_links, self.own_heading = [], [], None
+        self.field, self.depth, self.own_depth = None, 0, None
+        self.feed(text)
+
+    def handle_starttag(self, tag, attrs):
+        attrs = dict(attrs)
+        classes = (attrs.get('class') or '').split()
+        if tag not in ('br', 'img', 'meta', 'link', 'path', 'circle', 'rect', 'input'):
+            self.depth += 1
+        if tag == 'section' and 'own-driver' in classes:
+            self.own_depth = self.depth
+        if self.own_depth and tag == 'a':
+            self.own_links.append(attrs.get('href'))
+        if self.own_depth and tag == 'h2':
+            self.field = ['own-heading', '']
+        if tag == 'article' and 'driver' in classes:
+            self.cards.append({'id': attrs.get('id'), 'classes': classes, 'name': '', 'line': '', 'words': [], 'checks': []})
+        elif self.cards and tag == 'h3' and 'driver-name' in classes:
+            self.field = ['name', '']
+        elif self.cards and tag == 'p' and 'driver-line' in classes:
+            self.field = ['line', '']
+        elif self.cards and tag == 'code' and 'word' in classes:
+            self.field = ['word', '']
+        elif self.cards and tag == 'li' and 'kit-check' in classes:
+            self.cards[-1]['checks'].append([attrs.get('data-check'), attrs.get('data-state'), ''])
+            self.field = ['check', '']
+
+    def handle_data(self, data):
+        if self.field:
+            self.field[1] += data
+
+    def handle_endtag(self, tag):
+        if self.field and tag in ('h2', 'h3', 'p', 'code', 'li'):
+            kind, text = self.field
+            text = re.sub(r'\s+', ' ', text).strip()
+            if kind == 'own-heading':
+                self.own_heading = text
+            elif kind == 'word':
+                self.cards[-1]['words'].append(text)
+            elif kind == 'check':
+                self.cards[-1]['checks'][-1][2] = text
+            else:
+                self.cards[-1][kind] = text
+            self.field = None
+        if tag == 'section' and self.own_depth == self.depth:
+            self.own_depth = None
+        self.depth -= 1
+
+
+def top_bar(html):
+    found = re.findall(r'<header class="landing-nav wrap">[\s\S]*?</header>', html)
+    assert len(found) == 1, 'a page needs exactly one landing top bar'
+    return found[0]
+
+
+def check_drivers(landing, changelog, drivers, page):
+    """The drivers page (#50): the landing's exact top bar with Drivers current, the four driver cards in order with
+    their exact facts, words and kit results, boat.dev the hero, the Write your own driver section linking only the
+    public OpenWiz repository, no script, and no number beyond its facts. A Drivers nav link on the other pages."""
+    bar = top_bar(drivers)
+    current = re.findall(r'<a [^>]*aria-current="page"[^>]*>([^<]*)</a>', bar)
+    assert current == ['Drivers'] and re.search(r'<a class="nav-log" href="/drivers/" aria-current="page">Drivers</a>', bar), \
+        'the drivers top bar must mark its Drivers link aria-current="page"'
+    assert bar.replace(' aria-current="page"', '') == top_bar(landing), 'the drivers top bar must be identical to the landing\'s'
+    for name, html in (('landing', landing), ('Changelog', changelog)):
+        links = [text for href, text in Outline(top_bar(html)).links if href in DRIVERS_LINKS]
+        assert links == ['Drivers'], f'the {name} top bar needs one Drivers nav link: {links}'
+    assert re.search(r'<body class="[^"]*\bdrivers-page\b', drivers), 'the drivers page body is scoped .drivers-page'
+    assert not page.scripts and not page.inline_scripts, 'the drivers page reads completely without scripts'
+    main = re.search(r'<main\b[^>]*>[\s\S]*?</main>', drivers)
+    assert main, 'the drivers page needs its main'
+    assert not re.search(r'\shidden\b', main[0]), 'nothing on the drivers page waits for a script to show'
+    outline = DriverOutline(main[0])
+    assert [(c['id'], c['name']) for c in outline.cards] == [(d[0], d[1]) for d in DRIVERS], \
+        f'four driver cards, in order: {[(c["id"], c["name"]) for c in outline.cards]}'
+    for card, (key, name, line, state) in zip(outline.cards, DRIVERS):
+        assert card['line'] == line, f'{name}: the driver facts must read exactly: {line}'
+        assert card['words'] == list(DRIVER_WORDS), f'{name}: the four words, in order: {card["words"]}'
+        checks = [(c, s) for c, s, _ in card['checks']]
+        assert checks == [(check, state) for check in KIT_CHECKS], f'{name}: kit result must be {state} on the five checks: {checks}'
+        for check, state_, text in card['checks']:
+            assert text == f'{check} {state_}', f'{name}: each kit check says its state in words: {text!r}'
+        hero = 'hero' in card['classes']
+        assert hero == (key == DRIVER_HERO), f'boat.dev is the hero card, and only it: {name}'
+    reader = Text(main[0])
+    for reading in [reader.joined(), reader.spaced()] + reader.shown:
+        for number in re.findall(r'\d+', reading):
+            assert number in DRIVER_NUMBERS, f'invented number on the drivers page: {number}'
+    assert outline.own_heading == OWN_DRIVER, f'the drivers page needs its {OWN_DRIVER} section'
+    assert outline.own_links and OPENWIZ_REPO in outline.own_links and all(
+        href == OPENWIZ_REPO or href.startswith(OPENWIZ_REPO + '/') for href in outline.own_links), \
+        f'{OWN_DRIVER} links only to the public OpenWiz repository: {outline.own_links}'
+    assert not Outline(drivers).styles, 'the drivers page keeps its styles in site.css'
 
 
 def split_releases(built):

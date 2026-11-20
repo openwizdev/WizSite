@@ -3,6 +3,7 @@ from pathlib import Path
 import shutil
 import tempfile
 import unittest
+from unittest import mock
 
 import re
 
@@ -18,7 +19,7 @@ def edit_built(root, name, change):
     new = fingerprint(name, data)
     old.unlink()
     (root / new).write_bytes(data)
-    for page in ('index.html', 'changelog/index.html', 'app/index.html'):
+    for page in ('index.html', 'changelog/index.html', 'drivers/index.html', 'app/index.html'):
         path = root / page
         path.write_text(path.read_text().replace(f'"/{was}"', f'"/{new}"'))
 
@@ -460,6 +461,49 @@ class Checks(unittest.TestCase):
                 spoil(root)
                 with self.assertRaises(AssertionError):
                     check_site(root)
+
+    def test_drivers_page(self):
+        # Catches (#50): the drivers page dropped from the build or its checks; a card missing, reordered or with its
+        # facts, words or kit result changed; a kit state shown by colour or icon alone; boat.dev losing the hero, or a
+        # second hero; a link off the public OpenWiz repository; a top bar that drifts from the landing's or loses its
+        # current page; a Drivers link missing on the landing or Changelog; a script, a hidden part, an invented number;
+        # and variant D's art over its budget.
+        boat = '<article class="driver hero" id="boat-dev"'
+        for name, old, new, error in (
+                ('drivers/index.html', 'id="cloudroom"', 'id="cloud"', 'four driver cards'),
+                ('drivers/index.html', '>Grok Bot</h3>', '>Grok</h3>', 'four driver cards'),
+                ('drivers/index.html', 'Being fixed: its kit run is in progress', 'Being fixed: almost done', 'driver facts'),
+                ('drivers/index.html', 'on a real account (2026-11-19)', 'on a real account', 'driver facts'),
+                ('drivers/index.html', '<code class="word">wake</code>', '<code class="word">ping</code>', 'four words'),
+                ('drivers/index.html', 'data-check="token" data-state="passed"', 'data-check="token" data-state="in progress"', 'kit result'),
+                ('drivers/index.html', '<span class="kit-state">passed</span>', '<span class="kit-state"></span>', 'says its state in words'),
+                ('drivers/index.html', boat, boat.replace(' hero', ''), 'boat.dev is the hero'),
+                ('drivers/index.html', '<article class="driver" id="grok-bot"', '<article class="driver hero" id="grok-bot"', 'boat.dev is the hero'),
+                ('drivers/index.html', 'href="https://github.com/openwizdev/OpenWiz/tree/main/adapters/template"', 'href="https://github.com/openwizdev/WizSkills"', 'only to the public OpenWiz'),
+                ('drivers/index.html', '>Changelog</a>', '>Changes</a>', 'identical to the landing'),
+                ('drivers/index.html', ' aria-current="page">Drivers', '>Drivers', 'aria-current'),
+                ('drivers/index.html', '</main>', '<p>Used by 300 teams.</p></main>', 'invented number'),
+                ('drivers/index.html', '</main>', '<p hidden>Later.</p></main>', 'without a script|waits for a script'),
+                ('drivers/index.html', '</head>', '<script>1</script></head>', 'without scripts'),
+                ('index.html', '<a class="nav-log" href="/drivers/">Drivers</a>', '', 'identical to the landing|landing top bar needs one Drivers'),
+                ('changelog/index.html', '<a class="nav-log" href="/drivers/">Drivers</a>', '', 'Changelog top bar needs one Drivers')):
+            with self.subTest(name=name, error=error), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp) / 'dist'
+                shutil.copytree(ROOT / 'dist', root)
+                page = root / name
+                text = page.read_text()
+                self.assertIn(old, text)
+                page.write_text(text.replace(old, new, 1))
+                with self.assertRaisesRegex(AssertionError, error):
+                    check_site(root)
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / 'dist'
+            shutil.copytree(ROOT / 'dist', root)
+            (root / 'drivers/index.html').unlink()
+            with self.assertRaisesRegex(AssertionError, 'missing build output'):
+                check_site(root)
+        with mock.patch('check.DRIVER_ART_BUDGET', 1000), self.assertRaisesRegex(AssertionError, 'variant D art'):
+            check_site(ROOT / 'dist')
 
     def test_logo_pack(self):
         # Catches: a lockup that ships live text or a font reference (the wordmark font must never ship),
