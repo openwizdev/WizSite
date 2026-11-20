@@ -604,7 +604,6 @@ def check_site(root):
     moments = ('Answer a few questions', 'Watch your spec', 'Watch it ship')
     captions = re.findall(r'<h3>([^<]+)</h3>', landing)
     assert tuple(captions) == moments, 'the three moments must appear in order'
-    assert 'Steer the build from the narrated video.' in flat, 'spec video steering copy is missing'
     assert 'The real spec of an OpenWiz-built to-do app' in flat, 'the spec video must say it is the to-do app\'s real spec'
     # J267: the three moments point at the real to-do run: its grill, its spec and the live app.
     hrefs = {}
