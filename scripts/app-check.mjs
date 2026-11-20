@@ -1446,6 +1446,75 @@ async function main() {
       await page.close();
     });
 
+    // AP18 (#1588): the palette reaches everything the app shows, outside blockers and You-only tickets included.
+    await check('AP18 R1: an outside blocker the graph draws is a palette result whose Enter focuses its card; its own spec wins; placeholders stay out', async () => {
+      // #45 (spec 40) also blocks #52, so spec 50 (read first) draws #45 outside it.
+      const world = ap7World({ tickets: repository => {
+        const query = repository.s50.subIssues.nodes.find(issue => issue?.number === 52);
+        query.blockedBy.nodes.push({ number: 45, title: 'Notes search', url: 'https://github.com/acme/factory/issues/45', state: 'OPEN',
+          stateReason: null, repository: { nameWithOwner: 'acme/factory' } });
+        query.blockedBy.totalCount += 1;
+      } });
+      const page = await ap6Open(world);
+      await page.until(`document.querySelectorAll('main .cards a.card').length >= 6`, 'the You page');
+      await page.until(`OW.factory.model(OW.data.feeds)?.specs.find(s => s.number === 50)?.graph?.tickets.some(t => t.number === 45 && t.outside)`,
+        'spec 50 drawing #45 outside it');
+      // #30 blocks #43 from outside spec 40: Enter opens spec 40 and focuses #30's card there.
+      await paletteOpen(page);
+      await find(page, '#30', '#30');
+      const blocker = (await palette(page)).options.filter(o => o.includes('#30 #30'));
+      assert(blocker.length === 1 && /outside #40/.test(blocker[0]), `the outside blocker's results: ${JSON.stringify(blocker)}`);
+      await page.key('Enter');
+      await page.until(`location.hash === '#/specs/40' && document.activeElement.dataset.ticket === '30'`, 'Enter on the outside blocker to focus its card');
+      assert(await visibleFocus(page), "the outside blocker's card has focus but no visible focus ring");
+      // A ticket drawn outside one spec and inside its own goes to its own spec.
+      await page.key('1');
+      await page.until(`location.hash === '#/you'`, 'You by its key');
+      await paletteOpen(page);
+      await find(page, '#45', '#45 Notes search');
+      const results = (await palette(page)).options.filter(o => o.includes('#45 Notes search'));
+      assert(results.length === 1 && !/outside/i.test(results[0]), `#45's results: ${JSON.stringify(results)}`);
+      await page.key('Enter');
+      await page.until(`location.hash === '#/specs/40' && document.activeElement.dataset.ticket === '45'`, 'Enter on #45 to its own spec');
+      // The blocked-by placeholders GitHub couldn't read are no result.
+      await paletteOpen(page);
+      await page.type("couldn't read");
+      await page.until(`/no match/i.test(document.querySelector('dialog[open]').innerText)`, 'no result for an unreadable placeholder');
+      await page.key('Escape');
+      checkRequestLog(world);
+      assert(world.opened.length === 0, `going somewhere in the app opened a tab: ${JSON.stringify(world.opened)}`);
+      await page.close();
+    });
+
+    await check('AP18 R2: a ticket shown only on You goes to You and focuses its card; Shift+Enter still opens it on GitHub', async () => {
+      const world = ap7World();
+      const page = await ap6Open(world, '#/specs');
+      await page.until(`OW.data.feeds.specs.data?.specs && document.querySelector('main a.card')`, 'the Specs page');
+      // #48 is on You and in no spec's graph.
+      await paletteOpen(page);
+      await find(page, '#48', '#48 Register the notes domain');
+      await page.key('Enter');
+      await page.until(`location.hash === '#/you' && document.activeElement.dataset.focus === 'item:https://github.com/acme/factory/issues/48'`,
+        "Enter on #48 to focus its card on You");
+      assert(await visibleFocus(page), "#48's card has focus but no visible focus ring");
+      assert(world.opened.length === 0, `Enter on #48 opened a tab: ${JSON.stringify(world.opened)}`);
+      // Shift+Enter is still the direct GitHub action, and the app stays where it is.
+      await paletteOpen(page);
+      await find(page, '#48', '#48 Register the notes domain');
+      await page.key('Enter', 'Shift');
+      await waitFor(() => world.opened.length >= 1, '#48 opened on GitHub');
+      assert(JSON.stringify(world.opened.map(o => `${o.method} ${o.url}`)) === JSON.stringify(['GET https://github.com/acme/factory/issues/48']),
+        `opened: ${JSON.stringify(world.opened)}`);
+      assert(await page.run(`location.hash`) === '#/you', 'Shift+Enter moved the app');
+      // #46 is on You and in spec 40's graph: its card in the graph stays its place.
+      await paletteOpen(page);
+      await find(page, '#46', '#46 ');
+      await page.key('Enter');
+      await page.until(`location.hash === '#/specs/40' && document.activeElement.dataset.ticket === '46'`, 'Enter on #46 to its graph card');
+      checkRequestLog(world);
+      await page.close();
+    });
+
     // Every key the app answers to, as the `?` list must name it: [keys, what they do].
     const SHORTCUTS = [/Ctrl K|⌘ K/, /\b1\b[^\n]*You/, /\b2\b[^\n]*Specs/, /\b3\b[^\n]*Agents/, /\?[^\n]*shortcuts/i, /Esc/, /↑ ↓|Up|Down/,
       /Enter[^\n]*go/i, /Shift Enter[^\n]*GitHub/i, /Alt Enter[^\n]*cop/i, /Backspace[^\n]*filter/i, /Tab/];
