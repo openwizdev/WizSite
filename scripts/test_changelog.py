@@ -103,6 +103,8 @@ class Generator(unittest.TestCase):
         self.assertEqual(before + after, source)
         self.assertTrue(after.startswith('</main>'))
         self.assertEqual(len(Entries(section).entries), 2)
+        # A bullet with replacement patterns ($$, $&, $1) stays exactly as written (#82 R1).
+        self.assertIn('Costs $$ and keeps $&amp; and $1 as typed', page)
 
 
 if __name__ == '__main__':

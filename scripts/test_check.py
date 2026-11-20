@@ -36,14 +36,14 @@ DATA = {
     '0.01.json': {'name': '0.01', 'semver': '0.1.2', 'date': '2031-01-02', 'headline': 'One thing.',
                   'bullets': ['First line.', 'Second line.'], 'notes': 'https://github.com/openwizdev/OpenWiz/releases/tag/v0.1.2'},
     '0.02.json': {'name': '0.02', 'semver': '0.1.10', 'date': '2031-02-03', 'headline': 'Two things.',
-                  'bullets': ['A <b> line & more.', 'Another.', 'And a third.'], 'notes': 'https://github.com/openwizdev/OpenWiz/releases/tag/v0.1.10'},
+                  'bullets': ['A <b> line & more.', 'Another.', 'Costs $$ and keeps $& as typed.'], 'notes': 'https://github.com/openwizdev/OpenWiz/releases/tag/v0.1.10'},
 }
 ENTRY = ('<article class="release" aria-labelledby="v{id}"><h2 id="v{id}">{name} <small>· <time datetime="{date}">{day}</time> ({semver})</small></h2>'
          '<p class="headline">{headline}</p><ul>{bullets}</ul><p class="notes"><a href="{notes}">Full notes on GitHub</a></p></article>')
 PRE = 'https://github.com/openwizdev/OpenWiz/releases'
 LIVE = ('<section class="releases" aria-label="Releases">'
         + ENTRY.format(id='0-02', name='0.02', date='2031-02-03', day='Feb 3, 2031', semver='0.1.10', headline='Two things.',
-                       bullets='<li>A &lt;b&gt; line &amp; more.</li><li>Another.</li><li>And a third.</li>', notes=DATA['0.02.json']['notes'])
+                       bullets='<li>A &lt;b&gt; line &amp; more.</li><li>Another.</li><li>Costs $$ and keeps $&amp; as typed.</li>', notes=DATA['0.02.json']['notes'])
         + ENTRY.format(id='0-01', name='0.01', date='2031-01-02', day='Jan 2, 2031', semver='0.1.2', headline='One thing.',
                        bullets='<li>First line.</li><li>Second line.</li>', notes=DATA['0.01.json']['notes'])
         + f'<p class="pre">Earlier pre-releases are on <a href="{PRE}">GitHub</a>.</p></section>')
@@ -274,6 +274,8 @@ class Checks(unittest.TestCase):
                 ({'bullets': ['Line.', 'x' * 121]}, 'over 120 characters'),
                 ({'bullets': ['Line.', 'Two\nlines.']}, 'one line per bullet'),
                 ({'bullets': ['Line.', 'Runs on WizVault.']}, 'private repository is named'),
+                ({'bullets': ['Line.', 'Runs on <WizVault>.']}, 'private repository is named'),
+                ({'headline': 'Runs on <b>WizVault</b>.'}, 'private repository is named'),
                 ({'notes': ''}, 'missing notes'),
                 ({'notes': None}, 'missing notes'),
                 ({'notes': 'https://example.com/v0.1.2'}, 'notes link'),

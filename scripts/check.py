@@ -1,6 +1,6 @@
 """Dependency-free checks for this site's literal HTML/CSS and public source."""
 from hashlib import sha256
-from html import unescape
+from html import escape, unescape
 from html.parser import HTMLParser
 from pathlib import Path
 import json
@@ -1185,7 +1185,7 @@ def check_release_data(file, data):
         assert '\n' not in bullet, f'{file}: one line per bullet'
     assert data['notes'] == f'https://github.com/openwizdev/OpenWiz/releases/tag/v{data["semver"]}', \
         f'{file}: the notes link is the release on GitHub, https://github.com/openwizdev/OpenWiz/releases/tag/v{data["semver"]}'
-    check_public_names(' '.join(text + bullets))
+    check_public_names(escape(' '.join(text + bullets)))  # data is text: escaped, as the page shows it
 
 
 class ReleaseOutline(HTMLParser):

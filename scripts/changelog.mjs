@@ -54,7 +54,7 @@ export function render(list, live) {
 
 export function withReleases(page, section) {
   if (page.includes(START) || page.split('</main>').length !== 2) throw new Error('changelog page: expected one </main> and no generated section');
-  return page.replace('</main>', `${START}${section}${END}</main>`);
+  return page.replace('</main>', () => `${START}${section}${END}</main>`); // a function: copy with $& or $$ stays as written
 }
 
 export const summary = (list, live) => live ? `${list.length} release${list.length === 1 ? '' : 's'}` : `none shown until the install switch reads live (${list.length} waiting)`;
