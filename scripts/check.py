@@ -380,6 +380,9 @@ class Page(HTMLParser):
         elif tag == 'a' and attrs.get('href') == REPORT_LINK:
             # #1851: the Report a problem link, exempt from check_ref's no-query rule by its exact href only;
             # check_site counts it per page.
+            # R2 (WizSite #90): no Referer, so the form request never carries the page the visitor came from.
+            assert 'noreferrer' in (attrs.get('rel') or '').lower().split() and 'referrerpolicy' not in attrs, \
+                'Report a problem link needs rel="noreferrer"'
             self.report_links += 1
             attrs = {key: value for key, value in attrs.items() if key != 'href'}
         for key in ('href', 'src', 'poster'):
