@@ -124,16 +124,13 @@
         </div>
         <h3>Answer a few questions</h3>
       </li>
-      <li>
-        <div class="moment-screen spec-screen">
-          <p class="screen-label">Specs / To-do app</p><strong>Build a to-do app</strong>
-          <p>A single list for adding and completing tasks.</p>
-          <ul><li>Add a task</li><li>Mark it complete</li><li>Keep tasks after reload</li></ul>
-        </div>
-        <video class="spec-video" src="/art/spec-demo.webm" preload="none" playsinline controls hidden aria-label="Silent sample of the to-do app spec video"></video>
-        <p class="screen-label spec-sample">Silent sample</p>
-        <div class="moment-heading"><h3>Watch your spec</h3><button class="spec-play" type="button" aria-label="Play the silent spec sample" hidden><svg aria-hidden="true" viewBox="0 0 16 16"><path d="M5 3l8 5-8 5z"/></svg></button></div>
-        <p class="moment-copy">Steer the build from the narrated video.</p>
+      <li class="spec-moment">
+        <video class="spec-video" src="/art/spec-video.mp4" poster="/art/spec-poster.webp" preload="none" muted playsinline loop controls aria-label="OpenWiz's own narrated spec video for model config">
+          <track kind="captions" src="/art/spec-video.vtt" srclang="en" label="English" default>
+        </video>
+        <p class="screen-label spec-sample">Spec · Model config</p>
+        <div class="moment-heading"><h3>Watch your spec</h3><button class="spec-play" type="button" hidden><svg aria-hidden="true" viewBox="0 0 16 16"><path d="M5 3l8 5-8 5z"/></svg>Play with sound</button></div>
+        <p class="moment-copy">Steer the build from the narrated video. A real spec from OpenWiz's own factory. <a class="spec-link" href="/art/spec-video.mp4">Open the video</a></p>
       </li>
       <li>
         <div class="moment-screen ship-screen">

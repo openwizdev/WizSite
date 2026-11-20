@@ -28,7 +28,7 @@ const hashed = ['tokens.css', 'site.css', 'site.js', vendor[0], ...app];
 const brand = ['favicon.ico', 'favicon.svg', 'apple-touch-icon.png', 'brand/openwiz-lockup.svg', 'brand/og.png'];
 // The app's own mark and icons, cream on charcoal (J194, #1326): the brand mark, its favicons and a Wiz of the family.
 const appBrand = ['app/mark.svg', 'app/icon.svg', 'app/icon.ico', 'app/icon-180.png', 'app/wiz-reviewer.svg'];
-const files = ['_headers', 'app/manifest.webmanifest', ...appBrand, ...art, 'art/spec-demo.webm', ...vendor.slice(1), ...brand, 'fonts/Geist-var.woff2', 'fonts/GeistMono-var.woff2', 'fonts/OFL.txt'];
+const files = ['_headers', 'app/manifest.webmanifest', ...appBrand, ...art, 'art/spec-video.mp4', 'art/spec-video.vtt', ...vendor.slice(1), ...brand, 'fonts/Geist-var.woff2', 'fonts/GeistMono-var.woff2', 'fonts/OFL.txt'];
 // The Changelog's release parts (#1364), generated from each release's published notes on GitHub at this build.
 // A failed read shows its part as missing; the build never fails on it.
 const releases = await readAll();
