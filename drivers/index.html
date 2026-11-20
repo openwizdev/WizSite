@@ -53,100 +53,61 @@
     <div class="voyage-copy wrap">
       <p class="voyage-kicker">Drivers</p>
       <h1 id="voyage-title">Run your agents anywhere.</h1>
-      <p class="voyage-sub">A driver plugs a place that runs agents into OpenWiz: your own computer, a VPS, a cloud sandbox. One small program, four words, five checks.</p>
-      <ul class="drivers-chips" aria-label="In numbers">
-        <li><b>4</b> drivers</li><li><b>4</b> words</li><li><b>5</b> checks in the kit</li><li><b>1</b> passed, 5 of 5</li>
-      </ul>
+      <p class="drivers-explain">A driver connects OpenWiz to a place where your agents run: your own computer, a VPS, Cloudroom or boat.dev. Every driver answers the same four commands, <code>version</code>, <code>start</code>, <code>wake</code> and <code>stop</code>, and must pass the same five checks: one for each command, plus <code>token</code>, which proves no credential leaks.</p>
+      <p class="driver-map"><span class="map-node">OpenWiz</span><span class="map-arrow" aria-hidden="true">→</span><span class="map-node">driver <span class="map-words">(<code>version</code> · <code>start</code> · <code>wake</code> · <code>stop</code>)</span></span><span class="map-arrow" aria-hidden="true">→</span><span class="map-hosts"><span class="map-host"><img src="/drivers/logos/computer.svg" alt="Your own computer or VPS" width="18" height="18"><span aria-hidden="true">your computer / VPS</span></span><span class="map-host"><img src="/drivers/logos/cloudroom.png" alt="Cloudroom" width="18" height="18"><span aria-hidden="true">Cloudroom</span></span><span class="map-host"><img src="/drivers/logos/boat-dev.svg" alt="boat.dev" width="64" height="18"></span><span class="map-host">Grok Bot</span></span></p>
       <a class="voyage-pass" href="#boat-proof"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7"/><path d="M4.6 8.3l2.3 2.3 4.5-4.8"/></svg><span>See what <b>boat.dev</b>'s five checks proved</span></a>
     </div>
   </section>
   <section class="fleet wrap" aria-labelledby="fleet-title">
     <div class="fleet-head">
       <h2 id="fleet-title">The drivers</h2>
-      <p>Each one answers the same four words. The kit's five checks run on its real host: <span class="kit-key passed"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7"/><path d="M4.6 8.3l2.3 2.3 4.5-4.8"/></svg>passed</span> <span class="kit-key progress"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/><path d="M8 1.75a6.25 6.25 0 010 12.5z"/></svg>in progress</span> <span class="kit-key unrun"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/></svg>not yet run</span></p>
+      <p>Each one answers the same four commands, and the kit's fifth check, <code>token</code>, proves it leaks no credential.</p>
+      <p class="kit-legend"><span class="kit-key passed"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7"/><path d="M4.6 8.3l2.3 2.3 4.5-4.8"/></svg>passed</span> <span class="kit-key progress"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/><path d="M8 1.75a6.25 6.25 0 010 12.5z"/></svg>in progress</span> <span class="kit-key unrun"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/></svg>not run yet</span></p>
     </div>
     <ol class="driver-list">
     <li>
     <article class="driver" id="vps" aria-labelledby="vps-name">
-      <div class="driver-head">
-        <h3 class="driver-name" id="vps-name">Your own computer or VPS</h3>
-        <p class="driver-line">Being fixed: its kit run is in progress</p>
-      </div>
-      <div class="driver-words">
-        <h4>Its four words</h4>
-        <ul><li><code class="word">version</code></li><li><code class="word">start</code></li><li><code class="word">wake</code></li><li><code class="word">stop</code></li></ul>
-      </div>
-      <div class="kit progress">
-        <h4>Test kit <span>In progress</span></h4>
-        <ul>
-          <li class="kit-check" data-check="version" data-state="in progress"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/><path d="M8 1.75a6.25 6.25 0 010 12.5z"/></svg><span class="kit-name">version</span> <span class="kit-state">in progress</span></li>
-          <li class="kit-check" data-check="start" data-state="in progress"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/><path d="M8 1.75a6.25 6.25 0 010 12.5z"/></svg><span class="kit-name">start</span> <span class="kit-state">in progress</span></li>
-          <li class="kit-check" data-check="wake" data-state="in progress"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/><path d="M8 1.75a6.25 6.25 0 010 12.5z"/></svg><span class="kit-name">wake</span> <span class="kit-state">in progress</span></li>
-          <li class="kit-check" data-check="stop" data-state="in progress"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/><path d="M8 1.75a6.25 6.25 0 010 12.5z"/></svg><span class="kit-name">stop</span> <span class="kit-state">in progress</span></li>
-          <li class="kit-check" data-check="token" data-state="in progress"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/><path d="M8 1.75a6.25 6.25 0 010 12.5z"/></svg><span class="kit-name">token</span> <span class="kit-state">in progress</span></li>
-        </ul>
-      </div>
+      <div class="driver-logo"><img src="/drivers/logos/computer.svg" alt="Your own computer or VPS" width="28" height="28"></div>
+      <h3 class="driver-name" id="vps-name">Your own computer or VPS</h3>
+      <p class="driver-line">Being fixed: its kit run is in progress</p>
+      <ul class="driver-words" aria-label="Its four words"><li><code class="word">version</code></li><li><code class="word">start</code></li><li><code class="word">wake</code></li><li><code class="word">stop</code></li></ul>
+      <div class="kit progress"><p class="kit-line"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/><path d="M8 1.75a6.25 6.25 0 010 12.5z"/></svg><span>Kit: in progress</span></p></div>
     </article>
     </li>
     <li>
     <article class="driver" id="cloudroom" aria-labelledby="cloudroom-name">
-      <div class="driver-head">
-        <h3 class="driver-name" id="cloudroom-name">Cloudroom</h3>
-        <p class="driver-line">Works today: built real pull requests for OpenWiz</p>
-        <p class="driver-kit-note">Kit: not run yet</p>
-      </div>
-      <div class="driver-words">
-        <h4>Its four words</h4>
-        <ul><li><code class="word">version</code></li><li><code class="word">start</code></li><li><code class="word">wake</code></li><li><code class="word">stop</code></li></ul>
-      </div>
-      <div class="kit unrun">
-        <h4>Test kit <span>Not run yet</span></h4>
-        <ul>
-          <li class="kit-check" data-check="version" data-state="not yet run"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/></svg><span class="kit-name">version</span> <span class="kit-state">not yet run</span></li>
-          <li class="kit-check" data-check="start" data-state="not yet run"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/></svg><span class="kit-name">start</span> <span class="kit-state">not yet run</span></li>
-          <li class="kit-check" data-check="wake" data-state="not yet run"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/></svg><span class="kit-name">wake</span> <span class="kit-state">not yet run</span></li>
-          <li class="kit-check" data-check="stop" data-state="not yet run"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/></svg><span class="kit-name">stop</span> <span class="kit-state">not yet run</span></li>
-          <li class="kit-check" data-check="token" data-state="not yet run"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/></svg><span class="kit-name">token</span> <span class="kit-state">not yet run</span></li>
-        </ul>
-      </div>
+      <div class="driver-logo"><img src="/drivers/logos/cloudroom.png" alt="Cloudroom" width="28" height="28"></div>
+      <h3 class="driver-name" id="cloudroom-name">Cloudroom</h3>
+      <p class="driver-line">Works today: built real pull requests for OpenWiz; its kit run comes next</p>
+      <ul class="driver-words" aria-label="Its four words"><li><code class="word">version</code></li><li><code class="word">start</code></li><li><code class="word">wake</code></li><li><code class="word">stop</code></li></ul>
+      <div class="kit unrun"><p class="kit-line"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/></svg><span>Kit: not run yet</span></p></div>
     </article>
     </li>
     <li>
     <article class="driver hero" id="boat-dev" aria-labelledby="boat-dev-name">
-      <div class="driver-head">
-        <h3 class="driver-name" id="boat-dev-name">boat.dev</h3>
-        <p class="driver-line">Passed the kit, 5 of 5, on a real account (2026-11-19)</p>
-      </div>
-      <p class="hero-score" aria-hidden="true"><b>5</b><span>of 5</span></p>
-      <div class="driver-words">
-        <h4>Its four words</h4>
-        <ul><li><code class="word">version</code></li><li><code class="word">start</code></li><li><code class="word">wake</code></li><li><code class="word">stop</code></li></ul>
-      </div>
+      <div class="driver-logo"><img src="/drivers/logos/boat-dev.svg" alt="boat.dev" width="100" height="28"></div>
+      <h3 class="driver-name" id="boat-dev-name">boat.dev</h3>
+      <p class="driver-line">Passed all five checks on a real account, 2026-11-19</p>
+      <ul class="driver-words" aria-label="Its four words"><li><code class="word">version</code></li><li><code class="word">start</code></li><li><code class="word">wake</code></li><li><code class="word">stop</code></li></ul>
       <div class="kit passed">
-        <a class="kit-proof" href="#boat-proof"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7"/><path d="M4.6 8.3l2.3 2.3 4.5-4.8"/></svg><span>Kit: passed, 5 of 5</span></a>
+        <ul class="kit-ticks" aria-label="Its five checks">
+          <li class="kit-check" data-check="version" data-state="passed"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7"/><path d="M4.6 8.3l2.3 2.3 4.5-4.8"/></svg><span class="kit-name">version</span> <span class="sr-only">passed</span></li>
+          <li class="kit-check" data-check="start" data-state="passed"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7"/><path d="M4.6 8.3l2.3 2.3 4.5-4.8"/></svg><span class="kit-name">start</span> <span class="sr-only">passed</span></li>
+          <li class="kit-check" data-check="wake" data-state="passed"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7"/><path d="M4.6 8.3l2.3 2.3 4.5-4.8"/></svg><span class="kit-name">wake</span> <span class="sr-only">passed</span></li>
+          <li class="kit-check" data-check="stop" data-state="passed"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7"/><path d="M4.6 8.3l2.3 2.3 4.5-4.8"/></svg><span class="kit-name">stop</span> <span class="sr-only">passed</span></li>
+          <li class="kit-check" data-check="token" data-state="passed"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7"/><path d="M4.6 8.3l2.3 2.3 4.5-4.8"/></svg><span class="kit-name">token</span> <span class="sr-only">passed</span></li>
+        </ul>
+        <a class="kit-proof" href="#boat-proof">See what each check proved</a>
       </div>
     </article>
     </li>
     <li>
     <article class="driver" id="grok-bot" aria-labelledby="grok-bot-name">
-      <div class="driver-head">
-        <h3 class="driver-name" id="grok-bot-name">Grok Bot</h3>
-        <p class="driver-line">Coming soon: listed when its driver lands</p>
-      </div>
-      <div class="driver-words">
-        <h4>Its four words</h4>
-        <ul><li><code class="word">version</code></li><li><code class="word">start</code></li><li><code class="word">wake</code></li><li><code class="word">stop</code></li></ul>
-      </div>
-      <div class="kit unrun">
-        <h4>Test kit <span>Not run yet</span></h4>
-        <ul>
-          <li class="kit-check" data-check="version" data-state="not yet run"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/></svg><span class="kit-name">version</span> <span class="kit-state">not yet run</span></li>
-          <li class="kit-check" data-check="start" data-state="not yet run"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/></svg><span class="kit-name">start</span> <span class="kit-state">not yet run</span></li>
-          <li class="kit-check" data-check="wake" data-state="not yet run"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/></svg><span class="kit-name">wake</span> <span class="kit-state">not yet run</span></li>
-          <li class="kit-check" data-check="stop" data-state="not yet run"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/></svg><span class="kit-name">stop</span> <span class="kit-state">not yet run</span></li>
-          <li class="kit-check" data-check="token" data-state="not yet run"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/></svg><span class="kit-name">token</span> <span class="kit-state">not yet run</span></li>
-        </ul>
-      </div>
+      <div class="driver-logo"><span class="driver-mark" aria-hidden="true">Grok Bot</span></div>
+      <h3 class="driver-name" id="grok-bot-name">Grok Bot</h3>
+      <p class="driver-line">Coming soon: listed when its driver lands</p>
+      <ul class="driver-words" aria-label="Its four words"><li><code class="word">version</code></li><li><code class="word">start</code></li><li><code class="word">wake</code></li><li><code class="word">stop</code></li></ul>
+      <div class="kit unrun"><p class="kit-line"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/></svg><span>Kit: not run yet</span></p></div>
     </article>
     </li>
     </ol>
@@ -157,8 +118,8 @@
     </div>
     <div class="proof-copy">
       <p class="proof-kicker">The hero driver</p>
-      <h2 id="proof-title">boat.dev passed the kit, 5 of 5.</h2>
-      <p class="proof-lead">On a real account, on 2026-11-19. Each check is one thing the kit watched boat.dev do on its real host.</p>
+      <h2 id="proof-title">What boat.dev proved on a real account</h2>
+      <p class="proof-lead">On 2026-11-19 the kit ran its five checks on boat.dev's real host, and it passed all five. Each line says what passing one proved.</p>
       <ol class="proof-checks">
         <li class="proof-check" data-check="version" data-state="passed"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7"/><path d="M4.6 8.3l2.3 2.3 4.5-4.8"/></svg><code class="proof-name">version</code><span class="proof-state">passed</span><span class="proof-line">It names the kernel's records version, and prints its schema unchanged.</span></li>
         <li class="proof-check" data-check="start" data-state="passed"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7"/><path d="M4.6 8.3l2.3 2.3 4.5-4.8"/></svg><code class="proof-name">start</code><span class="proof-state">passed</span><span class="proof-line">It answered a run id, and the agent's status note appeared on a throwaway ticket.</span></li>
@@ -171,7 +132,7 @@
   <section class="own-driver wrap" aria-labelledby="own-title">
     <div class="own-copy">
       <h2 id="own-title">Write your own driver</h2>
-      <p>A driver is one small program, in any language, that answers four words. Pass the kit's five checks on your real host and it can join. OpenWiz never touches a login.</p>
+      <p>A driver is one small program, in any language, that answers four commands. Pass the kit's five checks on your real host and it can join. OpenWiz never touches a login.</p>
       <ul class="own-links">
         <li><a href="https://github.com/openwizdev/OpenWiz/blob/main/kernel/driver.v1.md">The contract <code>kernel/driver.v1.md</code></a></li>
         <li><a href="https://github.com/openwizdev/OpenWiz/tree/main/kernel/driver-kit">The kit <code>kernel/driver-kit/</code></a></li>
@@ -184,6 +145,7 @@
       <div><dt><code>start</code></dt><dd>runs one agent on one ticket and answers a run id</dd></div>
       <div><dt><code>wake</code></dt><dd>reaches the same run again</dd></div>
       <div><dt><code>stop</code></dt><dd>ends everything the run started</dd></div>
+      <div class="own-token"><dt><code>token</code></dt><dd>the fifth check: no credential leaks in its output, command lines or environment</dd></div>
     </dl>
   </section>
 </main>

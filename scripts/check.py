@@ -630,7 +630,7 @@ class DriverOutline(HTMLParser):
     def __init__(self, text):
         super().__init__(convert_charrefs=True)
         self.cards, self.own_links, self.own_heading = [], [], None
-        self.field, self.depth, self.own_depth = None, 0, None
+        self.field, self.depth, self.own_depth, self.card_depth = None, 0, None, None
         self.feed(text)
 
     def handle_starttag(self, tag, attrs):
@@ -645,9 +645,10 @@ class DriverOutline(HTMLParser):
         if self.own_depth and tag == 'h2':
             self.field = ['own-heading', '']
         if tag == 'article' and 'driver' in classes:
+            self.card_depth = self.depth
             self.cards.append({'id': attrs.get('id'), 'classes': classes, 'name': '', 'line': '', 'kit': None, 'words': [],
                                'checks': [], 'proof': None, 'images': [], 'mark': None})
-        elif self.cards and tag == 'img':
+        elif self.card_depth and tag == 'img':
             self.cards[-1]['images'].append((attrs.get('src'), attrs.get('alt')))
         elif self.cards and tag == 'span' and 'driver-mark' in classes:
             self.field = ['mark', '']
@@ -687,7 +688,10 @@ class DriverOutline(HTMLParser):
             self.field = None
         if tag == 'section' and self.own_depth == self.depth:
             self.own_depth = None
-        self.depth -= 1
+        if tag == 'article' and self.card_depth == self.depth:
+            self.card_depth = None
+        if tag not in ('br', 'img', 'meta', 'link', 'path', 'circle', 'rect', 'input'):  # self-closed shapes never opened a level
+            self.depth -= 1
 
 
 def top_bar(html):
@@ -771,7 +775,8 @@ def check_driver_proof(main):
     said = plain(explain[0])
     sentences = [s for s in re.split(r'(?<=[.!?])\s+(?=[A-Z])', said) if s]
     assert len(sentences) <= DRIVER_EXPLAIN_MAX, f'the driver explanation is {DRIVER_EXPLAIN_MAX} sentences at most: {sentences}'
-    assert 'driver' in said.lower() and all(word in said for word in DRIVER_WORDS), f'the driver explanation names the four words: {said!r}'
+    assert 'driver' in said.lower() and all(f'<code>{word}</code>' in explain[0] for word in DRIVER_WORDS), \
+        f'the driver explanation names the four words, each as a command: {said!r}'
     hero = re.search(r'<section class="voyage[\s\S]*?</section>', main)
     assert hero and 'drivers-explain' in hero[0], 'the driver explanation sits in the hero, under the headline'
     diagram = re.findall(r'<p class="driver-map"[^>]*>([\s\S]*?)</p>', hero[0])
