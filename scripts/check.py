@@ -63,7 +63,17 @@ GSAP = 'vendor/gsap-3.15.1.min.js'
 VENDOR_HASHES = {
     'vendor/GSAP-LICENSE.txt': '791e7d34e6718aad2bd3e20fa5240a4c0e47d73ee3ca31424652cca52fe9acf0',
     'vendor/LOBE-ICONS-LICENSE.txt': 'add9d7531d1b21646317a8958e38fc727506fa39d24bdecb44154d943c82753a',
+    # Lucide (ISC): the drivers page's one generic icon, drivers/logos/monitor.svg (#62).
+    'vendor/LUCIDE-LICENSE.txt': 'b495047bd93a9b06913511076f504daba17d5bbeb3e0650f3bb53a4220329c57',
     'vendor/gsap-3.15.1.min.js': '3d1bea374ab1b703cc5c4105358eec63c4465efdc573931dc116e34a0a190c1b',
+}
+
+# #62 item 2: real logos, each the owner's official file, unaltered (pinned to the downloaded original's sha256), small,
+# same-origin, with alt text naming its host. Grok Bot is text only: xAI's brand terms require permission for its marks.
+DRIVER_LOGOS = {
+    'drivers/logos/boat-dev.svg': ('9a103b949a566589486527567cda9051c9e2c81aa32e723b332df63067fca533', 'boat.dev'),
+    'drivers/logos/cloudroom.png': ('357d4b00935ff9b9ebf676e9dbe35ddd22af82b3e62a0fcafd59341b6b702592', 'Cloudroom'),
+    'drivers/logos/monitor.svg': ('9ef659c8515c6afe223a2d60407e7472b086593516f892963569692342ef2189', 'computer'),
 }
 
 HASHED = ('tokens.css', 'site.css', GSAP, 'site.js')
@@ -95,7 +105,7 @@ FINGERPRINTS = {name: fingerprint(name, (ROOT / name).read_bytes()) for name in 
 STATIC = {
     'index.html', 'changelog/index.html', 'drivers/index.html', '_headers', APP_PAGE, 'app/manifest.webmanifest',
     'fonts/Geist-var.woff2', 'fonts/GeistMono-var.woff2', 'fonts/OFL.txt',
-} | ART | set(ICON_HASHES) | set(VECTORS) | (set(VENDOR_HASHES) - {GSAP}) | set(APP_VENDOR)
+} | ART | set(ICON_HASHES) | set(VECTORS) | (set(VENDOR_HASHES) - {GSAP}) | set(APP_VENDOR) | set(DRIVER_LOGOS)
 RUNTIME = STATIC | set(FINGERPRINTS.values())
 
 
@@ -142,27 +152,39 @@ TODAY = 'What exists today'
 # section has its own rules (check_releases), one part per versioned repository, in this order.
 RELEASES = ('<!-- releases:start -->', '<!-- releases:end -->')
 RELEASE_REPOS = ('OpenWiz', 'WizSkills', 'WizLoops')
-# The drivers page (openwiz.dev/drivers, #50): one card per driver, in this order, each with its status line (the
-# ticket's facts, word for word), the driver's four words and its test-kit result on the kit's five checks.
+# The drivers page (openwiz.dev/drivers, #50; round 3H, #62): boat.dev's spotlight card first, then the other three
+# drivers' compact cards, in this order, each with its status line (the ticket's facts, word for word).
 DRIVERS_PAGE = 'drivers/index.html'
 DRIVERS_LINKS = ('/drivers/', '/drivers')
 DRIVERS = (
+    ('boat-dev', 'boat.dev', 'Passed all five checks on a real account, 2026-11-19', 'passed'),
     ('vps', 'Your own computer or VPS', 'Being fixed: its kit run is in progress', 'in progress'),
     ('cloudroom', 'Cloudroom', 'Works today: built real pull requests for OpenWiz', 'not yet run'),
-    ('boat-dev', 'boat.dev', 'Passed the kit, 5 of 5, on a real account (2026-11-19)', 'passed'),
     ('grok-bot', 'Grok Bot', 'Coming soon: listed when its driver lands', 'not yet run'),
 )
 DRIVER_HERO = 'boat-dev'
 DRIVER_WORDS = ('version', 'start', 'wake', 'stop')
 KIT_CHECKS = ('version', 'start', 'wake', 'stop', 'token')
 KIT_STATES = ('passed', 'in progress', 'not yet run')
-# Every number the page shows comes from these facts: four drivers and four words, boat.dev's 5 of 5 and its date,
-# the one driver that passed, and the contract's v1.
-DRIVER_NUMBERS = {'4', '5', '2026', '11', '19', '1'}
-# Round 2F (#56): the evidence chips under the headline, and boat.dev's proof section after the cards: the kit's five
-# checks, each with what passing it proved, in plain words from kernel/driver.v1.md section 3.
-DRIVER_CHIPS = ('4 drivers', '4 words', '5 checks in the kit', '1 passed, 5 of 5')
-PROOF_TITLE = 'boat.dev passed the kit, 5 of 5.'
+# Round 3H (#62): a pending driver shows one kit line, never five identical rows. Cloudroom's says its run comes next,
+# so "works" and "not run yet" never read as a conflict.
+DRIVER_KIT_LINES = {
+    'vps': 'Kit: in progress',
+    'cloudroom': 'Kit: not run yet. Its kit run comes next.',
+    'grok-bot': 'Kit: not run yet',
+}
+# Every number the page shows comes from these facts: boat.dev's date. Counts are said in words (#62 item 4).
+DRIVER_NUMBERS = {'2026', '11', '19'}
+# #62 item 4: no jargon counts ("4 words", "5 checks in the kit", "1 passed, 5 of 5"), and the five-of-five result
+# said at most twice on the page: the hero's one link and boat.dev's spotlight.
+DRIVER_JARGON = re.compile(r'\b\d+\s+(?:drivers?|words?|checks?|commands?|passed)\b|\b\d+\s+of\s+\d+\b', re.I)
+DRIVER_RESULT = re.compile(r'\ball five checks\b|\bfive passed checks\b|\bfive of five\b', re.I)
+DRIVER_RESULT_MAX = 2
+# #62 item 1: what a driver is, in plain words, in the hero above every card: two sentences at most, naming the four
+# commands and the five-check test with its token check.
+DRIVER_EXPLAINER_WORDS = ('driver', 'version', 'start', 'wake', 'stop', 'five', 'token', 'credential')
+# The five checks as boat.dev passed them, each with what passing it proved, in plain words from kernel/driver.v1.md
+# section 3; the spotlight is the page's one list of them.
 PROOF_LINES = (
     ('version', 'It names the kernel\'s records version, and prints its schema unchanged.'),
     ('start', 'It answered a run id, and the agent\'s status note appeared on a throwaway ticket.'),
@@ -170,16 +192,13 @@ PROOF_LINES = (
     ('stop', 'It ended the run: a wake after it was refused, and nothing the run started still runs.'),
     ('token', 'No credential showed in its output, command lines or environment, and it refused a token field.'),
 )
-# A driver that works but whose kit has not run says so plainly, so "works" and "not yet run" never read as a conflict.
-DRIVER_KIT_NOTES = {'cloudroom': 'Kit: not run yet'}
-# Final (#59): boat.dev's card keeps one kit line linking to its proof section, which alone lists the five checks.
-DRIVER_KIT_PROOF = {'boat-dev': ('#boat-proof', 'Kit: passed, 5 of 5')}
-DRIVER_HERO_MARK = '<p class="hero-score" aria-hidden="true"><b>5</b><span>of 5</span></p>'
-DRIVER_LABEL_TRACKING = 0.06  # em: the least tracking on an uppercase drivers-page label
+DRIVER_LOGO_MAX = 30_000  # bytes, each logo
+DRIVER_TEXT_ONLY = 'grok-bot'
 DRIVER_MIN_FONT = 12  # px: no drivers-page text smaller
+DRIVER_LABEL_TRACKING = 0.06  # em: the least tracking on an uppercase drivers-page label
 OWN_DRIVER = 'Write your own driver'
 OPENWIZ_REPO = 'https://github.com/openwizdev/OpenWiz'
-DRIVER_DESCRIPTION = 'boat.dev passed 5 of 5'  # the page's meta description names the one driver that passed (#59 R2)
+DRIVER_DESCRIPTION = 'boat.dev passed all five checks'  # the meta description names the one driver that passed (#59 R2)
 DRIVER_ART_BUDGET = 400_000  # bytes: the drivers page's own art (art/drivers-*.webp)
 
 
@@ -449,6 +468,7 @@ def check_site(root):
     drivers_art = {name for name in ART if name.startswith('art/drivers-')}
     unused = sorted(name for name in drivers_art if f'/{name}' not in (root / DRIVERS_PAGE).read_text())
     assert not unused, f'unused drivers art: {unused}'
+    check_driver_logo_files(root)
     check_drivers(landing, changelog, (root / DRIVERS_PAGE).read_text(), pages[root / DRIVERS_PAGE])
     check_drivers_nav((root / names['site.css']).read_text(), {name: (root / name).read_text() for name in PAGES})
     check_changelog(landing, changelog)
@@ -600,18 +620,18 @@ def check_changelog(landing, changelog):
 
 
 class DriverOutline(HTMLParser):
-    """The drivers page's cards: each card's id, classes, name, status line, words and kit checks with their states,
-    and every link inside the Write your own driver section."""
+    """The drivers page's cards: each card's id, classes, name (its heading's text, or its heading logo's alt), status
+    line, kit line and its state, per-check rows, pictures, and every link inside the Write your own driver section."""
     def __init__(self, text):
         super().__init__(convert_charrefs=True)
         self.cards, self.own_links, self.own_heading = [], [], None
-        self.field, self.depth, self.own_depth = None, 0, None
+        self.field, self.depth, self.own_depth, self.card_depth = None, 0, None, None
         self.feed(text)
 
     def handle_starttag(self, tag, attrs):
         attrs = dict(attrs)
         classes = (attrs.get('class') or '').split()
-        if tag not in ('br', 'img', 'meta', 'link', 'path', 'circle', 'rect', 'input'):
+        if tag not in ('br', 'img', 'meta', 'link', 'path', 'circle', 'rect', 'line', 'input'):
             self.depth += 1
         if tag == 'section' and 'own-driver' in classes:
             self.own_depth = self.depth
@@ -620,43 +640,50 @@ class DriverOutline(HTMLParser):
         if self.own_depth and tag == 'h2':
             self.field = ['own-heading', '']
         if tag == 'article' and 'driver' in classes:
-            self.cards.append({'id': attrs.get('id'), 'classes': classes, 'name': '', 'line': '', 'note': None, 'words': [], 'checks': [], 'proof': None})
-        elif self.cards and tag == 'a' and 'kit-proof' in classes:
-            self.cards[-1]['proof'] = [attrs.get('href'), '']
-            self.field = ['proof', '']
-        elif self.cards and tag == 'h3' and 'driver-name' in classes:
+            self.card_depth = self.depth
+            self.cards.append({'id': attrs.get('id'), 'classes': classes, 'name': '', 'line': '', 'kit': None,
+                               'kit_state': None, 'checks': [], 'proofs': [], 'images': [], 'svgs': 0})
+            return
+        card = self.cards[-1] if self.cards and self.card_depth else None
+        if not card:
+            return
+        if tag == 'img':
+            card['images'].append((attrs.get('src') or '', attrs.get('alt') or ''))
+            if self.field and self.field[0] == 'name':
+                self.field.append(attrs.get('alt') or '')
+        elif tag == 'svg':
+            card['svgs'] += 1
+        elif tag in ('h2', 'h3') and 'driver-name' in classes:
             self.field = ['name', '']
-        elif self.cards and tag == 'p' and 'driver-line' in classes:
+        elif tag == 'p' and 'driver-line' in classes:
             self.field = ['line', '']
-        elif self.cards and tag == 'p' and 'driver-kit-note' in classes:
-            self.field = ['note', '']
-        elif self.cards and tag == 'code' and 'word' in classes:
-            self.field = ['word', '']
-        elif self.cards and tag == 'li' and 'kit-check' in classes:
-            self.cards[-1]['checks'].append([attrs.get('data-check'), attrs.get('data-state'), ''])
-            self.field = ['check', '']
+        elif tag == 'p' and 'driver-kit' in classes:
+            card['kit_state'] = attrs.get('data-state')
+            self.field = ['kit', '']
+        elif tag == 'li' and 'kit-check' in classes:
+            card['checks'].append(attrs.get('data-check'))
+        elif tag == 'li' and 'proof-check' in classes:
+            card['proofs'].append(attrs.get('data-check'))
 
     def handle_data(self, data):
         if self.field:
             self.field[1] += data
 
     def handle_endtag(self, tag):
-        if self.field and tag in ('h2', 'h3', 'p', 'code', 'li', 'a'):
-            kind, text = self.field
+        if self.field and tag in ('h2', 'h3', 'p'):
+            kind, text, *alts = self.field
             text = re.sub(r'\s+', ' ', text).strip()
             if kind == 'own-heading':
                 self.own_heading = text
-            elif kind == 'word':
-                self.cards[-1]['words'].append(text)
-            elif kind == 'check':
-                self.cards[-1]['checks'][-1][2] = text
-            elif kind == 'proof':
-                self.cards[-1]['proof'][1] = text
+            elif kind == 'name':
+                self.cards[-1]['name'] = text or ' '.join(a for a in alts if a).strip()
             else:
                 self.cards[-1][kind] = text
             self.field = None
         if tag == 'section' and self.own_depth == self.depth:
             self.own_depth = None
+        if tag == 'article' and self.card_depth == self.depth:
+            self.card_depth = None
         self.depth -= 1
 
 
@@ -667,9 +694,10 @@ def top_bar(html):
 
 
 def check_drivers(landing, changelog, drivers, page):
-    """The drivers page (#50): the landing's exact top bar with Drivers current, the four driver cards in order with
-    their exact facts, words and kit results, boat.dev the hero, the Write your own driver section linking only the
-    public OpenWiz repository, no script, and no number beyond its facts. A Drivers nav link on the other pages."""
+    """The drivers page (#50, round 3H #62): the landing's exact top bar with Drivers current; the explainer of what a
+    driver is in the hero, above every card; boat.dev's spotlight first, then the three other drivers' compact cards
+    in order with their exact facts and one kit line each; real logos, Grok Bot in text only; no jargon counts; the
+    Write your own driver section linking only the public OpenWiz repository; no script; no invented number."""
     bar = top_bar(drivers)
     current = re.findall(r'<a [^>]*aria-current="page"[^>]*>([^<]*)</a>', bar)
     assert current == ['Drivers'] and re.search(r'<a class="nav-drivers" href="/drivers/" aria-current="page">Drivers</a>', bar), \
@@ -682,43 +710,48 @@ def check_drivers(landing, changelog, drivers, page):
     description = re.findall(r'<meta name="description" content="([^"]*)"', drivers)
     assert len(description) == 1 and DRIVER_DESCRIPTION in description[0], \
         f'the drivers description must say {DRIVER_DESCRIPTION}: {description}'
-    assert not re.search(r'\b(each|every|all)\b[^.]*\bpass', description[0], re.I), \
+    assert not re.search(r'\b(each|every)\b[^.]*\bpass', description[0], re.I), \
         f'the drivers description must not say every driver passes: {description[0]}'
+    assert not DRIVER_JARGON.search(description[0]), f'a jargon count in the drivers description: {description[0]}'
     assert not page.scripts and not page.inline_scripts, 'the drivers page reads completely without scripts'
     main = re.search(r'<main\b[^>]*>[\s\S]*?</main>', drivers)
     assert main, 'the drivers page needs its main'
-    assert not re.search(r'\shidden\b', main[0]), 'nothing on the drivers page waits for a script to show'
-    outline = DriverOutline(main[0])
+    main = main[0]
+    assert not re.search(r'\shidden\b', main), 'nothing on the drivers page waits for a script to show'
+    check_driver_explainer(main)
+    outline = DriverOutline(main)
     assert [(c['id'], c['name']) for c in outline.cards] == [(d[0], d[1]) for d in DRIVERS], \
-        f'four driver cards, in order: {[(c["id"], c["name"]) for c in outline.cards]}'
+        f'four driver cards, boat.dev first: {[(c["id"], c["name"]) for c in outline.cards]}'
     for card, (key, name, line, state) in zip(outline.cards, DRIVERS):
         assert card['line'] == line, f'{name}: the driver facts must read exactly: {line}'
-        assert card['words'] == list(DRIVER_WORDS), f'{name}: the four words, in order: {card["words"]}'
-        checks = [(c, s) for c, s, _ in card['checks']]
-        if key in DRIVER_KIT_PROOF:
-            href, said = DRIVER_KIT_PROOF[key]
-            assert not checks, f'{name}: its five checks appear only in the proof section, never again on its card: {checks}'
-            assert card['proof'] and card['proof'][0] == href, f'{name}: its kit line links to the proof section {href}: {card["proof"]}'
-            assert card['proof'][1] == said, f'{name}: its one kit line reads {said!r}: {card["proof"][1]!r}'
-        else:
-            assert card['proof'] is None, f'{name}: only boat.dev links to a proof section'
-            assert checks == [(check, state) for check in KIT_CHECKS], f'{name}: kit result must be {state} on the five checks: {checks}'
-        for check, state_, text in card['checks']:
-            assert text == f'{check} {state_}', f'{name}: each kit check says its state in words: {text!r}'
         hero = 'hero' in card['classes']
         assert hero == (key == DRIVER_HERO), f'boat.dev is the hero card, and only it: {name}'
-        assert card['note'] == DRIVER_KIT_NOTES.get(key), f'{name}: its kit note must read {DRIVER_KIT_NOTES.get(key)!r}: {card["note"]!r}'
-    hero_card = re.search(r'<article class="driver hero"[\s\S]*?</article>', main[0])
-    assert hero_card and DRIVER_HERO_MARK in hero_card[0], 'boat.dev keeps its 5 of 5 mark on its card'
-    check_driver_proof(main[0])
-    reader = Text(main[0])
-    for reading in [reader.joined(), reader.spaced()] + reader.shown:
+        assert not card['checks'], f'{name}: no per-check rows on a card: {card["checks"]}'
+        if key == DRIVER_HERO:
+            assert card['proofs'] == list(KIT_CHECKS), f'{name}: its spotlight lists the five checks in order: {card["proofs"]}'
+        else:
+            assert not card['proofs'], f'{name}: a pending card shows one kit line, never per-check rows: {card["proofs"]}'
+            assert (card['kit'], card['kit_state']) == (DRIVER_KIT_LINES[key], state), \
+                f'{name}: its one kit line must read {DRIVER_KIT_LINES[key]!r} ({state}): {card["kit"]!r} ({card["kit_state"]})'
+    check_driver_logos(main, outline)
+    check_driver_proof(main)
+    reader = Text(main)
+    readings = [reader.joined(), reader.spaced()] + reader.shown
+    for reading in readings:
         for number in re.findall(r'\d+', reading):
             assert number in DRIVER_NUMBERS, f'invented number on the drivers page: {number}'
+        found = DRIVER_JARGON.search(re.sub(r'\s+', ' ', reading))
+        assert not found, f'a jargon count on the drivers page: {found[0]!r}'
+    said = len(DRIVER_RESULT.findall(re.sub(r'\s+', ' ', reader.spaced())))
+    assert 1 <= said <= DRIVER_RESULT_MAX, f'say boat.dev\'s five-of-five result at most {DRIVER_RESULT_MAX} times on the page: {said}'
     assert outline.own_heading == OWN_DRIVER, f'the drivers page needs its {OWN_DRIVER} section'
     assert outline.own_links and OPENWIZ_REPO in outline.own_links and all(
         href == OPENWIZ_REPO or href.startswith(OPENWIZ_REPO + '/') for href in outline.own_links), \
         f'{OWN_DRIVER} links only to the public OpenWiz repository: {outline.own_links}'
+    own = re.search(r'<dl class="own-words">([\s\S]*?)</dl>', main)
+    rows = re.findall(r'<dt><code>([^<]*)</code></dt><dd>([\s\S]*?)</dd>', own[1]) if own else []
+    assert [r[0] for r in rows] == list(KIT_CHECKS) and 'credential' in plain(rows[-1][1]), \
+        f'{OWN_DRIVER} lists the four commands and the fifth check, token, proving no credential leaks: {rows}'
     assert not Outline(drivers).styles, 'the drivers page keeps its styles in site.css'
 
 
@@ -726,34 +759,73 @@ def plain(html):
     return re.sub(r'\s+', ' ', re.sub(r'<[^>]+>', '', html)).strip()
 
 
+def check_driver_explainer(main):
+    """#62 item 1: one explainer of what a driver is, inside the hero and above every card, in two sentences at most,
+    naming the four commands and the five-check test with token."""
+    found = re.findall(r'<div class="drivers-explainer">([\s\S]*?)</div>', main)
+    assert len(found) == 1, 'the drivers page needs one explainer of what a driver is'
+    hero = re.search(r'<section class="voyage"[\s\S]*?</section>', main)
+    assert hero and 'class="drivers-explainer"' in hero[0], 'the driver explainer sits in the hero'
+    assert main.index('class="drivers-explainer"') < main.index('<article class="driver'), 'the driver explainer comes above the cards'
+    text = re.sub(r'<[^>]+>', ' ', found[0])
+    text = re.sub(r'\s+', ' ', unescape(text)).strip()
+    sentences = [part for part in re.split(r'(?<=[.!?])\s+', text) if part]
+    assert 1 <= len(sentences) <= 2, f'the driver explainer is two sentences at most: {sentences}'
+    missing = [word for word in DRIVER_EXPLAINER_WORDS if not re.search(rf'\b{word}', text, re.I)]
+    assert not missing, f'the driver explainer must name {missing}'
+
+
+def check_driver_logos(main, outline):
+    """#62 item 2: every logo on the page is a pinned official file, used with alt text naming its host; every pinned
+    logo is used; Grok Bot shows no logo at all, and no Grok picture appears anywhere."""
+    used = set()
+    for attrs in re.findall(r'<img\b([^>]*)>', main):
+        src = (re.search(r'\bsrc="([^"]*)"', attrs) or [None, ''])[1]
+        alt = (re.search(r'\balt="([^"]*)"', attrs) or [None, ''])[1]
+        assert 'grok' not in (src + alt).lower(), f'no Grok logo: xAI\'s brand terms require permission: {src}'
+        if src.startswith('/drivers/'):
+            name = src.lstrip('/')
+            assert name in DRIVER_LOGOS, f'an unpinned logo on the drivers page: {src}'
+            host = DRIVER_LOGOS[name][1]
+            assert host.lower() in alt.lower(), f'the logo {src} needs alt text naming {host}: {alt!r}'
+            used.add(name)
+    assert used == set(DRIVER_LOGOS), f'unused drivers logos: {sorted(set(DRIVER_LOGOS) - used)}'
+    for card in outline.cards:
+        if card['id'] == DRIVER_TEXT_ONLY:
+            assert not card['images'] and not card['svgs'], f'no Grok logo: {card["name"]} is text only'
+    assert not any('grok' in name.lower() for name in DRIVER_LOGOS), 'no Grok logo file'
+
+
+def check_driver_logo_files(root):
+    for name, (digest, _) in DRIVER_LOGOS.items():
+        data = (root / name).read_bytes()
+        assert sha256(data).hexdigest() == digest, f'a drivers logo changed bytes: {name}'
+        assert len(data) <= DRIVER_LOGO_MAX, f'the drivers logo {name} is over {DRIVER_LOGO_MAX} bytes'
+
+
 def check_driver_proof(main):
-    """Round 2F (#56): the evidence chips under the headline; after the four cards, boat.dev's full-width proof section
-    with the kit's five checks in order, each passed with its plain line; and no picture shown twice."""
-    chips = re.findall(r'<ul class="drivers-chips"[^>]*>([\s\S]*?)</ul>', main)
-    assert len(chips) == 1 and main.index('drivers-chips') < main.index('class="fleet'), \
-        'the drivers page needs its evidence chips under the headline'
-    found = tuple(plain(li) for li in re.findall(r'<li\b[^>]*>([\s\S]*?)</li>', chips[0]))
-    assert found == DRIVER_CHIPS, f'the evidence chips must read {DRIVER_CHIPS}: {found}'
-    proof = re.findall(r'<section class="boat-proof[^"]*"[\s\S]*?</section>', main)
-    assert len(proof) == 1, 'the drivers page needs one boat.dev proof section'
-    proof = proof[0]
-    assert main.index('class="boat-proof') > main.rindex('<article class="driver'), 'the boat.dev proof section follows the four cards'
-    assert main.index('class="boat-proof') < main.index('class="own-driver'), 'the boat.dev proof section comes before Write your own driver'
-    title = re.findall(r'<h2\b[^>]*>([\s\S]*?)</h2>', proof)
-    assert [plain(t) for t in title] == [PROOF_TITLE], f'the proof section is titled {PROOF_TITLE!r}: {title}'
-    rows = re.findall(r'<li class="proof-check" data-check="([^"]*)" data-state="([^"]*)">([\s\S]*?)</li>', proof)
+    """boat.dev's spotlight (#62), right after the hero and before the other drivers: the kit's five checks in order,
+    each passed with its plain line, beside the crew painting; and no painting shown twice."""
+    spot = re.findall(r'<section class="spotlight[^"]*"[\s\S]*?</section>', main)
+    assert len(spot) == 1, 'the drivers page needs one boat.dev spotlight'
+    spot = spot[0]
+    assert 'id="boat-dev"' in spot, 'the spotlight is boat.dev\'s card'
+    assert main.index('class="spotlight') > main.index('class="voyage"') and \
+        main.index('class="spotlight') < main.index('<article class="driver" '), 'the spotlight comes right after the hero, before the other drivers'
+    assert main.index('class="spotlight') < main.index('class="own-driver'), 'the spotlight comes before Write your own driver'
+    rows = re.findall(r'<li class="proof-check" data-check="([^"]*)" data-state="([^"]*)">([\s\S]*?)</li>', spot)
     assert [(c, s) for c, s, _ in rows] == [(c, 'passed') for c, _ in PROOF_LINES], \
-        f'the proof lists the kit\'s five checks in order, each passed: {[(c, s) for c, s, _ in rows]}'
+        f'the spotlight lists the kit\'s five checks in order, each passed: {[(c, s) for c, s, _ in rows]}'
     for (check, _, body), (_, line) in zip(rows, PROOF_LINES):
         name = re.findall(r'<code class="proof-name">([^<]*)</code>', body)
         said = re.findall(r'<span class="proof-line">([\s\S]*?)</span>', body)
         state = re.findall(r'<span class="proof-state">([^<]*)</span>', body)
         assert name == [check] and [plain(s) for s in said] == [line] and state == ['passed'], \
             f'{check}: the proof row names the check, says passed in words and explains what it proved: {line!r}'
-    assert re.search(r'<img class="proof-art" src="/art/drivers-[^"]+" alt="[^"]+"', proof), 'the proof section shows a painting of the crew'
-    images = re.findall(r'<img\b[^>]*\bsrc="([^"]+)"', main)
+    assert re.search(r'<img class="proof-art" src="/art/drivers-[^"]+" alt="[^"]+"', spot), 'the spotlight shows a painting of the crew'
+    images = [src for src in re.findall(r'<img\b[^>]*\bsrc="([^"]+)"', main) if src.startswith('/art/')]
     twice = sorted({src for src in images if images.count(src) > 1})
-    assert not twice, f'a picture shown twice on the drivers page: {twice}'
+    assert not twice, f'a painting shown twice on the drivers page: {twice}'
 
 
 def check_drivers_nav(css, pages):
@@ -893,11 +965,13 @@ def check_privacy(path, data):
     if path.endswith(('.webp', '.webm')):
         check_art(font, data)
     if path.endswith(('.png', '.ico')):
-        pinned = DOC_HASHES.get(path) or ICON_HASHES.get(font)
+        pinned = DOC_HASHES.get(path) or ICON_HASHES.get(font) or DRIVER_LOGOS.get(font, (None,))[0]
         assert pinned and sha256(data).hexdigest() == pinned, 'unreviewed picture'
         assert not any(marker.encode() in data.lower() for marker in DENYLIST), f'private marker in {path}'
     if font in VECTORS:
         check_vector(data)
+    if font in DRIVER_LOGOS:
+        assert sha256(data).hexdigest() == DRIVER_LOGOS[font][0], f'a drivers logo changed bytes: {path}'
     binary = path.endswith(('.webp', '.webm', '.png', '.ico')) or (font in FONT_HASHES and font.endswith('.woff2'))
     text = path + '\n' + ('' if binary else data.decode('utf-8'))
     # The owner's copy rule covers every text file, this checker included (it builds the word from parts).
