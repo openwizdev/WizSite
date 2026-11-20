@@ -198,6 +198,12 @@ class Checks(unittest.TestCase):
                 (lambda t: t.replace('class="app-shot" src="/art/todo-app.webp" alt="The', 'class="app-shot" src="/art/todo-app.webp" alt=" " data-x="'), 'described capture of the live app'),
                 (lambda t: t.replace('<summary>The spec</summary>', '<summary>The spec</summary><a href="https://github.com/openwizdev/openwiz">x</a>'), 'keep visitors on the site'),
                 (lambda t: t.replace('<summary>The live app</summary>', '<summary><a href="https://openwizdev.github.io/todo-demo/">The live app</a></summary>'), 'keep visitors on the site|unexpected external URL'),
+                (lambda t: t.replace('<summary>The spec</summary>', "<summary>The spec</summary><a href='https://github.com/openwizdev/openwiz'>x</a>"), 'keep visitors on the site'),
+                (lambda t: t.replace('<summary>The spec</summary>', '<summary>The spec</summary><a href=//github.com/openwizdev/openwiz>x</a>'), 'keep visitors on the site|unexpected external URL'),
+                # Catches: an answer missing from the expanded grill while the bubbles still show it, and the reverse.
+                (lambda t: t.replace('</span></p>\n              <p class="reply">Yes, greyed out.</p>', '</span></p>\n'), 'expanded grill must show each question with its answer: Keep'),
+                (lambda t: t.replace('</span></p>\n              <p class="reply">One list for now.</p>', '</span></p>\n              <p class="reply">Several lists.</p>'), 'expanded grill must show each question with its answer: Where'),
+                (lambda t: t.replace('<p class="ask">Where should tasks live?</p><p class="reply">One list for now.</p>', '<p class="ask">Where should tasks live?</p>'), 'grill bubbles must show each question with its answer: Where'),
                 (lambda t: t.replace('</main>', '<p>Add a dark mode toggle</p></main>'), 'old example'),
                 (lambda t: t.replace('Oil painting of Wiz scholars studying a to-do list', ''), 'painting without a description')):
             with self.subTest(error=error), tempfile.TemporaryDirectory() as temp:

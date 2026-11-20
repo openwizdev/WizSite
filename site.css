@@ -190,6 +190,7 @@ code,.v{font-family:var(--ow-font-mono)}
 .moment-chat { display: grid; grid-auto-flow: column; grid-template-rows: auto auto; gap: 4px 10px; font-size: 12px; line-height: 1.3; }
 .moment-chat p, .grill-panel .ask, .grill-panel .reply { width: fit-content; margin: 0; padding: 4px 9px; border-radius: 10px 10px 10px 3px; background: rgb(190 210 240 / 10%); color: #d6e2f5; }
 .moment-chat .reply, .grill-panel .reply { justify-self: end; border-radius: 10px 10px 3px 10px; background: #2b3f69; color: #fff; }
+.chat-label { display: none; }
 .moment-thumb { display: block; width: auto; height: 76px; border-radius: 6px; box-shadow: 0 0 0 1px rgb(190 210 240 / 24%); filter: brightness(.86); }
 .moment-more > summary { display: block; width: fit-content; margin-left: auto; color: #e9f0fb; font-size: 15px; font-weight: 500; line-height: 1.3; white-space: nowrap; text-decoration: underline 1px; text-decoration-color: rgb(190 210 240 / 50%); text-underline-offset: .3em; cursor: pointer; list-style: none; }
 .moment-more > summary::-webkit-details-marker { display: none; }
@@ -233,6 +234,12 @@ code,.v{font-family:var(--ow-font-mono)}
 .spec-video:not([controls]) { cursor: pointer; }
 .spec-video:focus-visible { outline: 2px solid var(--orchid); outline-offset: -2px; }
 .spec-video::cue { color: #fff; background: rgba(15, 17, 21, .85); }
+/* Once the visitor takes over (or without this site's script) the native controls show. The box then grows below the
+   16:9 slide, which stays pinned to its top, so the control bar sits over that empty band under the slide and never
+   covers slide text, at any width: the band is a sixth of the slide's height, and never under 36px. */
+.spec-frame { container-type: inline-size; }
+.spec-frame:not(.is-ambient) .spec-video[controls] { height: calc(56.25cqw + max(9.375cqw, 36px)); aspect-ratio: auto; object-fit: contain; object-position: top; }
+.spec-video:fullscreen { object-position: center; }
 /* At rest and while it plays muted on its own (this script only), the frame shows just the slides' band: every slide's
    text lies between 27% and 73% of its height, so cropping to 20-80% never cuts it, and the captions stay hidden.
    Once the visitor plays it, the whole 16:9 frame returns with captions in its top band and controls in its bottom. */
@@ -265,6 +272,17 @@ code,.v{font-family:var(--ow-font-mono)}
   .spec-title h3 { font-size: 17px; }
   .spec-link, .moment-copy { font-size: 14px; }
   .moment-num { width: 26px; height: 26px; }
+}
+/* Phones: the three moments stack as three cards, each with its real preview shown openly on top (the grill's
+   questions and answers as chat bubbles, the spec clip, a large capture of the live app), then its title and expander. */
+@media (max-width: 719px) {
+  .moment-stage ol { gap: 12px; }
+  .moment-step { gap: 12px 10px; padding: 12px 12px 10px; }
+  .moment-step > :is(.moment-chat, .moment-thumb) { order: -1; flex-basis: 100%; }
+  .moment-chat { display: grid; grid-auto-flow: row; grid-template-rows: none; gap: 8px; padding: 12px; border-radius: 10px; background: #0e1628; box-shadow: inset 0 0 0 1px rgb(190 210 240 / 12%); font-size: 13.5px; }
+  .moment-chat p { padding: 6px 11px; }
+  .moment-chat .chat-label { display: block; width: auto; padding: 0 0 2px; background: none; color: #a9b8d0; font: 12px/1.3 var(--ow-font-mono); }
+  .moment-thumb { width: 100%; max-width: 420px; height: auto; margin-inline: max(0px, (100% - 420px) / 2); filter: none; }
 }
 @media (max-width: 480px) {
   .moment-stage { margin-inline: calc(-1 * var(--m) + 8px); padding: 14px 10px; }

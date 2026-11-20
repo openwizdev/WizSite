@@ -609,7 +609,10 @@ def check_site(root):
     # The three moments show the real to-do run on this page and never send the visitor away for it: no link out.
     section = re.search(r'<section class="moments[\s\S]*?</section>', re.sub(r'<!--.*?-->', '', landing, flags=re.S))
     section = section[0] if section else ''
-    assert not re.search(r'href="(?!/)', section), 'the moments must keep visitors on the site: no link out'
+    # Parsed, not pattern-matched, so a link written with single quotes or none counts too.
+    links = Page(section)
+    assert not links.books and not links.x_links and all(ref.startswith('/') and not ref.startswith('//') for ref in links.refs), \
+        'the moments must keep visitors on the site: no link out'
     blocks = {}
     # Comments hide markup from visitors, so a commented-out moment or text counts as missing.
     for block in re.findall(r'<li class="(?:moment-step|spec-moment)[^"]*">.*?</(?:details|div)>\s*</li>', section, re.S):
@@ -617,6 +620,16 @@ def check_site(root):
     for card, texts in zip(moments, TODO_RUN):
         for text in texts:
             assert text in blocks.get(card, ''), f'the {card} moment must show the real to-do run in place: {text}'
+    # Each grill question shows with its own answer right after it: in the bubbles (open on phones) and in the expanded grill.
+    grill = TODO_RUN[0]
+    chat = re.search(r'<div class="moment-chat"[^>]*>(.*?)</div>', section, re.S)
+    panel = re.search(r'<div class="moment-panel grill-panel">(.*?)</div>', section, re.S)
+    for question, answer in zip(grill[::2], grill[1::2]):
+        q, a = re.escape(escape(question, quote=False)), re.escape(escape(answer, quote=False))
+        assert chat and re.search(rf'<p class="ask">{q}</p>\s*<p class="reply">{a}</p>', chat[1]), \
+            f'the grill bubbles must show each question with its answer: {question}'
+        assert panel and re.search(rf'<p class="ask"><strong>{q}</strong>[^<]*<span>[^<]*</span></p>\s*<p class="reply">{a}</p>', panel[1]), \
+            f'the expanded grill must show each question with its answer: {question}'
     # The live app is shown as its pinned real capture, described, inside step 3.
     ship = re.search(r'<li class="moment-step moment-ship">.*?</li>', section, re.S)
     shot = next((i for i in Page(ship[0]).images if i.get('src') == TODO_APP and (i.get('alt') or '').strip()), None) if ship else None

@@ -293,8 +293,7 @@ function specVideo() {
   document.addEventListener('visibilitychange', update);
   pause.addEventListener('click', () => setTimeout(update));
   resting(true);
-  // The muted loop starts on the poster's own frame (a full slide), so the poster hands over without a jump.
-  video.addEventListener('loadedmetadata', () => { if (!visitor) video.currentTime = 17.5; }, { once: true });
+  // The muted loop starts at the opening slide, the poster's own frame, so the poster hands over without a jump.
   sound.hidden = false;
   const listen = () => {
     takeOver();
