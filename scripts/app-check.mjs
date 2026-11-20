@@ -988,6 +988,137 @@ async function main() {
       await page.close();
     });
 
+    // ---- AP17 (#1579): the pulse and the Agents card's pull request tell the truth (WizSite #34, R1 and R2) ----
+
+    // A status note on spec 40's ticket #43 as the Agents read gives it: its id, its state and its last edit.
+    const note43 = (id, state, updatedAt) => ({ databaseId: id, createdAt: '2030-01-01T00:00:00Z', updatedAt, author: { login: 'factory-bot[bot]' },
+      body: `<!-- openwiz:status v1 -->\nagent: builder\nstate: ${state}\nharness: Synthetic Harness\nmodel: Synthetic Model\nskills: build-ticket@0.1.2\nstep: a synthetic step\ntime: ${updatedAt}` });
+    const ticketOf = (number, comments, totalCount = comments.length) => ({ number, title: `Synthetic ticket ${number}`, url: `https://github.com/acme/factory/issues/${number}`,
+      state: 'OPEN', updatedAt: comments[0]?.updatedAt || '2030-01-01T00:00:00Z', comments: { totalCount, nodes: comments }, closedByPullRequestsReferences: { totalCount: 0, nodes: [] } });
+    const minutesAgo = n => new Date(Date.now() - n * 60 * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z');
+    // Spec 40 as both reads first give it (#42 and #43 working); then only the Agents read comes again, with `later`.
+    const pulseWorld = (later, specs = () => {}) => {
+      let changed = false;
+      const world = ap7World({
+        tickets: repository => {
+          for (const ticket of repository.s40.subIssues.nodes) for (const c of ticket?.comments?.nodes || []) {
+            c.body = c.body.replace('\nstep:', '\nskills: build-ticket@0.1.2\nstep:');
+            if (c.databaseId === 9009 || c.databaseId === 9007) c.updatedAt = minutesAgo(5); // working in the Specs read, 5 minutes ago
+            specs(c);
+          }
+        },
+        agents: repository => { if (changed) later(repository); },
+      });
+      world.later = () => { changed = true; };
+      return world;
+    };
+    const idle = `OW.data.feeds.agents.readAt && OW.data.feeds.specs.readAt && OW.data.feeds.specs.data?.specs && !OW.data.feeds.agents.busy && !OW.data.feeds.specs.busy`;
+    const pulsing = page => page.run(`[...document.querySelectorAll('main .graph [data-pulse]')].map(c => c.dataset.ticket).sort()`);
+    // Open spec 40, see both reads' pulse, then read Agents again (as its two-minute schedule does) and give the pulse.
+    const pulseAfterAgents = async (world, before = ['42', '43']) => {
+      const page = await ap6Open(world, '#/specs/40');
+      await page.until(`document.querySelectorAll('main .graph [data-ticket]').length === 10 && ${idle}`, 'the ticket graph and both reads');
+      const first = await pulsing(page);
+      assert(JSON.stringify(first) === JSON.stringify(before), `pulsing before the newer Agents read: ${JSON.stringify(first)}`);
+      world.later();
+      const specsAt = await page.run(`OW.data.feeds.specs.readAt`);
+      await page.run(`(() => { OW.data.feeds.agents.readAt = 1; document.dispatchEvent(new Event('visibilitychange')); })()`);
+      await page.until(`OW.data.feeds.agents.readAt > ${specsAt} && ${idle}`, 'the newer Agents read');
+      assert(await page.run(`OW.data.feeds.specs.readAt`) === specsAt, 'the Specs feed was read again');
+      return [page, await pulsing(page)];
+    };
+
+    await check('AP17 pulse: a note working in the Specs read and done in a newer Agents read shows no pulse', async () => {
+      // catches: the pulse unioning working claims from both snapshots, so an older Specs read keeps "Agent working" on.
+      const world = pulseWorld(repository => { repository.issues.nodes.unshift(ticketOf(43, [note43(9009, 'done', minutesAgo(1))])); });
+      const [page, now] = await pulseAfterAgents(world);
+      assert(JSON.stringify(now) === JSON.stringify(['42']), `pulsing tickets: ${JSON.stringify(now)}`);
+      checkRequestLog(world);
+      await page.close();
+    });
+
+    await check('AP17 pulse: a newer Agents read that covers a deleted note drops its pulse; one that does not reach it keeps it', async () => {
+      // catches: a deleted working note pulsing on from the older Specs read, or a note the newer read never reached being dropped.
+      const full = Array.from({ length: 20 }, (_, i) => ({ databaseId: 9900 + i, body: 'An ordinary comment.', createdAt: '2030-01-01T00:00:00Z',
+        updatedAt: minutesAgo(1), author: { login: 'factory-bot[bot]' } }));
+      const world = pulseWorld(repository => {
+        repository.issues.nodes.unshift(ticketOf(43, [], 0), ticketOf(42, full, 25)); // #43's note is gone; #42's window stops short of its note
+      });
+      const [page, now] = await pulseAfterAgents(world);
+      assert(JSON.stringify(now) === JSON.stringify(['42']), `pulsing tickets: ${JSON.stringify(now)}`);
+      checkRequestLog(world);
+      await page.close();
+    });
+
+    // Review round 1 of WizSite #41 (R1, R2): reads that overlap, and a newer read whose record authors can't be read.
+    // Both feeds are read again at once; the Specs answer, captured first, is held until the browser has taken the Agents one.
+    const overlapping = async (world, page) => {
+      let release;
+      const held = new Promise(resolve => { release = resolve; });
+      const answer = world.graphql.SpecTickets;
+      world.graphql.SpecTickets = async () => { const captured = await answer(); await held; return captured; };
+      world.later();
+      const agentsAt = await page.run(`OW.data.feeds.agents.readAt`);
+      await page.run(`OW.data.refreshAll()`);
+      await page.until(`OW.data.feeds.agents.readAt > ${agentsAt} && OW.data.feeds.specs.busy`, 'the Agents answer, with Specs still out');
+      release();
+      await page.until(`OW.data.feeds.specs.readAt > OW.data.feeds.agents.readAt && ${idle}`, 'the held Specs answer');
+      world.graphql.SpecTickets = answer;
+    };
+
+    await check('AP17 pulse: an older Specs answer that arrives after a newer Agents read never restores a deleted note', async () => {
+      // catches: snapshots ordered by when the browser took them, so a held Specs answer brings back a note the Agents read showed deleted.
+      const world = pulseWorld(repository => { repository.issues.nodes.unshift(ticketOf(43, [], 0)); });
+      const page = await ap6Open(world, '#/specs/40');
+      await page.until(`document.querySelectorAll('main .graph [data-ticket]').length === 10 && ${idle}`, 'the ticket graph and both reads');
+      await overlapping(world, page);
+      const held = await pulsing(page);
+      assert(JSON.stringify(held) === JSON.stringify(['42']), `pulsing after the held Specs answer: ${JSON.stringify(held)}`);
+      // An Agents read on its own settles the order: the note stays gone.
+      const specsAt = await page.run(`OW.data.feeds.specs.readAt`);
+      await page.run(`(() => { OW.data.feeds.agents.readAt = 1; document.dispatchEvent(new Event('visibilitychange')); })()`);
+      await page.until(`OW.data.feeds.agents.readAt > ${specsAt} && ${idle}`, 'a fresh Agents read');
+      const settled = await pulsing(page);
+      assert(JSON.stringify(settled) === JSON.stringify(['42']), `pulsing after a fresh Agents read: ${JSON.stringify(settled)}`);
+      checkRequestLog(world);
+      await page.close();
+    });
+
+    await check('AP17 pulse: a note first seen in an Agents read without record authors never pulses, as its card is unknown', async () => {
+      // catches: the older Specs read's record authors vouching for a note only the newer, unverifiable Agents read has.
+      const world = pulseWorld(repository => {
+        repository.fleet = null;
+        repository.issues.nodes.unshift(ticketOf(43, [note43(9009, 'working', minutesAgo(1))]));
+      }, c => { if (c.databaseId === 9009) c.body = c.body.replace('state: working', 'state: done'); });
+      const [page, now] = await pulseAfterAgents(world, ['42']);
+      assert(JSON.stringify(now) === JSON.stringify(['42']), `pulsing tickets: ${JSON.stringify(now)}`);
+      await page.go(`${SITE}/app/#/agents`);
+      await page.until(`document.querySelector('main article.card[data-note="9009"]')`, 'the note\'s card');
+      const status = await page.run(`document.querySelector('main article.card[data-note="9009"]').dataset.status`);
+      assert(status === 'unknown', `the note's card says ${status}`);
+      checkRequestLog(world);
+      await page.close();
+    });
+
+    await check('AP17 Agents: a note naming PR #12 that GitHub does not return links PR #12, with its facts unknown', async () => {
+      // catches: the card swapping in the ticket's other pull request (#99) beside the preview of the PR the note names.
+      const world = ap7World({ agents: repository => {
+        const pr = repository.issues.nodes.find(issue => issue.number === 70).closedByPullRequestsReferences;
+        pr.nodes = [{ ...pr.nodes[0], url: 'https://github.com/acme/site/pull/99', reviewDecision: 'APPROVED' }];
+      } });
+      const page = await ap6Open(world, '#/agents');
+      await page.until(`document.querySelector('main article.card[data-note="7001"]')`, 'the builder\'s card');
+      const links = await page.run(`[...document.querySelectorAll('main article.card[data-note="7001"] a')].map(a => a.getAttribute('href'))`);
+      assert(JSON.stringify(links) === JSON.stringify(['https://github.com/acme/factory/issues/70', 'https://github.com/acme/site/pull/12',
+        'https://12.example-site.pages.dev/app/']), `the builder's links: ${JSON.stringify(links)}`);
+      const text = await page.run(`document.querySelector('main article.card[data-note="7001"]').innerText.replace(/\\s+/g, ' ')`);
+      assert(/Pull request #12: [^·]*unknown/.test(text) && !/#99|approved|open,/.test(text), `the builder's pull request: ${text}`);
+      const second = await page.run(`document.querySelector('main article.card[data-note="7005"]').innerText.replace(/\\s+/g, ' ')`);
+      assert(/Pull request #99: open, approved/.test(second), `a note naming no PR loses the ticket's pull request: ${second}`);
+      checkRequestLog(world);
+      await page.close();
+    });
+
     await check('AP7 keyboard: 3 opens Agents; Tab walks each card\'s ticket, pull request and preview with visible focus; a refresh keeps it', async () => {
       const world = ap7World();
       const page = await ap6Open(world);
