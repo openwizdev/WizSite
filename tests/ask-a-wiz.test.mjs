@@ -34,13 +34,14 @@ const MIDSTREAM = [line({ type: 'text', text: 'Synthetic part one. ' }), refused
 // keeps the stream open after its lines until `release()` (or until the browser closes it, which sets `closed`).
 let fake;
 beforeEach(() => {
-  fake = { probe: { status: 404 }, answers: [], asked: [], closed: 0, release: null };
+  fake = { probe: { status: 404 }, probed: 0, answers: [], asked: [], closed: 0, release: null };
 });
 function serve() {
   const server = createServer(async (request, response) => {
     const path0 = new URL(request.url, 'http://x').pathname;
     if (path0 === '/api/ask') {
       if (request.method === 'GET') {
+        fake.probed++;
         const { status, type = 'application/json', body } = fake.probe;
         response.writeHead(status, body ? { 'content-type': type, 'cache-control': 'no-store' } : {}).end(body);
         return;
@@ -49,10 +50,11 @@ function serve() {
       for await (const chunk of request) body += chunk;
       fake.asked.push({ body: JSON.parse(body), origin: request.headers.origin, type: request.headers['content-type'] });
       const { status = 200, lines, hold } = fake.answers.shift();
+      const held = new Promise(resolve => { fake.release = resolve; response.on('close', resolve); });
       response.writeHead(status, { 'content-type': 'application/x-ndjson; charset=utf-8', 'cache-control': 'no-store' });
       response.on('close', () => { if (!response.writableFinished) fake.closed++; });
       for (const each of lines) { response.write(each); await new Promise(resolve => setTimeout(resolve, 30)); }
-      if (hold) await new Promise(resolve => { fake.release = resolve; response.on('close', resolve); });
+      if (hold) await held;
       response.end(...(hold && Array.isArray(hold) ? [hold.join('')] : []));
       return;
     }
@@ -111,7 +113,7 @@ before(async () => {
 });
 after(async () => { await browser?.close(); server?.close(); });
 
-async function open(path = '/', { width = 1280, height = 900, reduced = false } = {}) {
+async function open(path = '/', { width = 1280, height = 900, reduced = false, scroll = true } = {}) {
   const { targetId } = await browser.send('Target.createTarget', { url: 'about:blank' });
   const { sessionId } = await browser.send('Target.attachToTarget', { targetId, flatten: true });
   const send = (method, params) => browser.send(method, params, sessionId);
@@ -122,6 +124,7 @@ async function open(path = '/', { width = 1280, height = 900, reduced = false } 
   const loaded = new Promise(resolve => browser.on(m => m.sessionId === sessionId && m.method === 'Page.loadEventFired' && resolve()));
   await send('Page.navigate', { url: `${origin}${path}` });
   await loaded;
+  if (scroll) await send('Runtime.evaluate', { expression: `document.querySelector('section.faq').scrollIntoView()` }); // the row waits for its FAQ
   const evaluate = async expression => {
     const { result, exceptionDetails } = await send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true });
     if (exceptionDetails) throw new Error(exceptionDetails.exception?.description || exceptionDetails.text);
@@ -163,14 +166,23 @@ test('with the switch off the FAQ shows no input row, and asks nothing', async (
     { status: 200, body: '{"schema":"openwiz.ask-a-wiz.v1","enabled":false,"max_question_chars":300}' }]) {
     fake.probe = probe;
     for (const path of ['/', '/team/', '/faq/']) {
-      const page = await open(path);
+      const probed = fake.probed, page = await open(path);
       await page.evaluate('new Promise(resolve => setTimeout(resolve, 300))');
+      assert.equal(fake.probed, probed + 1, `${path}: asked once`);
       assert.equal(await page.evaluate(`document.querySelectorAll('section.faq input, section.faq form, .faq-ask').length`), 0, `${path} ${probe.status}`);
       assert.equal((await rows(page)).length, 7, `${path}: only the seven hand-written rows`);
       await page.close();
     }
   }
   assert.equal(fake.asked.length, 0);
+  // catches: every landing view calling the function, even for a visitor who never scrolls to the FAQ.
+  const probed = fake.probed, page = await open('/', { scroll: false });
+  await page.evaluate('new Promise(resolve => setTimeout(resolve, 300))');
+  assert.equal(fake.probed, probed, 'the landing asks nothing before its FAQ nears the screen');
+  await page.evaluate(`document.querySelector('section.faq').scrollIntoView()`);
+  await page.until(`true`).then(() => new Promise(resolve => setTimeout(resolve, 300)));
+  assert.equal(fake.probed, probed + 1, 'and asks once it does');
+  await page.close();
 });
 
 test('an answer streams in, becomes a normal FAQ row, and a fresh input row appears', async () => {

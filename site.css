@@ -557,3 +557,25 @@ body.landing > main { flex: 1 0 auto; }
   .faq { grid-template-columns: 1fr; }
   .faq-a p { padding-right: 0; }
 }
+/* The "Ask a Wiz..." row (#1902): site.js adds it as the FAQ's last row only when the switch is on. Its input reads like
+   a question; its answer streams in the answers' own style, with a caret that blinks only when motion is allowed. */
+.faq-ask [hidden] { display: none; }
+.faq-ask-form { display: flex; align-items: center; gap: 12px; min-height: 64px; }
+.faq-ask-form input { flex: 1; min-width: 0; min-height: 44px; padding: 10px 0; border: 0; background: none; color: var(--ink); font: 560 clamp(17px, 1.5vw, 19px)/1.35 var(--ow-font-sans); letter-spacing: -.015em; }
+.faq-ask-form input::placeholder { color: var(--grey); opacity: 1; }
+.faq-ask-form input:focus { outline: none; }
+.faq-ask:has(input:focus-visible) { border-bottom-color: var(--brass); }
+.faq-ask button { flex: none; min-height: 44px; padding: 0 16px; border: 1px solid var(--line); border-radius: 8px; background: none; color: var(--ink); font: 600 14px var(--ow-font-sans); cursor: pointer; }
+.faq-ask button:hover { border-color: var(--grey); }
+.faq-ask .faq-ask-go { background: var(--ink); border-color: var(--ink); color: var(--ground); }
+.faq-ask .faq-q { padding: 18px 0; color: var(--ink); font: 560 clamp(17px, 1.5vw, 19px)/1.35 var(--ow-font-sans); letter-spacing: -.015em; overflow-wrap: anywhere; }
+.faq-ask .faq-a p:empty { display: none; }
+.faq-ask[data-state="asking"] .faq-a p:empty { display: block; }
+.faq-ask[data-state="asking"] .faq-ask-answer::after { content: ""; display: inline-block; width: .5em; height: 1.1em; margin-left: 2px; vertical-align: text-bottom; background: var(--brass); }
+.faq-ask-actions { display: flex; flex-wrap: wrap; gap: 8px; padding-bottom: 22px; }
+.faq-a .faq-ask-sources { margin-top: -12px; color: var(--grey); font-size: 14px; }
+.faq-a .faq-ask-links { margin-top: -12px; }
+@media (prefers-reduced-motion:no-preference) {
+  .faq-ask[data-state="asking"] .faq-ask-answer::after { animation: faq-ask-caret 1s steps(2, jump-none) infinite; }
+  @keyframes faq-ask-caret { to { opacity: 0; } }
+}

@@ -459,7 +459,129 @@ function enableCopy() {
   });
 }
 
+// The "Ask a Wiz..." row (#1902, contract openwiz.ask-a-wiz.v1): the FAQ's last row, added only when GET /api/ask
+// answers the contract's probe (its switch, ASK_A_WIZ, is exactly "on"); anything else, the site's own page included,
+// leaves the FAQ as it is. A question streams in; a finished answer becomes a normal row and a fresh input row follows.
+// Everything from the stream is set as text; only the not-covered links, when they are exactly the contract's, link.
+const ASK_LINKS = { 'Book a call': 'https://openwiz.dev/team/#book', 'GitHub issues': 'https://github.com/openwizdev/openwiz/issues' };
+async function askAWiz() {
+  const lists = document.querySelectorAll('.faq .faq-rows');
+  if (!lists.length) return;
+  // Asked once, as the FAQ nears the screen: a visitor who never scrolls to it costs the function nothing.
+  await new Promise(resolve => {
+    const near = new IntersectionObserver(seen => seen.some(e => e.isIntersecting) && (near.disconnect(), resolve()), { rootMargin: '600px 0px' });
+    lists.forEach(list => near.observe(list));
+  });
+  const probe = await fetch('/api/ask', { cache: 'no-store' }).then(r => r.status === 200 ? r.json() : null).catch(() => null);
+  if (probe?.schema !== 'openwiz.ask-a-wiz.v1' || probe.enabled !== true) return;
+  let made = 0;
+  const el = (tag, className, text) => {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined) node.textContent = text;
+    return node;
+  };
+  for (const list of lists) {
+    const faq = list.closest('.faq');
+    const level = list.querySelector('.faq-q')?.tagName.toLowerCase() || 'h3';
+    const addRow = () => {
+      const n = ++made, row = el('div', 'faq-row faq-ask'), form = el('form', 'faq-ask-form'), input = el('input');
+      const label = el('label', 'sr-only', 'Ask a Wiz a question about OpenWiz');
+      Object.assign(input, { id: `faq-ask-${n}`, type: 'text', name: 'question', placeholder: 'Ask a Wiz...', autocomplete: 'off', enterKeyHint: 'send' });
+      label.htmlFor = input.id;
+      form.append(label, input, el('button', 'faq-ask-go', 'Ask'));
+      const heading = el(level, 'faq-q'), answer = el('p', 'faq-ask-answer'), body = el('div', 'faq-a'), actions = el('div', 'faq-ask-actions');
+      answer.setAttribute('aria-live', 'polite');
+      body.append(el('div'));
+      body.firstChild.append(answer);
+      const buttons = {};
+      for (const name of ['Stop', 'Retry', 'Edit']) actions.append(buttons[name] = Object.assign(el('button', '', name), { type: 'button' }));
+      row.append(form, heading, body, actions);
+      list.append(row);
+      let question = '', controller = null;
+      // idle: the input; asking: the question, its answer so far and Stop; ended: the question, a message, Retry and Edit.
+      const show = (state, message = '', retry = true) => {
+        row.dataset.state = state;
+        form.hidden = state !== 'idle';
+        heading.hidden = body.hidden = state === 'idle';
+        heading.textContent = question;
+        answer.textContent = message;
+        buttons.Stop.hidden = state !== 'asking';
+        buttons.Retry.hidden = state !== 'ended' || !retry;
+        buttons.Edit.hidden = state !== 'ended';
+        actions.hidden = state === 'idle';
+      };
+      const finish = (paragraphs, links = []) => {
+        const done = el('div', 'faq-row'), h = el(level, 'faq-q'), button = el('button', '', question), a = el('div', 'faq-a');
+        Object.assign(button, { type: 'button', id: `faq-ask-q${n}`, disabled: !faq.hasAttribute('data-ready') });
+        button.setAttribute('aria-expanded', 'true');
+        button.setAttribute('aria-controls', a.id = `faq-ask-a${n}`);
+        const chevron = list.querySelector('.faq-chevron');
+        if (chevron) button.append(chevron.cloneNode(true));
+        h.append(button);
+        a.append(el('div'));
+        for (const [text, className] of paragraphs) a.firstChild.append(el('p', className, text));
+        if (links.length) {
+          const p = el('p', 'faq-ask-links');
+          links.forEach(({ label, href }, i) => p.append(...(i ? [' · '] : []), Object.assign(el('a', '', label), { href })));
+          a.firstChild.append(p);
+        }
+        done.append(h, a);
+        row.replaceWith(done);
+        addRow().focus({ preventScroll: true });
+      };
+      const ask = async () => {
+        controller = new AbortController();
+        show('asking');
+        let text = '', sources = [], end = null;
+        try {
+          const response = await fetch('/api/ask', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ question }), cache: 'no-store', signal: controller.signal });
+          const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
+          let buffer = '';
+          while (!end) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            buffer += value;
+            for (let at; !end && (at = buffer.indexOf('\n')) >= 0; buffer = buffer.slice(at + 1)) {
+              const event = JSON.parse(buffer.slice(0, at));
+              if (event.type === 'text' && typeof event.text === 'string') answer.textContent = text += event.text;
+              else if (event.type === 'sources' && Array.isArray(event.sources)) sources = event.sources.map(s => String(s.title));
+              else if (['done', 'not_covered', 'refused'].includes(event.type)) end = event;
+            }
+          }
+          if (end) controller.abort(); // nothing may follow the last event
+        } catch {}
+        controller = null;
+        if (end?.type === 'done' && text) {
+          finish([[text], ...(sources.length ? [[`Sources: ${sources.join(', ')}`, 'faq-ask-sources']] : [])]);
+        } else if (end?.type === 'not_covered' && typeof end.text === 'string') {
+          const links = Array.isArray(end.links) && end.links.length === 2 && end.links.every(l => ASK_LINKS[l?.label] === l.href) ? end.links : [];
+          finish([[end.text]], links);
+        } else if (end?.type === 'refused' && typeof end.message === 'string') {
+          show('ended', end.message, end.reason !== 'too_long');
+        } else {
+          show('ended', 'stopped' in row.dataset ? 'Stopped.' : 'The answer didn’t finish. Try again.');
+        }
+        delete row.dataset.stopped;
+      };
+      form.addEventListener('submit', event => {
+        event.preventDefault();
+        question = input.value.trim();
+        if (question) ask();
+      });
+      buttons.Stop.addEventListener('click', () => { row.dataset.stopped = ''; controller?.abort(); });
+      buttons.Retry.addEventListener('click', ask);
+      buttons.Edit.addEventListener('click', () => { show('idle'); input.value = question; input.focus(); });
+      show('idle');
+      return input;
+    };
+    addRow();
+  }
+}
+
 enableCopy();
+askAWiz();
 showStars().catch(() => {});
 specVideo();
 enableFamily(window.gsap);
