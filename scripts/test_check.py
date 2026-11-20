@@ -7,7 +7,7 @@ from unittest import mock
 
 import re
 
-from check import CTA, FOOTER, FINGERPRINTS, HASHED, INSTALL_SWITCH, ROOT, Page, check_changelog, check_releases, split_releases, check_motion, check_privacy, check_ref, check_site, check_vector, check_webp, fingerprint
+from check import CTA, FAQ, FOOTER, FINGERPRINTS, HASHED, INSTALL_SWITCH, ROOT, Page, check_changelog, check_releases, split_releases, check_motion, check_privacy, check_ref, check_site, check_vector, check_webp, fingerprint
 
 
 def edit_built(root, name, change):
@@ -19,7 +19,7 @@ def edit_built(root, name, change):
     new = fingerprint(name, data)
     old.unlink()
     (root / new).write_bytes(data)
-    for page in ('index.html', 'changelog/index.html', 'drivers/index.html', 'team/index.html', 'app/index.html'):
+    for page in ('index.html', 'changelog/index.html', 'drivers/index.html', 'team/index.html', 'faq/index.html', 'app/index.html'):
         path = root / page
         path.write_text(path.read_text().replace(f'"/{was}"', f'"/{new}"'))
 
@@ -573,6 +573,55 @@ class Checks(unittest.TestCase):
                 path.write_text(text.replace(old, new, 1))
                 with self.assertRaisesRegex(AssertionError, message.strip()):
                     check_site(root)
+
+    def test_faq(self):
+        """#76: the one Questions snippet on the landing, /team and /faq, and nowhere else; its rows are buttons."""
+        import check
+        def planted(page, change):
+            temp = tempfile.TemporaryDirectory()
+            root = Path(temp.name) / 'dist'
+            shutil.copytree(ROOT / 'dist', root)
+            path = root / page
+            path.write_text(change(path.read_text()))
+            return temp, root
+        close = '<section class="team-part team-close'
+        for message, (page, change) in {
+            'the index.html page needs the one Questions': ('index.html', lambda t: t.replace(FAQ, '', 1)),
+            'the faq/index.html page needs the one Questions': ('faq/index.html', lambda t: t.replace('What is a kernel?', 'What is a core?', 1)),
+            # Placement on /team: its sections' order puts the Questions right above the closing Book a call.
+            'the team page sections': ('team/index.html', lambda t: t.replace(FAQ, '', 1).replace('</main>', FAQ + '</main>', 1)),
+            'needs faq.js': ('team/index.html', lambda t: re.sub(r'<script src="/faq\.[0-9a-f]+\.js" defer></script>', '', t)),
+        }.items():
+            temp, root = planted(page, change)
+            with temp, self.subTest(message=message), self.assertRaisesRegex(AssertionError, message):
+                check_site(root)
+        names = {'faq.js': 'faq.0123456789.js'}
+        for message, change in {
+            'the Questions rows': lambda f: f.replace('What is a kernel?', 'What is a core?', 1),
+            'the Questions rows ': lambda f: re.sub(r'\s*<div class="faq-row">[\s\S]*?</div></div>\n    </div>', '', f, count=1),
+            'a button that names its answer': lambda f: f.replace('type="button" ', '', 1),
+            'open and disabled until faq.js runs': lambda f: f.replace(' disabled id=', ' id=', 1),
+            'open and disabled until faq.js runs ': lambda f: f.replace('aria-expanded="true"', 'aria-expanded="false"', 1),
+            'a button that names its answer ': lambda f: f.replace('aria-controls="faq-a2"', 'aria-controls="faq-a1"', 1),
+            'links off the site': lambda f: f.replace('href="/team/#book"', 'href="https://example.com/"', 1),
+            'heading and its line': lambda f: f.replace('The short ones are here.', 'More.', 1),
+            'no form or input': lambda f: f.replace('<p>The open source', '<input><p>The open source', 1),
+        }.items():
+            broken = change(FAQ)
+            top = re.sub(r'<(/?)h3\b', r'<\1h2', re.sub(r'<(/?)h2\b', r'<\1h1', broken))
+            htmls = {'index.html': '</section>\n' + broken + '</main>', check.TEAM_PAGE: broken + close, check.FAQ_PAGE: top + '</main>'}
+            pages = {name: mock.Mock(scripts=['/faq.0123456789.js']) for name in htmls}
+            with self.subTest(message=message), mock.patch.multiple(check, FAQ=broken, FAQ_TOP=top,
+                    FAQ_ON={'index.html': broken, check.TEAM_PAGE: broken, check.FAQ_PAGE: top}), \
+                    self.assertRaisesRegex(AssertionError, message.strip()):
+                check.check_faq(htmls, pages, names)
+        htmls = {'index.html': '</section>\n' + FAQ + '</main>', check.TEAM_PAGE: FAQ + close, check.FAQ_PAGE: check.FAQ_TOP + '</main>',
+                 'drivers/index.html': '<main>' + FAQ + '</main>'}
+        pages = {name: mock.Mock(scripts=['/faq.0123456789.js']) for name in htmls}
+        with self.assertRaisesRegex(AssertionError, 'the drivers/index.html page shows no Questions'):
+            check.check_faq(htmls, pages, names)
+        del htmls['drivers/index.html']
+        check.check_faq(htmls, pages, names)
 
     def test_drivers_page(self):
         # Catches (#50, #62): the drivers page dropped from the build or its checks; a card missing, reordered or with
