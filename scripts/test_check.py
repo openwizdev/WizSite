@@ -190,10 +190,10 @@ class Checks(unittest.TestCase):
                 (lambda t: t.replace('Steer the build from the narrated video.', 'Watch the video.'), 'steering copy'),
                 (lambda t: t.replace('The real spec of an OpenWiz-built to-do app', 'A sample spec'), "to-do app's real spec"),
                 # Catches: a moment that loses, comments out or mistargets its link to the real to-do run (J267).
-                (lambda t: t.replace('<a class="moment-link" href="https://github.com/openwizdev/todo-demo/issues/1#issuecomment-7037022878">See its questions</a>', ''), 'Answer a few questions moment must link'),
+                (lambda t: re.sub(r'<a class="moment-link" href="https://github.com/openwizdev/todo-demo/issues/1#issuecomment-7037022878">(.*?)</a>', r'\1', t, count=1), 'Answer a few questions moment must link'),
                 (lambda t: t.replace('issuecomment-7037022878', 'issuecomment-7037022879'), 'unexpected repository link'),
-                (lambda t: t.replace('<a class="moment-link" href="https://github.com/openwizdev/todo-demo/issues/1">the spec</a>', '<!-- <a class="moment-link" href="https://github.com/openwizdev/todo-demo/issues/1">the spec</a> -->'), 'Watch your spec moment must link'),
-                (lambda t: t.replace('<a class="moment-link" href="https://openwizdev.github.io/todo-demo/">Open the to-do app</a>', ''), 'Watch it ship moment must link'),
+                (lambda t: t.replace('<a class="moment-link" href="https://github.com/openwizdev/todo-demo/issues/1">', '<!-- <a class="moment-link" href="https://github.com/openwizdev/todo-demo/issues/1"> -->'), 'Watch your spec moment must link'),
+                (lambda t: re.sub(r'<a class="moment-link" href="https://openwizdev.github.io/todo-demo/">(.*?)</a>', r'\1', t, count=1), 'Watch it ship moment must link'),
                 (lambda t: t.replace('https://openwizdev.github.io/todo-demo/', 'https://openwizdev.github.io/other/'), 'unexpected external URL'),
                 (lambda t: t.replace('https://github.com/openwizdev/todo-demo/issues/1"', 'https://github.com/openwizdev/todo-demo/issues/2"'), 'unexpected repository link'),
                 (lambda t: re.sub(r'(<li class="moment-step moment-grill">.*?</li>)', r'<!-- \1 -->', t, count=1, flags=re.S), 'Answer a few questions moment must link'),
