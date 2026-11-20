@@ -66,7 +66,9 @@
 
   // [{key, issue, id, at, note, live, holds, unknown}] for one issue's comments. `uncertain` is set on the issue's
   // result when its comment window is full of recent edits, so a live note may be missing.
+  // `authors` is the record authors (a Set, or null when they couldn't be read), or a function giving them per comment.
   function notesOf(issue, home, authors, now) {
+    const authorsOf = typeof authors === 'function' ? authors : () => authors;
     const out = [];
     const comments = issue?.comments;
     const nodes = Array.isArray(comments?.nodes) ? comments.nodes : [];
@@ -76,7 +78,8 @@
       if (!comment) continue;
       const note = readNote(comment.body);
       if (!note) continue;
-      const by = typeof comment.author?.login === 'string' && authors ? authors.has(comment.author.login.toLowerCase()) : null;
+      const set = authorsOf(comment);
+      const by = typeof comment.author?.login === 'string' && set ? set.has(comment.author.login.toLowerCase()) : null;
       if (by === false) continue; // a visitor's comment with the marker is ordinary discussion
       const at = Date.parse(comment.updatedAt) || 0;
       const base = { key: keyOf(issue, home), issue, id: comment.databaseId, at };
@@ -215,23 +218,38 @@
   }
 
   // ---- The pulse: the tickets an agent is working on now (a live `working` note that holds its claim) ----
-  // A ticket's notes can come from two reads taken at different times: the Specs read and the Agents read. They are
-  // reconciled by comment id before any claim is worked out: each comment counts at its latest edit (the newer read on
-  // a tie), and a comment only the older read has is dropped when the newer read covers it (its list is whole, or its
-  // newest-edited-first window reaches back past that comment's edit), as it was deleted. One the newer read never
-  // reached is kept.
+  // A ticket's notes can come from two reads: the Specs read and the Agents read. They are reconciled by comment id
+  // before any claim is worked out: each comment counts at its latest edit (the newer read on a tie), and a comment
+  // only the older read has is dropped when the newer read covers it (its list is whole, or its newest-edited-first
+  // window reaches back past that comment's edit), as it was deleted. One the newer read never reached is kept. Each
+  // comment is checked against the record authors of the read its copy came from.
+  //
+  // Which read is newer is known only when the newer one was asked for after the older one's answer arrived. When one
+  // feed's answer arrives while the other is still out, their order is unknown: a ticket then pulses only if it does
+  // in both orders, until a read on its own settles it.
+
+  const FEEDS = ['agents', 'specs'];
+  const order = Object.fromEntries(FEEDS.map(name => [name, { at: null, pending: false, overlapped: false }]));
+  // Registered before the shell's own listener (agents.js loads first), so a redraw sees the order as it is now.
+  OW.data.onChange(() => {
+    for (const name of FEEDS) {
+      const feed = OW.data.feeds[name];
+      const seen = order[name];
+      if (feed.readAt === seen.at) {
+        if (!feed.busy) seen.pending = false; // a failed read: the next one starts afresh
+        continue;
+      }
+      // A new answer (or none, after a sign-out or a change of repository).
+      Object.assign(seen, { at: feed.readAt, overlapped: feed.readAt !== null && seen.pending, pending: false });
+      const other = FEEDS.find(n => n !== name);
+      if (OW.data.feeds[other].busy) order[other].pending = true; // its answer was asked for before this one arrived
+    }
+  });
 
   const edited = comment => Date.parse(comment?.updatedAt) || 0;
-  function working(now = Date.now()) {
-    const home = OW.data.repo.get()?.full;
-    const { agents, specs } = OW.data.feeds;
-    const reads = [
-      { at: agents.readAt || 0, fleet: agents.data?.fleet?.text, issues: agents.data?.issues?.nodes || [] },
-      { at: specs.readAt || 0, fleet: specs.data?.fleet?.text, issues: Object.values(specs.data?.specs || {}).flatMap(spec => spec?.subIssues?.nodes || []) },
-    ].sort((a, b) => a.at - b.at); // the older read first
-    const authors = reads.map(read => OW.factory.recordAuthors(read.fleet)).filter(Boolean).pop();
-    if (!authors) return new Set();
-    const tickets = new Map(); // key -> {issue, comments: Map(id -> comment)}
+  // key -> {issue, comments: Map(id -> {comment, authors})}, merging the reads oldest first.
+  function reconcile(reads, home) {
+    const tickets = new Map();
     for (const read of reads) {
       for (const issue of read.issues) {
         if (!issue) continue;
@@ -239,19 +257,43 @@
         const nodes = (Array.isArray(list?.nodes) ? list.nodes : []).filter(Boolean);
         const seen = tickets.get(keyOf(issue, home));
         if (!seen) {
-          tickets.set(keyOf(issue, home), { issue, comments: new Map(nodes.map(c => [c.databaseId, c])) });
+          tickets.set(keyOf(issue, home), { issue, comments: new Map(nodes.map(c => [c.databaseId, { comment: c, authors: read.authors }])) });
           continue;
         }
         const whole = Boolean(list) && (list.totalCount ?? Infinity) <= nodes.length;
         const reach = nodes.length ? Math.min(...nodes.map(edited)) : Infinity;
         const ids = new Set(nodes.map(c => c.databaseId));
-        for (const [id, c] of seen.comments) if (!ids.has(id) && (whole || edited(c) > reach)) seen.comments.delete(id);
-        for (const c of nodes) if (!seen.comments.has(c.databaseId) || edited(c) >= edited(seen.comments.get(c.databaseId))) seen.comments.set(c.databaseId, c);
+        for (const [id, kept] of seen.comments) if (!ids.has(id) && (whole || edited(kept.comment) > reach)) seen.comments.delete(id);
+        for (const c of nodes) {
+          const kept = seen.comments.get(c.databaseId);
+          if (!kept || edited(c) >= edited(kept.comment)) seen.comments.set(c.databaseId, { comment: c, authors: read.authors });
+        }
       }
     }
-    return new Set([...tickets.values()]
-      .flatMap(({ issue, comments }) => notesOf({ ...issue, comments: { totalCount: comments.size, nodes: [...comments.values()] } }, home, authors, now).notes)
-      .filter(n => n.holds && n.note.state === 'working').map(n => n.key));
+    return tickets;
+  }
+  function pulsing(reads, home, now) {
+    const tickets = reconcile(reads, home);
+    return new Set([...tickets.values()].flatMap(({ issue, comments }) => {
+      const nodes = [...comments.values()].map(kept => kept.comment);
+      const authors = new Map([...comments.values()].map(kept => [kept.comment, kept.authors]));
+      return notesOf({ ...issue, comments: { totalCount: nodes.length, nodes } }, home, comment => authors.get(comment), now).notes;
+    }).filter(n => n.holds && n.note.state === 'working').map(n => n.key));
+  }
+  function working(now = Date.now()) {
+    const home = OW.data.repo.get()?.full;
+    const { agents, specs } = OW.data.feeds;
+    const reads = [
+      { name: 'agents', at: agents.readAt || 0, authors: OW.factory.recordAuthors(agents.data?.fleet?.text), issues: agents.data?.issues?.nodes || [] },
+      { name: 'specs', at: specs.readAt || 0, authors: OW.factory.recordAuthors(specs.data?.fleet?.text),
+        issues: Object.values(specs.data?.specs || {}).flatMap(spec => spec?.subIssues?.nodes || []) },
+    ].sort((a, b) => a.at - b.at); // the older read first
+    const [older, newer] = reads;
+    const known = older.at < newer.at && !(order[newer.name].at === newer.at && order[newer.name].overlapped);
+    const one = pulsing(reads, home, now);
+    if (known) return one;
+    const other = pulsing([newer, older], home, now);
+    return new Set([...one].filter(key => other.has(key)));
   }
 
   OW.agents = { readNote, picture, working };
