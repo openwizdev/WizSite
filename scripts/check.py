@@ -52,6 +52,8 @@ ART_HASHES = {
     'art/drivers-d-ship.webp': '885dd800aae2e75d45f2b88e1e69232bbf987df44beec9fa8070d4354b64cd04',
     # Round 2F (#56): variant C's painted cutaway of the Wiz crew's ship (#49), beside boat.dev's five checks.
     'art/drivers-c-boat.webp': '39fd43d08aa36bce84e964699d493a03af090499a63dffbfaa43e61804b7e1ef',
+    # Team page round 2 (#81): the boat video's poster frame, linking to the video on X.
+    'art/team-boat-poster.webp': '656c0c75f92a17390beda0d8afb45be3f9164330357635295998406dad3a69d4',
 }
 ART = set(ART_HASHES)
 # Logo pack (#1350: the dark-cream mark). Raster icons and the social card are pinned by hash like the art; a new picture needs review.
@@ -126,11 +128,40 @@ TOP_BAR_END = '  </nav>\n</header>'
 # only value. Until the real link is set it is this in-page placeholder; otherwise it must be an https URL.
 TEAM_PAGE = 'team/index.html'
 BOOK_PLACEHOLDER = '#book'
-TEAM_COPY = ('We set up your agent factory with you.', 'Your repos, your models, your machines. First fleet running in a day.',
-             'Solo builders and small teams.', 'Custom pricing.', 'Book a call')
-# #73: the team page's body after its hero, in order: what you get (three steps), where your agents run, the closing call.
-TEAM_PARTS = ('What you get', 'Where your agents run', 'Questions', 'Plan your factory with us.')
-TEAM_STEPS = ('A call to plan your setup', 'We install OpenWiz with you', 'Your first fleet ships')
+# Team page round 2, design P (#81): the round 1 copy, word for word, with headline A. Round 3, candidate 2 (#89):
+# curly apostrophes, the terms under their label, the timeline in the hero and Proof as three cards.
+TEAM_HEADLINE = 'Book 30 minutes. Leave with a shipped pull request.'
+TEAM_TERMS = ('A small, real change of your choice.',
+              'On a repository with working CI and a signed-in coding agent (Claude Code or Codex).',
+              "If it hasn’t shipped in 30 minutes, Jake stays on until it does.")
+TEAM_TERMS_LABEL = 'How the call works'
+TEAM_SHIPS = 'Ships means a pull request opens on your repo, built by your agents and passing your CI. Merging is your call.'
+TEAM_COPY = ('For solo builders and small teams', TEAM_HEADLINE,
+             'A 30-minute call with Jake, who builds OpenWiz. We connect it to your repo and the coding agent you already '
+             'use, you pick one small change, and your first fleet ships it on your workflow.',
+             *TEAM_TERMS, TEAM_SHIPS,
+             TEAM_TERMS_LABEL, 'Grok Bot: coming soon', 'See how drivers work',
+             'Our Drivers page was built the same way: a fleet of agents drew six designs, a council of judges picked one, '
+             'and it merged in one night.', 'See the Drivers page',
+             'Watch the fleet build it (49 s, on X)',
+             'Solo builders and small teams who already use Claude Code or Codex.', 'Custom pricing. No checkout.', 'Book a call')
+# The hero, then its sections in order: the timeline, proof, who it's for, pricing, the Questions (#76), the closing call.
+# #89: the timeline is the hero's second column, and Proof's first card carries the drivers, so the page has no separate
+# where-your-agents-run section.
+TEAM_PARTS = ('The 30 minutes, roughly', 'Proof', 'Who it’s for', 'Pricing', 'Questions', 'Your first fleet ships on the call.')
+TEAM_STEPS = (('Minute 0', 'We connect your repo and your agents.'),
+              ('Minute 10', 'You answer a few questions about your change.'),
+              ('Minute 20', 'Your agents build it.'), ('Minute 30', 'A pull request ships.'))
+# #89: Proof's first card, the drivers that passed: its heading, what the five checks are (as /drivers/ names them), then
+# each logo (as /drivers/ ships it) with its result under it.
+TEAM_PASSED_HEADING = 'Three drivers passed all five checks'
+TEAM_PASSED_ABOUT = 'The same test for every place your agents run: version, start, wake, stop and token.'
+TEAM_PASSED = ('/drivers/logos/monitor.svg', '/drivers/logos/cloudroom.png', '/drivers/logos/boat-dev.svg')
+TEAM_PASSED_LINE = '5 of 5'
+# The boat video's poster: a picture linking to the X post, never an embedded or hosted video.
+TEAM_POSTER = '/art/team-boat-poster.webp'
+TEAM_POSTER_ALT = 'Wizards on a boat: the fleet that built the Drivers page'
+TEAM_NEVER = re.compile(r'\binstall|\bguarantee', re.I)
 # The site footer (#73): one snippet, which the build adds at each site page's one slot (not the app's). Its links, in order.
 FOOTER = (ROOT / 'footer.html').read_text()
 FOOTER_SLOT = '<!-- footer.html -->\n'
@@ -150,6 +181,8 @@ FAQ_ON = {'index.html': FAQ, TEAM_PAGE: FAQ, FAQ_PAGE: FAQ_TOP}
 FAQ_TITLE = ('Questions', 'The short ones are here.')
 FAQ_QUESTIONS = ('What is OpenWiz?', 'What is a kernel?', 'What do I need to run it?', 'Where do my agents run?',
                  'Does OpenWiz see my code or my logins?', 'What does it cost?', 'Can you set it up for my team?')
+# #89: the last answer, word for word (the team page's offer).
+FAQ_LAST = 'Yes. Book a 30-minute call. Your first fleet ships on it.'
 
 
 def with_footer(html):
@@ -516,7 +549,9 @@ def check_site(root):
         # The social card: an absolute URL on the site that resolves to a built file.
         assert page.social and all(s.startswith(SITE_URL) and s.removeprefix(SITE_URL).split('?')[0] in STATIC for s in page.social), 'social image must be a built file on the site'
         assert path == root / TEAM_PAGE or not page.books, f'a booking link outside the team page: {path.name}'
-        assert page.x_links == 1, f'one X link per page, the footer\'s: {path.relative_to(root)} has {page.x_links}'
+        # #81: the team page's boat poster links to the X post too, beside the footer's X link.
+        x_links = 2 if path == root / TEAM_PAGE else 1
+        assert page.x_links == x_links, f'one X link per page, the footer\'s: {path.relative_to(root)} has {page.x_links}'
         for ref in page.refs:
             check_ref(root, path, ref, pages, page.favicons)
         for ref in css_refs(path.read_text()):
@@ -1095,19 +1130,68 @@ def check_team(htmls, pages):
         url = urlsplit(href)
         assert url.scheme == 'https' and url.netloc and not url.username and not url.password, f'the booking link must be https: {href}'
     flat = re.sub(r'\s+', ' ', unescape(re.sub(r'<[^>]*>', ' ', htmls[TEAM_PAGE])))
-    for text in TEAM_COPY:
-        assert text in flat, f'missing team page copy: {text}'
     assert not re.search(r'[$€£]\s*\d|\bper (?:month|seat|user)\b', flat, re.I), 'the team page shows no price'
     labels = re.findall(r'<a [^>]*data-book[^>]*>([^<]*)</a>', htmls[TEAM_PAGE])
     assert labels == ['Book a call', 'Book a call'], f'team page copy: both booking links read Book a call: {labels}'
-    parts = [plain(h) for h in re.findall(r'<h2\b[^>]*>([\s\S]*?)</h2>', htmls[TEAM_PAGE].split('<footer', 1)[0])]
+    main = htmls[TEAM_PAGE].split('<footer', 1)[0]
+    parts = [plain(h) for h in re.findall(r'<h2\b[^>]*>([\s\S]*?)</h2>', main)]
     assert parts == list(TEAM_PARTS), f'the team page sections, in order: {parts}'
-    steps = re.search(r'<ol class="team-steps">([\s\S]*?)</ol>', htmls[TEAM_PAGE])
-    assert steps and [plain(h) for h in re.findall(r'<h3>([\s\S]*?)</h3>', steps[1])] == list(TEAM_STEPS), \
-        f'What you get: its three steps, in order: {TEAM_STEPS}'
-    run = re.search(r'<ul class="team-drivers">([\s\S]*?)</ul>', htmls[TEAM_PAGE])
-    assert run and re.findall(r'href="([^"]*)"', run[1]) and set(re.findall(r'href="([^"]*)"', run[1])) == {'/drivers/'}, \
-        'Where your agents run: its drivers link to /drivers/'
+    h1 = re.findall(r'<h1\b[^>]*>([\s\S]*?)</h1>', main)
+    assert [plain(h) for h in h1] == [TEAM_HEADLINE], f'the team page headline: {h1}'
+    # #81: the hero holds the headline, the first Book a call and the three terms right under it, under their label (#89).
+    # #89: its second column is the timeline; the poster is in Proof.
+    hero = re.search(r'<div class="team wrap">([\s\S]*?)\n</div>\n', main)
+    assert hero, 'the team page needs its hero'
+    hero = hero[1]
+    terms = re.search(r'<ul class="team-terms"[^>]*>([\s\S]*?)</ul>', hero)
+    assert terms and [plain(t) for t in re.findall(r'<li>([\s\S]*?)</li>', terms[1])] == list(TEAM_TERMS), \
+        f'the terms: three exact lines right under the hero button: {TEAM_TERMS}'
+    assert hero.index('data-book') < hero.index('class="team-terms"'), 'the terms: under the first Book a call'
+    label = re.search(r'<p class="team-label" id="([^"]+)">([^<]*)</p>\s*<ul class="team-terms" aria-labelledby="([^"]+)"', hero)
+    assert label and label[2] == TEAM_TERMS_LABEL and label[1] == label[3], f'the terms: under their label, {TEAM_TERMS_LABEL}'
+    assert 'wizes' not in plain(hero).lower(), 'no Wizes in the team hero'
+    assert 'class="team-steps"' in hero and hero.index('class="team-terms"') < hero.index('class="team-steps"'), \
+        'the timeline: in the hero, after the terms'
+    assert 'x.com' not in hero and '<img' not in hero, 'the hero shows no poster: it is in Proof'
+    proof = re.search(r'<section class="team-part wrap" aria-labelledby="team-proof">([\s\S]*?)</section>', main)
+    assert proof, 'Proof: its section'
+    proof = proof[1]
+    cards = re.findall(r'<li class="team-card">([\s\S]*?)</li>\n', proof)
+    assert len(cards) == 3 and proof.count('<li') == 3, f'Proof: three cards: {len(cards)}'
+    passed = re.fullmatch(r'\s*<h3>([^<]*)</h3>\s*<p>([^<]*)</p>\s*<div class="team-logos">([\s\S]*?)</div>\s*'
+                          r'<p class="team-soon">Grok Bot: coming soon</p>\s*<a href="/drivers/">See how drivers work</a>\s*', cards[0])
+    logos = re.findall(r'<img\b[^>]*src="([^"]*)"[^>]*>\s*(?:<span>[^<]*</span>\s*)?<small>([^<]*)</small>', passed[3]) if passed else []
+    assert passed and (passed[1], passed[2]) == (TEAM_PASSED_HEADING, TEAM_PASSED_ABOUT) \
+        and [src for src, _ in logos] == list(TEAM_PASSED) and all(line == TEAM_PASSED_LINE for _, line in logos), \
+        f'Proof: the first card: {TEAM_PASSED_HEADING}, what the checks are, the three drivers\u2019 logos with ' \
+        f'{TEAM_PASSED_LINE} under each, Grok Bot coming soon and See how drivers work, to /drivers/'
+    built = re.fullmatch(r'\s*<p>([^<]*)</p>\s*<a href="/drivers/">See the Drivers page</a>\s*', cards[1])
+    assert built and built[1].startswith('Our Drivers page was built the same way'), \
+        'Proof: the second card says how the Drivers page was built, with its one link, See the Drivers page'
+    poster = re.findall(r'<a [^>]*href="https://x\.com/openwiz"[^>]*>([\s\S]*?)</a>', cards[2])
+    images = [dict(re.findall(r'([a-z-]+)="([^"]*)"', img)) for img in re.findall(r'<img\b[^>]*>', poster[0])] if len(poster) == 1 else []
+    assert len(images) == 1 and images[0].get('src') == TEAM_POSTER and images[0].get('alt') == TEAM_POSTER_ALT \
+        and images[0].get('width') == '1280' and images[0].get('height') == '720' and images[0].get('loading') == 'lazy', \
+        f'the boat poster: Proof\u2019s third card, one sized, lazy picture linking to the X post: {images}'
+    assert 'Watch the fleet build it (49 s, on X)' in plain(poster[0]), 'the boat poster: its label is its caption'
+    assert not re.search(r'<(?:video|iframe|embed|object|details)\b', main.replace(FAQ, '')), 'the team page embeds no video and folds nothing away'
+    steps = re.search(r'<ol class="team-steps">([\s\S]*?)</ol>', main)
+    found = re.findall(r'<li( class="team-end")?><h3>([\s\S]*?)</h3><p>([\s\S]*?)</p></li>', steps[1]) if steps else []
+    assert [(plain(m), plain(t)) for _, m, t in found] == list(TEAM_STEPS), f'The 30 minutes, roughly: its four marks, in order: {TEAM_STEPS}'
+    assert [bool(end) for end, _, _ in found] == [False, False, False, True] and steps[1].count('team-end') == 1, \
+        'The 30 minutes, roughly: Minute 30 is its one highlighted stop'
+    ships = re.search(r'</ol>\s*<p class="team-ships">([\s\S]*?)</p>', main)
+    assert ships and plain(ships[1]) == TEAM_SHIPS, 'the ships line: right under the timeline'
+    # This page's own copy, without the shared Questions (#76), which check_faq owns.
+    own = main.replace(FAQ, '')
+    shown = re.sub(r'\s+', ' ', unescape(re.sub(r'<[^>]*>', ' ', own)))
+    assert not TEAM_NEVER.search(shown), f'a word the team page never uses: {TEAM_NEVER.search(shown)[0]}'
+    assert "'" not in shown and "'" not in ' '.join(re.findall(r'aria-label="([^"]*)"', own)), \
+        'the team page uses curly apostrophes'
+    assert not re.search(r'\bhidden\b|aria-hidden', own.split('<main', 1)[1]), 'the team page hides none of its copy'
+    # Last, so a broken part above fails on its own line first: the rest of the round 1 copy, word for word.
+    for text in TEAM_COPY:
+        assert text in flat, f'missing team page copy: {text}'
 
 
 def check_footer(htmls):
@@ -1153,6 +1237,7 @@ def check_faq(htmls, pages, names):
         assert plain(answer), f'a question without its answer: {plain(question)}'
         for href in re.findall(r'href="([^"]*)"', answer):
             assert href.startswith('/'), f'an answer links off the site: {href}'
+    assert rows and plain(rows[-1][3]) == FAQ_LAST, f'the Questions\u2019 last answer: {FAQ_LAST}'
     assert not re.search(r'<(?:form|input|textarea)\b', FAQ), 'part 1 asks nothing: no form or input in the Questions'
 
 
