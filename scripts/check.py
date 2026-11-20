@@ -32,9 +32,8 @@ ART_HASHES = {
     'art/hero-samurai-frames.webp': '3a6eef42bfd2fc6f7b8e847d4355d75c283425a274b5fb9c95c3404f580725c5',
     'art/hero-steam-frames.webp': '20f057c963be16ebc3cabbf1d2ab849e2e8144d29a3e419344a867eef2c41f3c',
     'art/spec-demo.webm': '6619ae77a13229d9056037e5bc793d48f7fc98490d068c2b6e4f58426a8fac22',
-    # The drivers page, variant D (#50): the night sea and the Wiz family's ship, painted layers of its hero.
-    'art/drivers-d-sea.webp': 'f2699bd8fe4763993a492dfac2bdbfc3eae46ec33bae0ab74127ad6ebc6a6285',
-    'art/drivers-d-ship.webp': '885dd800aae2e75d45f2b88e1e69232bbf987df44beec9fa8070d4354b64cd04',
+    # The drivers page, round 2E (#55): variant B's painted harbour (#54) as D's hero, the whole Wiz family aboard.
+    'art/drivers-b-harbour.webp': 'c6d3e6950bb06eebe35190975d99d213d322a1cf8fdaf19f970988a8d021ea4d',
 }
 ART = set(ART_HASHES)
 # Logo pack (#1350: the dark-cream mark). Raster icons and the social card are pinned by hash like the art; a new picture needs review.

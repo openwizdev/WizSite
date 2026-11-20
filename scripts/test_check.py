@@ -471,7 +471,7 @@ class Checks(unittest.TestCase):
         # wrong card, and a card that drops or changes its berth number.
         boat = '<article class="driver hero" id="boat-dev"'
         for name, old, new, error in (
-                ('drivers/index.html', 'id="cloudroom"', 'id="cloud"', 'four driver cards'),
+                ('drivers/index.html', 'id="cloudroom"', 'id="cloud"', 'four driver cards|missing fragment: #cloudroom'),
                 ('drivers/index.html', '>Grok Bot</h3>', '>Grok</h3>', 'four driver cards'),
                 ('drivers/index.html', 'Being fixed: its kit run is in progress', 'Being fixed: almost done', 'driver facts'),
                 ('drivers/index.html', 'on a real account (2026-11-19)', 'on a real account', 'driver facts'),

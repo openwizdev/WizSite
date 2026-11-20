@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="Drivers plug the places that run agents into OpenWiz. Each one answers four words and passes the test kit's five checks on its real host."><title>Drivers — OpenWiz</title><link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48"><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><meta property="og:image" content="https://openwiz.dev/brand/og.png?v=2"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="OpenWiz"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="https://openwiz.dev/brand/og.png?v=2"><link rel="preload" href="/fonts/Geist-var.woff2" as="font" type="font/woff2" crossorigin><link rel="preload" href="/art/drivers-d-sea.webp" as="image" type="image/webp"><link rel="stylesheet" href="/tokens.css"><link rel="stylesheet" href="/site.css"></head>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="Drivers plug the places that run agents into OpenWiz. Each one answers four words and passes the test kit's five checks on its real host."><title>Drivers — OpenWiz</title><link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48"><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><meta property="og:image" content="https://openwiz.dev/brand/og.png?v=2"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="OpenWiz"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="https://openwiz.dev/brand/og.png?v=2"><link rel="preload" href="/fonts/Geist-var.woff2" as="font" type="font/woff2" crossorigin><link rel="preload" href="/art/drivers-b-harbour.webp" as="image" type="image/webp"><link rel="stylesheet" href="/tokens.css"><link rel="stylesheet" href="/site.css"></head>
 <body class="landing drivers-page">
 <a class="skip" href="#main">Skip to content</a>
 <header class="landing-nav wrap">
@@ -45,17 +45,23 @@
 </header>
 <main id="main">
   <section class="voyage" aria-labelledby="voyage-title">
-    <div class="voyage-art">
-      <img class="voyage-sea" src="/art/drivers-d-sea.webp" alt="" width="1536" height="1024" fetchpriority="high">
-      <span class="voyage-glow" aria-hidden="true"></span>
-      <span class="voyage-ship-wrap"><img class="voyage-ship" src="/art/drivers-d-ship.webp" alt="Oil painting of the Wiz family sailing a lantern-lit ship across a night sea" width="1100" height="765"></span>
-    </div>
     <div class="voyage-copy wrap">
       <p class="voyage-kicker">Drivers</p>
       <h1 id="voyage-title">Run your agents anywhere.</h1>
       <p class="voyage-sub">A driver plugs a place that runs agents into OpenWiz: your own computer, a VPS, a cloud sandbox. One small program, four words, five checks.</p>
       <a class="voyage-pass" href="#boat-dev"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7"/><path d="M4.6 8.3l2.3 2.3 4.5-4.8"/></svg><span><b>boat.dev</b> passed the kit, 5 of 5</span></a>
     </div>
+    <figure class="harbour">
+      <div class="harbour-frame">
+        <img class="harbour-art" src="/art/drivers-b-harbour.webp" alt="Oil painting of a harbour at dusk. Along the quay: a small lit workshop, a lantern-lit pier running into cloud, a big wooden boat with the whole Wiz family aboard, and an empty berth with one lantern lit." width="1672" height="941" fetchpriority="high">
+        <ol class="berth-pins" aria-label="The berths in the painting, one per driver">
+          <li class="pin-1"><a href="#vps"><b>1</b> Workshop</a></li>
+          <li class="pin-2"><a href="#cloudroom"><b>2</b> Cloud pier</a></li>
+          <li class="pin-3"><a href="#boat-dev"><b>3</b> The boat</a></li>
+          <li class="pin-4"><a href="#grok-bot"><b>4</b> Empty berth</a></li>
+        </ol>
+      </div>
+    </figure>
   </section>
   <section class="fleet wrap" aria-labelledby="fleet-title">
     <div class="fleet-head">
@@ -65,14 +71,16 @@
     <ol class="driver-list">
     <li>
     <article class="driver" id="vps" aria-labelledby="vps-name">
+      <p class="driver-berth"><b class="berth-no">1</b> Workshop</p>
       <h3 class="driver-name" id="vps-name">Your own computer or VPS</h3>
       <p class="driver-line">Being fixed: its kit run is in progress</p>
+      <p class="driver-kit progress"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/><path d="M8 1.75a6.25 6.25 0 010 12.5z"/></svg>Kit: in progress</p>
       <div class="driver-words">
         <h4>Its four words</h4>
         <ul><li><code class="word">version</code></li><li><code class="word">start</code></li><li><code class="word">wake</code></li><li><code class="word">stop</code></li></ul>
       </div>
       <div class="kit progress">
-        <h4>Test kit <span>In progress</span></h4>
+        <h4>Test kit: the five checks</h4>
         <ul>
           <li class="kit-check" data-check="version" data-state="in progress"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/><path d="M8 1.75a6.25 6.25 0 010 12.5z"/></svg><span class="kit-name">version</span> <span class="kit-state">in progress</span></li>
           <li class="kit-check" data-check="start" data-state="in progress"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/><path d="M8 1.75a6.25 6.25 0 010 12.5z"/></svg><span class="kit-name">start</span> <span class="kit-state">in progress</span></li>
@@ -85,14 +93,16 @@
     </li>
     <li>
     <article class="driver" id="cloudroom" aria-labelledby="cloudroom-name">
+      <p class="driver-berth"><b class="berth-no">2</b> Cloud pier</p>
       <h3 class="driver-name" id="cloudroom-name">Cloudroom</h3>
       <p class="driver-line">Works today: built real pull requests for OpenWiz</p>
+      <p class="driver-kit unrun"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/></svg>Kit: not run yet</p>
       <div class="driver-words">
         <h4>Its four words</h4>
         <ul><li><code class="word">version</code></li><li><code class="word">start</code></li><li><code class="word">wake</code></li><li><code class="word">stop</code></li></ul>
       </div>
       <div class="kit unrun">
-        <h4>Test kit <span>Not yet run</span></h4>
+        <h4>Test kit: the five checks</h4>
         <ul>
           <li class="kit-check" data-check="version" data-state="not yet run"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/></svg><span class="kit-name">version</span> <span class="kit-state">not yet run</span></li>
           <li class="kit-check" data-check="start" data-state="not yet run"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/></svg><span class="kit-name">start</span> <span class="kit-state">not yet run</span></li>
@@ -105,16 +115,17 @@
     </li>
     <li>
     <article class="driver hero" id="boat-dev" aria-labelledby="boat-dev-name">
-      <img class="hero-card-art" src="/art/drivers-d-ship.webp" alt="" width="1100" height="765" loading="lazy">
+      <p class="driver-berth"><b class="berth-no">3</b> The boat</p>
       <h3 class="driver-name" id="boat-dev-name">boat.dev</h3>
       <p class="driver-line">Passed the kit, 5 of 5, on a real account (2026-11-19)</p>
+      <p class="driver-kit passed"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7"/><path d="M4.6 8.3l2.3 2.3 4.5-4.8"/></svg>Kit: passed, 5 of 5</p>
       <p class="hero-score" aria-hidden="true"><b>5</b><span>of 5</span></p>
       <div class="driver-words">
         <h4>Its four words</h4>
         <ul><li><code class="word">version</code></li><li><code class="word">start</code></li><li><code class="word">wake</code></li><li><code class="word">stop</code></li></ul>
       </div>
       <div class="kit passed">
-        <h4>Test kit <span>Passed, 5 of 5</span></h4>
+        <h4>Test kit: the five checks</h4>
         <ul>
           <li class="kit-check" data-check="version" data-state="passed"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7"/><path d="M4.6 8.3l2.3 2.3 4.5-4.8"/></svg><span class="kit-name">version</span> <span class="kit-state">passed</span></li>
           <li class="kit-check" data-check="start" data-state="passed"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7"/><path d="M4.6 8.3l2.3 2.3 4.5-4.8"/></svg><span class="kit-name">start</span> <span class="kit-state">passed</span></li>
@@ -127,14 +138,16 @@
     </li>
     <li>
     <article class="driver" id="grok-bot" aria-labelledby="grok-bot-name">
+      <p class="driver-berth"><b class="berth-no">4</b> Empty berth</p>
       <h3 class="driver-name" id="grok-bot-name">Grok Bot</h3>
       <p class="driver-line">Coming soon: listed when its driver lands</p>
+      <p class="driver-kit unrun"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/></svg>Kit: not run yet</p>
       <div class="driver-words">
         <h4>Its four words</h4>
         <ul><li><code class="word">version</code></li><li><code class="word">start</code></li><li><code class="word">wake</code></li><li><code class="word">stop</code></li></ul>
       </div>
       <div class="kit unrun">
-        <h4>Test kit <span>Not yet run</span></h4>
+        <h4>Test kit: the five checks</h4>
         <ul>
           <li class="kit-check" data-check="version" data-state="not yet run"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/></svg><span class="kit-name">version</span> <span class="kit-state">not yet run</span></li>
           <li class="kit-check" data-check="start" data-state="not yet run"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/></svg><span class="kit-name">start</span> <span class="kit-state">not yet run</span></li>
