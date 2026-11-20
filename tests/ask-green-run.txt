@@ -1,4 +1,4 @@
-# FA3 (#1901) green run at 3d4515e6f23d60193a5466b629ba99bd369d564c: node --test tests/sign-in.test.mjs tests/ask-index.test.mjs tests/ask.test.mjs
+# FA3 (#1901) green run: npm run test:functions (node --test tests/sign-in.test.mjs tests/ask-index.test.mjs tests/ask.test.mjs), with the granted package.json line
 ✔ a fixture site and docs folder build exactly the expected sources and passages
 ✔ the index holds only public pages and docs: never the app, page chrome, scripts or internal folders
 ✔ a long section splits into passages within the limit, keeping every word in order
@@ -105,4 +105,4 @@
 ℹ tests 103
 ℹ pass 103
 ℹ fail 0
-# npm run build: ok; npm run check: PASS (exact export, links, resources, copy and privacy)
+# npm run build: ok; npm run check: PASS (exact export, links, resources, copy and privacy); npm test: 42 OK
