@@ -1,4 +1,4 @@
-# FA3 (#1901) green run: npm run test:functions (node --test tests/sign-in.test.mjs tests/ask-index.test.mjs tests/ask.test.mjs), with the granted package.json line
+# FA3 (#1901) green run at d6e37012c74a57e28849b1b690059d81d161630d (review round 1: R1, R2, R3 fixed; R5 folded in): npm run test:functions
 ✔ a fixture site and docs folder build exactly the expected sources and passages
 ✔ the index holds only public pages and docs: never the app, page chrome, scripts or internal folders
 ✔ a long section splits into passages within the limit, keeping every word in order
@@ -53,6 +53,10 @@
 ✔ any upstream status but 200 and 404 is upstream_error, with one attempt and the reservation kept
 ✔ an upstream that never answers times out as upstream_error, and the reservation stays
 ✔ an upstream that stalls mid-answer times out: text, then upstream_error, reservation kept
+✔ R1: a successful answer that carries the key, whole or split across pieces, never shows it or any of its pieces
+✔ R2: a redirect from OpenRouter is not followed: one call, upstream_error, the question sent nowhere else
+✔ R3: a previous day's write delayed past midnight leaves no row of that day behind
+✔ R3: a call is counted on the newest day the store holds, even when this request's clock is behind
 ✔ a visitor who stops the stream cancels the upstream call, and the reservation stays
 ✔ a stream nobody reads still ends at the timeout: the upstream call is cancelled and its waitUntil settles
 ✔ an invalid reported cost keeps the whole reservation; a valid one replaces it
@@ -102,7 +106,7 @@
 ✔ a stale or replayed callback leaves the current attempt intact
 ✔ at most four attempts are kept: a fifth start drops the oldest
 ✔ the manifest asks for read-only metadata, issues and pull requests and nothing else
-ℹ tests 103
-ℹ pass 103
+ℹ tests 107
+ℹ pass 107
 ℹ fail 0
-# npm run build: ok; npm run check: PASS (exact export, links, resources, copy and privacy); npm test: 42 OK
+# npm run build: ok; npm run check: PASS (exact export, links, resources, copy and privacy)
