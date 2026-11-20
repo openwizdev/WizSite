@@ -105,13 +105,16 @@
   // The repository button opens the list right under it: in the sidebar on a laptop, under the top bar on a phone.
   // Picking one keeps the shell and the tab the user is on, adds no history entry, and only changes the reads. A spec's
   // own page goes back to Specs, since that spec belongs to the old repository.
-  let listing = null; // {session, run}: one read of the repositories per sign-in, shared by both buttons
+  // Each open reads GitHub again, so a repository granted meanwhile shows (review R2); only a read still out is shared.
+  let listing = null; // {session, run}: the read in flight
   function readRepositories() {
     const session = data.auth.session();
-    if (listing?.session !== session) listing = { session, run: data.repositories() };
-    const mine = listing;
-    mine.run.catch(() => { if (listing === mine) listing = null; }); // a failed read is tried again on the next open
-    return mine.run;
+    if (listing?.session !== session) {
+      const mine = { session, run: data.repositories() };
+      listing = mine;
+      mine.run.then(() => {}, () => {}).finally(() => { if (listing === mine) listing = null; });
+    }
+    return listing.run;
   }
   function switchTo(full) {
     if (full === data.repo.get()?.full) return;
@@ -144,7 +147,11 @@
       list.replaceChildren(...[
         found.complete ? null : h('p', { class: 'bad' }, 'Only part of your repositories could be read, so some may be missing.'),
         h('ul', { class: 'repos' }, found.repos.map(r => h('li', {},
-          h('button', { type: 'button', 'aria-current': r.full === picked.full ? 'true' : null, onclick: () => { close(); switchTo(r.full); } }, r.full),
+          h('button', { type: 'button', 'aria-current': r.full === picked.full ? 'true' : null, onclick: () => {
+            close();
+            if (r.full === picked.full) button.focus(); // the current one: the list closes, focus goes back to its button (review R3)
+            else switchTo(r.full);
+          } }, r.full),
           h('span', { class: 'tag' }, r.private ? 'Private' : 'Public')))),
         h('p', {}, h('a', { href: 'https://github.com/settings/installations', target: '_blank', rel: 'noreferrer' }, 'Choose repositories on GitHub'))].filter(Boolean));
       list.querySelector('button[aria-current]')?.focus();

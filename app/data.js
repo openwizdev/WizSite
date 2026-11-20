@@ -253,6 +253,8 @@
   // updatedAt, so these hold every note the page can show (live: edited in the last 30 minutes; the last day). Each
   // with its most recently edited comments (the agents' status notes, with their ids and authors) and the pull requests
   // that close it (state, review, checks), and fleet.md (Record authors), whose notes count. About 4 points a page.
+  const PULLS = `closedByPullRequestsReferences(first: 5, includeClosedPrs: true) { totalCount nodes { url state isDraft reviewDecision
+          commits(last: 1) { nodes { commit { statusCheckRollup { state } } } } } }`;
   const AGENTS = `query Agents($owner: String!, $name: String!, $since: DateTime!, $after: String) {
   rateLimit { limit remaining resetAt }
   repository(owner: $owner, name: $name) {
@@ -260,12 +262,12 @@
       totalCount pageInfo { hasNextPage endCursor }
       nodes { number title url state updatedAt
         comments(first: 20, orderBy: {field: UPDATED_AT, direction: DESC}) { totalCount nodes { databaseId body createdAt updatedAt author { login } } }
-        closedByPullRequestsReferences(first: 5, includeClosedPrs: true) { totalCount nodes { url state isDraft reviewDecision
-          commits(last: 1) { nodes { commit { statusCheckRollup { state } } } } } } }
+        ${PULLS} }
     }
     fleet: object(expression: "HEAD:docs/agents/fleet.md") { ... on Blob { text } }
   }
 }`;
+  const PULL_REFRESH = 50; // kept tickets whose open pull requests a read between full reads asks for again
   const DAY = 24 * 60 * 60 * 1000;
   const SKEW = 5 * 60 * 1000; // an edit up to 5 minutes off this clock still counts
   const FULL_EVERY = 30 * 60 * 1000; // a full read of the last day; the reads between fetch only what changed
@@ -319,14 +321,16 @@
     const since = new Date(full ? now - DAY - SKEW : kept.startedAt - SKEW).toISOString();
     const issues = full ? new Map() : new Map(kept.issues);
     const unread = [];
+    const fetched = new Set(); // the tickets this read got from GitHub
     const errors = [];
     let after = null;
     let total = null;
     let read = 0;
     let fleet;
-    let complete = false;
+    let complete = false; // GitHub's list ran out: every ticket in this read's scope was asked for
+    let stop = null; // why it didn't: 'limit' (GitHub's limit is low) or 'failed' (a later page failed)
     for (let page = 0; page < AGENT_PAGES; page += 1) {
-      if (page && (paused() || (limit.remaining !== null && limit.remaining < RESERVE))) break;
+      if (page && (paused() || (limit.remaining !== null && limit.remaining < RESERVE))) { stop = 'limit'; break; }
       let response;
       let answer;
       try {
@@ -335,6 +339,7 @@
       } catch (error) {
         if (!page || error instanceof Ended || error instanceof SignedOut) throw error;
         errors.push({ message: 'a page of the read failed' });
+        stop = 'failed';
         break;
       }
       if (mine !== generation) return null;
@@ -343,6 +348,7 @@
       if (!response.ok || !Array.isArray(list?.nodes)) {
         if (!page) throw new Error(`GitHub answered ${response.status}`);
         errors.push({ message: `GitHub answered ${response.status}` });
+        stop = 'failed';
         break;
       }
       if (!page) {
@@ -352,12 +358,12 @@
       errors.push(...place(answer.errors, list.nodes));
       for (const issue of list.nodes) {
         read += 1;
-        if (issue && Number.isSafeInteger(issue.number)) issues.set(issue.number, issue);
+        if (issue && Number.isSafeInteger(issue.number)) { issues.set(issue.number, issue); fetched.add(issue.number); }
         else unread.push(null);
       }
-      if (!list.pageInfo) { complete = (list.totalCount ?? read) <= read; break; }
+      if (!list.pageInfo) { complete = (list.totalCount ?? read) <= read; if (!complete) stop = 'failed'; break; }
       if (!list.pageInfo.hasNextPage) { complete = true; break; }
-      if (typeof list.pageInfo.endCursor !== 'string') break;
+      if (typeof list.pageInfo.endCursor !== 'string') { stop = 'failed'; break; }
       after = list.pageInfo.endCursor;
       // The first read of a repository shows what it has so far, page by page, saying it is still reading.
       if (!feed.data || feed.data.issues?.reading) {
@@ -365,17 +371,62 @@
         changed();
       }
     }
-    complete &&= !errors.length;
+    if (!complete && !stop) stop = 'limit'; // AGENT_PAGES ran out
+    // The tickets kept from earlier reads keep showing their pull requests: those facts (state, review, checks) change
+    // without the ticket being updated, so each read asks for them again (review R1).
+    if (!full && !stop) {
+      const stale = [...issues.values()].filter(issue => !fetched.has(issue.number)
+        && (issue.closedByPullRequestsReferences?.nodes || []).some(pr => pr?.state === 'OPEN')).slice(0, PULL_REFRESH);
+      if (stale.length && !paused()) {
+        const ok = await pullsRead(stale, picked, mine, errors);
+        if (ok === null) return null;
+      }
+    }
     for (const [number, issue] of issues) if (Date.parse(issue.updatedAt) < now - DAY - SKEW) issues.delete(number);
     const nodes = [...issues.values()].sort((a, b) => (Date.parse(b.updatedAt) || 0) - (Date.parse(a.updatedAt) || 0));
-    feed.kept = { repo: picked.full, issues, startedAt: now, fullAt: full ? now : kept.fullAt, complete };
-    // An incomplete read counts what it couldn't reach, so the page says how many of how many it read.
+    feed.kept = { repo: picked.full, issues, startedAt: now, fullAt: full ? now : kept.fullAt, complete: complete && !errors.length };
+    // A read that stopped short says how many tickets of its own query it read, and why (review R4). An error it
+    // couldn't place keeps the read partial (the failure banner) without making up a missing ticket.
     const count = nodes.length + unread.length;
-    const totalCount = complete ? count : Math.max(count + 1, count + (total ?? 0) - read);
+    const short = complete ? null : { why: stop, read, total: Math.max(read + 1, total ?? 0), scope: full ? 'day' : 'since' };
     return {
-      data: { issues: { totalCount, nodes: [...nodes, ...unread] }, fleet },
+      data: { issues: { totalCount: short ? count + short.total - short.read : count, nodes: [...nodes, ...unread], short }, fleet },
       errors,
     };
+  }
+
+  // The pull requests that close the kept tickets, asked again by number: up to PULL_REFRESH tickets in one query.
+  // A ticket's pull requests are replaced where GitHub gave them; where it didn't, the card keeps the last facts and
+  // the read is partial. null when the read belongs to an earlier sign-in or repository.
+  async function pullsRead(stale, picked, mine, errors) {
+    const query = `query AgentPulls($owner: String!, $name: String!) {
+  rateLimit { limit remaining resetAt }
+  repository(owner: $owner, name: $name) {${stale.map(issue => `
+    i${issue.number}: issue(number: ${issue.number}) { ${PULLS} }`).join('')}
+  }
+}`;
+    try {
+      const response = await github('POST', '/graphql', { query, variables: { owner: picked.owner, name: picked.name } });
+      const answer = await response.json().catch(() => null);
+      if (mine !== generation) return null;
+      noteLimit(answer?.data?.rateLimit, response);
+      const repository = answer?.data?.repository;
+      if (!response.ok || !repository) { errors.push({ message: `GitHub answered ${response.status}` }); return false; }
+      for (const issue of stale) {
+        const got = repository[`i${issue.number}`];
+        const placed = (answer.errors || []).filter(e => Array.isArray(e?.path) && e.path[1] === `i${issue.number}`).map(e => e.path.slice(2));
+        if (!got?.closedByPullRequestsReferences) { if (placed.length || got === null) continue; errors.push({ message: `#${issue.number}'s pull requests` }); continue; }
+        issue.closedByPullRequestsReferences = got.closedByPullRequestsReferences;
+        issue.errors = [...(issue.errors || []).filter(path => path[0] !== 'closedByPullRequestsReferences'), ...placed];
+      }
+      errors.push(...(answer.errors || []).filter(e => !(Array.isArray(e?.path) && /^i\d+$/.test(e.path[1] || ''))));
+      return true;
+    } catch (error) {
+      if (error instanceof Ended || error instanceof SignedOut) throw error;
+      if (mine !== generation) return null;
+      errors.push({ message: 'the pull request read failed' });
+      return false;
+    }
   }
 
   // Every comment of one issue, with REST (AP22): a spec's older decision records past the first read. Its pages are

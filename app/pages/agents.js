@@ -119,6 +119,7 @@
       partial: (issues.totalCount ?? issues.nodes.length) > issues.nodes.length,
       read: issues.nodes.length,
       reading: Boolean(issues.reading),
+      short: issues.short || null,
       total: issues.totalCount,
       authors: Boolean(authors),
     };
@@ -214,7 +215,12 @@
     const notes = [];
     if (!seen.authors) notes.push('The record authors (fleet.md) couldn\'t be read, so no status note can be checked: each shows as unknown.');
     if (seen.reading) notes.push(`Still reading: ${seen.read} of the ${seen.total} tickets updated in the last day so far. Agents on the rest show as they are read.`);
-    else if (seen.partial) notes.push(`Read ${seen.read} of the ${seen.total} tickets updated in the last day: GitHub's limit can't cover the rest now, so an agent on another ticket may be missing.`);
+    else if (seen.short) {
+      const { read, total, why, scope } = seen.short;
+      const what = scope === 'since' ? 'tickets updated since the last read' : 'tickets updated in the last day';
+      notes.push(why === 'limit' ? `Read ${read} of the ${total} ${what}: GitHub's limit can't cover the rest now, so an agent on another ticket may be missing.`
+        : `Read ${read} of the ${total} ${what}: GitHub didn't give the rest, so an agent on another ticket may be missing.`);
+    }
     const hidden = seen.missing.filter(Boolean).map(issue => `#${issue.number}`);
     const unreadable = seen.missing.filter(issue => !issue).length;
     if (hidden.length) notes.push(`${hidden.join(', ')} ${hidden.length === 1 ? 'has' : 'have'} more recently edited comments than GitHub gave, so a note there may be missing.`);
