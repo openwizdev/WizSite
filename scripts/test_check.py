@@ -558,17 +558,17 @@ class Checks(unittest.TestCase):
 
     def test_report_a_problem_link(self):
         """#1851: openwiz.dev's Report a problem link opens GitHub's new-issue form on openwizdev/OpenWiz with the
-        feedback template (contracts/feedback-loop.v1.md: destination openwizdev/OpenWiz, template
-        .github/ISSUE_TEMPLATE/feedback.yml), in the footer of every site page and once in the changelog's main.
+        feedback template (contracts/feedback-loop.v1.md: template .github/ISSUE_TEMPLATE/feedback.yml; the exact link
+        is the planner's answer on #1851), in the footer of every site page and once in the changelog's main.
         Catches: the link missing from the footer or the changelog, pointing at another repository or template, or
         carrying anything more (a prefilled title or body would send words from openwiz.dev)."""
-        form = '<a href="https://github.com/openwizdev/OpenWiz/issues/new?template=feedback.yml">Report a problem</a>'
+        form = '<a href="https://github.com/openwizdev/openwiz/issues/new?template=feedback.yml">Report a problem</a>'
         for page, count in {'index.html': 1, 'drivers/index.html': 1, 'team/index.html': 1, 'changelog/index.html': 2, 'app/index.html': 0}.items():
             with self.subTest(page=page):
                 self.assertEqual((ROOT / 'dist' / page).read_text().count(form), count)
         main = re.search(r'<main\b[^>]*>[\s\S]*?</main>', (ROOT / 'dist/changelog/index.html').read_text())[0]
         self.assertEqual(main.count(form), 1)
-        href = 'https://github.com/openwizdev/OpenWiz/issues/new?template=feedback.yml'
+        href = 'https://github.com/openwizdev/openwiz/issues/new?template=feedback.yml'
         for message, (page, old, new) in {
             'Report a problem link': ('changelog/index.html', form, 'Report a problem'),
             'Report a problem link ': ('team/index.html', form, '<a href="/">Report a problem</a>'),
@@ -576,7 +576,9 @@ class Checks(unittest.TestCase):
             'Report a problem link, the footer\'s: the app': ('app/index.html', '</body>', form + '</body>'),
             'unexpected external URL parts': ('index.html', href, href + '&amp;body=x'),
             'unexpected external URL parts ': ('changelog/index.html', href, href.replace('feedback.yml', 'bug.yml')),
-            'unexpected repository link|unexpected external URL parts': ('index.html', href, href.replace('OpenWiz', 'WizSkills')),
+            'unexpected repository link|unexpected external URL parts': ('index.html', href, href.replace('/openwiz/', '/WizSkills/')),
+            'unexpected external URL parts  ': ('team/index.html', href, href.replace('/openwiz/', '/OpenWiz/')),
+            'unexpected external URL parts   ': ('drivers/index.html', href, href.replace('?template=', '?labels=x&amp;template=')),
         }.items():
             with tempfile.TemporaryDirectory() as temp, self.subTest(message=message):
                 root = Path(temp) / 'dist'
