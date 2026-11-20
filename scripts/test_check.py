@@ -424,8 +424,9 @@ class Checks(unittest.TestCase):
         """#1674 (J264): the install box shows the public name with its semver small beside it, reading exactly
         OpenWiz 0.01 0.1.0, in either switch state. That one label is the only release version the landing may
         mention; each case below plants one break, and each must fail."""
-        # catches: the label's semver or public name drifting, the label missing or doubled, and the guard's
-        # exception widening to let a version through anywhere else on the landing, in the box or outside it.
+        # catches: the label's semver or public name drifting, the label missing or doubled, the guard's exception
+        # widening to let a version through anywhere else on the landing, in the box or outside it, and the label
+        # moved out of the box with its text left behind in a comment (#46 R2).
         label = '<p class="install-version">OpenWiz 0.01 <small>0.1.0</small></p>'
         text = (ROOT / 'dist/index.html').read_text()
         self.assertEqual(text.count(label), 1, label)
@@ -442,6 +443,9 @@ class Checks(unittest.TestCase):
             ('</main>', '<p>Now 0.1.0</p></main>'),
             ('</main>', '<p>OpenWiz 0.01 <small>0.1.0</small></p></main>'),
         ]
+        # #46 R2: the label moved out of the box, its text left behind in a comment where it was, or only moved.
+        moved = lambda variant, trace: variant.replace(label, trace, 1).replace('</main>', label + '</main>', 1)
+        relocations = ['<!-- OpenWiz 0.01 <small>0.1.0</small>. -->', f'<!-- {label} -->', '']
         for state in INSTALL_SWITCH:
             variant = text.replace(shipped[0], f'data-install="{state}"')
             with self.subTest(state=state), tempfile.TemporaryDirectory() as temp:
@@ -454,6 +458,13 @@ class Checks(unittest.TestCase):
                     root = Path(temp) / 'dist'
                     shutil.copytree(ROOT / 'dist', root)
                     (root / 'index.html').write_text(variant.replace(good, bad, 1))
+                    with self.assertRaises(AssertionError):
+                        check_site(root)
+            for trace in relocations:
+                with self.subTest(state=state, moved=trace), tempfile.TemporaryDirectory() as temp:
+                    root = Path(temp) / 'dist'
+                    shutil.copytree(ROOT / 'dist', root)
+                    (root / 'index.html').write_text(moved(variant, trace))
                     with self.assertRaises(AssertionError):
                         check_site(root)
 
