@@ -485,8 +485,8 @@ class Checks(unittest.TestCase):
                 ('drivers/index.html', '</main>', '<p>Used by 300 teams.</p></main>', 'invented number'),
                 ('drivers/index.html', '</main>', '<p hidden>Later.</p></main>', 'without a script|waits for a script'),
                 ('drivers/index.html', '</head>', '<script>1</script></head>', 'without scripts'),
-                ('index.html', '<a class="nav-log" href="/drivers/">Drivers</a>', '', 'identical to the landing|landing top bar needs one Drivers'),
-                ('changelog/index.html', '<a class="nav-log" href="/drivers/">Drivers</a>', '', 'Changelog top bar needs one Drivers')):
+                ('index.html', '<a class="nav-drivers" href="/drivers/">Drivers</a>', '', 'identical to the landing|landing top bar needs one Drivers'),
+                ('changelog/index.html', '<a class="nav-drivers" href="/drivers/">Drivers</a>', '', 'Changelog top bar needs one Drivers')):
             with self.subTest(name=name, error=error), tempfile.TemporaryDirectory() as temp:
                 root = Path(temp) / 'dist'
                 shutil.copytree(ROOT / 'dist', root)

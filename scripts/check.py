@@ -672,7 +672,7 @@ def check_drivers(landing, changelog, drivers, page):
     public OpenWiz repository, no script, and no number beyond its facts. A Drivers nav link on the other pages."""
     bar = top_bar(drivers)
     current = re.findall(r'<a [^>]*aria-current="page"[^>]*>([^<]*)</a>', bar)
-    assert current == ['Drivers'] and re.search(r'<a class="nav-log" href="/drivers/" aria-current="page">Drivers</a>', bar), \
+    assert current == ['Drivers'] and re.search(r'<a class="nav-drivers" href="/drivers/" aria-current="page">Drivers</a>', bar), \
         'the drivers top bar must mark its Drivers link aria-current="page"'
     assert bar.replace(' aria-current="page"', '') == top_bar(landing), 'the drivers top bar must be identical to the landing\'s'
     for name, html in (('landing', landing), ('Changelog', changelog)):
