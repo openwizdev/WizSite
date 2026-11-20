@@ -372,6 +372,11 @@
       }
     }
     if (!complete && !stop) stop = 'limit'; // AGENT_PAGES ran out
+    // A ticket GitHub gave without its pull requests shows them as unknown, and the read stays partial until a read
+    // gives them (AP22b, review R1). Errors under a pull request GitHub did give stay on that card only.
+    for (const number of fetched) {
+      if (issues.get(number).closedByPullRequestsReferences == null) errors.push({ message: `#${number}'s pull requests couldn't be read` });
+    }
     // The tickets kept from earlier reads keep showing their pull requests: those facts (state, review, checks) change
     // without the ticket being updated, so each read asks for them again (review R1).
     if (!full && !stop) {
@@ -396,8 +401,8 @@
   }
 
   // The pull requests that close the kept tickets, asked again by number: up to PULL_REFRESH tickets in one query.
-  // A ticket's pull requests are replaced where GitHub gave them; where it didn't, the card keeps the last facts and
-  // the read is partial. null when the read belongs to an earlier sign-in or repository.
+  // A ticket's pull requests are replaced where GitHub gave them; where it didn't (or the whole query failed), its card
+  // shows them as unknown, never the last facts, and the read is partial (AP22b). null when the read belongs to an earlier sign-in or repository.
   async function pullsRead(stale, picked, mine, errors) {
     const query = `query AgentPulls($owner: String!, $name: String!) {
   rateLimit { limit remaining resetAt }
@@ -411,11 +416,21 @@
       if (mine !== generation) return null;
       noteLimit(answer?.data?.rateLimit, response);
       const repository = answer?.data?.repository;
-      if (!response.ok || !repository) { errors.push({ message: `GitHub answered ${response.status}` }); return false; }
+      if (!response.ok || !repository) {
+        for (const issue of stale) issue.closedByPullRequestsReferences = null;
+        errors.push({ message: `GitHub answered ${response.status}` });
+        return false;
+      }
       for (const issue of stale) {
         const got = repository[`i${issue.number}`];
         const placed = (answer.errors || []).filter(e => Array.isArray(e?.path) && e.path[1] === `i${issue.number}`).map(e => e.path.slice(2));
-        if (!got?.closedByPullRequestsReferences) { if (placed.length || got === null) continue; errors.push({ message: `#${issue.number}'s pull requests` }); continue; }
+        if (!got?.closedByPullRequestsReferences) {
+          // GitHub didn't give this ticket's pull requests: its card shows them as unknown, never the last facts, and
+          // the read is partial (AP22b, review R8). The next read asks again.
+          issue.closedByPullRequestsReferences = null;
+          errors.push({ message: `#${issue.number}'s pull requests couldn't be read` });
+          continue;
+        }
         issue.closedByPullRequestsReferences = got.closedByPullRequestsReferences;
         issue.errors = [...(issue.errors || []).filter(path => path[0] !== 'closedByPullRequestsReferences'), ...placed];
       }
@@ -424,6 +439,7 @@
     } catch (error) {
       if (error instanceof Ended || error instanceof SignedOut) throw error;
       if (mine !== generation) return null;
+      for (const issue of stale) issue.closedByPullRequestsReferences = null;
       errors.push({ message: 'the pull request read failed' });
       return false;
     }
