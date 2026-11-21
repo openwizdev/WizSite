@@ -9,12 +9,14 @@ import subprocess
 from urllib.parse import unquote, urlsplit
 
 ROOT = Path(__file__).resolve().parents[1]
-# J267: the landing's three moments link the real to-do run, in moment order: its grill, its spec, the live app.
-TODO_LINKS = (
-    'https://github.com/openwizdev/todo-demo/issues/1#issuecomment-7037022878',
-    'https://github.com/openwizdev/todo-demo/issues/1',
-    'https://openwizdev.github.io/todo-demo/',
+# The landing's three moments show the real to-do run in place, in moment order: its grill's questions and answers, its
+# spec (a static copy of openwizdev/todo-demo issue 1) and the live app's capture. Each moment must carry these texts.
+TODO_RUN = (
+    ('Where should tasks live?', 'One list for now.', 'Keep completed tasks visible?', 'Yes, greyed out.'),
+    ('Problem Statement', 'As a user, I want an empty task to be refused', 'todo-demo.tasks.v1', 'Out of Scope'),
+    ('openwizdev.github.io/todo-demo',),
 )
+TODO_APP = '/art/todo-app.webp'
 # Reviewed artwork and the spec video. Pin them after checking the visual content and metadata.
 ART_HASHES = {
     'art/era-2-grill.webp': 'efaf213c3f389c8feb2f9d0436e94b1f9241d0ecf3cc3e793385d34f11cd11dd',
@@ -40,8 +42,10 @@ ART_HASHES = {
     # The landing's spec video (#70, J267): the to-do app's real spec (openwizdev/todo-demo #1), narrated with captions,
     # its poster and captions; local voice, no paid service; every frame privacy-scanned.
     'art/todo-spec.mp4': '52bb1fa94a154e17270f7512db19efcedae921e4769a28742bc8a36093d1c732',
-    'art/todo-spec-poster.webp': '9f68e7ab1f17ea97659a085072500055adcd11c8ffd737231f1db114924dc963',
+    'art/todo-spec-poster.webp': '94a69b2033a98e4ae6663b61bf9f0af0ba06d5a4d4d28aa4b46247570cac5b72',
     'art/todo-spec.vtt': '47e9ffb41081dd72f541110c43312521a8dd92f1c8e58c11092ecd0daa74eee2',
+    # Step 3's real capture of the live to-do app (openwizdev.github.io/todo-demo), shown small and opened in place.
+    'art/todo-app.webp': 'ccc5be87687b1d4ac387cfb623033c0f567890cfe73570f8e4d4bb4b8a81de54',
     # OpenWiz's model config spec video (#1802), off the landing (J267) but still served at its URL for #1802's links.
     'art/spec-video.mp4': 'feb357b9a80453d676123a31285a36c34b5873e102ed58c95728bfd6315bfe16',
     # The model config video's poster frame and captions (#1405), still served for OpenWiz #1802's links (J267).
@@ -499,9 +503,6 @@ def check_ref(root, source, ref, pages, favicons=()):
         assert ref in ('/favicon.ico', '/favicon.svg', '/app/icon.ico', '/app/icon.svg'), 'unexpected favicon'
     url = urlsplit(ref)
     if url.scheme or url.netloc:
-        # The to-do run the landing's moments follow (J267): only its exact grill, spec and live app links.
-        if ref in TODO_LINKS:
-            return
         assert url.scheme == 'https' and url.netloc == 'github.com', 'unexpected external URL'
         assert re.match(r'^/openwizdev/(?:openwiz|OpenWiz|WizSkills|WizPlugins)(?:/|$)', url.path), 'unexpected repository link'
         assert not url.username and not url.password and not url.query, 'unexpected external URL parts'
@@ -607,16 +608,35 @@ def check_site(root):
     moments = ('Answer a few questions', 'Watch your spec', 'Watch it ship')
     captions = re.findall(r'<h3>([^<]+)</h3>', landing)
     assert tuple(captions) == moments, 'the three moments must appear in order'
-    assert 'Steer the build from the narrated video.' in flat, 'spec video steering copy is missing'
     assert 'The real spec of an OpenWiz-built to-do app' in flat, 'the spec video must say it is the to-do app\'s real spec'
-    # J267: the three moments point at the real to-do run: its grill, its spec and the live app.
-    hrefs = {}
-    # Comments hide markup from visitors, so a commented-out card or link counts as missing.
-    for block in re.findall(r'<li[^>]*>\s*(?:<div class="moment-screen|<video).*?</li>', re.sub(r'<!--.*?-->', '', landing, flags=re.S), re.S):
-        found = Page(block)
-        hrefs[re.search(r'<h3>([^<]+)</h3>', block)[1]] = {a.get('href') for a in found.links}
-    for card, link in zip(moments, TODO_LINKS):
-        assert link in hrefs.get(card, ()), f'the {card} moment must link the real to-do run: {link}'
+    # The three moments show the real to-do run on this page and never send the visitor away for it: no link out.
+    section = re.search(r'<section class="moments[\s\S]*?</section>', re.sub(r'<!--.*?-->', '', landing, flags=re.S))
+    section = section[0] if section else ''
+    # Parsed, not pattern-matched, so a link written with single quotes or none counts too.
+    links = Page(section)
+    assert not links.books and not links.x_links and all(ref.startswith('/') and not ref.startswith('//') for ref in links.refs), \
+        'the moments must keep visitors on the site: no link out'
+    blocks = {}
+    # Comments hide markup from visitors, so a commented-out moment or text counts as missing.
+    for block in re.findall(r'<li class="(?:moment-step|spec-moment)[^"]*">.*?</(?:details|div)>\s*</li>', section, re.S):
+        blocks[re.search(r'<h3>([^<]+)</h3>', block)[1]] = Text(block).spaced()
+    for card, texts in zip(moments, TODO_RUN):
+        for text in texts:
+            assert text in blocks.get(card, ''), f'the {card} moment must show the real to-do run in place: {text}'
+    # Each grill question shows with its own answer right after it: in the bubbles (open on phones) and in the expanded grill.
+    grill = TODO_RUN[0]
+    chat = re.search(r'<div class="moment-chat"[^>]*>(.*?)</div>', section, re.S)
+    panel = re.search(r'<div class="moment-panel grill-panel">(.*?)</div>', section, re.S)
+    for question, answer in zip(grill[::2], grill[1::2]):
+        q, a = re.escape(escape(question, quote=False)), re.escape(escape(answer, quote=False))
+        assert chat and re.search(rf'<p class="ask">{q}</p>\s*<p class="reply">{a}</p>', chat[1]), \
+            f'the grill bubbles must show each question with its answer: {question}'
+        assert panel and re.search(rf'<p class="ask"><strong>{q}</strong>[^<]*<span>[^<]*</span></p>\s*<p class="reply">{a}</p>', panel[1]), \
+            f'the expanded grill must show each question with its answer: {question}'
+    # The live app is shown as its pinned real capture, described, inside step 3.
+    ship = re.search(r'<li class="moment-step moment-ship">.*?</li>', section, re.S)
+    shot = next((i for i in Page(ship[0]).images if i.get('src') == TODO_APP and (i.get('alt') or '').strip()), None) if ship else None
+    assert shot, f'the Watch it ship moment lost its described capture of the live app: {TODO_APP}'
     # Owner cuts (round 6): obvious notes stay off the page.
     for text in ('Illustration, not live data', 'Building in public'):
         assert text.lower() not in flat.lower(), f'cut copy is back: {text}'
