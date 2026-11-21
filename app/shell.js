@@ -90,12 +90,7 @@
     });
   }
 
-  // ---- Changing repository, in place (AP22) ----
-  // The repository button opens the list right under it: in the sidebar on a laptop, under the top bar on a phone.
-  // Picking one keeps the shell and the tab the user is on, adds no history entry, and only changes the reads. A spec's
-  // own page goes back to Specs, since that spec belongs to the old repository.
-  // Each open reads GitHub again, so a repository granted meanwhile shows (review R2); only a read still out is shared.
-  let listing = null; // {session, run}: the read in flight
+  let listing = null;
   function readRepositories() {
     const session = data.auth.session();
     if (listing?.session !== session) {
@@ -138,7 +133,7 @@
         h('ul', { class: 'repos' }, found.repos.map(r => h('li', {},
           h('button', { type: 'button', 'aria-current': r.full === picked.full ? 'true' : null, onclick: () => {
             close();
-            if (r.full === picked.full) button.focus(); // the current one: the list closes, focus goes back to its button (review R3)
+            if (r.full === picked.full) button.focus();
             else switchTo(r.full);
           } }, r.full),
           h('span', { class: 'tag' }, r.private ? 'Private' : 'Public')))),

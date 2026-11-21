@@ -55,9 +55,6 @@
       : `${at.toLocaleDateString([], { day: 'numeric', month: 'short' })} ${clock}`;
   }
 
-  // An agent's harness and model as people say them, one mapping for every card (AP22): claude-code and Claude Code
-  // both read Claude Code; claude-opus-5-5, opus-5.5 and Opus 5.5 read Opus 5.5; gpt-6.2-sol reads Sol 6.2; an effort
-  // after it (medium, -high) reads Medium, High. An id this doesn't know shows as written.
   const HARNESSES = { 'claude-code': 'Claude Code', claude: 'Claude Code', codex: 'Codex', cursor: 'Cursor', opencode: 'OpenCode' };
   const FAMILY = '(opus|sonnet|haiku|fable|sol)';
   const MODELS = [

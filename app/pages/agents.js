@@ -113,7 +113,6 @@
     const nodes = (list?.nodes || []).filter(Boolean);
     const named = row.note?.pr || null;
     const pr = named ? nodes.find(p => p.url === named) || null : nodes.find(p => p.state === 'OPEN') || nodes.find(p => p.state === 'MERGED') || null;
-    // GitHub refused part of this pull request (its checks, in a private repository the Viewer App can't read checks of).
     const at = pr ? (list?.nodes || []).indexOf(pr) : -1;
     const refused = (row.issue.errors || []).some(path => path[0] === 'closedByPullRequestsReferences' && path[1] === 'nodes' && path[2] === at);
     const url = pr?.url || named;

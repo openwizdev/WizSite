@@ -1,8 +1,3 @@
-// FA3 (#1901): the Ask-a-Wiz function (functions/api/ask.js) against contract openwiz.ask-a-wiz.v1.
-// Every contract fixture is replayed against the function with a fake OpenRouter, a fake D1 store (a real
-// in-memory SQLite, so the function's own SQL runs) and a fake site serving the index. Synthetic values only:
-// no real key, no real OpenRouter, no real store.
-// Run: npm run test:functions
 import { test, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile, readdir } from 'node:fs/promises';
@@ -17,16 +12,11 @@ const UPSTREAM = 'https://openrouter.ai/api/v1/chat/completions';
 const PIN = JSON.parse((await readFile(new URL('ask-a-wiz.v1.md', FIXTURES), 'utf8')).match(/## The pin[\s\S]*?```json\n([\s\S]*?)\n```/)[1]);
 const INDEX = await read('index.json');
 const CASES = (await readdir(FIXTURES)).filter(f => f.endsWith('.json') && !['index.json', 'store.json'].includes(f)).map(f => f.slice(0, -5)).sort();
-const BASE = await read('answer.json'); // a valid on-switch request, settings and store to vary from
+const BASE = await read('answer.json');
 
-// ---- The fakes -------------------------------------------------------------------------------------------------
-
-// The fake D1: the binding's API (prepare, bind, first, all, run, batch) over an in-memory SQLite. `fails` makes
-// every operation fail; `hang` makes every operation never finish; `rival` is a salt another first request
-// stores just before this request's salt insert.
 function fakeD1(store, { fails = false, hang = false, rival = null, failWhen = null, empty = false } = {}) {
   const db = new DatabaseSync(':memory:');
-  if (empty) store = { salts: [], counters: [] }; // a database with no tables at all, as a new D1 binding starts
+  if (empty) store = { salts: [], counters: [] };
   else {
     db.exec('CREATE TABLE ask_counters (day TEXT, key TEXT, count INTEGER, PRIMARY KEY (day, key))');
     db.exec('CREATE TABLE ask_salts (day TEXT PRIMARY KEY, salt TEXT NOT NULL)');
@@ -73,7 +63,6 @@ function fakeD1(store, { fails = false, hang = false, rival = null, failWhen = n
   });
   return {
     log,
-    // The same database through a binding whose first batch runs only once `until` settles: a delayed write.
     delayed: until => binding(until),
     binding: {
       prepare: sql => statement(sql),
@@ -108,9 +97,6 @@ const canon = store => ({
     .sort((a, b) => `${a.day} ${a.key}`.localeCompare(`${b.day} ${b.key}`)),
 });
 
-// The fake OpenRouter's server-sent events: a comment line, then one event per content piece, then the usage
-// event (with `cost` only when the case reports one), then [DONE]. Every event is sent in two halves, so the
-// function must join lines across reads.
 function sse(upstream, { extra = [] } = {}) {
   const enc = new TextEncoder();
   const ERROR = Symbol('error');
@@ -149,8 +135,6 @@ beforeEach(() => {
     calls.push(call);
     if (!answer) throw new Error('unexpected upstream call');
     const response = await answer(call);
-    // Like fetch: a redirect is followed, re-sending the same request, unless the request says redirect: 'manual'
-    // (or 'error', which fails).
     const to = response.headers.get('Location');
     if (to && response.status >= 300 && response.status < 400) {
       if (init.redirect === 'error') throw new TypeError('redirect refused');
@@ -167,11 +151,9 @@ beforeEach(() => {
 afterEach(() => {
   globalThis.fetch = realFetch;
   Object.assign(console, realConsole);
-  // The function writes no log line at all, so no key, question or address can reach one.
   assert.deepEqual(logs, []);
 });
 
-// The fake site: env.ASSETS serves the index at /ask-index.json, as Pages serves the built site's files.
 const assets = (index = INDEX) => ({
   fetch: async input => {
     const url = new URL(input instanceof Request ? input.url : String(input));
@@ -180,8 +162,6 @@ const assets = (index = INDEX) => ({
   },
 });
 
-// Runs one request through the function: returns the response, its body text, the store after every waitUntil
-// promise settled, the upstream calls and the env names the function read.
 async function run(c, { store = fakeD1(c.store, { fails: !!c.store_fails, rival: c.rival_salt ?? null }), index = INDEX, rank, deps = {}, request } = {}) {
   const read = new Set();
   const values = { ...c.settings, ASSETS: assets(index) };
@@ -216,8 +196,6 @@ const withCase = (overrides = {}) => ({ ...structuredClone(BASE), ...overrides }
 const settingsWith = changes => ({ ...BASE.settings, ...changes });
 const ask = (question, extra = {}) => ({ method: 'POST', headers: { ...BASE.request.headers, ...extra.headers }, body: extra.body ?? JSON.stringify({ question }) });
 
-// ---- P2: every contract fixture, replayed --------------------------------------------------------------------
-
 test('the fixtures copied here are the contract\'s full list', () => {
   assert.deepEqual(CASES, [...PIN.fixtures].sort());
 });
@@ -247,8 +225,6 @@ for (const name of CASES) {
     for (const key of out.read) assert.ok(key === 'ASSETS' || Object.values(PIN.names).includes(key), `read env.${key}`);
   });
 }
-
-// ---- The key, the log and the escaping ------------------------------------------------------------------------
 
 test('the key never appears in a response, even when OpenRouter echoes it in an error or the stream', async () => {
   const c = withCase();
@@ -282,8 +258,6 @@ test('an answer holding < > & U+2028 U+2029 reaches the visitor escaped, and joi
   assert.match(out.body, /\\u2028/);
   assert.equal(events(out.body).filter(e => e.type === 'text').map(e => e.text).join(''), pieces.join(''));
 });
-
-// ---- The switch, the probe and the configuration --------------------------------------------------------------
 
 test('the switch is on only for exactly "on": anything else answers 404 with no body and reads nothing else', async () => {
   for (const value of [undefined, '', 'On', 'ON', ' on', 'on ', 'true', '1', 'yes']) {
@@ -347,8 +321,6 @@ test('a missing or invalid index is unavailable after the visitor is counted, wi
   assert.equal(calls.length, 0);
 });
 
-// ---- The request ---------------------------------------------------------------------------------------------
-
 test('every malformed request is bad_request, counts nothing and calls nothing', async () => {
   const ok = BASE.request;
   const bad = [
@@ -379,7 +351,7 @@ test('every malformed request is bad_request, counts nothing and calls nothing',
 });
 
 test('the question is trimmed and counted in code points: 300 pass, 301 are too_long', async () => {
-  const astral = '😀'; // two UTF-16 units, one code point
+  const astral = '😀';
   for (const [question, status] of [
     [astral.repeat(300), 200], [`  ${'é'.repeat(300)}\n`, 200], [astral.repeat(301), 413], ['a'.repeat(301), 413],
   ]) {
@@ -394,14 +366,11 @@ test('a body of exactly 4096 bytes is read, and Content-Type parameters are allo
   const body = JSON.stringify({ question: 'Synthetic padded question?' }).padEnd(4096, ' ');
   const out = await run(withCase({ request: ask('', { body, headers: { 'Content-Type': 'application/json; charset=utf-8' } }) }));
   assert.equal(out.response.status, 200);
-  // Escapes in the name or the value, and JSON white space anywhere between tokens, are still one valid member.
   answer = upstreamAnswer({ chunks: ['Synthetic answer to an escaped question.'], cost: 0.0001 });
   const escaped = run(withCase({ request: ask('', { body: '\r\n\t{ "\\u0071uestion" :\n"Say \\"hi\\" \\u00e9 \\ud83d\\ude00 \\\\ \\/?" }\n' }) }));
   assert.equal((await escaped).response.status, 200);
   assert.match(JSON.parse(calls.at(-1).body).messages[1].content, /Question: Say "hi" é 😀 \\ \/\?$/);
 });
-
-// ---- Retrieval -----------------------------------------------------------------------------------------------
 
 test('keyword scoring ranks passages sharing the question\'s words, best first, and drops those sharing none', () => {
   const ranked = rankPassages(INDEX, 'How do I set OpenWiz up with one line?');
@@ -429,8 +398,6 @@ test('with the real scoring, a matching question sends its passage and an unmatc
   assert.equal(calls.length, 1);
 });
 
-// ---- The model's answer ----------------------------------------------------------------------------------------
-
 test('NOT_COVERED with white space or split oddly is still the not-covered answer, and never reaches the visitor', async () => {
   for (const chunks of [['  \n NOT_COVERED'], ['N', 'O', 'T', '_', 'C', 'O', 'V', 'E', 'R', 'E', 'D'], ['NOT_COVERED. The passages do not say.']]) {
     answer = upstreamAnswer({ chunks, cost: 0.0001 });
@@ -440,7 +407,6 @@ test('NOT_COVERED with white space or split oddly is still the not-covered answe
     assert.ok(!out.body.includes('NOT_COVERED'));
   }
   answer = upstreamAnswer({ chunks: ['NOT_', 'COVERED is a phrase this answer explains.'], cost: 0.0001 });
-  // "starts with NOT_COVERED" holds here too: the contract's rule is a prefix test on the trimmed answer.
   assert.deepEqual(events((await run(withCase())).body).map(e => e.type), ['not_covered']);
   answer = upstreamAnswer({ chunks: ['NOT', ' COVERED here: a real answer.'], cost: 0.0001 });
   assert.deepEqual(events((await run(withCase())).body).map(e => e.type), ['text', 'text', 'sources', 'done']);
@@ -498,7 +464,6 @@ test('R1: a successful answer that carries the key, whole or split across pieces
     answer = upstreamAnswer({ chunks, cost: 0.0001 });
     const out = await run(withCase());
     assert.ok(!out.body.includes(KEY), `the key in the body: ${chunks.join('|')}`);
-    // No sent piece overlaps the key: every text event comes before the key's first character.
     const keyAt = chunks.join('').indexOf(KEY);
     const sent = events(out.body).filter(e => e.type === 'text').map(e => e.text);
     assert.ok(sent.join('').length <= keyAt, `a piece holding part of the key was sent: ${JSON.stringify(sent)}`);
@@ -527,7 +492,6 @@ test('R1: an upstream failure or stall right after part of the key arrives sends
     assert.equal(events(out.body).at(-1).reason, 'upstream_error');
     assert.equal(out.store.counters.find(r => r.key === 'spend').count, 63610, 'the reservation stays');
   }
-  // Text that can't begin the key still streams before a failure, as the contract's mid-answer case requires.
   answer = upstreamAnswer({ chunks: ['Synthetic safe first piece of the answer. ', `then ${part}`], fails: true, after_chunks: 2 });
   const out = await run(withCase());
   assert.equal(out.response.status, 200);
@@ -549,8 +513,6 @@ test('R2: a redirect from OpenRouter is not followed: one call, upstream_error, 
 });
 
 test('R3: a previous day\'s write delayed past midnight leaves no row of that day behind', async () => {
-  // Request A starts at 23:59:59 and its first store batch is delayed; request B, after midnight, runs to the end;
-  // then A's batch commits. Both questions match no passage, so neither writes again.
   const store = fakeD1({ salts: [], counters: [] });
   let release;
   const held = new Promise(resolve => { release = resolve; });
@@ -573,8 +535,6 @@ test('R3: a previous day\'s write delayed past midnight leaves no row of that da
 });
 
 test('R3: a call is counted on the newest day the store holds, even when this request\'s clock is behind', async () => {
-  // Another request already wrote the next day and used its whole call cap: this one, on the old day, must not
-  // slip a call through on a day that is about to be pruned.
   const c = withCase({ now: '2026-01-15T23:59:58+00:00', store: { salts: [], counters: [{ day: '2026-01-16', key: 'cap', count: 200 }] } });
   answer = upstreamAnswer({ chunks: ['Synthetic answer that must not be sent.'], cost: 0.0001 });
   const out = await run(c);
@@ -626,8 +586,6 @@ test('a stream nobody reads still ends at the timeout: the upstream call is canc
 });
 
 test('R6: a reader who pauses past the deadline then resumes gets only the refusal: no held text, no buffered piece, no done', async () => {
-  // The whole answer, the key's prefix and [DONE] are already buffered when the deadline passes; nothing after the
-  // abort may be sent, not even the safe first piece queued before it.
   const enc = new TextEncoder();
   const data = value => `data: ${JSON.stringify(value)}\n\n`;
   const all = [
@@ -648,15 +606,13 @@ test('R6: a reader who pauses past the deadline then resumes gets only the refus
   const response = await handle({ request: new Request(`${SITE}/api/ask`, { method: 'POST', headers: c.request.headers, body: c.request.body }), env, waitUntil: p => pending.push(p) },
     { clock: () => new Date(c.now), rank: () => c.retrieved, upstreamTimeout: 30 });
   assert.equal(response.status, 200);
-  await Promise.all(pending); // the deadline passed: the upstream call is cancelled and settled
+  await Promise.all(pending);
   assert.equal(upstream.cancelled, true);
   const body = await response.text();
   for (let n = 2; n <= KEY.length; n++) assert.ok(!body.includes(KEY.slice(0, n)), `part of the key sent: ${JSON.stringify(body)}`);
   assert.deepEqual(events(body), [{ type: 'refused', reason: 'upstream_error', message: "Ask a Wiz couldn't answer just now. Try again." }]);
   assert.equal(store.dump().counters.find(r => r.key === 'spend').count, 63610, 'the reservation stays');
 
-  // A read already in flight at the deadline that still resolves afterwards (here with [DONE]) is ignored: the
-  // visitor gets the piece sent before the deadline, then the refusal, never done.
   let late;
   const reads = [data({ choices: [{ delta: { content: 'Synthetic safe first piece long enough to send. ' } }] }), null];
   answer = () => ({
@@ -692,8 +648,6 @@ test('an invalid reported cost keeps the whole reservation; a valid one replaces
   }
 });
 
-// ---- The store -----------------------------------------------------------------------------------------------
-
 test('a store that fails at any step before the call refuses store_error with no call', async () => {
   for (const step of [/CREATE TABLE/i, /DELETE FROM ask_salts/i, /INSERT INTO ask_salts/i, /SELECT salt/i, /INSERT INTO ask_counters/i, /^\s*UPDATE/i]) {
     const c = withCase();
@@ -703,7 +657,6 @@ test('a store that fails at any step before the call refuses store_error with no
     assert.equal(out.response.status, 503, String(step));
     assert.match(out.body, /"reason":"store_error"/);
   }
-  // The cap and the spend reservations (step 6) fail after the visitor counted.
   for (const nth of [2, 3]) {
     let updates = 0;
     const c = withCase();
@@ -738,7 +691,7 @@ test('the store holds only the two tables and the pinned key forms, on a fresh s
   answer = upstreamAnswer({ chunks: ['Synthetic answer on a fresh store.'], cost: 0.0001 });
   const store = { salts: [], counters: [] };
   const c = withCase({ store });
-  const d1 = fakeD1(store, { empty: true }); // no tables: the function must create them itself
+  const d1 = fakeD1(store, { empty: true });
   const out = await run(c, { store: d1 });
   assert.equal(out.response.status, 200);
   assert.deepEqual(events(out.body).map(e => e.type), ['text', 'sources', 'done']);

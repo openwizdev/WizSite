@@ -1,7 +1,3 @@
-// #1932 (WD4): the Drivers page's Write your own driver part shows the write-driver contract's copy line, and its Copy
-// button copies exactly that line. Run after `npm run build`: node --test tests/drivers.test.mjs
-// (CHROME=/path/to/chrome picks the browser). The browser reaches only this test's own server: every other request,
-// GitHub's included, is refused before it leaves.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
@@ -11,12 +7,9 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { extname, join, normalize } from 'node:path';
 
-// Byte for byte the `copy_line` of contracts/write-driver.v1.md (openwizdev/OpenWiz, openwiz.write-driver.v1).
 const COPY_LINE = 'Write an OpenWiz driver for my host with the write-driver skill: https://github.com/openwizdev/WizSkills/tree/main/skills/write-driver';
 const ROOT = new URL('..', import.meta.url).pathname;
 const DIST = join(ROOT, 'dist');
-
-// ---- The browser, against the built site ---------------------------------------------------------------------
 
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml',
   '.png': 'image/png', '.webp': 'image/webp', '.woff2': 'font/woff2', '.ico': 'image/x-icon' };
@@ -111,7 +104,6 @@ test('the Write your own driver part shows the contract\'s copy line once, and C
     await page('Page.navigate', { url: `${origin}/drivers/` });
     await loaded;
     const evaluate = async expression => (await page('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true })).result.value;
-    // What the reader sees: every copy line in the Write your own driver part, as rendered.
     assert.deepEqual(await evaluate('[...document.querySelectorAll(".own-driver .install-line")].map(e => e.innerText)'), [COPY_LINE]);
     const box = await evaluate(`(() => { const all = document.querySelectorAll('.own-driver button.install');
       if (all.length !== 1 || all[0].disabled) return null; const b = all[0];
@@ -121,7 +113,6 @@ test('the Write your own driver part shows the contract\'s copy line once, and C
     for (const type of ['mousePressed', 'mouseReleased']) {
       await page('Input.dispatchMouseEvent', { type, x: box.x, y: box.y, button: 'left', clickCount: 1 });
     }
-    // site.js relabels the button once the clipboard write settles: wait for that change (5 s at most), then read it.
     assert.equal(await evaluate('Promise.race([window.copied, new Promise(r => setTimeout(() => r("no change"), 5000))])'), 'Copied');
     assert.equal(await evaluate('navigator.clipboard.readText()'), COPY_LINE);
   } finally {

@@ -1,32 +1,24 @@
-// FA3 (#1901): Ask a Wiz, the FAQ's "Ask a Wiz..." row, as contract openwiz.ask-a-wiz.v1 fixes it end to end.
-// GET /api/ask says whether the switch is on; POST /api/ask answers one question from the docs index
-// (/ask-index.json, FA2) through one bounded, zero-data-retention OpenRouter call, streamed as NDJSON events.
-// It checks in the contract's order: the switch, the configuration, the request, the visitor's hour, the
-// passages, the day's caps, the call, then settles the call's reported cost. It stores only the daily counters
-// and the day's salt in the ASK_A_WIZ_COUNTERS D1 database, and it writes no log line at all.
-// The key is read only as env.OPENROUTER_API_KEY and sent only in the upstream call's Authorization header.
-
 const SCHEMA = 'openwiz.ask-a-wiz.v1';
 const INDEX_SCHEMA = 'openwiz.ask-a-wiz.index.v1';
 const UPSTREAM = 'https://openrouter.ai/api/v1/chat/completions';
 const SOURCE_PREFIXES = ['https://openwiz.dev/', 'https://github.com/openwizdev/'];
 
 const MAX_BODY_BYTES = 4096;
-const MAX_QUESTION = 300; // code points, after trimming
-const PER_VISITOR = 10; // questions per UTC hour
+const MAX_QUESTION = 300;
+const PER_VISITOR = 10;
 const MAX_OUTPUT_TOKENS = 500;
 const MAX_PASSAGES = 6;
-const MAX_PASSAGE = 1200; // code points
-const MAX_FIELD = 200; // code points of a source's title or URL
+const MAX_PASSAGE = 1200;
+const MAX_FIELD = 200;
 const MAX_PROMPT_BYTES = 10000;
-const MAX_PROMPT_TOKENS = 14096; // MAX_PROMPT_BYTES at one token per byte, plus 4096 framing tokens
+const MAX_PROMPT_TOKENS = 14096;
 const MAX_ANSWER_BYTES = 4000;
 const MAX_INDEX_BYTES = 2_000_000;
-const HOLD = 16; // characters of the answer held back to catch the model's NOT_COVERED
+const HOLD = 16;
 const SENTINEL = 'NOT_COVERED';
-const PRICE = /^[0-9]{1,4}(\.[0-9]{1,6})?$/; // US dollars: per million tokens, or per request
-const UPSTREAM_TIMEOUT = 60_000; // ms for the whole call, first byte to last
-const STORE_TIMEOUT = 5_000; // ms for one store operation
+const PRICE = /^[0-9]{1,4}(\.[0-9]{1,6})?$/;
+const UPSTREAM_TIMEOUT = 60_000;
+const STORE_TIMEOUT = 5_000;
 
 const SYSTEM = "You answer questions about OpenWiz for visitors to openwiz.dev. Answer only from the passages in the user's message, in plain text, in at most three short paragraphs. If the passages do not answer the question, reply with exactly NOT_COVERED and nothing else.";
 const NOT_COVERED = {
@@ -48,7 +40,6 @@ const REFUSALS = {
   no_private_route: [503, "Ask a Wiz can't answer privately just now. Try again later."],
 };
 
-// Words too common to show that a passage supports a question.
 const STOP = new Set(('a about after all also am an and any are as at be been before but by can could did do does doing ' +
   'for from had has have he her his how i if in into is it its just me more most my no nor not of on or our out over ' +
   'own same she should so some such than that the their them then there these they this those through to too under ' +
@@ -59,7 +50,6 @@ const bytes = text => encoder.encode(text).length;
 const points = text => [...text].length;
 const NDJSON = { 'Content-Type': 'application/x-ndjson; charset=utf-8', 'Cache-Control': 'no-store' };
 
-// One event as one NDJSON line, with < > & U+2028 U+2029 written as \u escapes so no body holds them raw.
 const line = event => `${JSON.stringify(event).replace(/[<>&\u2028\u2029]/g, c => `\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`)}\n`;
 const refused = reason => line({ type: 'refused', reason, message: REFUSALS[reason][1] });
 
@@ -69,10 +59,8 @@ function refuse(reason, retryAfter) {
   return new Response(refused(reason), { status: REFUSALS[reason][0], headers });
 }
 
-// ---- Settings ---------------------------------------------------------------------------------------------------
-
 const price = value => (typeof value === 'string' && PRICE.test(value) && Number(value) > 0 && Number(value) <= 1000 ? Number(value) : null);
-const micro = usd => Math.ceil(Number(usd.toFixed(3))); // ceil(round(x, 3)), x already in micro-dollars
+const micro = usd => Math.ceil(Number(usd.toFixed(3)));
 
 function configure(env) {
   const key = env.OPENROUTER_API_KEY;
@@ -83,12 +71,10 @@ function configure(env) {
   if (!db || typeof db.prepare !== 'function' || typeof db.batch !== 'function') return null;
   if (prices.includes(null)) return null;
   const [prompt, completion, request] = prices;
-  // One call's most possible cost, in micro-dollars: every input and output token at the ceiling, plus the flat fee.
   const callMax = micro(MAX_PROMPT_TOKENS * prompt + MAX_OUTPUT_TOKENS * completion + 1_000_000 * request);
   return { key, model, db, prices: { prompt, completion, request }, callMax };
 }
 
-// The two daily caps, read at step 6: anything unset or invalid is 0, so the day is closed.
 function caps(env) {
   const calls = env.ASK_A_WIZ_DAILY_CAP;
   const usd = env.ASK_A_WIZ_DAILY_CAP_USD;
@@ -97,14 +83,10 @@ function caps(env) {
   return { calls: count, spend: dollars === null ? 0 : micro(dollars * 1_000_000) };
 }
 
-// ---- The request ------------------------------------------------------------------------------------------------
-
-// A JSON object of one member whose name and value are both strings: '{' name ':' value '}', JSON white space around.
 const JSON_STRING = String.raw`"(?:[^"\\\u0000-\u001f]|\\(?:["\\/bfnrt]|u[0-9a-fA-F]{4}))*"`;
 const WS = '[ \\t\\n\\r]*';
 const ONE_STRING_MEMBER = new RegExp(`^${WS}\\{${WS}(${JSON_STRING})${WS}:${WS}(${JSON_STRING})${WS}\\}${WS}$`);
 
-// The trimmed question, or the refusal it earns.
 async function readQuestion(request) {
   const bad = { refusal: 'bad_request' };
   if (request.method !== 'POST') return bad;
@@ -113,7 +95,6 @@ async function readQuestion(request) {
   if (request.headers.get('Origin') !== new URL(request.url).origin) return bad;
   const body = await readLimited(request.body, MAX_BODY_BYTES);
   if (body === null) return bad;
-  // Exactly one member, written once: JSON.parse alone would keep the last of a repeated key.
   let key, value;
   try {
     const shape = new TextDecoder('utf-8', { fatal: true }).decode(body).match(ONE_STRING_MEMBER);
@@ -131,7 +112,6 @@ async function readQuestion(request) {
   return { question };
 }
 
-// The body's bytes, or null past `max`.
 async function readLimited(stream, max) {
   if (!stream) return new Uint8Array(0);
   const reader = stream.getReader();
@@ -153,12 +133,6 @@ async function readLimited(stream, max) {
   return out;
 }
 
-// ---- The store --------------------------------------------------------------------------------------------------
-
-// Every store operation is one D1 batch (one transaction) that first deletes earlier days' rows from both tables,
-// and fails if D1 errs or takes longer than `timeout` ms. It ends by deleting every row older than the newest day
-// either table holds, in the same transaction: a batch for a day that has already ended (one delayed past
-// midnight) can read and count, but leaves nothing of that day behind. Each write also reports that newest day.
 const NEWEST = 'SELECT max(day) FROM (SELECT day FROM ask_counters UNION ALL SELECT day FROM ask_salts)';
 function counters(db, timeout) {
   const prune = day => [
@@ -182,9 +156,7 @@ function counters(db, timeout) {
     return results.slice(setup.length + 2, setup.length + 2 + statements.length);
   };
   return {
-    // The newest day any write has seen in the store: a day that has begun, even if this request's clock says not.
     newest: () => newest,
-    // The day's salt: a fresh one is offered, and the stored one (whoever stored it first) is used.
     async salt(day, fresh) {
       const results = await write(day, [
         db.prepare('INSERT INTO ask_salts (day, salt) VALUES (?, ?) ON CONFLICT (day) DO NOTHING').bind(day, fresh),
@@ -197,7 +169,6 @@ function counters(db, timeout) {
       if (typeof salt !== 'string' || !/^[0-9a-f]{64}$/.test(salt)) throw new Error('store: no salt');
       return salt;
     },
-    // Adds `add` to the day's `key` only while it is below `limit`; false when the limit is reached.
     async count(day, key, add, limit) {
       const results = await write(day, [
         db.prepare('INSERT INTO ask_counters (day, key, count) VALUES (?, ?, 0) ON CONFLICT (day, key) DO NOTHING').bind(day, key),
@@ -207,7 +178,6 @@ function counters(db, timeout) {
       if (!Array.isArray(rows)) throw new Error('store: no result');
       return rows.length > 0;
     },
-    // Replaces a call's reservation with its reported cost, on the day it was sent.
     settle(day, reserved, cost) {
       return write(day, [
         db.prepare("UPDATE ask_counters SET count = count - ? + ? WHERE day = ? AND key = 'spend'").bind(reserved, cost, day),
@@ -232,8 +202,6 @@ const utcHour = time => time.toISOString().slice(11, 13);
 const untilHourEnds = time => Math.ceil((3_600_000 - (time.getTime() % 3_600_000)) / 1000);
 const untilDayEnds = (time, day = utcDay(time)) => Math.ceil((Date.parse(`${day}T00:00:00Z`) + 86_400_000 - time.getTime()) / 1000);
 
-// ---- The index and the passages ---------------------------------------------------------------------------------
-
 const exactKeys = (value, keys) => value !== null && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).sort().join() === keys;
 
 function validIndex(index) {
@@ -250,7 +218,6 @@ function validIndex(index) {
     p.source < index.sources.length && typeof p.text === 'string' && points(p.text) >= 1 && points(p.text) <= MAX_PASSAGE);
 }
 
-// The site's own /ask-index.json, or null when it is missing or not the contract's form.
 async function loadIndex(env, request) {
   try {
     const response = await env.ASSETS.fetch(new URL('/ask-index.json', request.url).toString());
@@ -266,8 +233,6 @@ async function loadIndex(env, request) {
 
 const terms = text => new Set((text.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? []).filter(word => word.length > 1 && !STOP.has(word)));
 
-// Keyword scoring: each question word a passage holds adds that word's rarity across the index. Passages that
-// score above zero come back best first (ties in index order), as {source: {title, url}, text}.
 export function rankPassages(index, question) {
   const wanted = terms(question);
   if (!wanted.size) return [];
@@ -280,8 +245,6 @@ export function rankPassages(index, question) {
     .map(({ passage }) => ({ source: index.sources[passage.source], text: passage.text }));
 }
 
-// The user message: ranked passages in order, stopping at the first that would be a seventh or take the system
-// and user contents past MAX_PROMPT_BYTES; then the question. Returns the message and the passages sent.
 function userMessage(question, ranked) {
   const tail = `Question: ${question}`;
   const room = MAX_PROMPT_BYTES - bytes(SYSTEM) - bytes(tail);
@@ -303,10 +266,6 @@ function sourcesOf(used) {
   return [...seen.values()];
 }
 
-// ---- The upstream call ------------------------------------------------------------------------------------------
-
-// The answer's content pieces from OpenRouter's server-sent events. `usage.cost` lands in `report.cost` when it
-// is a valid number. It returns only at [DONE]; an error event, unreadable data or a stream that stops early throws.
 async function* answerPieces(reader, report) {
   const decoder = new TextDecoder();
   let buffer = '';
@@ -318,7 +277,7 @@ async function* answerPieces(reader, report) {
     while ((end = buffer.indexOf('\n')) >= 0) {
       const text = buffer.slice(0, end).replace(/\r$/, '');
       buffer = buffer.slice(end + 1);
-      if (!text.startsWith('data:')) continue; // a comment, a blank line or another field
+      if (!text.startsWith('data:')) continue;
       const data = text.slice(5).trim();
       if (data === '[DONE]') return;
       const chunk = JSON.parse(data);
@@ -334,38 +293,31 @@ async function* answerPieces(reader, report) {
   }
 }
 
-// ---- The function -----------------------------------------------------------------------------------------------
-
 export function onRequest(context) {
   return handle(context);
 }
 
-// `options` are the test seams: the clock, the salt, the passage ranking and the two timeouts.
 export async function handle(context, options = {}) {
   const { request, env } = context;
   const {
     clock = () => new Date(), salt: makeSalt = randomSalt, rank = rankPassages,
     upstreamTimeout = UPSTREAM_TIMEOUT, storeTimeout = STORE_TIMEOUT,
   } = options;
-  const keep = promise => { try { context.waitUntil?.(promise); } catch { /* no runtime to keep it alive */ } };
+  const keep = promise => { try { context.waitUntil?.(promise); } catch { } };
 
-  // 1. The switch: exactly "on", or nothing is here.
   if (env.ASK_A_WIZ !== 'on') return new Response(null, { status: 404 });
   if (request.method === 'GET') {
     return new Response(JSON.stringify({ schema: SCHEMA, enabled: true, max_question_chars: MAX_QUESTION }),
       { headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
   }
 
-  // 2. The configuration.
   const config = configure(env);
   if (!config) return refuse('unavailable');
 
-  // 3. The request, then its length.
   const asked = await readQuestion(request);
   if (asked.refusal) return refuse(asked.refusal);
   const { question } = asked;
 
-  // 4. The visitor's hour: the first store write; a question that passes counts, whatever comes next.
   const now = clock();
   const day = utcDay(now);
   const store = counters(config.db, storeTimeout);
@@ -377,19 +329,16 @@ export async function handle(context, options = {}) {
     return refuse('store_error');
   }
 
-  // 5. The passages: none scoring above zero is the not-covered answer, with no model call.
   const index = await loadIndex(env, request);
   if (!index) return refuse('unavailable');
   const { content, used } = userMessage(question, rank(index, question));
   if (!used.length) return new Response(line(NOT_COVERED), { headers: NDJSON });
 
-  // 6. The day's caps: the call count, then the dollar reservation; again on the new day if midnight passed.
   const cap = caps(env);
   const reserve = async when => await store.count(when, 'cap', 1, cap.calls) && await store.count(when, 'spend', config.callMax, cap.spend);
   let sentOn = day;
   try {
     if (!await reserve(day)) return refuse('daily_cap', untilDayEnds(now));
-    // The call is counted on the day it is sent: the clock's day, or a newer day the store already holds.
     const dispatch = clock();
     const later = [utcDay(dispatch), store.newest()].sort().at(-1);
     if (later > day) {
@@ -400,20 +349,14 @@ export async function handle(context, options = {}) {
     return refuse('store_error');
   }
 
-  // 7. The model call: one attempt, bounded, private, timed.
   const abort = new AbortController();
   let reader = null;
   let finished = false;
   let release;
   keep(new Promise(resolve => { release = resolve; }));
-  // The answer's pieces arrive in `queue` and leave it whole, in order (see `ready` below). `received` is all the
-  // text that has arrived. `state` is open, done (at [DONE]), failed (an error, the deadline or a cancel) or
-  // leaked (the key arrived); failed and leaked are final.
   const queue = [];
   let received = '';
   let state = 'open';
-  // The deadline is terminal: whatever is queued, held or still in the parser is dropped, and the next thing the
-  // visitor reads is the refusal.
   const timer = setTimeout(() => {
     state = 'failed';
     stop();
@@ -423,7 +366,6 @@ export async function handle(context, options = {}) {
     abort.abort();
     reader?.cancel().catch(() => {});
   }
-  // 8. Settling: the reported cost replaces the reservation; anything else keeps it, counted at call_max.
   function finish(cost) {
     if (finished) return;
     finished = true;
@@ -447,7 +389,7 @@ export async function handle(context, options = {}) {
         messages: [{ role: 'system', content: SYSTEM }, { role: 'user', content }],
       }),
       signal: abort.signal,
-      redirect: 'manual', // a redirect is a refusal: the question goes only to OpenRouter, under its privacy rules
+      redirect: 'manual',
     });
   } catch {
     finish();
@@ -462,16 +404,12 @@ export async function handle(context, options = {}) {
   const report = {};
   const pieces = answerPieces(reader, report);
 
-  // The last key length - 1 characters that arrived are always examined: from the first of them that could begin
-  // the key (what follows it is a start of the key), the text is held, and a piece leaves only when it ends before
-  // that point. The whole key arriving ends the answer. On any failure, timeout or cancel, held text is discarded,
-  // never sent: no part of the key ever reaches the visitor.
   const lookahead = config.key.length - 1;
   async function receive() {
     if (state !== 'open') return;
     try {
       const next = await pieces.next();
-      if (state !== 'open') return; // the deadline passed while the parser worked: its result is dropped
+      if (state !== 'open') return;
       if (next.done) { state = 'done'; return; }
       queue.push(next.value);
       received += next.value;
@@ -485,11 +423,9 @@ export async function handle(context, options = {}) {
     for (let at = Math.max(0, received.length - lookahead); at < received.length; at++) if (config.key.startsWith(received.slice(at))) return at;
     return received.length;
   };
-  // The next piece may leave: the answer ended complete without the key, or the piece ends before the held text.
   const ready = () => queue.length > 0 && state !== 'leaked' && state !== 'failed' &&
     (state === 'done' || received.length - queued() + queue[0].length <= heldFrom());
 
-  // Hold back the answer's start until it can't be NOT_COVERED, or the answer ends.
   while (state === 'open' && received.trimStart().length < HOLD) await receive();
   if (state === 'leaked' || state === 'failed') {
     stop();
@@ -497,22 +433,18 @@ export async function handle(context, options = {}) {
     return refuse('upstream_error');
   }
   if (received.trimStart().startsWith(SENTINEL)) {
-    // The model's not-covered answer; the rest of the stream is read only for its reported cost.
     keep((async () => {
       while (state === 'open') await receive();
       if (state === 'done') finish(report.cost); else { stop(); finish(); }
     })());
     return new Response(line(NOT_COVERED), { headers: NDJSON });
   }
-  // The first piece must be safe to send before the answer's status is set.
   while (state === 'open' && !ready()) await receive();
   if (!ready() || bytes(queue[0]) > MAX_ANSWER_BYTES) {
     if (state === 'done') finish(report.cost); else { stop(); finish(); }
     return refuse('upstream_error');
   }
 
-  // The answer: text pieces that fit whole within MAX_ANSWER_BYTES, then sources and done; an error after some
-  // text discards whatever is held and ends with upstream_error.
   let sent = 0;
   let closed = false;
   const body = new ReadableStream({
@@ -545,6 +477,6 @@ export async function handle(context, options = {}) {
       stop();
       finish();
     },
-  }, { highWaterMark: 0 }); // nothing is pulled ahead of the visitor's read, so nothing sits past the deadline
+  }, { highWaterMark: 0 });
   return new Response(body, { headers: NDJSON });
 }

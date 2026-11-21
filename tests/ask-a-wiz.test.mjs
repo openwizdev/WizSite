@@ -1,7 +1,3 @@
-// P4 (#1902): the "Ask a Wiz..." row in a real headless Chromium, against the built site (npm run build first) and a
-// fake /api/ask. No real OpenRouter, no network: the fake answers the probe and replays the stream bodies of the
-// Ask-a-Wiz contract's fixtures (openwiz.ask-a-wiz.v1, OpenWiz 9e68c7d556efc71ad1663d30b32cb953f77374e2), all synthetic.
-//   node --test tests/ask-a-wiz.test.mjs        (CHROME=/path/to/chrome picks the browser; SHOTS=dir saves screenshots)
 import { test, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
@@ -17,8 +13,6 @@ const TYPES = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 
   '.png': 'image/png', '.ico': 'image/x-icon', '.webp': 'image/webp', '.woff2': 'font/woff2' };
 const line = event => JSON.stringify(event).replace(/[<>&]/g, c => `\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`) + '\n';
 const refused = (reason, message) => line({ type: 'refused', reason, message });
-// The contract's probe and stream bodies (fixtures probe-on, answer, answer-escaped, not-covered, too-long,
-// upstream-error-midstream), as the lines the fake sends.
 const PROBE_ON = '{"schema":"openwiz.ask-a-wiz.v1","enabled":true,"max_question_chars":300}';
 const ANSWER = ['Synthetic answer: OpenWiz ', 'runs a fleet of coding agents ', 'from one approved plan.'].map(text => line({ type: 'text', text }))
   .concat(line({ type: 'sources', sources: [{ title: 'Questions', url: 'https://openwiz.dev/faq/' }, { title: 'OpenWiz README', url: 'https://github.com/openwizdev/openwiz#readme' }] }), line({ type: 'done' }));
@@ -30,8 +24,6 @@ const NOT_COVERED = [line({ type: 'not_covered', text: NOT_COVERED_TEXT, links: 
 const TOO_LONG = refused('too_long', 'That question is too long. Keep it to 300 characters or fewer.');
 const MIDSTREAM = [line({ type: 'text', text: 'Synthetic part one. ' }), refused('upstream_error', "Ask a Wiz couldn't answer just now. Try again.")];
 
-// The fake /api/ask. `probe` answers GET; each POST takes the next of `answers`: { status, lines, hold } where `hold`
-// keeps the stream open after its lines until `release()` (or until the browser closes it, which sets `closed`).
 let fake;
 beforeEach(() => {
   fake = { probe: { status: 404 }, probed: 0, answers: [], asked: [], closed: 0, release: null };
@@ -124,16 +116,14 @@ async function open(path = '/', { width = 1280, height = 900, reduced = false, s
   const loaded = new Promise(resolve => browser.on(m => m.sessionId === sessionId && m.method === 'Page.loadEventFired' && resolve()));
   await send('Page.navigate', { url: `${origin}${path}` });
   await loaded;
-  if (scroll) await send('Runtime.evaluate', { expression: `document.querySelector('section.faq').scrollIntoView()` }); // the row waits for its FAQ
+  if (scroll) await send('Runtime.evaluate', { expression: `document.querySelector('section.faq').scrollIntoView()` });
   const evaluate = async expression => {
     const { result, exceptionDetails } = await send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true });
     if (exceptionDetails) throw new Error(exceptionDetails.exception?.description || exceptionDetails.text);
     return result.value;
   };
-  // Waits (up to 5 s) until the expression is true in the page.
   const until = (expression, what = expression) => evaluate(`new Promise((resolve, reject) => { const t0 = Date.now();
     const tick = () => { let ok; try { ok = (${expression}); } catch {} ok ? resolve(true) : Date.now() - t0 > 5000 ? reject(new Error(${JSON.stringify(`timed out: ${what}`)})) : setTimeout(tick, 20); }; tick(); })`);
-  // Types into the open input row as a visitor would, then presses Enter.
   const ask = async question => {
     await evaluate(`document.querySelector('.faq-ask input').focus()`);
     await send('Input.insertText', { text: question });
@@ -149,7 +139,6 @@ async function open(path = '/', { width = 1280, height = 900, reduced = false, s
   return { evaluate, until, ask, press, shot, close: () => browser.send('Target.closeTarget', { targetId }) };
 }
 
-// What the visitor sees of the FAQ: each row's question and answer text, the input row's state and its buttons.
 const ROWS = `[...document.querySelectorAll('section.faq .faq-rows > *')].map(row => ({
   ask: row.classList.contains('faq-ask'), input: !!row.querySelector('input') && row.querySelector('input').getClientRects().length > 0,
   q: row.querySelector('.faq-q')?.textContent.trim() ?? '', a: row.querySelector('.faq-a')?.innerText.trim() ?? '',
@@ -157,7 +146,6 @@ const ROWS = `[...document.querySelectorAll('section.faq .faq-rows > *')].map(ro
   bold: !!row.querySelector('.faq-a b'),
   buttons: [...row.querySelectorAll('.faq-ask-actions button')].filter(b => b.getClientRects().length).map(b => b.textContent.trim()) }))`;
 const rows = page => page.evaluate(ROWS);
-// What a screen reader is told: the FAQ's one polite status line, and where focus is.
 const told = page => page.evaluate(`document.querySelector('section.faq [aria-live="polite"]')?.textContent.trim()`);
 const focused = page => page.evaluate(`(e => e === document.body ? 'the page' : e.tagName === 'INPUT' ? 'input' : e.textContent.trim())(document.activeElement)`);
 const waitFake = async (test, what) => {
@@ -166,11 +154,9 @@ const waitFake = async (test, what) => {
 const probeOn = () => { fake.probe = { status: 200, body: PROBE_ON }; };
 
 test('with the switch off the FAQ shows no input row, and asks nothing', async () => {
-  // catches: the row showing while the switch is off (404), or on any 200 that isn't the probe's JSON, such as the
-  // site's own page served in place of a function that isn't deployed yet.
   for (const probe of [{ status: 404 }, { status: 200, type: 'text/html', body: '<!doctype html><title>OpenWiz</title>' },
     { status: 200, body: '{"schema":"openwiz.ask-a-wiz.v1","enabled":false,"max_question_chars":300}' },
-    { status: 200, body: '{"schema":"openwiz.ask-a-wiz.v1","enabled":true}' }, // R4: the pinned on answer, or nothing
+    { status: 200, body: '{"schema":"openwiz.ask-a-wiz.v1","enabled":true}' },
     { status: 200, body: '{"schema":"openwiz.ask-a-wiz.v1","enabled":true,"max_question_chars":299}' },
     { status: 200, body: '{"schema":"openwiz.ask-a-wiz.v1","enabled":true,"max_question_chars":300,"extra":1}' }]) {
     fake.probe = probe;
@@ -184,7 +170,6 @@ test('with the switch off the FAQ shows no input row, and asks nothing', async (
     }
   }
   assert.equal(fake.asked.length, 0);
-  // catches: every landing view calling the function, even for a visitor who never scrolls to the FAQ.
   const probed = fake.probed, page = await open('/', { scroll: false });
   await page.evaluate('new Promise(resolve => setTimeout(resolve, 300))');
   assert.equal(fake.probed, probed, 'the landing asks nothing before its FAQ nears the screen');
@@ -195,8 +180,6 @@ test('with the switch off the FAQ shows no input row, and asks nothing', async (
 });
 
 test('an answer streams in, becomes a normal FAQ row, and a fresh input row appears', async () => {
-  // catches: text shown only at the end, a finished answer left as an input row, no fresh row, sources as links,
-  // the answer rendered as HTML, and a converted row whose heading level differs from its siblings on /faq.
   probeOn();
   for (const path of ['/', '/faq/']) {
     fake.answers.push({ lines: ANSWER.slice(0, 1), hold: ANSWER.slice(1) }, { lines: ESCAPED });
@@ -204,7 +187,7 @@ test('an answer streams in, becomes a normal FAQ row, and a fresh input row appe
     await page.until(`document.querySelector('.faq-ask input')`, 'the input row');
     assert.equal(await page.evaluate(`document.querySelector('.faq-ask input').placeholder`), 'Ask a Wiz...');
     assert.equal(await page.evaluate(`document.querySelector('.faq-rows').lastElementChild.classList.contains('faq-ask')`), true);
-    assert.equal(await focused(page), 'the page', 'the row never takes focus on its own'); // catches: the page jumping to the FAQ
+    assert.equal(await focused(page), 'the page', 'the row never takes focus on its own');
     await page.ask('  What does OpenWiz run?  ');
     await page.until(`document.querySelector('.faq-ask .faq-a')?.innerText.includes('Synthetic answer: OpenWiz')`, 'the first piece');
     let seen = (await rows(page)).at(-1);
@@ -212,7 +195,7 @@ test('an answer streams in, becomes a normal FAQ row, and a fresh input row appe
     assert.equal(await focused(page), 'Stop', 'focus moves to Stop, never to the page');
     assert.deepEqual(fake.asked.at(-1).body, { question: 'What does OpenWiz run?' });
     assert.equal(fake.asked.at(-1).origin, origin);
-    await page.evaluate(`document.querySelector('footer a').focus()`); // R1: the visitor tabs away while it streams
+    await page.evaluate(`document.querySelector('footer a').focus()`);
     const away = await focused(page);
     fake.release();
     await page.until(`document.querySelectorAll('.faq-rows > .faq-row').length === 9`, 'the converted row and a fresh one');
@@ -238,7 +221,6 @@ test('an answer streams in, becomes a normal FAQ row, and a fresh input row appe
 });
 
 test('stop ends the stream, shows nothing as finished, and retry asks again', async () => {
-  // catches: Stop leaving the request running, the partial text kept as an answer, and a retry that loses the question.
   probeOn();
   fake.answers.push({ lines: ANSWER.slice(0, 1), hold: true }, { lines: ANSWER });
   const page = await open('/team/');
@@ -263,8 +245,6 @@ test('stop ends the stream, shows nothing as finished, and retry asks again', as
 });
 
 test('refusals and the not-covered answer show in the row\'s own style', async () => {
-  // catches: a refusal shown as a finished answer, text before a mid-answer error kept, a retry offered for a question
-  // that is too long, Edit losing the question, and not-covered links that aren't exactly the contract's.
   probeOn();
   fake.answers.push({ status: 413, lines: [TOO_LONG] }, { lines: MIDSTREAM.slice(0, 1), hold: MIDSTREAM.slice(1) }, { lines: NOT_COVERED });
   const page = await open('/');
@@ -279,7 +259,7 @@ test('refusals and the not-covered answer show in the row\'s own style', async (
   await page.evaluate(`document.querySelector('.faq-ask input').select()`);
   await page.ask('Why did it fail?');
   await page.until(`document.querySelector('.faq-ask .faq-a')?.innerText.includes('Synthetic part one')`);
-  await page.evaluate(`document.querySelector('footer a').focus()`); // R1: tabbed away before the error arrives
+  await page.evaluate(`document.querySelector('footer a').focus()`);
   const away = await focused(page);
   fake.release();
   await page.until(`document.querySelector('.faq-ask .faq-a')?.innerText.includes("couldn't answer")`);
@@ -296,17 +276,15 @@ test('refusals and the not-covered answer show in the row\'s own style', async (
 });
 
 test('a stream that breaks the contract\'s shape is never shown as an answer', async () => {
-  // catches: a reader that accepts any event (an unknown type or key, an answer with no sources or done, text after
-  // the end, a not-covered answer with other links), turning a broken or foreign stream into a finished-looking row.
   probeOn();
   const text = line({ type: 'text', text: 'Synthetic text. ' }), sources = ANSWER[3], done = ANSWER[4];
   const bad = [[line({ type: 'text', text: 'Synthetic text. ', html: '<b>x</b>' }), sources, done], [text, line({ type: 'note' }), sources, done],
     [text, done], [text, sources, text, done], [text, line({ type: 'sources', sources: [] }), done],
     [line({ type: 'not_covered', text: NOT_COVERED_TEXT, links: [LINKS[0], { label: 'GitHub issues', href: 'https://example.com/' }] })],
     [line({ type: 'not_covered', text: 'Synthetic other text.', links: LINKS })], [text, refused('too_long', 'Synthetic.')], ['not json\n'],
-    [ANSWER.join('') + text], [ANSWER.join(''), 'x'], [ANSWER.join('') + done], [NOT_COVERED[0] + NOT_COVERED[0]], [ANSWER.join('').slice(0, -1)], // R3: anything after the end, or no end
+    [ANSWER.join('') + text], [ANSWER.join(''), 'x'], [ANSWER.join('') + done], [NOT_COVERED[0] + NOT_COVERED[0]], [ANSWER.join('').slice(0, -1)],
   ].map(lines => ({ lines })).concat({ status: 503, lines: ANSWER }, { status: 200, lines: [TOO_LONG] }, { type: 'text/html', lines: ANSWER },
-    { status: 413, lines: [refused('too_long', 'Synthetic other message.')] }); // R3: the wrong status, media type or message
+    { status: 413, lines: [refused('too_long', 'Synthetic other message.')] });
   for (const answer of bad) fake.answers.push(answer);
   const page = await open('/faq/');
   await page.until(`document.querySelector('.faq-ask input')`);
@@ -321,8 +299,6 @@ test('a stream that breaks the contract\'s shape is never shown as an answer', a
 });
 
 test('phone and laptop fit, and reduced motion keeps the row still', async () => {
-  // catches: the row overflowing a phone, controls under the 44px touch target, and motion that ignores the setting;
-  // R2: a long unbroken question or answer token widening the page or clipped by the answer panel.
   probeOn();
   const long = `Is ${'x'.repeat(90)} a ticket?`, LONG = [line({ type: 'text', text: `Synthetic ${'y'.repeat(400)} ` }), ...ANSWER.slice(1)];
   for (const [width, height, reduced] of [[390, 844, false], [1280, 900, false], [390, 844, true]]) {

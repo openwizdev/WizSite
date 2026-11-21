@@ -1,21 +1,11 @@
-// The Specs page, and the model of the factory that You, Specs and each spec's page read.
-//
-// The Specs feed (OW.data.feeds.specs) holds two GitHub reads. The first: `specIssues` (open specs: with sub-issues, labelled spec or titled "spec:"),
-// `youIssues` (open issues labelled needs-info or ready-for-human), each with its total, and `fleet` (the repository's
-// docs/agents/fleet.md, whose Record authors row says whose notes and decision records count). The second: `specs`,
-// each open spec's recent comments and its tickets with their state, labels, blocked-by links, closing pull requests
-// and recently edited comments (null where GitHub couldn't give it). What can't be read or established is unknown,
-// never dropped and never guessed; a list GitHub gave only part of says so.
 'use strict';
 (() => {
   const { h, STATES } = OW.ui;
-  const LAPSE = 30 * 60 * 1000; // a working or asking note not edited for 30 minutes has lapsed (AP1)
-  const SKEW = 5 * 60 * 1000; // an edit up to 5 minutes ahead of this clock still counts as recent
-  const recent = (at, now) => at - now <= SKEW && now - at < LAPSE;
+  const LAPSE = 30 * 60 * 1000;
+  const CLOCK_SKEW = 5 * 60 * 1000;
+  const recent = (at, now) => at - now <= CLOCK_SKEW && now - at < LAPSE;
   const names = issue => (issue?.labels?.nodes || []).filter(Boolean).map(label => label.name);
   const partialList = list => !list || (list.totalCount ?? 0) > (list.nodes || []).length;
-
-  // ---- Record authors: the `Record authors` row of fleet.md's `## GitHub identity` table ----
 
   function recordAuthors(text) {
     if (typeof text !== 'string') return null;
@@ -27,27 +17,18 @@
     if (!logins.length || !logins.every(login => /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})(?:\[bot\])?$/.test(login))) return null;
     return new Set(logins.map(login => login.toLowerCase()));
   }
-  // true: a record author; false: someone else (ordinary discussion); null: can't be established.
   function byRecordAuthor(comment, authors) {
     if (!authors) return null;
     const login = comment?.author?.login;
     return typeof login === 'string' ? authors.has(login.toLowerCase()) : null;
   }
 
-  // ---- Status notes (WizSkills' agent-status contract, openwiz:status v1) ----
-
-  // {agent, state} for a note that reads exactly as v1 says; {malformed: true} for one that doesn't (or another
-  // version); null for a comment that isn't a status note at all. One reader for the whole app: the Agents page's. A
-  // copy here once predated the skills line, so every current note read as malformed and Building read 0 (AP22).
   function readNote(body) {
     const note = OW.agents.readNote(body);
     if (!note) return null;
     return note.unknown ? { malformed: true } : { agent: note.agent, state: note.state };
   }
 
-  // The claims on a ticket: per agent kind, the live (working or asking, edited in the last 30 minutes) verified note
-  // with the lowest comment id. `uncertain` when a note that could be live can't be read or verified, or when the
-  // comments GitHub gave may hide one (the most-recently-edited window is full of recent edits).
   function claimsOf(issue, authors, now = Date.now()) {
     const out = { builder: null, reviewer: null, fleet: null, uncertain: false };
     const comments = issue?.comments;
@@ -62,7 +43,7 @@
       if (!note) continue;
       const at = Date.parse(comment.updatedAt) || 0;
       const author = byRecordAuthor(comment, authors);
-      if (author === false) continue; // ordinary discussion
+      if (author === false) continue;
       if (author === null || note.malformed || !Number.isSafeInteger(comment.databaseId)) {
         if (recent(at, now)) out.uncertain = true;
         continue;
@@ -75,16 +56,6 @@
     return out;
   }
 
-  // ---- A ticket's state, from GitHub and the claims, never from a state label (records spec B, AP1) ----
-  //   merged     closed as completed (a ticket closes only on a verified merge)
-  //   held       labelled held, or closed otherwise
-  //   you        labelled needs-info or ready-for-human, or a claim is asking
-  //   building   an open closing pull request that is a draft or has changes requested, or the builder's claim is
-  //              working with no open closing pull request
-  //   review     an open closing pull request, or the reviewer's claim is working
-  //   unknown    a claim that would decide it can't be established
-  //   waiting    something it is blocked by isn't merged, or couldn't be read or listed
-  //   ready      labelled ready-for-agent with nothing left to wait for; otherwise waiting
   function stateOf(issue, blockers, authors, now = Date.now()) {
     if (!issue) return 'unknown';
     if (issue.state === 'CLOSED') return issue.stateReason === 'COMPLETED' ? 'merged' : 'held';
@@ -104,13 +75,10 @@
     if (blockers.gap || blockers.states.some(state => state !== 'merged')) return 'waiting';
     return labels.includes('ready-for-agent') ? 'ready' : 'waiting';
   }
-  // A blocker outside the spec: whether it has merged is all its ticket needs.
   const outsideState = issue => (issue.state === 'CLOSED' ? (issue.stateReason === 'COMPLETED' ? 'merged' : 'held') : 'waiting');
 
   const keyOf = (issue, home) => `${issue.repository?.nameWithOwner || home}#${issue.number}`;
 
-  // One spec's graph: {tickets: [{key, number, title, url, state, outside, gap, blockers: [key], missing}], unknown}.
-  // A ticket whose blockers GitHub couldn't read or didn't list gets a gap node (unknown) with an arrow to it.
   function graph(detail, home, authors, now) {
     if (!detail?.subIssues) return null;
     const nodes = detail.subIssues.nodes || [];
@@ -132,7 +100,6 @@
         blockers.push(b);
         if (!tickets.has(b) && !outside.has(b)) outside.set(b, blocker);
       }
-      // Unreadable (null) or unlisted (past the first page) blockers; with no blocked-by read at all, one gap.
       const gap = issue.blockedBy ? Math.max(0, (issue.blockedBy.totalCount ?? listed.length) - blockers.length) : 1;
       list.push({ key: k, issue, blockers, gap });
     }
@@ -141,7 +108,7 @@
     const pending = new Map(list.map(t => [t.key, t]));
     const settle = (t, seen = new Set()) => {
       if (states.has(t.key)) return states.get(t.key);
-      if (seen.has(t.key)) return 'waiting'; // a blocking cycle never resolves
+      if (seen.has(t.key)) return 'waiting';
       seen.add(t.key);
       const blockerStates = t.blockers.map(b => (pending.has(b) ? settle(pending.get(b), seen) : states.get(b) || 'unknown'));
       const state = stateOf(t.issue, { states: blockerStates, gap: t.gap }, authors, now);
@@ -164,8 +131,6 @@
     };
   }
 
-  // ---- Decision records (contracts/decisions.v1.md): open spec confirmations and plan approvals ----
-
   const FENCE = /^```json\n([\s\S]*?)\n```$/gm;
   const COMMON = ['schema', 'kind', 'id', 'status', 'fingerprint', 'risk'];
   const KEYS = {
@@ -177,9 +142,7 @@
   const positive = n => Number.isSafeInteger(n) && n > 0;
   const text = v => typeof v === 'string' && v.length > 0;
   const exactly = (o, keys) => o && typeof o === 'object' && !Array.isArray(o) && Object.keys(o).length === keys.length && keys.every(k => Object.hasOwn(o, k));
-  // A plain string matching the pattern: never an array or object a lookup or a regex test would turn into one.
   const matches = (v, pattern) => typeof v === 'string' && pattern.test(v);
-  // A JSON text with a repeated key in any object (JSON.parse would keep only the last).
   function repeatsKeys(json) {
     const stack = [];
     for (const token of json.match(/"(?:[^"\\]|\\.)*"|[{}[\]:,]/g) || []) {
@@ -196,8 +159,6 @@
     }
     return false;
   }
-  // The record a comment holds, checked against decisions.v1 and bound to this spec: {record} or {malformed: true};
-  // null when the comment holds none.
   function readRecord(body, spec) {
     const raw = String(body ?? '').replace(/\r\n/g, '\n');
     const blocks = [...raw.matchAll(FENCE)].map(m => m[1]);
@@ -211,7 +172,7 @@
       && matches(r.id, /^[A-Za-z0-9][A-Za-z0-9_-]*$/) && ['open', 'resolved', 'superseded'].includes(r.status)
       && matches(r.fingerprint, /^[0-9a-f]{64}$/) && ['ordinary', 'live', 'release', 'publish', 'unknown'].includes(r.risk);
     if (!ok) return { malformed: true };
-    if (r.kind !== 'spec_confirmation' && r.kind !== 'plan_approval') return { record: r }; // a grill's record: not a spec's
+    if (r.kind !== 'spec_confirmation' && r.kind !== 'plan_approval') return { record: r };
     const summary = Array.isArray(r.summary) && r.summary.length >= 1 && r.summary.length <= 10 && r.summary.every(line => text(line) && !/[\r\n]/.test(line));
     const tickets = Array.isArray(r.tickets) && (r.kind === 'spec_confirmation' ? r.tickets.length === 0
       : r.tickets.every((t, i) => exactly(t, ['number', 'title', 'blockers']) && positive(t.number) && text(t.title)
@@ -222,15 +183,13 @@
     if (r.spec !== spec || !summary || !text(r.headline) || !tickets || !graphOk) return { malformed: true };
     return { record: r };
   }
-  // What a spec's comments ask of the user: [{kind, title, number, url, at}], with unreadable records as 'unreadable'.
-  // The author is checked before the body is read, and a record that can't be read is that record's problem only.
   function decisions(spec, detail, authors) {
     const found = [];
     const nodes = detail?.comments?.nodes;
     for (const comment of Array.isArray(nodes) ? nodes : []) {
       if (!comment) continue;
       const author = byRecordAuthor(comment, authors);
-      if (author === false) continue; // not the factory's: ordinary discussion, never parsed
+      if (author === false) continue;
       let read;
       try { read = readRecord(comment.body, spec.number); } catch { read = { malformed: true }; }
       if (!read) continue;
@@ -243,14 +202,12 @@
     return found;
   }
 
-  // ---- The whole picture for the pages; null when the Specs feed has nothing yet ----
-
   function model(feed, home, now = Date.now()) {
     const data = feed?.data;
     if (!data?.specIssues || !data?.youIssues) return null;
     const authors = recordAuthors(data.fleet?.text);
-    const details = data.specs; // undefined: no spec to read; null: the second read failed
-    const gaps = []; // why a list may be missing items
+    const details = data.specs;
+    const gaps = [];
     if (partialList(data.specIssues)) gaps.push('specs');
     if (partialList(data.youIssues)) gaps.push('tickets marked for you');
     const specs = (data.specIssues.nodes || []).filter(Boolean).map(issue => {
@@ -267,8 +224,6 @@
         detail,
       };
     });
-    // WizBar's rule (WizPlugins #164): a ready-for-human ticket with an open blocker is later, not due now. A question
-    // (needs-info) and an open decision record are always due now.
     const later = issue => !names(issue).includes('needs-info') && (issue.issueDependenciesSummary?.blockedBy ?? 0) > 0;
     const ticket = issue => ({ kind: 'ticket', title: issue.title, number: issue.number, url: issue.url, at: Date.parse(issue.updatedAt) || 0 });
     const marked = (data.youIssues.nodes || []).filter(Boolean);
@@ -277,7 +232,6 @@
       ...marked.filter(issue => !later(issue)).map(ticket),
     ].sort((a, b) => b.at - a.at);
     const yoursLater = marked.filter(later).map(ticket).sort((a, b) => b.at - a.at);
-    // A count from a partial read is a lower bound, shown as "N+"; with nothing read it is unknown.
     const running = specs.filter(spec => spec.total > 0);
     const read = running.filter(spec => spec.graph);
     const bound = (n, partial) => (partial ? `${n}+` : n);
@@ -301,8 +255,6 @@
     };
   }
 
-  // ---- Keyboard focus survives a redraw: the same control by its data-focus key, or the page's heading ----
-
   function redraw(el, build) {
     const active = document.activeElement;
     const had = Boolean(active && active !== document.body && el.contains(active));
@@ -316,8 +268,6 @@
   const home = () => OW.data.repo.get()?.full;
   OW.factory = { model: feeds => model(feeds.specs, home()), stateOf, claimsOf, readNote, readRecord, recordAuthors, redraw };
 
-  // ---- The Specs page: every spec with how many of its tickets are done ----
-
   function counts(spec) {
     if (!spec.graph) return null;
     const out = {};
@@ -328,7 +278,6 @@
   }
 
   function list(el, feeds) {
-    // Back from a spec's page (Esc or All specs): focus returns to that spec's card.
     const left = OW.specPage.shown;
     OW.specPage.shown = null;
     const seen = OW.factory.model(feeds);

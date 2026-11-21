@@ -65,7 +65,6 @@ function showHero(gsap, paused, signal) {
     }
     metrics.forEach((metric, i) => { metric.textContent = counts[i]; });
     steps.forEach((step, i) => step.classList.toggle('active', i <= index));
-    // Nothing downstream exists before its step: the stylesheet greys out the spec and tickets until then.
     demo.dataset.scene = index;
     setCrew(index, 0);
   };
@@ -104,7 +103,6 @@ function showHero(gsap, paused, signal) {
       timeline.fromTo(builder, { rotation: -10 }, {
         rotation: 8, duration: .32, repeat: 7, yoyo: true, ease: 'sine.inOut', transformOrigin: '50% 85%',
       }, at + .1);
-      // The smoke belongs to the outgoing costume. Hide the mascot only on the occlusion frame.
       timeline.call(() => {
         setFrame(smoke, sheet, 6);
         smoke.style.visibility = 'visible';
@@ -135,7 +133,7 @@ function showHero(gsap, paused, signal) {
   });
   observer.observe(demo);
   document.addEventListener('visibilitychange', update, { signal });
-  start().catch(() => {}); // Keep the still if a sheet is unavailable.
+  start().catch(() => {});
   signal.addEventListener('abort', () => {
     observer.disconnect();
     timeline?.kill();
@@ -163,7 +161,6 @@ function followPointer(gsap, paused, signal) {
     const pupil = eye.firstElementChild;
     return { eye, x: gsap.quickTo(pupil, 'x', { duration: .26 }), y: gsap.quickTo(pupil, 'y', { duration: .26 }), pupil };
   });
-  // Only update the pupils while the footer is on screen.
   let visible = false;
   let frame = 0;
   let pointer;
@@ -228,7 +225,6 @@ function enableMotion(gsap) {
     controller = new AbortController();
     const { signal } = controller;
     const isPaused = () => pause?.getAttribute('aria-pressed') === 'true';
-    // Every site page shares the footer's eyes; only the landing has the hero demo and its Pause motion.
     const updateEyes = followPointer(gsap, isPaused, signal);
     if (!pause) return;
     const updateHero = showHero(gsap, isPaused, signal);
@@ -246,12 +242,6 @@ function enableMotion(gsap) {
   configure();
 }
 
-// The "Watch your spec" moment (#1405). The video loads only when it first plays. With motion it plays muted while it
-// is in view; with reduced motion, Pause motion or the tab hidden it waits on its poster. It never starts with sound on
-// its own: "Play with sound" (or a click on the frame) does that on request, and from then on the visitor drives it
-// and scrolling no longer starts or stops it. Until then the frame stays clean: it shows only the slides' band, with no
-// captions and no controls; the whole frame, its captions and the native controls (there for visitors without this
-// script) come back once the visitor takes over. It needs only this script, not GSAP.
 function specVideo() {
   const video = document.querySelector('.spec-video');
   const sound = document.querySelector('.spec-play');
@@ -259,8 +249,8 @@ function specVideo() {
   if (!video || !sound) return;
   const calm = matchMedia('(prefers-reduced-motion: reduce)');
   let inView = false;
-  let visitor = false; // the visitor has taken over playback
-  let ours = 0; // play and pause events we caused, not the visitor
+  let visitorDrives = false;
+  let ownPlayEvents = 0;
   const frame = video.closest('.spec-frame');
   const track = video.textTracks[0];
   const resting = on => {
@@ -268,21 +258,21 @@ function specVideo() {
     video.controls = !on;
     if (track) track.mode = on ? 'hidden' : 'showing';
   };
-  const takeOver = () => { visitor = true; resting(false); };
+  const takeOver = () => { visitorDrives = true; resting(false); };
   const update = () => {
-    if (visitor) return;
+    if (visitorDrives) return;
     const ambient = inView && !calm.matches && pause.getAttribute('aria-pressed') !== 'true' && !document.hidden;
     if (ambient && video.paused) {
-      ours += 1;
+      ownPlayEvents += 1;
       video.muted = true;
-      video.play().catch(() => { ours = 0; });
+      video.play().catch(() => { ownPlayEvents = 0; });
     } else if (!ambient && !video.paused) {
-      ours += 1;
+      ownPlayEvents += 1;
       video.pause();
     }
   };
   const take = () => {
-    if (ours > 0) ours -= 1;
+    if (ownPlayEvents > 0) ownPlayEvents -= 1;
     else takeOver();
   };
   video.addEventListener('play', take);
@@ -293,22 +283,18 @@ function specVideo() {
   document.addEventListener('visibilitychange', update);
   pause.addEventListener('click', () => setTimeout(update));
   resting(true);
-  // The muted loop starts at the opening slide, the poster's own frame, so the poster hands over without a jump.
   sound.hidden = false;
   const listen = () => {
     takeOver();
     video.muted = false;
     video.loop = false;
     video.currentTime = 0;
-    // Focus moves into the player, so the keyboard reaches its pause control next, as #32's player did.
     video.play().then(() => video.focus(), () => {});
   };
   sound.addEventListener('click', listen);
   video.addEventListener('click', () => { if (!video.controls) listen(); });
 }
 
-// The footer Wizes react, one at a time and briefly; at rest the footer is unchanged. With reduced motion, Pause
-// motion or no GSAP, a click is a still pose change (another costume) and the line, nothing moves.
 const FAMILY = [
   ['Cave Wiz', 'era', 'thinking…', 'cave'], ['Builder Wiz', 'builder', 'building…'], ['Reviewer Wiz', 'reviewer', 'looks good!'],
   ['Samurai Wiz', 'era', 'building…', 'samurai'], ['Astronaut Wiz', 'orchestrator', 'shipped!'], ['Reviewer Wiz', 'reviewer', 'looks good!'],
@@ -326,7 +312,6 @@ function enableFamily(gsap) {
   const line = document.createElement('span');
   line.className = 'wiz-line';
   line.setAttribute('role', 'status');
-  // The one reaction running now: its Wiz, and its timeline or timer. Every new reaction ends it first.
   let current = null;
 
   family.removeAttribute('aria-hidden');
@@ -349,7 +334,6 @@ function enableFamily(gsap) {
     sprite.style.backgroundPositionX = `${index * 100 / 8}%`;
     sprite.style.display = 'block';
   };
-  // A costume change lasts only for its reaction; the Wiz keeps its own picture and name at rest.
   const wear = (wiz, index) => { wiz.querySelector('img').src = picture(index); };
   const release = () => {
     if (!current) return;
@@ -369,7 +353,6 @@ function enableFamily(gsap) {
     line.removeAttribute('style');
     wiz.append(line);
   };
-  // Starts one short reaction (under a second) on one Wiz, ending any other first.
   const react = (wiz, build, text) => {
     release();
     const timeline = gsap.timeline({ onComplete: () => { if (current?.timeline === timeline) release(); } });
@@ -385,7 +368,6 @@ function enableFamily(gsap) {
     const index = wizes.indexOf(wiz);
     const [, role, text, era] = FAMILY[index];
     if (!moving()) {
-      // A still pose: another costume for a moment, with this Wiz's own line, then back.
       release();
       current = { wiz, timer: setTimeout(release, 900) };
       wear(wiz, (index + 1) % FAMILY.length);
@@ -393,7 +375,6 @@ function enableFamily(gsap) {
       return;
     }
     if (Math.random() < .2) {
-      // Now and then a poof, from the hero's own smoke frames, into another costume and back.
       const other = (index + 1 + Math.floor(Math.random() * (FAMILY.length - 1))) % FAMILY.length;
       react(wiz, timeline => timeline
         .call(() => frame(wiz, POOF, 6), [], 0)
@@ -407,7 +388,6 @@ function enableFamily(gsap) {
     }
     react(wiz, timeline => {
       if (role === 'era') {
-        // The era Wizes play their work frames from the hero's sprite sheet.
         timeline.call(() => wiz.classList.add('is-acting'), [], 0);
         [2, 3, 4, 5].forEach((n, i) => timeline.call(() => frame(wiz, `/art/hero-${era}-frames.webp`, n), [], i * .14));
         timeline.call(() => { wiz.classList.remove('is-acting'); wiz.querySelector('.wiz-sprite').removeAttribute('style'); }, [], .6);
@@ -421,13 +401,11 @@ function enableFamily(gsap) {
       }
     }, text);
   };
-  // Hover and focus: a short wave on that Wiz only; moving on ends it at once.
   const wave = wiz => {
     if (!moving() || current?.wiz === wiz) return;
     react(wiz, timeline => timeline.to(wiz, { rotation: -6, duration: .12, yoyo: true, repeat: 3,
       transformOrigin: '50% 90%', ease: 'sine.inOut' }));
   };
-  // Entering the footer: the Wiz nearest the pointer hops once toward it.
   const perk = event => {
     if (event.pointerType === 'touch' || !moving()) return;
     const boxes = wizes.map(wiz => [wiz, wiz.getBoundingClientRect()]).filter(([, box]) => box.width);
@@ -452,7 +430,6 @@ function enableFamily(gsap) {
   document.querySelector('.landing-footer').addEventListener('pointerenter', perk);
 }
 
-// The install box (#1357): Copy works only once index.html's switch says live; until then it stays disabled.
 function enableCopy() {
   const box = document.querySelector('.install-box[data-install="live"]');
   if (!box || !navigator.clipboard) return;
@@ -473,12 +450,7 @@ function enableCopy() {
   });
 }
 
-// The "Ask a Wiz..." row (#1902, contract openwiz.ask-a-wiz.v1): the FAQ's last row, added only when GET /api/ask
-// answers the contract's probe (its switch, ASK_A_WIZ, is exactly "on"); anything else, the site's own page included,
-// leaves the FAQ as it is. A question streams in; a finished answer becomes a normal row and a fresh input row follows.
-// Everything from the stream is set as text; only the not-covered answer's links, exactly the contract's, are links.
 const ASK_KEYS = { text: 'text,type', sources: 'sources,type', done: 'type', not_covered: 'links,text,type', refused: 'message,reason,type' };
-// Each refusal's status and exact message, as the contract pins them.
 const ASK_REFUSALS = {
   bad_request: [400, 'That question couldn\'t be read. Try again.'],
   too_long: [413, 'That question is too long. Keep it to 300 characters or fewer.'],
@@ -493,9 +465,6 @@ const ASK_NOT_COVERED = 'The OpenWiz docs don\'t cover that yet, so I won\'t gue
 const ASK_LINKS = [['Book a call', 'https://openwiz.dev/team/#book'], ['GitHub issues', 'https://github.com/openwizdev/openwiz/issues']];
 const askKeys = value => value && typeof value === 'object' && !Array.isArray(value) ? Object.keys(value).sort().join() : '';
 const askText = value => typeof value === 'string' && value.length > 0;
-// One line of the stream, read only in the contract's shape: each event with exactly its keys, in one of its orders
-// (text, then sources, then done; not_covered alone; refused alone, or after text only as upstream_error), refusals
-// with their exact message. Anything else throws, and the row treats the stream as broken.
 function askEvent(line, text, sources) {
   const e = JSON.parse(line);
   const ok = askKeys(e) === ASK_KEYS[e?.type] && {
@@ -514,13 +483,11 @@ function askEvent(line, text, sources) {
 async function askAWiz() {
   const lists = document.querySelectorAll('.faq .faq-rows');
   if (!lists.length) return;
-  // Asked once, as the FAQ nears the screen: a visitor who never scrolls to it costs the function nothing.
   await new Promise(resolve => {
     const near = new IntersectionObserver(seen => seen.some(e => e.isIntersecting) && (near.disconnect(), resolve()), { rootMargin: '600px 0px' });
     lists.forEach(list => near.observe(list));
   });
   const probe = await fetch('/api/ask', { cache: 'no-store' }).then(r => r.status === 200 ? r.json() : null).catch(() => null);
-  // Only the contract's exact on answer turns the row on.
   if (askKeys(probe) !== 'enabled,max_question_chars,schema' || probe.schema !== 'openwiz.ask-a-wiz.v1' || probe.enabled !== true
     || probe.max_question_chars !== 300) return;
   let made = 0;
@@ -533,7 +500,6 @@ async function askAWiz() {
   for (const list of lists) {
     const faq = list.closest('.faq');
     const level = list.querySelector('.faq-q')?.tagName.toLowerCase() || 'h3';
-    // One polite status line per FAQ, outside the rows, so every outcome is announced even as its row is replaced.
     const status = el('p', 'sr-only');
     status.setAttribute('aria-live', 'polite');
     list.after(status);
@@ -551,9 +517,6 @@ async function askAWiz() {
       row.append(form, heading, body, actions);
       list.append(row);
       let question = '', controller = null;
-      // idle: the input; asking: the question, its answer so far and Stop; ended: the question, a message, Retry and
-      // Edit. When focus is in the row, it moves to the control that replaces the one just used, never to the page;
-      // focus the visitor moved elsewhere stays there.
       const show = (state, message = '', retry = true, focus = true) => {
         const inside = row.contains(document.activeElement);
         row.dataset.state = state;
@@ -601,7 +564,7 @@ async function askAWiz() {
           if (!/^application\/x-ndjson\s*(;|$)/i.test(response.headers.get('content-type') || '')) throw new Error('not a stream');
           const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
           let buffer = '';
-          for (;;) { // to the stream's end: nothing may follow the last event
+          for (;;) {
             const { value, done } = await reader.read();
             if (done) break;
             buffer += value;

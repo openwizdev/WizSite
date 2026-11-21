@@ -16,13 +16,13 @@ const withCta = html => {
 };
 const footer = await readFile(new URL('footer.html', root), 'utf8');
 const withFooter = html => {
-  const slot = '<!-- footer.html -->\n';
+  const slot = '<template data-slot="footer"></template>\n';
   if (html.split(slot).length !== 2) throw new Error('a site page needs exactly one footer slot');
   return html.replace(slot, footer);
 };
 const faq = await readFile(new URL('faq.html', root), 'utf8');
 const faqTop = faq.replace(/<(\/?)h2\b/g, '<$1h1').replace(/<(\/?)h3\b/g, '<$1h2');
-const withFaq = html => html.replace('<!-- faq.html -->\n', faq).replace('<!-- faq.html h1 -->\n', faqTop);
+const withFaq = html => html.replace('<template data-slot="faq"></template>\n', faq).replace('<template data-slot="faq-h1"></template>\n', faqTop);
 const app = ['app/ember.css', 'app/data.js', 'app/ui.js', 'app/pages/you.js', 'app/pages/specs.js', 'app/pages/spec.js', 'app/pages/agents.js', 'app/palette.js', 'app/shell.js'];
 const npmVendor = { 'app/vendor/dagre-3.1.3.min.js': 'node_modules/@dagrejs/dagre/dist/dagre.min.js', 'app/vendor/dagre-LICENSE.txt': 'node_modules/@dagrejs/dagre/LICENSE' };
 const hashed = ['tokens.css', 'site.css', 'site.js', 'faq.js', vendor[0], ...app];
@@ -52,7 +52,7 @@ for (const page of pages) {
   if (page === 'changelog/index.html') html = withReleases(html, render(releases, live));
   await put(page, html);
 }
-await put('ask-index.json', await (await import('./scripts/ask-index.mjs')).snapshotIndex(output, new URL('ask-docs/', root))); // Ask a Wiz's docs index (FA2, #1900)
+await put('ask-index.json', await (await import('./scripts/ask-index.mjs')).snapshotIndex(output, new URL('ask-docs/', root)));
 for (const [file, source] of Object.entries(npmVendor)) await put(file, await readFile(new URL(source, root)));
 for (const file of files) {
   await mkdir(new URL('./', new URL(file, output)), { recursive: true });
