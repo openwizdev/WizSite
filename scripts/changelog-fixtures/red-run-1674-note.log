@@ -1,0 +1,26 @@
+# #1674 RL2 red run: the install note and the FAQ answer to Where do my agents run? (paths trimmed)
+AssertionError: CloudRoom link, the landing install box's only: index.html has 0
+FAIL: test_install_note_under_the_box (test_check.Checks.test_install_note_under_the_box)
+AssertionError: 0 != 1 : <p class="install-note">Needs <a href="https://cloudroom.dev" rel="noreferrer">CloudRoom</a>, on an Apple-silicon Mac or x86_64 Linux. Your agent can install it; you sign in.</p>
+FAIL: test_faq (test_check.Checks.test_faq) (message='the index.html page needs the one Questions')
+AssertionError: CloudRoom link, the landing install box's only: index.html has 0
+AssertionError: "the index.html page needs the one Questions" does not match "CloudRoom link, the landing install box's only: index.html has 0"
+FAIL: test_faq (test_check.Checks.test_faq) (message='the faq/index.html page needs the one Questions')
+AssertionError: CloudRoom link, the landing install box's only: index.html has 0
+AssertionError: "the faq/index.html page needs the one Questions" does not match "CloudRoom link, the landing install box's only: index.html has 0"
+FAIL: test_faq (test_check.Checks.test_faq) (message='the team page sections')
+AssertionError: CloudRoom link, the landing install box's only: index.html has 0
+AssertionError: "the team page sections" does not match "CloudRoom link, the landing install box's only: index.html has 0"
+FAIL: test_faq (test_check.Checks.test_faq) (message='needs faq.js')
+AssertionError: CloudRoom link, the landing install box's only: index.html has 0
+AssertionError: "needs faq.js" does not match "CloudRoom link, the landing install box's only: index.html has 0"
+FAIL: test_faq (test_check.Checks.test_faq) (message='last answer')
+AssertionError: the Questions’ answer to Where do my agents run?: Through CloudRoom: OpenWiz runs on it, so it comes first. Once OpenWiz is set up, a fleet can also run agents on boat.dev or your own computer. Each is a driver that passed the same five-check test.
+AssertionError: "last answer" does not match "the Questions’ answer to Where do my agents run?: Through CloudRoom: OpenWiz runs on it, so it comes first. Once OpenWiz is set up, a fleet can also run agents on boat.dev or your own computer. Each is a driver that passed the same five-check test."
+FAIL: test_faq (test_check.Checks.test_faq) (message='no form or input')
+AssertionError: the Questions’ answer to Where do my agents run?: Through CloudRoom: OpenWiz runs on it, so it comes first. Once OpenWiz is set up, a fleet can also run agents on boat.dev or your own computer. Each is a driver that passed the same five-check test.
+AssertionError: "no form or input" does not match "the Questions’ answer to Where do my agents run?: Through CloudRoom: OpenWiz runs on it, so it comes first. Once OpenWiz is set up, a fleet can also run agents on boat.dev or your own computer. Each is a driver that passed the same five-check test."
+FAIL: test_faq (test_check.Checks.test_faq)
+AssertionError: the Questions’ answer to Where do my agents run?: Through CloudRoom: OpenWiz runs on it, so it comes first. Once OpenWiz is set up, a fleet can also run agents on boat.dev or your own computer. Each is a driver that passed the same five-check test.
+Ran 2 tests in 0.151s
+FAILED (failures=8)
