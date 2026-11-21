@@ -695,6 +695,42 @@ class Checks(unittest.TestCase):
                 with self.assertRaisesRegex(AssertionError, message.strip()):
                     check_site(root)
 
+    def test_report_a_problem_link(self):
+        """#1851: openwiz.dev's Report a problem link opens GitHub's new-issue form on openwizdev/OpenWiz with the
+        feedback template (contracts/feedback-loop.v1.md: template .github/ISSUE_TEMPLATE/feedback.yml; the exact link
+        is the planner's answer on #1851), in the footer of every site page, the changelog's included.
+        Catches: the link missing from a page's footer, pointing at another repository or template, or
+        carrying anything more (a prefilled title or body would send words from openwiz.dev), or (R2 on WizSite #90)
+        sending the page's address as a Referer: the link must carry rel="noreferrer"."""
+        form = '<a href="https://github.com/openwizdev/openwiz/issues/new?template=feedback.yml" rel="noreferrer">Report a problem</a>'
+        for page, count in {'index.html': 1, 'drivers/index.html': 1, 'team/index.html': 1, 'faq/index.html': 1, 'changelog/index.html': 1, 'app/index.html': 0}.items():
+            with self.subTest(page=page):
+                self.assertEqual((ROOT / 'dist' / page).read_text().count(form), count)
+        href = 'https://github.com/openwizdev/openwiz/issues/new?template=feedback.yml'
+        for message, (page, old, new) in {
+            'Report a problem link': ('changelog/index.html', form, 'Report a problem'),
+            'Report a problem link ': ('team/index.html', form, '<a href="/">Report a problem</a>'),
+            'Report a problem link  ': ('drivers/index.html', '</main>', form + '</main>'),
+            'Report a problem link, the footer\'s: the app': ('app/index.html', '</body>', form + '</body>'),
+            'Report a problem link needs rel="noreferrer"': ('index.html', ' rel="noreferrer">Report', '>Report'),
+            'Report a problem link needs rel="noreferrer" ': ('changelog/index.html', ' rel="noreferrer">Report', ' rel="noopener">Report'),
+            'Report a problem link needs rel="noreferrer"  ': ('team/index.html', ' rel="noreferrer">Report', ' rel="noreferrer" referrerpolicy="unsafe-url">Report'),
+            'unexpected external URL parts': ('index.html', href, href + '&amp;body=x'),
+            'unexpected external URL parts ': ('changelog/index.html', href, href.replace('feedback.yml', 'bug.yml')),
+            'unexpected repository link|unexpected external URL parts': ('index.html', href, href.replace('/openwiz/', '/WizSkills/')),
+            'unexpected external URL parts  ': ('team/index.html', href, href.replace('/openwiz/', '/OpenWiz/')),
+            'unexpected external URL parts   ': ('drivers/index.html', href, href.replace('?template=', '?labels=x&amp;template=')),
+        }.items():
+            with tempfile.TemporaryDirectory() as temp, self.subTest(message=message):
+                root = Path(temp) / 'dist'
+                shutil.copytree(ROOT / 'dist', root)
+                path = root / page
+                text = path.read_text()
+                self.assertIn(old, text)
+                path.write_text(text.replace(old, new, 1))
+                with self.assertRaisesRegex(AssertionError, message.strip()):
+                    check_site(root)
+
     def test_faq(self):
         """#76: the one Questions snippet on the landing, /team and /faq, and nowhere else; its rows are buttons."""
         import check

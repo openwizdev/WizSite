@@ -456,7 +456,7 @@ async function footer(page, where, mode) {
   expect(facts.count === 1, where, `one footer (${facts.count})`);
   // #75 R1: with JavaScript on, every page's footer Wizes answer focus and clicks, the landing's and /drivers/ alike.
   expect(facts.buttons === (mode === 'no JavaScript' ? 0 : 12), where, `the footer Wizes are not the landing's (${facts.buttons} of 12 respond)`);
-  expect(facts.links === 8 && facts.inside, where, 'the footer link groups are not all shown inside the window');
+  expect(facts.links === 9 && facts.inside, where, 'the footer link groups are not all shown inside the window');
   expect(facts.line, where, 'the footer lacks its Apache-2.0 line');
   expect(facts.whole, where, `the footer wordmark is clipped (ink and box: ${facts.dbg})`);
   expect(facts.gap >= 0 && facts.gap <= 16, where, `a ${facts.gap}px painted gap between the wordmark's ink and the Wizes (0 to 16)`);

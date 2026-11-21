@@ -166,12 +166,16 @@ TEAM_PASSED_LINE = '5 of 5'
 TEAM_POSTER = '/art/team-boat-poster.webp'
 TEAM_POSTER_ALT = 'Wizards on a boat: the fleet that built the Drivers page'
 TEAM_NEVER = re.compile(r'\binstall|\bguarantee', re.I)
+# #1851: Report a problem opens GitHub's new-issue form on openwizdev/openwiz with the feedback template
+# (contracts/feedback-loop.v1.md: .github/ISSUE_TEMPLATE/feedback.yml). The only external URL with a query; nothing
+# else may ride along, so no words leave openwiz.dev. In the footer of every site page.
+REPORT_LINK = 'https://github.com/openwizdev/openwiz/issues/new?template=feedback.yml'
 # The site footer (#73): one snippet, which the build adds at each site page's one slot (not the app's). Its links, in order.
 FOOTER = (ROOT / 'footer.html').read_text()
 FOOTER_SLOT = '<!-- footer.html -->\n'
 FOOTER_LINKS = (('/drivers/', 'Drivers'), ('/changelog/', 'Changelog'), ('https://github.com/openwizdev/openwiz#readme', 'Docs'),
-                ('/faq/', 'FAQ'), ('/app/', 'The app'), ('/team/', 'For teams'), ('https://github.com/openwizdev/openwiz', 'GitHub'),
-                ('https://x.com/openwiz', 'X @openwiz'))
+                ('/faq/', 'FAQ'), ('/app/', 'The app'), (REPORT_LINK, 'Report a problem'), ('/team/', 'For teams'),
+                ('https://github.com/openwizdev/openwiz', 'GitHub'), ('https://x.com/openwiz', 'X @openwiz'))
 FOOTER_LINE = 'Apache-2.0. Owned by no one.'
 # The only external link off GitHub: OpenWiz's own X account, in the footer.
 X_ACCOUNT = 'https://x.com/openwiz'
@@ -367,6 +371,7 @@ class Page(HTMLParser):
         self.inline_scripts = 0
         self.books = []
         self.x_links = 0
+        self.report_links = 0
         self.stylesheets, self.scripts = [], []
         self.feed(text)
 
@@ -384,6 +389,14 @@ class Page(HTMLParser):
             # #75 R3: OpenWiz's X account, only as a link a visitor follows (check_site allows one, the footer's);
             # anywhere else, as a resource or in CSS, check_ref refuses it like any external URL.
             self.x_links += 1
+            attrs = {key: value for key, value in attrs.items() if key != 'href'}
+        elif tag == 'a' and attrs.get('href') == REPORT_LINK:
+            # #1851: the Report a problem link, exempt from check_ref's no-query rule by its exact href only;
+            # check_site counts it per page.
+            # R2 (WizSite #90): no Referer, so the form request never carries the page the visitor came from.
+            assert 'noreferrer' in (attrs.get('rel') or '').lower().split() and 'referrerpolicy' not in attrs, \
+                'Report a problem link needs rel="noreferrer"'
+            self.report_links += 1
             attrs = {key: value for key, value in attrs.items() if key != 'href'}
         for key in ('href', 'src', 'poster'):
             if attrs.get(key):
@@ -568,6 +581,8 @@ def check_site(root):
         assert page.x_links == x_links, f'one X link per page, the footer\'s: {path.relative_to(root)} has {page.x_links}'
         for ref in page.refs:
             check_ref(root, path, ref, pages, page.favicons)
+        # After check_ref, so a changed Report a problem URL is refused as an external URL first.
+        assert page.report_links == 1, f'Report a problem link: {path.relative_to(root)} has {page.report_links}, not 1'
         for ref in css_refs(path.read_text()):
             check_ref(root, path, ref, pages)
     for path in root.glob('*.css'):
@@ -1469,6 +1484,7 @@ def check_app(root, names, pages):
     page = Page((root / APP_PAGE).read_text())
     assert not page.books, 'a booking link outside the team page: the app'
     assert not page.x_links, 'one X link per page, the footer\'s: the app has one'
+    assert not page.report_links, 'Report a problem link, the footer\'s: the app has one'
     assert not set(page.refs) & {f'/{name}' for name in HASHED}, 'the app uses an unfingerprinted style or script'
     assert page.stylesheets == [f'/{names[APP_STYLE]}'], 'the app must apply exactly the fingerprinted ember.css'
     assert page.scripts == [ref for name in APP_SCRIPTS for ref in [f'/{v}' for v, (_, before) in APP_VENDOR.items() if before == name] + [f'/{names[name]}']], \
