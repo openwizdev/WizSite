@@ -161,38 +161,28 @@ code,.v{font-family:var(--ow-font-mono)}
 .agent-row ul { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px 26px; list-style: none; padding: 0; margin: 0; }
 .agent-row li { display: flex; align-items: center; gap: 7px; font-weight: 620; color: #d6cdc0; }
 .agent-row svg { width: 20px; height: 20px; flex: none; }
-/* From idea to shipped: the spec video as a short clip on a painting, engraved in a cool blue duotone (the painting
-   goes grey, a light blue multiplies over it, a deep navy screens up its blacks, a fine hatch and dot grain etch it).
+/* From idea to shipped: three steps on one plain panel in the page's own warm colours, like the hero's app window.
    The clip and its caption are one card: the whole 16:9 slide on top, then title, "Play with sound" and its links
    directly below it, so nothing ever covers the video. The grill and the live app are two aligned rows directly above and below it. */
 .moments { padding-block: clamp(48px, 7vw, 100px); }
 .moments h2 { font-size: clamp(34px, 5vw, 62px); letter-spacing: -.06em; line-height: 1; }
-.moment-stage { position: relative; isolation: isolate; margin-top: clamp(20px, 3vw, 32px); padding: clamp(14px, 3.4vw, 48px) clamp(12px, 4vw, 56px); overflow: hidden; border-radius: var(--round); background: #0a1222; box-shadow: inset 0 0 0 1px rgb(150 180 230 / 16%); }
-.moment-art { position: absolute; inset: 0; z-index: -3; width: 100%; height: 100%; object-fit: cover; object-position: 62% 50%; filter: grayscale(1) contrast(1.35) brightness(1.6); }
-.moment-stage::before, .moment-stage::after { content: ""; position: absolute; inset: 0; pointer-events: none; }
-.moment-stage::before { z-index: -2; mix-blend-mode: multiply; background:
-  radial-gradient(circle, rgb(255 255 255 / 0%) 0 .7px, rgb(40 60 100 / 35%) 1.1px) 0 0 / 3px 3px,
-  repeating-linear-gradient(-28deg, rgb(30 46 80 / 55%) 0 1px, rgb(255 255 255 / 0%) 1px 3px),
-  var(--moment-shade, linear-gradient(rgb(255 255 255 / 0%) 72%, rgb(40 52 80) 92%)),
-  radial-gradient(ellipse 80% 75% at 55% 45%, rgb(255 255 255 / 0%) 45%, rgb(90 110 150 / 80%)), #a9c2ea; }
-.moment-stage::after { z-index: -1; mix-blend-mode: screen; background: #0b1528; }
-@media (min-width: 901px) { .moment-art { transform: translateX(-6%) scale(1.15); transform-origin: 60% 50%; } }
-.moment-stage ol { position: relative; z-index: 1; display: grid; gap: 10px; max-width: 840px; margin: 0 auto; padding: 0; list-style: none; }
+.moment-stage { margin-top: clamp(20px, 3vw, 32px); padding: clamp(14px, 3.4vw, 48px) clamp(12px, 4vw, 56px); border: 1px solid var(--line); border-radius: var(--round); background: var(--panel); }
+.moment-stage ol { display: grid; gap: 10px; max-width: 840px; margin: 0 auto; padding: 0; list-style: none; }
 .moment-stage li { min-width: 0; }
 /* Type: one weight for titles (600), one for links and the play control (500), mono tabular step numbers. */
 .moments h3 { margin: 0; font-size: 18px; font-weight: 600; letter-spacing: -.015em; line-height: 1.3; text-wrap: balance; }
-.moment-num { display: inline-grid; place-items: center; flex: none; width: 28px; height: 28px; border: 1px solid rgb(190 210 240 / 45%); border-radius: 50%; color: #d6e2f5; font: 500 14px/1 var(--ow-font-mono); font-variant-numeric: tabular-nums; }
+.moment-num { display: inline-grid; place-items: center; flex: none; width: 28px; height: 28px; border: 1px solid var(--edge); border-radius: 50%; color: var(--grey2); font: 500 14px/1 var(--ow-font-mono); font-variant-numeric: tabular-nums; }
 /* Steps 1 and 3: one row each, number and title on the left, a small real preview (the grill's two questions as chat
    bubbles, a capture of the live app) and an expander on the right. Everything opens in place on this page: the
    expander's panel takes the row's full width below it, so visitors never leave the site to see the real run. */
-.moment-step { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; min-height: 56px; padding: 8px 18px 8px 14px; border-radius: 12px; background: rgb(7 11 20 / 82%); box-shadow: 0 0 0 1px rgb(190 210 240 / 16%); }
+.moment-step { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; min-height: 56px; padding: 8px 18px 8px 14px; border-radius: 12px; background: #25211e; box-shadow: 0 0 0 1px var(--line); }
 .moment-step h3 { flex: 1 1 0; min-width: 0; }
 .moment-chat { display: grid; grid-auto-flow: column; grid-template-rows: auto auto; gap: 4px 10px; font-size: 12px; line-height: 1.3; }
-.moment-chat p, .grill-panel .ask, .grill-panel .reply { width: fit-content; margin: 0; padding: 4px 9px; border-radius: 10px 10px 10px 3px; background: rgb(190 210 240 / 10%); color: #d6e2f5; }
-.moment-chat .reply, .grill-panel .reply { justify-self: end; border-radius: 10px 10px 3px 10px; background: #2b3f69; color: #fff; }
+.moment-chat p, .grill-panel .ask, .grill-panel .reply { width: fit-content; margin: 0; padding: 4px 9px; border-radius: 10px 10px 10px 3px; background: #342d27; color: #e1d7cb; }
+.moment-chat .reply, .grill-panel .reply { justify-self: end; border-radius: 10px 10px 3px 10px; background: #4a4038; color: var(--ink); }
 .chat-label { display: none; }
-.moment-thumb { display: block; width: auto; height: 76px; border-radius: 6px; box-shadow: 0 0 0 1px rgb(190 210 240 / 24%); filter: brightness(.86); }
-.moment-more > summary { display: block; width: fit-content; margin-left: auto; color: #e9f0fb; font-size: 15px; font-weight: 500; line-height: 1.3; white-space: nowrap; text-decoration: underline 1px; text-decoration-color: rgb(190 210 240 / 50%); text-underline-offset: .3em; cursor: pointer; list-style: none; }
+.moment-thumb { display: block; width: auto; height: 76px; border-radius: 6px; box-shadow: 0 0 0 1px var(--edge); filter: brightness(.86); }
+.moment-more > summary { display: block; width: fit-content; margin-left: auto; color: var(--ink); font-size: 15px; font-weight: 500; line-height: 1.3; white-space: nowrap; text-decoration: underline 1px; text-decoration-color: var(--edge); text-underline-offset: .3em; cursor: pointer; list-style: none; }
 .moment-more > summary::-webkit-details-marker { display: none; }
 .moment-more > summary::after { content: " ▾"; }
 .moment-more[open] > summary::after { content: " ▴"; }
@@ -200,37 +190,37 @@ code,.v{font-family:var(--ow-font-mono)}
 .moment-more > summary:focus-visible { outline: 2px solid var(--orchid); outline-offset: 3px; border-radius: 2px; }
 .moment-more[open] { flex-basis: 100%; }
 .moment-step:has(.moment-more[open]) :is(.moment-chat, .moment-thumb) { display: none; }
-.moment-panel { display: grid; gap: 8px; margin: 10px 0 6px; padding: 14px 16px; border-radius: 10px; background: #0e1628; box-shadow: inset 0 0 0 1px rgb(190 210 240 / 12%); color: #c9d4e6; font-size: 14px; line-height: 1.5; text-align: left; }
+.moment-panel { display: grid; gap: 8px; margin: 10px 0 6px; padding: 14px 16px; border-radius: 10px; background: var(--ground); box-shadow: inset 0 0 0 1px var(--line); color: var(--grey2); font-size: 14px; line-height: 1.5; text-align: left; }
 .grill-panel .ask { max-width: 88%; padding: 8px 12px; }
-.grill-panel .ask strong { color: #fff; font-weight: 600; }
-.grill-panel .ask span { display: block; margin-top: 4px; color: #a9b8d0; }
+.grill-panel .ask strong { color: var(--ink); font-weight: 600; }
+.grill-panel .ask span { display: block; margin-top: 4px; color: var(--grey); }
 .grill-panel .reply { padding: 6px 12px; }
-.panel-note { margin: 0; color: #a9b8d0; font-size: 13px; }
+.panel-note { margin: 0; color: var(--grey); font-size: 13px; }
 .spec-more { flex: 1 1 auto; }
 .spec-more[open] { flex-basis: 100%; }
 .spec-more > summary { margin-left: 0; }
 .spec-doc { display: block; max-height: min(60vh, 480px); overflow: auto; overscroll-behavior: contain; }
 .spec-doc:focus-visible { outline: 2px solid var(--orchid); outline-offset: 2px; }
-.spec-doc h4 { margin: 16px 0 4px; color: #fff; font-size: 15px; font-weight: 600; }
+.spec-doc h4 { margin: 16px 0 4px; color: var(--ink); font-size: 15px; font-weight: 600; }
 .spec-doc h4:first-child { margin-top: 0; }
 .spec-doc p, .spec-doc ul, .spec-doc ol { margin: 0 0 6px; }
 .spec-doc ul, .spec-doc ol { padding-left: 20px; list-style: disc; }
 .spec-doc ol { list-style: decimal; }
 .spec-doc li + li { margin-top: 3px; }
-.spec-doc strong { color: #e9f0fb; font-weight: 600; }
-.spec-doc code { color: #cfe0ff; font-size: .9em; overflow-wrap: anywhere; }
+.spec-doc strong { color: var(--ink); font-weight: 600; }
+.spec-doc code { color: #e1d7cb; font-size: .9em; overflow-wrap: anywhere; }
 .spec-doc table { width: 100%; border-collapse: collapse; font-size: 13px; }
-.spec-doc th, .spec-doc td { padding: 6px 8px 6px 0; border-top: 1px solid rgb(190 210 240 / 16%); text-align: left; vertical-align: top; }
-.spec-doc th { color: #e9f0fb; font-weight: 600; }
+.spec-doc th, .spec-doc td { padding: 6px 8px 6px 0; border-top: 1px solid var(--line); text-align: left; vertical-align: top; }
+.spec-doc th { color: var(--ink); font-weight: 600; }
 .app-panel { justify-items: center; }
-.app-shot { width: min(100%, 420px); height: auto; border-radius: 8px; box-shadow: 0 0 0 1px rgb(190 210 240 / 24%); }
-.app-panel figcaption { color: #a9b8d0; font-size: 13px; text-align: center; text-wrap: balance; }
+.app-shot { width: min(100%, 420px); height: auto; border-radius: 8px; box-shadow: 0 0 0 1px var(--edge); }
+.app-panel figcaption { color: var(--grey); font-size: 13px; text-align: center; text-wrap: balance; }
 .app-panel figcaption span { white-space: nowrap; }
-.spec-link { color: #e9f0fb; font-size: 15px; font-weight: 500; line-height: 1.3; white-space: nowrap; text-decoration: underline 1px; text-decoration-color: rgb(190 210 240 / 50%); text-decoration-skip-ink: auto; text-underline-offset: .3em; }
+.spec-link { color: var(--ink); font-size: 15px; font-weight: 500; line-height: 1.3; white-space: nowrap; text-decoration: underline 1px; text-decoration-color: var(--edge); text-decoration-skip-ink: auto; text-underline-offset: .3em; }
 .spec-link:hover { text-decoration-color: currentColor; }
 /* Step 2, the clip: the caption sits in the same card, directly below the video. */
-.spec-frame { position: relative; overflow: hidden; border-radius: 14px; background: #0b111c; box-shadow: 0 0 0 1px rgb(190 210 240 / 22%), 0 30px 80px -20px rgb(0 0 0 / 85%), 0 0 120px rgb(80 120 200 / 18%); }
-.spec-video { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover; background: #0b111c; }
+.spec-frame { position: relative; overflow: hidden; border-radius: 12px; background: #25211e; box-shadow: 0 0 0 1px #726052, 0 18px 48px #090706b0; }
+.spec-video { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover; background: #1b1816; }
 .spec-video:not([controls]) { cursor: pointer; }
 .spec-video:focus-visible { outline: 2px solid var(--orchid); outline-offset: -2px; }
 .spec-video::cue { color: #fff; background: rgba(15, 17, 21, .85); }
@@ -244,21 +234,20 @@ code,.v{font-family:var(--ow-font-mono)}
    text lies between 27% and 73% of its height, so cropping to 20-80% never cuts it, and the captions stay hidden.
    Once the visitor plays it, the whole 16:9 frame returns with captions in its top band and controls in its bottom. */
 .spec-frame.is-ambient .spec-video { aspect-ratio: 1280 / 432; }
-.spec-caption { display: grid; gap: 6px; padding: clamp(14px, 1.6vw, 18px) clamp(16px, 2.4vw, 28px) clamp(16px, 2vw, 24px); background: #0b111c; }
+.spec-caption { display: grid; gap: 6px; padding: clamp(14px, 1.6vw, 18px) clamp(16px, 2.4vw, 28px) clamp(16px, 2vw, 24px); background: #25211e; }
 /* Once the visitor takes over (or without this site's script) the native controls show and the button goes. */
 .spec-video[controls] + .spec-caption .spec-play { display: none; }
 .spec-title { display: flex; align-items: center; gap: 12px; }
 .spec-title h3 { font-size: clamp(18px, 1.6vw, 23px); line-height: 1.2; }
-.moment-copy { margin: 0; color: #b9c6da; font-size: 15px; line-height: 1.45; text-wrap: balance; }
+.moment-copy { margin: 0; color: var(--grey); font-size: 15px; line-height: 1.45; text-wrap: balance; }
 .spec-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px; margin-top: 6px; }
-.moments .spec-play { display: inline-flex; flex: none; align-items: center; gap: 6px; min-height: 40px; padding: 0 16px 0 12px; border: 0; border-radius: 999px; background: #e9f0fb; color: #0a1222; font: 500 15px/1 var(--ow-font-sans); cursor: pointer; }
-.moments .spec-play:hover { background: #fff; }
+.moments .spec-play { display: inline-flex; flex: none; align-items: center; gap: 6px; min-height: 40px; padding: 0 16px 0 12px; border: 0; border-radius: 8px; background: #cfc6b8; color: var(--ground); font: 600 15px/1 var(--ow-font-sans); cursor: pointer; }
+.moments .spec-play:hover { background: var(--ink); }
 .moments .spec-play:focus-visible { outline: 2px solid var(--orchid); outline-offset: 2px; }
 .spec-play[hidden] { display: none; }
 .spec-play svg { width: 14px; height: 14px; flex: none; fill: currentColor; }
 @media (max-width: 900px) {
   .moment-chat { display: none; }
-  .moment-stage { --moment-shade: linear-gradient(rgb(30 40 64) 0 16%, rgb(255 255 255 / 0%) 34% 56%, rgb(30 40 64) 74%); }
 }
 @media (max-width: 600px) {
   .spec-caption { padding: 12px 14px 14px; gap: 4px; }
@@ -279,9 +268,9 @@ code,.v{font-family:var(--ow-font-mono)}
   .moment-stage ol { gap: 12px; }
   .moment-step { gap: 12px 10px; padding: 12px 12px 10px; }
   .moment-step > :is(.moment-chat, .moment-thumb) { order: -1; flex-basis: 100%; }
-  .moment-chat { display: grid; grid-auto-flow: row; grid-template-rows: none; gap: 8px; padding: 12px; border-radius: 10px; background: #0e1628; box-shadow: inset 0 0 0 1px rgb(190 210 240 / 12%); font-size: 13.5px; }
+  .moment-chat { display: grid; grid-auto-flow: row; grid-template-rows: none; gap: 8px; padding: 12px; border-radius: 10px; background: var(--ground); box-shadow: inset 0 0 0 1px var(--line); font-size: 13.5px; }
   .moment-chat p { padding: 6px 11px; }
-  .moment-chat .chat-label { display: block; width: auto; padding: 0 0 2px; background: none; color: #a9b8d0; font: 12px/1.3 var(--ow-font-mono); }
+  .moment-chat .chat-label { display: block; width: auto; padding: 0 0 2px; background: none; color: var(--grey); font: 12px/1.3 var(--ow-font-mono); }
   .moment-thumb { width: 100%; max-width: 420px; height: auto; margin-inline: max(0px, (100% - 420px) / 2); filter: none; }
 }
 @media (max-width: 480px) {
