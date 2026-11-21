@@ -91,8 +91,10 @@ const MODES = {
   reduced: { reduced: true },
   'no GSAP': { block: ['*gsap*'] },
   'no JavaScript': { noScript: true },
+  // #77 R1: the FAQ's own script fails to load; the rest of the page's scripts run.
+  'no FAQ script': { block: ['*/faq.*.js'] },
 };
-const WIDTHS = [[320, 640], [390, 844], [800, 1000], [1280, 800]];
+const WIDTHS = [[320, 640], [390, 844], [800, 1000], [1280, 800], [1440, 1100]];
 
 async function open(browser, origin, width, height, mode, path = '/') {
   const { targetId } = await browser.send('Target.createTarget', { url: 'about:blank' });
@@ -376,6 +378,150 @@ async function chrome(page, where, mode) {
   expect(facts.font === 'Geist', where, `the page is not set in the landing's type (${facts.font})`);
 }
 
+// #63: every site page's top bar shows the one buy button and the Drivers link inside the window, with no sideways
+// scroll, and the team page shows its one Book a call link.
+async function buy(page, where, path) {
+  const facts = await page.evaluate(`(() => { ${HELPERS}
+    const bar = document.querySelector('header.landing-nav');
+    // The worst case a visitor sees: a long star count and, above phone and tablet widths, a classic scrollbar taking 17 px.
+    const stars = bar?.querySelector('[data-stars]');
+    if (stars) { stars.hidden = false; stars.textContent = '12.3k'; }
+    if (innerWidth > 640) document.documentElement.style.width = (innerWidth - 17) + 'px';
+    const inside = el => shown(el) && el.getBoundingClientRect().left >= 0 && el.getBoundingClientRect().right <= innerWidth && el.scrollWidth <= el.clientWidth + 1;
+    const button = bar?.querySelector('a.nav-team[href="/team/"]');
+    const facts = {
+      scroll: document.scrollingElement.scrollWidth, inner: innerWidth,
+      clipped: [...bar.querySelectorAll('a')].filter(a => a.scrollWidth > a.clientWidth + 1).map(a => a.className || a.getAttribute('href')),
+      over: bar.scrollWidth - bar.clientWidth,
+      button: inside(button) && button.innerText.trim().length > 0,
+      drivers: inside(bar?.querySelector('a[href="/drivers/"]')),
+      book: [...document.querySelectorAll('a[data-book]')].filter(shown).length,
+    };
+    document.documentElement.style.width = '';
+    return facts;
+  })()`);
+  expect(facts.over <= 1 && !facts.clipped.length, where, `the top bar clips (with a star count and a scrollbar): ${facts.over}px over, links ${facts.clipped.join(', ')}`);
+  expect(facts.scroll <= facts.inner, where, `sideways scroll (${facts.scroll}px content in a ${facts.inner}px window)`);
+  expect(facts.button, where, 'the top bar lacks the buy button inside the window');
+  expect(facts.drivers, where, 'the top bar lacks the Drivers link inside the window');
+  if (path === '/team/') expect(facts.book === 2, where, `the team page needs its two Book a call links (${facts.book})`);
+}
+
+// #73: every site page's one footer: its link groups shown inside the window, the wordmark whole (no glyph cut by the
+// footer's edge), the Wizes right under it, and the footer's bottom at or below the window's bottom on short pages.
+async function footer(page, where, mode) {
+  const facts = await page.evaluate(`(async () => { ${HELPERS}
+    const footer = document.querySelector('footer.landing-footer');
+    const mark = footer.querySelector('.footer-wordmark');
+    // #75 R2: the painted Wizes, not their boxes: each shown Wiz's top opaque row, from its untransformed place.
+    footer.scrollIntoView({ block: 'end', behavior: 'instant' });
+    const shownWizes = [...footer.querySelectorAll('.family-wiz')].filter(shown);
+    await Promise.all(shownWizes.map(wiz => wiz.querySelector('img').decode().catch(() => {})));
+    const row = footer.querySelector('.family');
+    const painted = Math.min(...shownWizes.map(wiz => {
+      const img = wiz.querySelector('img');
+      const canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth; canvas.height = img.naturalHeight;
+      const context = canvas.getContext('2d');
+      context.drawImage(img, 0, 0);
+      const { data } = context.getImageData(0, 0, canvas.width, canvas.height);
+      let first = canvas.height;
+      for (let i = 3; i < data.length; i += 4) if (data[i] > 24) { first = Math.floor((i - 3) / 4 / canvas.width); break; }
+      return row.getBoundingClientRect().top + wiz.offsetTop - row.offsetTop + img.offsetTop + first * img.offsetHeight / canvas.height;
+    }));
+    const range = document.createRange();
+    range.selectNodeContents(mark);
+    const text = range.getBoundingClientRect();
+    // The ink, not the font's content box: the baseline from the font's ascent, then the letters' own descent.
+    const ink = document.createElement('canvas').getContext('2d');
+    const style = getComputedStyle(mark);
+    ink.font = style.fontWeight + ' ' + style.fontSize + ' ' + style.fontFamily;
+    ink.letterSpacing = style.letterSpacing;
+    const metrics = ink.measureText(mark.textContent);
+    const glyphs = { left: text.left, right: text.right, bottom: text.top + metrics.fontBoundingBoxAscent + metrics.actualBoundingBoxDescent };
+    const f = footer.getBoundingClientRect(), m = mark.getBoundingClientRect();
+    const family = footer.querySelector('.family').getBoundingClientRect();
+    const links = [...footer.querySelectorAll('.footer-groups a')];
+    return {
+      count: document.querySelectorAll('footer').length,
+      buttons: footer.querySelectorAll('.family-wiz[role="button"]').length,
+      links: links.length, inside: links.every(a => shown(a) && a.getBoundingClientRect().left >= 0 && a.getBoundingClientRect().right <= innerWidth),
+      line: shown(footer.querySelector('.footer-line')),
+      dbg: [glyphs.left, f.left, glyphs.right, f.right, glyphs.bottom, m.bottom, f.bottom].map(Math.round),
+      whole: glyphs.left >= f.left && glyphs.right <= f.right && glyphs.bottom <= m.bottom + 1 && m.bottom <= f.bottom,
+      gap: Math.round(painted - glyphs.bottom),
+      bottom: Math.round(f.bottom + scrollY), height: document.documentElement.scrollHeight, inner: innerHeight,
+    };
+  })()`);
+  expect(facts.count === 1, where, `one footer (${facts.count})`);
+  // #75 R1: with JavaScript on, every page's footer Wizes answer focus and clicks, the landing's and /drivers/ alike.
+  expect(facts.buttons === (mode === 'no JavaScript' ? 0 : 12), where, `the footer Wizes are not the landing's (${facts.buttons} of 12 respond)`);
+  expect(facts.links === 9 && facts.inside, where, 'the footer link groups are not all shown inside the window');
+  expect(facts.line, where, 'the footer lacks its Apache-2.0 line');
+  expect(facts.whole, where, `the footer wordmark is clipped (ink and box: ${facts.dbg})`);
+  expect(facts.gap >= 0 && facts.gap <= 16, where, `a ${facts.gap}px painted gap between the wordmark's ink and the Wizes (0 to 16)`);
+  expect(facts.bottom >= facts.inner && facts.bottom >= facts.height - 1, where, `the footer ends at ${facts.bottom}px, above the window's bottom (${facts.inner}px)`);
+}
+
+// #76: the Questions on the landing, /team and /faq: seven flat rows, two columns on desktop and one on phones. With
+// scripts every answer starts closed and its button (click, Enter or Space) opens it in about 350 ms, or at once with
+// reduced motion; without scripts every answer shows.
+const FAQ_PATHS = ['/', '/team/', '/faq/'];
+async function faq(page, where, width, mode) {
+  const read = () => page.evaluate(`(() => { ${HELPERS}
+    const faq = document.querySelector('section.faq');
+    const head = faq.querySelector('.faq-head').getBoundingClientRect(), rows = faq.querySelector('.faq-rows').getBoundingClientRect();
+    const buttons = [...faq.querySelectorAll('.faq-q button')];
+    const answers = buttons.map(b => document.getElementById(b.getAttribute('aria-controls')));
+    return {
+      rows: buttons.length, head: { left: head.left, right: head.right, top: head.top }, list: { left: rows.left, right: rows.right, top: rows.top },
+      width: faq.getBoundingClientRect().width,
+      expanded: buttons.map(b => b.getAttribute('aria-expanded')),
+      open: answers.map(a => shown(a) && a.getBoundingClientRect().height > 20),
+      disabled: buttons.map(b => b.disabled),
+      duration: getComputedStyle(answers[0]).transitionDuration,
+    };
+  })()`);
+  const facts = await read();
+  expect(facts.rows === 7, where, `the Questions have ${facts.rows} rows`);
+  if (width >= 1280) {
+    const third = (facts.head.right - facts.head.left) / facts.width;
+    expect(facts.list.left > facts.head.right && Math.abs(facts.head.top - facts.list.top) < 2 && third > .25 && third < .4, where,
+      `the Questions are not two columns, heading about a third (${third.toFixed(2)})`);
+  }
+  if (width <= 480) expect(facts.list.top > facts.head.top && Math.abs(facts.list.left - facts.head.left) < 2, where, 'the Questions are not one column on a phone');
+  if (mode === 'no JavaScript' || mode === 'no FAQ script') {
+    // Without its script every answer shows, and no row offers a control that does nothing.
+    expect(facts.open.every(Boolean), where, `without ${mode === 'no JavaScript' ? 'scripts' : 'faq.js'} an answer is hidden`);
+    expect(facts.disabled.every(Boolean) && facts.expanded.every(e => e === 'true'), where, 'a row offers a button that does nothing');
+    return;
+  }
+  expect(facts.disabled.every(d => !d), where, 'a row button stays disabled with its script');
+  expect(facts.open.every(o => !o) && facts.expanded.every(e => e === 'false'), where, 'an answer starts open');
+  if (mode === 'no GSAP' || (width !== 390 && width !== 1280)) return;
+  expect(facts.duration === (mode === 'reduced' ? '0s' : '0.35s, 0.35s, 0s'), where, `the answer's motion is ${facts.duration}`);
+  const settle = () => page.evaluate('new Promise(r => setTimeout(() => r(true), 450))');
+  // Click the first row, Enter on the second, Space on the third; then click the first again to close it.
+  const at = await page.evaluate(`(() => { const b = document.querySelector('.faq-q button'); b.scrollIntoView({ block: 'center' });
+    const r = b.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+  await page.click(at.x, at.y);
+  const press = async (n, key, code, keyCode, text) => {
+    await page.evaluate(`document.querySelectorAll('.faq-q button')[${n}].focus()`);
+    await page.send('Input.dispatchKeyEvent', { type: 'keyDown', key, code, windowsVirtualKeyCode: keyCode, ...(text ? { text } : {}) });
+    await page.send('Input.dispatchKeyEvent', { type: 'keyUp', key, code, windowsVirtualKeyCode: keyCode });
+  };
+  await press(1, 'Enter', 'Enter', 13, '\r');
+  await press(2, ' ', 'Space', 32, ' ');
+  await settle();
+  let now = await read();
+  expect(now.open.slice(0, 3).every(Boolean) && now.expanded.slice(0, 3).every(e => e === 'true') && !now.open[3], where,
+    `click, Enter and Space do not open their answers (${now.expanded.join(' ')})`);
+  await page.click(at.x, at.y);
+  await settle();
+  now = await read();
+  expect(!now.open[0] && now.expanded[0] === 'false', where, 'a second click does not close the answer');
+}
+
 async function main() {
   const server = await serve();
   const origin = `http://127.0.0.1:${server.address().port}`;
@@ -397,14 +543,31 @@ async function main() {
         } finally {
           await page.close();
         }
-        const changelog = await open(browser, origin, width, height, mode, '/changelog/');
-        try {
-          await chrome(changelog, `/changelog/ ${where}`, name);
-          if (process.env.SHOTS && name === 'motion' && (width === 390 || width === 1280)) {
-            await changelog.shot(join(process.env.SHOTS, `changelog-${width}.png`));
+        for (const path of ['/', '/changelog/', '/drivers/', '/team/', '/faq/']) {
+          const other = await open(browser, origin, width, height, mode, path);
+          try {
+            await buy(other, `${path} ${where}`, path);
+            await chrome(other, `${path} ${where}`, name);
+            await footer(other, `${path} ${where}`, name);
+            if (FAQ_PATHS.includes(path)) await faq(other, `${path} ${where}`, width, name);
+            if (process.env.SHOTS && name === 'motion' && path !== '/' && (width === 390 || width === 1280)) {
+              await other.shot(join(process.env.SHOTS, `${path.slice(1, -1)}-${width}.png`));
+            }
+          } finally {
+            await other.close();
           }
+        }
+      }
+    }
+    // #63 R1: the header between the phone and desktop widths, where the long button label must still fit.
+    for (const width of (process.env.WIDTHS || '481,500,560,640,641,700,760,761,800,900,960,1024').split(',').map(Number)) {
+      for (const path of ['/', '/changelog/', '/drivers/', '/team/', '/faq/']) {
+        const other = await open(browser, origin, width, 800, MODES.motion, path);
+        try {
+          await buy(other, `${path} ${width}px, motion`, path);
+          await footer(other, `${path} ${width}px, motion`, 'motion');
         } finally {
-          await changelog.close();
+          await other.close();
         }
       }
     }

@@ -62,8 +62,34 @@
       : `${at.toLocaleDateString([], { day: 'numeric', month: 'short' })} ${clock}`;
   }
 
+  // An agent's harness and model as people say them, one mapping for every card (AP22): claude-code and Claude Code
+  // both read Claude Code; claude-opus-5-5, opus-5.5 and Opus 5.5 read Opus 5.5; gpt-6.2-sol reads Sol 6.2; an effort
+  // after it (medium, -high) reads Medium, High. An id this doesn't know shows as written.
+  const HARNESSES = { 'claude-code': 'Claude Code', claude: 'Claude Code', codex: 'Codex', cursor: 'Cursor', opencode: 'OpenCode' };
+  const FAMILY = '(opus|sonnet|haiku|fable|sol)';
+  const MODELS = [
+    new RegExp(`^claude-${FAMILY}-(\\d+)-(\\d+)$`, 'i'),
+    new RegExp(`^${FAMILY}[- ](\\d+)\\.(\\d+)$`, 'i'),
+    new RegExp(`^gpt-(\\d+)\\.(\\d+)-${FAMILY}$`, 'i'),
+  ];
+  const EFFORT = /^(.*?)[- ](low|medium|high|xhigh|max)$/i;
+  const title = word => `${word[0].toUpperCase()}${word.slice(1).toLowerCase()}`;
+  function modelName(model) {
+    const text = String(model);
+    const effort = text.match(EFFORT);
+    const base = effort ? effort[1] : text;
+    for (const [i, pattern] of MODELS.entries()) {
+      const m = base.match(pattern);
+      if (!m) continue;
+      const [family, major, minor] = i === 2 ? [m[3], m[1], m[2]] : [m[1], m[2], m[3]];
+      return `${title(family)} ${major}.${minor}${effort ? ` ${effort[2] === 'xhigh' ? 'XHigh' : title(effort[2])}` : ''}`;
+    }
+    return text;
+  }
+  const agentName = (harness, model) => `${HARNESSES[String(harness).toLowerCase()] || harness}, ${modelName(model)}`;
+
   const ui = {
-    h, icon, logo, time, STATES,
+    h, icon, logo, time, STATES, agentName,
     pill: state => h('span', { class: 'pill', '--c': STATES[state].colour }, STATES[state].word),
     // tiles([{label: 'Needs you', value: 3, state: 'you'}, ...]); a value of null shows as "?" (unknown).
     tiles: items => h('div', { class: 'tiles' }, items.map(item => h('div', { class: `tile${item.state === 'you' ? ' you' : ''}`, '--c': STATES[item.state]?.colour },

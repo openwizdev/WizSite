@@ -246,6 +246,67 @@ function enableMotion(gsap) {
   configure();
 }
 
+// The "Watch your spec" moment (#1405). The video loads only when it first plays. With motion it plays muted while it
+// is in view; with reduced motion, Pause motion or the tab hidden it waits on its poster. It never starts with sound on
+// its own: "Play with sound" (or a click on the frame) does that on request, and from then on the visitor drives it
+// and scrolling no longer starts or stops it. Until then the frame stays clean: it shows only the slides' band, with no
+// captions and no controls; the whole frame, its captions and the native controls (there for visitors without this
+// script) come back once the visitor takes over. It needs only this script, not GSAP.
+function specVideo() {
+  const video = document.querySelector('.spec-video');
+  const sound = document.querySelector('.spec-play');
+  const pause = document.querySelector('.demo-pause');
+  if (!video || !sound) return;
+  const calm = matchMedia('(prefers-reduced-motion: reduce)');
+  let inView = false;
+  let visitor = false; // the visitor has taken over playback
+  let ours = 0; // play and pause events we caused, not the visitor
+  const frame = video.closest('.spec-frame');
+  const track = video.textTracks[0];
+  const resting = on => {
+    frame?.classList.toggle('is-ambient', on);
+    video.controls = !on;
+    if (track) track.mode = on ? 'hidden' : 'showing';
+  };
+  const takeOver = () => { visitor = true; resting(false); };
+  const update = () => {
+    if (visitor) return;
+    const ambient = inView && !calm.matches && pause.getAttribute('aria-pressed') !== 'true' && !document.hidden;
+    if (ambient && video.paused) {
+      ours += 1;
+      video.muted = true;
+      video.play().catch(() => { ours = 0; });
+    } else if (!ambient && !video.paused) {
+      ours += 1;
+      video.pause();
+    }
+  };
+  const take = () => {
+    if (ours > 0) ours -= 1;
+    else takeOver();
+  };
+  video.addEventListener('play', take);
+  video.addEventListener('pause', take);
+  video.addEventListener('volumechange', () => { if (!video.muted) takeOver(); });
+  new IntersectionObserver(([entry]) => { inView = entry.isIntersecting; update(); }, { threshold: .5 }).observe(video);
+  calm.addEventListener('change', update);
+  document.addEventListener('visibilitychange', update);
+  pause.addEventListener('click', () => setTimeout(update));
+  resting(true);
+  // The muted loop starts at the opening slide, the poster's own frame, so the poster hands over without a jump.
+  sound.hidden = false;
+  const listen = () => {
+    takeOver();
+    video.muted = false;
+    video.loop = false;
+    video.currentTime = 0;
+    // Focus moves into the player, so the keyboard reaches its pause control next, as #32's player did.
+    video.play().then(() => video.focus(), () => {});
+  };
+  sound.addEventListener('click', listen);
+  video.addEventListener('click', () => { if (!video.controls) listen(); });
+}
+
 // The footer Wizes react, one at a time and briefly; at rest the footer is unchanged. With reduced motion, Pause
 // motion or no GSAP, a click is a still pose change (another costume) and the line, nothing moves.
 const FAMILY = [
@@ -391,26 +452,6 @@ function enableFamily(gsap) {
   document.querySelector('.landing-footer').addEventListener('pointerenter', perk);
 }
 
-// The silent spec sample plays only on request, so it stays available with reduced motion on or GSAP blocked.
-function enableVideo() {
-  const play = document.querySelector('.spec-play');
-  const video = document.querySelector('.spec-video');
-  const still = document.querySelector('.spec-screen');
-  play.hidden = false;
-  play.addEventListener('click', async () => {
-    video.hidden = false;
-    still.hidden = true;
-    try {
-      video.currentTime = 0;
-      await video.play();
-      video.focus();
-    } catch {
-      video.hidden = true;
-      still.hidden = false;
-    }
-  });
-}
-
 // The install box (#1357): Copy works only once index.html's switch says live; until then it stays disabled.
 function enableCopy() {
   const box = document.querySelector('.install-box[data-install="live"]');
@@ -432,8 +473,177 @@ function enableCopy() {
   });
 }
 
+// The "Ask a Wiz..." row (#1902, contract openwiz.ask-a-wiz.v1): the FAQ's last row, added only when GET /api/ask
+// answers the contract's probe (its switch, ASK_A_WIZ, is exactly "on"); anything else, the site's own page included,
+// leaves the FAQ as it is. A question streams in; a finished answer becomes a normal row and a fresh input row follows.
+// Everything from the stream is set as text; only the not-covered answer's links, exactly the contract's, are links.
+const ASK_KEYS = { text: 'text,type', sources: 'sources,type', done: 'type', not_covered: 'links,text,type', refused: 'message,reason,type' };
+// Each refusal's status and exact message, as the contract pins them.
+const ASK_REFUSALS = {
+  bad_request: [400, 'That question couldn\'t be read. Try again.'],
+  too_long: [413, 'That question is too long. Keep it to 300 characters or fewer.'],
+  rate_limited: [429, 'That\'s a lot of questions at once. Try again in a few minutes.'],
+  daily_cap: [429, 'Ask a Wiz has answered all it can for today. Try again tomorrow.'],
+  upstream_error: [502, 'Ask a Wiz couldn\'t answer just now. Try again.'],
+  unavailable: [503, 'Ask a Wiz isn\'t available right now.'],
+  store_error: [503, 'Ask a Wiz couldn\'t keep count just now. Try again.'],
+  no_private_route: [503, 'Ask a Wiz can\'t answer privately just now. Try again later.'],
+};
+const ASK_NOT_COVERED = 'The OpenWiz docs don\'t cover that yet, so I won\'t guess. Book a call or open a GitHub issue, and we\'ll answer it.';
+const ASK_LINKS = [['Book a call', 'https://openwiz.dev/team/#book'], ['GitHub issues', 'https://github.com/openwizdev/openwiz/issues']];
+const askKeys = value => value && typeof value === 'object' && !Array.isArray(value) ? Object.keys(value).sort().join() : '';
+const askText = value => typeof value === 'string' && value.length > 0;
+// One line of the stream, read only in the contract's shape: each event with exactly its keys, in one of its orders
+// (text, then sources, then done; not_covered alone; refused alone, or after text only as upstream_error), refusals
+// with their exact message. Anything else throws, and the row treats the stream as broken.
+function askEvent(line, text, sources) {
+  const e = JSON.parse(line);
+  const ok = askKeys(e) === ASK_KEYS[e?.type] && {
+    text: () => !sources && askText(e.text),
+    sources: () => text && !sources && Array.isArray(e.sources) && e.sources.length >= 1 && e.sources.length <= 6
+      && new Set(e.sources.map(s => s?.url)).size === e.sources.length
+      && e.sources.every(s => askKeys(s) === 'title,url' && askText(s.title) && /^https:\/\/(openwiz\.dev|github\.com\/openwizdev)\//.test(s.url)),
+    done: () => !!sources,
+    not_covered: () => !text && e.text === ASK_NOT_COVERED && Array.isArray(e.links) && e.links.length === ASK_LINKS.length
+      && e.links.every((link, i) => askKeys(link) === 'href,label' && link.label === ASK_LINKS[i][0] && link.href === ASK_LINKS[i][1]),
+    refused: () => !sources && Object.hasOwn(ASK_REFUSALS, e.reason) && e.message === ASK_REFUSALS[e.reason][1] && (!text || e.reason === 'upstream_error'),
+  }[e.type]();
+  if (!ok) throw new Error('not the contract\'s stream');
+  return e;
+}
+async function askAWiz() {
+  const lists = document.querySelectorAll('.faq .faq-rows');
+  if (!lists.length) return;
+  // Asked once, as the FAQ nears the screen: a visitor who never scrolls to it costs the function nothing.
+  await new Promise(resolve => {
+    const near = new IntersectionObserver(seen => seen.some(e => e.isIntersecting) && (near.disconnect(), resolve()), { rootMargin: '600px 0px' });
+    lists.forEach(list => near.observe(list));
+  });
+  const probe = await fetch('/api/ask', { cache: 'no-store' }).then(r => r.status === 200 ? r.json() : null).catch(() => null);
+  // Only the contract's exact on answer turns the row on.
+  if (askKeys(probe) !== 'enabled,max_question_chars,schema' || probe.schema !== 'openwiz.ask-a-wiz.v1' || probe.enabled !== true
+    || probe.max_question_chars !== 300) return;
+  let made = 0;
+  const el = (tag, className, text) => {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined) node.textContent = text;
+    return node;
+  };
+  for (const list of lists) {
+    const faq = list.closest('.faq');
+    const level = list.querySelector('.faq-q')?.tagName.toLowerCase() || 'h3';
+    // One polite status line per FAQ, outside the rows, so every outcome is announced even as its row is replaced.
+    const status = el('p', 'sr-only');
+    status.setAttribute('aria-live', 'polite');
+    list.after(status);
+    const addRow = () => {
+      const n = ++made, row = el('div', 'faq-row faq-ask'), form = el('form', 'faq-ask-form'), input = el('input');
+      const label = el('label', 'sr-only', 'Ask a Wiz a question about OpenWiz');
+      Object.assign(input, { id: `faq-ask-${n}`, type: 'text', name: 'question', placeholder: 'Ask a Wiz...', autocomplete: 'off', enterKeyHint: 'send' });
+      label.htmlFor = input.id;
+      form.append(label, input, el('button', 'faq-ask-go', 'Ask'));
+      const heading = el(level, 'faq-q'), answer = el('p', 'faq-ask-answer'), body = el('div', 'faq-a'), actions = el('div', 'faq-ask-actions');
+      body.append(el('div'));
+      body.firstChild.append(answer);
+      const buttons = {};
+      for (const name of ['Stop', 'Retry', 'Edit']) actions.append(buttons[name] = Object.assign(el('button', '', name), { type: 'button' }));
+      row.append(form, heading, body, actions);
+      list.append(row);
+      let question = '', controller = null;
+      // idle: the input; asking: the question, its answer so far and Stop; ended: the question, a message, Retry and
+      // Edit. When focus is in the row, it moves to the control that replaces the one just used, never to the page;
+      // focus the visitor moved elsewhere stays there.
+      const show = (state, message = '', retry = true, focus = true) => {
+        const inside = row.contains(document.activeElement);
+        row.dataset.state = state;
+        form.hidden = state !== 'idle';
+        heading.hidden = body.hidden = state === 'idle';
+        heading.textContent = question;
+        answer.textContent = message;
+        buttons.Stop.hidden = state !== 'asking';
+        buttons.Retry.hidden = state !== 'ended' || !retry;
+        buttons.Edit.hidden = state !== 'ended';
+        actions.hidden = state === 'idle';
+        if (state !== 'idle') status.textContent = state === 'asking' ? 'Ask a Wiz is answering.' : message;
+        if (focus && inside) (state === 'idle' ? input : state === 'asking' ? buttons.Stop : retry ? buttons.Retry : buttons.Edit).focus();
+      };
+      const finish = (paragraphs, links = []) => {
+        const done = el('div', 'faq-row faq-asked'), h = el(level, 'faq-q'), button = el('button'), a = el('div', 'faq-a');
+        button.append(el('span', 'faq-ask-label', question));
+        Object.assign(button, { type: 'button', id: `faq-ask-q${n}`, disabled: !faq.hasAttribute('data-ready') });
+        button.setAttribute('aria-expanded', 'true');
+        button.setAttribute('aria-controls', a.id = `faq-ask-a${n}`);
+        const chevron = list.querySelector('.faq-chevron');
+        if (chevron) button.append(chevron.cloneNode(true));
+        h.append(button);
+        a.append(el('div'));
+        for (const [text, className] of paragraphs) a.firstChild.append(el('p', className, text));
+        if (links.length) {
+          const p = el('p', 'faq-ask-links');
+          links.forEach(([label, href], i) => p.append(...(i ? [' · '] : []), Object.assign(el('a', '', label), { href })));
+          a.firstChild.append(p);
+        }
+        done.append(h, a);
+        const inside = row.contains(document.activeElement);
+        row.replaceWith(done);
+        status.textContent = paragraphs[0][0];
+        const input = addRow();
+        if (inside) input.focus({ preventScroll: true });
+      };
+      const ask = async () => {
+        controller = new AbortController();
+        show('asking');
+        let text = '', sources = null, end = null;
+        try {
+          const response = await fetch('/api/ask', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ question }), cache: 'no-store', signal: controller.signal });
+          if (!/^application\/x-ndjson\s*(;|$)/i.test(response.headers.get('content-type') || '')) throw new Error('not a stream');
+          const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
+          let buffer = '';
+          for (;;) { // to the stream's end: nothing may follow the last event
+            const { value, done } = await reader.read();
+            if (done) break;
+            buffer += value;
+            for (let at; (at = buffer.indexOf('\n')) >= 0; buffer = buffer.slice(at + 1)) {
+              if (end) throw new Error('data after the last event');
+              const event = askEvent(buffer.slice(0, at), text, sources);
+              if (event.type === 'text') answer.textContent = text += event.text;
+              else if (event.type === 'sources') sources = event.sources.map(s => s.title);
+              else end = event;
+            }
+          }
+          const status = end?.type === 'refused' && !text ? ASK_REFUSALS[end.reason][0] : 200;
+          if (buffer || response.status !== status) throw new Error('not the contract\'s response');
+        } catch {
+          end = null;
+        }
+        controller.abort();
+        controller = null;
+        if (end?.type === 'done') finish([[text], [`Sources: ${sources.join(', ')}`, 'faq-ask-sources']]);
+        else if (end?.type === 'not_covered') finish([[end.text]], ASK_LINKS);
+        else if (end?.type === 'refused') show('ended', end.message, end.reason !== 'too_long');
+        else show('ended', 'stopped' in row.dataset ? 'Stopped.' : 'The answer didn’t finish. Try again.');
+        delete row.dataset.stopped;
+      };
+      form.addEventListener('submit', event => {
+        event.preventDefault();
+        question = input.value.trim();
+        if (question) ask();
+      });
+      buttons.Stop.addEventListener('click', () => { row.dataset.stopped = ''; controller?.abort(); });
+      buttons.Retry.addEventListener('click', ask);
+      buttons.Edit.addEventListener('click', () => { show('idle'); input.value = question; });
+      show('idle', '', true, false);
+      return input;
+    };
+    addRow();
+  }
+}
+
 enableCopy();
+askAWiz();
 showStars().catch(() => {});
-if (document.querySelector('.spec-play')) enableVideo();
+specVideo();
 enableFamily(window.gsap);
 if (window.gsap) enableMotion(window.gsap);

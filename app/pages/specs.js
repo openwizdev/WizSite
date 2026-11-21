@@ -1,6 +1,6 @@
 // The Specs page, and the model of the factory that You, Specs and each spec's page read.
 //
-// The Specs feed (OW.data.feeds.specs) holds two GitHub reads. The first: `specIssues` (open issues labelled spec),
+// The Specs feed (OW.data.feeds.specs) holds two GitHub reads. The first: `specIssues` (open specs: with sub-issues, labelled spec or titled "spec:"),
 // `youIssues` (open issues labelled needs-info or ready-for-human), each with its total, and `fleet` (the repository's
 // docs/agents/fleet.md, whose Record authors row says whose notes and decision records count). The second: `specs`,
 // each open spec's recent comments and its tickets with their state, labels, blocked-by links, closing pull requests
@@ -36,36 +36,13 @@
 
   // ---- Status notes (WizSkills' agent-status contract, openwiz:status v1) ----
 
-  const FIELDS = ['agent', 'state', 'harness', 'model', 'step', 'time', 'pr', 'preview'];
-  const REQUIRED = 6;
-  const FIELD_RULES = {
-    agent: v => ['builder', 'reviewer', 'fleet'].includes(v),
-    state: v => ['working', 'asking', 'done', 'stopped'].includes(v) || /^stopped \([^()]{1,100}\)$/.test(v),
-    harness: v => v.length <= 60,
-    model: v => v.length <= 60,
-    step: () => true,
-    time: v => /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/.test(v) && !Number.isNaN(Date.parse(v)),
-    pr: v => /^https:\/\/github\.com\/[A-Za-z0-9-]+\/[A-Za-z0-9._-]+\/pull\/[1-9]\d*$/.test(v),
-    preview: v => /^https:\/\/\S+$/.test(v),
-  };
   // {agent, state} for a note that reads exactly as v1 says; {malformed: true} for one that doesn't (or another
-  // version); null for a comment that isn't a status note at all.
+  // version); null for a comment that isn't a status note at all. One reader for the whole app: the Agents page's. A
+  // copy here once predated the skills line, so every current note read as malformed and Building read 0 (AP22).
   function readNote(body) {
-    const lines = String(body ?? '').replace(/\r\n/g, '\n').replace(/\n+$/, '').split('\n');
-    if (lines[0] !== '<!-- openwiz:status v1 -->') return /^<!-- openwiz:status v\d+ -->$/.test(lines[0]) ? { malformed: true } : null;
-    const fields = {};
-    let at = 0;
-    for (const line of lines.slice(1)) {
-      const m = line.match(/^([a-z]+): (.+)$/);
-      const index = m ? FIELDS.indexOf(m[1], at) : -1;
-      if (index < 0) return { malformed: true };
-      const value = m[2];
-      if (value.length > 300 || /[\u0000-\u001f\u007f]/.test(value) || !FIELD_RULES[m[1]](value)) return { malformed: true };
-      fields[m[1]] = value;
-      at = index + 1;
-    }
-    if (!FIELDS.slice(0, REQUIRED).every(name => name in fields)) return { malformed: true };
-    return { agent: fields.agent, state: fields.state.startsWith('stopped') ? 'stopped' : fields.state };
+    const note = OW.agents.readNote(body);
+    if (!note) return null;
+    return note.unknown ? { malformed: true } : { agent: note.agent, state: note.state };
   }
 
   // The claims on a ticket: per agent kind, the live (working or asking, edited in the last 30 minutes) verified note
@@ -290,12 +267,16 @@
         detail,
       };
     });
+    // WizBar's rule (WizPlugins #164): a ready-for-human ticket with an open blocker is later, not due now. A question
+    // (needs-info) and an open decision record are always due now.
+    const later = issue => !names(issue).includes('needs-info') && (issue.issueDependenciesSummary?.blockedBy ?? 0) > 0;
+    const ticket = issue => ({ kind: 'ticket', title: issue.title, number: issue.number, url: issue.url, at: Date.parse(issue.updatedAt) || 0 });
+    const marked = (data.youIssues.nodes || []).filter(Boolean);
     const you = [
       ...specs.flatMap(spec => decisions(spec, spec.detail, authors)),
-      ...(data.youIssues.nodes || []).filter(Boolean).map(issue => ({
-        kind: 'ticket', title: issue.title, number: issue.number, url: issue.url, at: Date.parse(issue.updatedAt) || 0,
-      })),
+      ...marked.filter(issue => !later(issue)).map(ticket),
     ].sort((a, b) => b.at - a.at);
+    const yoursLater = marked.filter(later).map(ticket).sort((a, b) => b.at - a.at);
     // A count from a partial read is a lower bound, shown as "N+"; with nothing read it is unknown.
     const running = specs.filter(spec => spec.total > 0);
     const read = running.filter(spec => spec.graph);
@@ -307,6 +288,7 @@
     return {
       specs,
       you,
+      later: yoursLater,
       gaps,
       partialSpecs: gaps.includes('specs'),
       counts: {
@@ -354,7 +336,7 @@
     const missing = seen.partialSpecs
       ? OW.ui.unknown('GitHub gave only part of the list of specs, so some may be missing. The app tries again on its own, or press Refresh now.') : null;
     if (!seen.specs.length) {
-      return el.replaceChildren(missing || OW.ui.placeholder('No open spec yet. A spec shows here once its issue has the spec label.'));
+      return el.replaceChildren(missing || OW.ui.placeholder('No open spec yet. A spec shows here once its issue has tickets (sub-issues), a "spec:" title or the spec label.'));
     }
     el.replaceChildren(...[missing, h('div', { class: 'cards' }, seen.specs.map(spec => {
       const href = `#/specs/${spec.number}`;

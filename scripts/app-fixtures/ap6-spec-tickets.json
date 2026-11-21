@@ -262,7 +262,7 @@
                 "nodes": [
                   {
                     "databaseId": 9007,
-                    "body": "<!-- openwiz:status v1 -->\nagent: reviewer\nstate: working\nharness: Synthetic Harness\nmodel: Synthetic Model\nstep: a synthetic step\ntime: 2030-01-01T00:00:00Z",
+                    "body": "<!-- openwiz:status v1 -->\nagent: reviewer\nstate: working\nharness: Synthetic Harness\nmodel: Synthetic Model\nskills: build-ticket@0.1.2\nstep: a synthetic step\ntime: 2030-01-01T00:00:00Z",
                     "url": "https://github.com/acme/factory/issues/42#issuecomment-9007",
                     "createdAt": "2029-12-31T09:00:00Z",
                     "updatedAt": "LIVE",
@@ -272,7 +272,7 @@
                   },
                   {
                     "databaseId": 9008,
-                    "body": "<!-- openwiz:status v1 -->\nagent: builder\nstate: done\nharness: Synthetic Harness\nmodel: Synthetic Model\nstep: a synthetic step\ntime: 2030-01-01T00:00:00Z",
+                    "body": "<!-- openwiz:status v1 -->\nagent: builder\nstate: done\nharness: Synthetic Harness\nmodel: Synthetic Model\nskills: build-ticket@0.1.2\nstep: a synthetic step\ntime: 2030-01-01T00:00:00Z",
                     "url": "https://github.com/acme/factory/issues/42#issuecomment-9008",
                     "createdAt": "2029-12-30T09:00:00Z",
                     "updatedAt": "LIVE-5",
@@ -319,7 +319,7 @@
                 "nodes": [
                   {
                     "databaseId": 9009,
-                    "body": "<!-- openwiz:status v1 -->\nagent: builder\nstate: working\nharness: Synthetic Harness\nmodel: Synthetic Model\nstep: a synthetic step\ntime: 2030-01-01T00:00:00Z",
+                    "body": "<!-- openwiz:status v1 -->\nagent: builder\nstate: working\nharness: Synthetic Harness\nmodel: Synthetic Model\nskills: build-ticket@0.1.2\nstep: a synthetic step\ntime: 2030-01-01T00:00:00Z",
                     "url": "https://github.com/acme/factory/issues/43#issuecomment-9009",
                     "createdAt": "2029-12-31T10:00:00Z",
                     "updatedAt": "LIVE",
@@ -329,7 +329,7 @@
                   },
                   {
                     "databaseId": 9010,
-                    "body": "<!-- openwiz:status v1 -->\nagent: builder\nstate: done\nharness: Synthetic Harness\nmodel: Synthetic Model\nstep: a synthetic step\ntime: 2030-01-01T00:00:00Z",
+                    "body": "<!-- openwiz:status v1 -->\nagent: builder\nstate: done\nharness: Synthetic Harness\nmodel: Synthetic Model\nskills: build-ticket@0.1.2\nstep: a synthetic step\ntime: 2030-01-01T00:00:00Z",
                     "url": "https://github.com/acme/factory/issues/43#issuecomment-9010",
                     "createdAt": "2029-12-30T10:00:00Z",
                     "updatedAt": "LIVE-5",
@@ -380,7 +380,7 @@
                 "nodes": [
                   {
                     "databaseId": 9011,
-                    "body": "<!-- openwiz:status v1 -->\nagent: builder\nstate: asking\nharness: Synthetic Harness\nmodel: Synthetic Model\nstep: a synthetic step\ntime: 2030-01-01T00:00:00Z",
+                    "body": "<!-- openwiz:status v1 -->\nagent: builder\nstate: asking\nharness: Synthetic Harness\nmodel: Synthetic Model\nskills: build-ticket@0.1.2\nstep: a synthetic step\ntime: 2030-01-01T00:00:00Z",
                     "url": "https://github.com/acme/factory/issues/44#issuecomment-9011",
                     "createdAt": "2029-12-31T11:00:00Z",
                     "updatedAt": "LIVE",

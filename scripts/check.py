@@ -1,6 +1,6 @@
 """Dependency-free checks for this site's literal HTML/CSS and public source."""
 from hashlib import sha256
-from html import unescape
+from html import escape, unescape
 from html.parser import HTMLParser
 from pathlib import Path
 import json
@@ -9,7 +9,15 @@ import subprocess
 from urllib.parse import unquote, urlsplit
 
 ROOT = Path(__file__).resolve().parents[1]
-# Reviewed artwork and the sample spec recording. Pin them after checking the visual content and metadata.
+# The landing's three moments show the real to-do run in place, in moment order: its grill's questions and answers, its
+# spec (a static copy of openwizdev/todo-demo issue 1) and the live app's capture. Each moment must carry these texts.
+TODO_RUN = (
+    ('Where should tasks live?', 'One list for now.', 'Keep completed tasks visible?', 'Yes, greyed out.'),
+    ('Problem Statement', 'As a user, I want an empty task to be refused', 'todo-demo.tasks.v1', 'Out of Scope'),
+    ('openwizdev.github.io/todo-demo',),
+)
+TODO_APP = '/art/todo-app.webp'
+# Reviewed artwork and the spec video. Pin them after checking the visual content and metadata.
 ART_HASHES = {
     'art/era-2-grill.webp': 'efaf213c3f389c8feb2f9d0436e94b1f9241d0ecf3cc3e793385d34f11cd11dd',
     'art/family-01.webp': '14532efb522eb7129ced9e1093f4b0321b1f00459301f059f2d9b5a8c2a7161f',
@@ -31,9 +39,16 @@ ART_HASHES = {
     'art/hero-renaissance-frames.webp': '04192a312129777ab9b4ee43ea632d04c6b725938b6feb7d134db4fcfdfd4cec',
     'art/hero-samurai-frames.webp': '3a6eef42bfd2fc6f7b8e847d4355d75c283425a274b5fb9c95c3404f580725c5',
     'art/hero-steam-frames.webp': '20f057c963be16ebc3cabbf1d2ab849e2e8144d29a3e419344a867eef2c41f3c',
-    'art/spec-demo.webm': '6619ae77a13229d9056037e5bc793d48f7fc98490d068c2b6e4f58426a8fac22',
+    # The landing's spec video (#70, J267): the to-do app's real spec (openwizdev/todo-demo #1), narrated with captions,
+    # its poster and captions; local voice, no paid service; every frame privacy-scanned.
+    'art/todo-spec.mp4': '52bb1fa94a154e17270f7512db19efcedae921e4769a28742bc8a36093d1c732',
+    'art/todo-spec-poster.webp': '94a69b2033a98e4ae6663b61bf9f0af0ba06d5a4d4d28aa4b46247570cac5b72',
+    'art/todo-spec.vtt': '47e9ffb41081dd72f541110c43312521a8dd92f1c8e58c11092ecd0daa74eee2',
+    # Step 3's real capture of the live to-do app (openwizdev.github.io/todo-demo), shown small and opened in place.
+    'art/todo-app.webp': 'ccc5be87687b1d4ac387cfb623033c0f567890cfe73570f8e4d4bb4b8a81de54',
     # OpenWiz's model config spec video (#1802), off the landing (J267) but still served at its URL for #1802's links.
     'art/spec-video.mp4': 'feb357b9a80453d676123a31285a36c34b5873e102ed58c95728bfd6315bfe16',
+    # The model config video's poster frame and captions (#1405), still served for OpenWiz #1802's links (J267).
     'art/spec-poster.webp': '4922f6d265ed8c0c57dead86a62288c94d97159dda34f95969db0ee42b72fdc4',
     'art/spec-video.vtt': '570f5621ff3d84152587612d1be5d78ba5e0fbf6a7da306088a5897c755dc09d',
     # The drivers page, variant D (#50): the night sea and the Wiz family's ship, painted layers of its hero.
@@ -41,6 +56,8 @@ ART_HASHES = {
     'art/drivers-d-ship.webp': '885dd800aae2e75d45f2b88e1e69232bbf987df44beec9fa8070d4354b64cd04',
     # Round 2F (#56): variant C's painted cutaway of the Wiz crew's ship (#49), beside boat.dev's five checks.
     'art/drivers-c-boat.webp': '39fd43d08aa36bce84e964699d493a03af090499a63dffbfaa43e61804b7e1ef',
+    # Team page round 2 (#81): the boat video's poster frame, linking to the video on X.
+    'art/team-boat-poster.webp': '656c0c75f92a17390beda0d8afb45be3f9164330357635295998406dad3a69d4',
 }
 ART = set(ART_HASHES)
 # Logo pack (#1350: the dark-cream mark). Raster icons and the social card are pinned by hash like the art; a new picture needs review.
@@ -67,10 +84,22 @@ GSAP = 'vendor/gsap-3.15.1.min.js'
 VENDOR_HASHES = {
     'vendor/GSAP-LICENSE.txt': '791e7d34e6718aad2bd3e20fa5240a4c0e47d73ee3ca31424652cca52fe9acf0',
     'vendor/LOBE-ICONS-LICENSE.txt': 'add9d7531d1b21646317a8958e38fc727506fa39d24bdecb44154d943c82753a',
+    # Lucide (ISC): the drivers page's generic icons, drivers/logos/monitor.svg (#62) and drivers/logos/bot.svg (#66).
+    'vendor/LUCIDE-LICENSE.txt': 'b495047bd93a9b06913511076f504daba17d5bbeb3e0650f3bb53a4220329c57',
     'vendor/gsap-3.15.1.min.js': '3d1bea374ab1b703cc5c4105358eec63c4465efdc573931dc116e34a0a190c1b',
 }
 
-HASHED = ('tokens.css', 'site.css', GSAP, 'site.js')
+# #62 item 2: real logos, each the owner's official file, unaltered (pinned to the downloaded original's sha256), small,
+# same-origin, with alt text naming its host. No Grok or xAI mark: xAI's brand terms require permission for its marks, so
+# Grok Bot's name is text, and its card shows one neutral generic icon (#66 item 6).
+DRIVER_LOGOS = {
+    'drivers/logos/boat-dev.svg': ('9a103b949a566589486527567cda9051c9e2c81aa32e723b332df63067fca533', 'boat.dev'),
+    'drivers/logos/cloudroom.png': ('357d4b00935ff9b9ebf676e9dbe35ddd22af82b3e62a0fcafd59341b6b702592', 'Cloudroom'),
+    'drivers/logos/monitor.svg': ('9ef659c8515c6afe223a2d60407e7472b086593516f892963569692342ef2189', 'computer'),
+    'drivers/logos/bot.svg': ('dcc04dfbe4330e73de3a093bc7b692ac9c373b6a40f41f38c0b05e746c99a250', 'bot'),
+}
+
+HASHED = ('tokens.css', 'site.css', GSAP, 'site.js', 'faq.js')
 # The app (openwiz.dev/app, #1258): its page, design system (Ember), data layer, page modules and shell.
 # The page applies only ember.css and loads exactly these scripts, in this order, all fingerprinted.
 APP_PAGE = 'app/index.html'
@@ -89,17 +118,105 @@ def fingerprint(name, data):
     return re.sub(r'\.(css|js)$', rf'.{sha256(data).hexdigest()[:10]}.\1', name)
 
 
-def fingerprinted_page(html):
+def fingerprinted_page(html, cta=False):
     for name, hashed in FINGERPRINTS.items():
         html = html.replace(f'"/{name}"', f'"/{hashed}"')
+    return with_faq(with_footer(with_cta(html))) if cta else html
+
+
+# The header's one buy button (#63): one snippet, which the build adds to every site page's top bar (not the app's).
+CTA = (ROOT / 'header-cta.html').read_text()
+CTA_LINK = '<a class="nav-team" href="/team/">'
+TOP_BAR_END = '  </nav>\n</header>'
+# The team page (openwiz.dev/team, #63) and its one booking link: the href of its one data-book link is the link's
+# only value. Until the real link is set it is this in-page placeholder; otherwise it must be an https URL.
+TEAM_PAGE = 'team/index.html'
+BOOK_PLACEHOLDER = '#book'
+# Team page round 2, design P (#81): the round 1 copy, word for word, with headline A. Round 3, candidate 2 (#89):
+# curly apostrophes, the terms under their label, the timeline in the hero and Proof as three cards.
+TEAM_HEADLINE = 'Book 30 minutes. Leave with a shipped pull request.'
+TEAM_TERMS = ('A small, real change of your choice.',
+              'On a repository with working CI and a signed-in coding agent (Claude Code or Codex).',
+              "If it hasn’t shipped in 30 minutes, Jake stays on until it does.")
+TEAM_TERMS_LABEL = 'How the call works'
+TEAM_SHIPS = 'Ships means a pull request opens on your repo, built by your agents and passing your CI. Merging is your call.'
+TEAM_COPY = ('For solo builders and small teams', TEAM_HEADLINE,
+             'A 30-minute call with Jake, who builds OpenWiz. We connect it to your repo and the coding agent you already '
+             'use, you pick one small change, and your first fleet ships it on your workflow.',
+             *TEAM_TERMS, TEAM_SHIPS,
+             TEAM_TERMS_LABEL, 'Grok Bot: coming soon', 'See how drivers work',
+             'Our Drivers page was built the same way: a fleet of agents drew six designs, a council of judges picked one, '
+             'and it merged in one night.', 'See the Drivers page',
+             'Watch the fleet build it (49 s, on X)',
+             'Solo builders and small teams who already use Claude Code or Codex.', 'Custom pricing. No checkout.', 'Book a call')
+# The hero, then its sections in order: the timeline, proof, who it's for, pricing, the Questions (#76), the closing call.
+# #89: the timeline is the hero's second column, and Proof's first card carries the drivers, so the page has no separate
+# where-your-agents-run section.
+TEAM_PARTS = ('The 30 minutes, roughly', 'Proof', 'Who it’s for', 'Pricing', 'Questions', 'Your first fleet ships on the call.')
+TEAM_STEPS = (('Minute 0', 'We connect your repo and your agents.'),
+              ('Minute 10', 'You answer a few questions about your change.'),
+              ('Minute 20', 'Your agents build it.'), ('Minute 30', 'A pull request ships.'))
+# #89: Proof's first card, the drivers that passed: its heading, what the five checks are (as /drivers/ names them), then
+# each logo (as /drivers/ ships it) with its result under it.
+TEAM_PASSED_HEADING = 'Three drivers passed all five checks'
+TEAM_PASSED_ABOUT = 'The same test for every place your agents run: version, start, wake, stop and token.'
+TEAM_PASSED = ('/drivers/logos/monitor.svg', '/drivers/logos/cloudroom.png', '/drivers/logos/boat-dev.svg')
+TEAM_PASSED_LINE = '5 of 5'
+# The boat video's poster: a picture linking to the X post, never an embedded or hosted video.
+TEAM_POSTER = '/art/team-boat-poster.webp'
+TEAM_POSTER_ALT = 'Wizards on a boat: the fleet that built the Drivers page'
+TEAM_NEVER = re.compile(r'\binstall|\bguarantee', re.I)
+# #1851: Report a problem opens GitHub's new-issue form on openwizdev/openwiz with the feedback template
+# (contracts/feedback-loop.v1.md: .github/ISSUE_TEMPLATE/feedback.yml). The only external URL with a query; nothing
+# else may ride along, so no words leave openwiz.dev. In the footer of every site page.
+REPORT_LINK = 'https://github.com/openwizdev/openwiz/issues/new?template=feedback.yml'
+# The site footer (#73): one snippet, which the build adds at each site page's one slot (not the app's). Its links, in order.
+FOOTER = (ROOT / 'footer.html').read_text()
+FOOTER_SLOT = '<!-- footer.html -->\n'
+FOOTER_LINKS = (('/drivers/', 'Drivers'), ('/changelog/', 'Changelog'), ('https://github.com/openwizdev/openwiz#readme', 'Docs'),
+                ('/faq/', 'FAQ'), ('/app/', 'The app'), (REPORT_LINK, 'Report a problem'), ('/team/', 'For teams'),
+                ('https://github.com/openwizdev/openwiz', 'GitHub'), ('https://x.com/openwiz', 'X @openwiz'))
+FOOTER_LINE = 'Apache-2.0. Owned by no one.'
+# The only external link off GitHub: OpenWiz's own X account, in the footer.
+X_ACCOUNT = 'https://x.com/openwiz'
+# The Questions (#76): one snippet, faq.html, the FAQ's one source. The build adds it at the landing's and /team's slot,
+# and at /faq's top slot as the page's own heading (its title the h1, each question an h2). Its questions, in order.
+FAQ = (ROOT / 'faq.html').read_text()
+FAQ_TOP = re.sub(r'<(/?)h3\b', r'<\1h2', re.sub(r'<(/?)h2\b', r'<\1h1', FAQ))
+FAQ_SLOTS = {'<!-- faq.html -->\n': FAQ, '<!-- faq.html h1 -->\n': FAQ_TOP}
+FAQ_PAGE = 'faq/index.html'
+FAQ_ON = {'index.html': FAQ, TEAM_PAGE: FAQ, FAQ_PAGE: FAQ_TOP}
+FAQ_TITLE = ('Questions', 'The short ones are here.')
+FAQ_QUESTIONS = ('What is OpenWiz?', 'What is a kernel?', 'What do I need to run it?', 'Where do my agents run?',
+                 'Does OpenWiz see my code or my logins?', 'What does it cost?', 'Can you set it up for my team?')
+# #89: the last answer, word for word (the team page's offer).
+FAQ_LAST = 'Yes. Book a 30-minute call. Your first fleet ships on it.'
+
+
+def with_footer(html):
+    assert html.count(FOOTER_SLOT) == 1, 'a site page needs exactly one footer slot'
+    return html.replace(FOOTER_SLOT, FOOTER)
+
+
+def with_faq(html):
+    for slot, faq in FAQ_SLOTS.items():
+        html = html.replace(slot, faq)
     return html
 
 
+def with_cta(html):
+    assert html.count(TOP_BAR_END) == 1, 'a site page needs exactly one top bar'
+    return html.replace(TOP_BAR_END, CTA + TOP_BAR_END)
+
+
 FINGERPRINTS = {name: fingerprint(name, (ROOT / name).read_bytes()) for name in HASHED}
+# Ask a Wiz's docs index (FA2, #1900): built from the built pages and ask-docs/, so it has no source copy to compare;
+# it is privacy-scanned with every runtime file.
+ASK_INDEX = 'ask-index.json'
 STATIC = {
-    'index.html', 'changelog/index.html', 'drivers/index.html', '_headers', APP_PAGE, 'app/manifest.webmanifest',
+    'index.html', 'changelog/index.html', 'drivers/index.html', 'team/index.html', 'faq/index.html', '_headers', APP_PAGE, 'app/manifest.webmanifest',
     'fonts/Geist-var.woff2', 'fonts/GeistMono-var.woff2', 'fonts/OFL.txt',
-} | ART | set(ICON_HASHES) | set(VECTORS) | (set(VENDOR_HASHES) - {GSAP}) | set(APP_VENDOR)
+} | ART | set(ICON_HASHES) | set(VECTORS) | (set(VENDOR_HASHES) - {GSAP}) | set(APP_VENDOR) | set(DRIVER_LOGOS) | {ASK_INDEX}
 RUNTIME = STATIC | set(FINGERPRINTS.values())
 
 
@@ -125,65 +242,117 @@ FONT_HASHES = {
     'fonts/GeistMono-var.woff2': '55419aa06f58adcd7f145c6c920e56936416f17e528f60efc6032ffa4269972b',
     'fonts/OFL.txt': 'c683bfbcc7e087f5d37a54ef628f10387c451a83ddc459b151403a164ac46c90',
 }
-PAGES = ('index.html', 'changelog/index.html', 'drivers/index.html')
+PAGES = ('index.html', 'changelog/index.html', 'drivers/index.html', TEAM_PAGE, FAQ_PAGE)
 ALL_PAGES = PAGES + (APP_PAGE,)
 # The to-do example and both app entry points stay visible in the static landing page.
 STORY_COPY = ('Build a to-do app', 'Bring any agent', 'Sign in with GitHub', 'Put the app on your phone')
 OLD_EXAMPLE = ('dark mode', 'dark-mode')
 MOTION_OK = '@media (prefers-reduced-motion:no-preference)'
 PHONE_QUERY = re.compile(r'\(max-width:[0-9]+px\)')
-# The Changelog (#1363): named Changelog everywhere; a small picture of how the repositories fit together opens
-# the page, then one "What exists today" section with one part per public repository, each opening with two or
-# three plain sentences. Private repositories appear at most as "private records and tools". No release entry,
-# version number or date: the old release list stays on GitHub's releases. Its reviewed text is pinned below.
-CHANGELOG_MAIN = 'a41401f686dd700c766358c47d89375a89f1faad74b668574d35cf5c0ac45567'
+# The Changelog (#78): named Changelog everywhere; its source page is the title and one line, and nothing else in its
+# main (no version number or date: those come only from the release data). Private repositories are never named.
+# Its reviewed text is pinned below. The repository map and What exists today moved to docs/repos.md.
+CHANGELOG_MAIN = '53ec7d0b87a84daf1ad319c06ed75ea810e35bd269496612631b7d4f5750d1dc'
 CHANGELOG_LINKS = ('/changelog/', '/changelog')
 PUBLIC_REPOS = ('OpenWiz', 'WizSkills', 'WizLoops', 'WizPlugins', 'WizSite')
 PUBLIC_WIZ_NAMES = set(PUBLIC_REPOS) | {'WizBar'}  # WizBar is WizPlugins' plugin, not a repository
-TODAY = 'What exists today'
-# The generated Releases section (#1364): build.mjs adds it last in the Changelog's main, between these markers, from
-# each versioned repository's published release notes. The page's reviewed rules and pin apply without it; the
-# section has its own rules (check_releases), one part per versioned repository, in this order.
+# The generated entries (#78): build.mjs adds them last in the Changelog's main, between these markers, from one data
+# file per public release in RELEASE_DIR. check_release_data checks each file; check_releases checks the built section
+# against them and the landing's install switch: no entry until it reads live (RL2), then every entry, newest first.
 RELEASES = ('<!-- releases:start -->', '<!-- releases:end -->')
-RELEASE_REPOS = ('OpenWiz', 'WizSkills', 'WizLoops')
-# The drivers page (openwiz.dev/drivers, #50): one card per driver, in this order, each with its status line (the
-# ticket's facts, word for word), the driver's four words and its test-kit result on the kit's five checks.
+RELEASE_DIR = ROOT / 'changelog/releases'
+RELEASE_FIELDS = ('name', 'semver', 'date', 'headline', 'bullets', 'notes')
+RELEASE_BULLETS = (1, 6)  # a human-readable number: about 2 to 5, never none and never more than 6
+RELEASE_BULLET_MAX = 120  # characters
+RELEASE_HEADLINE_MAX = 80  # characters: one line
+PRE_RELEASES = 'https://github.com/openwizdev/OpenWiz/releases'
+MONTHS = ('Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec')
+# The drivers page (openwiz.dev/drivers, #50; round 3H, #62): boat.dev's spotlight card first, then the other three
+# drivers' compact cards, in this order, each with its status line (the ticket's facts, word for word). #66's facts
+# (2026-11-20): boat.dev, Cloudroom and your own computer or VPS each passed the kit, five of five; Grok Bot is coming soon.
 DRIVERS_PAGE = 'drivers/index.html'
 DRIVERS_LINKS = ('/drivers/', '/drivers')
 DRIVERS = (
-    ('vps', 'Your own computer or VPS', 'Being fixed: its kit run is in progress', 'in progress'),
-    ('cloudroom', 'Cloudroom', 'Works today: built real pull requests for OpenWiz', 'not yet run'),
-    ('boat-dev', 'boat.dev', 'Passed the kit, 5 of 5, on a real account (2026-11-19)', 'passed'),
+    ('boat-dev', 'boat.dev', 'Passed all five checks', 'passed'),
+    ('vps', 'Your own computer or VPS', 'Passed the kit on a Linux PC', 'passed'),
+    ('cloudroom', 'Cloudroom', 'Passed the kit, run from a Cloudroom cloud thread against real Cloudroom', 'passed'),
     ('grok-bot', 'Grok Bot', 'Coming soon: listed when its driver lands', 'not yet run'),
 )
 DRIVER_HERO = 'boat-dev'
+# Round 3 final (#66 item 4): the spotlight's clean headline, then the date on its own metadata line under it.
+DRIVER_DATE = 'On a real account, 2026-11-19'
+# #66 facts: the drivers that passed the kit, each with its date and its public evidence; and the one still to come.
+# The spotlight stays boat.dev's, and says under its five checks that the other two passed the same ones.
+DRIVER_PASSED = {
+    'boat-dev': ('2026-11-19', 'https://github.com/openwizdev/OpenWiz/pull/1444'),
+    'cloudroom': ('2026-11-20', 'https://github.com/openwizdev/OpenWiz/pull/1458#issuecomment-7034556153'),
+    'vps': ('2026-11-20', 'https://github.com/openwizdev/OpenWiz/pull/1455#issuecomment-7034588211'),
+}
+DRIVER_COMING = 'grok-bot'
+# OpenWiz #2005 (DW8): each driver's login line, word for word from its README (kernel/driver.v1.md, The login line).
+DRIVER_LOGINS = {
+    'boat-dev': 'Login: held by boat.dev',
+    'vps': 'Login: stays on your machine',
+    'cloudroom': 'Login: held by Cloudroom',
+}
+DRIVER_ALSO = 'Cloudroom and your own computer or VPS passed the same five checks on 2026-11-20.'
+DRIVER_CARD_DATE = 'Kit run, {}'
+# Words that described the three passing drivers before they passed; none may come back anywhere on the page. "not run
+# yet" stays only on Grok Bot's card.
+DRIVER_STALE = re.compile(r'being fixed|works today|kit run next|in progress|not (?:yet )?run(?: yet)?|kit run (?:comes )?next', re.I)
 DRIVER_WORDS = ('version', 'start', 'wake', 'stop')
 KIT_CHECKS = ('version', 'start', 'wake', 'stop', 'token')
 KIT_STATES = ('passed', 'in progress', 'not yet run')
-# Every number the page shows comes from these facts: four drivers and four words, boat.dev's 5 of 5 and its date,
-# the one driver that passed, and the contract's v1.
-DRIVER_NUMBERS = {'4', '5', '2026', '11', '19', '1'}
-# Round 2F (#56): the evidence chips under the headline, and boat.dev's proof section after the cards: the kit's five
-# checks, each with what passing it proved, in plain words from kernel/driver.v1.md section 3.
-DRIVER_CHIPS = ('4 drivers', '4 words', '5 checks in the kit', '1 passed, 5 of 5')
-PROOF_TITLE = 'boat.dev passed the kit, 5 of 5.'
+# Round 3H (#62): a pending driver shows one kit line, never five identical rows. Round 3 final (#66 item 6): each kit
+# line fits one line at 1440; Cloudroom's status sentence says its kit run comes next, so "works" and "not run yet"
+# never read as a conflict.
+DRIVER_KIT_LINES = {
+    'vps': 'Kit: passed, 5 of 5',
+    'cloudroom': 'Kit: passed, 5 of 5',
+    'grok-bot': 'Kit: not run yet',
+}
+# #66 item 2: the hero's host pills, in order, each saying in words what works today; every mark sits in one
+# fixed-height slot (Grok Bot has no mark: its name in text). #66 facts: three passed, five of five; Grok Bot is coming.
+HOST_PILLS = (
+    ('vps', 'Your computer or VPS', 'passed 5 of 5', 'passed'),
+    ('cloudroom', 'Cloudroom', 'passed 5 of 5', 'passed'),
+    ('boat-dev', 'boat.dev', 'passed 5 of 5', 'passed'),
+    ('grok-bot', 'Grok Bot', 'coming soon', 'coming soon'),
+)
+# Every number the page shows comes from these facts: the kit dates, the contract's v1 and the kit's result, 5 of 5.
+# Other counts are said in words (#62 item 4).
+DRIVER_NUMBERS = {'2026', '11', '19', '20', '1', '5'}
+# #62 item 4: no jargon counts ("4 words", "5 checks in the kit", "1 passed", "3 of 5"), and the five-of-five result
+# said at most twice in words on the page: the hero's one link and boat.dev's spotlight. #66 facts: the kit's own
+# result, "5 of 5", is the one count shown in digits, in the host pills and the kit lines.
+DRIVER_JARGON = re.compile(r'\b\d+\s+(?:drivers?|words?|checks?|commands?|passed)\b|\b(?!5 of 5\b)\d+\s+of\s+\d+\b', re.I)
+DRIVER_RESULT = re.compile(r'\ball five checks\b|\bfive passed checks\b|\bfive of five\b', re.I)
+DRIVER_RESULT_MAX = 2
+# #62 item 1: what a driver is, in plain words, in the hero above every card: two sentences at most. #66 item 1: under
+# the headline, first what OpenWiz's agents do, then the same four commands and five-check test; the command-by-command
+# detail stays in the spotlight and Write your own driver, never in the hero.
+DRIVER_EXPLAINER_WORDS = ('driver', 'agents', 'tickets', 'four commands', 'five-check test')
+# The five checks as boat.dev passed them, each with what passing it proved, in plain words from kernel/driver.v1.md
+# section 3; the spotlight is the page's one list of them.
 PROOF_LINES = (
     ('version', 'It names the kernel\'s records version, and prints its schema unchanged.'),
     ('start', 'It answered a run id, and the agent\'s status note appeared on a throwaway ticket.'),
     ('wake', 'It reached the same run again: that note was edited, never a second one.'),
     ('stop', 'It ended the run: a wake after it was refused, and nothing the run started still runs.'),
-    ('token', 'No credential showed in its output, command lines or environment, and it refused a token field.'),
+    ('token', 'No credential appeared in its output, command lines or environment, and it refused a token field.'),
 )
-# A driver that works but whose kit has not run says so plainly, so "works" and "not yet run" never read as a conflict.
-DRIVER_KIT_NOTES = {'cloudroom': 'Kit: not run yet'}
-# Final (#59): boat.dev's card keeps one kit line linking to its proof section, which alone lists the five checks.
-DRIVER_KIT_PROOF = {'boat-dev': ('#boat-proof', 'Kit: passed, 5 of 5')}
-DRIVER_HERO_MARK = '<p class="hero-score" aria-hidden="true"><b>5</b><span>of 5</span></p>'
-DRIVER_LABEL_TRACKING = 0.06  # em: the least tracking on an uppercase drivers-page label
+# #66 item 7: wherever token is explained, say only what the run inspected; no broader claim.
+TOKEN_CLAIM = 'no credential appeared in its output, command lines or environment, and it refused a token field'
+TOKEN_BROAD = re.compile(r'credentials? leaks?|leaks? no credential|never leaks?|proves? no credential|no credential (?:can|will|ever)', re.I)
+DRIVER_LOGO_MAX = 30_000  # bytes, each logo
+# #66 item 6: Grok Bot's card shows only a neutral generic icon from the same open-licence set, never a Grok or xAI mark.
+DRIVER_GENERIC_ICON = ('grok-bot', 'drivers/logos/bot.svg')
 DRIVER_MIN_FONT = 12  # px: no drivers-page text smaller
+DRIVER_LABEL_TRACKING = 0.06  # em: the least tracking on an uppercase drivers-page label
 OWN_DRIVER = 'Write your own driver'
 OPENWIZ_REPO = 'https://github.com/openwizdev/OpenWiz'
-DRIVER_DESCRIPTION = 'boat.dev passed 5 of 5'  # the page's meta description names the one driver that passed (#59 R2)
+# The meta description names the drivers that passed (#59 R2; #66 facts: all three, and Grok Bot coming soon).
+DRIVER_DESCRIPTION = 'boat.dev, Cloudroom and your own computer or VPS passed all five checks; Grok Bot is coming soon'
 DRIVER_ART_BUDGET = 400_000  # bytes: the drivers page's own art (art/drivers-*.webp)
 
 
@@ -197,7 +366,12 @@ class Page(HTMLParser):
         self.buttons = []
         self.images = []
         self.videos = []
+        self.tracks = []
+        self.links = []
         self.inline_scripts = 0
+        self.books = []
+        self.x_links = 0
+        self.report_links = 0
         self.stylesheets, self.scripts = [], []
         self.feed(text)
 
@@ -206,6 +380,24 @@ class Page(HTMLParser):
         if 'id' in attrs:
             assert attrs['id'] not in self.ids, 'duplicate HTML id'
             self.ids.add(attrs['id'])
+        if tag == 'a' and 'data-book' in attrs:
+            # The booking link may leave the site: check_team checks it, on the team page only, instead of check_ref.
+            # Only this element's href is exempt; check_site refuses a booking link on any other page.
+            self.books.append(attrs.get('href') or '')
+            attrs = {key: value for key, value in attrs.items() if key != 'href'}
+        elif tag == 'a' and attrs.get('href') == X_ACCOUNT:
+            # #75 R3: OpenWiz's X account, only as a link a visitor follows (check_site allows one, the footer's);
+            # anywhere else, as a resource or in CSS, check_ref refuses it like any external URL.
+            self.x_links += 1
+            attrs = {key: value for key, value in attrs.items() if key != 'href'}
+        elif tag == 'a' and attrs.get('href') == REPORT_LINK:
+            # #1851: the Report a problem link, exempt from check_ref's no-query rule by its exact href only;
+            # check_site counts it per page.
+            # R2 (WizSite #90): no Referer, so the form request never carries the page the visitor came from.
+            assert 'noreferrer' in (attrs.get('rel') or '').lower().split() and 'referrerpolicy' not in attrs, \
+                'Report a problem link needs rel="noreferrer"'
+            self.report_links += 1
+            attrs = {key: value for key, value in attrs.items() if key != 'href'}
         for key in ('href', 'src', 'poster'):
             if attrs.get(key):
                 self.refs.append(attrs[key])
@@ -215,6 +407,10 @@ class Page(HTMLParser):
             self.images.append(attrs)
         if tag == 'video':
             self.videos.append(attrs)
+        if tag == 'track':
+            self.tracks.append(attrs)
+        if tag == 'a':
+            self.links.append(attrs)
         if tag == 'script' and not attrs.get('src'):
             self.inline_scripts += 1
         # Only references the browser applies: an enabled stylesheet for all media, a script of a runnable type.
@@ -352,11 +548,17 @@ def check_site(root):
         assert not set(page.refs) & {f'/{name}' for name in HASHED}, 'a page uses an unfingerprinted style or script'
         assert page.stylesheets == [f'/{names["tokens.css"]}', f'/{names["site.css"]}'], 'a page must apply exactly tokens.css then site.css'
     page = pages[root / 'index.html']
-    assert page.scripts == [f'/{names[GSAP]}', f'/{names["site.js"]}'], 'load the pinned GSAP before site.js'
+    assert page.scripts == [f'/{names[GSAP]}', f'/{names["site.js"]}', f'/{names["faq.js"]}'], 'load the pinned GSAP before site.js, then faq.js'
     assert not page.inline_scripts, 'landing motion must wait for both external scripts'
     assert len(page.videos) == 1, 'expected one spec recording'
     clip = page.videos[0]
-    assert clip.get('preload') == 'none' and 'autoplay' not in clip and 'hidden' in clip, 'spec recording must be opt-in'
+    # The spec video (#1405) loads only when it first plays, and site.js starts it muted inline, never with sound;
+    # its poster, default captions and a plain link to the video show without any script.
+    assert clip.get('preload') == 'none' and 'autoplay' not in clip, 'spec recording must be opt-in'
+    assert 'muted' in clip and 'playsinline' in clip, 'spec video must start muted inline'
+    assert clip.get('poster', '').removeprefix('/') in ART, 'spec video needs a pinned poster'
+    assert any(t.get('kind') == 'captions' and 'default' in t and t.get('src', '').removeprefix('/') in ART for t in page.tracks), 'spec video needs default captions'
+    assert any(a.get('href') == clip.get('src') and 'hidden' not in a for a in page.links), 'needs a plain link to the spec video'
     for attrs in page.buttons:
         if attrs.get('class') in ('demo-pause', 'spec-play'):
             assert 'hidden' in attrs, 'motion controls must wait for both scripts'
@@ -373,8 +575,14 @@ def check_site(root):
     for path, page in pages.items():
         # The social card: an absolute URL on the site that resolves to a built file.
         assert page.social and all(s.startswith(SITE_URL) and s.removeprefix(SITE_URL).split('?')[0] in STATIC for s in page.social), 'social image must be a built file on the site'
+        assert path == root / TEAM_PAGE or not page.books, f'a booking link outside the team page: {path.name}'
+        # #81: the team page's boat poster links to the X post too, beside the footer's X link.
+        x_links = 2 if path == root / TEAM_PAGE else 1
+        assert page.x_links == x_links, f'one X link per page, the footer\'s: {path.relative_to(root)} has {page.x_links}'
         for ref in page.refs:
             check_ref(root, path, ref, pages, page.favicons)
+        # After check_ref, so a changed Report a problem URL is refused as an external URL first.
+        assert page.report_links == 1, f'Report a problem link: {path.relative_to(root)} has {page.report_links}, not 1'
         for ref in css_refs(path.read_text()):
             check_ref(root, path, ref, pages)
     for path in root.glob('*.css'):
@@ -421,8 +629,35 @@ def check_site(root):
     moments = ('Answer a few questions', 'Watch your spec', 'Watch it ship')
     captions = re.findall(r'<h3>([^<]+)</h3>', landing)
     assert tuple(captions) == moments, 'the three moments must appear in order'
-    assert 'Steer the build from the narrated video.' in flat, 'spec video steering copy is missing'
-    assert 'Silent sample' in flat, 'the landing clip must be labeled as a silent sample'
+    assert 'The real spec of an OpenWiz-built to-do app' in flat, 'the spec video must say it is the to-do app\'s real spec'
+    # The three moments show the real to-do run on this page and never send the visitor away for it: no link out.
+    section = re.search(r'<section class="moments[\s\S]*?</section>', re.sub(r'<!--.*?-->', '', landing, flags=re.S))
+    section = section[0] if section else ''
+    # Parsed, not pattern-matched, so a link written with single quotes or none counts too.
+    links = Page(section)
+    assert not links.books and not links.x_links and all(ref.startswith('/') and not ref.startswith('//') for ref in links.refs), \
+        'the moments must keep visitors on the site: no link out'
+    blocks = {}
+    # Comments hide markup from visitors, so a commented-out moment or text counts as missing.
+    for block in re.findall(r'<li class="(?:moment-step|spec-moment)[^"]*">.*?</(?:details|div)>\s*</li>', section, re.S):
+        blocks[re.search(r'<h3>([^<]+)</h3>', block)[1]] = Text(block).spaced()
+    for card, texts in zip(moments, TODO_RUN):
+        for text in texts:
+            assert text in blocks.get(card, ''), f'the {card} moment must show the real to-do run in place: {text}'
+    # Each grill question shows with its own answer right after it: in the bubbles (open on phones) and in the expanded grill.
+    grill = TODO_RUN[0]
+    chat = re.search(r'<div class="moment-chat"[^>]*>(.*?)</div>', section, re.S)
+    panel = re.search(r'<div class="moment-panel grill-panel">(.*?)</div>', section, re.S)
+    for question, answer in zip(grill[::2], grill[1::2]):
+        q, a = re.escape(escape(question, quote=False)), re.escape(escape(answer, quote=False))
+        assert chat and re.search(rf'<p class="ask">{q}</p>\s*<p class="reply">{a}</p>', chat[1]), \
+            f'the grill bubbles must show each question with its answer: {question}'
+        assert panel and re.search(rf'<p class="ask"><strong>{q}</strong>[^<]*<span>[^<]*</span></p>\s*<p class="reply">{a}</p>', panel[1]), \
+            f'the expanded grill must show each question with its answer: {question}'
+    # The live app is shown as its pinned real capture, described, inside step 3.
+    ship = re.search(r'<li class="moment-step moment-ship">.*?</li>', section, re.S)
+    shot = next((i for i in Page(ship[0]).images if i.get('src') == TODO_APP and (i.get('alt') or '').strip()), None) if ship else None
+    assert shot, f'the Watch it ship moment lost its described capture of the live app: {TODO_APP}'
     # Owner cuts (round 6): obvious notes stay off the page.
     for text in ('Illustration, not live data', 'Building in public'):
         assert text.lower() not in flat.lower(), f'cut copy is back: {text}'
@@ -456,10 +691,14 @@ def check_site(root):
     drivers_art = {name for name in ART if name.startswith('art/drivers-')}
     unused = sorted(name for name in drivers_art if f'/{name}' not in (root / DRIVERS_PAGE).read_text())
     assert not unused, f'unused drivers art: {unused}'
+    check_driver_logo_files(root)
     check_drivers(landing, changelog, (root / DRIVERS_PAGE).read_text(), pages[root / DRIVERS_PAGE])
     check_drivers_nav((root / names['site.css']).read_text(), {name: (root / name).read_text() for name in PAGES})
     check_changelog(landing, changelog)
-    check_releases(releases)
+    check_releases(releases, read_releases(), install_switch(landing) == 'live')
+    check_team({name: (root / name).read_text() for name in PAGES}, {name: pages[root / name] for name in PAGES})
+    check_footer({name: (root / name).read_text() for name in PAGES})
+    check_faq({name: (root / name).read_text() for name in PAGES}, {name: pages[root / name] for name in PAGES}, names)
     main = re.search(r'<main\b[^>]*>[\s\S]*?</main>', changelog)
     assert main and sha256(main[0].encode()).hexdigest() == CHANGELOG_MAIN, 'changelog content changed; review explicitly before updating its snapshot'
 
@@ -562,8 +801,9 @@ def check_install(landing, page):
 
 
 def check_changelog(landing, changelog):
-    """The Changelog's name, its picture first, one What exists today with a part per public repository, and no
-    release history. `landing` and `changelog` are the two pages' HTML."""
+    """The Changelog's name, and its source page: the title, one line, and nothing else in its main; no version number
+    or date there, and no private repository named. `landing` and `changelog` are the two pages' HTML (the Changelog
+    without its generated section)."""
     home = Outline(landing)
     labels = [text for href, text in home.links if href in CHANGELOG_LINKS]
     assert labels == ['Changelog', 'Changelog'], f'the landing nav and footer must each link the Changelog: {labels}'
@@ -574,56 +814,45 @@ def check_changelog(landing, changelog):
             assert not re.search(r'ship\s*log', reading, re.I), 'the page is called Changelog, never ship log'
     page = Outline(changelog)
     assert page.title == 'Changelog — OpenWiz', 'the changelog page title must be Changelog'
-    items = page.items
-    kinds = [kind for kind, _, _ in items]
-    assert kinds[:1] == ['h1'] and items[0][2] == 'Changelog', 'the changelog heading must be Changelog'
-    today = [i for i, (kind, _, text) in enumerate(items) if kind == 'h2' and text == TODAY]
-    assert len(today) == 1 and kinds.count('h2') == 1, f'exactly one {TODAY} section'
-    figures = [i for i, kind in enumerate(kinds) if kind == 'figure']
-    # Right after the heading (and its lead, which the outline doesn't list), before anything else.
-    assert figures == [1] and today[0] > 1 and 'repo-map' in (items[1][1].get('class') or '').split(), 'the repository picture opens the page, before What exists today'
-    svg = [attrs for kind, attrs, _ in items if kind == 'svg']
-    assert len(svg) == 1 and svg[0].get('role') == 'img' and (svg[0].get('aria-label') or '').strip(), 'the picture is one labelled SVG'
-    parts = [i for i, kind in enumerate(kinds) if kind == 'part']
-    assert parts and parts[0] > today[0], 'the repository parts sit inside What exists today'
-    names = []
-    for at, end in zip(parts, parts[1:] + [len(items)]):
-        body = items[at + 1:end]
-        assert [k for k, _, _ in body[:2]] == ['h3', 'intro'], 'each part opens with its repository heading, then its plain lines'
-        name = body[0][2].split()[0] if body[0][2] else ''
-        assert name in PUBLIC_REPOS, f'a part names a repository that is not public: {name!r}'
-        count = len(sentences(body[1][2]))
-        assert 2 <= count <= 3, f'{name} opens with {count} sentences, not two or three'
-        names.append(name)
-    assert sorted(names) == sorted(PUBLIC_REPOS), f'one part per public repository: {names}'
+    kinds = [kind for kind, _, _ in page.items]
+    assert kinds[:1] == ['h1'] and page.items[0][2] == 'Changelog', 'the changelog heading must be Changelog'
+    assert kinds == ['h1'], f'the changelog is its title, one line and the release entries, nothing else: {kinds}'
     main = re.search(r'<main\b[^>]*>([\s\S]*?)</main>', changelog)[1]
+    assert len(re.findall(r'<p class="lead">', main)) == 1 and re.fullmatch(r'<h1>Changelog</h1><p class="lead">[^<]*</p>', main), \
+        'the changelog is its title, one line and the release entries, nothing else'
+    check_public_names(main)
     reader = Text(main)
-    readings = [reader.joined(), reader.spaced()] + reader.attrs
-    for reading in readings:
-        # Fail closed: every Wiz name is a public one. Text read joined can run a name into the next name or
-        # into a lowercase word, never into a capital: "WizSkillsthe" passes, "WizVault" and "WizSiteOps" fail.
-        public = '(?:' + '|'.join(sorted(PUBLIC_WIZ_NAMES)) + ')+(?:[a-z][A-Za-z]*)?'
-        for name in re.findall(r'\bWiz[A-Z][A-Za-z]*', reading):
-            assert re.fullmatch(public, name), f'a private repository is named; say "private records and tools": {name}'
-        assert not re.search(r'\d+\.\d+|\b(?:19|20)\d\d\b', reading), 'no version number or date on the changelog'
-    assert not re.search(r'<time\b|releases/tag/|class="rel"', main), 'no release entry on the changelog'
+    for reading in [reader.joined(), reader.spaced()] + reader.attrs:
+        assert not re.search(r'\d+\.\d+|\b(?:19|20)\d\d\b', reading), 'no version number or date outside the release entries'
     for style in page.styles:
         check_motion(style)
 
 
+def check_public_names(html):
+    """Fail closed: every Wiz name is a public one. Text read joined can run a name into the next name or into a
+    lowercase word, never into a capital: "WizSkillsthe" passes, "WizVault" and "WizSiteOps" fail."""
+    reader = Text(html)
+    public = '(?:' + '|'.join(sorted(PUBLIC_WIZ_NAMES)) + ')+(?:[a-z][A-Za-z]*)?'
+    for reading in [reader.joined(), reader.spaced()] + reader.attrs:
+        for name in re.findall(r'\bWiz[A-Z][A-Za-z]*', reading):
+            assert re.fullmatch(public, name), f'a private repository is named; say "private records and tools": {name}'
+
+
 class DriverOutline(HTMLParser):
-    """The drivers page's cards: each card's id, classes, name, status line, words and kit checks with their states,
-    and every link inside the Write your own driver section."""
+    """The drivers page's cards: each card's id, classes, name (its heading's text, or its heading logo's alt), status
+    line, kit line and its state, per-check rows, pictures, and every link inside the Write your own driver section."""
+    VOID = ('area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'source', 'track', 'wbr')
+
     def __init__(self, text):
         super().__init__(convert_charrefs=True)
         self.cards, self.own_links, self.own_heading = [], [], None
-        self.field, self.depth, self.own_depth = None, 0, None
+        self.field, self.depth, self.own_depth, self.card_depth = None, 0, None, None
         self.feed(text)
 
     def handle_starttag(self, tag, attrs):
         attrs = dict(attrs)
         classes = (attrs.get('class') or '').split()
-        if tag not in ('br', 'img', 'meta', 'link', 'path', 'circle', 'rect', 'input'):
+        if tag not in self.VOID:
             self.depth += 1
         if tag == 'section' and 'own-driver' in classes:
             self.own_depth = self.depth
@@ -632,43 +861,58 @@ class DriverOutline(HTMLParser):
         if self.own_depth and tag == 'h2':
             self.field = ['own-heading', '']
         if tag == 'article' and 'driver' in classes:
-            self.cards.append({'id': attrs.get('id'), 'classes': classes, 'name': '', 'line': '', 'note': None, 'words': [], 'checks': [], 'proof': None})
-        elif self.cards and tag == 'a' and 'kit-proof' in classes:
-            self.cards[-1]['proof'] = [attrs.get('href'), '']
-            self.field = ['proof', '']
-        elif self.cards and tag == 'h3' and 'driver-name' in classes:
+            self.card_depth = self.depth
+            self.cards.append({'id': attrs.get('id'), 'classes': classes, 'name': '', 'line': '', 'kit': None,
+                               'kit_state': None, 'checks': [], 'proofs': [], 'images': [], 'svgs': 0})
+            return
+        card = self.cards[-1] if self.cards and self.card_depth else None
+        if not card:
+            return
+        if tag == 'img':
+            card['images'].append((attrs.get('src') or '', attrs.get('alt') or ''))
+            if self.field and self.field[0] == 'name':
+                self.field.append(attrs.get('alt') or '')
+        elif tag == 'svg' and 'kit-icon' not in classes:  # a kit state's icon shape is not a logo
+            card['svgs'] += 1
+        elif tag in ('h2', 'h3') and 'driver-name' in classes:
             self.field = ['name', '']
-        elif self.cards and tag == 'p' and 'driver-line' in classes:
+        elif tag == 'p' and 'driver-line' in classes:
             self.field = ['line', '']
-        elif self.cards and tag == 'p' and 'driver-kit-note' in classes:
-            self.field = ['note', '']
-        elif self.cards and tag == 'code' and 'word' in classes:
-            self.field = ['word', '']
-        elif self.cards and tag == 'li' and 'kit-check' in classes:
-            self.cards[-1]['checks'].append([attrs.get('data-check'), attrs.get('data-state'), ''])
-            self.field = ['check', '']
+        elif tag == 'p' and 'driver-kit' in classes:
+            card['kit_state'] = attrs.get('data-state')
+            self.field = ['kit', '']
+        elif tag == 'li' and 'kit-check' in classes:
+            card['checks'].append(attrs.get('data-check'))
+        elif tag == 'li' and 'proof-check' in classes:
+            card['proofs'].append(attrs.get('data-check'))
+
+    def handle_startendtag(self, tag, attrs):
+        # A self-closed tag (<path/>, <img/>) opens and closes at once, so the depth stays balanced.
+        self.handle_starttag(tag, attrs)
+        if tag not in self.VOID:
+            self.handle_endtag(tag)
 
     def handle_data(self, data):
         if self.field:
             self.field[1] += data
 
     def handle_endtag(self, tag):
-        if self.field and tag in ('h2', 'h3', 'p', 'code', 'li', 'a'):
-            kind, text = self.field
+        if tag in self.VOID:
+            return
+        if self.field and tag in ('h2', 'h3', 'p'):
+            kind, text, *alts = self.field
             text = re.sub(r'\s+', ' ', text).strip()
             if kind == 'own-heading':
                 self.own_heading = text
-            elif kind == 'word':
-                self.cards[-1]['words'].append(text)
-            elif kind == 'check':
-                self.cards[-1]['checks'][-1][2] = text
-            elif kind == 'proof':
-                self.cards[-1]['proof'][1] = text
+            elif kind == 'name':
+                self.cards[-1]['name'] = text or ' '.join(a for a in alts if a).strip()
             else:
                 self.cards[-1][kind] = text
             self.field = None
         if tag == 'section' and self.own_depth == self.depth:
             self.own_depth = None
+        if tag == 'article' and self.card_depth == self.depth:
+            self.card_depth = None
         self.depth -= 1
 
 
@@ -679,9 +923,10 @@ def top_bar(html):
 
 
 def check_drivers(landing, changelog, drivers, page):
-    """The drivers page (#50): the landing's exact top bar with Drivers current, the four driver cards in order with
-    their exact facts, words and kit results, boat.dev the hero, the Write your own driver section linking only the
-    public OpenWiz repository, no script, and no number beyond its facts. A Drivers nav link on the other pages."""
+    """The drivers page (#50, round 3H #62): the landing's exact top bar with Drivers current; the explainer of what a
+    driver is in the hero, above every card; boat.dev's spotlight first, then the three other drivers' compact cards
+    in order with their exact facts and one kit line each; real logos, Grok Bot's name in text with only a generic icon; no jargon counts; the
+    Write your own driver section linking only the public OpenWiz repository; no script; no invented number."""
     bar = top_bar(drivers)
     current = re.findall(r'<a [^>]*aria-current="page"[^>]*>([^<]*)</a>', bar)
     assert current == ['Drivers'] and re.search(r'<a class="nav-drivers" href="/drivers/" aria-current="page">Drivers</a>', bar), \
@@ -694,78 +939,366 @@ def check_drivers(landing, changelog, drivers, page):
     description = re.findall(r'<meta name="description" content="([^"]*)"', drivers)
     assert len(description) == 1 and DRIVER_DESCRIPTION in description[0], \
         f'the drivers description must say {DRIVER_DESCRIPTION}: {description}'
-    assert not re.search(r'\b(each|every|all)\b[^.]*\bpass', description[0], re.I), \
+    assert not re.search(r'\b(each|every)\b[^.]*\bpass', description[0], re.I), \
         f'the drivers description must not say every driver passes: {description[0]}'
-    assert not page.scripts and not page.inline_scripts, 'the drivers page reads completely without scripts'
+    assert not DRIVER_JARGON.search(description[0]), f'a jargon count in the drivers description: {description[0]}'
+    assert not re.search(r'grok bot[^.;]*\bpass', description[0], re.I), f'Grok Bot has not passed: {description[0]}'
+    # #75 R1: the page itself reads without scripts; it loads only the site's own two (GSAP, then site.js), as every site
+    # page does, for the shared footer's star count and Wizes.
+    # (#76: the landing's faq.js is for its Questions, which the drivers page doesn't show.)
+    assert page.scripts == [s for s in Page(landing).scripts if not s.startswith('/faq.')] and not page.inline_scripts, \
+        'the drivers page loads only the site\'s footer scripts (GSAP, site.js), never its own'
     main = re.search(r'<main\b[^>]*>[\s\S]*?</main>', drivers)
     assert main, 'the drivers page needs its main'
-    assert not re.search(r'\shidden\b', main[0]), 'nothing on the drivers page waits for a script to show'
-    outline = DriverOutline(main[0])
+    main = main[0]
+    assert not re.search(r'\shidden\b', main), 'nothing on the drivers page waits for a script to show'
+    check_driver_explainer(main)
+    outline = DriverOutline(main)
     assert [(c['id'], c['name']) for c in outline.cards] == [(d[0], d[1]) for d in DRIVERS], \
-        f'four driver cards, in order: {[(c["id"], c["name"]) for c in outline.cards]}'
+        f'four driver cards, boat.dev first: {[(c["id"], c["name"]) for c in outline.cards]}'
     for card, (key, name, line, state) in zip(outline.cards, DRIVERS):
         assert card['line'] == line, f'{name}: the driver facts must read exactly: {line}'
-        assert card['words'] == list(DRIVER_WORDS), f'{name}: the four words, in order: {card["words"]}'
-        checks = [(c, s) for c, s, _ in card['checks']]
-        if key in DRIVER_KIT_PROOF:
-            href, said = DRIVER_KIT_PROOF[key]
-            assert not checks, f'{name}: its five checks appear only in the proof section, never again on its card: {checks}'
-            assert card['proof'] and card['proof'][0] == href, f'{name}: its kit line links to the proof section {href}: {card["proof"]}'
-            assert card['proof'][1] == said, f'{name}: its one kit line reads {said!r}: {card["proof"][1]!r}'
-        else:
-            assert card['proof'] is None, f'{name}: only boat.dev links to a proof section'
-            assert checks == [(check, state) for check in KIT_CHECKS], f'{name}: kit result must be {state} on the five checks: {checks}'
-        for check, state_, text in card['checks']:
-            assert text == f'{check} {state_}', f'{name}: each kit check says its state in words: {text!r}'
         hero = 'hero' in card['classes']
         assert hero == (key == DRIVER_HERO), f'boat.dev is the hero card, and only it: {name}'
-        assert card['note'] == DRIVER_KIT_NOTES.get(key), f'{name}: its kit note must read {DRIVER_KIT_NOTES.get(key)!r}: {card["note"]!r}'
-    hero_card = re.search(r'<article class="driver hero"[\s\S]*?</article>', main[0])
-    assert hero_card and DRIVER_HERO_MARK in hero_card[0], 'boat.dev keeps its 5 of 5 mark on its card'
-    check_driver_proof(main[0])
-    reader = Text(main[0])
-    for reading in [reader.joined(), reader.spaced()] + reader.shown:
+        assert not card['checks'], f'{name}: no per-check rows on a card: {card["checks"]}'
+        if key == DRIVER_HERO:
+            assert card['proofs'] == list(KIT_CHECKS), f'{name}: its spotlight lists the five checks in order: {card["proofs"]}'
+        else:
+            assert not card['proofs'], f'{name}: a pending card shows one kit line, never per-check rows: {card["proofs"]}'
+            assert (card['kit'], card['kit_state']) == (DRIVER_KIT_LINES[key], state), \
+                f'{name}: its one kit line must read {DRIVER_KIT_LINES[key]!r} ({state}): {card["kit"]!r} ({card["kit_state"]})'
+    check_driver_logos(main, outline)
+    for key, name, _, _ in DRIVERS[1:]:
+        # #66 item 6: all three compact cards share one header structure: a generic icon or logo, then the name.
+        heading = re.search(rf'<h3 class="driver-name" id="{key}-name">([\s\S]*?)</h3>', main)
+        assert heading and re.fullmatch(rf'<img class="driver-logo[^"]*" src="/drivers/logos/[^"]+" alt="[^"]+"[^>]*><span>{re.escape(name)}</span>', heading[1].strip()), \
+            f'{name}: the compact cards share one header structure (icon or logo, then the name): {heading[1] if heading else None!r}'
+    check_driver_proof(main)
+    check_host_pills(main)
+    check_driver_results(drivers, main, outline)
+    reader = Text(main)
+    readings = [reader.joined(), reader.spaced()] + reader.shown
+    for reading in readings:
+        found = DRIVER_JARGON.search(re.sub(r'\b5 of 5\b', 'the kit result', re.sub(r'\s+', ' ', reading)))  # #66: the one count in digits
+        assert not found, f'a jargon count on the drivers page: {found[0]!r}'
         for number in re.findall(r'\d+', reading):
             assert number in DRIVER_NUMBERS, f'invented number on the drivers page: {number}'
+    said = len(DRIVER_RESULT.findall(re.sub(r'\s+', ' ', reader.spaced())))
+    assert 1 <= said <= DRIVER_RESULT_MAX, f'say boat.dev\'s five-of-five result at most {DRIVER_RESULT_MAX} times on the page: {said}'
     assert outline.own_heading == OWN_DRIVER, f'the drivers page needs its {OWN_DRIVER} section'
     assert outline.own_links and OPENWIZ_REPO in outline.own_links and all(
         href == OPENWIZ_REPO or href.startswith(OPENWIZ_REPO + '/') for href in outline.own_links), \
         f'{OWN_DRIVER} links only to the public OpenWiz repository: {outline.own_links}'
+    own = re.search(r'<dl class="own-words">([\s\S]*?)</dl>', main)
+    rows = re.findall(r'<dt><code>([^<]*)</code></dt><dd>([\s\S]*?)</dd>', own[1]) if own else []
+    assert [r[0] for r in rows] == list(KIT_CHECKS) and 'credential' in plain(rows[-1][1]), \
+        f'{OWN_DRIVER} lists the four commands and the fifth check, token, with the credential it checks for: {rows}'
     assert not Outline(drivers).styles, 'the drivers page keeps its styles in site.css'
+    check_driver_logins(main)
+    check_driver_token(drivers, main)
 
 
 def plain(html):
     return re.sub(r'\s+', ' ', re.sub(r'<[^>]+>', '', html)).strip()
 
 
+def check_driver_explainer(main):
+    """#62 item 1: one explainer of what a driver is, inside the hero and above every card, in two sentences at most,
+    naming the four commands and the five-check test with token."""
+    found = re.findall(r'<div class="drivers-explainer">([\s\S]*?)</div>', main)
+    assert len(found) == 1, 'the drivers page needs one explainer of what a driver is'
+    hero = re.search(r'<section class="voyage"[\s\S]*?</section>', main)
+    assert hero and 'class="drivers-explainer"' in hero[0], 'the driver explainer sits in the hero'
+    assert main.index('class="drivers-explainer"') < main.index('<article class="driver'), 'the driver explainer comes above the cards'
+    text = re.sub(r'<[^>]+>', ' ', found[0])
+    text = re.sub(r'\s+', ' ', unescape(text)).strip()
+    sentences = [part for part in re.split(r'(?<=[.!?])\s+', text) if part]
+    assert 1 <= len(sentences) <= 2, f'the driver explainer is two sentences at most: {sentences}'
+    missing = [word for word in DRIVER_EXPLAINER_WORDS if not re.search(rf'\b{word}', text, re.I)]
+    assert not missing, f'the driver explainer must name {missing}'
+    agents, commands = text.lower().find('agents', text.find('.') + 1), text.lower().find('four commands')
+    assert 0 <= agents < commands, 'under the headline, the driver explainer first says what OpenWiz\'s agents do, then the four commands'
+    listed = [word for word in KIT_CHECKS if re.search(rf'\b{word}\b', text)] + re.findall(r'<code\b', found[0])
+    assert not listed, f'the command-by-command detail stays out of the hero\'s explainer: {listed}'
+
+
+def check_driver_logos(main, outline):
+    """#62 item 2: every logo on the page is a pinned official file, used with alt text naming its host; every pinned
+    logo is used; Grok Bot shows no Grok or xAI mark, only its generic icon (#66), and no Grok picture appears anywhere."""
+    used = set()
+    for attrs in re.findall(r'<img\b([^>]*)>', main):
+        src = (re.search(r'\bsrc="([^"]*)"', attrs) or [None, ''])[1]
+        alt = (re.search(r'\balt="([^"]*)"', attrs) or [None, ''])[1]
+        assert 'grok' not in (src + alt).lower(), f'no Grok logo: xAI\'s brand terms require permission: {src}'
+        if src.startswith('/drivers/'):
+            name = src.lstrip('/')
+            assert name in DRIVER_LOGOS, f'an unpinned logo on the drivers page: {src}'
+            host = DRIVER_LOGOS[name][1]
+            assert host.lower() in alt.lower(), f'the logo {src} needs alt text naming {host}: {alt!r}'
+            used.add(name)
+    key, icon = DRIVER_GENERIC_ICON
+    for card in outline.cards:
+        if card['id'] == key:
+            assert [src for src, _ in card['images']] == [f'/{icon}'] and not card['svgs'], \
+                f'no Grok logo: {card["name"]} shows only the generic icon {icon}: {card["images"]}, {card["svgs"]} other pictures'
+    assert used == set(DRIVER_LOGOS), f'unused drivers logos: {sorted(set(DRIVER_LOGOS) - used)}'
+    assert not any('grok' in name.lower() for name in DRIVER_LOGOS), 'no Grok logo file'
+
+
+def check_driver_logo_files(root):
+    for name, (digest, _) in DRIVER_LOGOS.items():
+        data = (root / name).read_bytes()
+        assert sha256(data).hexdigest() == digest, f'a drivers logo changed bytes: {name}'
+        assert len(data) <= DRIVER_LOGO_MAX, f'the drivers logo {name} is over {DRIVER_LOGO_MAX} bytes'
+
+
 def check_driver_proof(main):
-    """Round 2F (#56): the evidence chips under the headline; after the four cards, boat.dev's full-width proof section
-    with the kit's five checks in order, each passed with its plain line; and no picture shown twice."""
-    chips = re.findall(r'<ul class="drivers-chips"[^>]*>([\s\S]*?)</ul>', main)
-    assert len(chips) == 1 and main.index('drivers-chips') < main.index('class="fleet'), \
-        'the drivers page needs its evidence chips under the headline'
-    found = tuple(plain(li) for li in re.findall(r'<li\b[^>]*>([\s\S]*?)</li>', chips[0]))
-    assert found == DRIVER_CHIPS, f'the evidence chips must read {DRIVER_CHIPS}: {found}'
-    proof = re.findall(r'<section class="boat-proof[^"]*"[\s\S]*?</section>', main)
-    assert len(proof) == 1, 'the drivers page needs one boat.dev proof section'
-    proof = proof[0]
-    assert main.index('class="boat-proof') > main.rindex('<article class="driver'), 'the boat.dev proof section follows the four cards'
-    assert main.index('class="boat-proof') < main.index('class="own-driver'), 'the boat.dev proof section comes before Write your own driver'
-    title = re.findall(r'<h2\b[^>]*>([\s\S]*?)</h2>', proof)
-    assert [plain(t) for t in title] == [PROOF_TITLE], f'the proof section is titled {PROOF_TITLE!r}: {title}'
-    rows = re.findall(r'<li class="proof-check" data-check="([^"]*)" data-state="([^"]*)">([\s\S]*?)</li>', proof)
+    """boat.dev's spotlight (#62), right after the hero and before the other drivers: the kit's five checks in order,
+    each passed with its plain line, beside the crew painting; and no painting shown twice."""
+    spot = re.findall(r'<section class="spotlight[^"]*"[\s\S]*?</section>', main)
+    assert len(spot) == 1, 'the drivers page needs one boat.dev spotlight'
+    spot = spot[0]
+    assert 'id="boat-dev"' in spot, 'the spotlight is boat.dev\'s card'
+    assert main.index('class="spotlight') > main.index('class="voyage"') and \
+        main.index('class="spotlight') < main.index('<article class="driver" '), 'the spotlight comes right after the hero, before the other drivers'
+    assert main.index('class="spotlight') < main.index('class="own-driver'), 'the spotlight comes before Write your own driver'
+    rows = re.findall(r'<li class="proof-check" data-check="([^"]*)" data-state="([^"]*)">([\s\S]*?)</li>', spot)
     assert [(c, s) for c, s, _ in rows] == [(c, 'passed') for c, _ in PROOF_LINES], \
-        f'the proof lists the kit\'s five checks in order, each passed: {[(c, s) for c, s, _ in rows]}'
+        f'the spotlight lists the kit\'s five checks in order, each passed: {[(c, s) for c, s, _ in rows]}'
     for (check, _, body), (_, line) in zip(rows, PROOF_LINES):
         name = re.findall(r'<code class="proof-name">([^<]*)</code>', body)
         said = re.findall(r'<span class="proof-line">([\s\S]*?)</span>', body)
         state = re.findall(r'<span class="proof-state">([^<]*)</span>', body)
         assert name == [check] and [plain(s) for s in said] == [line] and state == ['passed'], \
             f'{check}: the proof row names the check, says passed in words and explains what it proved: {line!r}'
-    assert re.search(r'<img class="proof-art" src="/art/drivers-[^"]+" alt="[^"]+"', proof), 'the proof section shows a painting of the crew'
-    images = re.findall(r'<img\b[^>]*\bsrc="([^"]+)"', main)
+    assert re.search(r'<img class="proof-art" src="/art/drivers-[^"]+" alt="[^"]+"', spot), 'the spotlight shows a painting of the crew'
+    # #66 item 4: the mark, the clean headline, the date on its own line and the five checks come before the painting,
+    # so on a phone they lead and the painting follows as the supporting image.
+    assert spot.index('class="proof-copy"') < spot.index('class="proof-scene"'), \
+        'the spotlight\'s mark, result and five checks come before its painting (phone order)'
+    head = re.search(r'<p class="driver-line">([^<]*)</p>\s*<p class="driver-date">([\s\S]*?)</p>', spot)
+    assert head and head[1] == DRIVERS[0][2] and plain(head[2]) == DRIVER_DATE, \
+        f'the spotlight\'s headline reads {DRIVERS[0][2]!r}, then its own date line {DRIVER_DATE!r}: {head.groups() if head else None}'
+    images = [src for src in re.findall(r'<img\b[^>]*\bsrc="([^"]+)"', main) if src.startswith('/art/')]
     twice = sorted({src for src in images if images.count(src) > 1})
-    assert not twice, f'a picture shown twice on the drivers page: {twice}'
+    assert not twice, f'a painting shown twice on the drivers page: {twice}'
+
+
+def check_host_pills(main):
+    """#66 item 2: the hero's host pills, in order, each with its availability in words; every mark (Grok Bot has none)
+    sits alone in the pill's fixed-height mark slot."""
+    marks = re.search(r'<ul class="host-marks"[^>]*>([\s\S]*?)</ul>', main)
+    assert marks, 'the hero needs its host pills'
+    pills = re.findall(r'<li data-host="([^"]*)" data-state="([^"]*)">([\s\S]*?)</li>', marks[1])
+    assert [p[0] for p in pills] == [p[0] for p in HOST_PILLS] and len(pills) == marks[1].count('<li'), \
+        f'the host pills, in order: {[p[0] for p in pills]}'
+    for (key, kind, body), (_, name, state, want) in zip(pills, HOST_PILLS):
+        states = re.findall(r'<span class="host-state">([^<]*)</span>', body)
+        assert states == [state], f'the {name} pill says what works today in words, {state!r}: {states}'
+        assert kind == want, f'the {name} pill\'s state is {want!r}: {kind!r}'
+        slots = re.findall(r'<span class="host-mark">(<img\b[^>]*>)</span>', body)
+        assert len(re.findall(r'<img\b', body)) == len(slots) == (0 if key == DRIVER_GENERIC_ICON[0] else 1), \
+            f'the {name} pill\'s mark sits alone in its fixed-height slot: {body.strip()[:120]!r}'
+        shown = plain(re.sub(r'<span class="host-state">[^<]*</span>', '', body)) or \
+            ' '.join(re.findall(r'\balt="([^"]*)"', body))
+        assert shown == name, f'the {name} pill names its host: {shown!r}'
+
+
+def check_driver_results(drivers, main, outline):
+    """#66 facts: boat.dev, Cloudroom and your own computer or VPS are shown as passed everywhere the page states a
+    result (pill, card or spotlight, kit line, date and its public evidence), and Grok Bot never as passed; no word that
+    described them before they passed comes back; boat.dev is never the only one said to have passed."""
+    pills = dict((k, (s, b)) for k, s, b in re.findall(r'<li data-host="([^"]*)" data-state="([^"]*)">([\s\S]*?)</li>', main))
+    cards = {c['id']: c for c in outline.cards}
+    for key, (date, evidence) in DRIVER_PASSED.items():
+        name = cards[key]['name'] if key in cards else key
+        assert pills.get(key, ('',))[0] == 'passed', f'{name} passed the kit: shown as anything but passed in its pill: {pills.get(key)}'
+        card = re.search(rf'<article class="driver[^"]*" id="{key}"[\s\S]*?</article>', main)
+        assert card, f'{name} needs its card'
+        card = card[0]
+        assert re.search(r'^(?:Passed\b)', cards[key]['line']), f'{name} passed the kit: its status sentence says so: {cards[key]["line"]!r}'
+        if key != DRIVER_HERO:
+            assert cards[key]['kit_state'] == 'passed' and re.search(r'<p class="driver-kit passed"', card), \
+                f'{name} passed the kit: shown as anything but passed in its kit line: {cards[key]["kit_state"]!r}'
+            dated = re.findall(r'<p class="driver-date"><a href="([^"]+)">([\s\S]*?)</a></p>', card)
+            assert [(href, plain(text)) for href, text in dated] == [(evidence, DRIVER_CARD_DATE.format(date))], \
+                f'{name}: its card dates its kit run {date}, linked to its public evidence: {dated}'
+        else:
+            assert re.search(rf'<p class="driver-date"><a href="{re.escape(evidence)}">', card), \
+                f'{name}: its spotlight date links to its public evidence {evidence}'
+        assert f'datetime="{date}"' in card, f'{name}: its kit run is dated {date}'
+        stale = DRIVER_STALE.search(plain(card) + ' ' + plain(pills.get(key, ('', ''))[1]))
+        assert not stale, f'{name} passed the kit: no stale state word: {stale[0]!r}'
+    coming = re.search(rf'<article class="driver[^"]*" id="{DRIVER_COMING}"[\s\S]*?</article>', main)
+    assert pills.get(DRIVER_COMING, ('',))[0] == 'coming soon' and coming and cards[DRIVER_COMING]['kit_state'] != 'passed' \
+        and not re.search(r'\bpass', plain(coming[0]) + ' ' + pills[DRIVER_COMING][1], re.I), \
+        f'Grok Bot has not run the kit: never shown as passed'
+    spot = re.search(r'<section class="spotlight[\s\S]*?</section>', main)[0]
+    also = re.findall(r'</ol>\s*<p class="proof-also">([\s\S]*?)</p>', spot)
+    assert [plain(a) for a in also] == [DRIVER_ALSO], \
+        f'boat.dev is one of three: under its five checks, the spotlight says {DRIVER_ALSO!r}: {also}'
+    rest = re.sub(rf'<article class="driver[^"]*" id="{DRIVER_COMING}"[\s\S]*?</article>', '', main)
+    rest = re.sub(rf'<li data-host="{DRIVER_COMING}"[\s\S]*?</li>', '', rest)
+    stale = DRIVER_STALE.search(re.sub(r'\s+', ' ', re.sub(r'<[^>]+>', ' ', rest)) + ' ' + ' '.join(re.findall(r'content="([^"]*)"', drivers)))
+    assert not stale, f'a stale driver state word on the drivers page: {stale[0]!r}'
+    only = re.search(r'\bonly (?:boat\.dev|one)\b[^.]*\bpass|\bboat\.dev is the only\b', re.sub(r'\s+', ' ', re.sub(r'<[^>]+>', ' ', unescape(drivers))), re.I)
+    assert not only, f'boat.dev is never the only one that passed: {only[0]!r}'
+
+
+def check_driver_logins(main):
+    """OpenWiz #2005: each driver shows its login line right after its name, word for word from its README; a card with
+    no driver yet (Grok Bot) shows none, and no login line sits outside a driver card."""
+    cards = {key: re.search(rf'<article class="driver[^"]*" id="{key}"[\s\S]*?</article>', main) for key, *_ in DRIVERS}
+    for key, name, _, _ in DRIVERS:
+        card = cards[key][0] if cards[key] else ''
+        want = [DRIVER_LOGINS[key]] if key in DRIVER_LOGINS else []
+        lines = [plain(line) for line in re.findall(r'<p class="driver-login">([\s\S]*?)</p>', card)]
+        assert lines == want, f'{name}: its login line must read exactly {want}: {lines}'
+        if want:
+            assert re.search(r'</h[23]>\s*<p class="driver-login">', card), f'{name}: its login line sits right after its name'
+    found = len(re.findall(r'class="driver-login"', main))
+    assert found == len(DRIVER_LOGINS), f'a login line only on a driver card: {found} on the page'
+
+
+def check_driver_token(drivers, main):
+    """#66 item 7: wherever token is explained (boat.dev's token row and Write your own driver's), say what the run
+    inspected, in the scoped words, and nowhere make a broader claim."""
+    rows = re.findall(r'data-check="token"[^>]*>([\s\S]*?)</li>', main) + \
+        re.findall(r'<dt><code>token</code></dt><dd>([\s\S]*?)</dd>', main)
+    assert len(rows) == 2, f'token is explained in the spotlight and in Write your own driver: {len(rows)}'
+    for row in rows:
+        assert TOKEN_CLAIM in plain(row).lower(), f'say what the token check inspected: {TOKEN_CLAIM!r}: {plain(row)!r}'
+    broad = TOKEN_BROAD.search(re.sub(r'\s+', ' ', plain(drivers)) + ' ' + ' '.join(re.findall(r'content="([^"]*)"', drivers)))
+    assert not broad, f'a broader token claim than the run inspected: {broad[0]!r}'
+
+
+def check_team(htmls, pages):
+    """#63: every site page's top bar has the one buy button to /team/; the team page has its copy, no price, and the
+    site's one booking link: the placeholder (an id on the page) or an https URL with no credentials."""
+    for name, html in htmls.items():
+        bar = top_bar(html)
+        assert bar.count('class="nav-team"') == 1 and bar.count(CTA_LINK) == 1, f'the {name} top bar needs its one buy button to /team/'
+        assert html.count('class="nav-team"') == 1, f'the {name} page needs exactly one buy button'
+    # Two Book a call links, the hero's and the closing one (#73), both on the team page with the one booking value.
+    books = [(name, href) for name, page in pages.items() for href in page.books]
+    assert len(books) == 2 and all(name == TEAM_PAGE for name, _ in books), f'the site needs its two booking links, both on the team page: {books}'
+    assert books[0][1] == books[1][1], f'both booking links share the one booking value: {books}'
+    href = books[0][1]
+    if href == BOOK_PLACEHOLDER:
+        assert 'book' in pages[TEAM_PAGE].ids, 'the booking placeholder needs its id on the team page'
+    else:
+        url = urlsplit(href)
+        assert url.scheme == 'https' and url.netloc and not url.username and not url.password, f'the booking link must be https: {href}'
+    flat = re.sub(r'\s+', ' ', unescape(re.sub(r'<[^>]*>', ' ', htmls[TEAM_PAGE])))
+    assert not re.search(r'[$€£]\s*\d|\bper (?:month|seat|user)\b', flat, re.I), 'the team page shows no price'
+    labels = re.findall(r'<a [^>]*data-book[^>]*>([^<]*)</a>', htmls[TEAM_PAGE])
+    assert labels == ['Book a call', 'Book a call'], f'team page copy: both booking links read Book a call: {labels}'
+    main = htmls[TEAM_PAGE].split('<footer', 1)[0]
+    parts = [plain(h) for h in re.findall(r'<h2\b[^>]*>([\s\S]*?)</h2>', main)]
+    assert parts == list(TEAM_PARTS), f'the team page sections, in order: {parts}'
+    h1 = re.findall(r'<h1\b[^>]*>([\s\S]*?)</h1>', main)
+    assert [plain(h) for h in h1] == [TEAM_HEADLINE], f'the team page headline: {h1}'
+    # #81: the hero holds the headline, the first Book a call and the three terms right under it, under their label (#89).
+    # #89: its second column is the timeline; the poster is in Proof.
+    hero = re.search(r'<div class="team wrap">([\s\S]*?)\n</div>\n', main)
+    assert hero, 'the team page needs its hero'
+    hero = hero[1]
+    terms = re.search(r'<ul class="team-terms"[^>]*>([\s\S]*?)</ul>', hero)
+    assert terms and [plain(t) for t in re.findall(r'<li>([\s\S]*?)</li>', terms[1])] == list(TEAM_TERMS), \
+        f'the terms: three exact lines right under the hero button: {TEAM_TERMS}'
+    assert hero.index('data-book') < hero.index('class="team-terms"'), 'the terms: under the first Book a call'
+    label = re.search(r'<p class="team-label" id="([^"]+)">([^<]*)</p>\s*<ul class="team-terms" aria-labelledby="([^"]+)"', hero)
+    assert label and label[2] == TEAM_TERMS_LABEL and label[1] == label[3], f'the terms: under their label, {TEAM_TERMS_LABEL}'
+    assert 'wizes' not in plain(hero).lower(), 'no Wizes in the team hero'
+    assert 'class="team-steps"' in hero and hero.index('class="team-terms"') < hero.index('class="team-steps"'), \
+        'the timeline: in the hero, after the terms'
+    assert 'x.com' not in hero and '<img' not in hero, 'the hero shows no poster: it is in Proof'
+    proof = re.search(r'<section class="team-part wrap" aria-labelledby="team-proof">([\s\S]*?)</section>', main)
+    assert proof, 'Proof: its section'
+    proof = proof[1]
+    cards = re.findall(r'<li class="team-card">([\s\S]*?)</li>\n', proof)
+    assert len(cards) == 3 and proof.count('<li') == 3, f'Proof: three cards: {len(cards)}'
+    passed = re.fullmatch(r'\s*<h3>([^<]*)</h3>\s*<p>([^<]*)</p>\s*<div class="team-logos">([\s\S]*?)</div>\s*'
+                          r'<p class="team-soon">Grok Bot: coming soon</p>\s*<a href="/drivers/">See how drivers work</a>\s*', cards[0])
+    logos = re.findall(r'<img\b[^>]*src="([^"]*)"[^>]*>\s*(?:<span>[^<]*</span>\s*)?<small>([^<]*)</small>', passed[3]) if passed else []
+    assert passed and (passed[1], passed[2]) == (TEAM_PASSED_HEADING, TEAM_PASSED_ABOUT) \
+        and [src for src, _ in logos] == list(TEAM_PASSED) and all(line == TEAM_PASSED_LINE for _, line in logos), \
+        f'Proof: the first card: {TEAM_PASSED_HEADING}, what the checks are, the three drivers\u2019 logos with ' \
+        f'{TEAM_PASSED_LINE} under each, Grok Bot coming soon and See how drivers work, to /drivers/'
+    built = re.fullmatch(r'\s*<p>([^<]*)</p>\s*<a href="/drivers/">See the Drivers page</a>\s*', cards[1])
+    assert built and built[1].startswith('Our Drivers page was built the same way'), \
+        'Proof: the second card says how the Drivers page was built, with its one link, See the Drivers page'
+    poster = re.findall(r'<a [^>]*href="https://x\.com/openwiz"[^>]*>([\s\S]*?)</a>', cards[2])
+    images = [dict(re.findall(r'([a-z-]+)="([^"]*)"', img)) for img in re.findall(r'<img\b[^>]*>', poster[0])] if len(poster) == 1 else []
+    assert len(images) == 1 and images[0].get('src') == TEAM_POSTER and images[0].get('alt') == TEAM_POSTER_ALT \
+        and images[0].get('width') == '1280' and images[0].get('height') == '720' and images[0].get('loading') == 'lazy', \
+        f'the boat poster: Proof\u2019s third card, one sized, lazy picture linking to the X post: {images}'
+    assert 'Watch the fleet build it (49 s, on X)' in plain(poster[0]), 'the boat poster: its label is its caption'
+    assert not re.search(r'<(?:video|iframe|embed|object|details)\b', main.replace(FAQ, '')), 'the team page embeds no video and folds nothing away'
+    steps = re.search(r'<ol class="team-steps">([\s\S]*?)</ol>', main)
+    found = re.findall(r'<li( class="team-end")?><h3>([\s\S]*?)</h3><p>([\s\S]*?)</p></li>', steps[1]) if steps else []
+    assert [(plain(m), plain(t)) for _, m, t in found] == list(TEAM_STEPS), f'The 30 minutes, roughly: its four marks, in order: {TEAM_STEPS}'
+    assert [bool(end) for end, _, _ in found] == [False, False, False, True] and steps[1].count('team-end') == 1, \
+        'The 30 minutes, roughly: Minute 30 is its one highlighted stop'
+    ships = re.search(r'</ol>\s*<p class="team-ships">([\s\S]*?)</p>', main)
+    assert ships and plain(ships[1]) == TEAM_SHIPS, 'the ships line: right under the timeline'
+    # This page's own copy, without the shared Questions (#76), which check_faq owns.
+    own = main.replace(FAQ, '')
+    shown = re.sub(r'\s+', ' ', unescape(re.sub(r'<[^>]*>', ' ', own)))
+    assert not TEAM_NEVER.search(shown), f'a word the team page never uses: {TEAM_NEVER.search(shown)[0]}'
+    assert "'" not in shown and "'" not in ' '.join(re.findall(r'aria-label="([^"]*)"', own)), \
+        'the team page uses curly apostrophes'
+    assert not re.search(r'\bhidden\b|aria-hidden', own.split('<main', 1)[1]), 'the team page hides none of its copy'
+    # Last, so a broken part above fails on its own line first: the rest of the round 1 copy, word for word.
+    for text in TEAM_COPY:
+        assert text in flat, f'missing team page copy: {text}'
+
+
+def check_footer(htmls):
+    """#73: every site page has the one footer from footer.html, once, at its end: both link groups in order, the small
+    line, the wordmark and the twelve Wizes."""
+    for name, html in htmls.items():
+        assert html.count('<footer') == 1 and html.count(FOOTER) == 1, f'the {name} page needs the one site footer'
+        assert html.rstrip().endswith(FOOTER + '</body></html>'), f'the {name} page ends with the site footer'
+    links = [(href, plain(text)) for href, text in re.findall(r'<a [^>]*href="([^"]*)"[^>]*>([\s\S]*?)</a>', FOOTER)]
+    assert tuple(links) == FOOTER_LINKS, f'the footer links, in order: {links}'
+    groups = [plain(h) for h in re.findall(r'<h2>([\s\S]*?)</h2>', FOOTER)]
+    assert groups == ['Product', 'Company'], f'the footer link groups: {groups}'
+    assert FOOTER_LINE in plain(FOOTER), f'the footer says {FOOTER_LINE}'
+    assert '<p class="footer-wordmark">OpenWiz</p>' in FOOTER, 'the footer shows the wordmark'
+    assert FOOTER.count('class="family-wiz"') == 12, 'the footer has the twelve Wizes'
+
+
+def check_faq(htmls, pages, names):
+    """#76: the landing, /team and /faq each show the one Questions snippet from faq.html, once, and load faq.js; no other
+    page shows it. On the landing it closes the main; on /team it sits right above the closing Book a call. Each row is a
+    real button that names its answer, shipped open and disabled until faq.js runs; the answers link only within the site."""
+    for name, html in htmls.items():
+        want = FAQ_ON.get(name)
+        assert html.count('class="faq ') == (1 if want else 0) and (not want or html.count(want) == 1), \
+            f'the {name} page needs the one Questions section from faq.html' if want else f'the {name} page shows no Questions'
+        assert (f'/{names["faq.js"]}' in pages[name].scripts) == bool(want), \
+            f'the {name} page needs faq.js for its Questions' if want else f'the {name} page loads faq.js without Questions'
+    assert re.search(r'</section>\n' + re.escape(FAQ) + '</main>', htmls['index.html']), 'the landing Questions close its main'
+    assert (FAQ + '<section class="team-part team-close') in htmls[TEAM_PAGE], 'the /team Questions sit above its closing Book a call'
+    assert (FAQ_TOP + '</main>') in htmls[FAQ_PAGE], 'the /faq page is its Questions'
+    Page(FAQ)  # its ids never repeat
+    title = [plain(h) for h in re.findall(r'<h2\b[^>]*>([\s\S]*?)</h2>', FAQ)] + [plain(p) for p in re.findall(r'<p class="faq-lead">([\s\S]*?)</p>', FAQ)]
+    assert tuple(title) == FAQ_TITLE, f'the Questions heading and its line: {title}'
+    rows = re.findall(r'<div class="faq-row">\s*<h3 class="faq-q"><button ([^>]*)>([\s\S]*?)</button></h3>\s*<div class="faq-a" id="([^"]*)"><div>([\s\S]*?)</div></div>\s*</div>', FAQ)
+    assert tuple(plain(q) for _, q, _, _ in rows) == FAQ_QUESTIONS and FAQ.count('class="faq-row"') == len(FAQ_QUESTIONS), \
+        f'the Questions rows, in order: {[plain(q) for _, q, _, _ in rows]}'
+    for attrs, question, answer_id, answer in rows:
+        assert 'type="button"' in attrs and f'aria-controls="{answer_id}"' in attrs, \
+            f'each question is a button that names its answer: {plain(question)}'
+        # #77 R1: it ships open and disabled, so its answer reads even if faq.js never loads; faq.js closes and enables it.
+        assert re.search(r'(?:^|\s)disabled(?:\s|$)', attrs) and 'aria-expanded="true"' in attrs, \
+            f'each question ships open and disabled until faq.js runs: {plain(question)}'
+        assert plain(answer), f'a question without its answer: {plain(question)}'
+        for href in re.findall(r'href="([^"]*)"', answer):
+            assert href.startswith('/'), f'an answer links off the site: {href}'
+    assert rows and plain(rows[-1][3]) == FAQ_LAST, f'the Questions\u2019 last answer: {FAQ_LAST}'
+    assert not re.search(r'<(?:form|input|textarea)\b', FAQ), 'part 1 asks nothing: no form or input in the Questions'
 
 
 def check_drivers_nav(css, pages):
@@ -784,8 +1317,36 @@ def check_drivers_nav(css, pages):
         assert not classes & hidden, f'the {name} Drivers nav link is hidden on phones by {sorted(classes & hidden)}'
 
 
+def css_rules(css, selector):
+    return [body for sel, body in re.findall(r'([^{}]+)\{([^{}]*)\}', css) if selector in [s.strip() for s in sel.split(',')]]
+
+
 def check_driver_css(css):
-    """Round 2F (#56): no drivers-page text under DRIVER_MIN_FONT px."""
+    """Round 2F (#56): no drivers-page text under DRIVER_MIN_FONT px. Round 3 final (#66): every host pill's mark is
+    scaled inside one fixed-height slot; on a phone the spotlight's painting follows as a shorter image."""
+    slot = [re.search(r'(?<![-\w])height\s*:\s*(\d+)px', body) for body in css_rules(css, '.drivers-page .host-mark')]
+    assert any(slot), 'the host pills need one fixed-height mark slot (.drivers-page .host-mark { height: …px })'
+    fill = css_rules(css, '.drivers-page .host-mark img')
+    assert any(re.search(r'(?<![-\w])height\s*:\s*100%', body) for body in fill), 'each host mark scales to its slot\'s height'
+    for sel, body in re.findall(r'([^{}]+)\{([^{}]*)\}', css):
+        for one in sel.split(','):
+            one = one.strip()
+            if 'host-mark' in one and one != '.drivers-page .host-mark img' and re.search(r'img|host-(?:icon|tile|lockup)\b', one):
+                assert not re.search(r'(?<![-\w])(?:height|max-height|width)\s*:\s*\d', body), \
+                    f'a host mark sized apart from its slot, so the pills are uneven: {one}'
+    # #74 R1: an official mark shows whole, as its file draws it: no rounded corners, clip or crop on a logo image.
+    for sel, body in re.findall(r'([^{}]+)\{([^{}]*)\}', css):
+        if re.search(r'host-(?:tile|lockup|icon)\b|spot-logo|driver-logo|host-mark img', sel):
+            assert not re.search(r'(?<![-\w])(?:border-radius|clip-path|overflow|object-fit|mask)\s*:', body), \
+                f'a logo clipped or cropped; official marks show whole: {sel.strip()}'
+    phone = [b for q, b in re.findall(r'@media\s*\(max-width:\s*(\d+)px\)\s*\{((?:[^{}]*\{[^{}]*\})*)[^{}]*\}', css) if int(q) <= 760]
+    ratios = [r for block in phone for body in css_rules(block, '.drivers-page .proof-scene')
+              for r in re.findall(r'aspect-ratio\s*:\s*(\d+(?:\.\d+)?)\s*/\s*(\d+(?:\.\d+)?)', body)]
+    assert ratios and float(ratios[-1][0]) / float(ratios[-1][1]) > 1672 / 941, \
+        f'on a phone the spotlight\'s painting follows as a shorter supporting image: {ratios}'
+    for sel, body in re.findall(r'([^{}]+)\{([^{}]*)\}', css):
+        if re.search(r'\.proof-(?:scene|copy)\b', sel):
+            assert not re.search(r'(?<![-\w])order\s*:', body), f'the spotlight keeps its reading order on a phone: {sel.strip()}'
     for rule in re.findall(r'[^{}]*\.drivers-page[^{}]*\{[^{}]*\}', css):
         for size in re.findall(r'font(?:-size)?\s*:[^;}]*?(\d+(?:\.\d+)?)px', rule):
             assert float(size) >= DRIVER_MIN_FONT, f'drivers-page text under {DRIVER_MIN_FONT}px: {rule.strip()[:120]}'
@@ -809,72 +1370,129 @@ def split_releases(built):
     return before + after, section
 
 
+def install_switch(landing):
+    found = re.findall(r'<div class="install-box" data-install="([^"]*)"', landing)
+    assert len(found) == 1, 'the landing needs exactly one install box switch'
+    return found[0]
+
+
+def read_releases(folder=RELEASE_DIR):
+    """Every release data file, checked, as {file name: data}."""
+    files = sorted(folder.glob('*.json'))
+    assert sorted(p.name for p in folder.iterdir()) == [p.name for p in files], f'only release data files in {folder.name}/'
+    out = {}
+    for path in files:
+        try:
+            data = json.loads(path.read_text())
+        except ValueError as error:
+            raise AssertionError(f'{path.name}: not JSON: {error}') from None
+        check_release_data(path.name, data)
+        out[path.name] = data
+    names = [d['name'] for d in out.values()]
+    versions = [d['semver'] for d in out.values()]
+    assert len(set(names)) == len(names) and len(set(versions)) == len(versions), 'each release once'
+    return out
+
+
+def semver(text):
+    return tuple(map(int, text.split('.')))
+
+
+def check_release_data(file, data):
+    """One release: its public name (also the file name), semver from 0.1.0 on, date, a one-line headline, a short
+    list of plain bullets (1 to 6, each at most 120 characters) and the link to its full notes on GitHub."""
+    assert isinstance(data, dict), f'{file}: one release object'
+    missing = [k for k in RELEASE_FIELDS if k not in data or data[k] in (None, '', [])]
+    assert not missing, f'{file}: missing {", ".join(missing)}'
+    assert sorted(data) == sorted(RELEASE_FIELDS), f'{file}: unexpected fields {sorted(set(data) - set(RELEASE_FIELDS))}'
+    text = [data[k] for k in RELEASE_FIELDS if k != 'bullets']
+    assert all(isinstance(v, str) for v in text) and isinstance(data['bullets'], list), f'{file}: fields are text, bullets a list'
+    assert re.fullmatch(r'0\.\d\d|[1-9]\d*\.\d\d', data['name']) and file == f'{data["name"]}.json', \
+        f'{file}: the public name is like 0.01 and names the file'
+    assert re.fullmatch(r'\d+\.\d+\.\d+', data['semver']) and semver(data['semver']) >= (0, 1, 0), f'{file}: semver from 0.1.0 on'
+    assert re.fullmatch(r'20\d\d-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])', data['date']), f'{file}: date as YYYY-MM-DD'
+    assert len(data['headline']) <= RELEASE_HEADLINE_MAX and '\n' not in data['headline'], f'{file}: a one-line headline'
+    bullets = data['bullets']
+    low, high = RELEASE_BULLETS
+    assert low <= len(bullets) <= high, f'{file}: {len(bullets)} bullets; a short list of {low} to {high}'
+    for bullet in bullets:
+        assert isinstance(bullet, str) and bullet.strip(), f'{file}: an empty bullet'
+        assert len(bullet) <= RELEASE_BULLET_MAX, f'{file}: a bullet over {RELEASE_BULLET_MAX} characters: {bullet[:40]}...'
+        assert '\n' not in bullet, f'{file}: one line per bullet'
+    assert data['notes'] == f'https://github.com/openwizdev/OpenWiz/releases/tag/v{data["semver"]}', \
+        f'{file}: the notes link is the release on GitHub, https://github.com/openwizdev/OpenWiz/releases/tag/v{data["semver"]}'
+    check_public_names(escape(' '.join(text + bullets)))  # data is text: escaped, as the page shows it
+
+
 class ReleaseOutline(HTMLParser):
-    """The generated section's tags, heading, and each part's repository, entry titles and state."""
+    """The generated section's tags, its entries (name, small line, date, headline, bullets, links) and its last line."""
     def __init__(self, text):
         super().__init__(convert_charrefs=True)
-        self.tags, self.h2, self.parts, self.reading, self.semver = [], [], [], None, None
+        self.tags, self.entries, self.pre, self.at = [], [], None, None
         self.feed(text)
 
     def handle_starttag(self, tag, attrs):
         attrs = dict(attrs)
         classes = (attrs.get('class') or '').split()
         self.tags.append((tag, attrs))
-        if 'release-part' in classes:
-            self.parts.append({'repo': attrs.get('data-repo'), 'titles': [], 'states': []})
-        elif self.parts and tag == 'p' and ({'no-release', 'read'} & set(classes)):
-            self.parts[-1]['states'].append('no-release' if 'no-release' in classes else 'missing')
-        if tag in ('h2', 'h4'):
-            self.reading = [tag, '', None]
-        # #1674 (J264): a public-name headline carries its semver in one labelled small, inside the h4 only.
-        if tag == 'small':
-            assert self.reading and self.reading[0] == 'h4' and self.reading[2] is None and attrs == {'class': 'semver'}, \
-                'unexpected element in the generated releases: a small outside a headline, unlabelled or repeated'
-            self.semver, self.reading[2] = True, ''
-
-    def handle_data(self, data):
-        if self.reading and self.semver:
-            self.reading[2] += data
-        elif self.reading:
-            self.reading[1] += data
+        if tag == 'article':
+            self.entries.append({'name': '', 'small': '', 'date': None, 'headline': '', 'bullets': [], 'links': []})
+        elif tag == 'p' and 'pre' in classes:
+            self.pre = {'text': '', 'links': []}
+        if tag == 'time' and self.entries:
+            self.entries[-1]['date'] = attrs.get('datetime')
+        if tag == 'a':
+            (self.pre or self.entries[-1])['links'].append(attrs.get('href'))
+        if tag == 'li':
+            self.entries[-1]['bullets'].append('')
+        self.at = 'small' if tag == 'small' else 'name' if tag == 'h2' else 'headline' if 'headline' in classes else 'li' if tag == 'li' else self.at
 
     def handle_endtag(self, tag):
-        if tag == 'small':
-            self.semver = None
-        elif self.reading and self.reading[0] == tag:
-            text = re.sub(r'\s+', ' ', self.reading[1]).strip()
-            title = text if tag == 'h2' or self.reading[2] is None else (text, self.reading[2].strip())
-            (self.h2 if tag == 'h2' else self.parts[-1]['titles'] if self.parts else self.h2).append(title)
-            self.reading = None
+        if tag in ('h2', 'small', 'p', 'li'):
+            self.at = 'name' if tag == 'small' else None
+
+    def handle_data(self, data):
+        if self.pre is not None:
+            self.pre['text'] += data
+        elif self.at == 'li':
+            self.entries[-1]['bullets'][-1] += data
+        elif self.at:
+            self.entries[-1][self.at] += data
 
 
-def check_releases(section):
-    """The generated Releases section: one part per versioned repository in order, each with its releases newest
-    first or exactly one of "no release yet" and missing; release notes are text only."""
+def check_releases(section, releases, live):
+    """The generated entries: none until the landing's install switch reads live, then one per release file, newest
+    first by semver, each exactly its data; then one line pointing at the earlier pre-releases on GitHub."""
     outline = ReleaseOutline(section)
-    assert outline.h2 == ['Releases'], 'the generated section is headed Releases'
-    assert [p['repo'] for p in outline.parts] == list(RELEASE_REPOS), f'one release part per versioned repository: {[p["repo"] for p in outline.parts]}'
-    allowed = {'section', 'h2', 'h3', 'h4', 'span', 'p', 'article', 'time', 'div', 'ul', 'li', 'code', 'strong', 'small'}
+    allowed = {'section': {'class', 'aria-label'}, 'article': {'class', 'aria-labelledby'}, 'h2': {'id'}, 'small': set(),
+               'time': {'datetime'}, 'p': {'class'}, 'ul': set(), 'li': set(), 'a': {'href'}}
     for tag, attrs in outline.tags:
-        assert tag in allowed, f'unexpected element in the generated releases: {tag}'
-        assert set(attrs) <= {'class', 'id', 'data-repo', 'aria-labelledby', 'datetime'}, f'unexpected attribute in the generated releases: {sorted(attrs)}'
-    for part in outline.parts:
-        repo, titles, states = part['repo'], part['titles'], part['states']
-        assert bool(titles) != bool(states) and len(states) <= 1, f'{repo}: releases, or one of no release yet and missing'
-        versions = []
-        for title in titles:
-            # An OpenWiz release named "OpenWiz 0.NN" is headlined by that name, its semver small beside it (J264).
-            found = re.fullmatch(rf'{repo} (\d+)\.(\d+)\.(\d+)', title) if isinstance(title, str) else \
-                repo == 'OpenWiz' and re.fullmatch(r'OpenWiz 0\.\d{2}', title[0]) and re.fullmatch(r'(\d+)\.(\d+)\.(\d+)', title[1])
-            assert found, f'{repo}: unexpected release title {title!r}'
-            versions.append(tuple(map(int, found.groups())))
-        assert versions == sorted(versions, reverse=True) and len(set(versions)) == len(versions), f'{repo}: releases newest first, each once'
-        assert all(v >= (0, 1, 0) for v in versions), f'{repo}: releases from 0.1.0 on'
+        assert tag in allowed, f'unexpected element in the release entries: {tag}'
+        assert set(attrs) <= allowed[tag], f'unexpected attribute in the release entries: {tag} {sorted(attrs)}'
+    assert outline.tags[:1] == [('section', {'class': 'releases', 'aria-label': 'Releases'})], 'the entries sit in one Releases section'
+    want = sorted(releases.values(), key=lambda d: semver(d['semver']), reverse=True) if live else []
+    assert len(outline.entries) == len(want), f'{len(outline.entries)} entries shown; the data and the install switch say {len(want)}'
+    for got, data in zip(outline.entries, want):
+        flat = lambda t: re.sub(r'\s+', ' ', t).strip()
+        y, m, d = map(int, data['date'].split('-'))
+        assert (flat(got['name']), flat(got['small'])) == (data['name'], f'· {MONTHS[m - 1]} {d}, {y} ({data["semver"]})'), \
+            f'{data["name"]}: the entry is headed by its public name, its date and semver small beside it, newest first'
+        assert got['date'] == data['date'], f'{data["name"]}: the entry\'s date'
+        assert flat(got['headline']) == data['headline'], f'{data["name"]}: the entry\'s headline'
+        assert [flat(b) for b in got['bullets']] == data['bullets'], f'{data["name"]}: the entry\'s bullets'
+        assert got['links'] == [data['notes']], f'{data["name"]}: one link, to the full notes on GitHub'
+    assert outline.pre and outline.pre['links'] == [PRE_RELEASES], 'the entries end with one line linking the pre-releases on GitHub'
+    if not want:
+        # Never claim an unreleased version: before the switch reads live, the line alone, with no version or date.
+        assert not re.search(r'\d+\.\d+|\b(?:19|20)\d\d\b', Text(section).joined()), 'no release version shows before the install switch reads live'
 
 
 def check_app(root, names, pages):
     """The app's page: fingerprinted Ember and scripts only, no inline script, local links, its manifest, its CSP."""
     page = Page((root / APP_PAGE).read_text())
+    assert not page.books, 'a booking link outside the team page: the app'
+    assert not page.x_links, 'one X link per page, the footer\'s: the app has one'
+    assert not page.report_links, 'Report a problem link, the footer\'s: the app has one'
     assert not set(page.refs) & {f'/{name}' for name in HASHED}, 'the app uses an unfingerprinted style or script'
     assert page.stylesheets == [f'/{names[APP_STYLE]}'], 'the app must apply exactly the fingerprinted ember.css'
     assert page.scripts == [ref for name in APP_SCRIPTS for ref in [f'/{v}' for v, (_, before) in APP_VENDOR.items() if before == name] + [f'/{names[name]}']], \
@@ -903,10 +1521,8 @@ def check_art(name, data):
         check_webp(data)
     elif name.endswith('.vtt'):
         assert data.startswith(b'WEBVTT') and data.decode('utf-8'), 'invalid WebVTT captions'
-    elif name.endswith('.mp4'):
-        assert data[4:8] == b'ftyp' and data[8:12] in (b'isom', b'mp42'), 'invalid MP4 header'
     else:
-        assert data[:4] == b'\x1a\x45\xdf\xa3' and b'webm' in data[:64], 'invalid WebM header'
+        assert data[4:8] == b'ftyp' and data[8:12] in (b'isom', b'mp42'), 'invalid MP4 header'
     assert not any(marker.encode() in data.lower() for marker in DENYLIST), f'private marker in {name}'
 
 
@@ -918,15 +1534,17 @@ def check_privacy(path, data):
         assert sha256(data).hexdigest() == FONT_HASHES[font], 'unreviewed font or licence'
     if path.endswith('.woff2'):
         assert font in FONT_HASHES, 'unreviewed binary font'
-    if path.endswith(('.webp', '.webm', '.mp4', '.vtt')):
+    if path.endswith(('.webp', '.mp4', '.vtt')):
         check_art(font, data)
     if path.endswith(('.png', '.ico')):
-        pinned = DOC_HASHES.get(path) or ICON_HASHES.get(font)
+        pinned = DOC_HASHES.get(path) or ICON_HASHES.get(font) or DRIVER_LOGOS.get(font, (None,))[0]
         assert pinned and sha256(data).hexdigest() == pinned, 'unreviewed picture'
         assert not any(marker.encode() in data.lower() for marker in DENYLIST), f'private marker in {path}'
     if font in VECTORS:
         check_vector(data)
-    binary = path.endswith(('.webp', '.webm', '.mp4', '.png', '.ico')) or (font in FONT_HASHES and font.endswith('.woff2'))
+    if font in DRIVER_LOGOS:
+        assert sha256(data).hexdigest() == DRIVER_LOGOS[font][0], f'a drivers logo changed bytes: {path}'
+    binary = path.endswith(('.webp', '.mp4', '.png', '.ico')) or (font in FONT_HASHES and font.endswith('.woff2'))
     text = path + '\n' + ('' if binary else data.decode('utf-8'))
     # The owner's copy rule covers every text file, this checker included (it builds the word from parts).
     assert not any(word in text.lower() for word in BANNED_COPY), f'banned word in {path}'
@@ -939,7 +1557,7 @@ def check_privacy(path, data):
 def main():
     output = ROOT / 'dist'
     check_site(output)
-    for name in RUNTIME - set(FINGERPRINTS.values()) - set(ALL_PAGES):
+    for name in RUNTIME - set(FINGERPRINTS.values()) - set(ALL_PAGES) - {ASK_INDEX}:
         source = APP_VENDOR[name][0] if name in APP_VENDOR else name
         assert (ROOT / source).read_bytes() == (output / name).read_bytes(), f'export differs: {name}'
     assert built_fingerprints(output) == FINGERPRINTS, 'build is stale: rebuild the site'
@@ -949,7 +1567,7 @@ def main():
         built = (output / name).read_text()
         if name == 'changelog/index.html':
             built = split_releases(built)[0]
-        assert fingerprinted_page((ROOT / name).read_text()) == built, f'export differs: {name}'
+        assert fingerprinted_page((ROOT / name).read_text(), cta=name != APP_PAGE) == built, f'export differs: {name}'
     paths = subprocess.check_output(['git', 'ls-files', '-z', '--cached', '--others', '--exclude-standard'], cwd=ROOT).decode().split('\0')
     for name in set(paths) - {''}:
         path = ROOT / name

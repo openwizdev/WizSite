@@ -205,20 +205,24 @@
   //   loading  - not read yet;  ok - read whole;  partial - read, but part failed (missing parts are unknown);
   //   unknown  - never read successfully (the last read failed);  stale - the last read failed, the data is older.
 
-  const SPECS = `query Specs($owner: String!, $name: String!) {
+  // Specs: an open issue with sub-issues (its tickets), a spec label, or a "<version> spec: <name>" title (plan-graph's,
+  // before its tickets exist), and never a wayfind map. The factory gives specs no label: looking for the label alone
+  // found no spec on OpenWiz, and the You tiles read 0 (#1266 F1). GitHub's issue search finds them; specsOf keeps the
+  // ones that really are specs, since the search's "in:title spec" also matches a title that only mentions one.
+  const SPECS = `query Specs($owner: String!, $name: String!, $specs: String!) {
   rateLimit { limit remaining resetAt }
+  specSearch: search(query: $specs, type: ISSUE_ADVANCED, first: 100) {
+    totalCount: issueCount
+    nodes { ... on Issue { number title url updatedAt labels(first: 20) { nodes { name } } subIssuesSummary { total completed } } }
+  }
   repository(owner: $owner, name: $name) {
     issues(first: 100, states: OPEN, orderBy: {field: UPDATED_AT, direction: DESC}) {
       totalCount
       nodes { number title url updatedAt labels(first: 20) { nodes { name } } subIssuesSummary { total completed } }
     }
-    specIssues: issues(first: 50, states: OPEN, labels: ["spec"], orderBy: {field: UPDATED_AT, direction: DESC}) {
-      totalCount
-      nodes { number title url updatedAt subIssuesSummary { total completed } }
-    }
     youIssues: issues(first: 50, states: OPEN, labels: ["needs-info", "ready-for-human"], orderBy: {field: UPDATED_AT, direction: DESC}) {
       totalCount
-      nodes { number title url updatedAt labels(first: 20) { nodes { name } } }
+      nodes { number title url updatedAt labels(first: 20) { nodes { name } } issueDependenciesSummary { blockedBy } }
     }
     fleet: object(expression: "HEAD:docs/agents/fleet.md") { ... on Blob { text } }
   }
@@ -227,7 +231,7 @@
   // their state, labels, blocked-by links, the open pull requests that close them and their most recently edited
   // comments (the agents' status notes). Every list carries its total, so a page can tell a partial list from a whole
   // one. One aliased query for up to SPEC_DETAILS specs (the most recently updated); a spec past that is unknown.
-  const SPEC_DETAILS = 20;
+  const SPEC_DETAILS = 30;
   const RECENT = 'orderBy: {field: UPDATED_AT, direction: DESC}';
   const TICKET = 'number title url state stateReason repository { nameWithOwner }';
   function specTickets(repository) {
@@ -245,27 +249,231 @@
   }
 }`;
   }
-  // The Agents feed (AP7): the 50 most recently updated issues, each with its most recently edited comments (the
-  // agents' status notes, with their ids and authors) and the pull requests that close it (state, review, checks),
-  // and fleet.md (Record authors), whose notes count. About 13 GraphQL points a read.
-  const AGENTS = `query Agents($owner: String!, $name: String!) {
+  // The Agents feed (AP7, AP22): every issue updated in the last day, page by page. Editing a comment bumps its issue's
+  // updatedAt, so these hold every note the page can show (live: edited in the last 30 minutes; the last day). Each
+  // with its most recently edited comments (the agents' status notes, with their ids and authors) and the pull requests
+  // that close it (state, review, checks), and fleet.md (Record authors), whose notes count. About 4 points a page.
+  const PULLS = `closedByPullRequestsReferences(first: 5, includeClosedPrs: true) { totalCount nodes { url state isDraft reviewDecision
+          commits(last: 1) { nodes { commit { statusCheckRollup { state } } } } } }`;
+  const AGENTS = `query Agents($owner: String!, $name: String!, $since: DateTime!, $after: String) {
   rateLimit { limit remaining resetAt }
   repository(owner: $owner, name: $name) {
-    issues(first: 50, orderBy: {field: UPDATED_AT, direction: DESC}) {
-      totalCount
+    issues(first: 50, after: $after, filterBy: {since: $since}, orderBy: {field: UPDATED_AT, direction: DESC}) {
+      totalCount pageInfo { hasNextPage endCursor }
       nodes { number title url state updatedAt
         comments(first: 20, orderBy: {field: UPDATED_AT, direction: DESC}) { totalCount nodes { databaseId body createdAt updatedAt author { login } } }
-        closedByPullRequestsReferences(first: 5, includeClosedPrs: true) { totalCount nodes { url state isDraft reviewDecision
-          commits(last: 1) { nodes { commit { statusCheckRollup { state } } } } } } }
+        ${PULLS} }
     }
     fleet: object(expression: "HEAD:docs/agents/fleet.md") { ... on Blob { text } }
   }
 }`;
+  const PULL_REFRESH = 50; // kept tickets whose open pull requests a read between full reads asks for again
+  const DAY = 24 * 60 * 60 * 1000;
+  const SKEW = 5 * 60 * 1000; // an edit up to 5 minutes off this clock still counts
+  const FULL_EVERY = 30 * 60 * 1000; // a full read of the last day; the reads between fetch only what changed
+  const AGENT_PAGES = 40; // at most 2,000 tickets a read
+  const RESERVE = 500; // GitHub points kept for the other reads: the Agents read stops paging below this
+  const SPEC_TITLE = /(^|\s)spec:\s/i;
+  const SPEC_SEARCH = full => `repo:${full} is:issue state:open (has:sub-issue OR label:spec OR in:title spec) -label:wayfind:map sort:updated-desc`;
+  // The search's open issues that are specs, newest first, as data.specIssues: {totalCount, nodes}. A result GitHub
+  // didn't give (past the page, or null with an error) counts toward totalCount, so the list stays partial and the
+  // tiles show "N+"; a result GitHub gave that isn't a spec is left out of both.
+  function specsOf(search) {
+    if (!search || !Array.isArray(search.nodes)) return null;
+    const given = search.nodes.filter(issue => Number.isSafeInteger(issue?.number));
+    const labels = issue => (issue.labels?.nodes || []).map(label => label?.name);
+    const nodes = given.filter(issue => !labels(issue).includes('wayfind:map')
+      && (issue.subIssuesSummary?.total > 0 || labels(issue).includes('spec') || SPEC_TITLE.test(issue.title || '')));
+    return { totalCount: nodes.length + Math.max(0, (search.totalCount ?? 0) - given.length), nodes };
+  }
   const feeds = {
-    specs: { label: 'Specs', every: 10 * 60 * 1000, query: SPECS, more: specTickets },
-    agents: { label: 'Agents', every: 2 * 60 * 1000, query: AGENTS },
+    specs: { label: 'Specs', every: 10 * 60 * 1000, query: SPECS, more: specTickets,
+      variables: picked => ({ specs: SPEC_SEARCH(picked.full) }),
+      shape: (data, answer) => { data.specIssues = specsOf(answer.specSearch); } },
+    agents: { label: 'Agents', every: 2 * 60 * 1000, run: agentsRead },
   };
   for (const feed of Object.values(feeds)) Object.assign(feed, { state: 'loading', data: null, readAt: null, failedAt: null, timer: null, busy: false });
+
+  // ---- The Agents read, page by page (AP22) ----
+
+  // GraphQL errors inside one issue are kept on it (issue.errors: the rest of each path), so only that part of it is
+  // unknown; an error inside an issue GitHub gave as null is that ticket's ("couldn't be read"). The others come back.
+  function place(errors, nodes) {
+    const loose = [];
+    for (const error of Array.isArray(errors) ? errors : []) {
+      const path = Array.isArray(error?.path) ? error.path : [];
+      const at = path[0] === 'repository' && path[1] === 'issues' && path[2] === 'nodes' && Number.isSafeInteger(path[3]) ? path[3] : -1;
+      const issue = at >= 0 ? nodes[at] : undefined;
+      if (issue === null) continue;
+      if (issue && path.length > 4) (issue.errors ||= []).push(path.slice(4));
+      else loose.push(error);
+    }
+    return loose;
+  }
+  // A full read takes every ticket updated in the last day; the reads between take only those updated since the last
+  // read began, merged into what it kept. Paging stops early when GitHub's limit runs low: the page then says how many
+  // tickets were read of how many. {data, errors}, or null when the read belongs to an earlier sign-in or repository.
+  async function agentsRead(feed, picked, mine) {
+    const now = Date.now();
+    const kept = feed.kept?.repo === picked.full ? feed.kept : null;
+    const full = !kept || !kept.complete || feed.forceFull || now - kept.fullAt >= FULL_EVERY;
+    feed.forceFull = false;
+    const since = new Date(full ? now - DAY - SKEW : kept.startedAt - SKEW).toISOString();
+    const issues = full ? new Map() : new Map(kept.issues);
+    const unread = [];
+    const fetched = new Set(); // the tickets this read got from GitHub
+    const errors = [];
+    let after = null;
+    let total = null;
+    let read = 0;
+    let fleet;
+    let complete = false; // GitHub's list ran out: every ticket in this read's scope was asked for
+    let stop = null; // why it didn't: 'limit' (GitHub's limit is low) or 'failed' (a later page failed)
+    for (let page = 0; page < AGENT_PAGES; page += 1) {
+      if (page && (paused() || (limit.remaining !== null && limit.remaining < RESERVE))) { stop = 'limit'; break; }
+      let response;
+      let answer;
+      try {
+        response = await github('POST', '/graphql', { query: AGENTS, variables: { owner: picked.owner, name: picked.name, since, after } });
+        answer = await response.json().catch(() => null);
+      } catch (error) {
+        if (!page || error instanceof Ended || error instanceof SignedOut) throw error;
+        errors.push({ message: 'a page of the read failed' });
+        stop = 'failed';
+        break;
+      }
+      if (mine !== generation) return null;
+      noteLimit(answer?.data?.rateLimit, response);
+      const list = answer?.data?.repository?.issues;
+      if (!response.ok || !Array.isArray(list?.nodes)) {
+        if (!page) throw new Error(`GitHub answered ${response.status}`);
+        errors.push({ message: `GitHub answered ${response.status}` });
+        stop = 'failed';
+        break;
+      }
+      if (!page) {
+        fleet = answer.data.repository.fleet;
+        total = list.totalCount ?? null;
+      }
+      errors.push(...place(answer.errors, list.nodes));
+      for (const issue of list.nodes) {
+        read += 1;
+        if (issue && Number.isSafeInteger(issue.number)) { issues.set(issue.number, issue); fetched.add(issue.number); }
+        else unread.push(null);
+      }
+      if (!list.pageInfo) { complete = (list.totalCount ?? read) <= read; if (!complete) stop = 'failed'; break; }
+      if (!list.pageInfo.hasNextPage) { complete = true; break; }
+      if (typeof list.pageInfo.endCursor !== 'string') { stop = 'failed'; break; }
+      after = list.pageInfo.endCursor;
+      // The first read of a repository shows what it has so far, page by page, saying it is still reading.
+      if (!feed.data || feed.data.issues?.reading) {
+        feed.data = { issues: { totalCount: total, nodes: [...issues.values()], reading: true }, fleet };
+        changed();
+      }
+    }
+    if (!complete && !stop) stop = 'limit'; // AGENT_PAGES ran out
+    // A ticket GitHub gave without its pull requests shows them as unknown, and the read stays partial until a read
+    // gives them (AP22b, review R1). Errors under a pull request GitHub did give stay on that card only.
+    for (const number of fetched) {
+      if (issues.get(number).closedByPullRequestsReferences == null) errors.push({ message: `#${number}'s pull requests couldn't be read` });
+    }
+    // The tickets kept from earlier reads keep showing their pull requests: those facts (state, review, checks) change
+    // without the ticket being updated, so each read asks for them again (review R1).
+    if (!full && !stop) {
+      const stale = [...issues.values()].filter(issue => !fetched.has(issue.number)
+        && (issue.closedByPullRequestsReferences?.nodes || []).some(pr => pr?.state === 'OPEN')).slice(0, PULL_REFRESH);
+      if (stale.length && !paused()) {
+        const ok = await pullsRead(stale, picked, mine, errors);
+        if (ok === null) return null;
+      }
+    }
+    for (const [number, issue] of issues) if (Date.parse(issue.updatedAt) < now - DAY - SKEW) issues.delete(number);
+    const nodes = [...issues.values()].sort((a, b) => (Date.parse(b.updatedAt) || 0) - (Date.parse(a.updatedAt) || 0));
+    feed.kept = { repo: picked.full, issues, startedAt: now, fullAt: full ? now : kept.fullAt, complete: complete && !errors.length };
+    // A read that stopped short says how many tickets of its own query it read, and why (review R4). An error it
+    // couldn't place keeps the read partial (the failure banner) without making up a missing ticket.
+    const count = nodes.length + unread.length;
+    const short = complete ? null : { why: stop, read, total: Math.max(read + 1, total ?? 0), scope: full ? 'day' : 'since' };
+    return {
+      data: { issues: { totalCount: short ? count + short.total - short.read : count, nodes: [...nodes, ...unread], short }, fleet },
+      errors,
+    };
+  }
+
+  // The pull requests that close the kept tickets, asked again by number: up to PULL_REFRESH tickets in one query.
+  // A ticket's pull requests are replaced where GitHub gave them; where it didn't (or the whole query failed), its card
+  // shows them as unknown, never the last facts, and the read is partial (AP22b). null when the read belongs to an earlier sign-in or repository.
+  async function pullsRead(stale, picked, mine, errors) {
+    const query = `query AgentPulls($owner: String!, $name: String!) {
+  rateLimit { limit remaining resetAt }
+  repository(owner: $owner, name: $name) {${stale.map(issue => `
+    i${issue.number}: issue(number: ${issue.number}) { ${PULLS} }`).join('')}
+  }
+}`;
+    try {
+      const response = await github('POST', '/graphql', { query, variables: { owner: picked.owner, name: picked.name } });
+      const answer = await response.json().catch(() => null);
+      if (mine !== generation) return null;
+      noteLimit(answer?.data?.rateLimit, response);
+      const repository = answer?.data?.repository;
+      if (!response.ok || !repository) {
+        for (const issue of stale) issue.closedByPullRequestsReferences = null;
+        errors.push({ message: `GitHub answered ${response.status}` });
+        return false;
+      }
+      for (const issue of stale) {
+        const got = repository[`i${issue.number}`];
+        const placed = (answer.errors || []).filter(e => Array.isArray(e?.path) && e.path[1] === `i${issue.number}`).map(e => e.path.slice(2));
+        if (!got?.closedByPullRequestsReferences) {
+          // GitHub didn't give this ticket's pull requests: its card shows them as unknown, never the last facts, and
+          // the read is partial (AP22b, review R8). The next read asks again.
+          issue.closedByPullRequestsReferences = null;
+          errors.push({ message: `#${issue.number}'s pull requests couldn't be read` });
+          continue;
+        }
+        issue.closedByPullRequestsReferences = got.closedByPullRequestsReferences;
+        issue.errors = [...(issue.errors || []).filter(path => path[0] !== 'closedByPullRequestsReferences'), ...placed];
+      }
+      errors.push(...(answer.errors || []).filter(e => !(Array.isArray(e?.path) && /^i\d+$/.test(e.path[1] || ''))));
+      return true;
+    } catch (error) {
+      if (error instanceof Ended || error instanceof SignedOut) throw error;
+      if (mine !== generation) return null;
+      for (const issue of stale) issue.closedByPullRequestsReferences = null;
+      errors.push({ message: 'the pull request read failed' });
+      return false;
+    }
+  }
+
+  // Every comment of one issue, with REST (AP22): a spec's older decision records past the first read. Its pages are
+  // asked for by number on this same route (GitHub's own next link names the repository by id). {items, complete}.
+  async function issueComments(picked, number) {
+    const items = [];
+    for (let page = 1; page <= MAX_PAGES; page += 1) {
+      const response = await github('GET', `/repos/${encodeURIComponent(picked.owner)}/${encodeURIComponent(picked.name)}/issues/${number}/comments?per_page=100&page=${page}`);
+      const body = response.ok ? await response.json().catch(() => null) : null;
+      if (!Array.isArray(body)) return { items, complete: false };
+      items.push(...body);
+      if (!/rel="next"/.test(response.headers.get('Link') || '')) return { items, complete: true };
+    }
+    return { items, complete: false };
+  }
+  // The specs whose comments the first read gave only part of get the rest; one that can't be read stays partial.
+  async function moreComments(specs, picked) {
+    for (const detail of Object.values(specs || {})) {
+      const list = detail?.comments;
+      if (!list || !Number.isSafeInteger(detail.number) || (list.totalCount ?? 0) <= (list.nodes || []).length || paused()) continue;
+      try {
+        const got = await issueComments(picked, detail.number);
+        if (!got.complete) continue;
+        const nodes = got.items.filter(c => Number.isSafeInteger(c?.id)).map(c => ({ databaseId: c.id, body: c.body ?? '', url: c.html_url,
+          createdAt: c.created_at, updatedAt: c.updated_at, author: typeof c.user?.login === 'string' ? { login: c.user.login } : null }));
+        detail.comments = { totalCount: got.items.length, nodes };
+      } catch (error) {
+        if (error instanceof Ended || error instanceof SignedOut) throw error;
+      }
+    }
+  }
 
   const limit = { remaining: null, limit: null, pausedUntil: null };
   let generation = 0; // bumped by stop(): a read started for an earlier sign-in or repository is dropped
@@ -295,12 +503,23 @@
     const mine = generation;
     feed.busy = true;
     try {
-      const response = await github('POST', '/graphql', { query: feed.query, variables: { owner: picked.owner, name: picked.name } });
+      if (feed.run) {
+        const done = await feed.run(feed, picked, mine);
+        if (!done || mine !== generation) return;
+        feed.data = done.data;
+        feed.state = done.errors.length ? 'partial' : 'ok';
+        feed.errors = done.errors;
+        feed.readAt = Date.now();
+        feed.failedAt = null;
+        return;
+      }
+      const response = await github('POST', '/graphql', { query: feed.query, variables: { owner: picked.owner, name: picked.name, ...feed.variables?.(picked) } });
       const answer = await response.json().catch(() => null);
       if (mine !== generation) return;
       noteLimit(answer?.data?.rateLimit, response);
       if (!response.ok || !answer?.data?.repository) throw new Error(`GitHub answered ${response.status}`);
       const data = answer.data.repository;
+      feed.shape?.(data, answer.data);
       const errors = [...(answer.errors || [])];
       // A feed's second read (Specs: the running specs' tickets). If it fails, or GitHub's limit is now low, its part
       // is unknown (data.specs is null) and the feed is partial.
@@ -316,7 +535,11 @@
             const extra = await second.json().catch(() => null);
             if (mine !== generation) return;
             noteLimit(extra?.data?.rateLimit, second);
-            if (second.ok && extra?.data?.repository) data.specs = extra.data.repository;
+            if (second.ok && extra?.data?.repository) {
+              data.specs = extra.data.repository;
+              await moreComments(data.specs, picked);
+              if (mine !== generation) return;
+            }
             errors.push(...(second.ok && extra?.data?.repository ? extra.errors || [] : [{ message: `GitHub answered ${second.status}` }]));
           } catch (error) {
             if (error instanceof Ended || error instanceof SignedOut) throw error;
@@ -365,13 +588,14 @@
     generation += 1;
     for (const feed of Object.values(feeds)) {
       clearTimeout(feed.timer);
-      Object.assign(feed, { state: 'loading', data: null, readAt: null, failedAt: null, busy: false });
+      Object.assign(feed, { state: 'loading', data: null, readAt: null, failedAt: null, busy: false, kept: null });
     }
     // GitHub's limit belongs to the signed-in account, not the repository: a pause outlives a repository change.
   }
   // Read everything now (the Refresh button), unless GitHub's limit is low.
   function refreshAll() {
     if (paused()) return;
+    feeds.agents.forceFull = true;
     for (const name of Object.keys(feeds)) {
       read(name);
       schedule(name);
