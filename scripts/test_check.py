@@ -814,6 +814,24 @@ class Checks(unittest.TestCase):
         with mock.patch('check.DRIVER_ART_BUDGET', 1000), self.assertRaisesRegex(AssertionError, 'the drivers art'):
             check_site(ROOT / 'dist')
 
+    def test_drivers_login_lines(self):
+        # Catches (OpenWiz #2005): a driver card without its login line, with the wrong host or form, away from its
+        # name, or a login line given to Grok Bot, which has no driver yet.
+        import check
+        main = re.search(r'<main\b[\s\S]*?</main>', (ROOT / 'dist' / check.DRIVERS_PAGE).read_text())[0]
+        check.check_driver_logins(main)
+        held, local = '<p class="driver-login">Login: held by Cloudroom</p>', '<p class="driver-login">Login: stays on your machine</p>'
+        for old, new, error in (
+                (held, '', 'Cloudroom: its login line'),
+                (held, '<p class="driver-login">Login: stays on your machine</p>', 'Cloudroom: its login line'),
+                ('<p class="driver-login">Login: held by boat.dev</p>', '<p class="driver-login">Login: held by Cloudroom</p>', 'boat.dev: its login line'),
+                (local, '<p class="driver-login">Login: your machine</p>', 'Your own computer or VPS: its login line'),
+                ('<span>Grok Bot</span></h3>', '<span>Grok Bot</span></h3>' + local, 'Grok Bot: its login line'),
+                ('</ul>\n  </section>', '</ul>\n' + local + '  </section>', 'only on a driver card')):
+            self.broken('drivers/index.html', old, new, error)
+        line = '<p class="driver-line">Passed the kit, run from a Cloudroom cloud thread against real Cloudroom</p>'
+        self.broken('drivers/index.html', held + '\n        ' + line, line + '\n        ' + held, 'right after its name')
+
     def test_drivers_spotlight(self):
         # Catches (#56, #62): boat.dev's spotlight missing, after the other drivers, or with a check missing, reordered,
         # not passed, without its state in words or without its plain line; the crew painting dropped; a painting shown
