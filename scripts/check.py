@@ -285,6 +285,12 @@ DRIVER_PASSED = {
     'vps': ('2026-11-20', 'https://github.com/openwizdev/OpenWiz/pull/1455#issuecomment-7034588211'),
 }
 DRIVER_COMING = 'grok-bot'
+# OpenWiz #2005 (DW8): each driver's login line, word for word from its README (kernel/driver.v1.md, The login line).
+DRIVER_LOGINS = {
+    'boat-dev': 'Login: held by boat.dev',
+    'vps': 'Login: stays on your machine',
+    'cloudroom': 'Login: held by Cloudroom',
+}
 DRIVER_ALSO = 'Cloudroom and your own computer or VPS passed the same five checks on 2026-11-20.'
 DRIVER_CARD_DATE = 'Kit run, {}'
 # Words that described the three passing drivers before they passed; none may come back anywhere on the page. "not run
@@ -965,6 +971,7 @@ def check_drivers(landing, changelog, drivers, page):
     assert [r[0] for r in rows] == list(KIT_CHECKS) and 'credential' in plain(rows[-1][1]), \
         f'{OWN_DRIVER} lists the four commands and the fifth check, token, with the credential it checks for: {rows}'
     assert not Outline(drivers).styles, 'the drivers page keeps its styles in site.css'
+    check_driver_logins(main)
     check_driver_token(drivers, main)
 
 
@@ -1113,6 +1120,21 @@ def check_driver_results(drivers, main, outline):
     assert not stale, f'a stale driver state word on the drivers page: {stale[0]!r}'
     only = re.search(r'\bonly (?:boat\.dev|one)\b[^.]*\bpass|\bboat\.dev is the only\b', re.sub(r'\s+', ' ', re.sub(r'<[^>]+>', ' ', unescape(drivers))), re.I)
     assert not only, f'boat.dev is never the only one that passed: {only[0]!r}'
+
+
+def check_driver_logins(main):
+    """OpenWiz #2005: each driver shows its login line right after its name, word for word from its README; a card with
+    no driver yet (Grok Bot) shows none, and no login line sits outside a driver card."""
+    cards = {key: re.search(rf'<article class="driver[^"]*" id="{key}"[\s\S]*?</article>', main) for key, *_ in DRIVERS}
+    for key, name, _, _ in DRIVERS:
+        card = cards[key][0] if cards[key] else ''
+        want = [DRIVER_LOGINS[key]] if key in DRIVER_LOGINS else []
+        lines = [plain(line) for line in re.findall(r'<p class="driver-login">([\s\S]*?)</p>', card)]
+        assert lines == want, f'{name}: its login line must read exactly {want}: {lines}'
+        if want:
+            assert re.search(r'</h[23]>\s*<p class="driver-login">', card), f'{name}: its login line sits right after its name'
+    found = len(re.findall(r'class="driver-login"', main))
+    assert found == len(DRIVER_LOGINS), f'a login line only on a driver card: {found} on the page'
 
 
 def check_driver_token(drivers, main):
