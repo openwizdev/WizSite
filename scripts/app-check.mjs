@@ -843,7 +843,7 @@ async function main() {
         repository.s50.comments.totalCount = repository.s50.comments.nodes.length;
       } });
       const page = await ap6Open(world);
-      await page.until(`document.querySelectorAll('main .cards a.card').length >= 6`, 'the You items');
+      await page.until(`document.querySelectorAll('main .cards a.card').length >= 6`, 'the You items').catch(e => { throw new Error(e.message + JSON.stringify(world.violations) + JSON.stringify(world.log.map(r => r.path))); });
       await settle(page, 600);
       const items = await youItems(page);
       const unreadable = id => `A decision record that couldn't be read 50#issuecomment-${id}`;
@@ -1114,13 +1114,8 @@ async function main() {
     });
 
     await check('AP7 pulse: a spec page marks the tickets an agent is working on now, and only those', async () => {
-      // AP1's writer always writes a skills line; the recorded AP6 notes get one here.
-      const skills = repository => {
-        for (const ticket of repository.s40.subIssues.nodes) for (const c of ticket?.comments?.nodes || []) {
-          c.body = c.body.replace('\nstep:', '\nskills: build-ticket@0.1.2\nstep:');
-        }
-      };
-      const world = ap7World({ tickets: skills });
+      // AP1's writer always writes a skills line, and the recorded AP6 notes carry one (AP22).
+      const world = ap7World();
       const page = await ap6Open(world, '#/specs/40');
       await page.until(`document.querySelectorAll('main .graph [data-ticket]').length === 10`, 'the ticket graph');
       await page.until(`document.querySelector('main .graph [data-pulse]')`, 'a pulse');
@@ -1147,7 +1142,6 @@ async function main() {
       const world = ap7World({
         tickets: repository => {
           for (const ticket of repository.s40.subIssues.nodes) for (const c of ticket?.comments?.nodes || []) {
-            c.body = c.body.replace('\nstep:', '\nskills: build-ticket@0.1.2\nstep:');
             if (c.databaseId === 9009 || c.databaseId === 9007) c.updatedAt = minutesAgo(5); // working in the Specs read, 5 minutes ago
             specs(c);
           }
@@ -1264,6 +1258,193 @@ async function main() {
       await page.close();
     });
 
+    // ---- AP22 (#1266 follow-up, the owner's laptop): You and Agents read completely ----
+
+    // A ticket updated a minute ago with no status note, for filling a page of the Agents read.
+    const quietTicket = n => ({ number: n, title: `Synthetic quiet ticket ${n}`, url: `https://github.com/acme/factory/issues/${n}`, state: 'OPEN',
+      updatedAt: 'LIVE-1', comments: { totalCount: 0, nodes: [] }, closedByPullRequestsReferences: { totalCount: 0, nodes: [] } });
+    const noteBody = (agent, state, harness, model, minutes) => `<!-- openwiz:status v1 -->\nagent: ${agent}\nstate: ${state}\nharness: ${harness}\nmodel: ${model}\nskills: build-ticket@0.2.0\nstep: synthetic step\ntime: LIVE-${minutes}`;
+    // The Agents read in pages: 50 quiet tickets, then a second page holding a working builder on ticket #251.
+    const pagedAgents = async (world, { remaining = 4800, hold = null } = {}) => {
+      const fleet = (await fixture('ap7-agents.json')).data.repository.fleet;
+      world.graphql.Agents = async body => {
+        const second = body.variables?.after === 'cursor-50';
+        if (second && hold) await hold;
+        const nodes = second ? [{ ...quietTicket(251), title: 'Synthetic ticket past the first page',
+          comments: { totalCount: 1, nodes: [{ databaseId: 8801, body: noteBody('builder', 'working', 'claude-code', 'claude-opus-5-5', 2), createdAt: '2030-01-01T00:00:00Z', updatedAt: 'LIVE-2', author: { login: 'factory-bot[bot]' } }] } }, quietTicket(252)]
+          : Array.from({ length: 50 }, (_, i) => quietTicket(200 + i));
+        const answer = { data: { rateLimit: { limit: 5000, remaining, resetAt: '2099-01-01T00:00:00Z' }, repository: {
+          issues: { totalCount: 52, pageInfo: { hasNextPage: !second, endCursor: second ? 'cursor-52' : 'cursor-50' }, nodes }, fleet } } };
+        return { status: 200, json: ago(JSON.stringify(answer)) };
+      };
+    };
+
+    await check('AP22 Agents: every ticket updated in the last day is read, page by page, with no partial or failure note', async () => {
+      const world = ap7World();
+      await pagedAgents(world);
+      const page = await ap6Open(world, '#/agents');
+      await page.until(`document.querySelector('main article.card[data-note="8801"]')`, 'the working note on the second page');
+      const rows = await agentRows(page);
+      const row = rows.find(r => r[1] === 8801);
+      assert(row[0] === 'Working now' && row[2] === 'working', `the second page's builder: ${JSON.stringify(row)}`);
+      const text = await page.run(`document.querySelector('main').innerText`);
+      assert(!/Only the 50|Part of this read failed|tickets were read/.test(text), `a complete read says it is partial: ${text.slice(0, 300)}`);
+      const sent = world.log.filter(r => operation(r) === 'Agents').map(r => JSON.parse(r.body));
+      assert(sent.length >= 2 && sent.every(b => /filterBy:\s*\{\s*since:/.test(b.query) && b.variables.since), 'the Agents read is not limited to the last day');
+      // The next read (its two-minute schedule) asks only for what changed since this one, and keeps what it read.
+      world.graphql.Agents = async () => ({ status: 200, json: { data: { rateLimit: { limit: 5000, remaining: 4790, resetAt: '2099-01-01T00:00:00Z' },
+        repository: { issues: { totalCount: 0, pageInfo: { hasNextPage: false, endCursor: null }, nodes: [] }, fleet: (await fixture('ap7-agents.json')).data.repository.fleet } } } });
+      const was = world.log.length;
+      await page.run(`(() => { OW.data.feeds.agents.readAt = 1; document.dispatchEvent(new Event('visibilitychange')); })()`);
+      await page.until(`OW.data.feeds.agents.readAt > 1 && !OW.data.feeds.agents.busy`, 'the next Agents read');
+      const next = world.log.slice(was).filter(r => operation(r) === 'Agents').map(r => JSON.parse(r.body).variables.since);
+      assert(next.length === 1 && Date.parse(next[0]) > Date.now() - 10 * 60 * 1000, `the next read asked again for the whole day: ${JSON.stringify(next)}`);
+      assert(await page.run(`!!document.querySelector('main article.card[data-note="8801"]')`), 'the next read dropped what the first one read');
+      checkRequestLog(world);
+      await page.close();
+    });
+
+    await check('AP22 Agents: the first read shows the tickets read so far, and says it is still reading, until its last page', async () => {
+      let release;
+      const world = ap7World();
+      await pagedAgents(world, { hold: new Promise(resolve => { release = resolve; }) });
+      const page = await ap6Open(world, '#/agents');
+      await page.until(`/Still reading: 50 of the 52 tickets/.test(document.querySelector('main').innerText)`, 'the reading note');
+      release();
+      await page.until(`document.querySelector('main article.card[data-note="8801"]')`, 'the second page');
+      assert(!/Still reading/.test(await page.text()), 'the reading note stays after the last page');
+      checkRequestLog(world);
+      await page.close();
+    });
+
+    await check('AP22 Agents: when GitHub\'s limit can\'t cover every page, the page says how many tickets were read', async () => {
+      const world = ap7World();
+      await pagedAgents(world, { remaining: 300 });
+      const page = await ap6Open(world, '#/agents');
+      await page.until(`/Read 50 of the 52 tickets updated in the last day/.test(document.querySelector('main').innerText)`, 'how many tickets were read');
+      assert(!world.log.some(r => operation(r) === 'Agents' && JSON.parse(r.body).variables?.after === 'cursor-50'), 'the second page was read on a low limit');
+      checkRequestLog(world);
+      await page.close();
+    });
+
+    await check('AP22 Agents: an error on one pull request\'s checks shows on that card only; an error it can\'t place keeps the read partial', async () => {
+      const refused = { message: 'Resource not accessible by integration', type: 'FORBIDDEN',
+        path: ['repository', 'issues', 'nodes', 0, 'closedByPullRequestsReferences', 'nodes', 0, 'commits', 'nodes', 0, 'commit', 'statusCheckRollup'] };
+      const world = ap7World({ agents: repository => { repository.issues.nodes[0].closedByPullRequestsReferences.nodes[0].commits.nodes[0].commit.statusCheckRollup = null; } });
+      const fixed = world.graphql.Agents;
+      world.graphql.Agents = async body => { const reply = await fixed(body); reply.json.errors = [refused]; return reply; };
+      const page = await ap6Open(world, '#/agents');
+      await page.until(`document.querySelector('main article.card[data-note="7001"]')`, 'the builder card');
+      const card = await page.run(`document.querySelector('main article.card[data-note="7001"]').innerText.replace(/\\s+/g, ' ')`);
+      assert(/Pull request #12: open, waiting for review, checks unknown/.test(card), `the refused checks: ${card}`);
+      assert(!/Part of this read failed/.test(await page.text()), 'an error placed on one card shows a failure banner');
+      world.graphql.Agents = async body => { const reply = await fixed(body); reply.json.errors = [{ message: 'Something went wrong', path: ['repository', 'somewhere'] }]; return reply; };
+      await page.click('Refresh now');
+      await page.until(`/Part of this read failed/.test(document.body.innerText)`, 'the failure banner for an error it can\'t place');
+      checkRequestLog(world);
+      await page.close();
+    });
+
+    await check('AP22 You: a spec\'s comments past the first read are paged through, so its open record shows and nothing is unknown', async () => {
+      let plan;
+      const world = ap6World({ tickets: repository => {
+        plan = repository.s50.comments.nodes.find(c => c.databaseId === 9003);
+        first = repository.s50.comments.nodes;
+        repository.s50.comments.totalCount = 60;
+      } });
+      let first;
+      // GitHub's REST list, oldest first: the four the first read gave, 55 ordinary comments, then an open plan approval.
+      world.rest['/repos/acme/factory/issues/50/comments'] = async () => ({ status: 200, json: [
+        ...first.map(c => ({ id: c.databaseId, body: c.body, html_url: c.url, created_at: c.createdAt, updated_at: c.updatedAt, user: c.author })),
+        ...Array.from({ length: 56 }, (_, i) => {
+          const id = i === 55 ? 9050 : 9100 + i;
+          return { id, body: i === 55 ? plan.body.replace('r-plan_approval-50-open', 'r-plan_approval-50-late') : `An ordinary comment ${i}.`,
+            html_url: `https://github.com/acme/factory/issues/50#issuecomment-${id}`, created_at: '2030-01-05T00:00:00Z', updated_at: '2030-01-05T00:00:00Z',
+            user: { login: 'factory-bot[bot]' } };
+        })] });
+      const page = await ap6Open(world);
+      await page.until(`document.querySelectorAll('main .cards a.card').length >= 7`, 'the You items');
+      const items = await youItems(page);
+      assert(items.includes('Plan to approve 50#issuecomment-9050') && items.includes('Plan to approve 50#issuecomment-9003'),
+        `a record is missing: ${JSON.stringify(items)}`);
+      const text = await page.run(`document.querySelector('main').innerText`);
+      assert(!/GitHub gave only part of/.test(text), `a complete read says it is partial: ${text.slice(0, 400)}`);
+      checkRequestLog(world);
+      await page.close();
+    });
+
+    await check('AP22 You: a builder working with a skills line counts as Building, as on Agents', async () => {
+      const world = ap6World({ tickets: repository => {
+        for (const spec of Object.values(repository)) for (const ticket of spec?.subIssues?.nodes || []) for (const c of ticket?.comments?.nodes || []) {
+          if (!/\nskills: /.test(c.body)) c.body = c.body.replace('\nstep:', '\nskills: build-ticket@0.2.0\nstep:');
+        }
+      } });
+      const page = await ap6Open(world);
+      await page.until(`document.querySelectorAll('main .cards a.card').length >= 6`, 'the You items');
+      const tiles = await page.run(`[...document.querySelectorAll('main .tile')].map(t => t.querySelector('.k').textContent + '=' + t.querySelector('.v').textContent)`);
+      assert(tiles.includes('Building=1') && tiles.includes('In review=1'), `tiles with skills lines: ${JSON.stringify(tiles)}`);
+      checkRequestLog(world);
+      await page.close();
+    });
+
+    await check('AP22 You: a ready-for-human ticket with an open blocker is later: not counted, listed under Later', async () => {
+      const ticket = (number, blockedBy) => ({ number, title: `Synthetic live check ${number}`, url: `https://github.com/acme/factory/issues/${number}`,
+        updatedAt: '2030-01-06T00:00:00Z', labels: { nodes: [{ name: 'ready-for-human' }] }, issueDependenciesSummary: { blockedBy } });
+      const world = ap6World({ specs: repository => {
+        repository.youIssues.nodes.push(ticket(90, 0), ticket(91, 2));
+        repository.youIssues.totalCount += 2;
+      } });
+      const page = await ap6Open(world);
+      await page.until(`document.querySelectorAll('main .cards a.card').length >= 8`, 'the You items');
+      const tiles = await page.run(`[...document.querySelectorAll('main .tile')].map(t => t.querySelector('.k').textContent + '=' + t.querySelector('.v').textContent)`);
+      assert(tiles[0] === 'Needs you=5', `Needs you counts a later ticket: ${JSON.stringify(tiles)}`);
+      const badge = await page.run(`document.querySelector('nav.main a[href="#/you"] .badge').textContent`);
+      assert(badge === '5', `the You badge is ${badge}`);
+      const groups = await page.run(`[...document.querySelectorAll('main .cards')].map(g => [g.previousElementSibling?.tagName === 'H2' ? g.previousElementSibling.textContent : '',
+        [...g.querySelectorAll('a.card')].map(a => a.getAttribute('href').split('/').pop())])`);
+      assert(groups.length === 2 && groups[1][0] === 'Later' && JSON.stringify(groups[1][1]) === '["91"]' && groups[0][1].includes('90') && !groups[0][1].includes('91'),
+        `due now and later: ${JSON.stringify(groups)}`);
+      checkRequestLog(world);
+      await page.close();
+    });
+
+    await check('AP22 Agents: one mapping gives every card the same friendly names; an unknown id shows as written', async () => {
+      const set = (repository, id, harness, model) => {
+        for (const issue of repository.issues.nodes) for (const c of issue.comments.nodes) {
+          if (c.databaseId === id) c.body = c.body.replace(/\nharness: .*\nmodel: .*\n/, `\nharness: ${harness}\nmodel: ${model}\n`);
+        }
+      };
+      const world = ap7World({ agents: repository => {
+        set(repository, 7001, 'claude-code', 'claude-opus-5-5');
+        set(repository, 7101, 'Claude Code', 'Opus 5.5');
+        set(repository, 7102, 'codex', 'synthetic-model-x');
+        set(repository, 7501, 'codex', 'gpt-6.2-sol medium');
+      } });
+      const page = await ap6Open(world, '#/agents');
+      await page.until(`document.querySelector('main article.card[data-note="7102"]')`, 'the agent cards');
+      const heads = await page.run(`Object.fromEntries([7001, 7101, 7102, 7501].map(id => [id, document.querySelector('main article.card[data-note="' + id + '"] .num').textContent]))`);
+      assert(heads[7001] === 'Builder · Claude Code, Opus 5.5' && heads[7101] === 'Reviewer · Claude Code, Opus 5.5' && heads[7102] === 'Builder · Codex, synthetic-model-x'
+        && heads[7501] === 'Fleet · Codex, Sol 6.2 Medium',
+        `names: ${JSON.stringify(heads)}`);
+      checkRequestLog(world);
+      await page.close();
+    });
+
+    await check('AP22 You: every link to GitHub opens in a new tab, so the app stays open', async () => {
+      const world = ap6World();
+      const page = await ap6Open(world);
+      await page.until(`document.querySelectorAll('main .cards a.card').length >= 6`, 'the You items');
+      const links = await page.run(`[...document.querySelectorAll('main a[href^="https://github.com/"]')].map(a => [a.getAttribute('href'), a.target, a.rel])`);
+      assert(links.length >= 6 && links.every(([, target, rel]) => target === '_blank' && /noreferrer/.test(rel)), `links that leave the app: ${JSON.stringify(links.filter(l => l[1] !== '_blank'))}`);
+      await page.run(`document.querySelector('main .cards a.card').focus()`);
+      await page.key('Enter');
+      await waitFor(() => world.opened.length > 0, 'the new tab');
+      assert(world.opened[0].url === links[0][0], `the new tab opened ${JSON.stringify(world.opened)}`);
+      assert(await page.run(`location.pathname === '/app/' && !!document.querySelector('main .tiles')`), 'the app left its page');
+      checkRequestLog(world);
+      await page.close();
+    });
+
     await check('AP7 keyboard: 3 opens Agents; Tab walks each card\'s ticket, pull request and preview with visible focus; a refresh keeps it', async () => {
       const world = ap7World();
       const page = await ap6Open(world);
@@ -1343,6 +1524,149 @@ async function main() {
       await page.run(`new Promise(resolve => setTimeout(resolve, 400))`);
       assert(graphqlCount(world) === before, `changing repository read GitHub's GraphQL while paused (${graphqlCount(world) - before} more)`);
       assert(/GitHub.s limit is low/.test(await page.text()), 'the back-off notice is gone after changing repository');
+      checkRequestLog(world);
+      await page.close();
+    });
+
+    // AP22 (#1266 follow-up): changing repository happens in the sidebar. Before, the repository button dropped the
+    // shell for the full-screen picker, and picking sent the user to You with a new history entry, whatever tab
+    // they were on. Now the list opens under the button, the shell and the tab stay, and only the reads change.
+    for (const [route, title] of [['#/you', 'You'], ['#/specs', 'Specs'], ['#/agents', 'Agents']]) {
+      await check(`AP22 picker: changing repository on ${title} keeps the shell, the tab and the history, and reads the new repository`, async () => {
+        const world = new World();
+        world.graphql.Specs = ok('specs.json');
+        world.graphql.Agents = ok('agents.json');
+        const page = await open(browser, world);
+        await signIn(page, world);
+        await page.click('acme/factory');
+        await page.until(`document.querySelector('nav a[aria-current="page"]')`, 'the shell');
+        await page.go(`${SITE}/app/${route}`);
+        await page.until(`document.querySelector('main h1').textContent.trim() === ${JSON.stringify(title)}`, `the ${title} page`);
+        const depth = await page.run('history.length');
+        await page.click('acme/factory'); // the repository button in the sidebar
+        await page.until(`[...document.querySelectorAll('aside.side button')].some(b => b.textContent.trim() === 'acme/site')`, 'the repository list in the sidebar');
+        const kept = await page.run(`({ shell: !!document.querySelector('aside.side nav.main'), h1: document.querySelector('main h1')?.textContent.trim(), hash: location.hash })`);
+        assert(kept.shell && kept.h1 === title && kept.hash === route, `opening the list left the page: ${JSON.stringify(kept)}`);
+        const listed = await page.run(`document.querySelector('aside.side .repo-list').innerText.trim().split(/\\n+/)`);
+        assert(listed[0] === 'acme/factory' && !listed.includes('null'), `the repository list reads ${JSON.stringify(listed)}`);
+        const before = world.log.length;
+        await page.run(`[...document.querySelectorAll('aside.side button')].find(b => b.textContent.trim() === 'acme/site').click()`);
+        await page.until(`[...document.querySelectorAll('aside.side button.repo')].some(b => b.textContent.includes('acme/site'))`, 'the sidebar on acme/site');
+        await waitFor(() => world.log.slice(before).some(r => r.path === '/graphql' && r.body && JSON.parse(r.body).variables?.name === 'site'), 'a read of acme/site');
+        const after = await page.run(`({ shell: !!document.querySelector('aside.side nav.main'), h1: document.querySelector('main h1')?.textContent.trim(), hash: location.hash, depth: history.length, picker: /Pick a repository/.test(document.body.innerText) })`);
+        assert(after.shell && !after.picker && after.h1 === title && after.hash === route && after.depth === depth,
+          `changing repository moved the user: ${JSON.stringify({ ...after, was: { route, depth } })}`);
+        checkRequestLog(world);
+        await page.close();
+      });
+    }
+
+    // ---- AP22 review R1-R4 (WizSite #120) ----
+
+    await check('AP22 R1: the two-minute read refreshes the checks of a card whose ticket did not change', async () => {
+      const world = ap7World();
+      const page = await ap6Open(world, '#/agents');
+      await page.until(`/checks running/.test(document.querySelector('main article.card[data-note="7001"]')?.innerText || '')`, 'the builder card, checks running');
+      const fleet = (await fixture('ap7-agents.json')).data.repository.fleet;
+      // Nothing was updated since the last read; GitHub now reports #12's checks passed.
+      world.graphql.Agents = async () => ({ status: 200, json: { data: { rateLimit: { limit: 5000, remaining: 4790, resetAt: '2099-01-01T00:00:00Z' },
+        repository: { issues: { totalCount: 0, pageInfo: { hasNextPage: false, endCursor: null }, nodes: [] }, fleet } } } });
+      world.graphql.AgentPulls = async body => {
+        const answer = { data: { rateLimit: { limit: 5000, remaining: 4780, resetAt: '2099-01-01T00:00:00Z' }, repository: {} } };
+        for (const [, n] of String(body.query).matchAll(/i(\d+): issue\(number: (?:\d+)\)/g)) answer.data.repository[`i${n}`] = null;
+        answer.data.repository.i70 = { closedByPullRequestsReferences: { totalCount: 1, nodes: [{ url: 'https://github.com/acme/site/pull/12', state: 'OPEN', isDraft: false,
+          reviewDecision: 'APPROVED', commits: { nodes: [{ commit: { statusCheckRollup: { state: 'SUCCESS' } } }] } }] } };
+        return { status: 200, json: answer };
+      };
+      await page.run(`(() => { OW.data.feeds.agents.readAt = 1; document.dispatchEvent(new Event('visibilitychange')); })()`);
+      await page.until(`OW.data.feeds.agents.readAt > 1 && !OW.data.feeds.agents.busy`, 'the next Agents read');
+      const card = await page.run(`document.querySelector('main article.card[data-note="7001"]').innerText.replace(/\\s+/g, ' ')`);
+      assert(/Pull request #12: open, approved, checks pass/.test(card), `the card keeps old checks: ${card}`);
+      checkRequestLog(world);
+      await page.close();
+    });
+
+    await check('AP22b (#2027): a refresh that can\'t give a ticket\'s pull requests shows them as unknown, and the read as partial', async () => {
+      const world = ap7World();
+      const whole = world.graphql.Agents;
+      const page = await ap6Open(world, '#/agents');
+      await page.until(`/checks running/.test(document.querySelector('main article.card[data-note="7001"]')?.innerText || '')`, 'the builder card, checks running');
+      const fleet = (await fixture('ap7-agents.json')).data.repository.fleet;
+      world.graphql.Agents = async () => ({ status: 200, json: { data: { rateLimit: { limit: 5000, remaining: 4790, resetAt: '2099-01-01T00:00:00Z' },
+        repository: { issues: { totalCount: 0, pageInfo: { hasNextPage: false, endCursor: null }, nodes: [] }, fleet } } } });
+      const again = async () => {
+        const at = await page.run('OW.data.feeds.agents.readAt');
+        await page.run(`(() => { OW.data.feeds.agents.readAt = 1; document.dispatchEvent(new Event('visibilitychange')); })()`);
+        await page.until(`OW.data.feeds.agents.readAt > ${at} && !OW.data.feeds.agents.busy`, 'the next Agents read');
+      };
+      // GitHub answers #70's alias with an error and no pull-request list.
+      world.graphql.AgentPulls = async body => {
+        const answer = { data: { rateLimit: { limit: 5000, remaining: 4780, resetAt: '2099-01-01T00:00:00Z' }, repository: {} },
+          errors: [{ message: 'Something went wrong', path: ['repository', 'i70', 'closedByPullRequestsReferences'] }] };
+        for (const [, n] of String(body.query).matchAll(/i(\d+): issue\(number: \d+\)/g)) {
+          answer.data.repository[`i${n}`] = n === '70' ? { closedByPullRequestsReferences: null } : null;
+        }
+        return { status: 200, json: answer };
+      };
+      await page.run(`(() => { OW.data.feeds.agents.readAt = 1; document.dispatchEvent(new Event('visibilitychange')); })()`);
+      await page.until(`OW.data.feeds.agents.readAt > 1 && !OW.data.feeds.agents.busy`, 'the next Agents read');
+      const card = await page.run(`document.querySelector('main article.card[data-note="7001"]').innerText.replace(/\\s+/g, ' ')`);
+      assert(/Pull request #12: its state is unknown/.test(card) && !/checks running|checks pass/.test(card), `the card keeps old facts: ${card}`);
+      assert(/Part of this read failed/.test(await page.text()), 'a refresh GitHub refused shows no partial-read notice');
+      // The retry (a full read) gets #70 again, still without its pull requests: still unknown, still partial.
+      world.graphql.Agents = async body => {
+        const reply = await whole(body);
+        const issue = reply.json.data.repository.issues.nodes.find(i => i?.number === 70);
+        issue.closedByPullRequestsReferences = null;
+        reply.json.errors = [{ message: 'Something went wrong', path: ['repository', 'issues', 'nodes', reply.json.data.repository.issues.nodes.indexOf(issue), 'closedByPullRequestsReferences'] }];
+        return reply;
+      };
+      await again();
+      assert(/Pull request #12: its state is unknown/.test(await page.run(`document.querySelector('main article.card[data-note="7001"]').innerText`))
+        && /Part of this read failed/.test(await page.text()), 'a retry still missing the pull requests clears the partial-read notice');
+      // GitHub gives the list again: the notice goes and the card has its facts.
+      world.graphql.Agents = whole;
+      await again();
+      const back = await page.run(`document.querySelector('main article.card[data-note="7001"]').innerText.replace(/\\s+/g, ' ')`);
+      assert(/Pull request #12: open, waiting for review, checks running/.test(back) && !/Part of this read failed/.test(await page.text()), `after the list came back: ${back}`);
+      checkRequestLog(world);
+      await page.close();
+    });
+
+    await check('AP22 R4: an error the read can\'t place shows the failure banner, never a count blamed on GitHub\'s limit', async () => {
+      const world = ap7World();
+      const fixed = world.graphql.Agents;
+      world.graphql.Agents = async body => { const reply = await fixed(body); reply.json.errors = [{ message: 'Something went wrong', path: ['repository', 'fleet'] }]; return reply; };
+      const page = await ap6Open(world, '#/agents');
+      await page.until(`/Part of this read failed/.test(document.body.innerText) && document.querySelector('main article.card')`, 'the failure banner');
+      const text = await page.run(`document.querySelector('main .page-body').innerText`);
+      assert(!/Read \d+ of the|limit/.test(text), `a complete read with an error blames a missing ticket on the limit: ${text.slice(0, 300)}`);
+      checkRequestLog(world);
+      await page.close();
+    });
+
+    await check('AP22 R2 and R3: the picker reads GitHub again on each open, and closing on the current repository keeps focus on its button', async () => {
+      const world = new World();
+      world.graphql.Specs = ok('specs.json');
+      world.graphql.Agents = ok('agents.json');
+      const page = await open(browser, world);
+      await signIn(page, world);
+      await page.click('acme/factory');
+      await page.until(`document.querySelector('aside.side button.repo')`, 'the shell');
+      await page.click('acme/factory');
+      await page.until(`[...document.querySelectorAll('aside.side .repo-list button')].some(b => b.textContent.trim() === 'acme/site')`, 'the list');
+      // Enter on the current repository closes the list and gives focus back to the button that opened it.
+      await page.until(`document.activeElement?.textContent.trim() === 'acme/factory' && document.activeElement.closest('.repo-list')`, 'focus on the current repository');
+      await page.key('Enter');
+      await page.until(`document.querySelector('aside.side .repo-list').hidden`, 'the list closed');
+      const focus = await page.run(`document.activeElement === document.querySelector('aside.side button.repo')`);
+      assert(focus, `focus went to ${await page.run('document.activeElement.tagName')}`);
+      // The user grants a repository on GitHub, comes back and opens the list again.
+      const repos = await fixture('repositories.json');
+      world.rest['/user/installations/1001/repositories'] = async () => ({ status: 200, json: { ...repos, total_count: repos.repositories.length + 1,
+        repositories: [...repos.repositories, { id: 2003, name: 'granted', full_name: 'acme/granted', private: false, owner: { login: 'acme' } }] } });
+      await page.click('acme/factory');
+      await page.until(`[...document.querySelectorAll('aside.side .repo-list button')].some(b => b.textContent.trim() === 'acme/granted')`, 'the newly granted repository', 4000);
       checkRequestLog(world);
       await page.close();
     });
