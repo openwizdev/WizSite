@@ -1,23 +1,12 @@
-// The app's data layer: sign-in, the token, and every read from GitHub.
-//
-// The app only reads. Every request goes through ask() below, which allows only:
-//   - GitHub's API (https://api.github.com): GET, and POST /graphql with a query (never a mutation);
-//   - the sign-in helper on this site: POST /api/sign-in/token and /api/sign-in/refresh.
-// The page's Content-Security-Policy (_headers) enforces the same two destinations in the browser itself.
-//
-// The token lives only in this browser (localStorage), and goes only to api.github.com.
-// Feeds read on their own: agents every two minutes, specs every ten. A read that fails, or a part of one that
-// does, is unknown, never empty. When GitHub's limit runs low the feeds pause until it resets, and say so.
 'use strict';
 (() => {
   const OW = (window.OW = window.OW || {});
   const API = 'https://api.github.com';
   const AUTH_KEY = 'openwiz.app.auth';
   const REPO_KEY = 'openwiz.app.repo';
-  const LOW = 100; // GitHub points left at which the app stops reading until the limit resets
-  const PAUSE_DEFAULT = 5 * 60 * 1000; // when GitHub refuses for its limit without saying until when
+  const LOW = 100;
+  const PAUSE_DEFAULT = 5 * 60 * 1000;
 
-  // ---- The token and the picked repository, in this browser only ----
 
   const store = {
     get(key) {
@@ -26,8 +15,6 @@
     set(key, value) { localStorage.setItem(key, JSON.stringify(value)); },
     drop(key) { localStorage.removeItem(key); },
   };
-  // A sign-in is one session: a random id kept beside the token. Anything started for a session (a token refresh,
-  // a picker read, a feed read) is dropped when it ends: on Sign out, or when a new sign-in replaces it.
   const auth = {
     get: () => store.get(AUTH_KEY),
     session: () => store.get(AUTH_KEY)?.session ?? null,
@@ -47,7 +34,6 @@
       store.drop(REPO_KEY);
       refreshing = null;
       stop();
-      // A new sign-in may be another account, with its own GitHub limit.
       Object.assign(limit, { remaining: null, limit: null, pausedUntil: null });
     },
   };
@@ -60,7 +46,6 @@
     forget: () => store.drop(REPO_KEY),
   };
 
-  // ---- The one way out ----
 
   class Refused extends Error {}
   function allowed(method, url, body) {
@@ -82,7 +67,6 @@
     });
   }
 
-  // ---- Sign-in: the helper swaps GitHub's code (or the refresh token) for the user's token ----
 
   async function finishSignIn(code, state) {
     const response = await ask('POST', '/api/sign-in/token', { code, state });
@@ -90,7 +74,6 @@
     if (!grant?.access_token) throw new Error('the sign-in did not finish');
     auth.keep(grant, crypto.randomUUID());
   }
-  // One token refresh at a time, for one session. Its answer is kept only if that session is still the current one.
   let refreshing = null;
   function refresh(session) {
     if (refreshing?.session !== session) {
@@ -108,13 +91,9 @@
     return refreshing.run;
   }
 
-  // The session ended (signed out or replaced) while a request was out: its result is dropped, quietly.
   class Ended extends Error {}
-  // GitHub refused the sign-in itself (expired and not refreshable): the user has to sign in again.
   class SignedOut extends Error {}
 
-  // A GitHub request with this session's token. An expired token is refreshed once; a refused refresh signs out.
-  // Every await is followed by a check that the session that started the request is still the current one.
   async function github(method, path, body) {
     const session = auth.session();
     if (!session) throw new Ended();
@@ -144,10 +123,7 @@
     throw new SignedOut();
   }
 
-  // ---- The repository picker's read: every repository the user's installations of the App can see ----
 
-  // The next page of a GitHub list, only if its Link header points at the same route on api.github.com with
-  // nothing but per_page and page; anything else is not followed (and the list is reported incomplete).
   const MAX_PAGES = 50;
   function nextPage(response, path) {
     const link = (response.headers.get('Link') || '').split(',').map(part => part.match(/^\s*<([^>]*)>\s*;\s*rel="next"\s*$/)).find(Boolean);
@@ -159,7 +135,6 @@
       && keys.every(key => key === 'per_page' || key === 'page') && /^\d+$/.test(url.searchParams.get('page') || '');
     return fine ? { next: `${url.pathname}${url.search}` } : { done: false };
   }
-  // Every page of one list: {items, complete}. The first page failing throws; a later one makes it incomplete.
   async function every(path, field) {
     const items = [];
     let at = `${path}?per_page=100`;
@@ -200,15 +175,7 @@
     return { repos: repos.sort((a, b) => a.full.localeCompare(b.full)), complete, installations: installs.items.length };
   }
 
-  // ---- Feeds: the reads pages show, each on its own schedule ----
-  // Pages (AP6 You and Specs, AP7 Agents) read feeds[name].data. A feed's state is:
-  //   loading  - not read yet;  ok - read whole;  partial - read, but part failed (missing parts are unknown);
-  //   unknown  - never read successfully (the last read failed);  stale - the last read failed, the data is older.
 
-  // Specs: an open issue with sub-issues (its tickets), a spec label, or a "<version> spec: <name>" title (plan-graph's,
-  // before its tickets exist), and never a wayfind map. The factory gives specs no label: looking for the label alone
-  // found no spec on OpenWiz, and the You tiles read 0 (#1266 F1). GitHub's issue search finds them; specsOf keeps the
-  // ones that really are specs, since the search's "in:title spec" also matches a title that only mentions one.
   const SPECS = `query Specs($owner: String!, $name: String!, $specs: String!) {
   rateLimit { limit remaining resetAt }
   specSearch: search(query: $specs, type: ISSUE_ADVANCED, first: 100) {
@@ -227,10 +194,6 @@
     fleet: object(expression: "HEAD:docs/agents/fleet.md") { ... on Blob { text } }
   }
 }`;
-  // The Specs feed's second read (AP6): each open spec's recent comments (its decision records) and its tickets, with
-  // their state, labels, blocked-by links, the open pull requests that close them and their most recently edited
-  // comments (the agents' status notes). Every list carries its total, so a page can tell a partial list from a whole
-  // one. One aliased query for up to SPEC_DETAILS specs (the most recently updated); a spec past that is unknown.
   const SPEC_DETAILS = 30;
   const RECENT = 'orderBy: {field: UPDATED_AT, direction: DESC}';
   const TICKET = 'number title url state stateReason repository { nameWithOwner }';
@@ -249,10 +212,6 @@
   }
 }`;
   }
-  // The Agents feed (AP7, AP22): every issue updated in the last day, page by page. Editing a comment bumps its issue's
-  // updatedAt, so these hold every note the page can show (live: edited in the last 30 minutes; the last day). Each
-  // with its most recently edited comments (the agents' status notes, with their ids and authors) and the pull requests
-  // that close it (state, review, checks), and fleet.md (Record authors), whose notes count. About 4 points a page.
   const PULLS = `closedByPullRequestsReferences(first: 5, includeClosedPrs: true) { totalCount nodes { url state isDraft reviewDecision
           commits(last: 1) { nodes { commit { statusCheckRollup { state } } } } } }`;
   const AGENTS = `query Agents($owner: String!, $name: String!, $since: DateTime!, $after: String) {
@@ -267,17 +226,14 @@
     fleet: object(expression: "HEAD:docs/agents/fleet.md") { ... on Blob { text } }
   }
 }`;
-  const PULL_REFRESH = 50; // kept tickets whose open pull requests a read between full reads asks for again
+  const PULL_REFRESH = 50;
   const DAY = 24 * 60 * 60 * 1000;
-  const SKEW = 5 * 60 * 1000; // an edit up to 5 minutes off this clock still counts
-  const FULL_EVERY = 30 * 60 * 1000; // a full read of the last day; the reads between fetch only what changed
-  const AGENT_PAGES = 40; // at most 2,000 tickets a read
-  const RESERVE = 500; // GitHub points kept for the other reads: the Agents read stops paging below this
+  const SKEW = 5 * 60 * 1000;
+  const FULL_EVERY = 30 * 60 * 1000;
+  const AGENT_PAGES = 40;
+  const RESERVE = 500;
   const SPEC_TITLE = /(^|\s)spec:\s/i;
   const SPEC_SEARCH = full => `repo:${full} is:issue state:open (has:sub-issue OR label:spec OR in:title spec) -label:wayfind:map sort:updated-desc`;
-  // The search's open issues that are specs, newest first, as data.specIssues: {totalCount, nodes}. A result GitHub
-  // didn't give (past the page, or null with an error) counts toward totalCount, so the list stays partial and the
-  // tiles show "N+"; a result GitHub gave that isn't a spec is left out of both.
   function specsOf(search) {
     if (!search || !Array.isArray(search.nodes)) return null;
     const given = search.nodes.filter(issue => Number.isSafeInteger(issue?.number));
@@ -294,10 +250,7 @@
   };
   for (const feed of Object.values(feeds)) Object.assign(feed, { state: 'loading', data: null, readAt: null, failedAt: null, timer: null, busy: false });
 
-  // ---- The Agents read, page by page (AP22) ----
 
-  // GraphQL errors inside one issue are kept on it (issue.errors: the rest of each path), so only that part of it is
-  // unknown; an error inside an issue GitHub gave as null is that ticket's ("couldn't be read"). The others come back.
   function place(errors, nodes) {
     const loose = [];
     for (const error of Array.isArray(errors) ? errors : []) {
@@ -310,9 +263,6 @@
     }
     return loose;
   }
-  // A full read takes every ticket updated in the last day; the reads between take only those updated since the last
-  // read began, merged into what it kept. Paging stops early when GitHub's limit runs low: the page then says how many
-  // tickets were read of how many. {data, errors}, or null when the read belongs to an earlier sign-in or repository.
   async function agentsRead(feed, picked, mine) {
     const now = Date.now();
     const kept = feed.kept?.repo === picked.full ? feed.kept : null;
@@ -321,14 +271,14 @@
     const since = new Date(full ? now - DAY - SKEW : kept.startedAt - SKEW).toISOString();
     const issues = full ? new Map() : new Map(kept.issues);
     const unread = [];
-    const fetched = new Set(); // the tickets this read got from GitHub
+    const fetched = new Set();
     const errors = [];
     let after = null;
     let total = null;
     let read = 0;
     let fleet;
-    let complete = false; // GitHub's list ran out: every ticket in this read's scope was asked for
-    let stop = null; // why it didn't: 'limit' (GitHub's limit is low) or 'failed' (a later page failed)
+    let complete = false;
+    let stop = null;
     for (let page = 0; page < AGENT_PAGES; page += 1) {
       if (page && (paused() || (limit.remaining !== null && limit.remaining < RESERVE))) { stop = 'limit'; break; }
       let response;
@@ -365,20 +315,15 @@
       if (!list.pageInfo.hasNextPage) { complete = true; break; }
       if (typeof list.pageInfo.endCursor !== 'string') { stop = 'failed'; break; }
       after = list.pageInfo.endCursor;
-      // The first read of a repository shows what it has so far, page by page, saying it is still reading.
       if (!feed.data || feed.data.issues?.reading) {
         feed.data = { issues: { totalCount: total, nodes: [...issues.values()], reading: true }, fleet };
         changed();
       }
     }
-    if (!complete && !stop) stop = 'limit'; // AGENT_PAGES ran out
-    // A ticket GitHub gave without its pull requests shows them as unknown, and the read stays partial until a read
-    // gives them (AP22b, review R1). Errors under a pull request GitHub did give stay on that card only.
+    if (!complete && !stop) stop = 'limit';
     for (const number of fetched) {
       if (issues.get(number).closedByPullRequestsReferences == null) errors.push({ message: `#${number}'s pull requests couldn't be read` });
     }
-    // The tickets kept from earlier reads keep showing their pull requests: those facts (state, review, checks) change
-    // without the ticket being updated, so each read asks for them again (review R1).
     if (!full && !stop) {
       const stale = [...issues.values()].filter(issue => !fetched.has(issue.number)
         && (issue.closedByPullRequestsReferences?.nodes || []).some(pr => pr?.state === 'OPEN')).slice(0, PULL_REFRESH);
@@ -390,8 +335,6 @@
     for (const [number, issue] of issues) if (Date.parse(issue.updatedAt) < now - DAY - SKEW) issues.delete(number);
     const nodes = [...issues.values()].sort((a, b) => (Date.parse(b.updatedAt) || 0) - (Date.parse(a.updatedAt) || 0));
     feed.kept = { repo: picked.full, issues, startedAt: now, fullAt: full ? now : kept.fullAt, complete: complete && !errors.length };
-    // A read that stopped short says how many tickets of its own query it read, and why (review R4). An error it
-    // couldn't place keeps the read partial (the failure banner) without making up a missing ticket.
     const count = nodes.length + unread.length;
     const short = complete ? null : { why: stop, read, total: Math.max(read + 1, total ?? 0), scope: full ? 'day' : 'since' };
     return {
@@ -400,9 +343,6 @@
     };
   }
 
-  // The pull requests that close the kept tickets, asked again by number: up to PULL_REFRESH tickets in one query.
-  // A ticket's pull requests are replaced where GitHub gave them; where it didn't (or the whole query failed), its card
-  // shows them as unknown, never the last facts, and the read is partial (AP22b). null when the read belongs to an earlier sign-in or repository.
   async function pullsRead(stale, picked, mine, errors) {
     const query = `query AgentPulls($owner: String!, $name: String!) {
   rateLimit { limit remaining resetAt }
@@ -425,8 +365,6 @@
         const got = repository[`i${issue.number}`];
         const placed = (answer.errors || []).filter(e => Array.isArray(e?.path) && e.path[1] === `i${issue.number}`).map(e => e.path.slice(2));
         if (!got?.closedByPullRequestsReferences) {
-          // GitHub didn't give this ticket's pull requests: its card shows them as unknown, never the last facts, and
-          // the read is partial (AP22b, review R8). The next read asks again.
           issue.closedByPullRequestsReferences = null;
           errors.push({ message: `#${issue.number}'s pull requests couldn't be read` });
           continue;
@@ -445,8 +383,6 @@
     }
   }
 
-  // Every comment of one issue, with REST (AP22): a spec's older decision records past the first read. Its pages are
-  // asked for by number on this same route (GitHub's own next link names the repository by id). {items, complete}.
   async function issueComments(picked, number) {
     const items = [];
     for (let page = 1; page <= MAX_PAGES; page += 1) {
@@ -458,7 +394,6 @@
     }
     return { items, complete: false };
   }
-  // The specs whose comments the first read gave only part of get the rest; one that can't be read stays partial.
   async function moreComments(specs, picked) {
     for (const detail of Object.values(specs || {})) {
       const list = detail?.comments;
@@ -476,7 +411,7 @@
   }
 
   const limit = { remaining: null, limit: null, pausedUntil: null };
-  let generation = 0; // bumped by stop(): a read started for an earlier sign-in or repository is dropped
+  let generation = 0;
   const listeners = new Set();
   const changed = () => listeners.forEach(listener => listener());
   const paused = () => limit.pausedUntil !== null && limit.pausedUntil > Date.now();
@@ -489,7 +424,6 @@
       limit.limit = rate?.limit ?? limit.limit;
       if (remaining < LOW) limit.pausedUntil = Number.isFinite(reset) ? reset : Date.now() + PAUSE_DEFAULT;
     }
-    // GitHub refusing for its limit: a 429, or a 403 that says no points are left or asks to wait.
     const retry = Number(response.headers.get('retry-after') ?? NaN);
     if (response.status === 429 || (response.status === 403 && (remaining === 0 || Number.isFinite(retry)))) {
       limit.pausedUntil = Number.isFinite(retry) ? Date.now() + retry * 1000 : Number.isFinite(reset) ? reset : Date.now() + PAUSE_DEFAULT;
@@ -521,15 +455,12 @@
       const data = answer.data.repository;
       feed.shape?.(data, answer.data);
       const errors = [...(answer.errors || [])];
-      // A feed's second read (Specs: the running specs' tickets). If it fails, or GitHub's limit is now low, its part
-      // is unknown (data.specs is null) and the feed is partial.
       const more = feed.more?.(data);
       if (more) {
         data.specs = null;
         if (paused()) {
           errors.push({ message: 'the second read waits for GitHub\'s limit' });
         } else {
-          // A failure here (even of the network) keeps the first read: only its own part is unknown.
           try {
             const second = await github('POST', '/graphql', { query: more, variables: { owner: picked.owner, name: picked.name } });
             const extra = await second.json().catch(() => null);
@@ -590,9 +521,7 @@
       clearTimeout(feed.timer);
       Object.assign(feed, { state: 'loading', data: null, readAt: null, failedAt: null, busy: false, kept: null });
     }
-    // GitHub's limit belongs to the signed-in account, not the repository: a pause outlives a repository change.
   }
-  // Read everything now (the Refresh button), unless GitHub's limit is low.
   function refreshAll() {
     if (paused()) return;
     feeds.agents.forceFull = true;
@@ -601,7 +530,6 @@
       schedule(name);
     }
   }
-  // Back on a hidden tab: read whatever came due while it was hidden.
   document.addEventListener('visibilitychange', () => {
     if (document.hidden || !repo.get() || !auth.signedIn()) return;
     for (const [name, feed] of Object.entries(feeds)) {

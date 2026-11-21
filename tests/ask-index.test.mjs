@@ -1,6 +1,3 @@
-// FA2 (#1900): the docs index Ask a Wiz answers from (contract openwiz.ask-a-wiz.v1, "The docs index").
-// A fixture site and a fixture OpenWiz checkout go in; the exact index comes out. Synthetic values only.
-// Run: npm run test:functions
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
@@ -96,10 +93,8 @@ test('the contract\'s own index fixture passes the check, and every broken form 
   }
 });
 
-// The snapshot (ask-docs/): OpenWiz's public README.md and top-level docs/*.md, named by the commit they came from.
 const SNAPSHOT = fileURLToPath(new URL('../ask-docs/', import.meta.url));
 
-// A throwaway Git checkout of the fixture docs folder, with one commit by a synthetic author.
 async function checkout() {
   const dir = await mkdtemp(join(tmpdir(), 'ask-openwiz-'));
   await cp(docs, dir, { recursive: true });
@@ -121,7 +116,6 @@ test('a refresh copies only the named commit\'s README.md and top-level docs, wi
   const dir = await mkdtemp(join(tmpdir(), 'ask-docs-'));
   const openwiz = await checkout();
   try {
-    // After the commit: an unpublished edit to a tracked doc, and untracked drafts. Neither is the named commit.
     await writeFile(join(openwiz.dir, 'docs/install.md'), 'SYNTHETIC-UNPUBLISHED-EDIT\n', { flag: 'a' });
     await writeFile(join(openwiz.dir, 'docs/draft.md'), '# Draft\n\nSYNTHETIC-UNTRACKED-DRAFT\n');
     const target = join(dir, 'ask-docs');

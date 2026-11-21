@@ -1,4 +1,3 @@
-"""Synthetic negative cases for link/resource and privacy gates; no browser tools."""
 from pathlib import Path
 import json
 import shutil
@@ -13,8 +12,6 @@ from check import CTA, FAQ, FAQ_WHERE, FOOTER, INSTALL_NOTE_HTML, FINGERPRINTS, 
 
 
 def edit_built(root, name, change):
-    """Edit a fingerprinted file in a build copy and re-fingerprint it (renaming the file and the pages'
-    references), so a test reaches the gate it targets instead of failing on the stale fingerprint."""
     old = next(p for p in root.glob(name.rsplit('.', 1)[0] + '.*.' + name.rsplit('.', 1)[1]))
     was = old.relative_to(root).as_posix()
     data = change(old.read_text()).encode()
@@ -26,12 +23,10 @@ def edit_built(root, name, change):
         path.write_text(path.read_text().replace(f'"/{was}"', f'"/{new}"'))
 
 
-# A synthetic landing and changelog, valid as they stand; each case below plants one break.
 LANDING = ('<html><head><title>OpenWiz</title></head><body><header><nav><a href="/changelog/">Changelog</a></nav></header>'
            '<main><h1>Bring your own everything.</h1></main><footer><a href="/changelog/">Changelog</a></footer></body></html>')
 CHANGELOG = ('<html><head><title>Changelog — OpenWiz</title><style>.release{color:red}</style></head><body><main id="main">'
              '<h1>Changelog</h1><p class="lead">What each public release lets you do.</p></main></body></html>')
-# Two synthetic releases (#78), their data and their built section, newest first.
 DATA = {
     '0.01.json': {'name': '0.01', 'semver': '0.1.2', 'date': '2031-01-02', 'headline': 'One thing.',
                   'bullets': ['First line.', 'Second line.'], 'notes': 'https://github.com/openwizdev/OpenWiz/releases/tag/v0.1.2'},
@@ -51,7 +46,6 @@ SOON = f'<section class="releases" aria-label="Releases"><p class="pre">No publi
 
 
 def with_switch(state):
-    """The built Changelog as the build writes it when the landing's install switch reads `state`."""
     built = (ROOT / 'dist/changelog/index.html').read_text()
     section = subprocess.run(['node', str(ROOT / 'scripts/changelog.mjs'), '--switch', state], capture_output=True, text=True, check=True).stdout
     before, rest = built.split('<!-- releases:start -->')
@@ -94,7 +88,6 @@ class Checks(unittest.TestCase):
                 check_site(root)
 
     def test_privacy_in_text_paths_and_checker(self):
-        # Construct generic markers so the test file itself stays clean.
         for marker in ('Closed' + 'Wiz', '/' + 'Users' + '/example',
                        'private/' + 'evidence/', 'docs/' + 'grills/',
                        'thr' + '_synthetic', 'cr' + '_sub_synthetic'):
@@ -122,7 +115,6 @@ class Checks(unittest.TestCase):
         for bad in (webp((b'VP8L', b'xyz'), (b'EXIF', b'name')), webp((b'XMP ', b'x')), b'GIF89a' + b'\0' * 8):
             with self.subTest(bad=bad[:16]), self.assertRaises(AssertionError):
                 check_webp(bad)
-        # Unpinned pictures, and pinned names with other bytes, are refused.
         for path in ('elsewhere/x.webp', 'art/new.webp', 'art/seal.webp'):
             with self.subTest(path=path), self.assertRaises(AssertionError):
                 check_privacy(path, webp((b'VP8L', ('cr' + '_sub_x').encode())))
@@ -181,14 +173,11 @@ class Checks(unittest.TestCase):
                     check_site(root)
 
     def test_product_first_landing(self):
-        # Catches: a missing to-do example, a wrong step order, the retired approval step, missing
-        # sample copy, a return to the old example, or a missing painting description.
         for change, error in (
                 (lambda t: t.replace('Build a to-do app', 'Build an app'), 'missing landing story copy'),
                 (lambda t: t.replace('<h3>Watch your spec</h3>', '<h3>Watch it ship</h3>'), 'three moments'),
                 (lambda t: t.replace('<h3>Watch it ship</h3>', '<h3>Approve the plan</h3><h3>Watch it ship</h3>'), 'three moments'),
                 (lambda t: t.replace('The real spec of an OpenWiz-built to-do app', 'A sample spec'), "to-do app's real spec"),
-                # Catches: a moment that loses or comments out the real to-do run it shows in place, or a link out of the section.
                 (lambda t: t.replace('<p class="reply">Yes, greyed out.</p>', '<p class="reply">Yes.</p>'), 'Answer a few questions moment must show'),
                 (lambda t: t.replace('<h4>Problem Statement</h4>', '<!-- <h4>Problem Statement</h4> -->'), 'Watch your spec moment must show'),
                 (lambda t: t.replace('todo-demo.tasks.v1', 'tasks'), 'Watch your spec moment must show'),
@@ -200,7 +189,6 @@ class Checks(unittest.TestCase):
                 (lambda t: t.replace('<summary>The live app</summary>', '<summary><a href="https://openwizdev.github.io/todo-demo/">The live app</a></summary>'), 'keep visitors on the site|unexpected external URL'),
                 (lambda t: t.replace('<summary>The spec</summary>', "<summary>The spec</summary><a href='https://github.com/openwizdev/openwiz'>x</a>"), 'keep visitors on the site'),
                 (lambda t: t.replace('<summary>The spec</summary>', '<summary>The spec</summary><a href=//github.com/openwizdev/openwiz>x</a>'), 'keep visitors on the site|unexpected external URL'),
-                # Catches: an answer missing from the expanded grill while the bubbles still show it, and the reverse.
                 (lambda t: t.replace('</span></p>\n              <p class="reply">Yes, greyed out.</p>', '</span></p>\n'), 'expanded grill must show each question with its answer: Keep'),
                 (lambda t: t.replace('</span></p>\n              <p class="reply">One list for now.</p>', '</span></p>\n              <p class="reply">Several lists.</p>'), 'expanded grill must show each question with its answer: Where'),
                 (lambda t: t.replace('<p class="ask">Where should tasks live?</p><p class="reply">One list for now.</p>', '<p class="ask">Where should tasks live?</p>'), 'grill bubbles must show each question with its answer: Where'),
@@ -218,8 +206,6 @@ class Checks(unittest.TestCase):
                     check_site(root)
 
     def test_hero_names_no_approval_step(self):
-        # Catches: an approval step back in the hero (J203: the road is three moments with no approval),
-        # in its copy, its demo window or the demo's step labels.
         for name, old, new in (
                 ('index.html', 'Turn an idea into a spec and reviewed code.', 'Turn an idea into an approved plan and reviewed code.'),
                 ('index.html', '<p class="demo-status">', '<p class="demo-status">Approve the plan · '),
@@ -238,8 +224,6 @@ class Checks(unittest.TestCase):
                     check_site(root)
 
     def test_changelog_named_everywhere(self):
-        # Catches: a landing nav or footer label left as the old name, an extra or missing Changelog link on the
-        # landing, inline styles leaking into the landing, and the old name on either page's heading, title or text.
         check_changelog(LANDING, CHANGELOG)
         for landing, error in (
                 (LANDING.replace('>Changelog</a></nav>', '>Ship log</a></nav>'), 'nav and footer'),
@@ -259,8 +243,6 @@ class Checks(unittest.TestCase):
                 check_changelog(LANDING, changelog)
 
     def test_changelog_is_its_title_one_line_and_entries(self):
-        # Catches (#78): the repository picture, What exists today or any other section back on the page; a second
-        # line; a private repository named; a version number or date written into the page instead of the data.
         for changelog, error in (
                 (CHANGELOG.replace('</main>', '<figure class="repo-map"><svg role="img" aria-label="x"></svg></figure></main>'), 'nothing else'),
                 (CHANGELOG.replace('</main>', '<h2>What exists today</h2></main>'), 'nothing else'),
@@ -276,9 +258,6 @@ class Checks(unittest.TestCase):
                 check_changelog(LANDING, changelog)
 
     def test_release_data(self):
-        # Catches (#78): a release file with no bullets, more than 6, an empty bullet or one over 120 characters; a
-        # missing, non-GitHub or wrong-version notes link; a missing field or an extra one; a public name that doesn't
-        # name its file; a semver before 0.1.0; a bad date; a multi-line headline; a private repository named.
         for name, data in DATA.items():
             check_release_data(name, data)
         one = DATA['0.01.json']
@@ -324,14 +303,9 @@ class Checks(unittest.TestCase):
             (folder / 'notes.md').write_text('x')
             with self.assertRaisesRegex(AssertionError, 'only release data files'):
                 read_releases(folder)
-        # The shipped data passes.
         read_releases()
 
     def test_generated_releases(self):
-        # catches (#78): a build without the generated section, or with it twice or outside main; an entry shown
-        # before the install switch reads live (an unreleased version claimed); an entry missing, extra, out of
-        # version order or differing from its data; a second link; the pre-releases line missing; and markup
-        # (a script, an inline handler, an image) reaching the entries.
         page = CHANGELOG.replace('</main>', '<!-- releases:start -->' + LIVE + '<!-- releases:end --></main>')
         self.assertEqual(split_releases(page), (CHANGELOG, LIVE))
         check_releases(LIVE, DATA, True)
@@ -368,7 +342,6 @@ class Checks(unittest.TestCase):
                 check_releases(section, DATA, live)
 
     def test_landing_starts_in_still_mode(self):
-        # Catches: an early inline script, a visible broken motion control or an autoplaying clip.
         for change, error in (
                 (lambda t: t.replace('</head>', '<script>document.body.dataset.x = 1</script></head>', 1),
                  'wait for both external scripts'),
@@ -388,7 +361,6 @@ class Checks(unittest.TestCase):
                     check_site(root)
 
     def test_spec_video_poster_captions_and_link(self):
-        # Catches: the spec video losing its poster, captions, plain link or lazy, muted inline start (#1405).
         for change, error in (
                 (lambda t: re.sub(r' poster="[^"]*"', '', t, count=1), 'spec video needs a pinned poster'),
                 (lambda t: re.sub(r'<track [^>]*>', '', t, count=1), 'spec video needs default captions'),
@@ -419,8 +391,6 @@ class Checks(unittest.TestCase):
                          '{.x{transition:opacity .35s}}')
 
     def test_motion_only_without_reduced_motion(self):
-        # Catches: an idle move, a transition or smooth scrolling that still runs for a visitor who asked for
-        # reduced motion. Stopping motion (animation: none) is allowed anywhere.
         check_motion('@media (prefers-reduced-motion: no-preference){.a{animation:x 1s}html{scroll-behavior:smooth}'
                      '.b:hover{transition:opacity .2s}}@keyframes x{to{opacity:0}}.c{animation:none !important}')
         for bad in ('.a{animation:x 1s}', 'html{scroll-behavior:smooth}', '.b{transition:transform .2s}',
@@ -491,10 +461,6 @@ class Checks(unittest.TestCase):
                     check_site(root)
 
     def test_install_line_and_its_switch(self):
-        """#1357: the box shows exactly the line the install skill expects, the instruction and one copy button; the
-        button ships natively disabled and labelled coming soon, and one switch (data-install) is the only change
-        that turns it on. Both switch values are built from the shipped landing and checked, whichever value it
-        ships (#1573); each case below plants one break in each of them."""
         line = '<code class="install-line">Install OpenWiz from github.com/openwizdev/OpenWiz</code>'
         hint = '<p class="install-hint">Paste this into your agent</p>'
         button = '<button class="btn install" type="button" disabled>Copy · coming soon</button>'
@@ -507,13 +473,13 @@ class Checks(unittest.TestCase):
         for state in INSTALL_SWITCH:
             switch = f'data-install="{state}"'
             variant = text.replace(f'data-install="{shipped[0]}"', switch)
-            changelog = with_switch(state)  # the Changelog's entries follow the same switch (#78)
+            changelog = with_switch(state)
             with self.subTest(state=state), tempfile.TemporaryDirectory() as temp:
                 root = Path(temp) / 'dist'
                 shutil.copytree(ROOT / 'dist', root)
                 (root / 'index.html').write_text(variant)
                 (root / 'changelog/index.html').write_text(changelog)
-                check_site(root)  # either value keeps every other rule
+                check_site(root)
             breaks = [
                 (line, line.replace('github.com/openwizdev/OpenWiz', 'https://github.com/openwizdev/OpenWiz')),
                 (line, line.replace('OpenWiz</code>', 'openwiz</code>')),
@@ -544,10 +510,6 @@ class Checks(unittest.TestCase):
                         check_site(root)
 
     def test_install_note_under_the_box(self):
-        """#1674 (RL2): the install box ends with one note, word for word, naming what 0.1.0 needs, its one link
-        CloudRoom's site; that link is allowed nowhere else."""
-        # catches: the note missing, doubled, reworded or moved out of the box; its CloudRoom link dropped, pointed
-        # elsewhere or losing noreferrer; and CloudRoom's site linked anywhere but the note, on the landing or off it.
         note = INSTALL_NOTE_HTML
         link = '<a href="https://cloudroom.dev" rel="noreferrer">CloudRoom</a>'
         text = (ROOT / 'dist/index.html').read_text()
@@ -562,7 +524,7 @@ class Checks(unittest.TestCase):
             ('index.html', note, note.replace(link, 'CloudRoom')),
             ('index.html', note, note.replace('https://cloudroom.dev', 'https://cloudroom.dev/x')),
             ('index.html', note, note.replace(' rel="noreferrer"', '')),
-            ('index.html', note, ''),  # with the note re-added outside the box, below
+            ('index.html', note, ''),
             ('index.html', '</main>', f'<p>{link}</p></main>'),
             ('drivers/index.html', '</main>', f'<p>{link}</p></main>'),
         ]
@@ -578,12 +540,6 @@ class Checks(unittest.TestCase):
                     check_site(root)
 
     def test_install_version_label_is_the_only_version_on_the_landing(self):
-        """#1674 (J264): the install box shows the public name with its semver small beside it, reading exactly
-        OpenWiz 0.01 0.1.0, with the switch live. That one label is the only release version the landing may
-        mention; each case below plants one break, and each must fail."""
-        # catches: the label's semver or public name drifting, the label missing or doubled, the guard's exception
-        # widening to let a version through anywhere else on the landing, in the box or outside it, and the label
-        # moved out of the box with its text left behind in a comment (#46 R2).
         label = '<p class="install-version">OpenWiz 0.01 <small>0.1.0</small></p>'
         text = (ROOT / 'dist/index.html').read_text()
         self.assertEqual(text.count(label), 1, label)
@@ -600,11 +556,8 @@ class Checks(unittest.TestCase):
             ('</main>', '<p>Now 0.1.0</p></main>'),
             ('</main>', '<p>OpenWiz 0.01 <small>0.1.0</small></p></main>'),
         ]
-        # #46 R2: the label moved out of the box, its text left behind in a comment where it was, or only moved.
         moved = lambda variant, trace: variant.replace(label, trace, 1).replace('</main>', label + '</main>', 1)
         relocations = ['<!-- OpenWiz 0.01 <small>0.1.0</small>. -->', f'<!-- {label} -->', '']
-        # The shipped switch only: since #82 the built changelog follows it, so flipping the landing alone fails
-        # check_site for a reason that has nothing to do with the label.
         for state in ['live']:
             variant = text.replace(shipped[0], f'data-install="{state}"')
             with self.subTest(state=state), tempfile.TemporaryDirectory() as temp:
@@ -628,8 +581,6 @@ class Checks(unittest.TestCase):
                         check_site(root)
 
     def test_app_page_policy_and_calm(self):
-        # catches: the app losing the browser-enforced limit to GitHub and this site, loading an unchecked
-        # script, or gaining motion.
         cases = {
             'no CSP for /app/*': lambda root: (root / '_headers').write_text(
                 (root / '_headers').read_text().replace("connect-src 'self' https://api.github.com", "connect-src *")),
@@ -649,7 +600,6 @@ class Checks(unittest.TestCase):
                     check_site(root)
 
     def broken(self, name, old, new, error, css=None):
-        """A build copy with one planted break (a page edit, or a site.css addition) must fail check_site with error."""
         with self.subTest(name=name, old=old[:60], error=error), tempfile.TemporaryDirectory() as temp:
             root = Path(temp) / 'dist'
             shutil.copytree(ROOT / 'dist', root)
@@ -664,7 +614,6 @@ class Checks(unittest.TestCase):
                 check_site(root)
 
     def test_team_page_and_buy_button(self):
-        """#63: every site page's header has the one buy button, and the site has one booking link, https or the placeholder."""
         def planted(page, change):
             temp = tempfile.TemporaryDirectory()
             root = Path(temp.name) / 'dist'
@@ -690,7 +639,6 @@ class Checks(unittest.TestCase):
             'team page copy': ('team/index.html', lambda t: t.replace('>Book a call</a>', '>Talk</a>')),
             'team page copy ': ('team/index.html', lambda t: t.replace('>Book a call</a>', '>Talk</a>', 1)),
             'missing team page copy': ('team/index.html', lambda t: t.replace(' No checkout.', '', 1)),
-            # #81, design P: the hero's headline, terms, ships line and poster, then the timeline and the sections.
             'the team page headline': ('team/index.html', lambda t: t.replace('Leave with a shipped pull request.', 'Leave with a pull request.', 1)),
             'the terms': ('team/index.html', lambda t: re.sub(r'<ul class="team-terms"[^>]*>[\s\S]*?</ul>', '', t)),
             'the terms ': ('team/index.html', lambda t: t.replace('<li>A small, real change of your choice.</li>', '', 1)),
@@ -710,7 +658,6 @@ class Checks(unittest.TestCase):
             'the team page sections ': ('team/index.html', lambda t: re.sub(r'<section class="team-when"[\s\S]*?</section>\n', '', t)),
             'four marks': ('team/index.html', lambda t: t.replace('<li class="team-end"><h3>Minute 30</h3><p>A pull request ships.</p></li>', '', 1)),
             'four marks ': ('team/index.html', lambda t: t.replace('<h3>Minute 10</h3>', '<h3>Minute 15</h3>', 1)),
-            # #89, candidate 2: the terms' label, the timeline in the hero, Minute 30 highlighted, Proof's three cards.
             'the terms: under their label': ('team/index.html', lambda t: re.sub(r'<p class="team-label"[^>]*>How the call works</p>\s*', '', t, count=1)),
             'the terms: under their label ': ('team/index.html', lambda t: t.replace('>How the call works</p>', '>How it works</p>', 1)),
             'the timeline: in the hero': ('team/index.html', lambda t: re.sub(r'(\n  <section class="team-when"[\s\S]*?</section>)(\n</div>\n)', r'\2\1\n', t, count=1)),
@@ -723,13 +670,11 @@ class Checks(unittest.TestCase):
             'Proof: the first card': ('team/index.html', lambda t: t.replace('<small>5 of 5</small>', '', 1)),
             'Proof: the first card   ': ('team/index.html', lambda t: t.replace('<h3>Three drivers passed all five checks</h3>', '<h3>Three drivers passed</h3>', 1)),
             'Proof: the first card    ': ('team/index.html', lambda t: t.replace('version, start, wake, stop and token.', 'version and start.', 1)),
-            # #89: no repeated drivers: a where-your-agents-run section again is refused.
             'the team page sections  ': ('team/index.html', lambda t: t.replace('<section class="team-part team-close', '<section class="team-part wrap"><h2>Where your agents run</h2></section>\n<section class="team-part team-close', 1)),
             'Proof: the first card ': ('team/index.html', lambda t: t.replace('Grok Bot: coming soon', 'Grok Bot', 1)),
             'Proof: the first card  ': ('team/index.html', lambda t: t.replace('<a href="/drivers/">See how drivers work</a>', '<a href="/">See how drivers work</a>', 1)),
             'Proof: the second card': ('team/index.html', lambda t: t.replace('>See the Drivers page</a>', '>Drivers</a>', 1)),
             'the boat poster: Proof': ('team/index.html', lambda t: re.sub(r'<li class="team-card"><a href="https://x\.com/openwiz"[\s\S]*?</li>\n', '<li class="team-card"><a href="https://x.com/openwiz" class="team-poster">Watch the fleet build it (49 s, on X)</a></li>\n', t, count=1)),
-            # #73: the one site footer on every page.
             'the one site footer|one X link per page': ('drivers/index.html', lambda t: t.replace(FOOTER, '', 1)),
             'the one site footer|one X link per page ': ('changelog/index.html', lambda t: t.replace('</main>', '</main>' + FOOTER, 1)),
             'the one site footer  ': ('index.html', lambda t: t.replace('X @openwiz', 'X', 1)),
@@ -743,7 +688,6 @@ class Checks(unittest.TestCase):
             check_site(root)
 
     def test_footer_source(self):
-        """#73: the footer's own links and parts, and the one X link the site may make off GitHub."""
         import check
         for message, change in {
             'the footer links': lambda f: f.replace('<li><a href="/app/">The app</a></li>', '', 1),
@@ -754,10 +698,9 @@ class Checks(unittest.TestCase):
             'twelve Wizes': lambda f: f.replace('<span class="family-wiz">', '<span>', 1),
         }.items():
             broken = change(FOOTER)
-            html = '<html><body><!-- footer.html -->\n</body></html>'.replace('<!-- footer.html -->\n', broken)
+            html = '<html><body><template data-slot="footer"></template>\n</body></html>'.replace('<template data-slot="footer"></template>\n', broken)
             with self.subTest(message=message), mock.patch.object(check, 'FOOTER', broken), self.assertRaisesRegex(AssertionError, message.strip()):
                 check.check_footer({'index.html': html})
-        # #75 R3: the X account is a footer link only: never a resource, a CSS url() or a second link.
         for url in ('https://x.com/someone', 'https://x.com/openwiz'):
             with self.subTest(url=url), self.assertRaisesRegex(AssertionError, 'unexpected external URL'):
                 check_ref(ROOT, ROOT / 'site.css', url, {})
@@ -780,12 +723,6 @@ class Checks(unittest.TestCase):
                     check_site(root)
 
     def test_report_a_problem_link(self):
-        """#1851: openwiz.dev's Report a problem link opens GitHub's new-issue form on openwizdev/OpenWiz with the
-        feedback template (contracts/feedback-loop.v1.md: template .github/ISSUE_TEMPLATE/feedback.yml; the exact link
-        is the planner's answer on #1851), in the footer of every site page, the changelog's included.
-        Catches: the link missing from a page's footer, pointing at another repository or template, or
-        carrying anything more (a prefilled title or body would send words from openwiz.dev), or (R2 on WizSite #90)
-        sending the page's address as a Referer: the link must carry rel="noreferrer"."""
         form = '<a href="https://github.com/openwizdev/openwiz/issues/new?template=feedback.yml" rel="noreferrer">Report a problem</a>'
         for page, count in {'index.html': 1, 'drivers/index.html': 1, 'team/index.html': 1, 'faq/index.html': 1, 'changelog/index.html': 1, 'app/index.html': 0}.items():
             with self.subTest(page=page):
@@ -816,7 +753,6 @@ class Checks(unittest.TestCase):
                     check_site(root)
 
     def test_faq(self):
-        """#76: the one Questions snippet on the landing, /team and /faq, and nowhere else; its rows are buttons."""
         import check
         def planted(page, change):
             temp = tempfile.TemporaryDirectory()
@@ -829,7 +765,6 @@ class Checks(unittest.TestCase):
         for message, (page, change) in {
             'the index.html page needs the one Questions': ('index.html', lambda t: t.replace(FAQ, '', 1)),
             'the faq/index.html page needs the one Questions': ('faq/index.html', lambda t: t.replace('What is a kernel?', 'What is a core?', 1)),
-            # Placement on /team: its sections' order puts the Questions right above the closing Book a call.
             'the team page sections': ('team/index.html', lambda t: t.replace(FAQ, '', 1).replace('</main>', FAQ + '</main>', 1)),
             'needs faq.js': ('team/index.html', lambda t: re.sub(r'<script src="/faq\.[0-9a-f]+\.js" defer></script>', '', t)),
         }.items():
@@ -845,12 +780,9 @@ class Checks(unittest.TestCase):
             'open and disabled until faq.js runs ': lambda f: f.replace('aria-expanded="true"', 'aria-expanded="false"', 1),
             'a button that names its answer ': lambda f: f.replace('aria-controls="faq-a2"', 'aria-controls="faq-a1"', 1),
             'links off the site': lambda f: f.replace('href="/team/#book"', 'href="https://example.com/"', 1),
-            # #1674 (RL2): where agents run, word for word: the old "wherever you choose" answer, a dropped clause, and
-            # the answer moved off its question.
             'answer to Where do my agents run': lambda f: f.replace(FAQ_WHERE, 'Wherever you choose: your own computer or a VPS, Cloudroom, or boat.dev. Each has a driver that passed the same five-check test.', 1),
             'answer to Where do my agents run ': lambda f: f.replace(' so it comes first.', '', 1),
             'answer to Where do my agents run  ': lambda f: f.replace(FAQ_WHERE, 'Anywhere.', 1).replace('OpenWiz is free and open source', FAQ_WHERE + ' OpenWiz is free and open source', 1),
-            # #89: the last answer, word for word.
             'last answer': lambda f: f.replace('Your first fleet ships on it.', 'Your first fleet runs in a day.', 1),
             'heading and its line': lambda f: f.replace('The short ones are here.', 'More.', 1),
             'no form or input': lambda f: f.replace('<p>The open source', '<input><p>The open source', 1),
@@ -872,10 +804,6 @@ class Checks(unittest.TestCase):
         check.check_faq(htmls, pages, names)
 
     def test_drivers_page(self):
-        # Catches (#50, #62): the drivers page dropped from the build or its checks; a card missing, reordered or with
-        # its facts changed; boat.dev losing the hero, or a second hero; a link off the public OpenWiz repository; a top
-        # bar that drifts from the landing's or loses its current page; a Drivers link missing on the landing or
-        # Changelog; a script, a hidden part, an invented number; and the drivers art over its budget.
         boat = '<article class="driver hero" id="boat-dev"'
         for name, old, new, error in (
                 ('drivers/index.html', 'id="cloudroom"', 'id="cloud"', 'four driver cards'),
@@ -904,8 +832,6 @@ class Checks(unittest.TestCase):
             check_site(ROOT / 'dist')
 
     def test_drivers_login_lines(self):
-        # Catches (OpenWiz #2005): a driver card without its login line, with the wrong host or form, away from its
-        # name, or a login line given to Grok Bot, which has no driver yet.
         import check
         main = re.search(r'<main\b[\s\S]*?</main>', (ROOT / 'dist' / check.DRIVERS_PAGE).read_text())[0]
         check.check_driver_logins(main)
@@ -922,9 +848,6 @@ class Checks(unittest.TestCase):
         self.broken('drivers/index.html', held + '\n        ' + line, line + '\n        ' + held, 'right after its name')
 
     def test_drivers_spotlight(self):
-        # Catches (#56, #62): boat.dev's spotlight missing, after the other drivers, or with a check missing, reordered,
-        # not passed, without its state in words or without its plain line; the crew painting dropped; a painting shown
-        # twice; drivers art left unused; drivers-page text under 12 px; an uppercase label tracked too tight.
         page = 'drivers/index.html'
         for old, new, error in (
                 ('class="spotlight', 'class="boat-other', 'one boat.dev spotlight'),
@@ -947,7 +870,6 @@ class Checks(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp) / 'dist'
             shutil.copytree(ROOT / 'dist', root)
-            # The smallest pinned drivers picture, so the copy tests the unused-art rule rather than the art budget's headroom.
             (root / 'art/drivers-x-unused.webp').write_bytes((root / 'art/drivers-d-sea.webp').read_bytes())
             with mock.patch.dict('check.ART_HASHES', {'art/drivers-x-unused.webp': 'f2699bd8fe4763993a492dfac2bdbfc3eae46ec33bae0ab74127ad6ebc6a6285'}), \
                     mock.patch('check.ART', set(__import__('check').ART) | {'art/drivers-x-unused.webp'}), \
@@ -962,11 +884,6 @@ class Checks(unittest.TestCase):
             self.broken(page, '', '', error, css=bad)
 
     def test_drivers_round_3h(self):
-        # Catches (#62): the explainer of what a driver is missing, out of the hero, below the cards, over two sentences
-        # or without the four commands and token; a pending card showing per-check rows, or its one kit line changed;
-        # a jargon count back ("4 words", "5 of 5", "1 passed"); the five-of-five result said more than twice; Write
-        # your own driver without its token row; a logo that changed bytes, lost its alt or is unpinned; a pinned logo
-        # left unused; any Grok logo; a passing driver after the pending ones (phone order).
         page = 'drivers/index.html'
         explainer = '<div class="drivers-explainer">'
         row = '<li class="kit-check" data-check="token" data-state="not yet run">token not yet run</li>'
@@ -993,7 +910,7 @@ class Checks(unittest.TestCase):
                 (grok, grok + '<svg viewBox="0 0 8 8"><circle cx="4" cy="4" r="4"/></svg>', 'no Grok logo'),
                 ('</main>', '<img src="/favicon.svg" alt="Grok"></main>', 'no Grok logo')):
             self.broken(page, old, new, error)
-        with tempfile.TemporaryDirectory() as temp:  # the explainer moved below the cards
+        with tempfile.TemporaryDirectory() as temp:
             root = Path(temp) / 'dist'
             shutil.copytree(ROOT / 'dist', root)
             path = root / page
@@ -1002,7 +919,7 @@ class Checks(unittest.TestCase):
             path.write_text(text.replace(block, '').replace('</ul>\n  </section>\n  <section class="own-driver', '</ul>' + block + '\n  </section>\n  <section class="own-driver', 1))
             with self.assertRaisesRegex(AssertionError, 'sits in the hero|above the cards'):
                 check_site(root)
-        with tempfile.TemporaryDirectory() as temp:  # the passing driver after a pending one
+        with tempfile.TemporaryDirectory() as temp:
             root = Path(temp) / 'dist'
             shutil.copytree(ROOT / 'dist', root)
             path = root / page
@@ -1012,7 +929,7 @@ class Checks(unittest.TestCase):
             with self.assertRaisesRegex(AssertionError, 'boat.dev first'):
                 check_site(root)
         for logo in ('drivers/logos/boat-dev.svg', 'drivers/logos/cloudroom.png', 'drivers/logos/monitor.svg', 'drivers/logos/bot.svg'):
-            with self.subTest(logo=logo), tempfile.TemporaryDirectory() as temp:  # a logo recoloured or re-saved
+            with self.subTest(logo=logo), tempfile.TemporaryDirectory() as temp:
                 root = Path(temp) / 'dist'
                 shutil.copytree(ROOT / 'dist', root)
                 (root / logo).write_bytes((root / logo).read_bytes() + b'\n')
@@ -1030,12 +947,6 @@ class Checks(unittest.TestCase):
                 check_driver_logos(main, DriverOutline(main))
 
     def test_drivers_round_3_final(self):
-        # Catches (#66): item 2, a host pill without its availability in words, with the wrong words, out of order, or
-        # with its mark outside the fixed-height slot or sized apart from it (the boat.dev mark larger than the rest);
-        # item 4, the spotlight's painting before its mark and checks (phone order), the date back in the headline or
-        # missing, the phone painting no shorter than the art, or a CSS order that moves the painting first; item 6,
-        # Grok Bot's card without the generic icon, with a brand mark instead, or any compact card off the shared header
-        # structure; item 7, a token explanation without the scoped words, or a broader claim than the run inspected.
         page = 'drivers/index.html'
         pill = '<li data-host="boat-dev" data-state="passed">'
         for old, new, error in (
@@ -1056,7 +967,7 @@ class Checks(unittest.TestCase):
                 ('appeared in its output, command lines or environment, and it refused a token field</dd>', 'appeared in its output</dd>', 'token check inspected'),
                 ('</main>', '<p>The token check proves no credential leaks.</p></main>', 'broader token claim')):
             self.broken(page, old, new, error)
-        with tempfile.TemporaryDirectory() as temp:  # the painting moved back above the mark and the checks
+        with tempfile.TemporaryDirectory() as temp:
             root = Path(temp) / 'dist'
             shutil.copytree(ROOT / 'dist', root)
             path = root / page
@@ -1076,11 +987,6 @@ class Checks(unittest.TestCase):
             self.broken(page, '', '', error, css=bad)
 
     def test_drivers_kit_results(self):
-        # Catches (#66 facts, 2026-11-20): boat.dev, Cloudroom or your own computer or VPS shown as anything but passed
-        # (in a host pill, a card's status sentence, its kit line or state, its date or its public evidence link), Grok
-        # Bot shown as passed anywhere, a stale state word back ("being fixed", "works today", "kit run next", "in
-        # progress", "not run yet" outside Grok Bot), the spotlight losing its line that the other two passed the same
-        # five checks, or a claim that boat.dev is the only one that passed.
         page = 'drivers/index.html'
         vps, cloud, boat, grok = (f'<li data-host="{k}" data-state="' for k in ('vps', 'cloudroom', 'boat-dev', 'grok-bot'))
         for old, new, error in (
@@ -1106,9 +1012,6 @@ class Checks(unittest.TestCase):
             self.broken(page, old, new, error)
 
     def test_drivers_nav_and_description(self):
-        # Catches (#59 R1): a Drivers nav link the phone breakpoint hides (display: none, so not shown or focusable at
-        # 390 px) on the landing, the Changelog or the drivers page. Catches (#59 R2, #62): a description saying every
-        # driver passes, losing boat.dev's result, or carrying a jargon count.
         for name in ('index.html', 'changelog/index.html', 'drivers/index.html'):
             with self.subTest(page=name), tempfile.TemporaryDirectory() as temp:
                 root = Path(temp) / 'dist'
@@ -1137,9 +1040,6 @@ class Checks(unittest.TestCase):
                     check_site(root)
 
     def test_logo_pack(self):
-        # Catches: a lockup that ships live text or a font reference (the wordmark font must never ship),
-        # an unreviewed icon picture, and a social card URL that points off the site or at a missing file.
-        # Catches too (#1350): a vector logo still in the earlier blue mark rather than the dark-cream one.
         logo = (ROOT / 'brand/openwiz-lockup.svg').read_bytes()
         for name in ('favicon.svg', 'brand/openwiz-lockup.svg'):
             check_vector((ROOT / name).read_bytes())
@@ -1155,7 +1055,7 @@ class Checks(unittest.TestCase):
         for path in ('favicon.ico', 'brand/new.png', 'docs/map.png', 'docs/new.png'):
             with self.subTest(path=path), self.assertRaises(AssertionError):
                 check_privacy(path, b'\x89PNG tampered')
-        with self.assertRaises(AssertionError):  # a README picture is never part of the build
+        with self.assertRaises(AssertionError):
             check_privacy('dist/docs/map.png', (ROOT / 'docs/map.png').read_bytes())
         for new in ('https://example.com/brand/og.png', 'https://openwiz.dev/brand/missing.png'):
             with self.subTest(new=new), tempfile.TemporaryDirectory() as temp:

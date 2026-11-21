@@ -1,14 +1,3 @@
-// The landing page's browser check (#1355): the built landing in a real headless Chromium, at phone, tablet and
-// laptop widths, with motion, with reduced motion, with GSAP blocked and with no JavaScript at all.
-//
-// It covers what the static checks can't see: no sideways scroll, the three moments filling their rows (#1354),
-// Pause motion clear of the app window (#1351), the footer Wizes in one row on phones (#1352), the spec sample
-// playable on request with reduced motion on or GSAP blocked (#1349), and the hero window showing each part only
-// from its step onward, with tickets that look like tickets (the owner's fix 1). dist/ is served on 127.0.0.1;
-// every other host is blocked. No npm dependency: Node's own WebSocket talks to the browser.
-//
-//   node scripts/landing-check.mjs            (after npm run build; CHROME=/path/to/chrome to pick the browser)
-//   SHOTS=dir node scripts/landing-check.mjs  also saves the landing on a phone and a laptop as PNGs, for review
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
@@ -91,7 +80,6 @@ const MODES = {
   reduced: { reduced: true },
   'no GSAP': { block: ['*gsap*'] },
   'no JavaScript': { noScript: true },
-  // #77 R1: the FAQ's own script fails to load; the rest of the page's scripts run.
   'no FAQ script': { block: ['*/faq.*.js'] },
 };
 const WIDTHS = [[320, 640], [390, 844], [800, 1000], [1280, 800], [1440, 1100]];
@@ -102,7 +90,6 @@ async function open(browser, origin, width, height, mode, path = '/') {
   const send = (method, params) => browser.send(method, params, sessionId);
   await send('Page.enable');
   await send('Network.enable');
-  // Only the local copy of dist/; the star count's GitHub request and anything else stay offline.
   await send('Network.setBlockedURLs', { urls: ['*api.github.com*', ...(mode.block || [])] });
   await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: width <= 480 });
   await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: mode.reduced ? 'reduce' : 'no-preference' }] });
@@ -110,7 +97,6 @@ async function open(browser, origin, width, height, mode, path = '/') {
   const loaded = new Promise(resolve => browser.on(m => m.sessionId === sessionId && m.method === 'Page.loadEventFired' && resolve()));
   await send('Page.navigate', { url: `${origin}${path}` });
   await loaded;
-  // With scripts disabled, evaluation still works through the protocol (it is the page's scripts that stop).
   const evaluate = async expression => {
     const { result, exceptionDetails } = await send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true });
     if (exceptionDetails) throw new Error(exceptionDetails.exception?.description || exceptionDetails.text);
@@ -130,7 +116,6 @@ async function open(browser, origin, width, height, mode, path = '/') {
   return { send, evaluate, click, shot, close: () => browser.send('Target.closeTarget', { targetId }) };
 }
 
-// Shared page helpers, evaluated inside the page.
 const HELPERS = `
   const shown = el => !!el && el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden';
   const still = el => ['none', 'matrix(1, 0, 0, 1, 0, 0)'].includes(getComputedStyle(el).transform);
@@ -167,25 +152,20 @@ async function layout(page, where, width, mode) {
     };
   })()`);
   expect(facts.scroll <= facts.inner, where, `sideways scroll (${facts.scroll}px content in a ${facts.inner}px window)`);
-  // #1354: every row of moments spans the whole list, so no moment sits beside an empty cell.
   for (const row of facts.rows) {
     const left = Math.min(...row.map(i => i.left));
     const right = Math.max(...row.map(i => i.right));
     expect(left - facts.list.left < 2 && facts.list.right - right < 2, where,
       `a row of ${row.length} moment(s) leaves an empty cell (${Math.round(left)}–${Math.round(right)} of ${Math.round(facts.list.left)}–${Math.round(facts.list.right)})`);
   }
-  // #1352: on a phone the footer Wizes peek in one row.
   if (width <= 480) expect(facts.wizTops.length === 1, where, `footer Wizes in ${facts.wizTops.length} rows`);
-  // #1351: Pause motion never covers the app window.
   if (mode === 'motion') {
     expect(!!facts.pause, where, 'no Pause motion control with motion on');
     const { pause: p, window: w } = facts;
     if (p) expect(p.top >= w.bottom || p.bottom <= w.top || p.left >= w.right || p.right <= w.left, where,
       `Pause motion (${Math.round(p.top)}–${Math.round(p.bottom)}) covers the app window (ends at ${Math.round(w.bottom)})`);
   }
-  // #1349: whenever the page's script runs, the silent spec sample can be played on request.
   if (mode !== 'no JavaScript') expect(!!facts.play, where, 'the spec sample has no play button');
-  // The still (and the motion start, before it steps) shows a complete page; the still's tickets look like tickets.
   if (mode === 'reduced' || mode === 'no JavaScript' || mode === 'no GSAP') {
     expect(facts.spec, where, 'the still shows no spec');
     expect(facts.ticketsHeading === 'Tickets', where, 'the still has no "Tickets" heading');
@@ -212,7 +192,6 @@ async function playable(page, where) {
   expect(started, where, 'the spec sample does not play on request');
 }
 
-// The owner's fix 1: in the hero window nothing downstream exists before its step.
 async function sequence(page, where) {
   const seen = await page.evaluate(`new Promise(resolve => { ${HELPERS}
     const seen = {};
@@ -247,10 +226,7 @@ async function sequence(page, where) {
   }
 }
 
-// The owner's fix 2: a click (or Enter) on a footer Wiz gets a reaction and a tiny line that then fades; with
-// reduced motion it is a still pose change only. At rest no line shows.
 async function family(page, where, mode) {
-  // Wait until the footer stops moving (the spec sample's metadata can resize the page above it).
   await page.evaluate(`new Promise(resolve => { let last; const tick = () => {
     const wiz = document.querySelectorAll('.family-wiz')[5]; wiz.scrollIntoView({ block: 'end' });
     const now = JSON.stringify(wiz.getBoundingClientRect()); if (now === last) return resolve(); last = now; setTimeout(tick, 300); };
@@ -259,7 +235,6 @@ async function family(page, where, mode) {
     wiz.scrollIntoView({ block: 'end' }); const r = wiz.getBoundingClientRect();
     return { x: r.left + r.width / 2, y: Math.min(r.top + r.height * .45, innerHeight - 4), rest: !!document.querySelector('.wiz-line') }; })()`);
   expect(!at.rest, where, 'a Wiz line shows at rest');
-  // Watches one Wiz for 1.4 s: its line, whether it moved, its picture and its accessible name.
   const watch = `(wiz) => new Promise(resolve => { ${HELPERS}
     const before = { src: wiz.querySelector('img').getAttribute('src'), name: wiz.getAttribute('aria-label') };
     const seen = { line: '', moved: false, swapped: false, renamed: false };
@@ -284,13 +259,11 @@ async function family(page, where, mode) {
     await page.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
     await page.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
   };
-  // Start watching first, in its own call: the protocol does not order input events after an evaluation.
   await page.evaluate(`window.landingWatch = (${watch})(document.querySelectorAll('.family-wiz')[5]); true`);
   await page.click(at.x, at.y);
   const clicked = await page.evaluate('window.landingWatch');
   expect(!!clicked.line, where, 'clicking a Wiz shows no line');
   expect(clicked.faded, where, 'the Wiz line does not fade');
-  // Every reaction ends within a second and leaves the Wiz as it was, under the same name.
   expect(clicked.restored, where, 'a clicked Wiz is not back at rest, in its own costume, a second later');
   expect(!clicked.renamed, where, 'a clicked Wiz changes its accessible name');
   if (mode === 'motion') expect(clicked.moved || clicked.swapped, where, 'a clicked Wiz does not react');
@@ -298,7 +271,6 @@ async function family(page, where, mode) {
     expect(!clicked.moved, where, 'a Wiz moves with reduced motion on');
     expect(clicked.swapped, where, 'with reduced motion a click is not a still pose change');
   }
-  // Keyboard: focus the next Wiz and press Enter, twice; with reduced motion it answers as itself both times.
   const keyed = [];
   for (let i = 0; i < 2; i++) {
     await page.evaluate(`window.landingWatch = (${watch})((() => { const wiz = document.querySelectorAll('.family-wiz')[6]; wiz.focus(); return wiz; })()); true`);
@@ -312,7 +284,6 @@ async function family(page, where, mode) {
   if (mode === 'motion') await handoff(page, where);
 }
 
-// One Wiz at a time, each reaction under a second: hovering, moving along the row and quick clicks.
 async function handoff(page, where) {
   const centre = i => page.evaluate(`(() => { const r = document.querySelectorAll('.family-wiz')[${i}].getBoundingClientRect();
     return { x: r.left + r.width / 2, y: Math.min(r.top + r.height * .45, innerHeight - 4) }; })()`);
@@ -322,13 +293,11 @@ async function handoff(page, where) {
   const move = async ({ x, y }) => page.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y });
   await move({ x: 2, y: 2 });
   await wait(1200);
-  // Resting the pointer on a Wiz: its reaction is over within a second.
   const [a, b, c, d] = [await centre(4), await centre(7), await centre(3), await centre(8)];
   await move(a);
   await wait(1000);
   let now = await page.evaluate(busy);
   expect(now.length === 0, where, `a hovered Wiz is still reacting after a second (Wiz ${now.join(', ')})`);
-  // Moving to another Wiz ends the first one's reaction at once.
   await move({ x: a.x, y: a.y - 400 });
   await wait(1000);
   await move(a);
@@ -339,7 +308,6 @@ async function handoff(page, where) {
   expect(now.length <= 1, where, `${now.length} Wizes react at once after moving along the row`);
   await move({ x: 2, y: 2 });
   await wait(1100);
-  // Two quick clicks: the second cancels the first.
   await page.click(c.x, c.y);
   await wait(60);
   await page.click(d.x, d.y);
@@ -353,8 +321,6 @@ async function handoff(page, where) {
   expect(now.length === 0, where, `a Wiz still reacts more than a second after the last click (Wiz ${now.join(', ')})`);
 }
 
-// The owner's fix 3: every site page outside the app has the landing's exact top bar (the cream mark, the GitHub
-// logo with its star count or the logo alone, Sign in) and its footer, with no sideways scroll.
 async function chrome(page, where, mode) {
   const facts = await page.evaluate(`(() => { ${HELPERS}
     const bar = document.querySelector('header.landing-nav');
@@ -378,8 +344,6 @@ async function chrome(page, where, mode) {
   expect(facts.font === 'Geist', where, `the page is not set in the landing's type (${facts.font})`);
 }
 
-// #63: every site page's top bar shows the one buy button and the Drivers link inside the window, with no sideways
-// scroll, and the team page shows its one Book a call link.
 async function buy(page, where, path) {
   const facts = await page.evaluate(`(() => { ${HELPERS}
     const bar = document.querySelector('header.landing-nav');
@@ -407,8 +371,6 @@ async function buy(page, where, path) {
   if (path === '/team/') expect(facts.book === 2, where, `the team page needs its two Book a call links (${facts.book})`);
 }
 
-// #73: every site page's one footer: its link groups shown inside the window, the wordmark whole (no glyph cut by the
-// footer's edge), the Wizes right under it, and the footer's bottom at or below the window's bottom on short pages.
 async function footer(page, where, mode) {
   const facts = await page.evaluate(`(async () => { ${HELPERS}
     const footer = document.querySelector('footer.landing-footer');
@@ -454,7 +416,6 @@ async function footer(page, where, mode) {
     };
   })()`);
   expect(facts.count === 1, where, `one footer (${facts.count})`);
-  // #75 R1: with JavaScript on, every page's footer Wizes answer focus and clicks, the landing's and /drivers/ alike.
   expect(facts.buttons === (mode === 'no JavaScript' ? 0 : 12), where, `the footer Wizes are not the landing's (${facts.buttons} of 12 respond)`);
   expect(facts.links === 9 && facts.inside, where, 'the footer link groups are not all shown inside the window');
   expect(facts.line, where, 'the footer lacks its Apache-2.0 line');
@@ -463,9 +424,6 @@ async function footer(page, where, mode) {
   expect(facts.bottom >= facts.inner && facts.bottom >= facts.height - 1, where, `the footer ends at ${facts.bottom}px, above the window's bottom (${facts.inner}px)`);
 }
 
-// #76: the Questions on the landing, /team and /faq: seven flat rows, two columns on desktop and one on phones. With
-// scripts every answer starts closed and its button (click, Enter or Space) opens it in about 350 ms, or at once with
-// reduced motion; without scripts every answer shows.
 const FAQ_PATHS = ['/', '/team/', '/faq/'];
 async function faq(page, where, width, mode) {
   const read = () => page.evaluate(`(() => { ${HELPERS}
@@ -491,7 +449,6 @@ async function faq(page, where, width, mode) {
   }
   if (width <= 480) expect(facts.list.top > facts.head.top && Math.abs(facts.list.left - facts.head.left) < 2, where, 'the Questions are not one column on a phone');
   if (mode === 'no JavaScript' || mode === 'no FAQ script') {
-    // Without its script every answer shows, and no row offers a control that does nothing.
     expect(facts.open.every(Boolean), where, `without ${mode === 'no JavaScript' ? 'scripts' : 'faq.js'} an answer is hidden`);
     expect(facts.disabled.every(Boolean) && facts.expanded.every(e => e === 'true'), where, 'a row offers a button that does nothing');
     return;
@@ -501,7 +458,6 @@ async function faq(page, where, width, mode) {
   if (mode === 'no GSAP' || (width !== 390 && width !== 1280)) return;
   expect(facts.duration === (mode === 'reduced' ? '0s' : '0.35s, 0.35s, 0s'), where, `the answer's motion is ${facts.duration}`);
   const settle = () => page.evaluate('new Promise(r => setTimeout(() => r(true), 450))');
-  // Click the first row, Enter on the second, Space on the third; then click the first again to close it.
   const at = await page.evaluate(`(() => { const b = document.querySelector('.faq-q button'); b.scrollIntoView({ block: 'center' });
     const r = b.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
   await page.click(at.x, at.y);
@@ -559,7 +515,6 @@ async function main() {
         }
       }
     }
-    // #63 R1: the header between the phone and desktop widths, where the long button label must still fit.
     for (const width of (process.env.WIDTHS || '481,500,560,640,641,700,760,761,800,900,960,1024').split(',').map(Number)) {
       for (const path of ['/', '/changelog/', '/drivers/', '/team/', '/faq/']) {
         const other = await open(browser, origin, width, 800, MODES.motion, path);

@@ -1,7 +1,3 @@
-// The You page: what needs the user now. The count tiles (Needs you, Building, In review, Merged), then every
-// spec waiting for the user's confirm, every plan waiting for approval (open openwiz.decisions.v1 records from the
-// repository's record authors) and every ticket labelled needs-info or ready-for-human, newest first, each linked to
-// GitHub. A record that can't be read or verified is listed as unreadable; a list GitHub gave only part of says so.
 'use strict';
 OW.page({
   id: 'you',
@@ -31,7 +27,6 @@ OW.page({
         ticket: 'Open the ticket on GitHub.',
         unreadable: 'It isn\'t a valid request from the factory, or its author couldn\'t be checked. Open it on GitHub to read it.',
       };
-      // Each card opens GitHub in a new tab, so the app stays open (AP22).
       const card = (item, quiet) => h('a', {
         class: `card${item.kind === 'unreadable' || quiet ? '' : ' you'}`, href: item.url, target: '_blank', rel: 'noreferrer', 'data-focus': `item:${item.url}`,
         '--c': item.kind === 'unreadable' ? STATES.unknown.colour : quiet ? STATES.waiting.colour : STATES.you.colour,
@@ -40,7 +35,6 @@ OW.page({
       h('h3', {}, item.title),
       h('p', {}, quiet ? 'Later: it waits on an open blocker first. Open the ticket on GitHub.' : TELL[item.kind] || 'Say yes in chat, as today. Open it on GitHub to read it.'));
       const items = seen.you.map(item => card(item));
-      // Later: marked for the user but blocked by an open ticket, so not counted; a quieter group under the due ones.
       const later = seen.later.length ? [h('h2', { class: 'later' }, 'Later'), h('div', { class: 'cards later' }, seen.later.map(item => card(item, true)))] : [];
       const missing = seen.gaps.length
         ? OW.ui.unknown(`This list may be missing items: GitHub gave only part of ${seen.gaps.join(', ')}. The app tries again on its own.`) : null;

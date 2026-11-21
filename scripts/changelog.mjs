@@ -1,11 +1,3 @@
-// The Changelog's entries (#78): one short entry per public release, newest first, from one data file per release in
-// changelog/releases/ (public name, semver, date, headline, bullets, notes URL). Nothing is read from the network.
-// The entries sit behind the landing install box's switch (data-install in index.html, which RL2 flips when
-// OpenWiz 0.1.0 publishes): until it reads live, the page shows no entry, only one line pointing at the pre-releases
-// on GitHub, so it never claims an unreleased version. scripts/check.py checks the data and the built section.
-//
-//   node scripts/changelog.mjs [--releases DIR] [--switch live|coming-soon] [PAGE]
-// prints the generated section, or PAGE with it inserted. Defaults: changelog/releases and the landing's switch.
 import { readFile, readdir } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 
@@ -18,17 +10,14 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 const esc = text => String(text).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const version = semver => String(semver).split('.').map(Number);
 const newer = (a, b) => { const [x, y] = [version(a.semver), version(b.semver)]; return y[0] - x[0] || y[1] - x[1] || y[2] - x[2]; };
-// "2026-11-21" as "Nov 21, 2026", the same in every locale and time zone.
 export const day = iso => { const [y, m, d] = String(iso).split('-').map(Number); return `${MONTHS[m - 1]} ${d}, ${y}`; };
 
-// Every release file in DIR, newest first by semver.
 export async function readReleases(dir = new URL('changelog/releases/', ROOT)) {
   const names = (await readdir(dir)).filter(name => name.endsWith('.json')).sort();
   const list = await Promise.all(names.map(async name => JSON.parse(await readFile(new URL(name, dir), 'utf8'))));
   return list.sort(newer);
 }
 
-// The landing install box's switch: "live" once OpenWiz 0.1.0 is published (RL2), "coming-soon" before.
 export function installSwitch(landing) {
   const found = landing.match(/<div class="install-box" data-install="([^"]*)"/g) || [];
   if (found.length !== 1) throw new Error('the landing needs exactly one install box switch');
@@ -43,7 +32,6 @@ const entry = release => {
     + `<p class="notes"><a href="${esc(release.notes)}">Full notes on GitHub</a></p></article>`;
 };
 
-// The section: every entry when the switch reads live, then the pre-releases line; before that, the line alone.
 export function render(list, live) {
   const shown = live ? list : [];
   const pre = shown.length
@@ -54,7 +42,7 @@ export function render(list, live) {
 
 export function withReleases(page, section) {
   if (page.includes(START) || page.split('</main>').length !== 2) throw new Error('changelog page: expected one </main> and no generated section');
-  return page.replace('</main>', () => `${START}${section}${END}</main>`); // a function: copy with $& or $$ stays as written
+  return page.replace('</main>', () => `${START}${section}${END}</main>`);
 }
 
 export const summary = (list, live) => live ? `${list.length} release${list.length === 1 ? '' : 's'}` : `none shown until the install switch reads live (${list.length} waiting)`;

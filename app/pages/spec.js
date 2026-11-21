@@ -1,16 +1,9 @@
-// A running spec's own page (#/specs/<number>): its ticket graph, with the blocking arrows and one colour per state,
-// then the same tickets as a plain list. The layout is dagre's (layered, with fewer crossings and routed arrows):
-// left to right on a laptop, top to bottom on a phone. Ticket cards use Ember's card, pill and colours.
-//
-// The pulse (AP7, #1260): OW.specPage.pulse(card, ticket) is called for every ticket card, and marks the tickets an
-// agent is working on now (OW.agents.working()). The mark is still, a dot and its words: Ember has no motion.
 'use strict';
 (() => {
   const { h, STATES } = OW.ui;
   const SVG = 'http://www.w3.org/2000/svg';
   const NODE = { width: 248, height: 104 };
 
-  // Styles are set through the CSSOM (the page's CSP allows no style attributes), and only with Ember's tokens.
   const css = (el, props) => { for (const [k, v] of Object.entries(props)) el.style.setProperty(k, v); return el; };
   const svg = (tag, attrs = {}) => {
     const el = document.createElementNS(SVG, tag);
@@ -59,7 +52,6 @@
     }
     const board = css(h('div', { class: 'graph', role: 'group', 'aria-label': `Ticket graph of #${spec.number}` }, lines),
       { position: 'relative', width: `${width}px`, height: `${height}px`, margin: '0 auto' });
-    // Keyboard order follows the picture: rank by rank (left to right on a laptop, top to bottom on a phone).
     const along = t => (phone ? [g.node(t.key).y, g.node(t.key).x] : [g.node(t.key).x, g.node(t.key).y]);
     const ordered = [...tickets].sort((a, b) => along(a)[0] - along(b)[0] || along(a)[1] - along(b)[1]);
     for (const t of ordered) {
@@ -70,7 +62,6 @@
     return css(h('div', { class: 'graph-scroll' }, board), { overflow: 'auto', margin: '0 0 28px', padding: '4px 2px 12px' });
   }
 
-  // The legend: every state shown on this spec, with its count and word.
   function legend(spec) {
     const counts = {};
     for (const t of spec.graph.tickets) if (!t.outside) counts[t.state] = (counts[t.state] || 0) + 1;
@@ -98,12 +89,10 @@
     return css(h('ul', { class: 'tickets' }, rows), { 'list-style': 'none', margin: '0', padding: '0' });
   }
 
-  // The graph turns (left to right, or top to bottom) when the screen crosses the phone width: redraw it then.
   const PHONE = matchMedia('(max-width: 760px)');
   let last = null;
   PHONE.addEventListener('change', () => { if (last && last[0].isConnected && location.hash === `#/specs/${last[2]}`) render(...last); });
 
-  // A redraw (a feed refresh, or the screen turning) keeps keyboard focus on the same control.
   function render(el, feeds, arg) {
     last = [el, feeds, arg];
     OW.factory.redraw(el, () => draw(el, feeds, arg));
@@ -139,8 +128,6 @@
     arrived(el, arg);
   }
 
-  // Keyboard: arriving on a spec's page moves focus to its title (a refresh of the same page doesn't); Esc goes back
-  // to all specs, where focus returns to the card of the spec just left.
   function arrived(el, arg) {
     if (OW.specPage.shown === arg) return;
     OW.specPage.shown = arg;
@@ -157,7 +144,6 @@
     const dot = css(h('span', { 'aria-hidden': 'true' }), { width: '8px', height: '8px', 'border-radius': '50%', background: 'var(--em-building)',
       'box-shadow': '0 0 0 3px color-mix(in srgb, var(--em-building) 30%, transparent)' });
     el.setAttribute('data-pulse', '');
-    // On the card's number line: the graph's cards have a fixed height, and the state pill's line has no room.
     el.firstElementChild.append(' · ', css(h('span', { class: 'pulse' }, dot, 'Agent working'),
       { display: 'inline-flex', 'align-items': 'center', gap: '7px', color: 'var(--em-text-2)' }));
   }

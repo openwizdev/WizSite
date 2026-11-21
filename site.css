@@ -10,7 +10,6 @@ a{color:inherit;text-decoration:none}
 .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 code,.v{font-family:var(--ow-font-mono)}
 
-/* Header and footer */
 .top{position:relative;z-index:5;display:flex;align-items:center;height:76px;border-bottom:1px solid rgb(242 242 240 / 14%)}
 .brand{display:inline-flex;align-items:center;min-height:44px}
 .brand img{display:block;width:auto;height:40px}
@@ -20,13 +19,11 @@ code,.v{font-family:var(--ow-font-mono)}
 .foot-site{display:flex;align-items:center;margin-top:120px;padding:24px 0 48px;border-top:1px solid rgb(242 242 240 / 14%)}
 
 
-/* The ship log page (/changelog) */
 .shiplog{padding:64px 0 0}
 .shiplog h1{font-size:64px;font-weight:700;line-height:.98;letter-spacing:-.045em}
 .shiplog .lead{margin-top:16px;max-width:720px;font-size:19px;color:var(--grey2)}
 .shiplog .lead a{color:var(--ink);text-decoration:underline;text-decoration-color:var(--brass);text-underline-offset:4px;white-space:nowrap}
 .shiplog h2{margin-top:56px;font-size:30px}
-/* Being built: one compact strip after Shipped, named bundles only. */
 .being{margin-top:16px}
 .bundle-list{list-style:none;margin:18px 0 0;padding:0;display:grid;grid-auto-flow:column;grid-auto-columns:1fr;border-radius:14px;background:var(--panel);box-shadow:inset 0 0 0 1px var(--edge);overflow:hidden}
 .bundle-list li{display:flex;flex-direction:column;gap:4px;padding:16px 18px 18px;font-size:15px;line-height:1.45;color:var(--grey2)}
@@ -40,7 +37,6 @@ code,.v{font-family:var(--ow-font-mono)}
 .rel h3{font:650 24px/1.25 var(--ow-font-sans);letter-spacing:-.02em}
 .also{margin:10px 0 0;padding-left:20px;color:var(--grey2);font-size:16px}
 .also li{margin-top:4px}
-/* VS9 entries: What's new for you (the user list), one honest tested line, then Under the hood (folded). */
 .new-h{margin-top:14px;font:600 13px/1 var(--ow-font-sans);letter-spacing:.08em;text-transform:uppercase;color:var(--brass)}
 .new{margin:10px 0 0;padding-left:20px;color:var(--ink);font-size:17px;line-height:1.5}
 .new li{margin-top:6px}
@@ -55,7 +51,6 @@ code,.v{font-family:var(--ow-font-mono)}
 .rel code{font-size:.92em;color:#ffd0c8}
 .gh{display:inline-flex;align-items:center;min-height:44px;margin-top:6px;font-size:15px;color:var(--grey2);text-decoration:underline;text-decoration-color:var(--brass);text-underline-offset:4px}
 .gh:hover{color:var(--ink)}
-/* Shipped: the latest release leads as a card; earlier releases follow as a dated list. */
 .shipped .rel:first-of-type{grid-template-columns:164px 1fr;margin-top:20px;padding:32px 36px 26px;border-radius:18px;background:linear-gradient(160deg,rgb(217 175 232 / 12%),var(--panel) 55%);box-shadow:inset 0 0 0 1px var(--edge),inset 3px 0 0 var(--brass)}
 .shipped .rel:first-of-type .v{font-size:28px}
 .shipped .rel:first-of-type h3{font-size:34px;line-height:1.15}
@@ -89,7 +84,6 @@ code,.v{font-family:var(--ow-font-mono)}
 }
 
 
-/* Landing */
 .landing { --m: clamp(18px, 4vw, 68px); --round: 18px; }
 .landing-nav { display: flex; min-height: 76px; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--line); }
 .landing-brand, .landing-nav nav, .github-star { display: flex; align-items: center; }
@@ -156,7 +150,6 @@ code,.v{font-family:var(--ow-font-mono)}
 .ember-ticket.building { border-color: #4f8c7b; }
 .ticket-builder { position: absolute; top: -14px; right: -6px; width: 30px; height: 30px; padding: 2px; border: 1px solid #4f8c7b; border-radius: 50%; background: #1b1916; }
 .ember-ticket:not(.building) .ticket-builder { display: none; }
-/* The demo steps through the road; nothing downstream exists before its step (the still shows the build step). */
 .product-window[data-scene="0"] .spec-summary, .product-window:is([data-scene="0"],[data-scene="1"]) .ticket-list { display: none; }
 .product-window[data-scene="0"] .window-spec .window-waiting, .product-window:is([data-scene="0"],[data-scene="1"]) .window-tickets .window-waiting { display: flex; }
 .product-window[data-scene="0"] .window-spec .window-label, .product-window:is([data-scene="0"],[data-scene="1"]) .window-tickets .window-label { opacity: .5; }
@@ -167,22 +160,14 @@ code,.v{font-family:var(--ow-font-mono)}
 .agent-row ul { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px 26px; list-style: none; padding: 0; margin: 0; }
 .agent-row li { display: flex; align-items: center; gap: 7px; font-weight: 620; color: #d6cdc0; }
 .agent-row svg { width: 20px; height: 20px; flex: none; }
-/* From idea to shipped: three steps on one plain panel in the page's own warm colours, like the hero's app window.
-   The clip and its caption are one card: the whole 16:9 slide on top, then title, "Play with sound" and its links
-   directly below it, so nothing ever covers the video. The grill and the live app are two aligned rows directly above and below it. */
 .moments { padding-block: clamp(48px, 7vw, 100px); }
 .moments h2 { font-size: clamp(34px, 5vw, 62px); letter-spacing: -.06em; line-height: 1; }
 .moment-stage { position: relative; isolation: isolate; margin-top: clamp(20px, 3vw, 32px); padding: clamp(14px, 3.4vw, 48px) clamp(12px, 4vw, 56px); border: 1px solid var(--line); border-radius: var(--round); background: var(--panel); }
-/* A warm painted sunset sea behind the cards, darkened and edged exactly like the hero's painting so the page reads as one piece. */
 .moment-art { position: absolute; z-index: -1; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 26% 60%; border-radius: inherit; filter: brightness(.78) saturate(.8); }
 .moment-stage ol { display: grid; gap: 10px; max-width: 840px; margin: 0 auto; padding: 0; list-style: none; }
 .moment-stage li { min-width: 0; }
-/* Type: one weight for titles (600), one for links and the play control (500), mono tabular step numbers. */
 .moments h3 { margin: 0; font-size: 18px; font-weight: 600; letter-spacing: -.015em; line-height: 1.3; text-wrap: balance; }
 .moment-num { display: inline-grid; place-items: center; flex: none; width: 28px; height: 28px; border: 1px solid var(--edge); border-radius: 50%; color: var(--grey2); font: 500 14px/1 var(--ow-font-mono); font-variant-numeric: tabular-nums; }
-/* Steps 1 and 3: one row each, number and title on the left, a small real preview (the grill's two questions as chat
-   bubbles, a capture of the live app) and an expander on the right. Everything opens in place on this page: the
-   expander's panel takes the row's full width below it, so visitors never leave the site to see the real run. */
 .moment-step { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; min-height: 56px; padding: 8px 18px 8px 14px; border-radius: 12px; background: #25211e; box-shadow: 0 0 0 1px var(--line); }
 .moment-step h3 { flex: 1 1 0; min-width: 0; }
 .moment-chat { display: grid; grid-auto-flow: column; grid-template-rows: auto auto; gap: 4px 10px; font-size: 12px; line-height: 1.3; }
@@ -226,24 +211,16 @@ code,.v{font-family:var(--ow-font-mono)}
 .app-panel figcaption span { white-space: nowrap; }
 .spec-link { color: var(--ink); font-size: 15px; font-weight: 500; line-height: 1.3; white-space: nowrap; text-decoration: underline 1px; text-decoration-color: var(--edge); text-decoration-skip-ink: auto; text-underline-offset: .3em; }
 .spec-link:hover { text-decoration-color: currentColor; }
-/* Step 2, the clip: the caption sits in the same card, directly below the video. */
 .spec-frame { position: relative; overflow: hidden; border-radius: 12px; background: #25211e; box-shadow: 0 0 0 1px #726052, 0 18px 48px #090706b0; }
 .spec-video { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover; background: #1b1816; }
 .spec-video:not([controls]) { cursor: pointer; }
 .spec-video:focus-visible { outline: 2px solid var(--orchid); outline-offset: -2px; }
 .spec-video::cue { color: #fff; background: rgba(15, 17, 21, .85); }
-/* Once the visitor takes over (or without this site's script) the native controls show. The box then grows below the
-   16:9 slide, which stays pinned to its top, so the control bar sits over that empty band under the slide and never
-   covers slide text, at any width: the band is a sixth of the slide's height, and never under 36px. */
 .spec-frame { container-type: inline-size; }
 .spec-frame:not(.is-ambient) .spec-video[controls] { height: calc(56.25cqw + max(9.375cqw, 36px)); aspect-ratio: auto; object-fit: contain; object-position: top; }
 .spec-video:fullscreen { object-position: center; }
-/* At rest and while it plays muted on its own (this script only), the frame shows just the slides' band: every slide's
-   text lies between 27% and 73% of its height, so cropping to 20-80% never cuts it, and the captions stay hidden.
-   Once the visitor plays it, the whole 16:9 frame returns with captions in its top band and controls in its bottom. */
 .spec-frame.is-ambient .spec-video { aspect-ratio: 1280 / 432; }
 .spec-caption { display: grid; gap: 6px; padding: clamp(14px, 1.6vw, 18px) clamp(16px, 2.4vw, 28px) clamp(16px, 2vw, 24px); background: #25211e; }
-/* Once the visitor takes over (or without this site's script) the native controls show and the button goes. */
 .spec-video[controls] + .spec-caption .spec-play { display: none; }
 .spec-title { display: flex; align-items: center; gap: 12px; }
 .spec-title h3 { font-size: clamp(18px, 1.6vw, 23px); line-height: 1.2; }
@@ -270,8 +247,6 @@ code,.v{font-family:var(--ow-font-mono)}
   .spec-link, .moment-copy { font-size: 14px; }
   .moment-num { width: 26px; height: 26px; }
 }
-/* Phones: the three moments stack as three cards, each with its real preview shown openly on top (the grill's
-   questions and answers as chat bubbles, the spec clip, a large capture of the live app), then its title and expander. */
 @media (max-width: 719px) {
   .moment-stage ol { gap: 12px; }
   .moment-art { object-position: 78% 60%; }
@@ -285,8 +260,6 @@ code,.v{font-family:var(--ow-font-mono)}
 @media (max-width: 480px) {
   .moment-stage { margin-inline: calc(-1 * var(--m) + 8px); padding: 14px 10px; }
 }
-/* The site footer (#73): one snippet on every site page. Short pages pin it to the bottom of the window. The link
-   groups and the small line, then the wordmark whole (its descender inside the box), then the Wizes peeking up. */
 body.landing { display: flex; flex-direction: column; min-height: 100vh; min-height: 100svh; }
 body.landing > main { flex: 1 0 auto; }
 .landing-footer { overflow: hidden; border-top: 1px solid var(--line); background: #221e1a; }
@@ -303,7 +276,6 @@ body.landing > main { flex: 1 0 auto; }
 .family { display: flex; justify-content: center; max-width: 1480px; margin: max(-20px, calc(-6px - .9vw)) auto clamp(-48px, -3vw, -10px); padding: 8px 8px 0; overflow: hidden; }
 .family-wiz { position: relative; flex: 0 0 8.5%; margin-inline: -.08%; aspect-ratio: 1; }
 .family-wiz img { position: relative; display: block; width: 100%; height: auto; }
-/* Owner's fix 2: the Wizes become buttons once the script runs; nothing shows until one is used. */
 .family-wiz[role="button"] { cursor: pointer; border-radius: 12px; }
 .family-wiz:focus-visible { outline: 2px solid var(--orchid); outline-offset: -2px; }
 .wiz-sprite { position: absolute; inset: 0; display: none; background-size: 900% 100%; pointer-events: none; }
@@ -354,7 +326,6 @@ body.landing > main { flex: 1 0 auto; }
 .app-entry .signin { display: inline-flex; gap: 8px; align-items: center; padding: 8px 12px; border-radius: 7px; font-size: 13px; font-weight: 650; }
 .app-entry .signin svg { width: 16px; height: 16px; }
 
-/* The product demo starts as a readable still. The script reveals controls once motion is available. */
 .product-hero .app-entry { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 20px; width: 100%; margin-top: 0; padding-top: 14px; }
 .app-entry .app-lead { margin-right: auto; }
 .app-entry .signin, .app-entry .home-screen { margin: 0; }
@@ -375,7 +346,6 @@ body.landing > main { flex: 1 0 auto; }
 .demo-pause, .spec-play { min-height: 34px; padding: 0 8px; border: 1px solid var(--edge); border-radius: 6px; background: var(--ground); color: var(--ink); font: 550 12px var(--ow-font-sans); cursor: pointer; }
 .demo-pause { position: absolute; right: 10px; bottom: 8px; }
 .demo-pause[aria-pressed="true"] { color: var(--sea); }
-/* #1351: with Pause motion shown, the stage keeps room below the window so the control never covers it. */
 .product-stage:has(> .demo-pause:not([hidden])) { padding-bottom: clamp(50px, 5vw, 66px); }
 .wiz-eye { position: absolute; display: none; width: 7%; aspect-ratio: 1; border-radius: 50%; transform: translate(-50%, -50%); background: radial-gradient(circle at 35% 30%, #fff3d8, #e1bd8d); }
 .family.is-playing .wiz-eye { display: grid; place-items: center; }
@@ -400,8 +370,6 @@ body.landing > main { flex: 1 0 auto; }
   .hero-copy h1 { font-size: clamp(44px, 13vw, 52px); }
   .ember-ticket { overflow-wrap: anywhere; }
 }
-/* #63: room for the buy button up to 760 px: the brand shows its mark alone (its name stays for screen readers), the
-   GitHub link its logo alone, and the button says For teams. */
 @media (max-width: 760px) {
   .landing-nav .landing-brand { gap: 0; font-size: 0; }
   .landing-nav .github-star span { display: none; }
@@ -414,14 +382,6 @@ body.landing > main { flex: 1 0 auto; }
   .landing-nav .github-star { padding-inline: 8px; }
 }
 
-/* The drivers page (openwiz.dev/drivers, #50), variant D: the cinematic voyage. A painted night sea and the Wiz family's
-   ship behind the headline. Still and complete without scripts or motion; the bob and the parallax run only with motion
-   allowed. Round 3H (#62): the headline explains what a driver is, with the hosts' marks under it; boat.dev's spotlight
-   (its five passed checks beside the crew's cutaway) follows the hero; then the other three drivers in one compact row,
-   each with one kit line. One sans for prose and headings, mono only for the command words, no text under 12 px.
-   Round 3 final (#66): a shorter hero; even host pills, each mark scaled inside one fixed-height slot and each saying
-   in words what works today; a quiet text link to the proof; on a phone the spotlight's mark, result and checks lead
-   and its painting follows, shorter. */
 .drivers-page { --gold: #f2c27b; --night: #0f0d0b; }
 .drivers-page .voyage { position: relative; isolation: isolate; display: flex; flex-direction: column; min-height: min(84svh, 820px); overflow: hidden; background: var(--night); }
 .drivers-page .voyage-art { position: absolute; z-index: -1; inset: 0; }
@@ -446,15 +406,12 @@ body.landing > main { flex: 1 0 auto; }
 .drivers-page .host-icon { filter: invert(1); opacity: .92; }
 .drivers-page .voyage-pass { display: inline-flex; align-items: center; min-height: 44px; margin-top: 12px; color: var(--ink); font-size: 15px; text-decoration: underline; text-decoration-color: rgb(242 194 123 / 60%); text-underline-offset: 4px; text-shadow: 0 1px 14px rgb(0 0 0 / 70%); }
 .drivers-page .voyage-pass:hover { text-decoration-color: var(--gold); }
-/* Kit states: always a word plus an icon shape, never colour alone. */
 .drivers-page .kit-icon { flex: none; width: 16px; height: 16px; }
 .drivers-page .proof-check .kit-icon circle, .drivers-page .driver-kit.passed .kit-icon circle { fill: var(--gold); }
 .drivers-page .proof-check .kit-icon path, .drivers-page .driver-kit.passed .kit-icon path { fill: none; stroke: var(--ground); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .drivers-page .progress .kit-icon circle { fill: none; stroke: var(--orchid); stroke-width: 1.5; }
 .drivers-page .progress .kit-icon path { fill: var(--orchid); }
 .drivers-page .unrun .kit-icon circle { fill: none; stroke: var(--grey); stroke-width: 1.5; stroke-dasharray: 2.4 2.2; }
-/* boat.dev's spotlight: its official mark, the result in words and the five checks, beside the crew's cutaway. The copy
-   comes first in the page, so it leads on a phone; on desktop the painting takes the left column. */
 .drivers-page .spotlight { margin-top: clamp(8px, 2vw, 24px); }
 .drivers-page .driver.hero { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); overflow: hidden; border: 1px solid #7c6140; border-radius: 16px; background: #110f0d; box-shadow: 0 0 0 1px rgb(242 194 123 / 10%), 0 30px 80px rgb(255 150 60 / 7%); }
 .drivers-page .proof-scene { position: relative; grid-row: 1; grid-column: 1; min-height: 100%; }
@@ -475,7 +432,6 @@ body.landing > main { flex: 1 0 auto; }
 .drivers-page .proof-name { color: var(--ink); font-size: 15px; font-weight: 600; }
 .drivers-page .proof-state { color: var(--gold); font: 500 14px/1 var(--ow-font-sans); }
 .drivers-page .proof-line { grid-column: 2 / -1; color: var(--grey2); font-size: 15px; line-height: 1.45; }
-/* More drivers: one compact row, each card a logo and name, one status sentence and one kit line, all one height. */
 .drivers-page .more-drivers { padding-block: clamp(44px, 6vw, 80px) clamp(48px, 7vw, 96px); }
 .drivers-page .more-drivers h2 { font-size: clamp(28px, 3.4vw, 42px); font-weight: 720; line-height: 1.05; letter-spacing: -.045em; }
 .drivers-page .driver-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin: 22px 0 0; padding: 0; list-style: none; }
@@ -486,7 +442,6 @@ body.landing > main { flex: 1 0 auto; }
 .drivers-page .driver-list .driver-line { color: var(--grey2); font-size: 15px; line-height: 1.45; }
 .drivers-page .driver-list .driver-date { margin-top: -6px; font-size: 14px; }
 .drivers-page .driver-kit { display: flex; margin-top: auto; align-items: center; gap: 8px; padding-top: 12px; border-top: 1px solid var(--line); color: var(--ink); font-size: 14px; line-height: 1.4; white-space: nowrap; }
-/* Write your own driver: the four commands and the fifth check, token. */
 .drivers-page .own-driver { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: clamp(24px, 5vw, 72px); align-items: start; margin-bottom: clamp(56px, 8vw, 112px); padding: clamp(24px, 4vw, 48px); border: 1px solid var(--line); border-radius: 16px; background: var(--panel); }
 .drivers-page .own-driver h2 { font-size: clamp(28px, 3.4vw, 42px); font-weight: 720; line-height: 1.05; letter-spacing: -.045em; }
 .drivers-page .own-copy > p { max-width: 46ch; margin-top: 14px; color: var(--grey2); font-size: 16px; }
@@ -544,10 +499,6 @@ body.landing > main { flex: 1 0 auto; }
 @keyframes drivers-d-far { to { transform: translateY(6%); } }
 @keyframes drivers-d-near { to { transform: translateY(-10%); } }
 
-/* The team page (openwiz.dev/team, #63, #73; design P, #81; round 3 candidate 2, #89): the hero with the terms under
-   Book a call and the 30-minute rail beside them, then Proof as three cards (the drivers that passed, how the Drivers page
-   was built, the boat poster), who it's for and pricing, the Questions, the closing call. Text is at least the body size. Only
-   Book a call is coral in the first screen, apart from the rail's destination. */
 .team-page .nav-team { padding: 8px 0; border-radius: 0; background: none; color: var(--grey2); font-weight: 450; }
 .team-page .nav-team:hover { background: none; color: var(--ink); text-decoration: underline; text-underline-offset: 4px; }
 .team { display: grid; grid-template-columns: minmax(0, 1.08fr) minmax(0, .92fr); gap: clamp(28px, 4.5vw, 72px); align-items: center; padding-block: clamp(28px, 4.5vw, 64px); }
@@ -626,9 +577,6 @@ body.landing > main { flex: 1 0 auto; }
   .team-logo span, .team-logo small { font-size: 15px; }
   .team-logo small { margin: 0 0 0 auto; white-space: nowrap; }
 }
-/* The Questions (#76): one section from faq.html on the landing, /team and /faq. Two columns on desktop (the heading,
-   then the rows), one on phones. Flat rows: the question, a thin chevron and a 1px rule. A row's button opens its
-   answer (height and opacity); until faq.js runs every answer shows. */
 .faq { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 24px clamp(32px, 5vw, 72px); align-items: start; padding-block: clamp(48px, 6vw, 88px); border-top: 1px solid var(--line); }
 .faq-title { font-size: clamp(28px, 3vw, 40px); font-weight: 740; line-height: 1.1; letter-spacing: -.04em; }
 .faq-lead { margin-top: 12px; color: var(--grey2); }
@@ -640,7 +588,6 @@ body.landing > main { flex: 1 0 auto; }
 .faq-q button:hover .faq-chevron { stroke: var(--ink); }
 .faq-q [aria-expanded="true"] .faq-chevron { transform: rotate(180deg); }
 .faq-row { border-bottom: 1px solid var(--line); }
-/* Open until faq.js marks the section ready (#77 R1), so the answers never depend on the script loading. */
 .faq-a { display: grid; grid-template-rows: 1fr; }
 .faq-a > div { min-height: 0; overflow: hidden; }
 .faq-a p { max-width: 62ch; padding: 0 40px 22px 0; color: var(--grey2); font-size: 16px; line-height: 1.6; }
@@ -657,8 +604,6 @@ body.landing > main { flex: 1 0 auto; }
   .faq { grid-template-columns: 1fr; }
   .faq-a p { padding-right: 0; }
 }
-/* The "Ask a Wiz..." row (#1902): site.js adds it as the FAQ's last row only when the switch is on. Its input reads like
-   a question; its answer streams in the answers' own style, with a caret that blinks only when motion is allowed. */
 .faq-ask [hidden] { display: none; }
 .faq-ask-form { display: flex; align-items: center; gap: 12px; min-height: 64px; }
 .faq-ask-form input { flex: 1; min-width: 0; min-height: 44px; padding: 10px 0; border: 0; background: none; color: var(--ink); font: 560 clamp(17px, 1.5vw, 19px)/1.35 var(--ow-font-sans); letter-spacing: -.015em; }

@@ -1,12 +1,3 @@
-// The app's browser check (P2, P3): the built app in a real headless Chromium, against recorded GitHub answers.
-//
-// Every request the page makes is paused through the DevTools protocol and answered here: openwiz.dev from dist/
-// (with the security headers _headers gives it), the sign-in helper and api.github.com from scripts/app-fixtures/.
-// Anything else is refused and fails the check. The request log then has to show only GitHub and the helper, and
-// no write. No npm dependency: Node's own WebSocket talks to the browser.
-//
-//   node scripts/app-check.mjs            (after npm run build; CHROME=/path/to/chrome to pick the browser)
-//   SHOTS=dir node scripts/app-check.mjs  also saves the shell on a laptop and a phone as PNGs, for review
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { cp, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
@@ -21,8 +12,6 @@ const SITE = 'https://openwiz.dev';
 const API = 'https://api.github.com';
 const STATE = 'S'.repeat(43);
 const fixture = async name => JSON.parse(await readFile(new URL(name, FIXTURES), 'utf8'));
-
-// ---- The browser ----------------------------------------------------------------------------------------------
 
 function chromePath() {
   const found = [process.env.CHROME, '/usr/bin/google-chrome', '/usr/bin/google-chrome-stable', '/usr/bin/chromium',
@@ -65,10 +54,8 @@ async function launch() {
     waiting.set(id, { resolve, reject });
     socket.send(JSON.stringify({ id, method, params, ...(sessionId ? { sessionId } : {}) }));
   });
-  // Every new tab or window is attached paused, before it loads anything. One the app opens (it has an opener) has its
-  // first request handed to its opener's check (popups) and refused, and is closed: it never reaches the network.
-  const popups = new Map(); // opener target id -> (request) => void
-  const opened = new Map(); // popup session id -> opener target id
+  const popups = new Map();
+  const opened = new Map();
   listeners.push(async message => {
     if (message.method === 'Target.attachedToTarget' && !message.sessionId) {
       const { sessionId, targetInfo } = message.params;
@@ -94,13 +81,10 @@ async function launch() {
   return { send, on: listener => listeners.push(listener), popups, close };
 }
 
-// ---- The recorded world ---------------------------------------------------------------------------------------
-
 const TYPES = { html: 'text/html; charset=utf-8', css: 'text/css', js: 'text/javascript', json: 'application/json',
   webmanifest: 'application/manifest+json', svg: 'image/svg+xml', png: 'image/png', ico: 'image/x-icon',
   woff2: 'font/woff2', txt: 'text/plain' };
 
-// The _headers rules for a path, as Cloudflare Pages applies them (splat patterns only).
 async function siteHeaders(path) {
   const out = {};
   let match = false;
@@ -129,14 +113,12 @@ class World {
   constructor() {
     this.log = [];
     this.violations = [];
-    // operation name -> answer function (body) => {status, json, headers}. The Specs feed's second read (each running
-    // spec's tickets) answers with no spec by default, so those specs' tickets show as unknown.
     this.graphql = { SpecTickets: async () => ({ status: 200, json: { data: { rateLimit: { limit: 5000, remaining: 4800, resetAt: '2099-01-01T00:00:00Z' }, repository: {} } } }) };
-    this.rest = {}; // GitHub REST path -> answer function (url) => {status, json, headers}
-    this.helper = {}; // helper path -> answer function (body) => {status, json} (may wait, to hold a response)
-    this.done = []; // paths answered so far
-    this.opened = []; // tabs the page opened (a link to GitHub), by their first request: never answered
-    this.site = {}; // site path -> answer function () => {status, raw, type} or {abort}, in place of the built file
+    this.rest = {};
+    this.helper = {};
+    this.done = [];
+    this.opened = [];
+    this.site = {};
   }
 
   answered(path) {
@@ -161,7 +143,6 @@ class World {
       return { status: file.status, raw: file.body, type: file.type, headers: await siteHeaders(url.pathname) };
     }
     if (url.origin === API) {
-      // The browser's own CORS preflight, answered as GitHub does: it carries no data and changes nothing.
       if (request.method === 'OPTIONS') {
         return { status: 204, raw: Buffer.alloc(0), headers: { 'Access-Control-Allow-Methods': 'GET, POST',
           'Access-Control-Allow-Headers': 'Authorization, Accept, Content-Type' } };
@@ -177,17 +158,13 @@ class World {
       }
       return { status: 404, json: { message: 'Not Found' } };
     }
-    return null; // refused: not GitHub, not the site
+    return null;
   }
 }
 
-// The text a person reads on a control: without parts hidden from assistive technology (key hints, icons).
 const LABEL = `const label = e => { const c = e.cloneNode(true); c.querySelectorAll('[aria-hidden="true"]').forEach(x => x.remove()); return c.textContent.replace(/\\s+/g, ' ').trim(); };`;
 
-// ---- One page under test --------------------------------------------------------------------------------------
-
 async function open(browser, world) {
-  // Each check gets its own browser context: its own storage, so no sign-in or picked repository carries over.
   const { browserContextId } = await browser.send('Target.createBrowserContext');
   const { targetId } = await browser.send('Target.createTarget', { url: 'about:blank', browserContextId });
   const { sessionId } = await browser.send('Target.attachToTarget', { targetId, flatten: true });
@@ -199,14 +176,12 @@ async function open(browser, world) {
       const reply = await world.answer(request);
       world.done.push(new URL(request.url).pathname);
       if (!reply || reply.abort) {
-        // Refused (not GitHub, not the site), or a recorded network failure (abort).
         await send('Fetch.failRequest', { requestId, errorReason: reply ? 'ConnectionFailed' : 'BlockedByClient' }).catch(() => {});
         return;
       }
       const body = reply.raw ?? Buffer.from(JSON.stringify(reply.json));
       const headers = { 'Content-Type': TYPES[reply.type || 'json'] || 'application/octet-stream', ...(reply.headers || {}) };
       if (request.url.startsWith(API)) {
-        // As GitHub's API answers a browser: any origin, with its paging and limit headers readable.
         headers['Access-Control-Allow-Origin'] = SITE;
         headers['Access-Control-Expose-Headers'] = 'Link, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset, Retry-After';
       }
@@ -221,7 +196,6 @@ async function open(browser, world) {
       world.violations.push(`exception: ${message.params.exceptionDetails.exception?.description || message.params.exceptionDetails.text}`);
     }
   });
-  // A tab the page opens (a link to GitHub) is noted in world.opened by its first request, which is refused (launch).
   browser.popups.set(targetId, request => world.opened.push({ method: request.method, url: request.url }));
   await browser.send('Browser.grantPermissions', { origin: SITE, browserContextId, permissions: ['clipboardReadWrite', 'clipboardSanitizedWrite'] });
   await send('Emulation.setFocusEmulationEnabled', { enabled: true });
@@ -252,9 +226,7 @@ async function open(browser, world) {
       await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: mobile ? 2 : 1, mobile });
       await new Promise(resolve => setTimeout(resolve, 200));
     },
-    // One turn of a mouse wheel at (x, y), as the browser's own input.
     wheel: (x, y, deltaY) => send('Input.dispatchMouseEvent', { type: 'mouseWheel', x, y, deltaX: 0, deltaY }),
-    // CSS media features as the page sees them, e.g. display-mode: standalone for an app installed to the home screen.
     media: features => send('Emulation.setEmulatedMedia', { features }),
     async shot(path, width, height, mobile) {
       await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: mobile ? 2 : 1, mobile });
@@ -263,24 +235,18 @@ async function open(browser, world) {
       await writeFile(path, Buffer.from(data, 'base64'));
       await send('Emulation.clearDeviceMetricsOverride');
     },
-    // Press one key as a keyboard does (keyDown, then keyUp): 'Tab', 'Enter', 'Escape', an arrow, 'Backspace', '?',
-    // a digit or a letter, with any of the modifiers Alt, Ctrl, Meta and Shift held.
     async key(key, ...held) {
       const codes = { Tab: ['Tab', 9], Enter: ['Enter', 13, '\r'], Escape: ['Escape', 27], ArrowDown: ['ArrowDown', 40], ArrowUp: ['ArrowUp', 38],
         Backspace: ['Backspace', 8], '?': ['Slash', 191, '?'] };
       const letter = /^[a-z]$/i.test(key) ? [`Key${key.toUpperCase()}`, key.toUpperCase().charCodeAt(0), key] : null;
       const [code, vk, typed] = codes[key] || letter || [`Digit${key}`, key.charCodeAt(0), key];
       const modifiers = held.reduce((m, name) => m | { Alt: 1, Ctrl: 2, Meta: 4, Shift: 8 }[name], 0);
-      // A key pressed with Ctrl, Alt or Meta types nothing.
       const text = typed && !(modifiers & 7) ? typed : undefined;
       await send('Input.dispatchKeyEvent', { type: 'keyDown', key, code, windowsVirtualKeyCode: vk, modifiers, ...(text ? { text } : {}) });
       await send('Input.dispatchKeyEvent', { type: 'keyUp', key, code, windowsVirtualKeyCode: vk, modifiers });
     },
-    // Type text into the focused field, as a keyboard's input does.
     type: text => send('Input.insertText', { text }),
-    // What the app put on the clipboard, read as this site.
     clipboard: () => page.run('navigator.clipboard.readText()'),
-    // Click the visible control (link or button) whose text, without its aria-hidden parts, is exactly this.
     click: text => page.run(`(() => {
       ${LABEL}
       const el = [...document.querySelectorAll('a, button')].find(e => e.offsetParent !== null && label(e) === ${JSON.stringify(text)});
@@ -294,8 +260,6 @@ async function open(browser, world) {
   };
   return page;
 }
-
-// ---- The checks -----------------------------------------------------------------------------------------------
 
 const results = [];
 async function check(name, body) {
@@ -319,13 +283,11 @@ async function waitFor(test, what, ms = 8000) {
 }
 
 const operation = r => (String(JSON.parse(r.body || '{}').query).match(/^\s*query\s+(\w+)/) || [])[1];
-// GraphQL reads sent, or only those of the named operations (the first read of each feed: Specs, Agents).
 const graphqlCount = (world, names) => world.log.filter(r => r.origin === API && r.path === '/graphql' && r.method === 'POST'
   && (!names || names.includes(operation(r)))).length;
 const settle = (page, ms = 300) => page.run(`new Promise(resolve => setTimeout(resolve, ${ms}))`);
 const ok = name => async () => ({ status: 200, json: await fixture(name) });
 
-// Every logged request: only the site (static reads and the helper) and GitHub's API, and nothing that writes.
 function checkRequestLog(world) {
   assert(world.log.length > 0, 'no requests were logged');
   for (const r of world.log) {
@@ -362,7 +324,6 @@ async function releaseSwitchAlone() {
     const copy = join(temp, 'site');
     await cp(root, copy, { recursive: true, filter: src => src === root || !['.git', 'dist', 'node_modules', '__pycache__'].includes(basename(src)) });
     await symlink(join(root, 'node_modules'), join(copy, 'node_modules'));
-    // npm run check lists the site's files through git; the linked node_modules is not one of them.
     const git = spawnSync('git', ['init', '-q'], { cwd: copy });
     assert(git.status === 0, 'git init failed in the copy');
     await writeFile(join(copy, '.git/info/exclude'), '/node_modules\n');
@@ -389,11 +350,8 @@ async function main() {
   if (!existsSync(new URL('index.html', DIST))) throw new Error('dist/ is missing: run npm run build first');
   const browser = await launch();
   try {
-    // #1357: the landing's install box. The line is the one the install skill expects, word for word.
     const LINE = 'Install OpenWiz from github.com/openwizdev/OpenWiz';
     const landing = await readFile(new URL('index.html', DIST), 'utf8');
-    // The box's one switch (data-install): each check serves the built landing with the switch set to its state,
-    // so both states are checked whichever value the landing ships (#1573). The release changes only that value.
     const shipped = landing.match(/data-install="[^"]*"/g) || [];
     const servedAs = (world, state) => {
       assert(shipped.length === 1 && ['data-install="coming-soon"', 'data-install="live"'].includes(shipped[0]),
@@ -594,7 +552,6 @@ async function main() {
       const before = graphqlCount(world);
       const disabled = await page.run(`[...document.querySelectorAll('button')].filter(b => /refresh now/i.test(b.textContent)).map(b => b.disabled)`);
       assert(disabled.length === 2 && disabled.every(Boolean), `Refresh now is not disabled while backing off: ${JSON.stringify(disabled)}`);
-      // Even forced, a refresh reads nothing while the limit is low (the data layer's own guard, not the button).
       await page.run(`OW.data.refreshAll()`);
       await page.run(`new Promise(resolve => setTimeout(resolve, 300))`);
       assert(graphqlCount(world) === before, 'the app read GitHub again while backing off');
@@ -615,10 +572,6 @@ async function main() {
       assert(world.violations.some(text => /Content Security Policy/.test(text)), 'no Content Security Policy refused it');
       await page.close();
     });
-
-    // ---- AP6 (#1259): You, Specs and a spec's page, against recorded answers (ap6-*.json) ----
-    // A ticket's state comes from GitHub and the agents' openwiz:status v1 notes (AP1's contract), never from a state
-    // label. Notes and decision records count only from the record authors in the repository's docs/agents/fleet.md.
 
     const live = text => {
       const now = Date.now();
@@ -671,10 +624,6 @@ async function main() {
       await page.close();
     });
 
-    // AP21 (#1909, F2 of #1266): on a phone, and installed to the home screen, the tab bar stays on the bottom edge.
-    // On the owner's iPhone the document scrolled under a fixed bar, and at the list's end (and in rubber-band
-    // overscroll) iOS drew the bar mid-screen with the page below it. The phone shell is now fixed to the screen and
-    // only its content scrolls, so the document itself never scrolls; the bar ends where the screen does.
     const tabBarAtEnd = page => page.run(`(() => {
       const H = window.innerHeight, W = window.innerWidth, bar = document.querySelector('nav.tabs').getBoundingClientRect();
       const doc = document.scrollingElement;
@@ -700,10 +649,8 @@ async function main() {
       await page.until(`document.querySelectorAll('main .cards a.card').length >= 14`, 'the long You list');
       for (const standalone of [false, true]) {
         await page.media(standalone ? [{ name: 'display-mode', value: 'standalone' }] : []);
-        // An iPhone's screen, then the same screen with Safari's toolbar shown (a shorter viewport).
         for (const [width, height] of [[390, 844], [390, 760]]) {
           await page.size(width, height, true);
-          // Scroll to the list's end as a person does, with the wheel over the list, until nothing moves.
           for (let i = 0; i < 12; i += 1) await page.wheel(width / 2, height / 2, 1500);
           await settle(page, 300);
           const at = await tabBarAtEnd(page);
@@ -720,25 +667,19 @@ async function main() {
       await page.close();
     });
 
-    // AP21 (#1909, F1 of #1266): a spec is an open issue with sub-issues (its tickets), a spec label, or a "<version>
-    // spec: <name>" title, and never a wayfind map; the factory labels specs nothing. The You tiles read Building 0,
-    // In review 0 and Merged 0 on OpenWiz because the app looked only for the label. Here GitHub's advanced issue search
-    // is answered by evaluating the terms it was sent over these issues; the counts are known from ap6-spec-tickets.json.
     const searchable = async () => {
       const answer = await fixture('ap6-specs.json');
       const [s60, s50, s40] = answer.data.specSearch.nodes.map(issue => ({ ...issue, labels: { nodes: [] } }));
       return [
-        { ...s60, title: '0.1.0 spec: dark mode' }, // no tickets yet: found by its title
+        { ...s60, title: '0.1.0 spec: dark mode' },
         { ...s50, title: '0.1.0 spec: search' },
-        { ...s40, title: 'Shipping notes' }, // no "spec" in the title: found by its tickets
+        { ...s40, title: 'Shipping notes' },
         { number: 70, title: 'Wayfind: the spec: map for loops', url: 'https://github.com/acme/factory/issues/70', updatedAt: '2030-01-05T00:00:00Z',
           labels: { nodes: [{ name: 'wayfind:map' }] }, subIssuesSummary: { total: 5, completed: 4 } },
         { number: 71, title: 'to-spec step 1 drops a stop (polish for #50, R1)', url: 'https://github.com/acme/factory/issues/71', updatedAt: '2030-01-05T00:00:00Z',
           labels: { nodes: [] }, subIssuesSummary: { total: 0, completed: 0 } },
       ];
     };
-    // GitHub's advanced issue search, for the terms it knows here: repo, is:issue, state:open, sort, a parenthesized OR
-    // of has:sub-issue, label:X and in:title W, and -label:X. Any other term, or the legacy search type, is refused.
     const searchIssues = (query, type, issues) => {
       if (type !== 'ISSUE_ADVANCED') return { error: `this search needs type ISSUE_ADVANCED, not ${type}` };
       const required = ['repo:acme/factory', 'is:issue', 'state:open', 'sort:updated-desc'];
@@ -766,7 +707,6 @@ async function main() {
         const answer = await fixture('ap6-specs.json');
         delete answer.data.specSearch;
         const issues = await searchable();
-        // The old read: open issues labelled spec. None is.
         if (/labels:\s*\["spec"\]/.test(body.query)) answer.data.repository.specIssues = { totalCount: 0, nodes: [] };
         const search = body.query.match(/search\(query:\s*\$specs,\s*type:\s*(\w+)/);
         if (search) {
@@ -818,8 +758,6 @@ async function main() {
       await page.until(`document.querySelectorAll('main .cards a.card').length >= 2`, 'the You items');
       await settle(page, 600);
       const items = await youItems(page);
-      // Without the repository's record authors no record can be verified, not even a visitor's or a resolved one: all
-      // six are unreadable, and none is an approval.
       assert(!items.some(item => /^(Spec to confirm|Plan to approve)/.test(item)), `an unverified record shows as needing a yes: ${JSON.stringify(items)}`);
       assert(items.filter(item => item.startsWith('A decision record that couldn\'t be read')).length === 6, `unverified records are not unreadable: ${JSON.stringify(items)}`);
       checkRequestLog(world);
@@ -827,9 +765,6 @@ async function main() {
     });
 
     await check('R7: a decision record with the wrong field types is unreadable, never a crash, and the rest still renders', async () => {
-      // Synthetic comments on spec #50: a visitor's record whose kind names an inherited property (read before its
-      // author was checked, it threw), and the record authors' with a kind, id or fingerprint of the wrong JSON type
-      // (coerced to a string, they read as a valid plan approval).
       const record = fields => '```json\n' + JSON.stringify({ schema: 'openwiz.decisions.v1', kind: 'plan_approval',
         id: 'r-plan_approval-50-typed', status: 'open', fingerprint: 'a'.repeat(64), risk: 'ordinary', spec: 50,
         summary: ['Synthetic summary line.'], headline: 'Synthetic headline.', tickets: [], graph: [], ...fields }, null, 2) + '\n```';
@@ -966,7 +901,6 @@ async function main() {
       const world = ap6World();
       const page = await ap6Open(world);
       await page.until(`document.querySelectorAll('main .cards a.card').length >= 6`, 'the You items');
-      // What has focus: a ticket card's number, a link's address, or the element's tag; and whether its focus shows.
       const focused = () => page.run(`(() => { const e = document.activeElement; const s = getComputedStyle(e);
         return { what: e.dataset.ticket || e.getAttribute('href') || e.tagName, shows: s.outlineStyle !== 'none' && s.outlineWidth !== '0px' }; })()`);
       const tabTo = async (what, most = 60) => {
@@ -982,18 +916,15 @@ async function main() {
         }
         throw new Error(`Tab never reached ${what}: ${seen.join(' ')}`);
       };
-      // You: each item is reached by Tab, newest first.
       const you = await tabTo('https://github.com/acme/factory/issues/48');
       const order = ['https://github.com/acme/factory/issues/46', 'https://github.com/acme/factory/issues/60#issuecomment-9001',
         'https://github.com/acme/factory/issues/50#issuecomment-9003', 'https://github.com/acme/factory/issues/48'];
       assert(JSON.stringify(you.filter(w => order.includes(w))) === JSON.stringify(order), `You's items in Tab order: ${you.join(' ')}`);
-      // The shell's 2 opens Specs; Tab reaches a spec and Enter opens its page, with focus on its title.
       await page.key('2');
       await page.until(`location.hash === '#/specs' && document.querySelector('main a.card[href="#/specs/40"]')`, 'Specs by its key');
       await tabTo('#/specs/40');
       await page.key('Enter');
       await page.until(`location.hash === '#/specs/40' && document.activeElement.classList.contains('spec-title')`, 'focus on the spec page\'s title');
-      // The graph's tickets come in reading order: every ticket after each ticket it waits for.
       const walk = await tabTo('41', 80);
       const graph = [];
       const card = what => /^(\d+|gap-\d+)$/.test(what);
@@ -1008,7 +939,6 @@ async function main() {
       for (const [blocker, ticket] of [['30', '43'], ['41', '42'], ['41', '44'], ['41', '49'], ['42', '45'], ['43', '45'], ['44', '47'], ['gap-49', '49']]) {
         assert(all.indexOf(blocker) < all.indexOf(ticket), `#${ticket} comes before #${blocker}, which it waits for: ${all.join(' ')}`);
       }
-      // Esc goes back to all specs, with focus on the spec just left; the shell's 1 still opens You.
       await page.key('Escape');
       await page.until(`location.hash === '#/specs' && document.activeElement.getAttribute('href') === '#/specs/40'`, 'Esc back to the spec\'s card');
       await page.key('1');
@@ -1033,10 +963,6 @@ async function main() {
       await page.close();
     });
 
-    // ---- AP7 (#1260): the Agents page and the pulse, against recorded answers (ap7-agents.json) ----
-    // Agents come from their openwiz:status v1 notes (WizSkills' agent-status contract) and GitHub's pull requests,
-    // reviews and checks, never from a state label. "LIVE-<n>" in a fixture is n minutes before the read.
-
     const ago = text => {
       const now = Date.now();
       const at = n => new Date(now - Number(n) * 60 * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z');
@@ -1051,7 +977,6 @@ async function main() {
       };
       return world;
     };
-    // Each card on the Agents page: [section, note id, status, its text].
     const agentRows = page => page.run(`[...document.querySelectorAll('main article.card')].map(c => [
       c.closest('.cards').previousElementSibling.textContent, Number(c.dataset.note), c.dataset.status, c.innerText.replace(/\\s+/g, ' ')])`);
 
@@ -1114,7 +1039,6 @@ async function main() {
     });
 
     await check('AP7 pulse: a spec page marks the tickets an agent is working on now, and only those', async () => {
-      // AP1's writer always writes a skills line, and the recorded AP6 notes carry one (AP22).
       const world = ap7World();
       const page = await ap6Open(world, '#/specs/40');
       await page.until(`document.querySelectorAll('main .graph [data-ticket]').length === 10`, 'the ticket graph');
@@ -1128,21 +1052,17 @@ async function main() {
       await page.close();
     });
 
-    // ---- AP17 (#1579): the pulse and the Agents card's pull request tell the truth (WizSite #34, R1 and R2) ----
-
-    // A status note on spec 40's ticket #43 as the Agents read gives it: its id, its state and its last edit.
     const note43 = (id, state, updatedAt) => ({ databaseId: id, createdAt: '2030-01-01T00:00:00Z', updatedAt, author: { login: 'factory-bot[bot]' },
       body: `<!-- openwiz:status v1 -->\nagent: builder\nstate: ${state}\nharness: Synthetic Harness\nmodel: Synthetic Model\nskills: build-ticket@0.1.2\nstep: a synthetic step\ntime: ${updatedAt}` });
     const ticketOf = (number, comments, totalCount = comments.length) => ({ number, title: `Synthetic ticket ${number}`, url: `https://github.com/acme/factory/issues/${number}`,
       state: 'OPEN', updatedAt: comments[0]?.updatedAt || '2030-01-01T00:00:00Z', comments: { totalCount, nodes: comments }, closedByPullRequestsReferences: { totalCount: 0, nodes: [] } });
     const minutesAgo = n => new Date(Date.now() - n * 60 * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z');
-    // Spec 40 as both reads first give it (#42 and #43 working); then only the Agents read comes again, with `later`.
     const pulseWorld = (later, specs = () => {}) => {
       let changed = false;
       const world = ap7World({
         tickets: repository => {
           for (const ticket of repository.s40.subIssues.nodes) for (const c of ticket?.comments?.nodes || []) {
-            if (c.databaseId === 9009 || c.databaseId === 9007) c.updatedAt = minutesAgo(5); // working in the Specs read, 5 minutes ago
+            if (c.databaseId === 9009 || c.databaseId === 9007) c.updatedAt = minutesAgo(5);
             specs(c);
           }
         },
@@ -1153,7 +1073,6 @@ async function main() {
     };
     const idle = `OW.data.feeds.agents.readAt && OW.data.feeds.specs.readAt && OW.data.feeds.specs.data?.specs && !OW.data.feeds.agents.busy && !OW.data.feeds.specs.busy`;
     const pulsing = page => page.run(`[...document.querySelectorAll('main .graph [data-pulse]')].map(c => c.dataset.ticket).sort()`);
-    // Open spec 40, see both reads' pulse, then read Agents again (as its two-minute schedule does) and give the pulse.
     const pulseAfterAgents = async (world, before = ['42', '43']) => {
       const page = await ap6Open(world, '#/specs/40');
       await page.until(`document.querySelectorAll('main .graph [data-ticket]').length === 10 && ${idle}`, 'the ticket graph and both reads');
@@ -1168,7 +1087,6 @@ async function main() {
     };
 
     await check('AP17 pulse: a note working in the Specs read and done in a newer Agents read shows no pulse', async () => {
-      // catches: the pulse unioning working claims from both snapshots, so an older Specs read keeps "Agent working" on.
       const world = pulseWorld(repository => { repository.issues.nodes.unshift(ticketOf(43, [note43(9009, 'done', minutesAgo(1))])); });
       const [page, now] = await pulseAfterAgents(world);
       assert(JSON.stringify(now) === JSON.stringify(['42']), `pulsing tickets: ${JSON.stringify(now)}`);
@@ -1177,11 +1095,10 @@ async function main() {
     });
 
     await check('AP17 pulse: a newer Agents read that covers a deleted note drops its pulse; one that does not reach it keeps it', async () => {
-      // catches: a deleted working note pulsing on from the older Specs read, or a note the newer read never reached being dropped.
       const full = Array.from({ length: 20 }, (_, i) => ({ databaseId: 9900 + i, body: 'An ordinary comment.', createdAt: '2030-01-01T00:00:00Z',
         updatedAt: minutesAgo(1), author: { login: 'factory-bot[bot]' } }));
       const world = pulseWorld(repository => {
-        repository.issues.nodes.unshift(ticketOf(43, [], 0), ticketOf(42, full, 25)); // #43's note is gone; #42's window stops short of its note
+        repository.issues.nodes.unshift(ticketOf(43, [], 0), ticketOf(42, full, 25));
       });
       const [page, now] = await pulseAfterAgents(world);
       assert(JSON.stringify(now) === JSON.stringify(['42']), `pulsing tickets: ${JSON.stringify(now)}`);
@@ -1189,8 +1106,6 @@ async function main() {
       await page.close();
     });
 
-    // Review round 1 of WizSite #41 (R1, R2): reads that overlap, and a newer read whose record authors can't be read.
-    // Both feeds are read again at once; the Specs answer, captured first, is held until the browser has taken the Agents one.
     const overlapping = async (world, page) => {
       let release;
       const held = new Promise(resolve => { release = resolve; });
@@ -1206,14 +1121,12 @@ async function main() {
     };
 
     await check('AP17 pulse: an older Specs answer that arrives after a newer Agents read never restores a deleted note', async () => {
-      // catches: snapshots ordered by when the browser took them, so a held Specs answer brings back a note the Agents read showed deleted.
       const world = pulseWorld(repository => { repository.issues.nodes.unshift(ticketOf(43, [], 0)); });
       const page = await ap6Open(world, '#/specs/40');
       await page.until(`document.querySelectorAll('main .graph [data-ticket]').length === 10 && ${idle}`, 'the ticket graph and both reads');
       await overlapping(world, page);
       const held = await pulsing(page);
       assert(JSON.stringify(held) === JSON.stringify(['42']), `pulsing after the held Specs answer: ${JSON.stringify(held)}`);
-      // An Agents read on its own settles the order: the note stays gone.
       const specsAt = await page.run(`OW.data.feeds.specs.readAt`);
       await page.run(`(() => { OW.data.feeds.agents.readAt = 1; document.dispatchEvent(new Event('visibilitychange')); })()`);
       await page.until(`OW.data.feeds.agents.readAt > ${specsAt} && ${idle}`, 'a fresh Agents read');
@@ -1224,7 +1137,6 @@ async function main() {
     });
 
     await check('AP17 pulse: a note first seen in an Agents read without record authors never pulses, as its card is unknown', async () => {
-      // catches: the older Specs read's record authors vouching for a note only the newer, unverifiable Agents read has.
       const world = pulseWorld(repository => {
         repository.fleet = null;
         repository.issues.nodes.unshift(ticketOf(43, [note43(9009, 'working', minutesAgo(1))]));
@@ -1240,7 +1152,6 @@ async function main() {
     });
 
     await check('AP17 Agents: a note naming PR #12 that GitHub does not return links PR #12, with its facts unknown', async () => {
-      // catches: the card swapping in the ticket's other pull request (#99) beside the preview of the PR the note names.
       const world = ap7World({ agents: repository => {
         const pr = repository.issues.nodes.find(issue => issue.number === 70).closedByPullRequestsReferences;
         pr.nodes = [{ ...pr.nodes[0], url: 'https://github.com/acme/site/pull/99', reviewDecision: 'APPROVED' }];
@@ -1258,13 +1169,9 @@ async function main() {
       await page.close();
     });
 
-    // ---- AP22 (#1266 follow-up, the owner's laptop): You and Agents read completely ----
-
-    // A ticket updated a minute ago with no status note, for filling a page of the Agents read.
     const quietTicket = n => ({ number: n, title: `Synthetic quiet ticket ${n}`, url: `https://github.com/acme/factory/issues/${n}`, state: 'OPEN',
       updatedAt: 'LIVE-1', comments: { totalCount: 0, nodes: [] }, closedByPullRequestsReferences: { totalCount: 0, nodes: [] } });
     const noteBody = (agent, state, harness, model, minutes) => `<!-- openwiz:status v1 -->\nagent: ${agent}\nstate: ${state}\nharness: ${harness}\nmodel: ${model}\nskills: build-ticket@0.2.0\nstep: synthetic step\ntime: LIVE-${minutes}`;
-    // The Agents read in pages: 50 quiet tickets, then a second page holding a working builder on ticket #251.
     const pagedAgents = async (world, { remaining = 4800, hold = null } = {}) => {
       const fleet = (await fixture('ap7-agents.json')).data.repository.fleet;
       world.graphql.Agents = async body => {
@@ -1291,7 +1198,6 @@ async function main() {
       assert(!/Only the 50|Part of this read failed|tickets were read/.test(text), `a complete read says it is partial: ${text.slice(0, 300)}`);
       const sent = world.log.filter(r => operation(r) === 'Agents').map(r => JSON.parse(r.body));
       assert(sent.length >= 2 && sent.every(b => /filterBy:\s*\{\s*since:/.test(b.query) && b.variables.since), 'the Agents read is not limited to the last day');
-      // The next read (its two-minute schedule) asks only for what changed since this one, and keeps what it read.
       world.graphql.Agents = async () => ({ status: 200, json: { data: { rateLimit: { limit: 5000, remaining: 4790, resetAt: '2099-01-01T00:00:00Z' },
         repository: { issues: { totalCount: 0, pageInfo: { hasNextPage: false, endCursor: null }, nodes: [] }, fleet: (await fixture('ap7-agents.json')).data.repository.fleet } } } });
       const was = world.log.length;
@@ -1353,7 +1259,6 @@ async function main() {
         repository.s50.comments.totalCount = 60;
       } });
       let first;
-      // GitHub's REST list, oldest first: the four the first read gave, 55 ordinary comments, then an open plan approval.
       world.rest['/repos/acme/factory/issues/50/comments'] = async () => ({ status: 200, json: [
         ...first.map(c => ({ id: c.databaseId, body: c.body, html_url: c.url, created_at: c.createdAt, updated_at: c.updatedAt, user: c.author })),
         ...Array.from({ length: 56 }, (_, i) => {
@@ -1475,8 +1380,6 @@ async function main() {
       await page.close();
     });
 
-    // ---- Review round 1 (R1-R6) ----
-
     await check('R1: signing out while a token refresh is still out stays signed out', async () => {
       const world = new World();
       const grant = await fixture('token.json');
@@ -1517,7 +1420,7 @@ async function main() {
       await page.click('acme/factory');
       await page.until(`/GitHub.s limit is low/.test(document.body.innerText)`, 'the low-limit notice');
       const before = graphqlCount(world);
-      await page.click('acme/factory'); // the repository button: change repository
+      await page.click('acme/factory');
       await page.until(`[...document.querySelectorAll('button')].some(b => b.textContent.trim() === 'acme/site')`, 'the picker');
       await page.click('acme/site');
       await page.until(`document.querySelector('h1') && document.querySelector('h1').textContent.trim() === 'You' && document.body.innerText.includes('acme/site')`, 'the shell on acme/site');
@@ -1528,9 +1431,6 @@ async function main() {
       await page.close();
     });
 
-    // AP22 (#1266 follow-up): changing repository happens in the sidebar. Before, the repository button dropped the
-    // shell for the full-screen picker, and picking sent the user to You with a new history entry, whatever tab
-    // they were on. Now the list opens under the button, the shell and the tab stay, and only the reads change.
     for (const [route, title] of [['#/you', 'You'], ['#/specs', 'Specs'], ['#/agents', 'Agents']]) {
       await check(`AP22 picker: changing repository on ${title} keeps the shell, the tab and the history, and reads the new repository`, async () => {
         const world = new World();
@@ -1543,7 +1443,7 @@ async function main() {
         await page.go(`${SITE}/app/${route}`);
         await page.until(`document.querySelector('main h1').textContent.trim() === ${JSON.stringify(title)}`, `the ${title} page`);
         const depth = await page.run('history.length');
-        await page.click('acme/factory'); // the repository button in the sidebar
+        await page.click('acme/factory');
         await page.until(`[...document.querySelectorAll('aside.side button')].some(b => b.textContent.trim() === 'acme/site')`, 'the repository list in the sidebar');
         const kept = await page.run(`({ shell: !!document.querySelector('aside.side nav.main'), h1: document.querySelector('main h1')?.textContent.trim(), hash: location.hash })`);
         assert(kept.shell && kept.h1 === title && kept.hash === route, `opening the list left the page: ${JSON.stringify(kept)}`);
@@ -1561,14 +1461,11 @@ async function main() {
       });
     }
 
-    // ---- AP22 review R1-R4 (WizSite #120) ----
-
     await check('AP22 R1: the two-minute read refreshes the checks of a card whose ticket did not change', async () => {
       const world = ap7World();
       const page = await ap6Open(world, '#/agents');
       await page.until(`/checks running/.test(document.querySelector('main article.card[data-note="7001"]')?.innerText || '')`, 'the builder card, checks running');
       const fleet = (await fixture('ap7-agents.json')).data.repository.fleet;
-      // Nothing was updated since the last read; GitHub now reports #12's checks passed.
       world.graphql.Agents = async () => ({ status: 200, json: { data: { rateLimit: { limit: 5000, remaining: 4790, resetAt: '2099-01-01T00:00:00Z' },
         repository: { issues: { totalCount: 0, pageInfo: { hasNextPage: false, endCursor: null }, nodes: [] }, fleet } } } });
       world.graphql.AgentPulls = async body => {
@@ -1599,7 +1496,6 @@ async function main() {
         await page.run(`(() => { OW.data.feeds.agents.readAt = 1; document.dispatchEvent(new Event('visibilitychange')); })()`);
         await page.until(`OW.data.feeds.agents.readAt > ${at} && !OW.data.feeds.agents.busy`, 'the next Agents read');
       };
-      // GitHub answers #70's alias with an error and no pull-request list.
       world.graphql.AgentPulls = async body => {
         const answer = { data: { rateLimit: { limit: 5000, remaining: 4780, resetAt: '2099-01-01T00:00:00Z' }, repository: {} },
           errors: [{ message: 'Something went wrong', path: ['repository', 'i70', 'closedByPullRequestsReferences'] }] };
@@ -1613,7 +1509,6 @@ async function main() {
       const card = await page.run(`document.querySelector('main article.card[data-note="7001"]').innerText.replace(/\\s+/g, ' ')`);
       assert(/Pull request #12: its state is unknown/.test(card) && !/checks running|checks pass/.test(card), `the card keeps old facts: ${card}`);
       assert(/Part of this read failed/.test(await page.text()), 'a refresh GitHub refused shows no partial-read notice');
-      // The retry (a full read) gets #70 again, still without its pull requests: still unknown, still partial.
       world.graphql.Agents = async body => {
         const reply = await whole(body);
         const issue = reply.json.data.repository.issues.nodes.find(i => i?.number === 70);
@@ -1624,7 +1519,6 @@ async function main() {
       await again();
       assert(/Pull request #12: its state is unknown/.test(await page.run(`document.querySelector('main article.card[data-note="7001"]').innerText`))
         && /Part of this read failed/.test(await page.text()), 'a retry still missing the pull requests clears the partial-read notice');
-      // GitHub gives the list again: the notice goes and the card has its facts.
       world.graphql.Agents = whole;
       await again();
       const back = await page.run(`document.querySelector('main article.card[data-note="7001"]').innerText.replace(/\\s+/g, ' ')`);
@@ -1655,13 +1549,11 @@ async function main() {
       await page.until(`document.querySelector('aside.side button.repo')`, 'the shell');
       await page.click('acme/factory');
       await page.until(`[...document.querySelectorAll('aside.side .repo-list button')].some(b => b.textContent.trim() === 'acme/site')`, 'the list');
-      // Enter on the current repository closes the list and gives focus back to the button that opened it.
       await page.until(`document.activeElement?.textContent.trim() === 'acme/factory' && document.activeElement.closest('.repo-list')`, 'focus on the current repository');
       await page.key('Enter');
       await page.until(`document.querySelector('aside.side .repo-list').hidden`, 'the list closed');
       const focus = await page.run(`document.activeElement === document.querySelector('aside.side button.repo')`);
       assert(focus, `focus went to ${await page.run('document.activeElement.tagName')}`);
-      // The user grants a repository on GitHub, comes back and opens the list again.
       const repos = await fixture('repositories.json');
       world.rest['/user/installations/1001/repositories'] = async () => ({ status: 200, json: { ...repos, total_count: repos.repositories.length + 1,
         repositories: [...repos.repositories, { id: 2003, name: 'granted', full_name: 'acme/granted', private: false, owner: { login: 'acme' } }] } });
@@ -1743,7 +1635,7 @@ async function main() {
 
     await check('R6: a long repository name fits a phone', async () => {
       const world = new World();
-      const long = `acme/${'averylongrepositoryname'.repeat(4)}`; // 92 characters, nowhere to break
+      const long = `acme/${'averylongrepositoryname'.repeat(4)}`;
       world.rest['/user/installations/1001/repositories'] = async () => ({ status: 200,
         json: { total_count: 1, repositories: [{ id: 4001, name: long.slice(5), full_name: long, private: true, owner: { login: 'acme' } }] } });
       const page = await open(browser, world);
@@ -1758,7 +1650,6 @@ async function main() {
       checkRequestLog(world);
       await page.close();
     });
-    // ---- #1325: a first sign-in with no installation ----
 
     await check('#1325: no installation yet: one more step installs OpenWiz Viewer, and the return lists the repositories', async () => {
       const world = new World();
@@ -1778,7 +1669,6 @@ async function main() {
       assert(width <= 320, `the one-more-step screen is ${width} CSS pixels wide on a 320-pixel phone`);
       await page.size(null);
       if (process.env.SHOTS) await page.shot(join(process.env.SHOTS, 'install-phone.png'), 390, 844, true);
-      // GitHub sends the installer back to the setup URL with installation_id and setup_action; still signed in.
       installed = true;
       await page.go(`${SITE}/app/?installation_id=1001&setup_action=install`);
       await page.until(`document.body.innerText.includes('acme/factory') && document.body.innerText.includes('acme/site')`, 'the filled picker');
@@ -1811,13 +1701,9 @@ async function main() {
         await page.close();
       }
     });
-    // ---- AP14 (#1326): the new OpenWiz mark and the Wiz family, cream on charcoal; nothing else in the shell moves ----
 
     const CREAM = '#cfc6b8';
     const CHARCOAL = '#1b1916';
-    // Where the brand and the page sit, measured on main before the new mark (AP7's shell): the mark must take the old
-    // logo's 28 x 28 place exactly, so nothing else in the layout moves. [x, y, width, height], CSS pixels; a title's
-    // place only, as its width is its words'.
     const LAYOUT = {
       laptop: { brand: [12, 20, 239, 34], mark: [22, 23, 28, 28], nav: [12, 142, 239, 152], title: [312, 40] },
       phone: { top: [0, 0, 390, 65], brand: [14, 18, 28, 28], mark: [14, 18, 28, 28], title: [16, 87] },
@@ -1825,7 +1711,6 @@ async function main() {
     };
     const box = selector => `(() => { const el = [...document.querySelectorAll(${JSON.stringify(selector)})].find(e => e.getClientRects().length);
       if (!el) return null; const r = el.getBoundingClientRect(); return [r.x, r.y, r.width, r.height].map(Math.round); })()`;
-    // Every brand mark on screen: the new mark file, loaded and drawn at 28 x 28, with no old drawn logo beside it.
     async function checkMarks(page, where) {
       const marks = await page.run(`[...document.querySelectorAll('.brand')].filter(b => b.getClientRects().length).map(b => {
         const img = b.querySelector('img');
@@ -1848,7 +1733,6 @@ async function main() {
         assert(JSON.stringify(got) === JSON.stringify(want), `${where}: the ${part} moved: ${JSON.stringify(got)}, was ${JSON.stringify(want)}`);
       }
     }
-    // A served file of the app's, read as the browser gets it.
     const served = async path => {
       const file = await staticFile(path);
       assert(file.status === 200, `${path} is not served (${file.status})`);
@@ -1872,7 +1756,6 @@ async function main() {
       assert(JSON.stringify(sizes) === '[16,32,48]', `icon.ico holds ${JSON.stringify(sizes)}, not 16, 32 and 48`);
       const png = await served('/app/icon-180.png');
       assert(png.readUInt32BE(16) === 180 && png.readUInt32BE(20) === 180, 'the home-screen icon is not 180 x 180');
-      // The picture itself: drawn in the page, its corner is charcoal and the mark's middle is cream.
       const pixels = await page.run(`new Promise(resolve => { const img = new Image(); img.onload = () => {
         const c = document.createElement('canvas'); c.width = c.height = 180; const g = c.getContext('2d'); g.drawImage(img, 0, 0);
         const at = (x, y) => '#' + [...g.getImageData(x, y, 1, 1).data.slice(0, 3)].map(v => v.toString(16).padStart(2, '0')).join('');
@@ -1951,11 +1834,6 @@ async function main() {
       }
     });
 
-    // ---- AP15 (#1327): Cmd-K, a keyboard-first command palette, and `?` for every shortcut ----
-    // The palette is a modal dialog: a search field (a combobox) over a list of results (a listbox). It finds every page,
-    // spec, ticket and agent the app shows, and runs the app's view actions. It never writes to GitHub: anything that
-    // changes work is something an agent does through GitHub, and the palette only links to it.
-
     const palette = page => page.run(`(() => { const d = document.querySelector('dialog[open]'); if (!d) return null;
       const input = d.querySelector('input'); const active = d.querySelector('[role="option"][aria-selected="true"]');
       return { label: d.getAttribute('aria-label') || d.querySelector('h2')?.textContent || '', typing: document.activeElement === input,
@@ -1966,7 +1844,6 @@ async function main() {
       await page.key('k', ...(held.length ? held : ['Ctrl']));
       await page.until(`document.querySelector('dialog[open] input') === document.activeElement`, 'the palette, with the search field focused');
     };
-    // Type into the palette and wait until the first result is the one wanted.
     const find = async (page, text, first) => {
       await page.type(text);
       await page.until(`(document.querySelector('dialog[open] [role="option"][aria-selected="true"]')?.innerText || '').replace(/\\s+/g, ' ').includes(${JSON.stringify(first)})`,
@@ -1980,7 +1857,6 @@ async function main() {
       const page = await ap6Open(world);
       await page.until(`document.querySelectorAll('main .cards a.card').length >= 6`, 'the You page');
       await page.until(`/Agents read \\d\\d:\\d\\d/.test(document.body.innerText) && OW.data.feeds.specs.data?.specs`, 'both feeds read');
-      // Ctrl-K opens it with the search field focused; Esc closes it and gives focus back; Cmd-K (Meta) opens it too.
       await page.run(`document.querySelector('main .cards a.card').focus()`);
       await paletteOpen(page, 'Ctrl');
       assert(/command/i.test((await palette(page)).label), 'the palette has no accessible name');
@@ -1989,33 +1865,27 @@ async function main() {
       assert(await page.run(`document.activeElement === document.querySelector('main .cards a.card')`), 'closing the palette lost the focused card');
       assert(await page.run(`location.hash`) === '#/you', 'Esc in the palette left the page');
       await paletteOpen(page, 'Meta');
-      // A page, by its name.
       await find(page, 'agents', 'Agents');
       await page.key('Enter');
       await page.until(`location.hash === '#/agents' && !document.querySelector('dialog[open]')`, 'Enter on a page to go there');
-      // A spec, by its number: its page, with focus on its title.
       await paletteOpen(page);
       await find(page, '#40', 'Spec: shipping notes');
       await page.key('Enter');
       await page.until(`location.hash === '#/specs/40' && document.activeElement.classList.contains('spec-title')`, 'Enter on a spec to open its page');
-      // A ticket, by words of its title: its spec's page, with focus on its card in the graph.
       await paletteOpen(page);
       await find(page, 'notes search', '#45 Notes search');
       await page.key('Enter');
       await page.until(`location.hash === '#/specs/40' && document.activeElement.dataset.ticket === '45'`, 'Enter on a ticket to focus its card');
-      // A ticket on another spec, from another page.
       await page.key('1');
       await page.until(`location.hash === '#/you'`, 'You by its key');
       await paletteOpen(page);
       await find(page, 'results page', '#53 Results page');
       await page.key('Enter');
       await page.until(`location.hash === '#/specs/50' && document.activeElement.dataset.ticket === '53'`, 'Enter on a ticket of spec 50');
-      // An agent, by its ticket: the Agents page, with focus on its card's ticket.
       await paletteOpen(page);
       await find(page, 'synthetic contract', 'Reviewer');
       await page.key('Enter');
       await page.until(`location.hash === '#/agents' && document.activeElement.closest('article.card')?.dataset.note === '7101'`, 'Enter on an agent to focus its card');
-      // Nothing found says so, never an empty box.
       await paletteOpen(page);
       await page.type('zzqx nothing like this');
       await page.until(`/no match/i.test(document.querySelector('dialog[open]').innerText)`, 'the no-match line');
@@ -2030,21 +1900,18 @@ async function main() {
       const page = await ap6Open(world, '#/specs/40');
       await page.until(`document.querySelectorAll('main .graph [data-ticket]').length === 10`, 'the ticket graph');
       await page.until(`/Agents read \\d\\d:\\d\\d/.test(document.body.innerText)`, 'the Agents read');
-      // Copy a link: this page's own address.
       await paletteOpen(page);
       await find(page, 'copy link', 'Copy a link to this page');
       await page.key('Enter');
       await page.until(`/copied/i.test(document.querySelector('dialog[open]')?.innerText || '')`, 'the copied line');
       assert(await page.clipboard() === `${SITE}/app/#/specs/40`, `the copied link is ${await page.clipboard()}`);
       await page.key('Escape');
-      // Alt+Enter copies the chosen result's GitHub link.
       await paletteOpen(page);
       await find(page, 'notes export', '#47 Notes export');
       await page.key('Enter', 'Alt');
       await page.until(`/copied/i.test(document.querySelector('dialog[open]')?.innerText || '')`, 'the copied line');
       assert(await page.clipboard() === 'https://github.com/acme/factory/issues/47', `Alt+Enter copied ${await page.clipboard()}`);
       await page.key('Escape');
-      // Open on GitHub: this page's spec, and a chosen result with Shift+Enter, each in a new tab; the app stays.
       await paletteOpen(page);
       await find(page, 'open on github', 'Open this page on GitHub');
       await page.key('Enter');
@@ -2056,7 +1923,6 @@ async function main() {
       assert(JSON.stringify(world.opened.map(o => `${o.method} ${o.url}`)) === JSON.stringify(['GET https://github.com/acme/factory/issues/40',
         'GET https://github.com/acme/factory/issues/44']), `opened: ${JSON.stringify(world.opened)}`);
       assert(await page.run(`location.href`) === `${SITE}/app/#/specs/40`, 'opening on GitHub moved the app');
-      // Filter: only one kind of result, until Backspace in the empty field shows everything again.
       await paletteOpen(page);
       await find(page, 'only tickets', 'Show only tickets');
       await page.key('Enter');
@@ -2069,21 +1935,17 @@ async function main() {
       for (let i = 0; i < 'agents'.length + 1; i += 1) await page.key('Backspace');
       await page.until(`[...document.querySelectorAll('dialog[open] [role="option"]')].some(o => /^Page\\b/.test(o.innerText.trim()))`, 'everything back after Backspace');
       await page.key('Escape');
-      // Refresh: every feed is read again.
       const before = graphqlCount(world);
       await paletteOpen(page);
       await find(page, 'refresh', 'Refresh now');
       await page.key('Enter');
       await waitFor(() => graphqlCount(world) >= before + 3, 'both feeds read again');
-      // Every result that would change work only links to GitHub; no request the app sent writes anything.
       checkRequestLog(world);
       assert(world.opened.every(o => o.method === 'GET' && o.url.startsWith('https://github.com/')), 'a tab opened somewhere other than GitHub');
       await page.close();
     });
 
-    // AP18 (#1588): the palette reaches everything the app shows, outside blockers and You-only tickets included.
     await check('AP18 R1: an outside blocker the graph draws is a palette result whose Enter focuses its card; its own spec wins; placeholders stay out', async () => {
-      // #45 (spec 40) also blocks #52, so spec 50 (read first) draws #45 outside it.
       const world = ap7World({ tickets: repository => {
         const query = repository.s50.subIssues.nodes.find(issue => issue?.number === 52);
         query.blockedBy.nodes.push({ number: 45, title: 'Notes search', url: 'https://github.com/acme/factory/issues/45', state: 'OPEN',
@@ -2094,7 +1956,6 @@ async function main() {
       await page.until(`document.querySelectorAll('main .cards a.card').length >= 6`, 'the You page');
       await page.until(`OW.factory.model(OW.data.feeds)?.specs.find(s => s.number === 50)?.graph?.tickets.some(t => t.number === 45 && t.outside)`,
         'spec 50 drawing #45 outside it');
-      // #30 blocks #43 from outside spec 40: Enter opens spec 40 and focuses #30's card there.
       await paletteOpen(page);
       await find(page, '#30', '#30');
       const blocker = (await palette(page)).options.filter(o => o.includes('#30 #30'));
@@ -2102,7 +1963,6 @@ async function main() {
       await page.key('Enter');
       await page.until(`location.hash === '#/specs/40' && document.activeElement.dataset.ticket === '30'`, 'Enter on the outside blocker to focus its card');
       assert(await visibleFocus(page), "the outside blocker's card has focus but no visible focus ring");
-      // A ticket drawn outside one spec and inside its own goes to its own spec.
       await page.key('1');
       await page.until(`location.hash === '#/you'`, 'You by its key');
       await paletteOpen(page);
@@ -2111,7 +1971,6 @@ async function main() {
       assert(results.length === 1 && !/outside/i.test(results[0]), `#45's results: ${JSON.stringify(results)}`);
       await page.key('Enter');
       await page.until(`location.hash === '#/specs/40' && document.activeElement.dataset.ticket === '45'`, 'Enter on #45 to its own spec');
-      // The blocked-by placeholders GitHub couldn't read are no result.
       await paletteOpen(page);
       await page.type("couldn't read");
       await page.until(`/no match/i.test(document.querySelector('dialog[open]').innerText)`, 'no result for an unreadable placeholder');
@@ -2125,7 +1984,6 @@ async function main() {
       const world = ap7World();
       const page = await ap6Open(world, '#/specs');
       await page.until(`OW.data.feeds.specs.data?.specs && document.querySelector('main a.card')`, 'the Specs page');
-      // #48 is on You and in no spec's graph.
       await paletteOpen(page);
       await find(page, '#48', '#48 Register the notes domain');
       await page.key('Enter');
@@ -2133,7 +1991,6 @@ async function main() {
         "Enter on #48 to focus its card on You");
       assert(await visibleFocus(page), "#48's card has focus but no visible focus ring");
       assert(world.opened.length === 0, `Enter on #48 opened a tab: ${JSON.stringify(world.opened)}`);
-      // Shift+Enter is still the direct GitHub action, and the app stays where it is.
       await paletteOpen(page);
       await find(page, '#48', '#48 Register the notes domain');
       await page.key('Enter', 'Shift');
@@ -2141,7 +1998,6 @@ async function main() {
       assert(JSON.stringify(world.opened.map(o => `${o.method} ${o.url}`)) === JSON.stringify(['GET https://github.com/acme/factory/issues/48']),
         `opened: ${JSON.stringify(world.opened)}`);
       assert(await page.run(`location.hash`) === '#/you', 'Shift+Enter moved the app');
-      // #46 is on You and in spec 40's graph: its card in the graph stays its place.
       await paletteOpen(page);
       await find(page, '#46', '#46 ');
       await page.key('Enter');
@@ -2150,7 +2006,6 @@ async function main() {
       await page.close();
     });
 
-    // Every key the app answers to, as the `?` list must name it: [keys, what they do].
     const SHORTCUTS = [/Ctrl K|⌘ K/, /\b1\b[^\n]*You/, /\b2\b[^\n]*Specs/, /\b3\b[^\n]*Agents/, /\?[^\n]*shortcuts/i, /Esc/, /↑ ↓|Up|Down/,
       /Enter[^\n]*go/i, /Shift Enter[^\n]*GitHub/i, /Alt Enter[^\n]*cop/i, /Backspace[^\n]*filter/i, /Tab/];
 
@@ -2163,7 +2018,6 @@ async function main() {
       const list = await page.run(`document.querySelector('dialog[open]').innerText`);
       for (const want of SHORTCUTS) assert(want.test(list), `the shortcut list misses ${want}: ${list.replace(/\s+/g, ' ')}`);
       assert((await palette(page)).inside, 'focus is not inside the shortcut list');
-      // A number key while the list is open doesn't move the page behind it.
       await page.key('2');
       assert(await page.run(`location.hash`) === '#/you', 'a number key moved the page behind the shortcut list');
       await page.key('Escape');
@@ -2172,7 +2026,6 @@ async function main() {
         await page.key(key);
         await page.until(`location.hash === '${hash}'`, `${key} to open ${hash}`);
       }
-      // Typing ? or a digit in the palette's field types it: no list opens, and the page stays.
       await paletteOpen(page);
       await page.key('2');
       await page.key('?');
@@ -2180,7 +2033,6 @@ async function main() {
       assert(typed.value === '2?' && typed.typing, `typing in the palette gave ${JSON.stringify(typed.value)}`);
       assert(await page.run(`location.hash`) === '#/you', 'a digit typed in the palette moved the page');
       assert(await page.run(`document.querySelectorAll('dialog[open]').length`) === 1, 'a ? typed in the palette opened the shortcut list');
-      // The palette offers the shortcut list too.
       await page.key('Backspace');
       await page.key('Backspace');
       await find(page, 'shortcuts', 'Show keyboard shortcuts');
@@ -2201,7 +2053,6 @@ async function main() {
       const before = await page.run(`document.activeElement.getAttribute('href')`);
       await paletteOpen(page);
       assert(await visibleFocus(page), "the palette's search field has focus but no visible focus ring");
-      // Down and Up move the chosen result, which shows as chosen and is announced (aria-activedescendant).
       await page.type('notes');
       await page.until(`document.querySelectorAll('dialog[open] [role="option"]').length >= 3`, 'several results');
       const first = (await palette(page)).active;
@@ -2214,17 +2065,14 @@ async function main() {
       assert(chosen.second && chosen.text !== first, `Down, Down, Up did not choose the second result: ${chosen.text}`);
       assert(chosen.announced, "the chosen result is not the field's aria-activedescendant");
       assert(chosen.marked, 'the chosen result is not visibly marked');
-      // Tab and Shift+Tab keep focus inside the open palette.
       for (const held of [[], ['Shift']]) {
         await page.key('Tab', ...held);
         assert((await palette(page)).inside, `${held.length ? 'Shift+Tab' : 'Tab'} took focus out of the open palette`);
       }
-      // Esc gives focus back to where it was.
       await page.key('Escape');
       await page.until(`!document.querySelector('dialog[open]')`, 'Esc to close');
       assert(await page.run(`document.activeElement.getAttribute('href')`) === before, 'closing the palette did not give focus back');
       assert(await visibleFocus(page), 'focus came back without a visible focus ring');
-      // The shortcut list: focus inside on a visible control, Tab stays inside, Esc gives focus back.
       await page.key('?');
       await page.until(`document.querySelector('dialog[open]')?.contains(document.activeElement)`, 'focus inside the shortcut list');
       assert(await visibleFocus(page), "the shortcut list's focused control has no visible focus ring");
@@ -2232,13 +2080,11 @@ async function main() {
       assert((await palette(page)).inside, 'Tab took focus out of the shortcut list');
       await page.key('Escape');
       await page.until(`!document.querySelector('dialog[open]') && document.activeElement.getAttribute('href') === ${JSON.stringify(before)}`, 'focus back after the list');
-      // A whole trip without a mouse: open, find, go, and land with visible focus on the ticket's card.
       await paletteOpen(page);
       await find(page, '43', '#43 Store the notes');
       await page.key('Enter');
       await page.until(`document.activeElement.dataset.ticket === '43'`, 'focus on ticket 43');
       assert(await visibleFocus(page), 'the ticket the palette went to has focus but no visible focus ring');
-      // The palette opens on a phone too, inside the screen.
       await page.size(390, 844, true);
       await paletteOpen(page);
       const box = await page.run(`(() => { const r = document.querySelector('dialog[open]').getBoundingClientRect(); return [r.left, r.right, r.top]; })()`);
@@ -2264,8 +2110,6 @@ async function main() {
   } finally {
     await browser.close();
   }
-  // #1573: the release's one documented change alone passes CI. A copy of the site gets only data-install set to live,
-  // then CI's own steps run on it; inside the copy this check is skipped, so the copy's test:app doesn't recurse.
   if (!process.env.WIZSITE_SWITCH_COPY) {
     await check('#1573 the release switch alone passes CI: a copy with only data-install set to live passes every CI step', releaseSwitchAlone);
   }

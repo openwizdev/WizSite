@@ -1,9 +1,3 @@
-// FA2 (#1900): the docs index Ask a Wiz answers from, as contract openwiz.ask-a-wiz.v1 fixes it ("The docs index").
-// It gathers the built site's public pages (every index.html but the app's) and OpenWiz's public docs (README.md and
-// the top-level docs/*.md of an OpenWiz checkout) into short plain-text passages, each pointing at its source page.
-// Plain text only, no embeddings and no dependency: the function scores these passages by keyword.
-// Cloudflare's build has no OpenWiz checkout, so the docs come from ask-docs/, a reviewed snapshot refreshed by hand:
-//   node scripts/ask-index.mjs --refresh <an OpenWiz checkout> [<commit>, HEAD by default]
 import { execFileSync } from 'node:child_process';
 import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -13,26 +7,21 @@ const SCHEMA = 'openwiz.ask-a-wiz.index.v1';
 const SITE = 'https://openwiz.dev/';
 const DOCS = 'https://github.com/openwizdev/OpenWiz/blob/main/';
 const PREFIXES = [SITE, 'https://github.com/openwizdev/'];
-const MAX_PASSAGE = 1200; // code points
+const MAX_PASSAGE = 1200;
 const MAX_FIELD = 200;
 const MAX_BYTES = 2_000_000;
-// A pointer to a private record, in either public form ("[private record](url)" or "Private record: url"): a line
-// holding one is never copied or indexed.
-// The HTML a Markdown doc may hold (a picture, a heading, emphasis): only these names are tags, so a placeholder
-// such as <state> in prose stays text.
 const HTML_TAG = /<\/?(?:a|b|i|u|s|em|strong|br|hr|img|picture|source|p|div|span|sup|sub|code|kbd|pre|small|details|summary|h[1-6]|table|thead|tbody|tr|td|th|ul|ol|li|blockquote|video)\b[^>]*>/gi;
 const PRIVATE = /\[private record\]\(|private record: *https?:/i;
 
 const ENTITIES = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', mdash: '—', ndash: '–', middot: '·', hellip: '…', rsquo: '’', lsquo: '‘', rdquo: '”', ldquo: '“' };
 const decode = text => text.replace(/&(#x[0-9a-f]+|#[0-9]+|[a-z]+);/gi, (all, name) =>
   name[0] === '#' ? point(Number(name.slice(1).replace(/^x/i, '0x')), all) : ENTITIES[name.toLowerCase()] ?? all);
-const point = (code, all) => code <= 0x10ffff ? String.fromCodePoint(code) : all; // an impossible character stays as written
+const point = (code, all) => code <= 0x10ffff ? String.fromCodePoint(code) : all;
 const squash = text => text.replace(/\s+/g, ' ').trim();
 const length = text => [...text].length;
 const cut = (text, max) => [...text].slice(0, max).join('');
-const byName = (a, b) => (a < b ? -1 : a > b ? 1 : 0); // the same order on every machine
+const byName = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 
-// A page's blocks: its <main> (or <body>) without scripts, styles, pictures and page chrome; headings marked.
 function htmlBlocks(html) {
   const main = html.match(/<main\b[^>]*>([\s\S]*)<\/main>/i)?.[1] ?? html.match(/<body\b[^>]*>([\s\S]*)<\/body>/i)?.[1] ?? '';
   const text = main
@@ -44,10 +33,7 @@ function htmlBlocks(html) {
   return text.split('\n').map(line => ({ heading: line.startsWith('\u0001'), text: squash(decode(line.replace('\u0001', ''))) }));
 }
 
-// A Markdown file's blocks: headings, paragraphs, list items, table rows and code lines, as plain text.
 function markdownBlocks(markdown) {
-  // Code spans are kept as written (a `<build>/runtime` placeholder is text, not HTML); only the prose around them
-  // loses its HTML tags, link targets and emphasis marks.
   const prose = text => decode(text
     .replace(HTML_TAG, '')
     .replace(/(\*\*|__|`)/g, ''));
@@ -65,7 +51,7 @@ function markdownBlocks(markdown) {
     if (fenced) { blocks.push({ heading: false, text: squash(line) }); open = false; continue; }
     const heading = line.match(/^#{1,6}\s+(.*)$/);
     if (heading) { blocks.push({ heading: true, text: inline(heading[1].replace(/\s#+\s*$/, '')) }); open = false; continue; }
-    if (/^\s*\|?\s*:?-{3,}/.test(line) && line.includes('|')) continue; // a table's separator row
+    if (/^\s*\|?\s*:?-{3,}/.test(line) && line.includes('|')) continue;
     if (/^\s*\|/.test(line)) {
       blocks.push({ heading: false, text: line.trim().replace(/^\||\|$/g, '').split('|').map(inline).join(' · ') });
       open = false;
@@ -80,7 +66,6 @@ function markdownBlocks(markdown) {
   return blocks;
 }
 
-// A block too long for one passage, split at sentence ends, then at spaces, then anywhere.
 function pieces(text) {
   if (length(text) <= MAX_PASSAGE) return [text];
   const out = [];
@@ -96,8 +81,6 @@ function pieces(text) {
   return out;
 }
 
-// Blocks into passages: each heading starts one (unless the passage so far is only headings), and a passage
-// never passes MAX_PASSAGE code points.
 function passages(blocks) {
   const out = [];
   let current = '', body = false;
@@ -125,7 +108,6 @@ async function files(dir, keep, rel = '') {
   return found;
 }
 
-// The index of `site` (a built site folder) and `docs` (an OpenWiz checkout); either may be left out.
 export async function buildIndex({ site, docs } = {}) {
   const pages = [];
   if (site) {
@@ -144,7 +126,6 @@ export async function buildIndex({ site, docs } = {}) {
       const text = await readFile(join(docs, path), 'utf8').catch(() => null);
       if (text === null) continue;
       const blocks = markdownBlocks(text);
-      // README's top heading is a picture, so it has a fixed title; each doc is titled by its first heading.
       const title = path === 'README.md' ? 'OpenWiz README' : blocks.find(b => b.heading && b.text)?.text || path;
       pages.push({ title, url: DOCS + path, blocks });
     }
@@ -160,7 +141,6 @@ export async function buildIndex({ site, docs } = {}) {
   return index;
 }
 
-// Throws unless `index` is exactly the contract's form.
 export function checkIndex(index) {
   const fail = why => { throw new Error(`ask index: ${why}`); };
   const keys = (value, want) => value && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).sort().join() === want;
@@ -182,18 +162,13 @@ export function checkIndex(index) {
   if (Buffer.byteLength(serialize(index)) > MAX_BYTES) fail(`over ${MAX_BYTES} bytes`);
 }
 
-// The file's text: JSON with every non-ASCII character escaped, so it reads the same in any encoding.
 export const serialize = index => JSON.stringify(index).replace(/[\u007f-￿]/g, c => `\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`);
 
 
-// The snapshot holds exactly commit.txt (the OpenWiz commit it was taken from), README.md and top-level docs/*.md.
 const SNAPSHOT_FILE = /^(README\.md|docs\/[^/]+\.md)$/;
 const local = place => place instanceof URL ? fileURLToPath(place) : place;
 
-// Copies an OpenWiz checkout's public README.md and top-level docs/*.md into `target`, replacing what was there,
-// without private-record lines, and names the commit they came from.
 export async function refreshSnapshot(checkout, target, commit = 'HEAD') {
-  // Only what the named commit tracks: never an unpublished edit or an untracked draft in the checkout.
   const git = (...args) => execFileSync('git', ['-C', checkout, ...args], { maxBuffer: 64 * 1024 * 1024 });
   const full = git('rev-parse', '--verify', '--end-of-options', `${commit}^{commit}`).toString().trim();
   const entries = git('ls-tree', '-z', full, '--', 'README.md', 'docs/').toString().split('\0').filter(Boolean)
@@ -210,8 +185,6 @@ export async function refreshSnapshot(checkout, target, commit = 'HEAD') {
   return full;
 }
 
-// Throws unless `dir` is exactly a snapshot: its commit named, only README.md and top-level docs/*.md, no
-// private-record line, and so never docs/agents/, docs/evidence/, docs/adr/ or AGENTS.md.
 export async function checkSnapshot(dir) {
   const fail = why => { throw new Error(`ask docs: ${why}`); };
   const commit = await readFile(join(local(dir), 'commit.txt'), 'utf8').catch(() => fail('no commit.txt'));
@@ -225,7 +198,6 @@ export async function checkSnapshot(dir) {
   }
 }
 
-// The build's one step: the index of the built `site` and the checked `snapshot`, as the file's text.
 export async function snapshotIndex(site, snapshot) {
   await checkSnapshot(snapshot);
   return serialize(await buildIndex({ site: local(site), docs: local(snapshot) }));

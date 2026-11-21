@@ -1,5 +1,3 @@
-"""The changelog generator (#78): one data file per public release becomes one short entry, newest first by semver,
-shown only once the landing's install switch reads live; before that, one line pointing at the pre-releases."""
 from html.parser import HTMLParser
 from pathlib import Path
 import re
@@ -18,7 +16,6 @@ def generate(*args):
 
 
 class Entries(HTMLParser):
-    """The generated section read back as data: each entry's heading, small line, headline, bullets and links."""
     def __init__(self, text):
         super().__init__(convert_charrefs=True)
         self.entries, self.tags, self.pre, self.at, self.text = [], [], None, None, ''
@@ -54,8 +51,6 @@ class Entries(HTMLParser):
 
 class Generator(unittest.TestCase):
     def test_live_shows_every_entry_newest_first(self):
-        # catches: entries sorted as text (0.1.2 above 0.1.10), a date in the wrong form, the public name or semver
-        # missing from the heading, a bullet dropped, a second link, and the pre-releases line missing.
         out = Entries(generate('--releases', TWO, '--switch', 'live'))
         self.assertEqual([(e['h2'].strip(), e['small']) for e in out.entries],
                          [('0.02', '· Feb 3, 2031 (0.1.10)'), ('0.01', '· Jan 2, 2031 (0.1.2)')])
@@ -66,7 +61,6 @@ class Generator(unittest.TestCase):
         self.assertEqual(out.pre, {'text': 'Earlier pre-releases are on GitHub.', 'links': [PRE]})
 
     def test_before_live_no_version_is_claimed(self):
-        # catches: an entry, a version number or a date shown while the install switch still reads coming-soon.
         for state in ('coming-soon', 'anything-else'):
             out = Entries(generate('--releases', TWO, '--switch', state))
             self.assertEqual(out.entries, [])
@@ -74,7 +68,6 @@ class Generator(unittest.TestCase):
             self.assertNotRegex(out.text, r'\d')
 
     def test_text_is_text_never_markup(self):
-        # catches: a data file's words injected into the page as HTML.
         html = generate('--releases', TWO, '--switch', 'live')
         out = Entries(html)
         self.assertNotIn('script', out.tags)
@@ -83,8 +76,6 @@ class Generator(unittest.TestCase):
         self.assertEqual(out.entries[0]['bullets'][0], 'Lists <script>sample</script> threads & specs.')
 
     def test_defaults_read_the_shipped_data_and_the_landing_switch(self):
-        # catches: the build reading a different switch than the landing's install box, or other data than
-        # changelog/releases; and a network read coming back.
         state = re.search(r'<div class="install-box" data-install="([^"]*)"', (ROOT / 'index.html').read_text())[1]
         self.assertEqual(generate(), generate('--releases', ROOT / 'changelog/releases', '--switch', state))
         live = Entries(generate('--switch', 'live'))
@@ -93,7 +84,6 @@ class Generator(unittest.TestCase):
         self.assertNotRegex(source, r'\bfetch\(|https?\.request|api\.github\.com')
 
     def test_page_gets_the_section_once_at_the_end_of_main(self):
-        # catches: the page's own text changed, the section placed outside main or twice.
         source = (ROOT / 'changelog/index.html').read_text()
         page = generate('--releases', TWO, '--switch', 'live', ROOT / 'changelog/index.html')
         start, end = '<!-- releases:start -->', '<!-- releases:end -->'
@@ -103,7 +93,6 @@ class Generator(unittest.TestCase):
         self.assertEqual(before + after, source)
         self.assertTrue(after.startswith('</main>'))
         self.assertEqual(len(Entries(section).entries), 2)
-        # A bullet with replacement patterns ($$, $&, $1) stays exactly as written (#82 R1).
         self.assertIn('Costs $$ and keeps $&amp; and $1 as typed', page)
 
 
