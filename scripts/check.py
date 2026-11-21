@@ -182,6 +182,12 @@ FOOTER_LINKS = (('/drivers/', 'Drivers'), ('/changelog/', 'Changelog'), ('https:
 FOOTER_LINE = 'Apache-2.0. Owned by no one.'
 # The only external link off GitHub: OpenWiz's own X account, in the footer.
 X_ACCOUNT = 'https://x.com/openwiz'
+# #1674 (RL2): the install box's last line names what 0.1.0 needs; its one link, CloudRoom's site, is the landing's only
+# link off GitHub besides the footer's X account.
+CLOUDROOM_LINK = 'https://cloudroom.dev'
+INSTALL_NOTE = 'Needs CloudRoom, on an Apple-silicon Mac or x86_64 Linux. Your agent can install it; you sign in.'
+INSTALL_NOTE_HTML = ('<p class="install-note">Needs <a href="https://cloudroom.dev" rel="noreferrer">CloudRoom</a>, '
+                     'on an Apple-silicon Mac or x86_64 Linux. Your agent can install it; you sign in.</p>')
 # The Questions (#76): one snippet, faq.html, the FAQ's one source. The build adds it at the landing's and /team's slot,
 # and at /faq's top slot as the page's own heading (its title the h1, each question an h2). Its questions, in order.
 FAQ = (ROOT / 'faq.html').read_text()
@@ -194,6 +200,9 @@ FAQ_QUESTIONS = ('What is OpenWiz?', 'What is a kernel?', 'What do I need to run
                  'Does OpenWiz see my code or my logins?', 'What does it cost?', 'Can you set it up for my team?')
 # #89: the last answer, word for word (the team page's offer).
 FAQ_LAST = 'Yes. Book a 30-minute call. Your first fleet ships on it.'
+# #1674 (RL2): where agents run, word for word: 0.1.0 runs through CloudRoom; the other drivers come after it.
+FAQ_WHERE = ('Through CloudRoom: OpenWiz runs on it, so it comes first. Once OpenWiz is set up, a fleet can also run '
+             'agents on boat.dev or your own computer. Each is a driver that passed the same five-check test.')
 
 
 def with_footer(html):
@@ -375,6 +384,7 @@ class Page(HTMLParser):
         self.books = []
         self.x_links = 0
         self.report_links = 0
+        self.cloudroom_links = 0
         self.stylesheets, self.scripts = [], []
         self.feed(text)
 
@@ -392,6 +402,11 @@ class Page(HTMLParser):
             # #75 R3: OpenWiz's X account, only as a link a visitor follows (check_site allows one, the footer's);
             # anywhere else, as a resource or in CSS, check_ref refuses it like any external URL.
             self.x_links += 1
+            attrs = {key: value for key, value in attrs.items() if key != 'href'}
+        elif tag == 'a' and attrs.get('href') == CLOUDROOM_LINK:
+            # #1674: CloudRoom's site, exempt from check_ref by its exact href only; check_site allows one, the
+            # landing install box's, and check_install pins the element around it.
+            self.cloudroom_links += 1
             attrs = {key: value for key, value in attrs.items() if key != 'href'}
         elif tag == 'a' and attrs.get('href') == REPORT_LINK:
             # #1851: the Report a problem link, exempt from check_ref's no-query rule by its exact href only;
@@ -585,6 +600,8 @@ def check_site(root):
         for ref in page.refs:
             check_ref(root, path, ref, pages, page.favicons)
         # After check_ref, so a changed Report a problem URL is refused as an external URL first.
+        assert page.cloudroom_links == (1 if path == root / 'index.html' else 0), \
+            f'CloudRoom link, the landing install box\'s only: {path.relative_to(root)} has {page.cloudroom_links}'
         assert page.report_links == 1, f'Report a problem link: {path.relative_to(root)} has {page.report_links}, not 1'
         for ref in css_refs(path.read_text()):
             check_ref(root, path, ref, pages)
@@ -674,10 +691,13 @@ def check_site(root):
             assert (attrs.get('alt') or '').strip(), f'painting without a description: {attrs.get("src")}'
     check_motion((root / names['site.css']).read_text())
     check_driver_css((root / names['site.css']).read_text())
-    check_install(landing, pages[root / 'index.html'])
+    unlabelled = check_install(landing, pages[root / 'index.html'])
     assert not re.search(r'\b\d{4}-\d{2}-\d{2}\b', words), 'dated landing promise'
     changelog, releases = split_releases((root / 'changelog/index.html').read_text())
-    assert not re.search(r'(?<![\d.])\d+\.\d+\.\d+(?![\d.])', flat), 'release version mentioned on the landing'
+    # #1674 (J264): the install box's one version label (check_install reads it exactly and returns the landing
+    # without that element) is the only version allowed.
+    unlabelled = re.sub(r'\s+', ' ', unescape(re.sub(r'<[^>]*>', '', re.sub(r'<br>', ' ', unlabelled))))
+    assert not re.search(r'(?<![\d.])\d+\.\d+\.\d+(?![\d.])', unlabelled), 'release version mentioned on the landing'
     for name in VECTORS:
         check_vector((root / name).read_bytes())
     total = 0
@@ -769,6 +789,7 @@ INSTALL_LINE = 'Install OpenWiz from github.com/openwizdev/OpenWiz'
 INSTALL_HINT = 'Paste this into your agent'
 INSTALL_BUTTON = 'Copy · coming soon'
 INSTALL_SWITCH = ('coming-soon', 'live')
+INSTALL_VERSION = 'OpenWiz 0.01 0.1.0'  # the public name with its semver small beside it (#1674, J264)
 
 
 def check_install(landing, page):
@@ -780,6 +801,12 @@ def check_install(landing, page):
     assert switch and switch[1] in INSTALL_SWITCH, f'the install box needs its one switch, data-install = {" or ".join(INSTALL_SWITCH)}'
     lines = re.findall(r'<code class="install-line">([^<]*)</code>', box)
     assert lines == [INSTALL_LINE], f'the install line must read exactly: {INSTALL_LINE}'
+    # #1674: the version label is the box's first element, the only one of its class on the landing (#46 R2).
+    label = re.search(r'<div class="install-box"[^>]*>\s*(<p class="install-version">([^<]*<small>[^<]*</small>)</p>)', landing)
+    assert label and landing.count('install-version') == 1 and flat(label[2]) == INSTALL_VERSION, f'the install box must show {INSTALL_VERSION}'
+    # #1674 (RL2): the note is the box's last element, exactly, after its row.
+    assert re.search(re.escape(INSTALL_NOTE_HTML) + r'\s*$', box) and landing.count('install-note') == 1 \
+        and flat(INSTALL_NOTE_HTML) == INSTALL_NOTE, f'the install box must end with: {INSTALL_NOTE}'
     hints = re.findall(r'<p class="install-hint">([\s\S]*?)</p>', box)
     assert [flat(h) for h in hints] == [INSTALL_HINT], f'the install box must say: {INSTALL_HINT}'
     labels = re.findall(r'<button class="btn install"[^>]*>([\s\S]*?)</button>', landing)
@@ -793,6 +820,7 @@ def check_install(landing, page):
     reader = Text(rest)
     for reading in [reader.joined(), reader.spaced()] + reader.shown:
         assert not re.search(r'install|coming soon|paid plans|works today', re.sub(r'\s+', ' ', reading), re.I), 'unsettled landing claim or a second install mention'
+    return landing[:label.start(1)] + landing[label.end(1):]
 
 
 def check_changelog(landing, changelog):
@@ -1292,6 +1320,8 @@ def check_faq(htmls, pages, names):
         assert plain(answer), f'a question without its answer: {plain(question)}'
         for href in re.findall(r'href="([^"]*)"', answer):
             assert href.startswith('/'), f'an answer links off the site: {href}'
+    where = [plain(a) for _, q, _, a in rows if plain(q) == 'Where do my agents run?']
+    assert where == [FAQ_WHERE], f'the Questions\u2019 answer to Where do my agents run?: {FAQ_WHERE}'
     assert rows and plain(rows[-1][3]) == FAQ_LAST, f'the Questions\u2019 last answer: {FAQ_LAST}'
     assert not re.search(r'<(?:form|input|textarea)\b', FAQ), 'part 1 asks nothing: no form or input in the Questions'
 

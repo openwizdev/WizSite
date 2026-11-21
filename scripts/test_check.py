@@ -9,7 +9,7 @@ from unittest import mock
 
 import re
 
-from check import CTA, FAQ, FOOTER, FINGERPRINTS, HASHED, INSTALL_SWITCH, ROOT, Page, check_changelog, check_release_data, check_releases, read_releases, split_releases, check_motion, check_privacy, check_ref, check_site, check_vector, check_webp, fingerprint
+from check import CTA, FAQ, FAQ_WHERE, FOOTER, INSTALL_NOTE_HTML, FINGERPRINTS, HASHED, INSTALL_SWITCH, ROOT, Page, check_changelog, check_release_data, check_releases, read_releases, split_releases, check_motion, check_privacy, check_ref, check_site, check_vector, check_webp, fingerprint
 
 
 def edit_built(root, name, change):
@@ -543,6 +543,90 @@ class Checks(unittest.TestCase):
                     with self.assertRaises(AssertionError):
                         check_site(root)
 
+    def test_install_note_under_the_box(self):
+        """#1674 (RL2): the install box ends with one note, word for word, naming what 0.1.0 needs, its one link
+        CloudRoom's site; that link is allowed nowhere else."""
+        # catches: the note missing, doubled, reworded or moved out of the box; its CloudRoom link dropped, pointed
+        # elsewhere or losing noreferrer; and CloudRoom's site linked anywhere but the note, on the landing or off it.
+        note = INSTALL_NOTE_HTML
+        link = '<a href="https://cloudroom.dev" rel="noreferrer">CloudRoom</a>'
+        text = (ROOT / 'dist/index.html').read_text()
+        self.assertEqual(text.count(note), 1, note)
+        check_site(ROOT / 'dist')
+        breaks = [
+            ('index.html', note, ''),
+            ('index.html', note, note + note),
+            ('index.html', note, note.replace('x86_64 Linux', 'Linux')),
+            ('index.html', note, note.replace('Apple-silicon Mac', 'Mac')),
+            ('index.html', note, note.replace('; you sign in.', '.')),
+            ('index.html', note, note.replace(link, 'CloudRoom')),
+            ('index.html', note, note.replace('https://cloudroom.dev', 'https://cloudroom.dev/x')),
+            ('index.html', note, note.replace(' rel="noreferrer"', '')),
+            ('index.html', note, ''),  # with the note re-added outside the box, below
+            ('index.html', '</main>', f'<p>{link}</p></main>'),
+            ('drivers/index.html', '</main>', f'<p>{link}</p></main>'),
+        ]
+        for i, (page, good, bad) in enumerate(breaks):
+            with self.subTest(page=page, bad=bad), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp) / 'dist'
+                shutil.copytree(ROOT / 'dist', root)
+                changed = (root / page).read_text().replace(good, bad, 1)
+                if i == 8:
+                    changed = changed.replace('</main>', note + '</main>', 1)
+                (root / page).write_text(changed)
+                with self.assertRaises(AssertionError):
+                    check_site(root)
+
+    def test_install_version_label_is_the_only_version_on_the_landing(self):
+        """#1674 (J264): the install box shows the public name with its semver small beside it, reading exactly
+        OpenWiz 0.01 0.1.0, with the switch live. That one label is the only release version the landing may
+        mention; each case below plants one break, and each must fail."""
+        # catches: the label's semver or public name drifting, the label missing or doubled, the guard's exception
+        # widening to let a version through anywhere else on the landing, in the box or outside it, and the label
+        # moved out of the box with its text left behind in a comment (#46 R2).
+        label = '<p class="install-version">OpenWiz 0.01 <small>0.1.0</small></p>'
+        text = (ROOT / 'dist/index.html').read_text()
+        self.assertEqual(text.count(label), 1, label)
+        shipped = re.findall(r'data-install="[^"]*"', text)
+        self.assertEqual(len(shipped), 1, 'one install switch')
+        hint = '<p class="install-hint">'
+        breaks = [
+            (label, label.replace('0.1.0', '0.1.1')),
+            (label, label.replace('0.01', '0.02')),
+            (label, label.replace('OpenWiz 0.01', 'OpenWiz')),
+            (label, ''),
+            (label, label + label),
+            (hint, '<p>0.1.0</p>' + hint),
+            ('</main>', '<p>Now 0.1.0</p></main>'),
+            ('</main>', '<p>OpenWiz 0.01 <small>0.1.0</small></p></main>'),
+        ]
+        # #46 R2: the label moved out of the box, its text left behind in a comment where it was, or only moved.
+        moved = lambda variant, trace: variant.replace(label, trace, 1).replace('</main>', label + '</main>', 1)
+        relocations = ['<!-- OpenWiz 0.01 <small>0.1.0</small>. -->', f'<!-- {label} -->', '']
+        # The shipped switch only: since #82 the built changelog follows it, so flipping the landing alone fails
+        # check_site for a reason that has nothing to do with the label.
+        for state in ['live']:
+            variant = text.replace(shipped[0], f'data-install="{state}"')
+            with self.subTest(state=state), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp) / 'dist'
+                shutil.copytree(ROOT / 'dist', root)
+                (root / 'index.html').write_text(variant)
+                check_site(root)
+            for good, bad in breaks:
+                with self.subTest(state=state, bad=bad), tempfile.TemporaryDirectory() as temp:
+                    root = Path(temp) / 'dist'
+                    shutil.copytree(ROOT / 'dist', root)
+                    (root / 'index.html').write_text(variant.replace(good, bad, 1))
+                    with self.assertRaises(AssertionError):
+                        check_site(root)
+            for trace in relocations:
+                with self.subTest(state=state, moved=trace), tempfile.TemporaryDirectory() as temp:
+                    root = Path(temp) / 'dist'
+                    shutil.copytree(ROOT / 'dist', root)
+                    (root / 'index.html').write_text(moved(variant, trace))
+                    with self.assertRaises(AssertionError):
+                        check_site(root)
+
     def test_app_page_policy_and_calm(self):
         # catches: the app losing the browser-enforced limit to GitHub and this site, loading an unchecked
         # script, or gaining motion.
@@ -761,6 +845,11 @@ class Checks(unittest.TestCase):
             'open and disabled until faq.js runs ': lambda f: f.replace('aria-expanded="true"', 'aria-expanded="false"', 1),
             'a button that names its answer ': lambda f: f.replace('aria-controls="faq-a2"', 'aria-controls="faq-a1"', 1),
             'links off the site': lambda f: f.replace('href="/team/#book"', 'href="https://example.com/"', 1),
+            # #1674 (RL2): where agents run, word for word: the old "wherever you choose" answer, a dropped clause, and
+            # the answer moved off its question.
+            'answer to Where do my agents run': lambda f: f.replace(FAQ_WHERE, 'Wherever you choose: your own computer or a VPS, Cloudroom, or boat.dev. Each has a driver that passed the same five-check test.', 1),
+            'answer to Where do my agents run ': lambda f: f.replace(' so it comes first.', '', 1),
+            'answer to Where do my agents run  ': lambda f: f.replace(FAQ_WHERE, 'Anywhere.', 1).replace('OpenWiz is free and open source', FAQ_WHERE + ' OpenWiz is free and open source', 1),
             # #89: the last answer, word for word.
             'last answer': lambda f: f.replace('Your first fleet ships on it.', 'Your first fleet runs in a day.', 1),
             'heading and its line': lambda f: f.replace('The short ones are here.', 'More.', 1),

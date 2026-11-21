@@ -1,0 +1,23 @@
+FF
+======================================================================
+FAIL: test_install_version_label_is_the_only_version_on_the_landing (test_check.Checks.test_install_version_label_is_the_only_version_on_the_landing) (state='coming-soon', moved='<!-- OpenWiz 0.01 <small>0.1.0</small>. -->')
+#1674 (J264): the install box shows the public name with its semver small beside it, reading exactly
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "scripts/test_check.py", line 468, in test_install_version_label_is_the_only_version_on_the_landing
+    with self.assertRaises(AssertionError):
+AssertionError: AssertionError not raised
+
+======================================================================
+FAIL: test_install_version_label_is_the_only_version_on_the_landing (test_check.Checks.test_install_version_label_is_the_only_version_on_the_landing) (state='live', moved='<!-- OpenWiz 0.01 <small>0.1.0</small>. -->')
+#1674 (J264): the install box shows the public name with its semver small beside it, reading exactly
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "scripts/test_check.py", line 468, in test_install_version_label_is_the_only_version_on_the_landing
+    with self.assertRaises(AssertionError):
+AssertionError: AssertionError not raised
+
+----------------------------------------------------------------------
+Ran 1 test in 0.826s
+
+FAILED (failures=2)
