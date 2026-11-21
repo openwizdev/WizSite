@@ -1,0 +1,1 @@
+SYNTHETIC-TEXT-NOTE never indexed: only Markdown is read.

@@ -1,0 +1,84 @@
+{
+  "case": "not-covered",
+  "now": "2026-01-15T14:20:05+00:00",
+  "request": {
+    "method": "POST",
+    "headers": {
+      "Content-Type": "application/json",
+      "Origin": "https://openwiz.dev",
+      "CF-Connecting-IP": "192.0.2.10"
+    },
+    "body": "{\"question\": \"Synthetic question with no matching passage?\"}"
+  },
+  "settings": {
+    "ASK_A_WIZ": "on",
+    "OPENROUTER_API_KEY": "fake-openrouter-key",
+    "ASK_A_WIZ_MODEL": "synthetic/cheap-model",
+    "ASK_A_WIZ_DAILY_CAP": "200",
+    "ASK_A_WIZ_COUNTERS": "bound",
+    "ASK_A_WIZ_DAILY_CAP_USD": "1.00",
+    "ASK_A_WIZ_MAX_PROMPT_PRICE": "0.10",
+    "ASK_A_WIZ_MAX_COMPLETION_PRICE": "0.40",
+    "ASK_A_WIZ_MAX_REQUEST_PRICE": "0.001"
+  },
+  "store": {
+    "salts": [
+      {
+        "day": "2026-01-15",
+        "salt": "df78e3e5ba90348fbe926b2adb0915d6dbac592d0be7f50c56d5dfd5266d4dd6"
+      }
+    ],
+    "counters": [
+      {
+        "day": "2026-01-15",
+        "key": "cap",
+        "count": 37
+      },
+      {
+        "day": "2026-01-15",
+        "key": "visitor:da147cbef259f07d5627eb7e94b57d5a:14",
+        "count": 2
+      },
+      {
+        "day": "2026-01-15",
+        "key": "spend",
+        "count": 61000
+      }
+    ]
+  },
+  "upstream": null,
+  "store_after": {
+    "salts": [
+      {
+        "day": "2026-01-15",
+        "salt": "df78e3e5ba90348fbe926b2adb0915d6dbac592d0be7f50c56d5dfd5266d4dd6"
+      }
+    ],
+    "counters": [
+      {
+        "day": "2026-01-15",
+        "key": "cap",
+        "count": 37
+      },
+      {
+        "day": "2026-01-15",
+        "key": "visitor:da147cbef259f07d5627eb7e94b57d5a:14",
+        "count": 3
+      },
+      {
+        "day": "2026-01-15",
+        "key": "spend",
+        "count": 61000
+      }
+    ]
+  },
+  "retrieved": [],
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/x-ndjson; charset=utf-8",
+      "Cache-Control": "no-store"
+    },
+    "body": "{\"type\":\"not_covered\",\"text\":\"The OpenWiz docs don't cover that yet, so I won't guess. Book a call or open a GitHub issue, and we'll answer it.\",\"links\":[{\"label\":\"Book a call\",\"href\":\"https://openwiz.dev/team/#book\"},{\"label\":\"GitHub issues\",\"href\":\"https://github.com/openwizdev/openwiz/issues\"}]}\n"
+  }
+}
