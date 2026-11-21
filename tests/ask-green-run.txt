@@ -1,0 +1,115 @@
+# FA3 (#1901) green run at 9f741dbdfc482af19562090e33d35bec86e37fb9 (review R6: the upstream deadline is terminal): npm run test:functions
+✔ a fixture site and docs folder build exactly the expected sources and passages
+✔ the index holds only public pages and docs: never the app, page chrome, scripts or internal folders
+✔ a long section splits into passages within the limit, keeping every word in order
+✔ the written file escapes every non-ASCII character and parses back to the same index
+✔ the contract's own index fixture passes the check, and every broken form is refused
+✔ the shipped snapshot names its OpenWiz commit and passes its own check
+✔ a refresh copies only the named commit's README.md and top-level docs, without private-record lines
+✔ the snapshot check refuses internal folders, AGENTS.md, other files, a private-record line or no commit
+✔ the fixtures copied here are the contract's full list
+✔ contract fixture answer: the exact response, upstream request and store
+✔ contract fixture answer-escaped: the exact response, upstream request and store
+✔ contract fixture answer-overflow: the exact response, upstream request and store
+✔ contract fixture answer-trimmed-bytes: the exact response, upstream request and store
+✔ contract fixture answer-trimmed-count: the exact response, upstream request and store
+✔ contract fixture bad-request: the exact response, upstream request and store
+✔ contract fixture daily-cap: the exact response, upstream request and store
+✔ contract fixture first-write-race: the exact response, upstream request and store
+✔ contract fixture midnight-answer: the exact response, upstream request and store
+✔ contract fixture midnight-cap: the exact response, upstream request and store
+✔ contract fixture no-private-route: the exact response, upstream request and store
+✔ contract fixture not-covered: the exact response, upstream request and store
+✔ contract fixture not-covered-model: the exact response, upstream request and store
+✔ contract fixture off: the exact response, upstream request and store
+✔ contract fixture off-not-exact: the exact response, upstream request and store
+✔ contract fixture probe-off: the exact response, upstream request and store
+✔ contract fixture probe-on: the exact response, upstream request and store
+✔ contract fixture rate-limited: the exact response, upstream request and store
+✔ contract fixture spend-cap: the exact response, upstream request and store
+✔ contract fixture spend-flat-fee: the exact response, upstream request and store
+✔ contract fixture spend-missing-cost: the exact response, upstream request and store
+✔ contract fixture spend-near-cap: the exact response, upstream request and store
+✔ contract fixture store-error: the exact response, upstream request and store
+✔ contract fixture too-long: the exact response, upstream request and store
+✔ contract fixture unavailable: the exact response, upstream request and store
+✔ contract fixture unavailable-price: the exact response, upstream request and store
+✔ contract fixture unavailable-request-price: the exact response, upstream request and store
+✔ contract fixture upstream-error: the exact response, upstream request and store
+✔ contract fixture upstream-error-midstream: the exact response, upstream request and store
+✔ the key never appears in a response, even when OpenRouter echoes it in an error or the stream
+✔ an answer holding < > & U+2028 U+2029 reaches the visitor escaped, and joins back to the same text
+✔ the switch is on only for exactly "on": anything else answers 404 with no body and reads nothing else
+✔ the probe reads only the switch: no secret, store or index, even when they are missing
+✔ a missing or invalid secret, model, store or maximum price is unavailable before the request is read
+✔ a missing or invalid index is unavailable after the visitor is counted, with no model call
+✔ every malformed request is bad_request, counts nothing and calls nothing
+✔ the question is trimmed and counted in code points: 300 pass, 301 are too_long
+✔ a body of exactly 4096 bytes is read, and Content-Type parameters are allowed
+✔ keyword scoring ranks passages sharing the question's words, best first, and drops those sharing none
+✔ with the real scoring, a matching question sends its passage and an unmatched one gets not_covered with no call
+✔ NOT_COVERED with white space or split oddly is still the not-covered answer, and never reaches the visitor
+✔ a short answer under 16 characters still streams, and an empty answer is upstream_error
+✔ any upstream status but 200 and 404 is upstream_error, with one attempt and the reservation kept
+✔ an upstream that never answers times out as upstream_error, and the reservation stays
+✔ an upstream that stalls mid-answer times out: text, then upstream_error, reservation kept
+✔ R1: a successful answer that carries the key, whole or split across pieces, never shows it or any of its pieces
+✔ R1: an upstream failure or stall right after part of the key arrives sends no part of the key, only the refusal
+✔ R2: a redirect from OpenRouter is not followed: one call, upstream_error, the question sent nowhere else
+✔ R3: a previous day's write delayed past midnight leaves no row of that day behind
+✔ R3: a call is counted on the newest day the store holds, even when this request's clock is behind
+✔ a visitor who stops the stream cancels the upstream call, and the reservation stays
+✔ a stream nobody reads still ends at the timeout: the upstream call is cancelled and its waitUntil settles
+✔ R6: a reader who pauses past the deadline then resumes gets only the refusal: no held text, no buffered piece, no done
+✔ an invalid reported cost keeps the whole reservation; a valid one replaces it
+✔ a store that fails at any step before the call refuses store_error with no call
+✔ a store that never answers times out as store_error
+✔ a failing settle keeps the reservation and leaves the answer unchanged
+✔ the store holds only the two tables and the pinned key forms, on a fresh store too
+✔ the default salt is 32 random bytes as 64 lower-case hex digits, fresh each day
+✔ onRequest is the Pages entry point: the probe answers through it
+✔ start: a fresh state value goes to GitHub and into a host-only, single-site cookie
+✔ token: the code is exchanged once and only the token fields reach the browser
+✔ refresh: the refresh token is exchanged once for a new pair
+✔ refused: token: wrong state value
+✔ refused: token: no state cookie
+✔ refused: token: two cookies for one attempt
+✔ refused: token: a cookie for another attempt only
+✔ refused: token: an install-time callback (code, no state)
+✔ refused: token: missing code
+✔ refused: token: empty code
+✔ refused: token: code not a string
+✔ refused: token: an extra field
+✔ refused: token: a body that is not an object
+✔ refused: token: not JSON
+✔ refused: token: broken JSON
+✔ refused: token: another origin
+✔ refused: token: no Origin header
+✔ refused: token: a lookalike origin
+✔ refused: token: another host (a preview)
+✔ refused: token: plain http
+✔ refused: token: a GET
+✔ refused: refresh: another origin
+✔ refused: refresh: missing refresh token
+✔ refused: refresh: a code instead
+✔ refused: start: another host (a preview)
+✔ refused: start: a POST
+✔ refused: an unknown step
+✔ refused: token: not configured yet
+✔ refused: start: not configured yet
+✔ refused: GitHub refuses the code
+✔ refused: GitHub answers 500
+✔ refused: GitHub answers without a token
+✔ refused: GitHub answers with a non-string token
+✔ refused: GitHub redirects the exchange elsewhere
+✔ refused: GitHub cannot be reached
+✔ refused: GitHub redirects the refresh elsewhere, and the refresh token goes nowhere else
+✔ two tabs: overlapping attempts both sign in, whichever returns from GitHub first
+✔ a stale or replayed callback leaves the current attempt intact
+✔ at most four attempts are kept: a fifth start drops the oldest
+✔ the manifest asks for read-only metadata, issues and pull requests and nothing else
+ℹ tests 109
+ℹ pass 109
+ℹ fail 0
+# Planted breaks for R6, each caught by the R6 test: the deadline not marking the stream failed; an in-flight parser result accepted after the abort; the answer stream pulling ahead of the visitor's read (default highWaterMark)
+# npm run build: ok; npm run check: PASS (exact export, links, resources, copy and privacy)
