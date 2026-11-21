@@ -206,10 +206,13 @@ def with_cta(html):
 
 
 FINGERPRINTS = {name: fingerprint(name, (ROOT / name).read_bytes()) for name in HASHED}
+# Ask a Wiz's docs index (FA2, #1900): built from the built pages and ask-docs/, so it has no source copy to compare;
+# it is privacy-scanned with every runtime file.
+ASK_INDEX = 'ask-index.json'
 STATIC = {
     'index.html', 'changelog/index.html', 'drivers/index.html', 'team/index.html', 'faq/index.html', '_headers', APP_PAGE, 'app/manifest.webmanifest',
     'fonts/Geist-var.woff2', 'fonts/GeistMono-var.woff2', 'fonts/OFL.txt',
-} | ART | set(ICON_HASHES) | set(VECTORS) | (set(VENDOR_HASHES) - {GSAP}) | set(APP_VENDOR) | set(DRIVER_LOGOS)
+} | ART | set(ICON_HASHES) | set(VECTORS) | (set(VENDOR_HASHES) - {GSAP}) | set(APP_VENDOR) | set(DRIVER_LOGOS) | {ASK_INDEX}
 RUNTIME = STATIC | set(FINGERPRINTS.values())
 
 
@@ -1530,7 +1533,7 @@ def check_privacy(path, data):
 def main():
     output = ROOT / 'dist'
     check_site(output)
-    for name in RUNTIME - set(FINGERPRINTS.values()) - set(ALL_PAGES):
+    for name in RUNTIME - set(FINGERPRINTS.values()) - set(ALL_PAGES) - {ASK_INDEX}:
         source = APP_VENDOR[name][0] if name in APP_VENDOR else name
         assert (ROOT / source).read_bytes() == (output / name).read_bytes(), f'export differs: {name}'
     assert built_fingerprints(output) == FINGERPRINTS, 'build is stale: rebuild the site'
