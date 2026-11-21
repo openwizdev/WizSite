@@ -1,0 +1,135 @@
+{
+  "case": "spend-near-cap",
+  "now": "2026-01-15T14:20:05+00:00",
+  "request": {
+    "method": "POST",
+    "headers": {
+      "Content-Type": "application/json",
+      "Origin": "https://openwiz.dev",
+      "CF-Connecting-IP": "192.0.2.10"
+    },
+    "body": "{\"question\": \"Synthetic question just under the dollar cap?\"}"
+  },
+  "settings": {
+    "ASK_A_WIZ": "on",
+    "OPENROUTER_API_KEY": "fake-openrouter-key",
+    "ASK_A_WIZ_MODEL": "synthetic/cheap-model",
+    "ASK_A_WIZ_DAILY_CAP": "200",
+    "ASK_A_WIZ_COUNTERS": "bound",
+    "ASK_A_WIZ_DAILY_CAP_USD": "1.00",
+    "ASK_A_WIZ_MAX_PROMPT_PRICE": "0.10",
+    "ASK_A_WIZ_MAX_COMPLETION_PRICE": "0.40",
+    "ASK_A_WIZ_MAX_REQUEST_PRICE": "0.001"
+  },
+  "store": {
+    "salts": [
+      {
+        "day": "2026-01-15",
+        "salt": "df78e3e5ba90348fbe926b2adb0915d6dbac592d0be7f50c56d5dfd5266d4dd6"
+      }
+    ],
+    "counters": [
+      {
+        "day": "2026-01-15",
+        "key": "cap",
+        "count": 37
+      },
+      {
+        "day": "2026-01-15",
+        "key": "visitor:da147cbef259f07d5627eb7e94b57d5a:14",
+        "count": 2
+      },
+      {
+        "day": "2026-01-15",
+        "key": "spend",
+        "count": 999999
+      }
+    ]
+  },
+  "upstream": {
+    "request": {
+      "model": "synthetic/cheap-model",
+      "stream": true,
+      "provider": {
+        "max_price": {
+          "prompt": 0.1,
+          "completion": 0.4,
+          "request": 0.001
+        },
+        "require_parameters": true,
+        "data_collection": "deny",
+        "zdr": true
+      },
+      "usage": {
+        "include": true
+      },
+      "max_tokens": 500,
+      "temperature": 0,
+      "messages": [
+        {
+          "role": "system",
+          "content": "You answer questions about OpenWiz for visitors to openwiz.dev. Answer only from the passages in the user's message, in plain text, in at most three short paragraphs. If the passages do not answer the question, reply with exactly NOT_COVERED and nothing else."
+        },
+        {
+          "role": "user",
+          "content": "Passage 1 from https://openwiz.dev/faq/:\nSynthetic passage: OpenWiz runs a fleet of coding agents from one approved plan.\n\nPassage 2 from https://github.com/openwizdev/openwiz#readme:\nSynthetic passage: one line, pasted into your agent, sets OpenWiz up.\n\nQuestion: Synthetic question just under the dollar cap?"
+        }
+      ]
+    },
+    "chunks": [
+      "Synthetic answer: OpenWiz ",
+      "runs a fleet of coding agents ",
+      "from one approved plan."
+    ],
+    "cost": 0.0009
+  },
+  "store_after": {
+    "salts": [
+      {
+        "day": "2026-01-15",
+        "salt": "df78e3e5ba90348fbe926b2adb0915d6dbac592d0be7f50c56d5dfd5266d4dd6"
+      }
+    ],
+    "counters": [
+      {
+        "day": "2026-01-15",
+        "key": "cap",
+        "count": 38
+      },
+      {
+        "day": "2026-01-15",
+        "key": "visitor:da147cbef259f07d5627eb7e94b57d5a:14",
+        "count": 3
+      },
+      {
+        "day": "2026-01-15",
+        "key": "spend",
+        "count": 1000899
+      }
+    ]
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/x-ndjson; charset=utf-8",
+      "Cache-Control": "no-store"
+    },
+    "body": "{\"type\":\"text\",\"text\":\"Synthetic answer: OpenWiz \"}\n{\"type\":\"text\",\"text\":\"runs a fleet of coding agents \"}\n{\"type\":\"text\",\"text\":\"from one approved plan.\"}\n{\"type\":\"sources\",\"sources\":[{\"title\":\"Questions\",\"url\":\"https://openwiz.dev/faq/\"},{\"title\":\"OpenWiz README\",\"url\":\"https://github.com/openwizdev/openwiz#readme\"}]}\n{\"type\":\"done\"}\n"
+  },
+  "retrieved": [
+    {
+      "source": {
+        "title": "Questions",
+        "url": "https://openwiz.dev/faq/"
+      },
+      "text": "Synthetic passage: OpenWiz runs a fleet of coding agents from one approved plan."
+    },
+    {
+      "source": {
+        "title": "OpenWiz README",
+        "url": "https://github.com/openwizdev/openwiz#readme"
+      },
+      "text": "Synthetic passage: one line, pasted into your agent, sets OpenWiz up."
+    }
+  ]
+}

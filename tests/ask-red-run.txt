@@ -1,0 +1,114 @@
+# FA3 (#1901) red run: node --test tests/ask.test.mjs against the stub functions/api/ask.js (answers 501)
+✔ the fixtures copied here are the contract's full list (1.865599ms)
+✖ contract fixture answer: the exact response, upstream request and store (30.357045ms)
+✖ contract fixture answer-escaped: the exact response, upstream request and store (3.013941ms)
+✖ contract fixture answer-overflow: the exact response, upstream request and store (1.68838ms)
+✖ contract fixture answer-trimmed-bytes: the exact response, upstream request and store (1.397135ms)
+✖ contract fixture answer-trimmed-count: the exact response, upstream request and store (1.315659ms)
+✖ contract fixture bad-request: the exact response, upstream request and store (1.306972ms)
+✖ contract fixture daily-cap: the exact response, upstream request and store (1.276625ms)
+✖ contract fixture first-write-race: the exact response, upstream request and store (1.320073ms)
+✖ contract fixture midnight-answer: the exact response, upstream request and store (1.23996ms)
+✖ contract fixture midnight-cap: the exact response, upstream request and store (2.370785ms)
+✖ contract fixture no-private-route: the exact response, upstream request and store (1.094569ms)
+✖ contract fixture not-covered: the exact response, upstream request and store (0.920563ms)
+✖ contract fixture not-covered-model: the exact response, upstream request and store (0.941192ms)
+✖ contract fixture off: the exact response, upstream request and store (0.917698ms)
+✖ contract fixture off-not-exact: the exact response, upstream request and store (0.969742ms)
+✖ contract fixture probe-off: the exact response, upstream request and store (1.006984ms)
+✖ contract fixture probe-on: the exact response, upstream request and store (0.852602ms)
+✖ contract fixture rate-limited: the exact response, upstream request and store (0.945466ms)
+✖ contract fixture spend-cap: the exact response, upstream request and store (0.934399ms)
+✖ contract fixture spend-flat-fee: the exact response, upstream request and store (1.022547ms)
+✖ contract fixture spend-missing-cost: the exact response, upstream request and store (1.029391ms)
+✖ contract fixture spend-near-cap: the exact response, upstream request and store (0.990239ms)
+✖ contract fixture store-error: the exact response, upstream request and store (1.007813ms)
+✖ contract fixture too-long: the exact response, upstream request and store (1.055381ms)
+✖ contract fixture unavailable: the exact response, upstream request and store (1.059635ms)
+✖ contract fixture unavailable-price: the exact response, upstream request and store (0.975436ms)
+✖ contract fixture unavailable-request-price: the exact response, upstream request and store (0.998404ms)
+✖ contract fixture upstream-error: the exact response, upstream request and store (1.017432ms)
+✖ contract fixture upstream-error-midstream: the exact response, upstream request and store (1.140831ms)
+✖ the key never appears in a response, even when OpenRouter echoes it in an error or the stream (1.218517ms)
+✖ an answer holding < > & U+2028 U+2029 reaches the visitor escaped, and joins back to the same text (0.72597ms)
+✖ the switch is on only for exactly "on": anything else answers 404 with no body and reads nothing else (0.601063ms)
+✖ the probe reads only the switch: no secret, store or index, even when they are missing (0.541505ms)
+✖ a missing or invalid secret, model, store or maximum price is unavailable before the request is read (0.746799ms)
+✖ a missing or invalid index is unavailable after the visitor is counted, with no model call (0.619935ms)
+✖ every malformed request is bad_request, counts nothing and calls nothing (0.635781ms)
+✖ the question is trimmed and counted in code points: 300 pass, 301 are too_long (0.668109ms)
+✖ a body of exactly 4096 bytes is read, and Content-Type parameters are allowed (0.637143ms)
+✖ keyword scoring ranks passages sharing the question's words, best first, and drops those sharing none (0.622376ms)
+✖ with the real scoring, a matching question sends its passage and an unmatched one gets not_covered with no call (0.582797ms)
+✖ NOT_COVERED with white space or split oddly is still the not-covered answer, and never reaches the visitor (0.634214ms)
+✖ a short answer under 16 characters still streams, and an empty answer is upstream_error (0.638049ms)
+✖ any upstream status but 200 and 404 is upstream_error, with one attempt and the reservation kept (1.972903ms)
+✖ an upstream that never answers times out as upstream_error, and the reservation stays (0.546448ms)
+✖ an upstream that stalls mid-answer times out: text, then upstream_error, reservation kept (0.494415ms)
+✖ a visitor who stops the stream cancels the upstream call, and the reservation stays (0.553046ms)
+✖ an invalid reported cost keeps the whole reservation; a valid one replaces it (0.51438ms)
+✖ a store that fails at any step before the call refuses store_error with no call (0.537982ms)
+✖ a store that never answers times out as store_error (0.569097ms)
+✖ a failing settle keeps the reservation and leaves the answer unchanged (0.562393ms)
+✖ the store holds only the two tables and the pinned key forms, on a fresh store too (4.634452ms)
+✖ the default salt is 32 random bytes as 64 lower-case hex digits, fresh each day (0.885064ms)
+✖ onRequest is the Pages entry point: the probe answers through it (0.279109ms)
+ℹ tests 54
+ℹ pass 1
+ℹ fail 53
+✖ failing tests:
+
+# R1 red run: a body repeating the question key (raw or escaped) is read, not refused as bad_request
+✖ every malformed request is bad_request, counts nothing and calls nothing (48.502766ms)
+ℹ tests 1
+ℹ pass 0
+ℹ fail 1
+✖ failing tests:
+    actual: 502,
+    expected: 400,
+
+# R2 red run: a stream nobody reads stops at the timeout but never settles, so its waitUntil promise stays pending
+✖ a stream nobody reads still ends at the timeout: the upstream call is cancelled and its waitUntil settles (1031.565274ms)
+ℹ tests 1
+ℹ pass 0
+ℹ fail 1
+✖ failing tests:
+    actual: 'still pending',
+    expected: 'settled',
+
+# Review round 1 red run (R1 key in a successful answer, R2 redirect followed, R3 previous-day rows after midnight) at dd47ff6
+✖ R1: a successful answer that carries the key, whole or split across pieces, never shows it or any of its pieces
+✖ R2: a redirect from OpenRouter is not followed: one call, upstream_error, the question sent nowhere else
+✖ R3: a previous day's write delayed past midnight leaves no row of that day behind
+✖ R3: a call is counted on the newest day the store holds, even when this request's clock is behind
+ℹ tests 4
+ℹ pass 0
+ℹ fail 4
+✖ failing tests:
+    actual: false,
+    expected: true,
+    actual: [ 'https://openrouter.ai/api/v1/chat/completions', 'https://example.invalid/collect' ],
+    expected: [ 'https://openrouter.ai/api/v1/chat/completions' ],
+    actual: [ { day: '2026-01-15', salt: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' } ],
+    expected: [],
+    actual: 1,
+    expected: 0,
+
+# Planner ruling on Ruling 13, red run at 87afa9c: an upstream failure or stall right after part of the key arrives flushes the held piece, so part of the key is sent
+✖ R1: an upstream failure or stall right after part of the key arrives sends no part of the key, only the refusal
+ℹ tests 1
+ℹ pass 0
+ℹ fail 1
+✖ failing tests:
+    actual: false,
+    expected: true,
+
+# R6 red run at 5c09520: a reader who pauses past the upstream deadline, then resumes, is sent the queued piece, all of the key but its last character, sources and done
+ℹ tests 1
+ℹ pass 0
+ℹ fail 1
+✖ R6: a reader who pauses past the deadline then resumes gets only the refusal: no held text, no buffered piece, no done
+✖ failing tests:
+AssertionError [ERR_ASSERTION]: part of the key sent: "{\"type\":\"text\",\"text\":\"Synthetic safe first piece long enough to send. \"}\n{\"type\":\"text\",\"text\":\"fake-openrouter-ke\"}\n{\"type\":\"sources\",\"sources\":[{\"title\":\"Questions\",\"url\":\"https://openwiz.dev/faq/\"},{\"title\":\"OpenWiz README\",\"url\":\"https://github.com/openwizdev/openwiz#readme\"}]}\n{\"type\":\"done\"}\n"
+    actual: false,
+    expected: true,

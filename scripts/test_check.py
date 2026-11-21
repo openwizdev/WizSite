@@ -9,7 +9,7 @@ from unittest import mock
 
 import re
 
-from check import CTA, FAQ, FOOTER, FINGERPRINTS, HASHED, INSTALL_SWITCH, ROOT, Page, check_changelog, check_release_data, check_releases, read_releases, split_releases, check_motion, check_privacy, check_ref, check_site, check_vector, check_webp, fingerprint
+from check import CTA, FAQ, FAQ_WHERE, FOOTER, INSTALL_NOTE_HTML, FINGERPRINTS, HASHED, INSTALL_SWITCH, ROOT, Page, check_changelog, check_release_data, check_releases, read_releases, split_releases, check_motion, check_privacy, check_ref, check_site, check_vector, check_webp, fingerprint
 
 
 def edit_built(root, name, change):
@@ -182,22 +182,28 @@ class Checks(unittest.TestCase):
 
     def test_product_first_landing(self):
         # Catches: a missing to-do example, a wrong step order, the retired approval step, missing
-        # steering or sample copy, a return to the old example, or a missing painting description.
+        # sample copy, a return to the old example, or a missing painting description.
         for change, error in (
                 (lambda t: t.replace('Build a to-do app', 'Build an app'), 'missing landing story copy'),
                 (lambda t: t.replace('<h3>Watch your spec</h3>', '<h3>Watch it ship</h3>'), 'three moments'),
                 (lambda t: t.replace('<h3>Watch it ship</h3>', '<h3>Approve the plan</h3><h3>Watch it ship</h3>'), 'three moments'),
-                (lambda t: t.replace('Steer the build from the narrated video.', 'Watch the video.'), 'steering copy'),
                 (lambda t: t.replace('The real spec of an OpenWiz-built to-do app', 'A sample spec'), "to-do app's real spec"),
-                # Catches: a moment that loses, comments out or mistargets its link to the real to-do run (J267).
-                (lambda t: t.replace('<a class="moment-link" href="https://github.com/openwizdev/todo-demo/issues/1#issuecomment-7037022878">See its questions</a>', ''), 'Answer a few questions moment must link'),
-                (lambda t: t.replace('issuecomment-7037022878', 'issuecomment-7037022879'), 'unexpected repository link'),
-                (lambda t: t.replace('<a class="moment-link" href="https://github.com/openwizdev/todo-demo/issues/1">the spec</a>', '<!-- <a class="moment-link" href="https://github.com/openwizdev/todo-demo/issues/1">the spec</a> -->'), 'Watch your spec moment must link'),
-                (lambda t: t.replace('<a class="moment-link" href="https://openwizdev.github.io/todo-demo/">Open the to-do app</a>', ''), 'Watch it ship moment must link'),
-                (lambda t: t.replace('https://openwizdev.github.io/todo-demo/', 'https://openwizdev.github.io/other/'), 'unexpected external URL'),
-                (lambda t: t.replace('https://github.com/openwizdev/todo-demo/issues/1"', 'https://github.com/openwizdev/todo-demo/issues/2"'), 'unexpected repository link'),
-                (lambda t: re.sub(r'(<li>\s*<div class="moment-screen chat-screen">.*?</li>)', r'<!-- \1 -->', t, count=1, flags=re.S), 'Answer a few questions moment must link'),
-                (lambda t: re.sub(r'(<li>\s*<div class="moment-screen ship-screen">.*?</li>)', r'<!-- \1 -->', t, count=1, flags=re.S), 'Watch it ship moment must link'),
+                # Catches: a moment that loses or comments out the real to-do run it shows in place, or a link out of the section.
+                (lambda t: t.replace('<p class="reply">Yes, greyed out.</p>', '<p class="reply">Yes.</p>'), 'Answer a few questions moment must show'),
+                (lambda t: t.replace('<h4>Problem Statement</h4>', '<!-- <h4>Problem Statement</h4> -->'), 'Watch your spec moment must show'),
+                (lambda t: t.replace('todo-demo.tasks.v1', 'tasks'), 'Watch your spec moment must show'),
+                (lambda t: re.sub(r'(<li class="moment-step moment-grill">.*?</li>)', r'<!-- \1 -->', t, count=1, flags=re.S), 'Answer a few questions moment must show'),
+                (lambda t: re.sub(r'(<li class="moment-step moment-ship">.*?</li>)', r'<!-- \1 -->', t, count=1, flags=re.S), 'Watch it ship moment must show|described capture'),
+                (lambda t: re.sub(r'<img class="app-shot"[^>]*>', '', t), 'described capture of the live app'),
+                (lambda t: t.replace('class="app-shot" src="/art/todo-app.webp" alt="The', 'class="app-shot" src="/art/todo-app.webp" alt=" " data-x="'), 'described capture of the live app'),
+                (lambda t: t.replace('<summary>The spec</summary>', '<summary>The spec</summary><a href="https://github.com/openwizdev/openwiz">x</a>'), 'keep visitors on the site'),
+                (lambda t: t.replace('<summary>The live app</summary>', '<summary><a href="https://openwizdev.github.io/todo-demo/">The live app</a></summary>'), 'keep visitors on the site|unexpected external URL'),
+                (lambda t: t.replace('<summary>The spec</summary>', "<summary>The spec</summary><a href='https://github.com/openwizdev/openwiz'>x</a>"), 'keep visitors on the site'),
+                (lambda t: t.replace('<summary>The spec</summary>', '<summary>The spec</summary><a href=//github.com/openwizdev/openwiz>x</a>'), 'keep visitors on the site|unexpected external URL'),
+                # Catches: an answer missing from the expanded grill while the bubbles still show it, and the reverse.
+                (lambda t: t.replace('</span></p>\n              <p class="reply">Yes, greyed out.</p>', '</span></p>\n'), 'expanded grill must show each question with its answer: Keep'),
+                (lambda t: t.replace('</span></p>\n              <p class="reply">One list for now.</p>', '</span></p>\n              <p class="reply">Several lists.</p>'), 'expanded grill must show each question with its answer: Where'),
+                (lambda t: t.replace('<p class="ask">Where should tasks live?</p><p class="reply">One list for now.</p>', '<p class="ask">Where should tasks live?</p>'), 'grill bubbles must show each question with its answer: Where'),
                 (lambda t: t.replace('</main>', '<p>Add a dark mode toggle</p></main>'), 'old example'),
                 (lambda t: t.replace('Oil painting of Wiz scholars studying a to-do list', ''), 'painting without a description')):
             with self.subTest(error=error), tempfile.TemporaryDirectory() as temp:
@@ -537,6 +543,90 @@ class Checks(unittest.TestCase):
                     with self.assertRaises(AssertionError):
                         check_site(root)
 
+    def test_install_note_under_the_box(self):
+        """#1674 (RL2): the install box ends with one note, word for word, naming what 0.1.0 needs, its one link
+        CloudRoom's site; that link is allowed nowhere else."""
+        # catches: the note missing, doubled, reworded or moved out of the box; its CloudRoom link dropped, pointed
+        # elsewhere or losing noreferrer; and CloudRoom's site linked anywhere but the note, on the landing or off it.
+        note = INSTALL_NOTE_HTML
+        link = '<a href="https://cloudroom.dev" rel="noreferrer">CloudRoom</a>'
+        text = (ROOT / 'dist/index.html').read_text()
+        self.assertEqual(text.count(note), 1, note)
+        check_site(ROOT / 'dist')
+        breaks = [
+            ('index.html', note, ''),
+            ('index.html', note, note + note),
+            ('index.html', note, note.replace('x86_64 Linux', 'Linux')),
+            ('index.html', note, note.replace('Apple-silicon Mac', 'Mac')),
+            ('index.html', note, note.replace('; you sign in.', '.')),
+            ('index.html', note, note.replace(link, 'CloudRoom')),
+            ('index.html', note, note.replace('https://cloudroom.dev', 'https://cloudroom.dev/x')),
+            ('index.html', note, note.replace(' rel="noreferrer"', '')),
+            ('index.html', note, ''),  # with the note re-added outside the box, below
+            ('index.html', '</main>', f'<p>{link}</p></main>'),
+            ('drivers/index.html', '</main>', f'<p>{link}</p></main>'),
+        ]
+        for i, (page, good, bad) in enumerate(breaks):
+            with self.subTest(page=page, bad=bad), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp) / 'dist'
+                shutil.copytree(ROOT / 'dist', root)
+                changed = (root / page).read_text().replace(good, bad, 1)
+                if i == 8:
+                    changed = changed.replace('</main>', note + '</main>', 1)
+                (root / page).write_text(changed)
+                with self.assertRaises(AssertionError):
+                    check_site(root)
+
+    def test_install_version_label_is_the_only_version_on_the_landing(self):
+        """#1674 (J264): the install box shows the public name with its semver small beside it, reading exactly
+        OpenWiz 0.01 0.1.0, with the switch live. That one label is the only release version the landing may
+        mention; each case below plants one break, and each must fail."""
+        # catches: the label's semver or public name drifting, the label missing or doubled, the guard's exception
+        # widening to let a version through anywhere else on the landing, in the box or outside it, and the label
+        # moved out of the box with its text left behind in a comment (#46 R2).
+        label = '<p class="install-version">OpenWiz 0.01 <small>0.1.0</small></p>'
+        text = (ROOT / 'dist/index.html').read_text()
+        self.assertEqual(text.count(label), 1, label)
+        shipped = re.findall(r'data-install="[^"]*"', text)
+        self.assertEqual(len(shipped), 1, 'one install switch')
+        hint = '<p class="install-hint">'
+        breaks = [
+            (label, label.replace('0.1.0', '0.1.1')),
+            (label, label.replace('0.01', '0.02')),
+            (label, label.replace('OpenWiz 0.01', 'OpenWiz')),
+            (label, ''),
+            (label, label + label),
+            (hint, '<p>0.1.0</p>' + hint),
+            ('</main>', '<p>Now 0.1.0</p></main>'),
+            ('</main>', '<p>OpenWiz 0.01 <small>0.1.0</small></p></main>'),
+        ]
+        # #46 R2: the label moved out of the box, its text left behind in a comment where it was, or only moved.
+        moved = lambda variant, trace: variant.replace(label, trace, 1).replace('</main>', label + '</main>', 1)
+        relocations = ['<!-- OpenWiz 0.01 <small>0.1.0</small>. -->', f'<!-- {label} -->', '']
+        # The shipped switch only: since #82 the built changelog follows it, so flipping the landing alone fails
+        # check_site for a reason that has nothing to do with the label.
+        for state in ['live']:
+            variant = text.replace(shipped[0], f'data-install="{state}"')
+            with self.subTest(state=state), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp) / 'dist'
+                shutil.copytree(ROOT / 'dist', root)
+                (root / 'index.html').write_text(variant)
+                check_site(root)
+            for good, bad in breaks:
+                with self.subTest(state=state, bad=bad), tempfile.TemporaryDirectory() as temp:
+                    root = Path(temp) / 'dist'
+                    shutil.copytree(ROOT / 'dist', root)
+                    (root / 'index.html').write_text(variant.replace(good, bad, 1))
+                    with self.assertRaises(AssertionError):
+                        check_site(root)
+            for trace in relocations:
+                with self.subTest(state=state, moved=trace), tempfile.TemporaryDirectory() as temp:
+                    root = Path(temp) / 'dist'
+                    shutil.copytree(ROOT / 'dist', root)
+                    (root / 'index.html').write_text(moved(variant, trace))
+                    with self.assertRaises(AssertionError):
+                        check_site(root)
+
     def test_app_page_policy_and_calm(self):
         # catches: the app losing the browser-enforced limit to GitHub and this site, loading an unchecked
         # script, or gaining motion.
@@ -689,6 +779,42 @@ class Checks(unittest.TestCase):
                 with self.assertRaisesRegex(AssertionError, message.strip()):
                     check_site(root)
 
+    def test_report_a_problem_link(self):
+        """#1851: openwiz.dev's Report a problem link opens GitHub's new-issue form on openwizdev/OpenWiz with the
+        feedback template (contracts/feedback-loop.v1.md: template .github/ISSUE_TEMPLATE/feedback.yml; the exact link
+        is the planner's answer on #1851), in the footer of every site page, the changelog's included.
+        Catches: the link missing from a page's footer, pointing at another repository or template, or
+        carrying anything more (a prefilled title or body would send words from openwiz.dev), or (R2 on WizSite #90)
+        sending the page's address as a Referer: the link must carry rel="noreferrer"."""
+        form = '<a href="https://github.com/openwizdev/openwiz/issues/new?template=feedback.yml" rel="noreferrer">Report a problem</a>'
+        for page, count in {'index.html': 1, 'drivers/index.html': 1, 'team/index.html': 1, 'faq/index.html': 1, 'changelog/index.html': 1, 'app/index.html': 0}.items():
+            with self.subTest(page=page):
+                self.assertEqual((ROOT / 'dist' / page).read_text().count(form), count)
+        href = 'https://github.com/openwizdev/openwiz/issues/new?template=feedback.yml'
+        for message, (page, old, new) in {
+            'Report a problem link': ('changelog/index.html', form, 'Report a problem'),
+            'Report a problem link ': ('team/index.html', form, '<a href="/">Report a problem</a>'),
+            'Report a problem link  ': ('drivers/index.html', '</main>', form + '</main>'),
+            'Report a problem link, the footer\'s: the app': ('app/index.html', '</body>', form + '</body>'),
+            'Report a problem link needs rel="noreferrer"': ('index.html', ' rel="noreferrer">Report', '>Report'),
+            'Report a problem link needs rel="noreferrer" ': ('changelog/index.html', ' rel="noreferrer">Report', ' rel="noopener">Report'),
+            'Report a problem link needs rel="noreferrer"  ': ('team/index.html', ' rel="noreferrer">Report', ' rel="noreferrer" referrerpolicy="unsafe-url">Report'),
+            'unexpected external URL parts': ('index.html', href, href + '&amp;body=x'),
+            'unexpected external URL parts ': ('changelog/index.html', href, href.replace('feedback.yml', 'bug.yml')),
+            'unexpected repository link|unexpected external URL parts': ('index.html', href, href.replace('/openwiz/', '/WizSkills/')),
+            'unexpected external URL parts  ': ('team/index.html', href, href.replace('/openwiz/', '/OpenWiz/')),
+            'unexpected external URL parts   ': ('drivers/index.html', href, href.replace('?template=', '?labels=x&amp;template=')),
+        }.items():
+            with tempfile.TemporaryDirectory() as temp, self.subTest(message=message):
+                root = Path(temp) / 'dist'
+                shutil.copytree(ROOT / 'dist', root)
+                path = root / page
+                text = path.read_text()
+                self.assertIn(old, text)
+                path.write_text(text.replace(old, new, 1))
+                with self.assertRaisesRegex(AssertionError, message.strip()):
+                    check_site(root)
+
     def test_faq(self):
         """#76: the one Questions snippet on the landing, /team and /faq, and nowhere else; its rows are buttons."""
         import check
@@ -719,6 +845,11 @@ class Checks(unittest.TestCase):
             'open and disabled until faq.js runs ': lambda f: f.replace('aria-expanded="true"', 'aria-expanded="false"', 1),
             'a button that names its answer ': lambda f: f.replace('aria-controls="faq-a2"', 'aria-controls="faq-a1"', 1),
             'links off the site': lambda f: f.replace('href="/team/#book"', 'href="https://example.com/"', 1),
+            # #1674 (RL2): where agents run, word for word: the old "wherever you choose" answer, a dropped clause, and
+            # the answer moved off its question.
+            'answer to Where do my agents run': lambda f: f.replace(FAQ_WHERE, 'Wherever you choose: your own computer or a VPS, Cloudroom, or boat.dev. Each has a driver that passed the same five-check test.', 1),
+            'answer to Where do my agents run ': lambda f: f.replace(' so it comes first.', '', 1),
+            'answer to Where do my agents run  ': lambda f: f.replace(FAQ_WHERE, 'Anywhere.', 1).replace('OpenWiz is free and open source', FAQ_WHERE + ' OpenWiz is free and open source', 1),
             # #89: the last answer, word for word.
             'last answer': lambda f: f.replace('Your first fleet ships on it.', 'Your first fleet runs in a day.', 1),
             'heading and its line': lambda f: f.replace('The short ones are here.', 'More.', 1),
@@ -772,6 +903,24 @@ class Checks(unittest.TestCase):
         with mock.patch('check.DRIVER_ART_BUDGET', 1000), self.assertRaisesRegex(AssertionError, 'the drivers art'):
             check_site(ROOT / 'dist')
 
+    def test_drivers_login_lines(self):
+        # Catches (OpenWiz #2005): a driver card without its login line, with the wrong host or form, away from its
+        # name, or a login line given to Grok Bot, which has no driver yet.
+        import check
+        main = re.search(r'<main\b[\s\S]*?</main>', (ROOT / 'dist' / check.DRIVERS_PAGE).read_text())[0]
+        check.check_driver_logins(main)
+        held, local = '<p class="driver-login">Login: held by Cloudroom</p>', '<p class="driver-login">Login: stays on your machine</p>'
+        for old, new, error in (
+                (held, '', 'Cloudroom: its login line'),
+                (held, '<p class="driver-login">Login: stays on your machine</p>', 'Cloudroom: its login line'),
+                ('<p class="driver-login">Login: held by boat.dev</p>', '<p class="driver-login">Login: held by Cloudroom</p>', 'boat.dev: its login line'),
+                (local, '<p class="driver-login">Login: your machine</p>', 'Your own computer or VPS: its login line'),
+                ('<span>Grok Bot</span></h3>', '<span>Grok Bot</span></h3>' + local, 'Grok Bot: its login line'),
+                ('</ul>\n  </section>', '</ul>\n' + local + '  </section>', 'only on a driver card')):
+            self.broken('drivers/index.html', old, new, error)
+        line = '<p class="driver-line">Passed the kit, run from a Cloudroom cloud thread against real Cloudroom</p>'
+        self.broken('drivers/index.html', held + '\n        ' + line, line + '\n        ' + held, 'right after its name')
+
     def test_drivers_spotlight(self):
         # Catches (#56, #62): boat.dev's spotlight missing, after the other drivers, or with a check missing, reordered,
         # not passed, without its state in words or without its plain line; the crew painting dropped; a painting shown
@@ -798,8 +947,9 @@ class Checks(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp) / 'dist'
             shutil.copytree(ROOT / 'dist', root)
-            (root / 'art/drivers-x-unused.webp').write_bytes((root / 'art/drivers-c-boat.webp').read_bytes())
-            with mock.patch.dict('check.ART_HASHES', {'art/drivers-x-unused.webp': '39fd43d08aa36bce84e964699d493a03af090499a63dffbfaa43e61804b7e1ef'}), \
+            # The smallest pinned drivers picture, so the copy tests the unused-art rule rather than the art budget's headroom.
+            (root / 'art/drivers-x-unused.webp').write_bytes((root / 'art/drivers-d-sea.webp').read_bytes())
+            with mock.patch.dict('check.ART_HASHES', {'art/drivers-x-unused.webp': 'f2699bd8fe4763993a492dfac2bdbfc3eae46ec33bae0ab74127ad6ebc6a6285'}), \
                     mock.patch('check.ART', set(__import__('check').ART) | {'art/drivers-x-unused.webp'}), \
                     mock.patch('check.STATIC', set(__import__('check').STATIC) | {'art/drivers-x-unused.webp'}), \
                     self.assertRaisesRegex(AssertionError, 'unused drivers art'):

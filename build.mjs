@@ -52,6 +52,7 @@ for (const page of pages) {
   if (page === 'changelog/index.html') html = withReleases(html, render(releases, live));
   await put(page, html);
 }
+await put('ask-index.json', await (await import('./scripts/ask-index.mjs')).snapshotIndex(output, new URL('ask-docs/', root))); // Ask a Wiz's docs index (FA2, #1900)
 for (const [file, source] of Object.entries(npmVendor)) await put(file, await readFile(new URL(source, root)));
 for (const file of files) {
   await mkdir(new URL('./', new URL(file, output)), { recursive: true });

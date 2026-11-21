@@ -40,7 +40,7 @@
     for (const row of rows) {
       const who = row.unknown ? 'Unknown agent' : `${row.note.agent[0].toUpperCase()}${row.note.agent.slice(1)}`;
       out.push({ kind: 'agent', id: `agent:${row.id}`, title: `${who} on #${row.issue.number} ${row.issue.title}`,
-        detail: row.unknown ? 'Unknown' : `${row.note.state}${row.holds ? '' : ' · in the last day'} · ${row.note.harness}, ${row.note.model}`,
+        detail: row.unknown ? 'Unknown' : `${row.note.state}${row.holds ? '' : ' · in the last day'} · ${OW.ui.agentName(row.note.harness, row.note.model)}`,
         go: '#/agents', focus: `main [data-focus="${CSS.escape(`ticket:${row.key}:${row.id}`)}"]`, url: row.issue.url });
     }
     return out;

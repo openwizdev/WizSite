@@ -9,12 +9,14 @@ import subprocess
 from urllib.parse import unquote, urlsplit
 
 ROOT = Path(__file__).resolve().parents[1]
-# J267: the landing's three moments link the real to-do run, in moment order: its grill, its spec, the live app.
-TODO_LINKS = (
-    'https://github.com/openwizdev/todo-demo/issues/1#issuecomment-7037022878',
-    'https://github.com/openwizdev/todo-demo/issues/1',
-    'https://openwizdev.github.io/todo-demo/',
+# The landing's three moments show the real to-do run in place, in moment order: its grill's questions and answers, its
+# spec (a static copy of openwizdev/todo-demo issue 1) and the live app's capture. Each moment must carry these texts.
+TODO_RUN = (
+    ('Where should tasks live?', 'One list for now.', 'Keep completed tasks visible?', 'Yes, greyed out.'),
+    ('Problem Statement', 'As a user, I want an empty task to be refused', 'todo-demo.tasks.v1', 'Out of Scope'),
+    ('openwizdev.github.io/todo-demo',),
 )
+TODO_APP = '/art/todo-app.webp'
 # Reviewed artwork and the spec video. Pin them after checking the visual content and metadata.
 ART_HASHES = {
     'art/era-2-grill.webp': 'efaf213c3f389c8feb2f9d0436e94b1f9241d0ecf3cc3e793385d34f11cd11dd',
@@ -40,8 +42,10 @@ ART_HASHES = {
     # The landing's spec video (#70, J267): the to-do app's real spec (openwizdev/todo-demo #1), narrated with captions,
     # its poster and captions; local voice, no paid service; every frame privacy-scanned.
     'art/todo-spec.mp4': '52bb1fa94a154e17270f7512db19efcedae921e4769a28742bc8a36093d1c732',
-    'art/todo-spec-poster.webp': '9f68e7ab1f17ea97659a085072500055adcd11c8ffd737231f1db114924dc963',
+    'art/todo-spec-poster.webp': '94a69b2033a98e4ae6663b61bf9f0af0ba06d5a4d4d28aa4b46247570cac5b72',
     'art/todo-spec.vtt': '47e9ffb41081dd72f541110c43312521a8dd92f1c8e58c11092ecd0daa74eee2',
+    # Step 3's real capture of the live to-do app (openwizdev.github.io/todo-demo), shown small and opened in place.
+    'art/todo-app.webp': 'ccc5be87687b1d4ac387cfb623033c0f567890cfe73570f8e4d4bb4b8a81de54',
     # OpenWiz's model config spec video (#1802), off the landing (J267) but still served at its URL for #1802's links.
     'art/spec-video.mp4': 'feb357b9a80453d676123a31285a36c34b5873e102ed58c95728bfd6315bfe16',
     # The model config video's poster frame and captions (#1405), still served for OpenWiz #1802's links (J267).
@@ -52,6 +56,9 @@ ART_HASHES = {
     'art/drivers-d-ship.webp': '885dd800aae2e75d45f2b88e1e69232bbf987df44beec9fa8070d4354b64cd04',
     # Round 2F (#56): variant C's painted cutaway of the Wiz crew's ship (#49), beside boat.dev's five checks.
     'art/drivers-c-boat.webp': '39fd43d08aa36bce84e964699d493a03af090499a63dffbfaa43e61804b7e1ef',
+    # The landing's From idea to shipped panel: our own warm sunset sea from the Limitr build-night video, with its
+    # bouncer Wiz, velvet rope, label and deck painted out.
+    'art/moments-sea.webp': '903adfdf5e77c61d49bbbfba6b5aa7942a45a12293dbce40cf04175949d1fbb7',
     # Team page round 2 (#81): the boat video's poster frame, linking to the video on X.
     'art/team-boat-poster.webp': '656c0c75f92a17390beda0d8afb45be3f9164330357635295998406dad3a69d4',
 }
@@ -162,15 +169,25 @@ TEAM_PASSED_LINE = '5 of 5'
 TEAM_POSTER = '/art/team-boat-poster.webp'
 TEAM_POSTER_ALT = 'Wizards on a boat: the fleet that built the Drivers page'
 TEAM_NEVER = re.compile(r'\binstall|\bguarantee', re.I)
+# #1851: Report a problem opens GitHub's new-issue form on openwizdev/openwiz with the feedback template
+# (contracts/feedback-loop.v1.md: .github/ISSUE_TEMPLATE/feedback.yml). The only external URL with a query; nothing
+# else may ride along, so no words leave openwiz.dev. In the footer of every site page.
+REPORT_LINK = 'https://github.com/openwizdev/openwiz/issues/new?template=feedback.yml'
 # The site footer (#73): one snippet, which the build adds at each site page's one slot (not the app's). Its links, in order.
 FOOTER = (ROOT / 'footer.html').read_text()
 FOOTER_SLOT = '<!-- footer.html -->\n'
 FOOTER_LINKS = (('/drivers/', 'Drivers'), ('/changelog/', 'Changelog'), ('https://github.com/openwizdev/openwiz#readme', 'Docs'),
-                ('/faq/', 'FAQ'), ('/app/', 'The app'), ('/team/', 'For teams'), ('https://github.com/openwizdev/openwiz', 'GitHub'),
-                ('https://x.com/openwiz', 'X @openwiz'))
+                ('/faq/', 'FAQ'), ('/app/', 'The app'), (REPORT_LINK, 'Report a problem'), ('/team/', 'For teams'),
+                ('https://github.com/openwizdev/openwiz', 'GitHub'), ('https://x.com/openwiz', 'X @openwiz'))
 FOOTER_LINE = 'Apache-2.0. Owned by no one.'
 # The only external link off GitHub: OpenWiz's own X account, in the footer.
 X_ACCOUNT = 'https://x.com/openwiz'
+# #1674 (RL2): the install box's last line names what 0.1.0 needs; its one link, CloudRoom's site, is the landing's only
+# link off GitHub besides the footer's X account.
+CLOUDROOM_LINK = 'https://cloudroom.dev'
+INSTALL_NOTE = 'Needs CloudRoom, on an Apple-silicon Mac or x86_64 Linux. Your agent can install it; you sign in.'
+INSTALL_NOTE_HTML = ('<p class="install-note">Needs <a href="https://cloudroom.dev" rel="noreferrer">CloudRoom</a>, '
+                     'on an Apple-silicon Mac or x86_64 Linux. Your agent can install it; you sign in.</p>')
 # The Questions (#76): one snippet, faq.html, the FAQ's one source. The build adds it at the landing's and /team's slot,
 # and at /faq's top slot as the page's own heading (its title the h1, each question an h2). Its questions, in order.
 FAQ = (ROOT / 'faq.html').read_text()
@@ -183,6 +200,9 @@ FAQ_QUESTIONS = ('What is OpenWiz?', 'What is a kernel?', 'What do I need to run
                  'Does OpenWiz see my code or my logins?', 'What does it cost?', 'Can you set it up for my team?')
 # #89: the last answer, word for word (the team page's offer).
 FAQ_LAST = 'Yes. Book a 30-minute call. Your first fleet ships on it.'
+# #1674 (RL2): where agents run, word for word: 0.1.0 runs through CloudRoom; the other drivers come after it.
+FAQ_WHERE = ('Through CloudRoom: OpenWiz runs on it, so it comes first. Once OpenWiz is set up, a fleet can also run '
+             'agents on boat.dev or your own computer. Each is a driver that passed the same five-check test.')
 
 
 def with_footer(html):
@@ -202,10 +222,13 @@ def with_cta(html):
 
 
 FINGERPRINTS = {name: fingerprint(name, (ROOT / name).read_bytes()) for name in HASHED}
+# Ask a Wiz's docs index (FA2, #1900): built from the built pages and ask-docs/, so it has no source copy to compare;
+# it is privacy-scanned with every runtime file.
+ASK_INDEX = 'ask-index.json'
 STATIC = {
     'index.html', 'changelog/index.html', 'drivers/index.html', 'team/index.html', 'faq/index.html', '_headers', APP_PAGE, 'app/manifest.webmanifest',
     'fonts/Geist-var.woff2', 'fonts/GeistMono-var.woff2', 'fonts/OFL.txt',
-} | ART | set(ICON_HASHES) | set(VECTORS) | (set(VENDOR_HASHES) - {GSAP}) | set(APP_VENDOR) | set(DRIVER_LOGOS)
+} | ART | set(ICON_HASHES) | set(VECTORS) | (set(VENDOR_HASHES) - {GSAP}) | set(APP_VENDOR) | set(DRIVER_LOGOS) | {ASK_INDEX}
 RUNTIME = STATIC | set(FINGERPRINTS.values())
 
 
@@ -278,6 +301,12 @@ DRIVER_PASSED = {
     'vps': ('2026-11-20', 'https://github.com/openwizdev/OpenWiz/pull/1455#issuecomment-7034588211'),
 }
 DRIVER_COMING = 'grok-bot'
+# OpenWiz #2005 (DW8): each driver's login line, word for word from its README (kernel/driver.v1.md, The login line).
+DRIVER_LOGINS = {
+    'boat-dev': 'Login: held by boat.dev',
+    'vps': 'Login: stays on your machine',
+    'cloudroom': 'Login: held by Cloudroom',
+}
 DRIVER_ALSO = 'Cloudroom and your own computer or VPS passed the same five checks on 2026-11-20.'
 DRIVER_CARD_DATE = 'Kit run, {}'
 # Words that described the three passing drivers before they passed; none may come back anywhere on the page. "not run
@@ -354,6 +383,8 @@ class Page(HTMLParser):
         self.inline_scripts = 0
         self.books = []
         self.x_links = 0
+        self.report_links = 0
+        self.cloudroom_links = 0
         self.stylesheets, self.scripts = [], []
         self.feed(text)
 
@@ -371,6 +402,19 @@ class Page(HTMLParser):
             # #75 R3: OpenWiz's X account, only as a link a visitor follows (check_site allows one, the footer's);
             # anywhere else, as a resource or in CSS, check_ref refuses it like any external URL.
             self.x_links += 1
+            attrs = {key: value for key, value in attrs.items() if key != 'href'}
+        elif tag == 'a' and attrs.get('href') == CLOUDROOM_LINK:
+            # #1674: CloudRoom's site, exempt from check_ref by its exact href only; check_site allows one, the
+            # landing install box's, and check_install pins the element around it.
+            self.cloudroom_links += 1
+            attrs = {key: value for key, value in attrs.items() if key != 'href'}
+        elif tag == 'a' and attrs.get('href') == REPORT_LINK:
+            # #1851: the Report a problem link, exempt from check_ref's no-query rule by its exact href only;
+            # check_site counts it per page.
+            # R2 (WizSite #90): no Referer, so the form request never carries the page the visitor came from.
+            assert 'noreferrer' in (attrs.get('rel') or '').lower().split() and 'referrerpolicy' not in attrs, \
+                'Report a problem link needs rel="noreferrer"'
+            self.report_links += 1
             attrs = {key: value for key, value in attrs.items() if key != 'href'}
         for key in ('href', 'src', 'poster'):
             if attrs.get(key):
@@ -496,9 +540,6 @@ def check_ref(root, source, ref, pages, favicons=()):
         assert ref in ('/favicon.ico', '/favicon.svg', '/app/icon.ico', '/app/icon.svg'), 'unexpected favicon'
     url = urlsplit(ref)
     if url.scheme or url.netloc:
-        # The to-do run the landing's moments follow (J267): only its exact grill, spec and live app links.
-        if ref in TODO_LINKS:
-            return
         assert url.scheme == 'https' and url.netloc == 'github.com', 'unexpected external URL'
         assert re.match(r'^/openwizdev/(?:openwiz|OpenWiz|WizSkills|WizPlugins)(?:/|$)', url.path), 'unexpected repository link'
         assert not url.username and not url.password and not url.query, 'unexpected external URL parts'
@@ -558,6 +599,10 @@ def check_site(root):
         assert page.x_links == x_links, f'one X link per page, the footer\'s: {path.relative_to(root)} has {page.x_links}'
         for ref in page.refs:
             check_ref(root, path, ref, pages, page.favicons)
+        # After check_ref, so a changed Report a problem URL is refused as an external URL first.
+        assert page.cloudroom_links == (1 if path == root / 'index.html' else 0), \
+            f'CloudRoom link, the landing install box\'s only: {path.relative_to(root)} has {page.cloudroom_links}'
+        assert page.report_links == 1, f'Report a problem link: {path.relative_to(root)} has {page.report_links}, not 1'
         for ref in css_refs(path.read_text()):
             check_ref(root, path, ref, pages)
     for path in root.glob('*.css'):
@@ -604,16 +649,35 @@ def check_site(root):
     moments = ('Answer a few questions', 'Watch your spec', 'Watch it ship')
     captions = re.findall(r'<h3>([^<]+)</h3>', landing)
     assert tuple(captions) == moments, 'the three moments must appear in order'
-    assert 'Steer the build from the narrated video.' in flat, 'spec video steering copy is missing'
     assert 'The real spec of an OpenWiz-built to-do app' in flat, 'the spec video must say it is the to-do app\'s real spec'
-    # J267: the three moments point at the real to-do run: its grill, its spec and the live app.
-    hrefs = {}
-    # Comments hide markup from visitors, so a commented-out card or link counts as missing.
-    for block in re.findall(r'<li[^>]*>\s*(?:<div class="moment-screen|<video).*?</li>', re.sub(r'<!--.*?-->', '', landing, flags=re.S), re.S):
-        found = Page(block)
-        hrefs[re.search(r'<h3>([^<]+)</h3>', block)[1]] = {a.get('href') for a in found.links}
-    for card, link in zip(moments, TODO_LINKS):
-        assert link in hrefs.get(card, ()), f'the {card} moment must link the real to-do run: {link}'
+    # The three moments show the real to-do run on this page and never send the visitor away for it: no link out.
+    section = re.search(r'<section class="moments[\s\S]*?</section>', re.sub(r'<!--.*?-->', '', landing, flags=re.S))
+    section = section[0] if section else ''
+    # Parsed, not pattern-matched, so a link written with single quotes or none counts too.
+    links = Page(section)
+    assert not links.books and not links.x_links and all(ref.startswith('/') and not ref.startswith('//') for ref in links.refs), \
+        'the moments must keep visitors on the site: no link out'
+    blocks = {}
+    # Comments hide markup from visitors, so a commented-out moment or text counts as missing.
+    for block in re.findall(r'<li class="(?:moment-step|spec-moment)[^"]*">.*?</(?:details|div)>\s*</li>', section, re.S):
+        blocks[re.search(r'<h3>([^<]+)</h3>', block)[1]] = Text(block).spaced()
+    for card, texts in zip(moments, TODO_RUN):
+        for text in texts:
+            assert text in blocks.get(card, ''), f'the {card} moment must show the real to-do run in place: {text}'
+    # Each grill question shows with its own answer right after it: in the bubbles (open on phones) and in the expanded grill.
+    grill = TODO_RUN[0]
+    chat = re.search(r'<div class="moment-chat"[^>]*>(.*?)</div>', section, re.S)
+    panel = re.search(r'<div class="moment-panel grill-panel">(.*?)</div>', section, re.S)
+    for question, answer in zip(grill[::2], grill[1::2]):
+        q, a = re.escape(escape(question, quote=False)), re.escape(escape(answer, quote=False))
+        assert chat and re.search(rf'<p class="ask">{q}</p>\s*<p class="reply">{a}</p>', chat[1]), \
+            f'the grill bubbles must show each question with its answer: {question}'
+        assert panel and re.search(rf'<p class="ask"><strong>{q}</strong>[^<]*<span>[^<]*</span></p>\s*<p class="reply">{a}</p>', panel[1]), \
+            f'the expanded grill must show each question with its answer: {question}'
+    # The live app is shown as its pinned real capture, described, inside step 3.
+    ship = re.search(r'<li class="moment-step moment-ship">.*?</li>', section, re.S)
+    shot = next((i for i in Page(ship[0]).images if i.get('src') == TODO_APP and (i.get('alt') or '').strip()), None) if ship else None
+    assert shot, f'the Watch it ship moment lost its described capture of the live app: {TODO_APP}'
     # Owner cuts (round 6): obvious notes stay off the page.
     for text in ('Illustration, not live data', 'Building in public'):
         assert text.lower() not in flat.lower(), f'cut copy is back: {text}'
@@ -627,10 +691,13 @@ def check_site(root):
             assert (attrs.get('alt') or '').strip(), f'painting without a description: {attrs.get("src")}'
     check_motion((root / names['site.css']).read_text())
     check_driver_css((root / names['site.css']).read_text())
-    check_install(landing, pages[root / 'index.html'])
+    unlabelled = check_install(landing, pages[root / 'index.html'])
     assert not re.search(r'\b\d{4}-\d{2}-\d{2}\b', words), 'dated landing promise'
     changelog, releases = split_releases((root / 'changelog/index.html').read_text())
-    assert not re.search(r'(?<![\d.])\d+\.\d+\.\d+(?![\d.])', flat), 'release version mentioned on the landing'
+    # #1674 (J264): the install box's one version label (check_install reads it exactly and returns the landing
+    # without that element) is the only version allowed.
+    unlabelled = re.sub(r'\s+', ' ', unescape(re.sub(r'<[^>]*>', '', re.sub(r'<br>', ' ', unlabelled))))
+    assert not re.search(r'(?<![\d.])\d+\.\d+\.\d+(?![\d.])', unlabelled), 'release version mentioned on the landing'
     for name in VECTORS:
         check_vector((root / name).read_bytes())
     total = 0
@@ -722,6 +789,7 @@ INSTALL_LINE = 'Install OpenWiz from github.com/openwizdev/OpenWiz'
 INSTALL_HINT = 'Paste this into your agent'
 INSTALL_BUTTON = 'Copy · coming soon'
 INSTALL_SWITCH = ('coming-soon', 'live')
+INSTALL_VERSION = 'OpenWiz 0.01 0.1.0'  # the public name with its semver small beside it (#1674, J264)
 
 
 def check_install(landing, page):
@@ -733,6 +801,12 @@ def check_install(landing, page):
     assert switch and switch[1] in INSTALL_SWITCH, f'the install box needs its one switch, data-install = {" or ".join(INSTALL_SWITCH)}'
     lines = re.findall(r'<code class="install-line">([^<]*)</code>', box)
     assert lines == [INSTALL_LINE], f'the install line must read exactly: {INSTALL_LINE}'
+    # #1674: the version label is the box's first element, the only one of its class on the landing (#46 R2).
+    label = re.search(r'<div class="install-box"[^>]*>\s*(<p class="install-version">([^<]*<small>[^<]*</small>)</p>)', landing)
+    assert label and landing.count('install-version') == 1 and flat(label[2]) == INSTALL_VERSION, f'the install box must show {INSTALL_VERSION}'
+    # #1674 (RL2): the note is the box's last element, exactly, after its row.
+    assert re.search(re.escape(INSTALL_NOTE_HTML) + r'\s*$', box) and landing.count('install-note') == 1 \
+        and flat(INSTALL_NOTE_HTML) == INSTALL_NOTE, f'the install box must end with: {INSTALL_NOTE}'
     hints = re.findall(r'<p class="install-hint">([\s\S]*?)</p>', box)
     assert [flat(h) for h in hints] == [INSTALL_HINT], f'the install box must say: {INSTALL_HINT}'
     labels = re.findall(r'<button class="btn install"[^>]*>([\s\S]*?)</button>', landing)
@@ -746,6 +820,7 @@ def check_install(landing, page):
     reader = Text(rest)
     for reading in [reader.joined(), reader.spaced()] + reader.shown:
         assert not re.search(r'install|coming soon|paid plans|works today', re.sub(r'\s+', ' ', reading), re.I), 'unsettled landing claim or a second install mention'
+    return landing[:label.start(1)] + landing[label.end(1):]
 
 
 def check_changelog(landing, changelog):
@@ -942,6 +1017,7 @@ def check_drivers(landing, changelog, drivers, page):
     assert [r[0] for r in rows] == list(KIT_CHECKS) and 'credential' in plain(rows[-1][1]), \
         f'{OWN_DRIVER} lists the four commands and the fifth check, token, with the credential it checks for: {rows}'
     assert not Outline(drivers).styles, 'the drivers page keeps its styles in site.css'
+    check_driver_logins(main)
     check_driver_token(drivers, main)
 
 
@@ -1092,6 +1168,21 @@ def check_driver_results(drivers, main, outline):
     assert not only, f'boat.dev is never the only one that passed: {only[0]!r}'
 
 
+def check_driver_logins(main):
+    """OpenWiz #2005: each driver shows its login line right after its name, word for word from its README; a card with
+    no driver yet (Grok Bot) shows none, and no login line sits outside a driver card."""
+    cards = {key: re.search(rf'<article class="driver[^"]*" id="{key}"[\s\S]*?</article>', main) for key, *_ in DRIVERS}
+    for key, name, _, _ in DRIVERS:
+        card = cards[key][0] if cards[key] else ''
+        want = [DRIVER_LOGINS[key]] if key in DRIVER_LOGINS else []
+        lines = [plain(line) for line in re.findall(r'<p class="driver-login">([\s\S]*?)</p>', card)]
+        assert lines == want, f'{name}: its login line must read exactly {want}: {lines}'
+        if want:
+            assert re.search(r'</h[23]>\s*<p class="driver-login">', card), f'{name}: its login line sits right after its name'
+    found = len(re.findall(r'class="driver-login"', main))
+    assert found == len(DRIVER_LOGINS), f'a login line only on a driver card: {found} on the page'
+
+
 def check_driver_token(drivers, main):
     """#66 item 7: wherever token is explained (boat.dev's token row and Write your own driver's), say what the run
     inspected, in the scoped words, and nowhere make a broader claim."""
@@ -1229,6 +1320,8 @@ def check_faq(htmls, pages, names):
         assert plain(answer), f'a question without its answer: {plain(question)}'
         for href in re.findall(r'href="([^"]*)"', answer):
             assert href.startswith('/'), f'an answer links off the site: {href}'
+    where = [plain(a) for _, q, _, a in rows if plain(q) == 'Where do my agents run?']
+    assert where == [FAQ_WHERE], f'the Questions\u2019 answer to Where do my agents run?: {FAQ_WHERE}'
     assert rows and plain(rows[-1][3]) == FAQ_LAST, f'the Questions\u2019 last answer: {FAQ_LAST}'
     assert not re.search(r'<(?:form|input|textarea)\b', FAQ), 'part 1 asks nothing: no form or input in the Questions'
 
@@ -1424,6 +1517,7 @@ def check_app(root, names, pages):
     page = Page((root / APP_PAGE).read_text())
     assert not page.books, 'a booking link outside the team page: the app'
     assert not page.x_links, 'one X link per page, the footer\'s: the app has one'
+    assert not page.report_links, 'Report a problem link, the footer\'s: the app has one'
     assert not set(page.refs) & {f'/{name}' for name in HASHED}, 'the app uses an unfingerprinted style or script'
     assert page.stylesheets == [f'/{names[APP_STYLE]}'], 'the app must apply exactly the fingerprinted ember.css'
     assert page.scripts == [ref for name in APP_SCRIPTS for ref in [f'/{v}' for v, (_, before) in APP_VENDOR.items() if before == name] + [f'/{names[name]}']], \
@@ -1488,7 +1582,7 @@ def check_privacy(path, data):
 def main():
     output = ROOT / 'dist'
     check_site(output)
-    for name in RUNTIME - set(FINGERPRINTS.values()) - set(ALL_PAGES):
+    for name in RUNTIME - set(FINGERPRINTS.values()) - set(ALL_PAGES) - {ASK_INDEX}:
         source = APP_VENDOR[name][0] if name in APP_VENDOR else name
         assert (ROOT / source).read_bytes() == (output / name).read_bytes(), f'export differs: {name}'
     assert built_fingerprints(output) == FINGERPRINTS, 'build is stale: rebuild the site'

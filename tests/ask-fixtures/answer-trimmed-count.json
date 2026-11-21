@@ -1,0 +1,175 @@
+{
+  "case": "answer-trimmed-count",
+  "now": "2026-01-15T14:20:05+00:00",
+  "request": {
+    "method": "POST",
+    "headers": {
+      "Content-Type": "application/json",
+      "Origin": "https://openwiz.dev",
+      "CF-Connecting-IP": "192.0.2.10"
+    },
+    "body": "{\"question\": \"Synthetic question matching eight passages?\"}"
+  },
+  "settings": {
+    "ASK_A_WIZ": "on",
+    "OPENROUTER_API_KEY": "fake-openrouter-key",
+    "ASK_A_WIZ_MODEL": "synthetic/cheap-model",
+    "ASK_A_WIZ_DAILY_CAP": "200",
+    "ASK_A_WIZ_COUNTERS": "bound",
+    "ASK_A_WIZ_DAILY_CAP_USD": "1.00",
+    "ASK_A_WIZ_MAX_PROMPT_PRICE": "0.10",
+    "ASK_A_WIZ_MAX_COMPLETION_PRICE": "0.40",
+    "ASK_A_WIZ_MAX_REQUEST_PRICE": "0.001"
+  },
+  "store": {
+    "salts": [
+      {
+        "day": "2026-01-15",
+        "salt": "df78e3e5ba90348fbe926b2adb0915d6dbac592d0be7f50c56d5dfd5266d4dd6"
+      }
+    ],
+    "counters": [
+      {
+        "day": "2026-01-15",
+        "key": "cap",
+        "count": 37
+      },
+      {
+        "day": "2026-01-15",
+        "key": "visitor:da147cbef259f07d5627eb7e94b57d5a:14",
+        "count": 2
+      },
+      {
+        "day": "2026-01-15",
+        "key": "spend",
+        "count": 61000
+      }
+    ]
+  },
+  "upstream": {
+    "request": {
+      "model": "synthetic/cheap-model",
+      "stream": true,
+      "provider": {
+        "max_price": {
+          "prompt": 0.1,
+          "completion": 0.4,
+          "request": 0.001
+        },
+        "require_parameters": true,
+        "data_collection": "deny",
+        "zdr": true
+      },
+      "usage": {
+        "include": true
+      },
+      "max_tokens": 500,
+      "temperature": 0,
+      "messages": [
+        {
+          "role": "system",
+          "content": "You answer questions about OpenWiz for visitors to openwiz.dev. Answer only from the passages in the user's message, in plain text, in at most three short paragraphs. If the passages do not answer the question, reply with exactly NOT_COVERED and nothing else."
+        },
+        {
+          "role": "user",
+          "content": "Passage 1 from https://openwiz.dev/synthetic/1/:\nSynthetic passage 1.\n\nPassage 2 from https://openwiz.dev/synthetic/2/:\nSynthetic passage 2.\n\nPassage 3 from https://openwiz.dev/synthetic/3/:\nSynthetic passage 3.\n\nPassage 4 from https://openwiz.dev/synthetic/4/:\nSynthetic passage 4.\n\nPassage 5 from https://openwiz.dev/synthetic/5/:\nSynthetic passage 5.\n\nPassage 6 from https://openwiz.dev/synthetic/6/:\nSynthetic passage 6.\n\nQuestion: Synthetic question matching eight passages?"
+        }
+      ]
+    },
+    "chunks": [
+      "Synthetic answer from six passages."
+    ],
+    "cost": 0.000812
+  },
+  "store_after": {
+    "salts": [
+      {
+        "day": "2026-01-15",
+        "salt": "df78e3e5ba90348fbe926b2adb0915d6dbac592d0be7f50c56d5dfd5266d4dd6"
+      }
+    ],
+    "counters": [
+      {
+        "day": "2026-01-15",
+        "key": "cap",
+        "count": 38
+      },
+      {
+        "day": "2026-01-15",
+        "key": "visitor:da147cbef259f07d5627eb7e94b57d5a:14",
+        "count": 3
+      },
+      {
+        "day": "2026-01-15",
+        "key": "spend",
+        "count": 61812
+      }
+    ]
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/x-ndjson; charset=utf-8",
+      "Cache-Control": "no-store"
+    },
+    "body": "{\"type\":\"text\",\"text\":\"Synthetic answer from six passages.\"}\n{\"type\":\"sources\",\"sources\":[{\"title\":\"Synthetic page 1\",\"url\":\"https://openwiz.dev/synthetic/1/\"},{\"title\":\"Synthetic page 2\",\"url\":\"https://openwiz.dev/synthetic/2/\"},{\"title\":\"Synthetic page 3\",\"url\":\"https://openwiz.dev/synthetic/3/\"},{\"title\":\"Synthetic page 4\",\"url\":\"https://openwiz.dev/synthetic/4/\"},{\"title\":\"Synthetic page 5\",\"url\":\"https://openwiz.dev/synthetic/5/\"},{\"title\":\"Synthetic page 6\",\"url\":\"https://openwiz.dev/synthetic/6/\"}]}\n{\"type\":\"done\"}\n"
+  },
+  "retrieved": [
+    {
+      "source": {
+        "title": "Synthetic page 1",
+        "url": "https://openwiz.dev/synthetic/1/"
+      },
+      "text": "Synthetic passage 1."
+    },
+    {
+      "source": {
+        "title": "Synthetic page 2",
+        "url": "https://openwiz.dev/synthetic/2/"
+      },
+      "text": "Synthetic passage 2."
+    },
+    {
+      "source": {
+        "title": "Synthetic page 3",
+        "url": "https://openwiz.dev/synthetic/3/"
+      },
+      "text": "Synthetic passage 3."
+    },
+    {
+      "source": {
+        "title": "Synthetic page 4",
+        "url": "https://openwiz.dev/synthetic/4/"
+      },
+      "text": "Synthetic passage 4."
+    },
+    {
+      "source": {
+        "title": "Synthetic page 5",
+        "url": "https://openwiz.dev/synthetic/5/"
+      },
+      "text": "Synthetic passage 5."
+    },
+    {
+      "source": {
+        "title": "Synthetic page 6",
+        "url": "https://openwiz.dev/synthetic/6/"
+      },
+      "text": "Synthetic passage 6."
+    },
+    {
+      "source": {
+        "title": "Synthetic page 7",
+        "url": "https://openwiz.dev/synthetic/7/"
+      },
+      "text": "Synthetic passage 7."
+    },
+    {
+      "source": {
+        "title": "Synthetic page 8",
+        "url": "https://openwiz.dev/synthetic/8/"
+      },
+      "text": "Synthetic passage 8."
+    }
+  ]
+}
