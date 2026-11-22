@@ -1,0 +1,27 @@
+{
+  "schema": "openwiz.ask-a-wiz.index.v1",
+  "sources": [
+    {
+      "title": "Questions",
+      "url": "https://openwiz.dev/faq/"
+    },
+    {
+      "title": "OpenWiz README",
+      "url": "https://github.com/openwizdev/openwiz#readme"
+    }
+  ],
+  "passages": [
+    {
+      "source": 0,
+      "text": "Synthetic passage: OpenWiz runs a fleet of coding agents from one approved plan."
+    },
+    {
+      "source": 0,
+      "text": "Synthetic passage: the FAQ answers the short questions."
+    },
+    {
+      "source": 1,
+      "text": "Synthetic passage: one line, pasted into your agent, sets OpenWiz up."
+    }
+  ]
+}

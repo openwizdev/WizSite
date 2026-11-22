@@ -1,0 +1,31 @@
+{
+  "note": "Synthetic: the whole store after a day of synthetic questions. Only these forms exist.",
+  "salts": [
+    {
+      "day": "2026-01-15",
+      "salt": "df78e3e5ba90348fbe926b2adb0915d6dbac592d0be7f50c56d5dfd5266d4dd6"
+    }
+  ],
+  "counters": [
+    {
+      "day": "2026-01-15",
+      "key": "cap",
+      "count": 37
+    },
+    {
+      "day": "2026-01-15",
+      "key": "spend",
+      "count": 61000
+    },
+    {
+      "day": "2026-01-15",
+      "key": "visitor:da147cbef259f07d5627eb7e94b57d5a:14",
+      "count": 2
+    },
+    {
+      "day": "2026-01-15",
+      "key": "visitor:9963a935a24b4310ca3f4c10461703c0:09",
+      "count": 4
+    }
+  ]
+}

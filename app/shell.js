@@ -1,19 +1,14 @@
-// The app's shell: sign-in, the repository picker, and the frame every page uses (navigation, read times,
-// failed, partial and paused reads). Pages register with OW.page (pages/*.js); the shell routes by #/<page>.
 'use strict';
 (() => {
   const { h, icon, time } = OW.ui;
-  // The OpenWiz mark, cream on charcoal (J194), in the old logo's 28 x 28 place; the name beside it says what it is.
   const logo = () => h('img', { src: '/app/mark.svg', alt: '', width: 28, height: 28 });
-  // A Wiz of the family keeps an empty state company; its sentence says it all, so the picture is decorative.
   const wiz = () => h('p', {}, h('img', { src: '/app/wiz-reviewer.svg', alt: '', width: 96, height: 105 }));
   const data = OW.data;
   const root = document.getElementById('app');
   const ROUTES = () => OW.pages.map(page => page.id);
-  let built = null; // the shell's live parts, once drawn
-  const INSTALL = 'https://github.com/apps/openwiz-viewer/installations/new'; // GitHub returns to /app (the setup URL)
+  let built = null;
+  const INSTALL = 'https://github.com/apps/openwiz-viewer/installations/new';
 
-  // #/<page>, or #/specs/<n> for one spec's page (the Specs page draws it; its navigation stays on Specs).
   const route = () => {
     const [id, arg] = location.hash.replace(/^#\/?/, '').split('/');
     return id === 'specs' && /^[1-9]\d*$/.test(arg || '') ? { id, arg } : { id: arg === undefined ? id : '', arg: null };
@@ -23,11 +18,9 @@
     return OW.pages.find(page => page.id === id) || OW.pages[0];
   };
 
-  // ---- Screens before the shell ----
-
   function screen(...children) {
     built = null;
-    OW.palette.close(); // the palette and the shortcut list belong to the shell
+    OW.palette.close();
     root.replaceChildren(h('div', { class: 'center' }, h('div', { class: 'panel' }, h('div', { class: 'brand' }, logo(), h('span', {}, 'OpenWiz')), ...children)));
     document.title = 'OpenWiz';
   }
@@ -43,7 +36,6 @@
     );
   }
 
-  // Sign out is offered on every picker screen: loading, failed and listed.
   const signOutButton = () => h('button', { class: 'btn', type: 'button', onclick: () => { data.auth.signOut(); signedOut(); } }, 'Sign out');
 
   async function picker() {
@@ -54,16 +46,15 @@
     try {
       found = await data.repositories();
     } catch (error) {
-      if (data.auth.session() !== session || error instanceof data.Ended) return; // signed out (or in again) meanwhile
+      if (data.auth.session() !== session || error instanceof data.Ended) return;
       if (error instanceof data.SignedOut) return signedOut('Your sign-in ended. Sign in again.');
       return screen(h('h1', {}, 'Pick a repository'),
         h('div', { class: 'notices' }, h('div', { class: 'notice bad', role: 'alert' }, icon('warn'),
           h('span', {}, h('b', {}, 'Couldn\'t read your repositories. '), 'GitHub didn\'t answer, so the list is unknown, not empty.'))),
         h('p', { class: 'actions' }, h('button', { class: 'btn', type: 'button', onclick: picker }, icon('refresh'), 'Try again'), ' ', signOutButton()));
     }
-    if (data.auth.session() !== session) return; // this list belongs to a sign-in that has ended
+    if (data.auth.session() !== session) return;
     const repos = found.repos;
-    // Signing in authorizes the Viewer App but doesn't install it: only a complete read with no installation asks for it.
     if (found.complete && found.installations === 0) {
       return screen(
         h('h1', {}, 'Pick a repository'),
@@ -90,8 +81,6 @@
     );
   }
 
-  // ---- The shell ----
-
   function navLinks(kind) {
     return OW.pages.map((page, i) => {
       const badge = h('span', { class: 'badge', hidden: true });
@@ -101,10 +90,73 @@
     });
   }
 
+  let listing = null;
+  function readRepositories() {
+    const session = data.auth.session();
+    if (listing?.session !== session) {
+      const mine = { session, run: data.repositories() };
+      listing = mine;
+      mine.run.then(() => {}, () => {}).finally(() => { if (listing === mine) listing = null; });
+    }
+    return listing.run;
+  }
+  function switchTo(full) {
+    if (full === data.repo.get()?.full) return;
+    data.stop();
+    data.repo.pick(full);
+    if (route().arg) history.replaceState(null, '', `#/${route().id}`);
+    const side = document.activeElement?.closest?.('.side, .top')?.classList.contains('top') ? '.top' : '.side';
+    built = null;
+    buildShell();
+    data.start();
+    update();
+    root.querySelector(`${side} button.repo`)?.focus();
+  }
+  function repoSwitch(picked) {
+    const list = h('div', { class: 'repo-list', hidden: true, id: `repos-${Math.random().toString(36).slice(2)}` });
+    const close = () => { list.hidden = true; button.setAttribute('aria-expanded', 'false'); };
+    const fill = async () => {
+      const session = data.auth.session();
+      list.replaceChildren(h('p', {}, 'Reading your repositories…'));
+      let found;
+      try {
+        found = await readRepositories();
+      } catch (error) {
+        if (data.auth.session() !== session || error instanceof data.Ended) return;
+        if (error instanceof data.SignedOut) return signedOut('Your sign-in ended. Sign in again.');
+        return list.replaceChildren(h('p', { class: 'bad' }, 'Couldn\'t read your repositories, so the list is unknown, not empty.'),
+          h('button', { class: 'btn', type: 'button', onclick: fill }, icon('refresh'), 'Try again'));
+      }
+      if (data.auth.session() !== session || list.hidden) return;
+      list.replaceChildren(...[
+        found.complete ? null : h('p', { class: 'bad' }, 'Only part of your repositories could be read, so some may be missing.'),
+        h('ul', { class: 'repos' }, found.repos.map(r => h('li', {},
+          h('button', { type: 'button', 'aria-current': r.full === picked.full ? 'true' : null, onclick: () => {
+            close();
+            if (r.full === picked.full) button.focus();
+            else switchTo(r.full);
+          } }, r.full),
+          h('span', { class: 'tag' }, r.private ? 'Private' : 'Public')))),
+        h('p', {}, h('a', { href: 'https://github.com/settings/installations', target: '_blank', rel: 'noreferrer' }, 'Choose repositories on GitHub'))].filter(Boolean));
+      list.querySelector('button[aria-current]')?.focus();
+    };
+    const button = h('button', { class: 'repo', type: 'button', 'aria-expanded': 'false', 'aria-controls': list.id,
+      'aria-label': `Repository ${picked.full}. Change repository`,
+      onclick: () => {
+        if (!list.hidden) return close();
+        list.hidden = false;
+        button.setAttribute('aria-expanded', 'true');
+        fill();
+      } },
+    icon('repo'), h('span', { class: 'name' }, picked.full), icon('chevron'));
+    const wrap = h('div', { class: 'repo-switch', onkeydown: event => { if (event.key === 'Escape' && !list.hidden) { event.stopPropagation(); close(); button.focus(); } } }, button, list);
+    wrap.addEventListener('focusout', event => { if (!wrap.contains(event.relatedTarget) && event.relatedTarget) close(); });
+    return wrap;
+  }
+
   function buildShell() {
     const picked = data.repo.get();
-    const repoButton = () => h('button', { class: 'repo', type: 'button', 'aria-label': `Repository ${picked.full}. Change repository`, onclick: () => { data.repo.forget(); picker(); } },
-      icon('repo'), h('span', { class: 'name' }, picked.full), icon('chevron'));
+    const repoButton = () => repoSwitch(picked);
     const side = navLinks('main');
     const tabs = navLinks('tabs');
     const reads = h('div', { class: 'reads', 'aria-live': 'polite' });
@@ -117,7 +169,6 @@
     const notices = h('div', { class: 'notices', role: 'status' });
     const body = h('section', { class: 'page-body' });
     root.replaceChildren(
-      // Moves focus to the page's heading; the route (#/specs) stays as it is.
       h('a', { class: 'skip', href: '#content', onclick: event => { event.preventDefault(); title.focus(); } }, 'Skip to the page'),
       h('div', { class: 'shell' },
         h('aside', { class: 'side' },
@@ -132,7 +183,6 @@
     built = { side, tabs, reads, refresh, title, read, phoneReads, notices, body, page: null };
   }
 
-  // The read line for one feed: "Specs read 14:02", or why it isn't known.
   function readLine(feed) {
     if (feed.state === 'loading') return [h('span', {}, `${feed.label}: reading…`)];
     if (feed.state === 'unknown') return [h('span', { class: 'bad' }, `${feed.label}: unknown (couldn't read at ${time(feed.failedAt)})`)];
@@ -148,7 +198,6 @@
     const page = current();
     const feeds = data.feeds;
     const limit = data.limit;
-    // Navigation: the current page, and each page's badge.
     for (const { page: p, link, badge } of [...built.side, ...built.tabs]) {
       if (p.id === page.id) link.setAttribute('aria-current', 'page');
       else link.removeAttribute('aria-current');
@@ -156,11 +205,9 @@
       badge.hidden = !count;
       badge.textContent = count ? String(count) : '';
     }
-    // Every feed's read time, and the GitHub limit.
     built.reads.replaceChildren(...Object.values(feeds).flatMap(feed => [h('div', {}, ...readLine(feed))]),
       h('div', {}, limit.remaining === null ? 'GitHub limit: not read yet' : `GitHub limit: ${limit.remaining.toLocaleString()} left`));
     for (const button of built.refresh) button.disabled = data.paused();
-    // The page's own feeds: its read line, and a notice for each that failed, came back partial or is old.
     const mine = page.feeds.map(name => feeds[name]);
     const latest = mine.filter(feed => feed.readAt).map(feed => feed.readAt);
     built.read.textContent = latest.length ? `Read ${time(Math.min(...latest))}` : '';
@@ -175,7 +222,6 @@
       if (feed.state === 'partial') notes.push(notice('bad', 'warn', 'Part of this read failed', `(${feed.label}, ${time(feed.readAt)}). What's missing shows as unknown.`));
     }
     built.notices.replaceChildren(...notes);
-    // The page itself: unknown if none of its feeds could ever be read; "reading" before the first read.
     if (mine.every(feed => feed.state === 'unknown')) {
       built.body.replaceChildren(OW.ui.unknown(`${page.title} couldn't be read from GitHub. The app tries again on its own, or press Refresh now.`));
     } else if (mine.some(feed => feed.state === 'loading') && !mine.some(feed => feed.data)) {
@@ -202,13 +248,9 @@
     update();
   }
 
-  // ---- Start ----
-
   data.onChange(update);
   OW.onSignedOut = () => signedOut('Your sign-in ended. Sign in again.');
   window.addEventListener('hashchange', () => (built ? update() : null));
-  // Super easy navigation: Cmd-K (Ctrl-K elsewhere) opens the command palette (palette.js), even while typing; 1, 2, 3
-  // jump to the pages and ? lists every shortcut (not while typing, with a modifier, or while a dialog is open).
   document.addEventListener('keydown', event => {
     if (!built) return;
     if ((event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'k') {
@@ -228,7 +270,6 @@
     const params = new URLSearchParams(location.search);
     const code = params.get('code');
     const state = params.get('state');
-    // The code never stays in the address bar, history or a shared link.
     if (location.search) history.replaceState(null, '', `${location.pathname}${location.hash}`);
     if (code && state) {
       screen(h('h1', {}, 'Signing in…'), h('p', {}, 'Finishing your GitHub sign-in.'));

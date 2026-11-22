@@ -69,6 +69,7 @@
     <article class="driver hero" id="boat-dev" aria-labelledby="boat-dev-name">
       <div class="proof-copy">
         <h2 class="driver-name" id="boat-dev-name"><img class="spot-logo" src="/drivers/logos/boat-dev.svg" alt="boat.dev" width="390" height="109"></h2>
+        <p class="driver-login">Login: held by boat.dev</p>
         <p class="driver-line">Passed all five checks</p>
         <p class="driver-date"><a href="https://github.com/openwizdev/OpenWiz/pull/1444">On a real account, <time datetime="2026-11-19">2026-11-19</time></a></p>
         <p class="proof-lead">Each check is one thing the test watched boat.dev do on its real host.</p>
@@ -92,6 +93,7 @@
       <li>
       <article class="driver" id="vps" aria-labelledby="vps-name">
         <h3 class="driver-name" id="vps-name"><img class="driver-logo host-icon" src="/drivers/logos/monitor.svg" alt="Computer or VPS icon" width="24" height="24"><span>Your own computer or VPS</span></h3>
+        <p class="driver-login">Login: stays on your machine</p>
         <p class="driver-line">Passed the kit on a Linux PC</p>
         <p class="driver-date"><a href="https://github.com/openwizdev/OpenWiz/pull/1455#issuecomment-7034588211">Kit run, <time datetime="2026-11-20">2026-11-20</time></a></p>
         <p class="driver-kit passed" data-state="passed"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7"/><path d="M4.6 8.3l2.3 2.3 4.5-4.8"/></svg><span>Kit: passed, 5 of 5</span></p>
@@ -100,6 +102,7 @@
       <li>
       <article class="driver" id="cloudroom" aria-labelledby="cloudroom-name">
         <h3 class="driver-name" id="cloudroom-name"><img class="driver-logo host-tile" src="/drivers/logos/cloudroom.png" alt="Cloudroom logo" width="256" height="256"><span>Cloudroom</span></h3>
+        <p class="driver-login">Login: held by Cloudroom</p>
         <p class="driver-line">Passed the kit, run from a Cloudroom cloud thread against real Cloudroom</p>
         <p class="driver-date"><a href="https://github.com/openwizdev/OpenWiz/pull/1458#issuecomment-7034556153">Kit run, <time datetime="2026-11-20">2026-11-20</time></a></p>
         <p class="driver-kit passed" data-state="passed"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7"/><path d="M4.6 8.3l2.3 2.3 4.5-4.8"/></svg><span>Kit: passed, 5 of 5</span></p>
@@ -118,6 +121,12 @@
     <div class="own-copy">
       <h2 id="own-title">Write your own driver</h2>
       <p>A driver is one small program, in any language, that answers four commands. Pass the same five-check test on your real host and it can join. OpenWiz never touches a login.</p>
+      <p class="own-platforms">Platforms: the test, the template, and the boat.dev and own-computer drivers run on Linux and macOS, with a supported version of Python installed (see the <a href="https://github.com/openwizdev/OpenWiz/blob/main/kernel/driver.v1.md#supported-platforms">driver requirements</a>).</p>
+      <div class="install-box" data-install="live">
+        <p class="install-hint">Paste this into your agent</p>
+        <div class="install-row"><span aria-hidden="true">›_</span><code class="install-line">Write an OpenWiz driver for my host with the write-driver skill: https://github.com/openwizdev/WizSkills/tree/main/skills/write-driver</code><button class="btn install" type="button" disabled>Copy</button></div>
+      </div>
+      <p>Your agent writes a driver for your host from the template and runs the same test on your real host. It asks before any step that could cost money or start a machine, never handles a login, and tells you how long it took.</p>
       <ul class="own-links">
         <li><a href="https://github.com/openwizdev/OpenWiz/blob/main/kernel/driver.v1.md">The contract <span>kernel/driver.v1.md</span></a></li>
         <li><a href="https://github.com/openwizdev/OpenWiz/tree/main/kernel/driver-kit">The test <span>kernel/driver-kit/</span></a></li>
@@ -134,5 +143,5 @@
     </dl>
   </section>
 </main>
-<!-- footer.html -->
+<template data-slot="footer"></template>
 </body></html>

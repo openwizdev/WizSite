@@ -1,23 +1,12 @@
-// The app's data layer: sign-in, the token, and every read from GitHub.
-//
-// The app only reads. Every request goes through ask() below, which allows only:
-//   - GitHub's API (https://api.github.com): GET, and POST /graphql with a query (never a mutation);
-//   - the sign-in helper on this site: POST /api/sign-in/token and /api/sign-in/refresh.
-// The page's Content-Security-Policy (_headers) enforces the same two destinations in the browser itself.
-//
-// The token lives only in this browser (localStorage), and goes only to api.github.com.
-// Feeds read on their own: agents every two minutes, specs every ten. A read that fails, or a part of one that
-// does, is unknown, never empty. When GitHub's limit runs low the feeds pause until it resets, and say so.
 'use strict';
 (() => {
   const OW = (window.OW = window.OW || {});
   const API = 'https://api.github.com';
   const AUTH_KEY = 'openwiz.app.auth';
   const REPO_KEY = 'openwiz.app.repo';
-  const LOW = 100; // GitHub points left at which the app stops reading until the limit resets
-  const PAUSE_DEFAULT = 5 * 60 * 1000; // when GitHub refuses for its limit without saying until when
+  const LOW = 100;
+  const PAUSE_DEFAULT = 5 * 60 * 1000;
 
-  // ---- The token and the picked repository, in this browser only ----
 
   const store = {
     get(key) {
@@ -26,8 +15,6 @@
     set(key, value) { localStorage.setItem(key, JSON.stringify(value)); },
     drop(key) { localStorage.removeItem(key); },
   };
-  // A sign-in is one session: a random id kept beside the token. Anything started for a session (a token refresh,
-  // a picker read, a feed read) is dropped when it ends: on Sign out, or when a new sign-in replaces it.
   const auth = {
     get: () => store.get(AUTH_KEY),
     session: () => store.get(AUTH_KEY)?.session ?? null,
@@ -47,7 +34,6 @@
       store.drop(REPO_KEY);
       refreshing = null;
       stop();
-      // A new sign-in may be another account, with its own GitHub limit.
       Object.assign(limit, { remaining: null, limit: null, pausedUntil: null });
     },
   };
@@ -60,7 +46,6 @@
     forget: () => store.drop(REPO_KEY),
   };
 
-  // ---- The one way out ----
 
   class Refused extends Error {}
   function allowed(method, url, body) {
@@ -82,7 +67,6 @@
     });
   }
 
-  // ---- Sign-in: the helper swaps GitHub's code (or the refresh token) for the user's token ----
 
   async function finishSignIn(code, state) {
     const response = await ask('POST', '/api/sign-in/token', { code, state });
@@ -90,7 +74,6 @@
     if (!grant?.access_token) throw new Error('the sign-in did not finish');
     auth.keep(grant, crypto.randomUUID());
   }
-  // One token refresh at a time, for one session. Its answer is kept only if that session is still the current one.
   let refreshing = null;
   function refresh(session) {
     if (refreshing?.session !== session) {
@@ -108,13 +91,9 @@
     return refreshing.run;
   }
 
-  // The session ended (signed out or replaced) while a request was out: its result is dropped, quietly.
   class Ended extends Error {}
-  // GitHub refused the sign-in itself (expired and not refreshable): the user has to sign in again.
   class SignedOut extends Error {}
 
-  // A GitHub request with this session's token. An expired token is refreshed once; a refused refresh signs out.
-  // Every await is followed by a check that the session that started the request is still the current one.
   async function github(method, path, body) {
     const session = auth.session();
     if (!session) throw new Ended();
@@ -144,10 +123,7 @@
     throw new SignedOut();
   }
 
-  // ---- The repository picker's read: every repository the user's installations of the App can see ----
 
-  // The next page of a GitHub list, only if its Link header points at the same route on api.github.com with
-  // nothing but per_page and page; anything else is not followed (and the list is reported incomplete).
   const MAX_PAGES = 50;
   function nextPage(response, path) {
     const link = (response.headers.get('Link') || '').split(',').map(part => part.match(/^\s*<([^>]*)>\s*;\s*rel="next"\s*$/)).find(Boolean);
@@ -159,7 +135,6 @@
       && keys.every(key => key === 'per_page' || key === 'page') && /^\d+$/.test(url.searchParams.get('page') || '');
     return fine ? { next: `${url.pathname}${url.search}` } : { done: false };
   }
-  // Every page of one list: {items, complete}. The first page failing throws; a later one makes it incomplete.
   async function every(path, field) {
     const items = [];
     let at = `${path}?per_page=100`;
@@ -200,34 +175,26 @@
     return { repos: repos.sort((a, b) => a.full.localeCompare(b.full)), complete, installations: installs.items.length };
   }
 
-  // ---- Feeds: the reads pages show, each on its own schedule ----
-  // Pages (AP6 You and Specs, AP7 Agents) read feeds[name].data. A feed's state is:
-  //   loading  - not read yet;  ok - read whole;  partial - read, but part failed (missing parts are unknown);
-  //   unknown  - never read successfully (the last read failed);  stale - the last read failed, the data is older.
 
-  const SPECS = `query Specs($owner: String!, $name: String!) {
+  const SPECS = `query Specs($owner: String!, $name: String!, $specs: String!) {
   rateLimit { limit remaining resetAt }
+  specSearch: search(query: $specs, type: ISSUE_ADVANCED, first: 100) {
+    totalCount: issueCount
+    nodes { ... on Issue { number title url updatedAt labels(first: 20) { nodes { name } } subIssuesSummary { total completed } } }
+  }
   repository(owner: $owner, name: $name) {
     issues(first: 100, states: OPEN, orderBy: {field: UPDATED_AT, direction: DESC}) {
       totalCount
       nodes { number title url updatedAt labels(first: 20) { nodes { name } } subIssuesSummary { total completed } }
     }
-    specIssues: issues(first: 50, states: OPEN, labels: ["spec"], orderBy: {field: UPDATED_AT, direction: DESC}) {
-      totalCount
-      nodes { number title url updatedAt subIssuesSummary { total completed } }
-    }
     youIssues: issues(first: 50, states: OPEN, labels: ["needs-info", "ready-for-human"], orderBy: {field: UPDATED_AT, direction: DESC}) {
       totalCount
-      nodes { number title url updatedAt labels(first: 20) { nodes { name } } }
+      nodes { number title url updatedAt labels(first: 20) { nodes { name } } issueDependenciesSummary { blockedBy } }
     }
     fleet: object(expression: "HEAD:docs/agents/fleet.md") { ... on Blob { text } }
   }
 }`;
-  // The Specs feed's second read (AP6): each open spec's recent comments (its decision records) and its tickets, with
-  // their state, labels, blocked-by links, the open pull requests that close them and their most recently edited
-  // comments (the agents' status notes). Every list carries its total, so a page can tell a partial list from a whole
-  // one. One aliased query for up to SPEC_DETAILS specs (the most recently updated); a spec past that is unknown.
-  const SPEC_DETAILS = 20;
+  const SPEC_DETAILS = 30;
   const RECENT = 'orderBy: {field: UPDATED_AT, direction: DESC}';
   const TICKET = 'number title url state stateReason repository { nameWithOwner }';
   function specTickets(repository) {
@@ -245,22 +212,36 @@
   }
 }`;
   }
-  // The Agents feed (AP7): the 50 most recently updated issues, each with its most recently edited comments (the
-  // agents' status notes, with their ids and authors) and the pull requests that close it (state, review, checks),
-  // and fleet.md (Record authors), whose notes count. About 13 GraphQL points a read.
-  const AGENTS = `query Agents($owner: String!, $name: String!) {
+  const PULLS = `closedByPullRequestsReferences(first: 5, includeClosedPrs: true) { totalCount nodes { url state isDraft reviewDecision
+          commits(last: 1) { nodes { commit { statusCheckRollup { state } } } } } }`;
+  const AGENTS = `query Agents($owner: String!, $name: String!, $since: DateTime!, $after: String) {
   rateLimit { limit remaining resetAt }
   repository(owner: $owner, name: $name) {
-    issues(first: 50, orderBy: {field: UPDATED_AT, direction: DESC}) {
-      totalCount
+    issues(first: 50, after: $after, filterBy: {since: $since}, orderBy: {field: UPDATED_AT, direction: DESC}) {
+      totalCount pageInfo { hasNextPage endCursor }
       nodes { number title url state updatedAt
         comments(first: 20, orderBy: {field: UPDATED_AT, direction: DESC}) { totalCount nodes { databaseId body createdAt updatedAt author { login } } }
-        closedByPullRequestsReferences(first: 5, includeClosedPrs: true) { totalCount nodes { url state isDraft reviewDecision
-          commits(last: 1) { nodes { commit { statusCheckRollup { state } } } } } } }
+        ${PULLS} }
     }
     fleet: object(expression: "HEAD:docs/agents/fleet.md") { ... on Blob { text } }
   }
 }`;
+  const PULL_REFRESH = 50;
+  const DAY = 24 * 60 * 60 * 1000;
+  const SKEW = 5 * 60 * 1000;
+  const FULL_EVERY = 30 * 60 * 1000;
+  const AGENT_PAGES = 40;
+  const RESERVE = 500;
+  const SPEC_TITLE = /(^|\s)spec:\s/i;
+  const SPEC_SEARCH = full => `repo:${full} is:issue state:open (has:sub-issue OR label:spec OR in:title spec) -label:wayfind:map sort:updated-desc`;
+  function specsOf(search) {
+    if (!search || !Array.isArray(search.nodes)) return null;
+    const given = search.nodes.filter(issue => Number.isSafeInteger(issue?.number));
+    const labels = issue => (issue.labels?.nodes || []).map(label => label?.name);
+    const nodes = given.filter(issue => !labels(issue).includes('wayfind:map')
+      && (issue.subIssuesSummary?.total > 0 || labels(issue).includes('spec') || SPEC_TITLE.test(issue.title || '')));
+    return { totalCount: nodes.length + Math.max(0, (search.totalCount ?? 0) - given.length), nodes };
+  }
   // The Models feed (MD6): fleet.md's model settings and the offered-models snapshot beside it (models.v1).
   const MODELS = `query Models($owner: String!, $name: String!) {
   rateLimit { limit remaining resetAt }
@@ -270,14 +251,176 @@
   }
 }`;
   const feeds = {
-    specs: { label: 'Specs', every: 10 * 60 * 1000, query: SPECS, more: specTickets },
-    agents: { label: 'Agents', every: 2 * 60 * 1000, query: AGENTS },
+    specs: { label: 'Specs', every: 10 * 60 * 1000, query: SPECS, more: specTickets,
+      variables: picked => ({ specs: SPEC_SEARCH(picked.full) }),
+      shape: (data, answer) => { data.specIssues = specsOf(answer.specSearch); } },
+    agents: { label: 'Agents', every: 2 * 60 * 1000, run: agentsRead },
     models: { label: 'Models', every: 10 * 60 * 1000, query: MODELS },
   };
   for (const feed of Object.values(feeds)) Object.assign(feed, { state: 'loading', data: null, readAt: null, failedAt: null, timer: null, busy: false });
 
+
+  function place(errors, nodes) {
+    const loose = [];
+    for (const error of Array.isArray(errors) ? errors : []) {
+      const path = Array.isArray(error?.path) ? error.path : [];
+      const at = path[0] === 'repository' && path[1] === 'issues' && path[2] === 'nodes' && Number.isSafeInteger(path[3]) ? path[3] : -1;
+      const issue = at >= 0 ? nodes[at] : undefined;
+      if (issue === null) continue;
+      if (issue && path.length > 4) (issue.errors ||= []).push(path.slice(4));
+      else loose.push(error);
+    }
+    return loose;
+  }
+  async function agentsRead(feed, picked, mine) {
+    const now = Date.now();
+    const kept = feed.kept?.repo === picked.full ? feed.kept : null;
+    const full = !kept || !kept.complete || feed.forceFull || now - kept.fullAt >= FULL_EVERY;
+    feed.forceFull = false;
+    const since = new Date(full ? now - DAY - SKEW : kept.startedAt - SKEW).toISOString();
+    const issues = full ? new Map() : new Map(kept.issues);
+    const unread = [];
+    const fetched = new Set();
+    const errors = [];
+    let after = null;
+    let total = null;
+    let read = 0;
+    let fleet;
+    let complete = false;
+    let stop = null;
+    for (let page = 0; page < AGENT_PAGES; page += 1) {
+      if (page && (paused() || (limit.remaining !== null && limit.remaining < RESERVE))) { stop = 'limit'; break; }
+      let response;
+      let answer;
+      try {
+        response = await github('POST', '/graphql', { query: AGENTS, variables: { owner: picked.owner, name: picked.name, since, after } });
+        answer = await response.json().catch(() => null);
+      } catch (error) {
+        if (!page || error instanceof Ended || error instanceof SignedOut) throw error;
+        errors.push({ message: 'a page of the read failed' });
+        stop = 'failed';
+        break;
+      }
+      if (mine !== generation) return null;
+      noteLimit(answer?.data?.rateLimit, response);
+      const list = answer?.data?.repository?.issues;
+      if (!response.ok || !Array.isArray(list?.nodes)) {
+        if (!page) throw new Error(`GitHub answered ${response.status}`);
+        errors.push({ message: `GitHub answered ${response.status}` });
+        stop = 'failed';
+        break;
+      }
+      if (!page) {
+        fleet = answer.data.repository.fleet;
+        total = list.totalCount ?? null;
+      }
+      errors.push(...place(answer.errors, list.nodes));
+      for (const issue of list.nodes) {
+        read += 1;
+        if (issue && Number.isSafeInteger(issue.number)) { issues.set(issue.number, issue); fetched.add(issue.number); }
+        else unread.push(null);
+      }
+      if (!list.pageInfo) { complete = (list.totalCount ?? read) <= read; if (!complete) stop = 'failed'; break; }
+      if (!list.pageInfo.hasNextPage) { complete = true; break; }
+      if (typeof list.pageInfo.endCursor !== 'string') { stop = 'failed'; break; }
+      after = list.pageInfo.endCursor;
+      if (!feed.data || feed.data.issues?.reading) {
+        feed.data = { issues: { totalCount: total, nodes: [...issues.values()], reading: true }, fleet };
+        changed();
+      }
+    }
+    if (!complete && !stop) stop = 'limit';
+    for (const number of fetched) {
+      if (issues.get(number).closedByPullRequestsReferences == null) errors.push({ message: `#${number}'s pull requests couldn't be read` });
+    }
+    if (!full && !stop) {
+      const stale = [...issues.values()].filter(issue => !fetched.has(issue.number)
+        && (issue.closedByPullRequestsReferences?.nodes || []).some(pr => pr?.state === 'OPEN')).slice(0, PULL_REFRESH);
+      if (stale.length && !paused()) {
+        const ok = await pullsRead(stale, picked, mine, errors);
+        if (ok === null) return null;
+      }
+    }
+    for (const [number, issue] of issues) if (Date.parse(issue.updatedAt) < now - DAY - SKEW) issues.delete(number);
+    const nodes = [...issues.values()].sort((a, b) => (Date.parse(b.updatedAt) || 0) - (Date.parse(a.updatedAt) || 0));
+    feed.kept = { repo: picked.full, issues, startedAt: now, fullAt: full ? now : kept.fullAt, complete: complete && !errors.length };
+    const count = nodes.length + unread.length;
+    const short = complete ? null : { why: stop, read, total: Math.max(read + 1, total ?? 0), scope: full ? 'day' : 'since' };
+    return {
+      data: { issues: { totalCount: short ? count + short.total - short.read : count, nodes: [...nodes, ...unread], short }, fleet },
+      errors,
+    };
+  }
+
+  async function pullsRead(stale, picked, mine, errors) {
+    const query = `query AgentPulls($owner: String!, $name: String!) {
+  rateLimit { limit remaining resetAt }
+  repository(owner: $owner, name: $name) {${stale.map(issue => `
+    i${issue.number}: issue(number: ${issue.number}) { ${PULLS} }`).join('')}
+  }
+}`;
+    try {
+      const response = await github('POST', '/graphql', { query, variables: { owner: picked.owner, name: picked.name } });
+      const answer = await response.json().catch(() => null);
+      if (mine !== generation) return null;
+      noteLimit(answer?.data?.rateLimit, response);
+      const repository = answer?.data?.repository;
+      if (!response.ok || !repository) {
+        for (const issue of stale) issue.closedByPullRequestsReferences = null;
+        errors.push({ message: `GitHub answered ${response.status}` });
+        return false;
+      }
+      for (const issue of stale) {
+        const got = repository[`i${issue.number}`];
+        const placed = (answer.errors || []).filter(e => Array.isArray(e?.path) && e.path[1] === `i${issue.number}`).map(e => e.path.slice(2));
+        if (!got?.closedByPullRequestsReferences) {
+          issue.closedByPullRequestsReferences = null;
+          errors.push({ message: `#${issue.number}'s pull requests couldn't be read` });
+          continue;
+        }
+        issue.closedByPullRequestsReferences = got.closedByPullRequestsReferences;
+        issue.errors = [...(issue.errors || []).filter(path => path[0] !== 'closedByPullRequestsReferences'), ...placed];
+      }
+      errors.push(...(answer.errors || []).filter(e => !(Array.isArray(e?.path) && /^i\d+$/.test(e.path[1] || ''))));
+      return true;
+    } catch (error) {
+      if (error instanceof Ended || error instanceof SignedOut) throw error;
+      if (mine !== generation) return null;
+      for (const issue of stale) issue.closedByPullRequestsReferences = null;
+      errors.push({ message: 'the pull request read failed' });
+      return false;
+    }
+  }
+
+  async function issueComments(picked, number) {
+    const items = [];
+    for (let page = 1; page <= MAX_PAGES; page += 1) {
+      const response = await github('GET', `/repos/${encodeURIComponent(picked.owner)}/${encodeURIComponent(picked.name)}/issues/${number}/comments?per_page=100&page=${page}`);
+      const body = response.ok ? await response.json().catch(() => null) : null;
+      if (!Array.isArray(body)) return { items, complete: false };
+      items.push(...body);
+      if (!/rel="next"/.test(response.headers.get('Link') || '')) return { items, complete: true };
+    }
+    return { items, complete: false };
+  }
+  async function moreComments(specs, picked) {
+    for (const detail of Object.values(specs || {})) {
+      const list = detail?.comments;
+      if (!list || !Number.isSafeInteger(detail.number) || (list.totalCount ?? 0) <= (list.nodes || []).length || paused()) continue;
+      try {
+        const got = await issueComments(picked, detail.number);
+        if (!got.complete) continue;
+        const nodes = got.items.filter(c => Number.isSafeInteger(c?.id)).map(c => ({ databaseId: c.id, body: c.body ?? '', url: c.html_url,
+          createdAt: c.created_at, updatedAt: c.updated_at, author: typeof c.user?.login === 'string' ? { login: c.user.login } : null }));
+        detail.comments = { totalCount: got.items.length, nodes };
+      } catch (error) {
+        if (error instanceof Ended || error instanceof SignedOut) throw error;
+      }
+    }
+  }
+
   const limit = { remaining: null, limit: null, pausedUntil: null };
-  let generation = 0; // bumped by stop(): a read started for an earlier sign-in or repository is dropped
+  let generation = 0;
   const listeners = new Set();
   const changed = () => listeners.forEach(listener => listener());
   const paused = () => limit.pausedUntil !== null && limit.pausedUntil > Date.now();
@@ -290,7 +433,6 @@
       limit.limit = rate?.limit ?? limit.limit;
       if (remaining < LOW) limit.pausedUntil = Number.isFinite(reset) ? reset : Date.now() + PAUSE_DEFAULT;
     }
-    // GitHub refusing for its limit: a 429, or a 403 that says no points are left or asks to wait.
     const retry = Number(response.headers.get('retry-after') ?? NaN);
     if (response.status === 429 || (response.status === 403 && (remaining === 0 || Number.isFinite(retry)))) {
       limit.pausedUntil = Number.isFinite(retry) ? Date.now() + retry * 1000 : Number.isFinite(reset) ? reset : Date.now() + PAUSE_DEFAULT;
@@ -304,28 +446,40 @@
     const mine = generation;
     feed.busy = true;
     try {
-      const response = await github('POST', '/graphql', { query: feed.query, variables: { owner: picked.owner, name: picked.name } });
+      if (feed.run) {
+        const done = await feed.run(feed, picked, mine);
+        if (!done || mine !== generation) return;
+        feed.data = done.data;
+        feed.state = done.errors.length ? 'partial' : 'ok';
+        feed.errors = done.errors;
+        feed.readAt = Date.now();
+        feed.failedAt = null;
+        return;
+      }
+      const response = await github('POST', '/graphql', { query: feed.query, variables: { owner: picked.owner, name: picked.name, ...feed.variables?.(picked) } });
       const answer = await response.json().catch(() => null);
       if (mine !== generation) return;
       noteLimit(answer?.data?.rateLimit, response);
       if (!response.ok || !answer?.data?.repository) throw new Error(`GitHub answered ${response.status}`);
       const data = answer.data.repository;
+      feed.shape?.(data, answer.data);
       const errors = [...(answer.errors || [])];
-      // A feed's second read (Specs: the running specs' tickets). If it fails, or GitHub's limit is now low, its part
-      // is unknown (data.specs is null) and the feed is partial.
       const more = feed.more?.(data);
       if (more) {
         data.specs = null;
         if (paused()) {
           errors.push({ message: 'the second read waits for GitHub\'s limit' });
         } else {
-          // A failure here (even of the network) keeps the first read: only its own part is unknown.
           try {
             const second = await github('POST', '/graphql', { query: more, variables: { owner: picked.owner, name: picked.name } });
             const extra = await second.json().catch(() => null);
             if (mine !== generation) return;
             noteLimit(extra?.data?.rateLimit, second);
-            if (second.ok && extra?.data?.repository) data.specs = extra.data.repository;
+            if (second.ok && extra?.data?.repository) {
+              data.specs = extra.data.repository;
+              await moreComments(data.specs, picked);
+              if (mine !== generation) return;
+            }
             errors.push(...(second.ok && extra?.data?.repository ? extra.errors || [] : [{ message: `GitHub answered ${second.status}` }]));
           } catch (error) {
             if (error instanceof Ended || error instanceof SignedOut) throw error;
@@ -374,19 +528,17 @@
     generation += 1;
     for (const feed of Object.values(feeds)) {
       clearTimeout(feed.timer);
-      Object.assign(feed, { state: 'loading', data: null, readAt: null, failedAt: null, busy: false });
+      Object.assign(feed, { state: 'loading', data: null, readAt: null, failedAt: null, busy: false, kept: null });
     }
-    // GitHub's limit belongs to the signed-in account, not the repository: a pause outlives a repository change.
   }
-  // Read everything now (the Refresh button), unless GitHub's limit is low.
   function refreshAll() {
     if (paused()) return;
+    feeds.agents.forceFull = true;
     for (const name of Object.keys(feeds)) {
       read(name);
       schedule(name);
     }
   }
-  // Back on a hidden tab: read whatever came due while it was hidden.
   document.addEventListener('visibilitychange', () => {
     if (document.hidden || !repo.get() || !auth.signedIn()) return;
     for (const [name, feed] of Object.entries(feeds)) {

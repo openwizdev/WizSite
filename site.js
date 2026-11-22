@@ -65,7 +65,6 @@ function showHero(gsap, paused, signal) {
     }
     metrics.forEach((metric, i) => { metric.textContent = counts[i]; });
     steps.forEach((step, i) => step.classList.toggle('active', i <= index));
-    // Nothing downstream exists before its step: the stylesheet greys out the spec and tickets until then.
     demo.dataset.scene = index;
     setCrew(index, 0);
   };
@@ -104,7 +103,6 @@ function showHero(gsap, paused, signal) {
       timeline.fromTo(builder, { rotation: -10 }, {
         rotation: 8, duration: .32, repeat: 7, yoyo: true, ease: 'sine.inOut', transformOrigin: '50% 85%',
       }, at + .1);
-      // The smoke belongs to the outgoing costume. Hide the mascot only on the occlusion frame.
       timeline.call(() => {
         setFrame(smoke, sheet, 6);
         smoke.style.visibility = 'visible';
@@ -135,7 +133,7 @@ function showHero(gsap, paused, signal) {
   });
   observer.observe(demo);
   document.addEventListener('visibilitychange', update, { signal });
-  start().catch(() => {}); // Keep the still if a sheet is unavailable.
+  start().catch(() => {});
   signal.addEventListener('abort', () => {
     observer.disconnect();
     timeline?.kill();
@@ -163,7 +161,6 @@ function followPointer(gsap, paused, signal) {
     const pupil = eye.firstElementChild;
     return { eye, x: gsap.quickTo(pupil, 'x', { duration: .26 }), y: gsap.quickTo(pupil, 'y', { duration: .26 }), pupil };
   });
-  // Only update the pupils while the footer is on screen.
   let visible = false;
   let frame = 0;
   let pointer;
@@ -228,7 +225,6 @@ function enableMotion(gsap) {
     controller = new AbortController();
     const { signal } = controller;
     const isPaused = () => pause?.getAttribute('aria-pressed') === 'true';
-    // Every site page shares the footer's eyes; only the landing has the hero demo and its Pause motion.
     const updateEyes = followPointer(gsap, isPaused, signal);
     if (!pause) return;
     const updateHero = showHero(gsap, isPaused, signal);
@@ -246,8 +242,59 @@ function enableMotion(gsap) {
   configure();
 }
 
-// The footer Wizes react, one at a time and briefly; at rest the footer is unchanged. With reduced motion, Pause
-// motion or no GSAP, a click is a still pose change (another costume) and the line, nothing moves.
+function specVideo() {
+  const video = document.querySelector('.spec-video');
+  const sound = document.querySelector('.spec-play');
+  const pause = document.querySelector('.demo-pause');
+  if (!video || !sound) return;
+  const calm = matchMedia('(prefers-reduced-motion: reduce)');
+  let inView = false;
+  let visitorDrives = false;
+  let ownPlayEvents = 0;
+  const frame = video.closest('.spec-frame');
+  const track = video.textTracks[0];
+  const resting = on => {
+    frame?.classList.toggle('is-ambient', on);
+    video.controls = !on;
+    if (track) track.mode = on ? 'hidden' : 'showing';
+  };
+  const takeOver = () => { visitorDrives = true; resting(false); };
+  const update = () => {
+    if (visitorDrives) return;
+    const ambient = inView && !calm.matches && pause.getAttribute('aria-pressed') !== 'true' && !document.hidden;
+    if (ambient && video.paused) {
+      ownPlayEvents += 1;
+      video.muted = true;
+      video.play().catch(() => { ownPlayEvents = 0; });
+    } else if (!ambient && !video.paused) {
+      ownPlayEvents += 1;
+      video.pause();
+    }
+  };
+  const take = () => {
+    if (ownPlayEvents > 0) ownPlayEvents -= 1;
+    else takeOver();
+  };
+  video.addEventListener('play', take);
+  video.addEventListener('pause', take);
+  video.addEventListener('volumechange', () => { if (!video.muted) takeOver(); });
+  new IntersectionObserver(([entry]) => { inView = entry.isIntersecting; update(); }, { threshold: .5 }).observe(video);
+  calm.addEventListener('change', update);
+  document.addEventListener('visibilitychange', update);
+  pause.addEventListener('click', () => setTimeout(update));
+  resting(true);
+  sound.hidden = false;
+  const listen = () => {
+    takeOver();
+    video.muted = false;
+    video.loop = false;
+    video.currentTime = 0;
+    video.play().then(() => video.focus(), () => {});
+  };
+  sound.addEventListener('click', listen);
+  video.addEventListener('click', () => { if (!video.controls) listen(); });
+}
+
 const FAMILY = [
   ['Cave Wiz', 'era', 'thinking…', 'cave'], ['Builder Wiz', 'builder', 'building…'], ['Reviewer Wiz', 'reviewer', 'looks good!'],
   ['Samurai Wiz', 'era', 'building…', 'samurai'], ['Astronaut Wiz', 'orchestrator', 'shipped!'], ['Reviewer Wiz', 'reviewer', 'looks good!'],
@@ -265,7 +312,6 @@ function enableFamily(gsap) {
   const line = document.createElement('span');
   line.className = 'wiz-line';
   line.setAttribute('role', 'status');
-  // The one reaction running now: its Wiz, and its timeline or timer. Every new reaction ends it first.
   let current = null;
 
   family.removeAttribute('aria-hidden');
@@ -288,7 +334,6 @@ function enableFamily(gsap) {
     sprite.style.backgroundPositionX = `${index * 100 / 8}%`;
     sprite.style.display = 'block';
   };
-  // A costume change lasts only for its reaction; the Wiz keeps its own picture and name at rest.
   const wear = (wiz, index) => { wiz.querySelector('img').src = picture(index); };
   const release = () => {
     if (!current) return;
@@ -308,7 +353,6 @@ function enableFamily(gsap) {
     line.removeAttribute('style');
     wiz.append(line);
   };
-  // Starts one short reaction (under a second) on one Wiz, ending any other first.
   const react = (wiz, build, text) => {
     release();
     const timeline = gsap.timeline({ onComplete: () => { if (current?.timeline === timeline) release(); } });
@@ -324,7 +368,6 @@ function enableFamily(gsap) {
     const index = wizes.indexOf(wiz);
     const [, role, text, era] = FAMILY[index];
     if (!moving()) {
-      // A still pose: another costume for a moment, with this Wiz's own line, then back.
       release();
       current = { wiz, timer: setTimeout(release, 900) };
       wear(wiz, (index + 1) % FAMILY.length);
@@ -332,7 +375,6 @@ function enableFamily(gsap) {
       return;
     }
     if (Math.random() < .2) {
-      // Now and then a poof, from the hero's own smoke frames, into another costume and back.
       const other = (index + 1 + Math.floor(Math.random() * (FAMILY.length - 1))) % FAMILY.length;
       react(wiz, timeline => timeline
         .call(() => frame(wiz, POOF, 6), [], 0)
@@ -346,7 +388,6 @@ function enableFamily(gsap) {
     }
     react(wiz, timeline => {
       if (role === 'era') {
-        // The era Wizes play their work frames from the hero's sprite sheet.
         timeline.call(() => wiz.classList.add('is-acting'), [], 0);
         [2, 3, 4, 5].forEach((n, i) => timeline.call(() => frame(wiz, `/art/hero-${era}-frames.webp`, n), [], i * .14));
         timeline.call(() => { wiz.classList.remove('is-acting'); wiz.querySelector('.wiz-sprite').removeAttribute('style'); }, [], .6);
@@ -360,13 +401,11 @@ function enableFamily(gsap) {
       }
     }, text);
   };
-  // Hover and focus: a short wave on that Wiz only; moving on ends it at once.
   const wave = wiz => {
     if (!moving() || current?.wiz === wiz) return;
     react(wiz, timeline => timeline.to(wiz, { rotation: -6, duration: .12, yoyo: true, repeat: 3,
       transformOrigin: '50% 90%', ease: 'sine.inOut' }));
   };
-  // Entering the footer: the Wiz nearest the pointer hops once toward it.
   const perk = event => {
     if (event.pointerType === 'touch' || !moving()) return;
     const boxes = wizes.map(wiz => [wiz, wiz.getBoundingClientRect()]).filter(([, box]) => box.width);
@@ -391,27 +430,6 @@ function enableFamily(gsap) {
   document.querySelector('.landing-footer').addEventListener('pointerenter', perk);
 }
 
-// The silent spec sample plays only on request, so it stays available with reduced motion on or GSAP blocked.
-function enableVideo() {
-  const play = document.querySelector('.spec-play');
-  const video = document.querySelector('.spec-video');
-  const still = document.querySelector('.spec-screen');
-  play.hidden = false;
-  play.addEventListener('click', async () => {
-    video.hidden = false;
-    still.hidden = true;
-    try {
-      video.currentTime = 0;
-      await video.play();
-      video.focus();
-    } catch {
-      video.hidden = true;
-      still.hidden = false;
-    }
-  });
-}
-
-// The install box (#1357): Copy works only once index.html's switch says live; until then it stays disabled.
 function enableCopy() {
   const box = document.querySelector('.install-box[data-install="live"]');
   if (!box || !navigator.clipboard) return;
@@ -432,8 +450,163 @@ function enableCopy() {
   });
 }
 
+const ASK_KEYS = { text: 'text,type', sources: 'sources,type', done: 'type', not_covered: 'links,text,type', refused: 'message,reason,type' };
+const ASK_REFUSALS = {
+  bad_request: [400, 'That question couldn\'t be read. Try again.'],
+  too_long: [413, 'That question is too long. Keep it to 300 characters or fewer.'],
+  rate_limited: [429, 'That\'s a lot of questions at once. Try again in a few minutes.'],
+  daily_cap: [429, 'Ask a Wiz has answered all it can for today. Try again tomorrow.'],
+  upstream_error: [502, 'Ask a Wiz couldn\'t answer just now. Try again.'],
+  unavailable: [503, 'Ask a Wiz isn\'t available right now.'],
+  store_error: [503, 'Ask a Wiz couldn\'t keep count just now. Try again.'],
+  no_private_route: [503, 'Ask a Wiz can\'t answer privately just now. Try again later.'],
+};
+const ASK_NOT_COVERED = 'The OpenWiz docs don\'t cover that yet, so I won\'t guess. Book a call or open a GitHub issue, and we\'ll answer it.';
+const ASK_LINKS = [['Book a call', 'https://openwiz.dev/team/#book'], ['GitHub issues', 'https://github.com/openwizdev/openwiz/issues']];
+const askKeys = value => value && typeof value === 'object' && !Array.isArray(value) ? Object.keys(value).sort().join() : '';
+const askText = value => typeof value === 'string' && value.length > 0;
+function askEvent(line, text, sources) {
+  const e = JSON.parse(line);
+  const ok = askKeys(e) === ASK_KEYS[e?.type] && {
+    text: () => !sources && askText(e.text),
+    sources: () => text && !sources && Array.isArray(e.sources) && e.sources.length >= 1 && e.sources.length <= 6
+      && new Set(e.sources.map(s => s?.url)).size === e.sources.length
+      && e.sources.every(s => askKeys(s) === 'title,url' && askText(s.title) && /^https:\/\/(openwiz\.dev|github\.com\/openwizdev)\//.test(s.url)),
+    done: () => !!sources,
+    not_covered: () => !text && e.text === ASK_NOT_COVERED && Array.isArray(e.links) && e.links.length === ASK_LINKS.length
+      && e.links.every((link, i) => askKeys(link) === 'href,label' && link.label === ASK_LINKS[i][0] && link.href === ASK_LINKS[i][1]),
+    refused: () => !sources && Object.hasOwn(ASK_REFUSALS, e.reason) && e.message === ASK_REFUSALS[e.reason][1] && (!text || e.reason === 'upstream_error'),
+  }[e.type]();
+  if (!ok) throw new Error('not the contract\'s stream');
+  return e;
+}
+async function askAWiz() {
+  const lists = document.querySelectorAll('.faq .faq-rows');
+  if (!lists.length) return;
+  await new Promise(resolve => {
+    const near = new IntersectionObserver(seen => seen.some(e => e.isIntersecting) && (near.disconnect(), resolve()), { rootMargin: '600px 0px' });
+    lists.forEach(list => near.observe(list));
+  });
+  const probe = await fetch('/api/ask', { cache: 'no-store' }).then(r => r.status === 200 ? r.json() : null).catch(() => null);
+  if (askKeys(probe) !== 'enabled,max_question_chars,schema' || probe.schema !== 'openwiz.ask-a-wiz.v1' || probe.enabled !== true
+    || probe.max_question_chars !== 300) return;
+  let made = 0;
+  const el = (tag, className, text) => {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined) node.textContent = text;
+    return node;
+  };
+  for (const list of lists) {
+    const faq = list.closest('.faq');
+    const level = list.querySelector('.faq-q')?.tagName.toLowerCase() || 'h3';
+    const status = el('p', 'sr-only');
+    status.setAttribute('aria-live', 'polite');
+    list.after(status);
+    const addRow = () => {
+      const n = ++made, row = el('div', 'faq-row faq-ask'), form = el('form', 'faq-ask-form'), input = el('input');
+      const label = el('label', 'sr-only', 'Ask a Wiz a question about OpenWiz');
+      Object.assign(input, { id: `faq-ask-${n}`, type: 'text', name: 'question', placeholder: 'Ask a Wiz...', autocomplete: 'off', enterKeyHint: 'send' });
+      label.htmlFor = input.id;
+      form.append(label, input, el('button', 'faq-ask-go', 'Ask'));
+      const heading = el(level, 'faq-q'), answer = el('p', 'faq-ask-answer'), body = el('div', 'faq-a'), actions = el('div', 'faq-ask-actions');
+      body.append(el('div'));
+      body.firstChild.append(answer);
+      const buttons = {};
+      for (const name of ['Stop', 'Retry', 'Edit']) actions.append(buttons[name] = Object.assign(el('button', '', name), { type: 'button' }));
+      row.append(form, heading, body, actions);
+      list.append(row);
+      let question = '', controller = null;
+      const show = (state, message = '', retry = true, focus = true) => {
+        const inside = row.contains(document.activeElement);
+        row.dataset.state = state;
+        form.hidden = state !== 'idle';
+        heading.hidden = body.hidden = state === 'idle';
+        heading.textContent = question;
+        answer.textContent = message;
+        buttons.Stop.hidden = state !== 'asking';
+        buttons.Retry.hidden = state !== 'ended' || !retry;
+        buttons.Edit.hidden = state !== 'ended';
+        actions.hidden = state === 'idle';
+        if (state !== 'idle') status.textContent = state === 'asking' ? 'Ask a Wiz is answering.' : message;
+        if (focus && inside) (state === 'idle' ? input : state === 'asking' ? buttons.Stop : retry ? buttons.Retry : buttons.Edit).focus();
+      };
+      const finish = (paragraphs, links = []) => {
+        const done = el('div', 'faq-row faq-asked'), h = el(level, 'faq-q'), button = el('button'), a = el('div', 'faq-a');
+        button.append(el('span', 'faq-ask-label', question));
+        Object.assign(button, { type: 'button', id: `faq-ask-q${n}`, disabled: !faq.hasAttribute('data-ready') });
+        button.setAttribute('aria-expanded', 'true');
+        button.setAttribute('aria-controls', a.id = `faq-ask-a${n}`);
+        const chevron = list.querySelector('.faq-chevron');
+        if (chevron) button.append(chevron.cloneNode(true));
+        h.append(button);
+        a.append(el('div'));
+        for (const [text, className] of paragraphs) a.firstChild.append(el('p', className, text));
+        if (links.length) {
+          const p = el('p', 'faq-ask-links');
+          links.forEach(([label, href], i) => p.append(...(i ? [' · '] : []), Object.assign(el('a', '', label), { href })));
+          a.firstChild.append(p);
+        }
+        done.append(h, a);
+        const inside = row.contains(document.activeElement);
+        row.replaceWith(done);
+        status.textContent = paragraphs[0][0];
+        const input = addRow();
+        if (inside) input.focus({ preventScroll: true });
+      };
+      const ask = async () => {
+        controller = new AbortController();
+        show('asking');
+        let text = '', sources = null, end = null;
+        try {
+          const response = await fetch('/api/ask', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ question }), cache: 'no-store', signal: controller.signal });
+          if (!/^application\/x-ndjson\s*(;|$)/i.test(response.headers.get('content-type') || '')) throw new Error('not a stream');
+          const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
+          let buffer = '';
+          for (;;) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            buffer += value;
+            for (let at; (at = buffer.indexOf('\n')) >= 0; buffer = buffer.slice(at + 1)) {
+              if (end) throw new Error('data after the last event');
+              const event = askEvent(buffer.slice(0, at), text, sources);
+              if (event.type === 'text') answer.textContent = text += event.text;
+              else if (event.type === 'sources') sources = event.sources.map(s => s.title);
+              else end = event;
+            }
+          }
+          const status = end?.type === 'refused' && !text ? ASK_REFUSALS[end.reason][0] : 200;
+          if (buffer || response.status !== status) throw new Error('not the contract\'s response');
+        } catch {
+          end = null;
+        }
+        controller.abort();
+        controller = null;
+        if (end?.type === 'done') finish([[text], [`Sources: ${sources.join(', ')}`, 'faq-ask-sources']]);
+        else if (end?.type === 'not_covered') finish([[end.text]], ASK_LINKS);
+        else if (end?.type === 'refused') show('ended', end.message, end.reason !== 'too_long');
+        else show('ended', 'stopped' in row.dataset ? 'Stopped.' : 'The answer didn’t finish. Try again.');
+        delete row.dataset.stopped;
+      };
+      form.addEventListener('submit', event => {
+        event.preventDefault();
+        question = input.value.trim();
+        if (question) ask();
+      });
+      buttons.Stop.addEventListener('click', () => { row.dataset.stopped = ''; controller?.abort(); });
+      buttons.Retry.addEventListener('click', ask);
+      buttons.Edit.addEventListener('click', () => { show('idle'); input.value = question; });
+      show('idle', '', true, false);
+      return input;
+    };
+    addRow();
+  }
+}
+
 enableCopy();
+askAWiz();
 showStars().catch(() => {});
-if (document.querySelector('.spec-play')) enableVideo();
+specVideo();
 enableFamily(window.gsap);
 if (window.gsap) enableMotion(window.gsap);
