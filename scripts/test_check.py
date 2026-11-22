@@ -558,18 +558,21 @@ class Checks(unittest.TestCase):
         ]
         moved = lambda variant, trace: variant.replace(label, trace, 1).replace('</main>', label + '</main>', 1)
         relocations = ['<!-- OpenWiz 0.01 <small>0.1.0</small>. -->', f'<!-- {label} -->', '']
-        for state in ['live']:
+        for state in INSTALL_SWITCH:
             variant = text.replace(shipped[0], f'data-install="{state}"')
+            changelog = with_switch(state)
             with self.subTest(state=state), tempfile.TemporaryDirectory() as temp:
                 root = Path(temp) / 'dist'
                 shutil.copytree(ROOT / 'dist', root)
                 (root / 'index.html').write_text(variant)
+                (root / 'changelog/index.html').write_text(changelog)
                 check_site(root)
             for good, bad in breaks:
                 with self.subTest(state=state, bad=bad), tempfile.TemporaryDirectory() as temp:
                     root = Path(temp) / 'dist'
                     shutil.copytree(ROOT / 'dist', root)
                     (root / 'index.html').write_text(variant.replace(good, bad, 1))
+                    (root / 'changelog/index.html').write_text(changelog)
                     with self.assertRaises(AssertionError):
                         check_site(root)
             for trace in relocations:
@@ -577,6 +580,7 @@ class Checks(unittest.TestCase):
                     root = Path(temp) / 'dist'
                     shutil.copytree(ROOT / 'dist', root)
                     (root / 'index.html').write_text(moved(variant, trace))
+                    (root / 'changelog/index.html').write_text(changelog)
                     with self.assertRaises(AssertionError):
                         check_site(root)
 
