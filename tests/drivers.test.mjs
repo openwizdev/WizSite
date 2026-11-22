@@ -120,3 +120,43 @@ test('the Write your own driver part shows the contract\'s copy line once, and C
     server.close();
   }
 });
+
+test('the key-host section says where a host key lives, who reads it, where it goes, and that the five checks have no exception; Devin is coming soon', async () => {
+  const html = await readFile(join(ROOT, 'drivers/index.html'), 'utf8');
+  const text = s => s.replace(/<[^>]+>/g, ' ').replace(/&#39;|&rsquo;/g, '\'').replace(/\s+/g, ' ').trim();
+  const sections = html.match(/<section class="[^"]*\bkey-hosts\b[^"]*"[\s\S]*?<\/section>/g) ?? [];
+  assert.equal(sections.length, 1, 'the Drivers page has one key-host section');
+  const section = sections[0];
+  const facts = [...section.matchAll(/<li class="key-fact" data-fact="([^"]+)">([\s\S]*?)<\/li>/g)].map(([, key, body]) => [key, text(body)]);
+  assert.deepEqual(facts.map(([key]) => key), ['lives', 'stored', 'helper', 'driver', 'checks'], 'the five facts, in order');
+  const fact = Object.fromEntries(facts);
+  // N4: the key is read from the user's system keychain or the environment variable the user set.
+  assert.match(fact.lives, /only on your computer/);
+  assert.match(fact.lives, /system keychain/);
+  assert.match(fact.lives, /environment variable you set/);
+  // N4: OpenWiz never stores a key, so removing it is the whole revocation.
+  assert.match(fact.stored, /OpenWiz never stores it/);
+  assert.match(fact.stored, /remove it/);
+  assert.match(fact.stored, /revoke/);
+  // N4: the helper alone reads it, and sends it only over HTTPS to the address registered for that host.
+  assert.match(fact.helper, /one small helper in the kernel's driver kit/);
+  assert.match(fact.helper, /only thing that reads/);
+  assert.match(fact.helper, /only over HTTPS to that host's own registered address/);
+  assert.match(section, /href="https:\/\/github\.com\/openwizdev\/OpenWiz\/blob\/main\/kernel\/driver-kit\/hostkey\.py"/);
+  assert.match(section, /href="https:\/\/github\.com\/openwizdev\/OpenWiz\/blob\/main\/kernel\/driver\.v1\.md#2-logins"/);
+  // N4 and the key check: the driver never names, reads, receives or prints the key, and the token check proves it.
+  assert.match(fact.driver, /driver never sees it/);
+  assert.match(fact.driver, /the kit checks that/);
+  // Section 3: a driver merges only when it passes the same five checks, wake and stop included; no sixth check.
+  assert.match(fact.checks, /same five checks/);
+  assert.match(fact.checks, /can't wake or stop a run gets no driver/);
+  assert.doesNotMatch(text(section), /\bsix(th)?\b|\bexcept(ion)?\b|\bwaive/i, 'no extra or skipped check');
+  // Devin: coming soon until its live check records 5 of 5; never named as live or passed before that.
+  const devin = section.match(/<article class="[^"]*" id="key-host-devin"[^>]*>([\s\S]*?)<\/article>/);
+  assert.ok(devin, 'Devin has its coming-soon card in the key-host section');
+  assert.match(text(devin[1]), /^Devin Coming soon: listed when its live check on a real Devin account records 5 of 5\./);
+  assert.match(devin[1], /href="https:\/\/github\.com\/openwizdev\/openwiz\/issues\/1997"/);
+  assert.doesNotMatch(text(devin[1]), /\bpassed\b|\blive\b(?! check)|\breleased\b|\bavailable\b/i, 'Devin is never shown as live');
+  const elsewhere = html.replace(section, '');
+  assert.doesNotMatch(elsewhere, /devin/i, 'Devin is named only in its coming-soon card');
+});
