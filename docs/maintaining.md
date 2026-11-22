@@ -69,6 +69,8 @@ The logo files are the favicons (`favicon.ico` with 16, 32 and 48 px images, `fa
 
 The old README map (`docs/map.png`, and `docs/map-phone.png`) is for GitHub only, and the README no longer shows it: the build never copies it, and the check pins both by hash in `DOC_HASHES` like the icons. Its source is `maps/draw.mjs` in `openwizdev/.github`.
 
+`/llms.txt` and `/SKILL.md` are for agents: plain text the build copies as they are. `llms.txt` (the [llmstxt.org](https://llmstxt.org) format) says what OpenWiz is and links its install, docs, drivers, skills, changelog and feedback; `SKILL.md` is a short Agent Skill that starts the install from the one line and hands off to WizSkills' install skill rather than copying it. Keep both to plain facts from OpenWiz's README and install guide, with no price.
+
 The Geist and Geist Mono fonts ship unmodified with `fonts/OFL.txt`. Keep the licence in source and the static export. The build does not fetch fonts from an external service.
 
 ## Privacy and verification limits

@@ -1,0 +1,40 @@
+# OpenWiz
+
+> OpenWiz is the open kernel for agent factories: you answer a few questions, and your coding agents write the spec and the tickets, build, review and merge. Specs, tickets and one status note per agent live as records in your GitHub repository's issues, and small programs called drivers start agents on your computer or a VPS, on boat.dev or on CloudRoom. OpenWiz 0.1.0 installs on macOS on Apple silicon and on Linux on x86_64 (glibc 2.34 or later), and needs Python 3.9 or later, git and the GitHub CLI (gh). CloudRoom is optional: OpenWiz installs, signs in to GitHub and plans without it, and in 0.1.0 only the automatic fleet runs in CloudRoom. OpenWiz never touches a login, runs no server of its own, and is open source under the Apache License 2.0.
+
+To install, paste this one line into your coding agent (Claude Code, Codex or another): "Install OpenWiz from github.com/openwizdev/OpenWiz". It shows every change first and waits for your yes.
+
+## Install
+
+- [SKILL.md](https://openwiz.dev/SKILL.md): a short Agent Skill that installs OpenWiz from the one line
+- [Install skill](https://github.com/openwizdev/WizSkills/blob/v0.3.1/skills/install/SKILL.md): the full install your agent follows (WizSkills v0.3.1)
+- [Install guide](https://github.com/openwizdev/OpenWiz/blob/main/docs/install.md): every step and command, what it may change, and how to recover or remove it
+- [Release 0.1.0](https://github.com/openwizdev/OpenWiz/releases/tag/v0.1.0): the verified prebuilt packages
+
+## Docs
+
+- [README](https://github.com/openwizdev/OpenWiz/blob/main/README.md): what OpenWiz is and how the kernel fits together
+- [Your first hour](https://github.com/openwizdev/OpenWiz/blob/main/docs/first-hour.md): from install to your first merged pull request
+- [Records v1](https://github.com/openwizdev/OpenWiz/blob/main/kernel/records.v1.md): the rules for specs, tickets and status notes on GitHub
+- [AGENTS.md](https://github.com/openwizdev/OpenWiz/blob/main/AGENTS.md): where agents start when contributing to OpenWiz
+
+## Drivers
+
+- [Drivers](https://openwiz.dev/drivers/): where your agents run: your computer or a VPS, CloudRoom and boat.dev
+- [Driver v1](https://github.com/openwizdev/OpenWiz/blob/main/kernel/driver.v1.md): the four commands a driver answers: version, start, wake, stop
+- [Driver template](https://github.com/openwizdev/OpenWiz/blob/main/adapters/template/README.md): copy it to plug in your own host
+- [Driver kit](https://github.com/openwizdev/OpenWiz/blob/main/kernel/driver-kit/README.md): checks a driver on its real host
+
+## Skills
+
+- [WizSkills](https://github.com/openwizdev/WizSkills): the skills OpenWiz puts into your agents, such as install, grill, to-spec, to-tickets, build-ticket and review-ticket
+
+## Changelog
+
+- [Changelog](https://openwiz.dev/changelog/): what each public release lets you do
+- [CHANGELOG.md](https://github.com/openwizdev/OpenWiz/blob/main/CHANGELOG.md): what each version adds, in full
+
+## Feedback
+
+- [Report a problem](https://github.com/openwizdev/OpenWiz/issues/new?template=feedback.yml): open a feedback issue on GitHub
+- [Issues](https://github.com/openwizdev/OpenWiz/issues): for anything beyond a small fix, open an issue first
