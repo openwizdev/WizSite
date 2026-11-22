@@ -675,7 +675,7 @@ class Checks(unittest.TestCase):
             'Proof: the first card   ': ('team/index.html', lambda t: t.replace('<h3>Three drivers passed all five checks</h3>', '<h3>Three drivers passed</h3>', 1)),
             'Proof: the first card    ': ('team/index.html', lambda t: t.replace('version, start, wake, stop and token.', 'version and start.', 1)),
             'the team page sections  ': ('team/index.html', lambda t: t.replace('<section class="team-part team-close', '<section class="team-part wrap"><h2>Where your agents run</h2></section>\n<section class="team-part team-close', 1)),
-            'Proof: the first card ': ('team/index.html', lambda t: t.replace('Grok Bot: coming soon', 'Grok Bot', 1)),
+            'Proof: the first card ': ('team/index.html', lambda t: t.replace('Grok Bot: on hold', 'Grok Bot', 1)),
             'Proof: the first card  ': ('team/index.html', lambda t: t.replace('<a href="/drivers/">See how drivers work</a>', '<a href="/">See how drivers work</a>', 1)),
             'Proof: the second card': ('team/index.html', lambda t: t.replace('>See the Drivers page</a>', '>Drivers</a>', 1)),
             'the boat poster: Proof': ('team/index.html', lambda t: re.sub(r'<li class="team-card"><a href="https://x\.com/openwiz"[\s\S]*?</li>\n', '<li class="team-card"><a href="https://x.com/openwiz" class="team-poster">Watch the fleet build it (49 s, on X)</a></li>\n', t, count=1)),
@@ -914,8 +914,9 @@ class Checks(unittest.TestCase):
                 (explainer, '<div class="drivers-intro">', 'one explainer of what a driver is'),
                 ('five-check test on its real host.</p>', 'five-check test. It is free. It is fast.</p>', 'two sentences at most'),
                 ('every driver answers the same four commands', 'every driver answers the same commands', 'explainer must name'),
+                ('answers four commands, plus its schema. Pass', 'answers four commands. Pass', 'says a driver'),
                 ('build software from tickets', 'build software', 'explainer must name'),
-                ('every driver answers the same four commands', 'every driver answers the same four commands (<code>version</code>, <code>start</code>, <code>wake</code>, <code>stop</code>)', 'stays out of the hero'),
+                ('every driver answers the same four commands, plus its schema', 'every driver answers the same four commands, plus its schema (<code>version</code>, <code>start</code>, <code>wake</code>, <code>stop</code>)', 'stays out of the hero'),
                 ('five-check test on its real host.</p>', 'five-check test on its real host, token included.</p>', 'stays out of the hero'),
                 ('must pass the same five-check test', 'passes the same five-check test', 'a requirement, never'),
                 ('<span>Kit: not run yet</span></p>', '<span>Kit: not run yet</span></p><ul>' + row + '</ul>', 'no per-check rows'),
@@ -975,7 +976,7 @@ class Checks(unittest.TestCase):
         for old, new, error in (
                 ('<span class="host-state">passed 5 of 5</span>', '', 'works today in words'),
                 ('<span class="host-state">passed 5 of 5</span>', '<span class="host-state">works</span>', 'passed 5 of 5'),
-                ('<span class="host-state">coming soon</span>', '<span class="host-state">soon</span>', 'coming soon'),
+                ('<span class="host-state">on hold</span>', '<span class="host-state">held</span>', 'on hold'),
                 ('<li data-host="vps" data-state="passed">', '<li data-host="computer" data-state="passed">', 'host pills, in order'),
                 ('<span class="host-mark"><img class="host-lockup"', '<span class="host-mark"></span><img class="host-lockup"', 'fixed-height slot'),
                 (pill, pill + '<span class="host-mark"><img src="/drivers/logos/boat-dev.svg" alt="boat.dev"></span>', 'fixed-height slot'),
@@ -1016,12 +1017,12 @@ class Checks(unittest.TestCase):
                 (vps + 'passed">', vps + 'being fixed">', "pill's state is 'passed'|shown as anything but passed"),
                 (cloud + 'passed">', cloud + 'works today">', "pill's state is 'passed'|shown as anything but passed"),
                 (boat + 'passed">', boat + 'coming soon">', "pill's state is 'passed'|shown as anything but passed"),
-                (grok + 'coming soon">', grok + 'passed">', "pill's state is 'coming soon'|never shown as passed"),
-                ('<span class="host-state">coming soon</span>', '<span class="host-state">passed 5 of 5</span>', 'coming soon'),
+                (grok + 'on hold">', grok + 'passed">', "pill's state is 'on hold'|never shown as passed"),
+                ('<span class="host-state">on hold</span>', '<span class="host-state">passed 5 of 5</span>', 'on hold'),
                 ('<span>Kit: not run yet</span>', '<span>Kit: passed, 5 of 5</span>', 'one kit line must read|never shown as passed'),
                 ('<p class="driver-kit unrun" data-state="not yet run">', '<p class="driver-kit passed" data-state="passed">', 'one kit line must read|never shown as passed'),
                 ('<p class="driver-kit passed" data-state="passed">', '<p class="driver-kit unrun" data-state="passed">', 'shown as anything but passed in its kit line'),
-                ('Coming soon: listed when its driver lands', 'Coming soon: passed the kit', 'driver facts|never shown as passed'),
+                ('On hold: Grok Bot has no way yet for a program to wake or stop a run', 'On hold: passed the kit', 'driver facts|never shown as passed'),
                 ('Kit run, <time datetime="2026-11-20">2026-11-20</time>', 'Kit run, <time datetime="2026-11-21">2026-11-21</time>', 'dates its kit run 2026-11-20|invented number'),
                 ('<a href="https://github.com/openwizdev/OpenWiz/pull/1455#issuecomment-7034588211">', '<a href="https://github.com/openwizdev/OpenWiz/pull/1458#issuecomment-7034556153">', 'linked to its public evidence'),
                 ('<a href="https://github.com/openwizdev/OpenWiz/pull/1444">', '<a href="https://github.com/openwizdev/OpenWiz">', 'spotlight date links to its public evidence'),
@@ -1048,9 +1049,10 @@ class Checks(unittest.TestCase):
         self.broken('', '', '', 'hidden on phones', css='\n@media (max-width: 480px) { .landing-nav .nav-drivers { display: none; } }\n')
         for old, new, error in (
                 ('boat.dev, Cloudroom and your own computer or VPS passed all five checks', 'boat.dev passed all five checks', 'must say boat.dev, Cloudroom and your own computer or VPS passed'),
-                ('Grok Bot is coming soon', 'Grok Bot is coming soon, and Grok Bot passed too', 'Grok Bot has not passed'),
+                ('Grok Bot is on hold', 'Grok Bot is on hold, and Grok Bot passed too', 'Grok Bot has not passed'),
                 ('A driver connects', 'Every driver passes the kit. A driver connects', 'must not say every driver passes'),
-                ('Drivers answer the same four commands', 'Drivers answer 4 words', 'jargon count')):
+                ('Drivers answer the same four commands', 'Drivers answer 4 words', 'jargon count'),
+                ('commands, plus their schema, and take', 'commands and take', 'description says')):
             with self.subTest(error=error), tempfile.TemporaryDirectory() as temp:
                 root = Path(temp) / 'dist'
                 shutil.copytree(ROOT / 'dist', root)
