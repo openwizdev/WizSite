@@ -227,7 +227,7 @@ DRIVERS = (
     ('boat-dev', 'boat.dev', 'Passed all five checks', 'passed'),
     ('vps', 'Your own computer or VPS', 'Passed the kit on a Linux PC', 'passed'),
     ('cloudroom', 'Cloudroom', 'Passed the kit, run from a Cloudroom cloud thread against real Cloudroom', 'passed'),
-    ('grok-bot', 'Grok Bot', 'Coming soon: listed when its driver lands', 'not yet run'),
+    ('grok-bot', 'Grok Bot', 'On hold: Grok Bot has no way yet for a program to wake or stop a run', 'not yet run'),
 )
 DRIVER_HERO = 'boat-dev'
 DRIVER_DATE = 'On a real account, 2026-11-19'
@@ -257,7 +257,7 @@ HOST_PILLS = (
     ('vps', 'Your computer or VPS', 'passed 5 of 5', 'passed'),
     ('cloudroom', 'Cloudroom', 'passed 5 of 5', 'passed'),
     ('boat-dev', 'boat.dev', 'passed 5 of 5', 'passed'),
-    ('grok-bot', 'Grok Bot', 'coming soon', 'coming soon'),
+    ('grok-bot', 'Grok Bot', 'on hold', 'on hold'),
 )
 DRIVER_NUMBERS = {'2026', '11', '19', '20', '1', '5'}
 DRIVER_JARGON = re.compile(r'\b\d+\s+(?:drivers?|words?|checks?|commands?|passed)\b|\b(?!5 of 5\b)\d+\s+of\s+\d+\b', re.I)
@@ -279,7 +279,7 @@ DRIVER_MIN_FONT = 12
 DRIVER_LABEL_TRACKING = 0.06
 OWN_DRIVER = 'Write your own driver'
 OPENWIZ_REPO = 'https://github.com/openwizdev/OpenWiz'
-DRIVER_DESCRIPTION = 'boat.dev, Cloudroom and your own computer or VPS passed all five checks; Grok Bot is coming soon'
+DRIVER_DESCRIPTION = 'boat.dev, Cloudroom and your own computer or VPS passed all five checks; Grok Bot is on hold'
 DRIVER_ART_BUDGET = 400_000
 DRIVERS_BUILDING_TITLE = 'Being built now'
 DRIVERS_BUILDING = (
@@ -1005,7 +1005,7 @@ def check_driver_results(drivers, main, outline):
         stale = DRIVER_STALE.search(plain(card) + ' ' + plain(pills.get(key, ('', ''))[1]))
         assert not stale, f'{name} passed the kit: no stale state word: {stale[0]!r}'
     coming = re.search(rf'<article class="driver[^"]*" id="{DRIVER_COMING}"[\s\S]*?</article>', main)
-    assert pills.get(DRIVER_COMING, ('',))[0] == 'coming soon' and coming and cards[DRIVER_COMING]['kit_state'] != 'passed' \
+    assert pills.get(DRIVER_COMING, ('',))[0] == 'on hold' and coming and cards[DRIVER_COMING]['kit_state'] != 'passed' \
         and not re.search(r'\bpass', plain(coming[0]) + ' ' + pills[DRIVER_COMING][1], re.I), \
         f'Grok Bot has not run the kit: never shown as passed'
     spot = re.search(r'<section class="spotlight[\s\S]*?</section>', main)[0]
