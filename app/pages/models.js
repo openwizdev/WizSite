@@ -175,7 +175,8 @@
   }
 
   // The snapshot's exact shape (models.v1.schema.json#/$defs/snapshot): every key it pins and no other, each of its type.
-  const LABEL = 'as reported by CloudRoom; it may answer from a saved copy';
+  // The snapshot's two labels (models.v1 since OpenWiz #2239): a CloudRoom read, or the installed local harnesses.
+  const LABELS = ['as reported by CloudRoom; it may answer from a saved copy', 'Installed local harnesses with OpenWiz\'s current choices'];
   const str = v => typeof v === 'string' && v !== '';
   const exactly = (v, keys) => Boolean(v) && typeof v === 'object' && !Array.isArray(v)
     && Object.keys(v).length === keys.length && keys.every(key => Object.hasOwn(v, key));
@@ -184,7 +185,7 @@
     && isId(c.effort) && ['claude', 'gpt', null].includes(c.family) && exactly(c.names, ['harness', 'model', 'effort'])
     && str(c.names.harness) && str(c.names.model) && str(c.names.effort);
   const validSnapshot = s => exactly(s, ['schema', 'read_at', 'label', 'state', 'harnesses', 'unavailable', 'recommended'])
-    && s.schema === 'openwiz.models-offered.v1' && Number.isSafeInteger(s.read_at) && s.read_at >= 0 && s.label === LABEL
+    && s.schema === 'openwiz.models-offered.v1' && Number.isSafeInteger(s.read_at) && s.read_at >= 0 && LABELS.includes(s.label)
     && exactly(s.state, ['kind']) && s.state.kind === 'offered'
     && listOf(s.harnesses, hr => exactly(hr, ['harness', 'provider', 'models']) && str(hr.harness) && str(hr.provider)
       && listOf(hr.models, m => exactly(m, ['model', 'efforts']) && str(m.model) && m.efforts.length > 0 && listOf(m.efforts, str)))
