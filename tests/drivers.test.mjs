@@ -130,28 +130,22 @@ test('the key-host section says where a host key lives, who reads it, where it g
   const facts = [...section.matchAll(/<li class="key-fact" data-fact="([^"]+)">([\s\S]*?)<\/li>/g)].map(([, key, body]) => [key, text(body)]);
   assert.deepEqual(facts.map(([key]) => key), ['lives', 'stored', 'helper', 'driver', 'checks'], 'the five facts, in order');
   const fact = Object.fromEntries(facts);
-  // N4: the key is read from the user's system keychain or the environment variable the user set.
-  assert.match(fact.lives, /only on your computer/);
-  assert.match(fact.lives, /system keychain/);
-  assert.match(fact.lives, /environment variable you set/);
-  // N4: OpenWiz never stores a key, so removing it is the whole revocation.
-  assert.match(fact.stored, /OpenWiz never stores it/);
-  assert.match(fact.stored, /remove it/);
-  assert.match(fact.stored, /revoke/);
-  // N4: the helper alone reads it, and sends it only over HTTPS to the address registered for that host.
-  assert.match(fact.helper, /one small helper in the kernel's driver kit/);
-  assert.match(fact.helper, /only thing that reads/);
-  assert.match(fact.helper, /only over HTTPS to that host's own registered address/);
+  assert.match(fact.lives, /only on your computer/, 'N4: the key lives only on the user\'s computer');
+  assert.match(fact.lives, /system keychain/, 'N4: read from the user\'s system keychain');
+  assert.match(fact.lives, /environment variable you set/, 'N4: or from the environment variable the user set');
+  assert.match(fact.stored, /OpenWiz never stores it/, 'N4: OpenWiz never stores a key');
+  assert.match(fact.stored, /remove it/, 'removing it is how the user revokes it');
+  assert.match(fact.stored, /revoke/, 'removing it is how the user revokes it');
+  assert.match(fact.helper, /one small helper in the kernel's driver kit/, 'N4: one helper in the kit');
+  assert.match(fact.helper, /only thing that reads/, 'N4: the helper alone reads the key');
+  assert.match(fact.helper, /only over HTTPS to that host's own registered address/, 'N4: sent only over HTTPS to the host\'s registered address');
   assert.match(section, /href="https:\/\/github\.com\/openwizdev\/OpenWiz\/blob\/main\/kernel\/driver-kit\/hostkey\.py"/);
   assert.match(section, /href="https:\/\/github\.com\/openwizdev\/OpenWiz\/blob\/main\/kernel\/driver\.v1\.md#2-logins"/);
-  // N4 and the key check: the driver never names, reads, receives or prints the key, and the token check proves it.
-  assert.match(fact.driver, /driver never sees it/);
-  assert.match(fact.driver, /the kit checks that/);
-  // Section 3: a driver merges only when it passes the same five checks, wake and stop included; no sixth check.
-  assert.match(fact.checks, /same five checks/);
-  assert.match(fact.checks, /can't wake or stop a run gets no driver/);
+  assert.match(fact.driver, /driver never sees it/, 'N4: the driver never reads or receives the key');
+  assert.match(fact.driver, /the kit checks that/, 'the token check runs the key check');
+  assert.match(fact.checks, /same five checks/, 'driver v1 section 3: the same five checks, no sixth');
+  assert.match(fact.checks, /can't wake or stop a run gets no driver/, 'wake and stop are two of the five checks');
   assert.doesNotMatch(text(section), /\bsix(th)?\b|\bexcept(ion)?\b|\bwaive/i, 'no extra or skipped check');
-  // Devin: coming soon until its live check records 5 of 5; never named as live or passed before that.
   const devin = section.match(/<article class="[^"]*" id="key-host-devin"[^>]*>([\s\S]*?)<\/article>/);
   assert.ok(devin, 'Devin has its coming-soon card in the key-host section');
   assert.match(text(devin[1]), /^Devin Coming soon: listed when its live check on a real Devin account records 5 of 5\./);
