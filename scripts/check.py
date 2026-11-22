@@ -139,10 +139,10 @@ FOOTER_LINKS = (('/drivers/', 'Drivers'), ('/changelog/', 'Changelog'), ('https:
 FOOTER_LINE = 'Apache-2.0. Owned by no one.'
 X_ACCOUNT = 'https://x.com/openwiz'
 CLOUDROOM_LINK = 'https://cloudroom.dev'
-INSTALL_NOTE = ("No CloudRoom needed to install. In this release, you start builders by hand on this computer, with the Claude Code "
+INSTALL_NOTE = ("No CloudRoom needed to install. In OpenWiz 0.01, you start builders by hand on this computer, with the Claude Code "
                 "or Codex you're signed in to, or on boat.dev; the automatic fleet runs in CloudRoom. "
                 'For an Apple-silicon Mac or x86_64 Linux.')
-INSTALL_NOTE_HTML = ('<p class="install-note">No CloudRoom needed to install. In this release, you start builders by hand on this '
+INSTALL_NOTE_HTML = ('<p class="install-note">No CloudRoom needed to install. In OpenWiz 0.01, you start builders by hand on this '
                      "computer, with the Claude Code or Codex you're signed in to, or on boat.dev; the automatic fleet runs in "
                      '<a href="https://cloudroom.dev" rel="noreferrer">CloudRoom</a>. For an Apple-silicon Mac or x86_64 Linux.</p>')
 FAQ = (ROOT / 'faq.html').read_text()
@@ -155,7 +155,7 @@ FAQ_QUESTIONS = ('What is OpenWiz?', 'What is a kernel?', 'What do I need to run
                  'Does OpenWiz see my code or my logins?', 'What does it cost?', 'Can you set it up for my team?')
 FAQ_LAST = 'Yes. Book a 30-minute call. Your first fleet ships on it.'
 FAQ_WHERE = ("Builders run where you choose: this computer, with the Claude Code or Codex you're signed in to, boat.dev, "
-             'or CloudRoom. Each is a driver that passed the same five-check test. In the current release, you start builders by '
+             'or CloudRoom. Each is a driver that passed the same five-check test. In OpenWiz 0.01, you start builders by '
              'hand on this computer or boat.dev, and the automatic fleet runs in CloudRoom.')
 
 
