@@ -781,7 +781,7 @@ class Checks(unittest.TestCase):
             'a button that names its answer ': lambda f: f.replace('aria-controls="faq-a2"', 'aria-controls="faq-a1"', 1),
             'links off the site': lambda f: f.replace('href="/team/#book"', 'href="https://example.com/"', 1),
             'answer to Where do my agents run': lambda f: f.replace(FAQ_WHERE, 'Wherever you choose: your own computer or a VPS, Cloudroom, or boat.dev. Each has a driver that passed the same five-check test.', 1),
-            'answer to Where do my agents run ': lambda f: f.replace(' In the current release, you start builders by hand on this computer or boat.dev, and the automatic fleet runs in CloudRoom.', '', 1),
+            'answer to Where do my agents run ': lambda f: f.replace(' In OpenWiz 0.01, you start builders by hand on this computer or boat.dev, and the automatic fleet runs in CloudRoom.', '', 1),
             'answer to Where do my agents run  ': lambda f: f.replace(FAQ_WHERE, 'Anywhere.', 1).replace('OpenWiz is free and open source', FAQ_WHERE + ' OpenWiz is free and open source', 1),
             'last answer': lambda f: f.replace('Your first fleet ships on it.', 'Your first fleet runs in a day.', 1),
             'heading and its line': lambda f: f.replace('The short ones are here.', 'More.', 1),
