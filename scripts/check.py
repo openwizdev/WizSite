@@ -107,8 +107,7 @@ TEAM_PAGE = 'team/index.html'
 BOOK_PLACEHOLDER = '#book'
 TEAM_HEADLINE = 'Book 30 minutes. Leave with a shipped pull request.'
 TEAM_TERMS = ('A small, real change of your choice.',
-              'On a repository with working CI and a signed-in coding agent (Claude Code or Codex).',
-              "If it hasn’t shipped in 30 minutes, Jake stays on until it does.")
+              'On a repository with working CI and a signed-in coding agent (Claude Code or Codex).')
 TEAM_TERMS_LABEL = 'How the call works'
 TEAM_SHIPS = 'Ships means a pull request opens on your repo, built by your agents and passing your CI. Merging is your call.'
 TEAM_COPY = ('For solo builders and small teams', TEAM_HEADLINE,
@@ -1054,7 +1053,7 @@ def check_team(htmls, pages):
     hero = hero[1]
     terms = re.search(r'<ul class="team-terms"[^>]*>([\s\S]*?)</ul>', hero)
     assert terms and [plain(t) for t in re.findall(r'<li>([\s\S]*?)</li>', terms[1])] == list(TEAM_TERMS), \
-        f'the terms: three exact lines right under the hero button: {TEAM_TERMS}'
+        f'the terms: two exact lines right under the hero button: {TEAM_TERMS}'
     assert hero.index('data-book') < hero.index('class="team-terms"'), 'the terms: under the first Book a call'
     label = re.search(r'<p class="team-label" id="([^"]+)">([^<]*)</p>\s*<ul class="team-terms" aria-labelledby="([^"]+)"', hero)
     assert label and label[2] == TEAM_TERMS_LABEL and label[1] == label[3], f'the terms: under their label, {TEAM_TERMS_LABEL}'
