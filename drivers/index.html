@@ -171,6 +171,26 @@
       </li>
     </ul>
   </section>
+  <section class="building key-hosts wrap" aria-labelledby="key-hosts-title">
+    <h2 id="key-hosts-title">Hosts that need an API key</h2>
+    <p class="building-lead">Some hosts can be driven only through an API that takes your key. Their drivers keep one more rule of <a href="https://github.com/openwizdev/OpenWiz/blob/main/kernel/driver.v1.md#2-logins">the contract</a>:</p>
+    <ul class="building-lead key-facts">
+      <li class="key-fact" data-fact="lives">The key lives only on your computer: in your system keychain, or in an environment variable you set.</li>
+      <li class="key-fact" data-fact="stored">OpenWiz never stores it: remove it from there to revoke OpenWiz's use of it.</li>
+      <li class="key-fact" data-fact="helper"><a href="https://github.com/openwizdev/OpenWiz/blob/main/kernel/driver-kit/hostkey.py"><code>hostkey.py</code></a>, one small helper in the kernel's driver kit, is the only thing that reads it. It sends the key only over HTTPS to that host's own registered address.</li>
+      <li class="key-fact" data-fact="driver">The driver never sees it, and the kit checks that.</li>
+      <li class="key-fact" data-fact="checks">Every driver still has to pass the same five checks, so a host that can't wake or stop a run gets no driver.</li>
+    </ul>
+    <ul class="build-list">
+      <li>
+      <article class="build" id="key-host-devin" aria-labelledby="key-host-devin-name">
+        <h3 class="build-name" id="key-host-devin-name">Devin</h3>
+        <p class="build-line">Coming soon: listed when its live check on a real Devin account records 5 of 5.</p>
+        <p class="build-state"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/></svg><span>Coming soon</span> <a href="https://github.com/openwizdev/openwiz/issues/1997">Live check</a></p>
+      </article>
+      </li>
+    </ul>
+  </section>
   <section class="own-driver wrap" aria-labelledby="own-title">
     <div class="own-copy">
       <h2 id="own-title">Write your own driver</h2>
