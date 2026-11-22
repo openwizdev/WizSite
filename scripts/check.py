@@ -227,7 +227,7 @@ DRIVERS = (
     ('boat-dev', 'boat.dev', 'Passed all five checks', 'passed'),
     ('vps', 'Your own computer or VPS', 'Passed the kit on a Linux PC', 'passed'),
     ('cloudroom', 'Cloudroom', 'Passed the kit, run from a Cloudroom cloud thread against real Cloudroom', 'passed'),
-    ('openclaw', 'OpenClaw', 'Passed its live check; ships in the next release', 'passed'),
+    ('openclaw', 'OpenClaw', 'Passed its live check, 5 of 5 on a real host; ships in the next release', 'passed'),
     ('grok-bot', 'Grok Bot', 'On hold: Grok Bot has no way yet for a program to wake or stop a run', 'not yet run'),
 )
 DRIVER_HERO = 'boat-dev'
