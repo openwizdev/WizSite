@@ -114,7 +114,7 @@ TEAM_COPY = ('For solo builders and small teams', TEAM_HEADLINE,
              'A 30-minute call with Jake, who builds OpenWiz. We connect it to your repo and the coding agent you already '
              'use, you pick one small change, and your first fleet ships it on your workflow.',
              *TEAM_TERMS, TEAM_SHIPS,
-             TEAM_TERMS_LABEL, 'Grok Bot: coming soon', 'See how drivers work',
+             TEAM_TERMS_LABEL, 'Grok Bot: on hold', 'See how drivers work',
              'Our Drivers page was built the same way: a fleet of agents drew six designs, a council of judges picked one, '
              'and it merged in one night.', 'See the Drivers page',
              'Watch the fleet build it (49 s, on X)',
@@ -263,7 +263,9 @@ DRIVER_NUMBERS = {'2026', '11', '19', '20', '1', '5'}
 DRIVER_JARGON = re.compile(r'\b\d+\s+(?:drivers?|words?|checks?|commands?|passed)\b|\b(?!5 of 5\b)\d+\s+of\s+\d+\b', re.I)
 DRIVER_RESULT = re.compile(r'\ball five checks\b|\bfive passed checks\b|\bfive of five\b', re.I)
 DRIVER_RESULT_MAX = 2
-DRIVER_EXPLAINER_WORDS = ('driver', 'agents', 'tickets', 'four commands', 'five-check test')
+DRIVER_EXPLAINER_WORDS = ('driver', 'agents', 'tickets', 'four commands, plus its schema', 'five-check test')
+DRIVER_COMMANDS = 'answers four commands, plus its schema.'
+DRIVER_DESCRIPTION_COMMANDS = 'Drivers answer the same four commands, plus their schema,'
 PROOF_LINES = (
     ('version', 'It names the kernel\'s records version, and prints its schema unchanged.'),
     ('start', 'It answered a run id, and the agent\'s status note appeared on a throwaway ticket.'),
@@ -832,6 +834,7 @@ def check_drivers(landing, changelog, drivers, page):
         f'the drivers description must not say every driver passes: {description[0]}'
     assert not DRIVER_JARGON.search(description[0]), f'a jargon count in the drivers description: {description[0]}'
     assert not re.search(r'grok bot[^.;]*\bpass', description[0], re.I), f'Grok Bot has not passed: {description[0]}'
+    assert DRIVER_DESCRIPTION_COMMANDS in description[0], f'the drivers description says {DRIVER_DESCRIPTION_COMMANDS!r}: {description[0]}'
     assert page.scripts == [s for s in Page(landing).scripts if not s.startswith('/faq.')] and not page.inline_scripts, \
         'the drivers page loads only the site\'s footer scripts (GSAP, site.js), never its own'
     main = re.search(r'<main\b[^>]*>[\s\S]*?</main>', drivers)
@@ -878,6 +881,8 @@ def check_drivers(landing, changelog, drivers, page):
     rows = re.findall(r'<dt><code>([^<]*)</code></dt><dd>([\s\S]*?)</dd>', own[1]) if own else []
     assert [r[0] for r in rows] == list(KIT_CHECKS) and 'credential' in plain(rows[-1][1]), \
         f'{OWN_DRIVER} lists the four commands and the fifth check, token, with the credential it checks for: {rows}'
+    own_copy = re.search(r'<div class="own-copy">\s*<h2[^>]*>[^<]*</h2>\s*<p>([^<]*)</p>', main)
+    assert own_copy and DRIVER_COMMANDS in own_copy[1], f'{OWN_DRIVER} says a driver {DRIVER_COMMANDS!r}'
     assert not Outline(drivers).styles, 'the drivers page keeps its styles in site.css'
     check_driver_logins(main)
     check_drivers_building(main)
@@ -1112,12 +1117,12 @@ def check_team(htmls, pages):
     cards = re.findall(r'<li class="team-card">([\s\S]*?)</li>\n', proof)
     assert len(cards) == 3 and proof.count('<li') == 3, f'Proof: three cards: {len(cards)}'
     passed = re.fullmatch(r'\s*<h3>([^<]*)</h3>\s*<p>([^<]*)</p>\s*<div class="team-logos">([\s\S]*?)</div>\s*'
-                          r'<p class="team-soon">Grok Bot: coming soon</p>\s*<a href="/drivers/">See how drivers work</a>\s*', cards[0])
+                          r'<p class="team-soon">Grok Bot: on hold</p>\s*<a href="/drivers/">See how drivers work</a>\s*', cards[0])
     logos = re.findall(r'<img\b[^>]*src="([^"]*)"[^>]*>\s*(?:<span>[^<]*</span>\s*)?<small>([^<]*)</small>', passed[3]) if passed else []
     assert passed and (passed[1], passed[2]) == (TEAM_PASSED_HEADING, TEAM_PASSED_ABOUT) \
         and [src for src, _ in logos] == list(TEAM_PASSED) and all(line == TEAM_PASSED_LINE for _, line in logos), \
         f'Proof: the first card: {TEAM_PASSED_HEADING}, what the checks are, the three drivers\u2019 logos with ' \
-        f'{TEAM_PASSED_LINE} under each, Grok Bot coming soon and See how drivers work, to /drivers/'
+        f'{TEAM_PASSED_LINE} under each, Grok Bot on hold and See how drivers work, to /drivers/'
     built = re.fullmatch(r'\s*<p>([^<]*)</p>\s*<a href="/drivers/">See the Drivers page</a>\s*', cards[1])
     assert built and built[1].startswith('Our Drivers page was built the same way'), \
         'Proof: the second card says how the Drivers page was built, with its one link, See the Drivers page'
