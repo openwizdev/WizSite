@@ -227,6 +227,7 @@ DRIVERS = (
     ('boat-dev', 'boat.dev', 'Passed all five checks', 'passed'),
     ('vps', 'Your own computer or VPS', 'Passed the kit on a Linux PC', 'passed'),
     ('cloudroom', 'Cloudroom', 'Passed the kit, run from a Cloudroom cloud thread against real Cloudroom', 'passed'),
+    ('openclaw', 'OpenClaw', 'Passed its live check; ships in the next release', 'passed'),
     ('grok-bot', 'Grok Bot', 'On hold: Grok Bot has no way yet for a program to wake or stop a run', 'not yet run'),
 )
 DRIVER_HERO = 'boat-dev'
@@ -235,12 +236,16 @@ DRIVER_PASSED = {
     'boat-dev': ('2026-11-19', 'https://github.com/openwizdev/OpenWiz/pull/1444'),
     'cloudroom': ('2026-11-20', 'https://github.com/openwizdev/OpenWiz/pull/1458#issuecomment-7034556153'),
     'vps': ('2026-11-20', 'https://github.com/openwizdev/OpenWiz/pull/1455#issuecomment-7034588211'),
+    'openclaw': ('2026-11-22', 'https://github.com/openwizdev/OpenWiz/issues/1991#issuecomment-7087326408'),
 }
+# Passed its live check, but its driver merges after the next release cut: no host pill yet, and its line says so.
+DRIVER_NEXT_RELEASE = {'openclaw': 'ships in the next release'}
 DRIVER_COMING = 'grok-bot'
 DRIVER_LOGINS = {
     'boat-dev': 'Login: held by boat.dev',
     'vps': 'Login: stays on your machine',
     'cloudroom': 'Login: held by Cloudroom',
+    'openclaw': 'Login: stays on your machine',
 }
 DRIVER_ALSO = 'Cloudroom and your own computer or VPS passed the same five checks on 2026-11-20.'
 DRIVER_CARD_DATE = 'Kit run, {}'
@@ -251,6 +256,7 @@ KIT_STATES = ('passed', 'in progress', 'not yet run')
 DRIVER_KIT_LINES = {
     'vps': 'Kit: passed, 5 of 5',
     'cloudroom': 'Kit: passed, 5 of 5',
+    'openclaw': 'Kit: passed, 5 of 5',
     'grok-bot': 'Kit: not run yet',
 }
 HOST_PILLS = (
@@ -259,7 +265,7 @@ HOST_PILLS = (
     ('boat-dev', 'boat.dev', 'passed 5 of 5', 'passed'),
     ('grok-bot', 'Grok Bot', 'on hold', 'on hold'),
 )
-DRIVER_NUMBERS = {'2026', '11', '19', '20', '1', '5'}
+DRIVER_NUMBERS = {'2026', '11', '19', '20', '22', '1', '5'}
 DRIVER_JARGON = re.compile(r'\b\d+\s+(?:drivers?|words?|checks?|commands?|passed)\b|\b(?!5 of 5\b)\d+\s+of\s+\d+\b', re.I)
 DRIVER_RESULT = re.compile(r'\ball five checks\b|\bfive passed checks\b|\bfive of five\b', re.I)
 DRIVER_RESULT_MAX = 2
@@ -286,7 +292,6 @@ DRIVER_ART_BUDGET = 400_000
 DRIVERS_BUILDING_TITLE = 'Being built now'
 DRIVERS_BUILDING = (
     ('hermes', 'Hermes', 'Login: stays on your machine', 2017),
-    ('openclaw', 'OpenClaw', 'Login: stays on your machine', 2018),
     ('conductor', 'Conductor', 'Login: held by Conductor', 2020),
     ('cursor', 'Cursor cloud agents', 'Login: held by Cursor', 2021),
     ('factory', 'Factory', 'Login: held by Factory', 2022),
@@ -992,7 +997,11 @@ def check_driver_results(drivers, main, outline):
     cards = {c['id']: c for c in outline.cards}
     for key, (date, evidence) in DRIVER_PASSED.items():
         name = cards[key]['name'] if key in cards else key
-        assert pills.get(key, ('',))[0] == 'passed', f'{name} passed the kit: shown as anything but passed in its pill: {pills.get(key)}'
+        if key in DRIVER_NEXT_RELEASE:
+            assert key not in pills, f'{name} ships in the next release: no host pill until it does'
+            assert DRIVER_NEXT_RELEASE[key] in cards[key]['line'], f'{name}: its line says it {DRIVER_NEXT_RELEASE[key]}: {cards[key]["line"]!r}'
+        else:
+            assert pills.get(key, ('',))[0] == 'passed', f'{name} passed the kit: shown as anything but passed in its pill: {pills.get(key)}'
         card = re.search(rf'<article class="driver[^"]*" id="{key}"[\s\S]*?</article>', main)
         assert card, f'{name} needs its card'
         card = card[0]
