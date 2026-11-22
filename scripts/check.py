@@ -281,6 +281,17 @@ OWN_DRIVER = 'Write your own driver'
 OPENWIZ_REPO = 'https://github.com/openwizdev/OpenWiz'
 DRIVER_DESCRIPTION = 'boat.dev, Cloudroom and your own computer or VPS passed all five checks; Grok Bot is coming soon'
 DRIVER_ART_BUDGET = 400_000
+DRIVERS_BUILDING_TITLE = 'Being built now'
+DRIVERS_BUILDING = (
+    ('hermes', 'Hermes', 'Login: stays on your machine', 2017),
+    ('openclaw', 'OpenClaw', 'Login: stays on your machine', 2018),
+    ('conductor', 'Conductor', 'Login: held by Conductor', 2020),
+    ('cursor', 'Cursor cloud agents', 'Login: held by Cursor', 2021),
+    ('factory', 'Factory', 'Login: held by Factory', 2022),
+    ('pane', 'Pane', 'Login: stays on your machine', 2029),
+)
+DRIVER_BUILD_STATE = 'Not released: waits for its live check'
+DRIVER_BUILD_CLAIM = re.compile(r'(?<!\bnot )(?<!\bnone is )\breleased\b|\b(?:live|supported|available|ships?|shipped|works|soon|ready)\b', re.I)
 
 
 class Page(HTMLParser):
@@ -869,6 +880,7 @@ def check_drivers(landing, changelog, drivers, page):
         f'{OWN_DRIVER} lists the four commands and the fifth check, token, with the credential it checks for: {rows}'
     assert not Outline(drivers).styles, 'the drivers page keeps its styles in site.css'
     check_driver_logins(main)
+    check_drivers_building(main)
     check_driver_token(drivers, main)
 
 
@@ -1016,7 +1028,34 @@ def check_driver_logins(main):
         if want:
             assert re.search(r'</h[23]>\s*<p class="driver-login">', card), f'{name}: its login line sits right after its name'
     found = len(re.findall(r'class="driver-login"', main))
-    assert found == len(DRIVER_LOGINS), f'a login line only on a driver card: {found} on the page'
+    assert found == len(DRIVER_LOGINS) + len(DRIVERS_BUILDING), f'a login line only on a driver card: {found} on the page'
+
+
+def check_drivers_building(main):
+    found = re.findall(r'<section class="building wrap"[^>]*>([\s\S]*?)</section>', main)
+    assert len(found) == 1, f'the drivers page needs one {DRIVERS_BUILDING_TITLE} section'
+    section = found[0]
+    assert main.index('class="more-drivers') < main.index('class="building wrap"') < main.index('class="own-driver'), \
+        f'{DRIVERS_BUILDING_TITLE} sits after the passed drivers, before Write your own driver'
+    assert re.findall(r'<h2 id="building-title">([^<]*)</h2>', section) == [DRIVERS_BUILDING_TITLE], \
+        f'the section is headed {DRIVERS_BUILDING_TITLE!r}'
+    assert not re.search(r'<(?:img|svg(?![^>]*kit-icon)|time)\b', section), \
+        f'{DRIVERS_BUILDING_TITLE}: names in text, no logos, no dates'
+    cards = re.findall(r'<article class="build" id="build-([^"]+)"[^>]*>([\s\S]*?)</article>', section)
+    assert [k for k, _ in cards] == [d[0] for d in DRIVERS_BUILDING] and len(cards) == section.count('<article'), \
+        f'{DRIVERS_BUILDING_TITLE} lists, in order: {[k for k, _ in cards]}'
+    for (key, body), (_, name, login, pr) in zip(cards, DRIVERS_BUILDING):
+        names = [plain(n) for n in re.findall(r'<h3 class="build-name"[^>]*>([\s\S]*?)</h3>', body)]
+        logins = [plain(n) for n in re.findall(r'</h3>\s*<p class="driver-login">([\s\S]*?)</p>', body)]
+        lines = [plain(n) for n in re.findall(r'<p class="build-line">([\s\S]*?)</p>', body)]
+        states = re.findall(r'<p class="build-state">[\s\S]*?<span>([^<]*)</span>\s*<a href="([^"]+)">([^<]*)</a></p>', body)
+        assert names == [name] and logins == [login], f'{name}: its name, then its login line {login!r}: {names}, {logins}'
+        assert len(lines) == 1 and lines[0], f'{name}: one line on what its driver does'
+        assert states == [(DRIVER_BUILD_STATE, f'{OPENWIZ_REPO}/pull/{pr}', 'Pull request')], \
+            f'{name}: says {DRIVER_BUILD_STATE!r} and links its open pull request #{pr}: {states}'
+        assert not re.search(r'\bpass', plain(body), re.I), f'{name} has not passed its live check: never shown as passed'
+    said = DRIVER_BUILD_CLAIM.search(plain(section).replace('live check', ''))
+    assert not said, f'{DRIVERS_BUILDING_TITLE}: never say or imply these are released, live-checked or supported: {said[0]!r}'
 
 
 def check_driver_token(drivers, main):
