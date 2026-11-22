@@ -847,6 +847,24 @@ class Checks(unittest.TestCase):
         line = '<p class="driver-line">Passed the kit, run from a Cloudroom cloud thread against real Cloudroom</p>'
         self.broken('drivers/index.html', held + '\n        ' + line, line + '\n        ' + held, 'right after its name')
 
+    def test_drivers_building(self):
+        import check
+        main = re.search(r'<main\b[\s\S]*?</main>', (ROOT / 'dist' / check.DRIVERS_PAGE).read_text())[0]
+        check.check_drivers_building(main)
+        state = '<span>Not released: waits for its live check</span>'
+        for old, new, error in (
+                ('<h2 id="building-title">Being built now</h2>', '<h2 id="building-title">Coming soon</h2>', 'headed'),
+                ('<h3 class="build-name" id="build-pane-name">Pane</h3>', '<h3 class="build-name" id="build-pane-name">Pane app</h3>', 'Pane: its name'),
+                ('id="build-hermes"', 'id="build-devin"', 'lists, in order'),
+                ('<article class="build" id="build-factory"', '<article class="driver build" id="build-factory"', 'four driver cards'),
+                (state, '<span>Live check: passed</span>', 'links its open pull request'),
+                ('pull/2021">', 'pull/2019">', 'links its open pull request'),
+                ('<h3 class="build-name" id="build-hermes-name">Hermes</h3>', '<h3 class="build-name" id="build-hermes-name"><img src="/favicon.svg" alt="Hermes">Hermes</h3>', 'no logos'),
+                ('Runs each build as one Cursor cloud agent.', 'Runs each build as one Cursor cloud agent, supported today.', 'released, live-checked or supported'),
+                ('Runs each build as one Cursor cloud agent.', 'Passed on Cursor.', 'never shown as passed'),
+                ('Login: held by Conductor', 'Login: stays on your machine', 'Conductor: its name, then its login line')):
+            self.broken('drivers/index.html', old, new, error)
+
     def test_drivers_spotlight(self):
         page = 'drivers/index.html'
         for old, new, error in (
@@ -890,11 +908,12 @@ class Checks(unittest.TestCase):
         grok = '<h3 class="driver-name" id="grok-bot-name">'
         for old, new, error in (
                 (explainer, '<div class="drivers-intro">', 'one explainer of what a driver is'),
-                ('five-check test.</p>', 'five-check test. It is free. It is fast.</p>', 'two sentences at most'),
+                ('five-check test on its real host.</p>', 'five-check test. It is free. It is fast.</p>', 'two sentences at most'),
                 ('every driver answers the same four commands', 'every driver answers the same commands', 'explainer must name'),
                 ('build software from tickets', 'build software', 'explainer must name'),
                 ('every driver answers the same four commands', 'every driver answers the same four commands (<code>version</code>, <code>start</code>, <code>wake</code>, <code>stop</code>)', 'stays out of the hero'),
-                ('five-check test.</p>', 'five-check test, token included.</p>', 'stays out of the hero'),
+                ('five-check test on its real host.</p>', 'five-check test on its real host, token included.</p>', 'stays out of the hero'),
+                ('must pass the same five-check test', 'passes the same five-check test', 'a requirement, never'),
                 ('<span>Kit: not run yet</span></p>', '<span>Kit: not run yet</span></p><ul>' + row + '</ul>', 'no per-check rows'),
                 ('<span>Kit: not run yet</span></p>', '<span>Kit: not run yet</span></p><ol><li class="proof-check" data-check="token">x</li></ol>', 'one kit line, never per-check rows'),
                 ('<span>Kit: not run yet</span>', '<span>Kit: not run yet. Its kit run comes next.</span>', 'one kit line must read'),

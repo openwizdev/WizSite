@@ -54,7 +54,7 @@
       <p class="voyage-kicker">Drivers</p>
       <div class="drivers-explainer">
         <h1 id="voyage-title">A driver connects OpenWiz to wherever your agents run.</h1>
-        <p class="voyage-sub">OpenWiz's agents build software from tickets, and every driver answers the same four commands and passes the same five-check test.</p>
+        <p class="voyage-sub">OpenWiz's agents build software from tickets, and every driver answers the same four commands and must pass the same five-check test on its real host.</p>
       </div>
       <ul class="host-marks" aria-label="Where drivers run today">
         <li data-host="vps" data-state="passed"><span class="host-mark"><img class="host-icon" src="/drivers/logos/monitor.svg" alt="Computer icon" width="24" height="24"></span><span class="host-name">Your computer or VPS</span> <span class="host-state">passed 5 of 5</span></li>
@@ -113,6 +113,60 @@
         <h3 class="driver-name" id="grok-bot-name"><img class="driver-logo host-icon" src="/drivers/logos/bot.svg" alt="Generic bot icon" width="24" height="24"><span>Grok Bot</span></h3>
         <p class="driver-line">Coming soon: listed when its driver lands</p>
         <p class="driver-kit unrun" data-state="not yet run"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/></svg><span>Kit: not run yet</span></p>
+      </article>
+      </li>
+    </ul>
+  </section>
+  <section class="building wrap" aria-labelledby="building-title">
+    <h2 id="building-title">Being built now</h2>
+    <p class="building-lead">Each has a reviewed pull request whose driver passes the five-check test against a stand-in host. None is released: each waits for its live check on a real host before it can merge.</p>
+    <ul class="build-list">
+      <li>
+      <article class="build" id="build-hermes" aria-labelledby="build-hermes-name">
+        <h3 class="build-name" id="build-hermes-name">Hermes</h3>
+        <p class="driver-login">Login: stays on your machine</p>
+        <p class="build-line">Runs Hermes from its own command line on your computer.</p>
+        <p class="build-state"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/></svg><span>Not released: waits for its live check</span> <a href="https://github.com/openwizdev/OpenWiz/pull/2017">Pull request</a></p>
+      </article>
+      </li>
+      <li>
+      <article class="build" id="build-openclaw" aria-labelledby="build-openclaw-name">
+        <h3 class="build-name" id="build-openclaw-name">OpenClaw</h3>
+        <p class="driver-login">Login: stays on your machine</p>
+        <p class="build-line">Runs builders on your computer through acpx, OpenClaw's headless client.</p>
+        <p class="build-state"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/></svg><span>Not released: waits for its live check</span> <a href="https://github.com/openwizdev/OpenWiz/pull/2018">Pull request</a></p>
+      </article>
+      </li>
+      <li>
+      <article class="build" id="build-conductor" aria-labelledby="build-conductor-name">
+        <h3 class="build-name" id="build-conductor-name">Conductor</h3>
+        <p class="driver-login">Login: held by Conductor</p>
+        <p class="build-line">Runs each build in its own Conductor cloud workspace.</p>
+        <p class="build-state"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/></svg><span>Not released: waits for its live check</span> <a href="https://github.com/openwizdev/OpenWiz/pull/2020">Pull request</a></p>
+      </article>
+      </li>
+      <li>
+      <article class="build" id="build-cursor" aria-labelledby="build-cursor-name">
+        <h3 class="build-name" id="build-cursor-name">Cursor cloud agents</h3>
+        <p class="driver-login">Login: held by Cursor</p>
+        <p class="build-line">Runs each build as one Cursor cloud agent.</p>
+        <p class="build-state"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/></svg><span>Not released: waits for its live check</span> <a href="https://github.com/openwizdev/OpenWiz/pull/2021">Pull request</a></p>
+      </article>
+      </li>
+      <li>
+      <article class="build" id="build-factory" aria-labelledby="build-factory-name">
+        <h3 class="build-name" id="build-factory-name">Factory</h3>
+        <p class="driver-login">Login: held by Factory</p>
+        <p class="build-line">Runs each build as a Droid session on your computer.</p>
+        <p class="build-state"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/></svg><span>Not released: waits for its live check</span> <a href="https://github.com/openwizdev/OpenWiz/pull/2022">Pull request</a></p>
+      </article>
+      </li>
+      <li>
+      <article class="build" id="build-pane" aria-labelledby="build-pane-name">
+        <h3 class="build-name" id="build-pane-name">Pane</h3>
+        <p class="driver-login">Login: stays on your machine</p>
+        <p class="build-line">Runs each build in its own Pane worktree on your computer.</p>
+        <p class="build-state"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/></svg><span>Not released: waits for its live check</span> <a href="https://github.com/openwizdev/OpenWiz/pull/2029">Pull request</a></p>
       </article>
       </li>
     </ul>

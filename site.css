@@ -411,7 +411,7 @@ body.landing > main { flex: 1 0 auto; }
 .drivers-page .proof-check .kit-icon path, .drivers-page .driver-kit.passed .kit-icon path { fill: none; stroke: var(--ground); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .drivers-page .progress .kit-icon circle { fill: none; stroke: var(--orchid); stroke-width: 1.5; }
 .drivers-page .progress .kit-icon path { fill: var(--orchid); }
-.drivers-page .unrun .kit-icon circle { fill: none; stroke: var(--grey); stroke-width: 1.5; stroke-dasharray: 2.4 2.2; }
+.drivers-page :is(.unrun, .build-state) .kit-icon circle { fill: none; stroke: var(--grey); stroke-width: 1.5; stroke-dasharray: 2.4 2.2; }
 .drivers-page .spotlight { margin-top: clamp(8px, 2vw, 24px); }
 .drivers-page .driver.hero { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); overflow: hidden; border: 1px solid #7c6140; border-radius: 16px; background: #110f0d; box-shadow: 0 0 0 1px rgb(242 194 123 / 10%), 0 30px 80px rgb(255 150 60 / 7%); }
 .drivers-page .proof-scene { position: relative; grid-row: 1; grid-column: 1; min-height: 100%; }
@@ -442,6 +442,18 @@ body.landing > main { flex: 1 0 auto; }
 .drivers-page .driver-list .driver-line { color: var(--grey2); font-size: 15px; line-height: 1.45; }
 .drivers-page .driver-list .driver-date { margin-top: -6px; font-size: 14px; }
 .drivers-page .driver-kit { display: flex; margin-top: auto; align-items: center; gap: 8px; padding-top: 12px; border-top: 1px solid var(--line); color: var(--ink); font-size: 14px; line-height: 1.4; white-space: nowrap; }
+.drivers-page .building { margin-top: calc(-1 * clamp(16px, 3vw, 48px)); padding-bottom: clamp(48px, 7vw, 96px); }
+.drivers-page .building h2 { font-size: clamp(24px, 2.6vw, 32px); font-weight: 700; line-height: 1.1; letter-spacing: -.04em; }
+.drivers-page .building-lead { max-width: 60ch; margin-top: 10px; color: var(--grey2); font-size: 15px; line-height: 1.5; }
+.drivers-page .build-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 20px 0 0; padding: 0; list-style: none; }
+.drivers-page .build-list > li { display: flex; }
+.drivers-page .build { display: flex; flex-direction: column; gap: 8px; width: 100%; padding: 18px 20px; border: 1px dashed var(--line); border-radius: 14px; }
+.drivers-page .build-name { margin: 0; color: #e1d7cb; font-size: 17px; font-weight: 620; line-height: 1.25; letter-spacing: -.02em; }
+.drivers-page .build .driver-login { margin-top: 0; }
+.drivers-page .build-line { color: var(--grey2); font-size: 15px; line-height: 1.45; }
+.drivers-page .build-state { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin-top: auto; padding-top: 10px; border-top: 1px dashed var(--line); color: var(--grey2); font-size: 14px; line-height: 1.4; }
+.drivers-page .build-state a { margin-left: auto; color: var(--ink); text-decoration: underline; text-decoration-color: rgb(242 194 123 / 45%); text-underline-offset: 3px; }
+.drivers-page .build-state a:hover { text-decoration-color: var(--gold); }
 .drivers-page .own-driver { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: clamp(24px, 5vw, 72px); align-items: start; margin-bottom: clamp(56px, 8vw, 112px); padding: clamp(24px, 4vw, 48px); border: 1px solid var(--line); border-radius: 16px; background: var(--panel); }
 .drivers-page .own-driver h2 { font-size: clamp(28px, 3.4vw, 42px); font-weight: 720; line-height: 1.05; letter-spacing: -.045em; }
 .drivers-page .own-copy > p { max-width: 46ch; margin-top: 14px; color: var(--grey2); font-size: 16px; }
@@ -464,6 +476,7 @@ body.landing > main { flex: 1 0 auto; }
 }
 @media (max-width: 860px) {
   .drivers-page .driver-list { grid-template-columns: 1fr; }
+  .drivers-page .build-list { grid-template-columns: 1fr; }
 }
 @media (max-width: 760px) {
   .drivers-page .voyage { min-height: 0; padding-bottom: min(70vw, 480px); }
