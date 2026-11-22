@@ -242,7 +242,6 @@
       && (issue.subIssuesSummary?.total > 0 || labels(issue).includes('spec') || SPEC_TITLE.test(issue.title || '')));
     return { totalCount: nodes.length + Math.max(0, (search.totalCount ?? 0) - given.length), nodes };
   }
-  // The Models feed (MD6): fleet.md's model settings and the offered-models snapshot beside it (models.v1).
   const MODELS = `query Models($owner: String!, $name: String!) {
   rateLimit { limit remaining resetAt }
   repository(owner: $owner, name: $name) {

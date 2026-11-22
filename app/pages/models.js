@@ -1,17 +1,7 @@
-// The Models page (MD6): which models the project's agents run on, and a Change button per role.
-//
-// It reads docs/agents/fleet.md's Models table (or the older five tables) and the offered-models snapshot
-// docs/agents/models-offered.json, exactly as the models contract (openwiz.models.v1) pins them; a file it can't
-// read is refused, never guessed. Change opens a picker of the snapshot's settable choices, the recommended one
-// marked, and a pick shows and copies the contract's exact line for the user's agent. The page only reads: the
-// agent runs `openwiz models set` and commits the change.
 'use strict';
 (() => {
   const OW = window.OW;
 
-  // ---- The reader (OW.models), the contract's rules ----
-
-  // [key, the table's word, the command line's word, what the role does]
   const ROLES = [
     ['orchestrator', 'Orchestrator', 'orchestrator', 'Starts each spec\'s fleet thread.'],
     ['builder', 'Builder', 'builder', 'Builds each ticket.'],
@@ -31,7 +21,6 @@
   const cells = line => (line.length > 1 && line.startsWith('|') && line.endsWith('|') ? line.slice(1, -1).split('|').map(c => c.trim()) : null);
   const row = line => cells(line) || refuse('a table line that is not a table row');
 
-  // The lines under the one `## <name>` heading, to the next `## `; null when there is none.
   function section(lines, name) {
     const at = lines.flatMap((line, i) => (line === `## ${name}` ? [i] : []));
     if (at.length > 1) refuse(`more than one ## ${name} heading`);
@@ -45,7 +34,6 @@
     return { provider, model: modelId, effort: effortId, family: FAMILY[provider] ?? null, names: { harness, model, effort } };
   }
 
-  // `--provider P --model M --reasoning-level E`, in one code span.
   function flags(cell) {
     const words = /^`(.*)`$/.exec(cell)?.[1].split(' ') || refuse('flags not in one code span');
     if (words.length !== 6 || words[0] !== '--provider' || words[2] !== '--model' || words[4] !== '--reasoning-level'
@@ -80,7 +68,6 @@
     return roles;
   }
 
-  // One older `| Setting | Value | flag |` table: its Harness, Model and Effort rows.
   function settingTable(lines) {
     const rows = lines.filter(line => line.startsWith('|')).map(row);
     const names = [];
@@ -112,13 +99,10 @@
         small_builder: { follows: null, choice: tables[1] },
         fixer: { follows: null, choice: fixers[at] },
       },
-      // The six older rows, in KEPT's order, as written.
       rows: [tables[0], tables[1], tables[2], tables[3], fixers[0], fixers[1]],
     };
   }
 
-  // The older rows `set` keeps in step while both forms are present, and what each must equal from the Models table:
-  // the Builder, the Small builder, each family's review (cross-family rule) and fix round (fixer rule); null waits.
   const KEPT = ['Builder', 'Builder for small tickets', 'Reviewer for Claude-built', 'Reviewer for GPT-built', 'Fixer, Claude', 'Fixer, GPT'];
   function resolved({ builder, reviewer, small_builder: small, fixer }) {
     const review = family => [reviewer, builder].find(r => r.choice.family && r.choice.family !== family)?.choice ?? null;
@@ -126,7 +110,6 @@
     return [builder.choice, small.choice, review('claude'), review('gpt'), fix('claude'), fix('gpt')];
   }
   const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
-  // A kept row's two values: the model ids (or waits); when equal, model and effort; when those are too, all three.
   function values(now, was) {
     for (const keys of [['model'], ['model', 'effort'], ['provider', 'model', 'effort']]) {
       const [a, b] = [now, was].map(c => (c ? keys.map(k => c[k]).join(' ') : 'waits'));
@@ -135,7 +118,6 @@
     return [null, null];
   }
 
-  // fleet.md's text -> {form, olderPresent, roles: {key: {follows, choice}}, warnings: [text]}, or throws Refused.
   function read(text) {
     const lines = String(text).split(/\r?\n/);
     const olderPresent = OLDER.some(name => lines.includes(`## ${name}`));
@@ -148,8 +130,6 @@
       const word = reviewer.choice.family === 'claude' ? 'Claude' : 'GPT';
       warnings.push(`The Reviewer and the Builder are both ${word} models, so reviews of ${word}-built work wait (ADR 0008).`);
     }
-    // While both forms are present, each older row that differs from what the Models table resolves to is named:
-    // today's fleets still start from it. Unreadable older tables are ignored, as the Models table wins.
     let older = null;
     if (models && olderPresent) try { older = olderTables(lines).rows; } catch (error) { if (!(error instanceof Refused)) throw error; }
     if (older) {
@@ -162,20 +142,16 @@
     return { form: models ? 'models_table' : 'older_tables', olderPresent: Boolean(models) && olderPresent, roles, warnings };
   }
 
-  // The names `set` writes for a choice's ids.
   const written = (provider, model, effort) => ({
     harness: WRITTEN[provider] || provider, model: WRITTEN[model] || model, effort: effort.charAt(0).toUpperCase() + effort.slice(1) });
   const said = names => `${names.model} ${names.effort} on ${names.harness}`;
 
-  // The exact line for the user's agent: a choice ({provider, model, effort}), or null to follow the builder.
   function line(key, to) {
     const [, word, token] = ROLES.find(([k]) => k === key);
     if (!to) return `Set the ${word.toLowerCase()} to follow the builder: run \`openwiz models set ${token} follows-builder\` and commit the change.`;
     return `Set the ${word.toLowerCase()} to ${said(written(to.provider, to.model, to.effort))}: run \`openwiz models set ${token} ${to.provider} ${to.model} ${to.effort}\` and commit the change.`;
   }
 
-  // The snapshot's exact shape (models.v1.schema.json#/$defs/snapshot): every key it pins and no other, each of its type.
-  // The snapshot's two labels (models.v1 since OpenWiz #2239): a CloudRoom read, or the installed local harnesses.
   const LABELS = ['as reported by CloudRoom; it may answer from a saved copy', 'Installed local harnesses with OpenWiz\'s current choices'];
   const str = v => typeof v === 'string' && v !== '';
   const exactly = (v, keys) => Boolean(v) && typeof v === 'object' && !Array.isArray(v)
@@ -195,9 +171,6 @@
     && Object.values(s.recommended).every(r => exactly(r, ['choice', 'source', 'offered']) && str(r.source)
       && typeof r.offered === 'boolean' && (r.choice === null || validChoice(r.choice)));
 
-  // The snapshot's text -> {readAt, label, choices: [{provider, model, effort, names, settable, recommended: [key]}]},
-  // or throws Refused: a snapshot that breaks its schema (or offered nothing) gives no choice at all. Every offered
-  // choice is listed; only those `set` can write (the ids rule) are settable.
   function offered(text) {
     let snap;
     try { snap = JSON.parse(text); } catch { refuse('not JSON'); }
@@ -215,10 +188,8 @@
 
   OW.models = { read, offered, line, Refused };
 
-  // ---- The page ----
-
   const MAKE = 'Ask your agent to run `openwiz models list --save` and commit docs/agents/models-offered.json; the choices your harnesses offer then show here.';
-  const shown = { repo: null, open: null, picked: {} }; // for one repository: the open picker and each role's picked line
+  const shown = { repo: null, open: null, picked: {} };
 
   function render(el, feed) {
     const { h, time } = OW.ui;
@@ -226,9 +197,7 @@
     const repo = OW.data.repo.get()?.full;
     if (shown.repo !== repo) Object.assign(shown, { repo, open: null, picked: {} });
     if (!data) return el.replaceChildren(OW.ui.placeholder('Reading GitHub…'));
-    // A field GitHub refused or failed (an error at its path) is a failed read, never a missing file.
     const failed = field => (feed.errors || []).find(e => Array.isArray(e?.path) && e.path[0] === 'repository' && e.path[1] === field);
-    // One plain line, and the command that shows the models instead (a private repository the Viewer can't read).
     const failedText = (field, file) => `GitHub ${failed(field)?.type === 'FORBIDDEN' ? 'refused to read' : 'couldn\'t read'} ${file}, so the app can't show it here; run \`openwiz models show\` in the repository instead.`;
     if (failed('fleet')) return el.replaceChildren(h('div', { class: 'models' }, h('div', { class: 'unknown models-unread' }, failedText('fleet', 'docs/agents/fleet.md'))));
     if (!data.fleet) {
@@ -255,8 +224,6 @@
         snapshotNote = h('div', { class: 'notice bad' }, h('span', {}, h('b', {}, 'The list of offered models couldn\'t be read. '), MAKE));
       }
     }
-    // Choices and hand-offs only from a whole, current read: after a failed or partial read nothing is offered, and a
-    // line picked earlier is dropped unless this read still offers its choice.
     const fresh = feed.state === 'ok';
     if (!fresh) snapshot = null;
     for (const [key, picked] of Object.entries(shown.picked)) {
@@ -280,7 +247,6 @@
       const pick = to => {
         const record = { text: line(key, to), to, copied: null };
         shown.picked[key] = record;
-        // The copy may finish after the user left this page or repository: redraw only while this pick is still shown.
         Promise.resolve().then(() => navigator.clipboard.writeText(record.text)).then(() => true, () => false).then(copied => {
           record.copied = copied;
           const here = location.hash.replace(/^#\/?/, '').split('/')[0] === 'models';

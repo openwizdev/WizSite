@@ -1,12 +1,3 @@
-// The Models page (MD6, #1808), proof P6: the page reads fleet.md and the offered-models snapshot as the models
-// contract (openwiz.models.v1) pins them, and its Change button hands over exactly the contract's line.
-//
-// Two seams. The page's reader runs in Node on the contract's own fixtures (tests/models-fixtures/). Then the built
-// app runs in a real headless Chromium against recorded GitHub answers: sign in, pick the repository, open Models,
-// press Change, pick a choice and read the clipboard. Every request is answered here; anything else fails the test.
-//
-//   npm run build && node --test tests/models-page.test.mjs     (CHROME=/path/to/chrome picks the browser)
-//   SHOTS=dir node --test tests/models-page.test.mjs            also saves the page on a laptop and a phone
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
@@ -27,9 +18,6 @@ const json = async (url) => JSON.parse(await text(url));
 const CASES = ['one-table', 'five-tables', 'both', 'overridden', 'same-family'];
 const ROLE_KEYS = ['orchestrator', 'builder', 'reviewer', 'small_builder', 'fixer'];
 
-// ---- The reader, in Node ----------------------------------------------------------------------------------------
-
-// The page script as the app loads it, with only what it needs from the rest of the app.
 async function loadModels() {
   const file = new URL('app/pages/models.js', ROOT);
   assert.ok(existsSync(file), 'the app has no Models page script (app/pages/models.js)');
@@ -46,9 +34,6 @@ describe('the Models page reader', () => {
   let models;
   before(async () => { models = await loadModels(); });
 
-  // catches: a role read from the wrong row or table, a follow rule applied wrongly, the older tables' Reviewer or
-  // Fixer taken from the wrong family, a stale older table winning over the Models table, or an older table left out
-  // of step with the Models table read silently (its older_table_kept warning missing or worded otherwise).
   for (const name of CASES) {
     test(`${name}: every role reads as the contract's show fixture says`, async () => {
       const show = await json(new URL(`${name}/show.json`, FIX));
@@ -59,8 +44,6 @@ describe('the Models page reader', () => {
     });
   }
 
-  // catches: a broken Models table guessed at (so the page shows a model no reader would start), or a fall back to
-  // the older tables past a broken Models table.
   test('a broken Models table is refused, never guessed', async () => {
     const good = await text(new URL('one-table/fleet.md', FIX));
     const breaks = [
@@ -81,15 +64,11 @@ describe('the Models page reader', () => {
     assert.throws(() => models.read('# Fleet settings\n'), models.Refused);
   });
 
-  // catches: a hand-off line that differs from the contract's by a word, a name or a flag, so the agent runs
-  // something else or nothing.
   test('every hand-off line is exactly the contract\'s', async () => {
     const { lines } = await json(new URL('handoff.json', FIX));
     for (const { role, to, line } of lines) assert.equal(models.line(role, to), line);
   });
 
-  // catches: a choice the snapshot never offered, or one `set` can't write, offered as a Change; a recommendation
-  // shown when it isn't offered.
   test('the picker offers only the snapshot\'s settable choices, the recommended ones marked', async () => {
     const snapshot = await json(new URL('models-offered.json', FIX));
     const read = JSON.parse(JSON.stringify(models.offered(JSON.stringify(snapshot))));
@@ -108,8 +87,6 @@ describe('the Models page reader', () => {
     }
   });
 
-  // catches: a snapshot of the installed local harnesses (models.v1 since OpenWiz #2239: its label is the local one)
-  // refused as unreadable, so a local project gets no choices; or a label outside the schema's two taken.
   test('a local snapshot is read like a CloudRoom one, and any other label is refused', async () => {
     const local = await json(new URL('models-offered.json', FIX));
     local.label = 'Installed local harnesses with OpenWiz\'s current choices';
@@ -119,8 +96,6 @@ describe('the Models page reader', () => {
     assert.throws(() => models.offered(JSON.stringify({ ...local, label: 'Installed local harnesses' })), models.Refused);
   });
 
-  // catches (review R3): a snapshot that breaks its pinned schema (openwiz.models-offered.v1) still supplying
-  // choices: a harness without its name, a model with no effort, an unknown key, a broken recommendation.
   test('a snapshot that breaks its schema is refused whole, never offered', async () => {
     const good = await json(new URL('models-offered.json', FIX));
     const broken = [
@@ -158,8 +133,6 @@ describe('the Models page reader', () => {
     assert.doesNotThrow(() => models.offered(JSON.stringify(nullChoice)));
   });
 });
-
-// ---- The page, in a real browser ----------------------------------------------------------------------------------
 
 function chromePath() {
   const found = [process.env.CHROME, '/usr/bin/google-chrome', '/usr/bin/google-chrome-stable', '/usr/bin/chromium',
@@ -213,9 +186,6 @@ const TYPES = { html: 'text/html; charset=utf-8', css: 'text/css', js: 'text/jav
   webmanifest: 'application/manifest+json', svg: 'image/svg+xml', png: 'image/png', ico: 'image/x-icon', woff2: 'font/woff2' };
 const blob = value => (value === null ? null : { text: value });
 
-// GitHub as the app sees it: the sign-in, the picker's lists, and each feed's GraphQL read. `files` is what
-// HEAD:docs/agents/<name> holds for the Models read (null: no such file); `modelsStatus` other than 200 fails it;
-// `forbidden` names the fields GitHub refuses.
 class World {
   constructor({ fleet, offered, modelsStatus = 200, forbidden = [] }) {
     Object.assign(this, { fleet, offered, modelsStatus, forbidden, log: [], problems: [] });
@@ -246,7 +216,6 @@ class World {
       const rateLimit = { limit: 5000, remaining: 4800, resetAt: '2099-01-01T00:00:00Z' };
       if (/^\s*query\s+Models\b/.test(query)) {
         if (this.modelsStatus !== 200) return { status: this.modelsStatus, json: { message: 'Server Error' } };
-        // A field GitHub refuses (an App without contents access) comes back null, with a FORBIDDEN error at its path.
         const repository = { fleet: blob(this.fleet), offered: blob(this.offered) };
         const errors = this.forbidden.map(field => {
           repository[field] = null;
@@ -310,7 +279,6 @@ async function open(browser, world) {
       }
       assert.fail(`timed out waiting for ${what}; page text: ${(await page.text()).slice(0, 800)}`);
     },
-    // Click the visible button or link inside `scope` (a CSS selector) whose text is exactly this.
     click: (label, scope = 'body') => page.run(`(() => {
       const el = [...document.querySelector(${JSON.stringify(scope)}).querySelectorAll('a, button')]
         .find(e => e.offsetParent !== null && e.textContent.replace(/\\s+/g, ' ').trim() === ${JSON.stringify(label)});
@@ -333,7 +301,6 @@ async function open(browser, world) {
   return page;
 }
 
-// Signed in, acme/factory picked, on the Models page with its read done.
 async function modelsPage(browser, world) {
   const page = await open(browser, world);
   await page.go(`${SITE}/app/?code=c0de&state=${'S'.repeat(43)}`);
@@ -345,7 +312,6 @@ async function modelsPage(browser, world) {
   return page;
 }
 
-// The app never writes: only the site and GitHub, only reads, no GraphQL mutation; nothing thrown in the page.
 function readOnly(world) {
   for (const r of world.log) {
     const { origin, pathname } = new URL(r.url);
@@ -358,7 +324,6 @@ function readOnly(world) {
   assert.deepEqual(world.problems, []);
 }
 
-// A role's card text, by its heading.
 const card = (page, role) => page.run(`(() => { const c = [...document.querySelectorAll('.models .card')]
   .find(c => c.querySelector('h3')?.textContent === ${JSON.stringify(role)}); return c ? c.innerText.replace(/\\s+/g, ' ') : null; })()`);
 
@@ -372,8 +337,6 @@ describe('the Models page in the app', () => {
   });
   after(async () => { await browser?.close(); });
 
-  // catches: the page not reading fleet.md's Models table, a role left out, or what a following role follows
-  // not shown.
   test('one table: each role with its harness, model and effort, and what the small builder and fixer follow', async () => {
     const world = new World({ fleet: await text(new URL('one-table/fleet.md', FIX)), offered });
     const page = await modelsPage(browser, world);
@@ -386,8 +349,6 @@ describe('the Models page in the app', () => {
     await page.close();
   });
 
-  // catches: a project still on the older five tables shown as empty or wrong, or its reviewer taken from the
-  // wrong family's table.
   test('five tables: each role read from the older tables, the orchestrator following the builder', async () => {
     const fleet = (await text(new URL('five-tables/fleet.md', FIX)))
       .replace('| Model | Sol 6.2 | `--model gpt-6.2-sol` |', '| Model | Sol 6.1 | `--model gpt-6.1-sol` |');
@@ -401,8 +362,6 @@ describe('the Models page in the app', () => {
     await page.close();
   });
 
-  // catches: Change offering a model the snapshot doesn't list (or one set can't write), no read time or
-  // recommendation shown, or a copied line that isn't the contract's.
   test('Change: the snapshot\'s choices only, recommended marked, read time shown; a pick shows and copies the exact line', async () => {
     const world = new World({ fleet: await text(new URL('one-table/fleet.md', FIX)), offered });
     const page = await modelsPage(browser, world);
@@ -437,8 +396,6 @@ describe('the Models page in the app', () => {
     await page.close();
   });
 
-  // catches: an older table that fleets still start from, left out of step with the Models table, not shown on the
-  // page (the planner's ruling: the mismatch is never silent).
   test('both forms: an older table kept out of step is named on the page', async () => {
     const world = new World({ fleet: await text(new URL('both/fleet.md', FIX)), offered });
     const page = await modelsPage(browser, world);
@@ -449,9 +406,6 @@ describe('the Models page in the app', () => {
     await page.close();
   });
 
-  // catches (review R1, planner's ruling): GitHub refusing the file reads (a private repository the Viewer can't
-  // read) shown as a missing fleet.md with setup advice, or a refused snapshot as "none yet", or either without the
-  // command that shows the models instead (`openwiz models show`), or with any model shown.
   test('a refused file read is a failed read, never a missing file, and offers no choice', async () => {
     const fleet = await text(new URL('one-table/fleet.md', FIX));
     let world = new World({ fleet, offered, forbidden: ['fleet', 'offered'] });
@@ -475,8 +429,6 @@ describe('the Models page in the app', () => {
     await page.close();
   });
 
-  // catches (review R2): after a failed refresh the old read's choices stay selectable, or a hand-off copied from a
-  // snapshot that a newer read no longer has stays shown as the line to paste.
   test('a failed refresh offers no choice and drops the old hand-off; so does a refresh that finds no snapshot', async () => {
     const fleet = await text(new URL('one-table/fleet.md', FIX));
     for (const after of [{ modelsStatus: 502 }, { offered: null }]) {
@@ -497,8 +449,6 @@ describe('the Models page in the app', () => {
     }
   });
 
-  // catches (review R4): a clipboard write that finishes after the user left the page redrawing the Models cards
-  // into another page's body.
   test('a copy that finishes after leaving the page never draws Models into another page', async () => {
     const world = new World({ fleet: await text(new URL('one-table/fleet.md', FIX)), offered });
     const page = await modelsPage(browser, world);
@@ -515,7 +465,6 @@ describe('the Models page in the app', () => {
     await page.close();
   });
 
-  // catches: a project with no snapshot shown made-up choices, or left without a way to make one.
   test('no snapshot: the page says how to make one and offers no choice', async () => {
     const world = new World({ fleet: await text(new URL('one-table/fleet.md', FIX)), offered: null });
     const page = await modelsPage(browser, world);
@@ -527,7 +476,6 @@ describe('the Models page in the app', () => {
     await page.close();
   });
 
-  // catches: an unreadable snapshot or fleet.md shown as choices or roles, a failed read shown as empty.
   test('an unreadable snapshot, a broken fleet.md or a failed read: the page says what to do and offers no choice', async () => {
     const fleet = await text(new URL('one-table/fleet.md', FIX));
     let world = new World({ fleet, offered: '{"schema": "openwiz.models-offered.v1"' });
