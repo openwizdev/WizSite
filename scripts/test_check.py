@@ -908,11 +908,12 @@ class Checks(unittest.TestCase):
         grok = '<h3 class="driver-name" id="grok-bot-name">'
         for old, new, error in (
                 (explainer, '<div class="drivers-intro">', 'one explainer of what a driver is'),
-                ('five-check test.</p>', 'five-check test. It is free. It is fast.</p>', 'two sentences at most'),
+                ('five-check test on its real host.</p>', 'five-check test. It is free. It is fast.</p>', 'two sentences at most'),
                 ('every driver answers the same four commands', 'every driver answers the same commands', 'explainer must name'),
                 ('build software from tickets', 'build software', 'explainer must name'),
                 ('every driver answers the same four commands', 'every driver answers the same four commands (<code>version</code>, <code>start</code>, <code>wake</code>, <code>stop</code>)', 'stays out of the hero'),
-                ('five-check test.</p>', 'five-check test, token included.</p>', 'stays out of the hero'),
+                ('five-check test on its real host.</p>', 'five-check test on its real host, token included.</p>', 'stays out of the hero'),
+                ('must pass the same five-check test', 'passes the same five-check test', 'a requirement, never'),
                 ('<span>Kit: not run yet</span></p>', '<span>Kit: not run yet</span></p><ul>' + row + '</ul>', 'no per-check rows'),
                 ('<span>Kit: not run yet</span></p>', '<span>Kit: not run yet</span></p><ol><li class="proof-check" data-check="token">x</li></ol>', 'one kit line, never per-check rows'),
                 ('<span>Kit: not run yet</span>', '<span>Kit: not run yet. Its kit run comes next.</span>', 'one kit line must read'),

@@ -902,6 +902,8 @@ def check_driver_explainer(main):
     assert not missing, f'the driver explainer must name {missing}'
     agents, commands = text.lower().find('agents', text.find('.') + 1), text.lower().find('four commands')
     assert 0 <= agents < commands, 'under the headline, the driver explainer first says what OpenWiz\'s agents do, then the four commands'
+    assert re.search(r'\bmust pass the same five-check test on its real host\b', text) and not re.search(r'\bevery\b[^.]*\bpasses\b', text), \
+        'the driver explainer states the test as a requirement, never as every driver\'s result'
     listed = [word for word in KIT_CHECKS if re.search(rf'\b{word}\b', text)] + re.findall(r'<code\b', found[0])
     assert not listed, f'the command-by-command detail stays out of the hero\'s explainer: {listed}'
 
