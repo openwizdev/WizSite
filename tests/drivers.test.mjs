@@ -134,8 +134,12 @@ test('the key-host section says where a host key lives, who reads it, where it g
   assert.match(fact.lives, /system keychain/, 'N4: read from the user\'s system keychain');
   assert.match(fact.lives, /environment variable you set/, 'N4: or from the environment variable the user set');
   assert.match(fact.stored, /OpenWiz never stores it/, 'N4: OpenWiz never stores a key');
-  assert.match(fact.stored, /remove it/, 'removing it is how the user revokes it');
-  assert.match(fact.stored, /revoke/, 'removing it is how the user revokes it');
+  assert.match(fact.stored, /revoke/, 'the fact says how the user revokes it');
+  assert.match(fact.stored, /clear every place you put it/, 'one copy left behind still works: clear every copy');
+  assert.match(fact.stored, /keychain entry/, 'a copy can sit in the keychain entry');
+  assert.match(fact.stored, /environment variable/, 'a copy can sit in the environment variable');
+  assert.match(fact.stored, /restart anything that inherited/, 'a running process keeps an inherited value until it restarts');
+  assert.doesNotMatch(fact.stored, /remove it from there/, 'no single-copy removal advice');
   assert.match(fact.helper, /one small helper in the kernel's driver kit/, 'N4: one helper in the kit');
   assert.match(fact.helper, /only thing that reads/, 'N4: the helper alone reads the key');
   assert.match(fact.helper, /only over HTTPS to that host's own registered address/, 'N4: sent only over HTTPS to the host\'s registered address');
