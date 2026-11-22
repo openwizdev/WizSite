@@ -108,6 +108,17 @@ describe('the Models page reader', () => {
     }
   });
 
+  // catches: a snapshot of the installed local harnesses (models.v1 since OpenWiz #2239: its label is the local one)
+  // refused as unreadable, so a local project gets no choices; or a label outside the schema's two taken.
+  test('a local snapshot is read like a CloudRoom one, and any other label is refused', async () => {
+    const local = await json(new URL('models-offered.json', FIX));
+    local.label = 'Installed local harnesses with OpenWiz\'s current choices';
+    const read = models.offered(JSON.stringify(local));
+    assert.equal(read.label, local.label);
+    assert.equal(read.choices.filter(c => c.settable).length, 14);
+    assert.throws(() => models.offered(JSON.stringify({ ...local, label: 'Installed local harnesses' })), models.Refused);
+  });
+
   // catches (review R3): a snapshot that breaks its pinned schema (openwiz.models-offered.v1) still supplying
   // choices: a harness without its name, a model with no effort, an unknown key, a broken recommendation.
   test('a snapshot that breaks its schema is refused whole, never offered', async () => {
