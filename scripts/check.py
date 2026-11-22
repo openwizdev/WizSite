@@ -139,9 +139,11 @@ FOOTER_LINKS = (('/drivers/', 'Drivers'), ('/changelog/', 'Changelog'), ('https:
 FOOTER_LINE = 'Apache-2.0. Owned by no one.'
 X_ACCOUNT = 'https://x.com/openwiz'
 CLOUDROOM_LINK = 'https://cloudroom.dev'
-INSTALL_NOTE = 'Needs CloudRoom, on an Apple-silicon Mac or x86_64 Linux. Your agent can install it; you sign in.'
-INSTALL_NOTE_HTML = ('<p class="install-note">Needs <a href="https://cloudroom.dev" rel="noreferrer">CloudRoom</a>, '
-                     'on an Apple-silicon Mac or x86_64 Linux. Your agent can install it; you sign in.</p>')
+INSTALL_NOTE = ('No CloudRoom needed to install. Your agents run on this computer, with the Claude Code or Codex '
+                "you're signed in to, or on boat.dev or CloudRoom. For an Apple-silicon Mac or x86_64 Linux.")
+INSTALL_NOTE_HTML = ('<p class="install-note">No CloudRoom needed to install. Your agents run on this computer, with the '
+                     "Claude Code or Codex you're signed in to, or on boat.dev or "
+                     '<a href="https://cloudroom.dev" rel="noreferrer">CloudRoom</a>. For an Apple-silicon Mac or x86_64 Linux.</p>')
 FAQ = (ROOT / 'faq.html').read_text()
 FAQ_TOP = re.sub(r'<(/?)h3\b', r'<\1h2', re.sub(r'<(/?)h2\b', r'<\1h1', FAQ))
 FAQ_SLOTS = {'<template data-slot="faq"></template>\n': FAQ, '<template data-slot="faq-h1"></template>\n': FAQ_TOP}
@@ -151,8 +153,8 @@ FAQ_TITLE = ('Questions', 'The short ones are here.')
 FAQ_QUESTIONS = ('What is OpenWiz?', 'What is a kernel?', 'What do I need to run it?', 'Where do my agents run?',
                  'Does OpenWiz see my code or my logins?', 'What does it cost?', 'Can you set it up for my team?')
 FAQ_LAST = 'Yes. Book a 30-minute call. Your first fleet ships on it.'
-FAQ_WHERE = ('Through CloudRoom: OpenWiz runs on it, so it comes first. Once OpenWiz is set up, a fleet can also run '
-             'agents on boat.dev or your own computer. Each is a driver that passed the same five-check test.')
+FAQ_WHERE = ("Where you choose: this computer, with the Claude Code or Codex you're signed in to, boat.dev, or "
+             'CloudRoom. CloudRoom is optional. Each is a driver that passed the same five-check test.')
 
 
 def with_footer(html):
