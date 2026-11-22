@@ -227,7 +227,7 @@ DRIVERS = (
     ('boat-dev', 'boat.dev', 'Passed all five checks', 'passed'),
     ('vps', 'Your own computer or VPS', 'Passed the kit on a Linux PC', 'passed'),
     ('cloudroom', 'Cloudroom', 'Passed the kit, run from a Cloudroom cloud thread against real Cloudroom', 'passed'),
-    ('openclaw', 'OpenClaw', 'Passed its live check, 5 of 5 on a real host; ships in the next release', 'passed'),
+    ('openclaw', 'OpenClaw', 'Passed its live check, 5 of 5 on a real host; not in a release yet', 'passed'),
     ('grok-bot', 'Grok Bot', 'On hold: Grok Bot has no way yet for a program to wake or stop a run', 'not yet run'),
 )
 DRIVER_HERO = 'boat-dev'
@@ -238,8 +238,7 @@ DRIVER_PASSED = {
     'vps': ('2026-11-20', 'https://github.com/openwizdev/OpenWiz/pull/1455#issuecomment-7034588211'),
     'openclaw': ('2026-11-22', 'https://github.com/openwizdev/OpenWiz/issues/1991#issuecomment-7087326408'),
 }
-# Passed its live check, but its driver merges after the next release cut: no host pill yet, and its line says so.
-DRIVER_NEXT_RELEASE = {'openclaw': 'ships in the next release'}
+DRIVER_NEXT_RELEASE = {'openclaw': 'not in a release yet'}
 DRIVER_COMING = 'grok-bot'
 DRIVER_LOGINS = {
     'boat-dev': 'Login: held by boat.dev',
