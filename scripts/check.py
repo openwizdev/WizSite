@@ -1267,7 +1267,7 @@ class ReleaseOutline(HTMLParser):
         classes = (attrs.get('class') or '').split()
         self.tags.append((tag, attrs))
         if tag == 'article':
-            self.entries.append({'name': '', 'small': '', 'date': None, 'headline': '', 'bullets': [], 'links': []})
+            self.entries.append({'name': '', 'small': '', 'after': '', 'date': None, 'headline': '', 'bullets': [], 'links': []})
         elif tag == 'p' and 'pre' in classes:
             self.pre = {'text': '', 'links': []}
         if tag == 'time' and self.entries:
@@ -1280,7 +1280,7 @@ class ReleaseOutline(HTMLParser):
 
     def handle_endtag(self, tag):
         if tag in ('h2', 'small', 'p', 'li'):
-            self.at = 'name' if tag == 'small' else None
+            self.at = 'after' if tag == 'small' else None
 
     def handle_data(self, data):
         if self.pre is not None:
@@ -1304,8 +1304,8 @@ def check_releases(section, releases, live):
     for got, data in zip(outline.entries, want):
         flat = lambda t: re.sub(r'\s+', ' ', t).strip()
         y, m, d = map(int, data['date'].split('-'))
-        assert (flat(got['name']), flat(got['small'])) == (data['name'], f'· {MONTHS[m - 1]} {d}, {y} ({data["semver"]})'), \
-            f'{data["name"]}: the entry is headed by its public name, its date and semver small beside it, newest first'
+        assert (flat(got['name']), flat(got['small']), flat(got['after'])) == (data['name'], f'· {MONTHS[m - 1]} {d}, {y} ({data["semver"]})', ''), \
+            f'{data["name"]}: the entry is headed by its whole public name, then its date and semver small, nothing after it, newest first'
         assert got['date'] == data['date'], f'{data["name"]}: the entry\'s date'
         assert flat(got['headline']) == data['headline'], f'{data["name"]}: the entry\'s headline'
         assert [flat(b) for b in got['bullets']] == data['bullets'], f'{data["name"]}: the entry\'s bullets'
