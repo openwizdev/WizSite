@@ -109,7 +109,7 @@ test('a non-verified listing never shows verified', () => {
 
 test('a malformed snapshot fails the build', () => {
   const broken = Object.fromEntries(readdirSync(join(FIXTURES, 'broken')).filter(name => name.endsWith('.json')).sort().map(name => [name, bytes(`broken/${name}`)]));
-  assert.equal(Object.keys(broken).length, 27, 'the broken fixtures are there');
+  assert.equal(Object.keys(broken).length, 29, 'the broken fixtures are there');
   const valid = bytes('contract-index.json');
   const at = valid.indexOf('Example driver');
   broken['invalid UTF-8'] = Buffer.concat([valid.subarray(0, at), Buffer.from([0xc3, 0x28]), valid.subarray(at)]);
@@ -128,12 +128,14 @@ test('the build refuses what WizMarket refuses: repeated keys, bad text, impossi
     ['repeated-key-escaped.json', /key status twice/],
     ['unpaired-surrogate.json', /unpaired surrogate/],
     ['receipt-date-impossible.json', /date is not a calendar date/],
+    ['receipt-date-year-zero.json', /date is not a calendar date/],
+    ['repeated-key-private.json', /key \(not shown\) twice/],
     ['summary-password.json', /looks like a token/],
   ]) {
     const { code, stderr } = build(bytes(`broken/${name}`));
     assert.notEqual(code, 0, `${name}: the build passed`);
     assert.match(stderr, why, `${name}: says why (${stderr.trim().split('\n').at(-1)})`);
-    assert.doesNotMatch(stderr, /example-not-a-real-one/, `${name}: the refusal never prints the value`);
+    assert.doesNotMatch(stderr, /example[-_]not[-_]a[-_]real[-_]one/, `${name}: the refusal never prints the value`);
   }
 });
 
