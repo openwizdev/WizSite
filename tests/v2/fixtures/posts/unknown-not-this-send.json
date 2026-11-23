@@ -1,0 +1,64 @@
+{
+  "about": "After an unknown, the same words from another account, or from this account before the send, are not this send: it sends once more.",
+  "account": {
+    "id": 5001,
+    "login": "acme-owner"
+  },
+  "picked": {
+    "full": "acme/factory",
+    "private": true
+  },
+  "github": {},
+  "comments": {
+    "41": [
+      {
+        "id": 9100020,
+        "user": {
+          "id": 5002,
+          "login": "acme-helper"
+        },
+        "body": "stop",
+        "created_at": "2030-02-01T00:00:00Z"
+      },
+      {
+        "id": 9100021,
+        "user": {
+          "id": 5001,
+          "login": "acme-owner"
+        },
+        "body": "stop",
+        "created_at": "2000-01-01T00:00:00Z"
+      }
+    ]
+  },
+  "steps": [
+    {
+      "compose": "spec-not_now",
+      "as": "a"
+    },
+    {
+      "confirm": "a",
+      "tap": 1
+    },
+    {
+      "post": "a",
+      "write": "dropped",
+      "expect": {
+        "outcome": "unknown"
+      }
+    },
+    {
+      "confirm": "a",
+      "tap": 2
+    },
+    {
+      "post": "a",
+      "write": "ok",
+      "expect": {
+        "outcome": "posted",
+        "same": "a"
+      }
+    }
+  ],
+  "writes": 2
+}
