@@ -109,7 +109,7 @@ test('a non-verified listing never shows verified', () => {
 
 test('a malformed snapshot fails the build', () => {
   const broken = Object.fromEntries(readdirSync(join(FIXTURES, 'broken')).filter(name => name.endsWith('.json')).sort().map(name => [name, bytes(`broken/${name}`)]));
-  assert.equal(Object.keys(broken).length, 29, 'the broken fixtures are there');
+  assert.equal(Object.keys(broken).length, 30, 'the broken fixtures are there');
   const valid = bytes('contract-index.json');
   const at = valid.indexOf('Example driver');
   broken['invalid UTF-8'] = Buffer.concat([valid.subarray(0, at), Buffer.from([0xc3, 0x28]), valid.subarray(at)]);
@@ -131,12 +131,32 @@ test('the build refuses what WizMarket refuses: repeated keys, bad text, impossi
     ['receipt-date-year-zero.json', /date is not a calendar date/],
     ['repeated-key-private.json', /key \(not shown\) twice/],
     ['summary-password.json', /looks like a token/],
+    ['summary-password-long-s.json', /looks like a token/],
   ]) {
     const { code, stderr } = build(bytes(`broken/${name}`));
     assert.notEqual(code, 0, `${name}: the build passed`);
     assert.match(stderr, why, `${name}: says why (${stderr.trim().split('\n').at(-1)})`);
     assert.doesNotMatch(stderr, /example[-_]not[-_]a[-_]real[-_]one/, `${name}: the refusal never prints the value`);
   }
+});
+
+test('the privacy scan refuses every string WizMarket\'s own scan refuses, every BMP code point at every probe position', async () => {
+  const { validate } = await import('../scripts/market.mjs');
+  const run = spawnSync('python3', ['-I', join(FIXTURES, 'private-parity.py')], { encoding: 'utf8', maxBuffer: 1 << 28 });
+  assert.equal(run.status, 0, run.stderr);
+  const { cases } = JSON.parse(run.stdout);
+  assert.ok(cases.length > 400, 'the probes ran');
+  const missed = [];
+  for (const [probe, at, ranges] of cases) {
+    for (const [first, last] of ranges) {
+      for (let point = first; point <= last; point++) {
+        const text = probe.slice(0, at) + String.fromCharCode(point) + probe.slice(at + 1);
+        try { validate([text]); } catch (error) { if (/holds what looks like/.test(error.message)) continue; }
+        if (missed.push(`${JSON.stringify(probe)} at ${at}: U+${point.toString(16).toUpperCase().padStart(4, '0')}`) >= 20) break;
+      }
+    }
+  }
+  assert.deepEqual(missed, [], 'strings WizMarket refuses and the site would publish');
 });
 
 test('any tag set builds and passes the site checker: distinct ids, registry links in generated markup only', () => {
