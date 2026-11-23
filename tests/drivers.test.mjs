@@ -121,7 +121,7 @@ test('the Write your own driver part shows the contract\'s copy line once, and C
   }
 });
 
-test('the key-host section says where a host key lives, who reads it, where it goes, and that the five checks have no exception; Devin is coming soon', async () => {
+test('the key-host section says where a host key lives, who reads it, where it goes, and that the five checks have no exception', async () => {
   const html = await readFile(join(ROOT, 'drivers/index.html'), 'utf8');
   const text = s => s.replace(/<[^>]+>/g, ' ').replace(/&#39;|&rsquo;/g, '\'').replace(/\s+/g, ' ').trim();
   const sections = html.match(/<section class="[^"]*\bkey-hosts\b[^"]*"[\s\S]*?<\/section>/g) ?? [];
@@ -150,11 +150,67 @@ test('the key-host section says where a host key lives, who reads it, where it g
   assert.match(fact.checks, /same five checks/, 'driver v1 section 3: the same five checks, no sixth');
   assert.match(fact.checks, /can't wake or stop a run gets no driver/, 'wake and stop are two of the five checks');
   assert.doesNotMatch(text(section), /\bsix(th)?\b|\bexcept(ion)?\b|\bwaive/i, 'no extra or skipped check');
-  const devin = section.match(/<article class="[^"]*" id="key-host-devin"[^>]*>([\s\S]*?)<\/article>/);
-  assert.ok(devin, 'Devin has its coming-soon card in the key-host section');
-  assert.match(text(devin[1]), /^Devin Coming soon: listed when its live check on a real Devin account records 5 of 5\./);
-  assert.match(devin[1], /href="https:\/\/github\.com\/openwizdev\/openwiz\/issues\/1997"/);
-  assert.doesNotMatch(text(devin[1]), /\bpassed\b|\blive\b(?! check)|\breleased\b|\bavailable\b/i, 'Devin is never shown as live');
-  const elsewhere = html.replace(section, '');
-  assert.doesNotMatch(elsewhere, /devin/i, 'Devin is named only in its coming-soon card');
+});
+
+test('the rendered Devin card says exactly that Devin is coming soon, links its live check, and sits in the key-host section, outside every passed list', async () => {
+  assert.ok(existsSync(join(DIST, 'drivers/index.html')), 'run npm run build first');
+  const server = await serve();
+  const origin = `http://127.0.0.1:${server.address().port}`;
+  const browser = await launch();
+  try {
+    const { send, listeners } = browser;
+    const { targetId } = await send('Target.createTarget', { url: 'about:blank' });
+    const { sessionId } = await send('Target.attachToTarget', { targetId, flatten: true });
+    const page = (method, params) => send(method, params, sessionId);
+    listeners.push(message => {
+      if (message.sessionId !== sessionId || message.method !== 'Fetch.requestPaused') return;
+      const { requestId, request } = message.params;
+      if (request.url.startsWith(origin + '/')) page('Fetch.continueRequest', { requestId }).catch(() => {});
+      else page('Fetch.failRequest', { requestId, errorReason: 'BlockedByClient' }).catch(() => {});
+    });
+    await page('Fetch.enable', { patterns: [{ urlPattern: '*', requestStage: 'Request' }] });
+    await page('Page.enable');
+    const loaded = new Promise(resolve => listeners.push(m => m.sessionId === sessionId && m.method === 'Page.loadEventFired' && resolve()));
+    await page('Page.navigate', { url: `${origin}/drivers/` });
+    await loaded;
+    const { result } = await page('Runtime.evaluate', { returnByValue: true, expression: `(() => {
+      const norm = s => s.replace(/\\s+/g, ' ').trim();
+      const cards = document.querySelectorAll('#key-host-devin');
+      if (cards.length !== 1) return { cards: cards.length };
+      const card = cards[0];
+      card.scrollIntoView({ block: 'center' });
+      const box = card.getBoundingClientRect();
+      const rest = document.documentElement.cloneNode(true);
+      rest.querySelector('#key-host-devin').remove();
+      return {
+        cards: 1,
+        visible: box.width > 0 && box.height > 0 && getComputedStyle(card).visibility === 'visible',
+        parts: [...card.children].map(e => [e.tagName.toLowerCase(), e.className, norm(e.textContent)]),
+        shown: norm(card.innerText),
+        links: [...card.querySelectorAll('a')].map(a => [norm(a.textContent), a.href]),
+        inKeyHosts: card.closest('section') === document.querySelector('section.key-hosts'),
+        inPassedList: Boolean(card.closest('.driver-list, .host-marks, .spotlight, [data-state="passed"], .passed')),
+        passedInside: card.querySelectorAll('[data-state="passed"], .passed').length,
+        devinElsewhere: (rest.outerHTML.match(/devin/gi) ?? []).length,
+      };
+    })()` });
+    assert.deepEqual(result.value, {
+      cards: 1,
+      visible: true,
+      parts: [
+        ['h3', 'build-name', 'Devin'],
+        ['p', 'build-line', 'Coming soon: listed when its live check on a real Devin account records 5 of 5.'],
+        ['p', 'build-state', 'Coming soon Live check'],
+      ],
+      shown: 'Devin Coming soon: listed when its live check on a real Devin account records 5 of 5. Coming soon Live check',
+      links: [['Live check', 'https://github.com/openwizdev/openwiz/issues/1997']],
+      inKeyHosts: true,
+      inPassedList: false,
+      passedInside: 0,
+      devinElsewhere: 0,
+    });
+  } finally {
+    await browser.close();
+    server.close();
+  }
 });
