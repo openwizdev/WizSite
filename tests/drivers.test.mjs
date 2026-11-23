@@ -152,8 +152,10 @@ test('the key-host section says where a host key lives, who reads it, where it g
   assert.doesNotMatch(text(section), /\bsix(th)?\b|\bexcept(ion)?\b|\bwaive/i, 'no extra or skipped check');
 });
 
-test('the rendered Drivers page shows exactly one visible Devin tile in a pre-live state', async () => {
+test('the rendered Drivers page shows exactly one visible Devin entry', async () => {
   assert.ok(existsSync(join(DIST, 'drivers/index.html')), 'run npm run build first');
+  const snapshot = JSON.parse(await readFile(join(ROOT, 'market/registry.json'), 'utf8'));
+  const listing = snapshot.listings.find(item => item.id === 'devin' && item.tags.includes('driver'));
   const server = await serve();
   const origin = `http://127.0.0.1:${server.address().port}`;
   const browser = await launch();
@@ -183,14 +185,14 @@ test('the rendered Drivers page shows exactly one visible Devin tile in a pre-li
     };
     const readDevin = () => evaluate(() => {
       const norm = s => s.replace(/\s+/g, ' ').trim();
-      const tiles = document.querySelectorAll('#devin');
+      const tiles = document.querySelectorAll('article[data-listing="devin"], li.tile[data-listing="devin"], #devin');
       if (tiles.length !== 1) return { tiles: tiles.length };
       const [tile] = tiles;
       const box = tile.getBoundingClientRect();
       const state = tile.dataset.state;
       const group = tile.parentElement.closest('[data-state]');
       const rest = document.documentElement.cloneNode(true);
-      rest.querySelector('#devin').remove();
+      rest.querySelector('#' + CSS.escape(tile.id)).remove();
       const released = '[data-state="live"], [data-state="passed"], [data-state="shipped"], .live, .passed, .shipped';
       return {
         tiles: tiles.length,
@@ -199,14 +201,56 @@ test('the rendered Drivers page shows exactly one visible Devin tile in a pre-li
         inHostGroup: tile.matches('li.tile') && group?.id === `hosts-${state}`
           && group.dataset.state === state && Boolean(group.closest('#hosts')),
         state,
-        names: [...tile.querySelectorAll('h4')].map(e => norm(e.innerText)),
+        names: [...tile.querySelectorAll('h3, h4')].map(e => norm(e.innerText)),
         shown: norm(tile.innerText),
         links: [...tile.querySelectorAll('a')].map(a => [norm(a.innerText), a.href]),
         markedReleased: Boolean(tile.closest(released) || tile.querySelector(released)),
         devinElsewhere: /devin/i.test(rest.outerHTML),
         comingSoon: /coming soon/i.test(norm(tile.textContent)),
+        listing: tile.dataset.listing,
+        stage: tile.dataset.stage,
+        status: tile.dataset.status,
+        login: tile.querySelector('.driver-login')?.innerText,
+        summary: tile.querySelector('.build-line')?.innerText,
+        wording: tile.querySelector('.tile-state')?.innerText,
+        kit: tile.querySelector('.driver-kit')?.innerText,
+        marks: document.querySelectorAll('li[data-host][data-listing="devin"]').length,
       };
     });
+
+    if (listing) {
+      const entry = await readDevin();
+      assert.equal(entry.tiles, 1, 'exactly one registry-covered Devin card');
+      assert.equal(entry.visible, true);
+      assert.deepEqual([entry.listing, entry.stage, entry.status], [listing.id, listing.stage, listing.status]);
+      assert.deepEqual(entry.names, [listing.name]);
+      assert.equal(entry.login, listing.login ? 'Login: ' + listing.login : undefined);
+      const receipt = listing.proof?.receipt;
+      if (listing.stage === 'available' && receipt) {
+        assert.equal(entry.marks, 1);
+        assert.equal(entry.kit, 'Kit: passed, 5 of 5');
+        assert.deepEqual(entry.links, [['Kit run, ' + receipt.date, receipt.url]]);
+      } else {
+        assert.equal(entry.marks, 0);
+        assert.equal(entry.inHostGroup, true);
+        assert.equal(entry.summary, listing.summary);
+        if (listing.stage === 'being-built') {
+          const work = listing.links[0];
+          const links = [[work.label, work.url]];
+          if (receipt) {
+            assert.equal(entry.wording, 'Passed its live check, 5 of 5 on a real host; not in a release yet');
+            links.push(['Live check receipt, ' + receipt.date, receipt.url]);
+          } else {
+            assert.equal(entry.markedReleased, false);
+          }
+          assert.deepEqual(entry.links, links);
+        } else {
+          assert.equal(entry.markedReleased, false);
+          assert.deepEqual(entry.links, [['Get it', listing.url]]);
+        }
+      }
+      return;
+    }
 
     const labels = {
       review: 'In review',
