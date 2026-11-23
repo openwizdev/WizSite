@@ -1,0 +1,27 @@
+{
+  "commit": "dddddddddddddddddddddddddddddddddddddddd",
+  "contract": "listing.v1",
+  "listings": [
+    {
+      "id": "example-cloudroom-tool",
+      "links": [
+        {
+          "label": "Issue",
+          "url": "https://tracker.example.com/example-owner/example-tool/-/issues/1?view=full#note-2"
+        }
+      ],
+      "name": "Example tool on a shared host",
+      "plugs_into": "The agent's MCP servers",
+      "publisher": "example-publisher",
+      "stage": "being-built",
+      "status": "listed",
+      "summary": "https://summary.example.com/a-summary-not-a-link-field",
+      "tags": [
+        "driver",
+        "driver-name",
+        "mcp-server"
+      ],
+      "url": "https://cloudroom.dev"
+    }
+  ]
+}

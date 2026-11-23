@@ -1,0 +1,8 @@
+{
+  "commit": "dddddddddddddddddddddddddddddddddddddddd",
+  "contract": "listing.v1",
+  "listings": [
+    {
+      "id": "example-driver",
+      "login": "Your own login on the example host",
+      "na
