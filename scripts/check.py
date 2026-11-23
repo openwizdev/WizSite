@@ -501,7 +501,7 @@ def check_ref(root, source, ref, pages, favicons=(), market=None):
         assert target in pages and unquote(url.fragment) in pages[target].ids, f'missing fragment: {ref}'
 
 
-def check_site(root):
+def check_site(root, registry=ROOT / 'market/registry.json'):
     files = {p.relative_to(root).as_posix() for p in root.rglob('*') if p.is_file()}
     names = built_fingerprints(root)
     assert files == STATIC | set(names.values()), 'unexpected or missing build output'
@@ -535,7 +535,7 @@ def check_site(root):
         assert path == root / TEAM_PAGE or not page.books, f'a booking link outside the team page: {path.name}'
         x_links = 2 if path == root / TEAM_PAGE else 1
         assert page.x_links == x_links, f'one X link per page, the footer\'s: {path.relative_to(root)} has {page.x_links}'
-        market = market_urls() if path == root / MARKET_PAGE else None
+        market = market_urls(registry) if path == root / MARKET_PAGE else None
         for ref in page.refs:
             check_ref(root, path, ref, pages, page.favicons, market)
         assert page.cloudroom_links == (1 if path == root / 'index.html' else 0), \
