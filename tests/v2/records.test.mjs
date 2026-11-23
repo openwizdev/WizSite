@@ -591,6 +591,17 @@ test('R1: a session switched during post\'s reads never posts under the new acco
   assert.deepEqual(run.net.posts(), [], 'the confirmed preview was posted after the session changed');
 });
 
+test('R1: a preview composed under one sign-in is never posted under another', async () => {
+  const run = await boot();
+  const preview = await steerPreview(run);
+  run.storage.set('openwiz.app.auth', JSON.stringify({ session: 'session-later', token: 'synthetic-token-other',
+    expiresAt: null, refresh: null, refreshExpiresAt: null, account: OTHER.id }));
+  run.records.confirm(preview, tap());
+  const from = run.net.log.length;
+  assert.deepEqual(plain(await run.records.post(preview)), { outcome: 'refused', op: preview.op, reason: 'not_composed' });
+  assert.equal(run.net.log.length, from, 'a preview from an earlier sign-in made requests');
+});
+
 test('R1: records-layer requests never follow a redirect, and a redirected write is refused', async () => {
   const run = await boot();
   const preview = await steerPreview(run);
