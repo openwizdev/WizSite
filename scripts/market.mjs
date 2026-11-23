@@ -42,7 +42,7 @@ export function isUrl(value) {
   if (!match) return false;
   const [, host, port] = match;
   const labels = host.split('.');
-  if (host.length > 253 || labels.length < 2 || !/[A-Za-z]/.test(labels.at(-1))) return false;
+  if (host.length > 253 || labels.length < 2 || !/^[A-Za-z]/.test(labels.at(-1))) return false;
   if (!labels.every(label => /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$/.test(label))) return false;
   return port === undefined || (/^[1-9][0-9]*$/.test(port) && Number(port) <= 65535);
 }
