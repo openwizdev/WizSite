@@ -122,7 +122,6 @@ const CHECKS = {
   source_changed: input => input.action.item.type === 'decision' && sourceOf(input).result === 'changed',
   source_unchecked: input => input.action.item.type === 'decision' && sourceOf(input).result === 'unchecked',
 };
-// Recorded GitHub answers: keys are `METHOD /path?query`, exactly as the app asks.
 function recorded(github) {
   const world = { requests: 0, github };
   world.get = path => {
@@ -151,7 +150,6 @@ function recordAuthors(text) {
   return row ? new Set([...row.split('|')[2].matchAll(/`([^`]*)`/g)].map(m => m[1].toLowerCase())) : null;
 }
 
-// decisions.v1 request records, with the grill variants this contract's grill read adds.
 const QUESTION = /^[A-Z]{1,2}[1-9][0-9]*$/;
 const GRILL_FILE = /^docs\/grills\/[A-Za-z0-9][A-Za-z0-9_.-]*\.md$/;
 const COMMON = ['schema', 'kind', 'id', 'status', 'fingerprint', 'risk'];
@@ -190,7 +188,6 @@ function readRecord(body) {
     ? { record: r } : { malformed: true };
 }
 
-// grill's latest() (skills/grill/scripts/records.py in WizSkills): the saved proposal a grill request must equal.
 function latest(source) {
   if (!source.startsWith('# Grill: ') || source.includes('\r')) throw new Error('unreadable saved grill');
   let selected = null;
@@ -240,7 +237,6 @@ function latest(source) {
   return { kind: selected.kind, risk, round: selected.round, questions };
 }
 
-// revision-v2 text, as skills/to-tickets/revision.sh in WizSkills prints it.
 const untick = body => `${body}\n`.split('\n').map(l => l.replace(/^([ \t]*[-*+][ \t]+)\[[xX]\]$/, '$1[ ]')
   .replace(/^([ \t]*[-*+][ \t]+)\[[xX]\]([ \t\r])/, '$1[ ]$2')).join('\n');
 const headline = body => {
@@ -385,7 +381,6 @@ test('accepted bodies with JSON escapes are written verbatim, never decoded', as
   }
 });
 
-// The grill pull request read ("### Grill pull requests") and the queue's currentness, over recorded answers.
 function grillQueue(fx, world, now) {
   assert.ok(section('### Grill pull requests').length > 3, 'the contract names no grill pull request read');
   const repository = fx.picked.full;
@@ -440,7 +435,6 @@ test('the queue reads grill pull requests, and current rests on a fresh source c
   }
 });
 
-// OW.records as the contract's "Interfaces" section specifies it, run over recorded post sequences.
 function confirmsFor(preview, item) {
   const rows = table('### Confirmation');
   const row = item.type === 'spec' ? rows.find(r => r.Risk === 'a spec steer') : rows.find(r => code(r.Risk).includes(item.request.risk));

@@ -151,7 +151,6 @@ export class World {
     return { status: 404, json: { message: 'Not Found' } };
   }
 
-  // A fixture's recorded answers, keyed `METHOD /path?query` exactly as the app asks (contracts/app-records.v1.md).
   record(github) {
     Object.assign(this.recorded, github);
   }
@@ -252,7 +251,6 @@ export async function open(browser, world) {
       if (!el) throw new Error('no visible control: ' + ${JSON.stringify(text)});
       el.click();
     })()`),
-    // A real mouse click (a trusted event), which OW.records.confirm requires; page.click's el.click() is not trusted.
     async tap(text) {
       const box = await page.run(`(() => {
         ${LABEL}
