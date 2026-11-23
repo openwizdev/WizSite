@@ -15,11 +15,12 @@ const TOKEN = 'synthetic-token-for-tests';
 const OWNER = { id: 5001, login: 'acme-owner' };
 const PICKED = { owner: 'acme', name: 'factory', full: 'acme/factory', private: true };
 const FLEET = '# Fleet\n\n## GitHub identity\n\n| Role | Logins |\n| --- | --- |\n| Record authors | `factory-bot[bot]` |\n';
-const SCRIPTS = ['app/data.js', 'app/ui.js', 'app/pages/specs.js', 'app/records.js'];
+const SCRIPTS = ['app/data.js', 'app/records.js', 'app/ui.js', 'app/pages/specs.js'];
 const json = async url => JSON.parse(await readFile(url, 'utf8'));
 const plain = value => JSON.parse(JSON.stringify(value));
 const names = async url => (await readdir(url)).filter(n => n.endsWith('.input.json')).map(n => n.slice(0, -'.input.json'.length)).sort();
 const settle = async () => { for (let i = 0; i < 20; i += 1) await new Promise(resolve => setImmediate(resolve)); };
+const RECORDED_AT = '2030-01-07T07:06:40.000Z';
 
 class Net {
   constructor(github = {}, comments = {}) {
@@ -29,31 +30,61 @@ class Net {
     this.mode = 'ok';
     this.next = 9100050;
     this.account = OWNER;
+    this.edited = {};
+    this.held = [];
   }
-  writes() { return this.log.filter(r => r.method !== 'GET'); }
-  list(number) { return (this.comments[number] ||= []); }
-  add(number, comment) { this.list(number).push(comment); }
+  writes() { return this.log.filter(r => r.method !== 'GET' && !(r.url === `${API}/graphql`) && !r.url.startsWith('/api/')); }
+  posts() { return this.log.filter(r => r.method === 'POST' && /\/comments$/.test(r.url)); }
+  list(number, full = 'acme/factory') { return (this.comments[full === 'acme/factory' ? number : `${full}#${number}`] ||= []); }
+  add(number, comment, full = 'acme/factory') { this.list(number, full).push(comment); }
+  recorded(full, number) {
+    return Object.entries(this.github).filter(([key, got]) => key.startsWith(`GET /repos/${full}/issues/comments/`) && got.status === 200
+      && got.json?.issue_url === `${API}/repos/${full}/issues/${number}`).map(([, got]) => ({ created_at: RECORDED_AT, ...got.json }));
+  }
   async fetch(url, init = {}) {
     const method = init.method || 'GET';
     const headers = Object.fromEntries(new Headers(init.headers).entries());
-    this.log.push({ method, url: String(url), headers, body: init.body });
+    this.log.push({ method, url: String(url), headers, body: init.body, redirect: init.redirect });
     const at = new URL(url, 'https://openwiz.dev');
-    if (at.origin !== API) return Response.json({ error: 'not_found' }, { status: 404 });
     const answer = (status, body, extra = {}) => Response.json(body, { status, headers: extra });
+    if (at.origin === 'https://openwiz.dev' && method === 'POST' && at.pathname === '/api/sign-in/token') {
+      return answer(200, { access_token: TOKEN, expires_in: 28800, refresh_token: 'synthetic-refresh', refresh_token_expires_in: 1e6 });
+    }
+    if (at.origin === 'https://openwiz.dev' && method === 'POST' && at.pathname === '/api/sign-in/refresh') {
+      return answer(200, { access_token: `${TOKEN}-renewed`, expires_in: 28800, refresh_token: 'synthetic-refresh-2', refresh_token_expires_in: 1e6 });
+    }
+    if (at.origin !== API) return Response.json({ error: 'not_found' }, { status: 404 });
     if (method === 'GET' && at.pathname === '/user') return answer(200, this.account);
-    const comments = at.pathname.match(/^\/repos\/acme\/factory\/issues\/(\d+)\/comments$/);
+    if (method === 'POST' && at.pathname === '/graphql') {
+      const query = JSON.parse(init.body);
+      const number = query.variables?.number;
+      if (/lastEditedAt/.test(query.query) && Object.hasOwn(this.edited, number) && this.edited[number] === 'fail') return answer(502, {});
+      if (/lastEditedAt/.test(query.query)) return answer(200, { data: { repository: { issue: { lastEditedAt: this.edited[number] ?? null } } } });
+      return answer(200, { data: {} });
+    }
+    const comments = at.pathname.match(/^\/repos\/([^/]+\/[^/]+)\/issues\/(\d+)\/comments$/);
     if (comments && method === 'GET') {
+      const [, full, number] = comments;
       const page = Number(at.searchParams.get('page'));
-      return answer(200, page === 1 ? this.list(comments[1]).map(c => ({ html_url: `https://github.com/acme/factory/issues/${comments[1]}#issuecomment-${c.id}`, ...c })) : []);
+      const all = [...this.recorded(full, number), ...this.list(number, full).map(c => ({ html_url: `https://github.com/${full}/issues/${number}#issuecomment-${c.id}`,
+        issue_url: `${API}/repos/${full}/issues/${number}`, ...c }))];
+      if (this.pages && page === 1) return answer(200, all.slice(0, 1), { Link: `<${API}${at.pathname}?per_page=100&page=2>; rel="next"` });
+      if (this.pages && page === 2) return this.pages === 'fail' ? answer(502, {}) : answer(200, all.slice(1));
+      return answer(200, page === 1 ? all : []);
     }
     if (comments && method === 'POST') {
+      const [, full, number] = comments;
       const id = this.next++;
       const comment = { id, user: { login: this.account.login, id: this.account.id }, body: JSON.parse(init.body).body,
-        created_at: new Date().toISOString(), html_url: `https://github.com/acme/factory/issues/${comments[1]}#issuecomment-${id}` };
+        created_at: new Date().toISOString(), html_url: `https://github.com/${full}/issues/${number}#issuecomment-${id}` };
+      if (this.mode === 'hang') return new Promise(resolve => this.held.push(() => { this.add(number, comment, full); resolve(answer(201, comment)); }));
+      if (this.mode === 'void') { this.add(number, comment, full); return new Promise(() => {}); }
       if (this.mode === 'dropped') throw new TypeError('synthetic network failure');
       if (this.mode === 'server') return answer(502, { message: 'Bad Gateway' });
       if (this.mode === 'forbidden') return answer(403, { message: 'Resource not accessible by integration' });
-      this.add(comments[1], comment);
+      if (this.mode === 'expired') { this.mode = 'ok'; return answer(401, { message: 'Bad credentials' }); }
+      if (this.mode === 'redirect') return new Response(null, { status: 307, headers: { Location: `${API}/repos/acme/elsewhere/issues/${number}/comments` } });
+      this.add(number, comment, full);
       if (this.mode === 'lost') throw new TypeError('synthetic lost answer');
       return answer(201, comment);
     }
@@ -71,15 +102,43 @@ class FakeEvent {
 }
 const tap = () => new FakeEvent('click', true);
 
-async function boot({ net = new Net(), storage = new Map(), mode = 'on', account = OWNER, picked = PICKED, search = '', signedIn = true, before } = {}) {
+class Locks {
+  constructor() { this.held = new Map(); }
+  async request(name, options, callback) {
+    if (typeof options === 'function') [options, callback] = [{}, options];
+    if (options.ifAvailable && this.held.has(name)) return callback(null);
+    while (this.held.has(name)) await this.held.get(name).promise;
+    let release;
+    const promise = new Promise(resolve => { release = resolve; });
+    this.held.set(name, { promise });
+    try { return await callback({ name, mode: 'exclusive' }); } finally { this.held.delete(name); release(); }
+  }
+}
+
+function scriptElement(src) {
+  return { tagName: 'SCRIPT', nextElementSibling: null, getAttribute: name => (name === 'src' ? `/${src}` : null) };
+}
+
+async function boot({ net = new Net(), storage = new Map(), locks = new Locks(), mode = 'on', account = OWNER, picked = PICKED, search = '',
+  signedIn = true, known = true, between, expiresAt = null, lockless = false } = {}) {
   if (mode !== null) storage.set('openwiz.app.v2', JSON.stringify(mode));
-  if (signedIn) storage.set('openwiz.app.auth', JSON.stringify({ session: `session-${account.id}`, token: TOKEN, expiresAt: null, refresh: null, refreshExpiresAt: null }));
+  if (signedIn) {
+    storage.set('openwiz.app.auth', JSON.stringify({ session: `session-${account.id}`, token: TOKEN, expiresAt, refresh: 'synthetic-refresh',
+      refreshExpiresAt: null, ...(known ? { account: account.id } : {}) }));
+  }
   if (picked) storage.set('openwiz.app.repo', JSON.stringify(picked));
   net.account = account;
   const page = { search, replaced: [] };
+  class Document {}
+  Object.defineProperty(Document.prototype, 'currentScript', { configurable: true, get() { return page.current ?? null; } });
+  const document = Object.assign(new Document(), { hidden: false, addEventListener() {}, createElementNS() { throw new Error('no DOM in this test'); } });
+  const order = between ? [SCRIPTS[0], 'app/between.js', ...SCRIPTS.slice(1)] : SCRIPTS;
+  const elements = order.map(scriptElement);
+  elements.forEach((el, i) => { el.nextElementSibling = elements[i + 1] ?? null; });
   const context = {
     console, URL, URLSearchParams, Headers, Response, TextDecoder, TextEncoder, atob, btoa, setTimeout, clearTimeout,
-    crypto: webcrypto, Event: FakeEvent, structuredClone,
+    crypto: webcrypto, Event: FakeEvent, structuredClone, Document, document,
+    navigator: lockless ? {} : { locks },
     fetch: (url, init) => net.fetch(url, init),
     localStorage: {
       getItem: key => (storage.has(key) ? storage.get(key) : null),
@@ -88,19 +147,22 @@ async function boot({ net = new Net(), storage = new Map(), mode = 'on', account
     },
     location: { get search() { return page.search; }, pathname: '/app/', hash: '#/you' },
     history: { replaceState: (_, __, url) => { page.replaced.push(url); page.search = new URL(url, 'https://openwiz.dev').search; } },
-    document: { hidden: false, addEventListener() {}, createElementNS() { throw new Error('no DOM in this test'); } },
   };
   context.window = context;
   vm.createContext(context);
-  for (const script of SCRIPTS) {
-    const file = new URL(script, ROOT);
-    if (script === 'app/records.js' && before) vm.runInContext(before, context);
-    if (existsSync(file)) vm.runInContext(await readFile(file, 'utf8'), context, { filename: script });
+  for (const [i, script] of order.entries()) {
+    page.current = elements[i];
+    if (script === 'app/between.js') vm.runInContext(between, context);
+    else {
+      const file = new URL(script, ROOT);
+      if (existsSync(file)) vm.runInContext(await readFile(file, 'utf8'), context, { filename: script });
+    }
   }
+  page.current = null;
   const OW = context.OW;
   OW.data.feeds.specs.data = { fleet: { text: FLEET } };
   await settle();
-  const run = { OW, net, storage, page, records: OW.records };
+  const run = { OW, net, storage, locks, page, context, records: OW.records };
   needsRecords(run);
   return run;
 }
@@ -114,7 +176,10 @@ function needsRecords(run) {
 }
 
 async function composeLike(records, action) {
-  if (action.item?.type === 'decision' && action.item.request) await records.check(action.item);
+  if (action.item?.type === 'decision' && action.item.request) {
+    const checked = await records.check(action.item);
+    action = { ...action, item: { ...action.item, checked_at: checked.checked_at } };
+  }
   return records.compose(action);
 }
 
@@ -357,13 +422,10 @@ test('R3: a restored sending receipt is reconciled with a read before any other 
   const first = await boot({ net, storage });
   const preview = await first.records.compose(input.action);
   first.records.confirm(preview, tap());
-  net.mode = 'hang';
-  const original = net.fetch.bind(net);
-  net.fetch = (url, init) => (init?.method === 'POST' ? original(url, { ...init, method: 'POST' }).then(() => new Promise(() => {})) : original(url, init));
+  net.mode = 'void';
   first.records.post(preview);
   await settle();
   assert.equal(net.writes().length, 1, 'the first write did not start');
-  net.fetch = original;
   net.mode = 'ok';
   const second = await boot({ net, storage });
   const restored = second.records.pending();
@@ -462,17 +524,6 @@ test('R6: after an unknown, a new write needs a fresh source match', async () =>
   assert.equal(net.writes().length, 1);
 });
 
-test('a script that claims the write path before records.js leaves the layer off, with zero writes', async () => {
-  const input = await json(new URL('spec-not_now.input.json', FORMS));
-  const run = await boot({ before: 'OW.stolen = OW.data.writer();' });
-  assert.equal(typeof run.OW.stolen?.github, 'function', 'the first claim got no handle');
-  assert.equal(run.records.enabled(), false);
-  const preview = await run.records.compose(input.action);
-  run.records.confirm(preview, tap());
-  assert.deepEqual(plain(await run.records.post(preview)), { outcome: 'refused', op: preview.op, reason: 'disabled' });
-  assert.deepEqual(run.net.writes(), []);
-});
-
 test('a 4xx answer is refused and frees the subject; a 5xx answer is unknown and holds it', async () => {
   const input = await json(new URL('spec-not_now.input.json', FORMS));
   const run = await boot();
@@ -487,4 +538,372 @@ test('a 4xx answer is refused and frees the subject; a 5xx answer is unknown and
   assert.equal(plain(await run.records.post(second)).outcome, 'unknown');
   assert.deepEqual(plain(run.records.pending().map(p => p.op)), [second.op]);
   assert.equal(run.net.writes().length, 2);
+});
+
+const STEER = new URL('spec-not_now.input.json', FORMS);
+const OTHER = { id: 6001, login: 'acme-other' };
+const PUBLIC = { owner: 'acme', name: 'public', full: 'acme/public', private: false };
+async function steerPreview(run, words) {
+  const { action } = await json(words ? new URL('spec-change.input.json', FORMS) : STEER);
+  return run.records.compose(words ? { ...action, words } : action);
+}
+function onFirstRead(net, then) {
+  const original = net.fetch.bind(net);
+  let done = false;
+  net.fetch = async (url, init = {}) => {
+    const response = await original(url, init);
+    if (!done && (init.method || 'GET') === 'GET' && /\/issues\/\d+\/comments/.test(String(url))) {
+      done = true;
+      const body = response.json.bind(response);
+      response.json = async () => { then(); return body(); };
+    }
+    return response;
+  };
+}
+
+test('R1: a repository switched during post\'s reads never moves the write to it', async () => {
+  const run = await boot();
+  const preview = await steerPreview(run);
+  run.records.confirm(preview, tap());
+  onFirstRead(run.net, () => run.storage.set('openwiz.app.repo', JSON.stringify(PUBLIC)));
+  const outcome = plain(await run.records.post(preview));
+  assert.equal(outcome.outcome, 'refused', JSON.stringify(outcome));
+  assert.deepEqual(run.net.posts().map(r => r.url), [], 'the private repository\'s preview was posted to another repository');
+});
+
+test('R1: a session switched during post\'s reads never posts under the new account', async () => {
+  const run = await boot();
+  const preview = await steerPreview(run);
+  run.records.confirm(preview, tap());
+  onFirstRead(run.net, () => run.storage.set('openwiz.app.auth', JSON.stringify({ session: 'session-6001', token: 'synthetic-token-other',
+    expiresAt: null, refresh: null, refreshExpiresAt: null, account: OTHER.id })));
+  const outcome = plain(await run.records.post(preview));
+  assert.equal(outcome.outcome, 'refused', JSON.stringify(outcome));
+  assert.deepEqual(run.net.posts(), [], 'the confirmed preview was posted after the session changed');
+});
+
+test('R1: records-layer requests never follow a redirect, and a redirected write is refused', async () => {
+  const run = await boot();
+  const preview = await steerPreview(run);
+  run.records.confirm(preview, tap());
+  const from = run.net.log.length;
+  run.net.mode = 'redirect';
+  const outcome = plain(await run.records.post(preview));
+  assert.deepEqual(outcome, { outcome: 'refused', op: preview.op, reason: 'github' });
+  const sent = run.net.log.slice(from);
+  assert.ok(sent.length >= 2, 'post made no reads');
+  for (const request of sent) assert.equal(request.redirect, 'manual', `${request.method} ${request.url} follows redirects`);
+  assert.equal(run.net.posts().length, 1);
+});
+
+test('R2: no page script can obtain the write path, before or after records.js', async () => {
+  const between = await boot({ between: 'OW.stolen = [OW.data.claim?.() ?? null, OW.data.writer?.() ?? null];' });
+  assert.deepEqual(plain(between.OW.stolen.map(Boolean)), [false, false], 'a script after data.js obtained the write path');
+  assert.equal(between.records.enabled(), false, 'records.js wrote with an unknown script between it and data.js');
+  const run = await boot();
+  assert.equal(run.records.enabled(), true, 'records.js did not get the write path');
+  assert.equal(run.OW.data.writer, undefined, 'OW.data still offers a writer');
+  assert.equal(run.OW.data.claim?.() ?? null, null, 'a later script obtained the write path');
+});
+
+test('R3: the public client checks the payload it actually sends, not the caller\'s object', async () => {
+  const run = await boot();
+  let reads = 0;
+  const shifty = { variables: {}, get query() { reads += 1; return reads > 1 ? 'mutation M { addComment(input: {}) { clientMutationId } }' : 'query Q { viewer { login } }'; } };
+  const masked = { query: 'query Q { viewer { login } }', toJSON: () => ({ query: 'mutation M { addComment(input: {}) { clientMutationId } }' }) };
+  for (const body of [shifty, masked]) await run.OW.data.github('POST', '/graphql', body).catch(() => {});
+  for (const request of run.net.log.filter(r => r.url === `${API}/graphql`)) {
+    assert.doesNotMatch(JSON.parse(request.body).query, /mutation/, 'a GraphQL mutation was sent with the user\'s token');
+  }
+});
+
+test('R4: compose builds the preview from one snapshot, whatever the caller changes during its reads', async () => {
+  const input = await json(new URL('decision-own-plan_approval.input.json', FORMS));
+  const run = await boot({ net: new Net(input.github) });
+  const checked = await run.records.check(input.action.item);
+  const action = structuredClone({ ...input.action, item: { ...input.action.item, checked_at: checked.checked_at } });
+  const composing = run.records.compose(action);
+  action.words = 'launch-fleet: started';
+  action.item.request.risk = 'ordinary';
+  const preview = plain(await composing);
+  assert.equal(preview.body, await json(new URL('decision-own-plan_approval.body.json', FORMS)), JSON.stringify(preview).slice(0, 200));
+  assert.equal(preview.confirms, 2, 'the risky preview lost its second confirm');
+});
+
+async function genuineUnknown(storage = new Map()) {
+  const input = await json(new URL('decision-yes-plan_approval.input.json', FORMS));
+  const net = new Net(input.github);
+  const run = await boot({ net, storage });
+  const preview = await composeLike(run.records, input.action);
+  await confirmAll(run.records, preview);
+  net.mode = 'dropped';
+  assert.equal(plain(await run.records.post(preview)).outcome, 'unknown');
+  net.mode = 'ok';
+  return { net, storage, preview, key: `openwiz.app.v2.receipts.${OWNER.id}` };
+}
+
+test('R5: a tampered receipt restores nothing, and a forged one never becomes a preview', async () => {
+  const tampers = {
+    'no before': r => { delete r.before; },
+    'one confirm for a live approval': r => { r.preview.confirms = 1; },
+    'another body': r => { r.preview.body = 'launch-fleet: started'; r.body = r.preview.body; },
+    'another subject': r => { r.preview.subject.number = 42; r.subject = { ...r.preview.subject }; },
+    'no sent_at': r => { delete r.sent_at; },
+  };
+  const restored = [];
+  for (const [what, tamper] of Object.entries(tampers)) {
+    const { net, storage, preview, key } = await genuineUnknown();
+    const ledger = JSON.parse(storage.get(key));
+    tamper(ledger[preview.op]);
+    storage.set(key, JSON.stringify(ledger));
+    const run = await boot({ net, storage });
+    if (run.records.pending().length) restored.push(what);
+  }
+  assert.deepEqual(restored, [], 'tampered receipts were restored');
+});
+
+test('R5: an unreadable receipt ledger refuses every post for that account with zero requests', async () => {
+  for (const ledger of ['{"op-', '[]', JSON.stringify({ 'op-1': { state: 'sending' } })]) {
+    const storage = new Map([[`openwiz.app.v2.receipts.${OWNER.id}`, ledger]]);
+    const run = await boot({ storage });
+    const preview = await steerPreview(run);
+    run.records.confirm(preview, tap());
+    const from = run.net.log.length;
+    const outcome = plain(await run.records.post(preview));
+    assert.deepEqual(outcome, { outcome: 'refused', op: preview.op, reason: 'pending' }, ledger);
+    assert.equal(run.net.log.length, from, `${ledger}: post made a request`);
+  }
+});
+
+test('R6: two previews for one subject confirmed together send one comment', async () => {
+  const run = await boot();
+  const a = await steerPreview(run);
+  const b = await steerPreview(run, 'later words');
+  run.records.confirm(a, tap());
+  run.records.confirm(b, tap());
+  const outcomes = (await Promise.all([run.records.post(a), run.records.post(b)])).map(plain);
+  assert.equal(run.net.posts().length, 1, `two comments while the first was unresolved: ${JSON.stringify(outcomes)}`);
+  assert.deepEqual(outcomes.map(o => o.outcome).sort(), ['posted', 'refused']);
+  assert.equal(outcomes.find(o => o.outcome === 'refused').reason, 'pending');
+});
+
+test('R6: another tab cannot reconcile and resend an attempt that is still in flight', async () => {
+  const net = new Net();
+  const storage = new Map();
+  const locks = new Locks();
+  const first = await boot({ net, storage, locks });
+  const preview = await steerPreview(first);
+  first.records.confirm(preview, tap());
+  net.mode = 'hang';
+  const sending = first.records.post(preview);
+  await settle();
+  assert.equal(net.posts().length, 1, 'the first write did not start');
+  net.mode = 'ok';
+  const second = await boot({ net, storage, locks });
+  const restored = second.records.pending();
+  assert.deepEqual(plain(restored.map(p => p.op)), [preview.op]);
+  second.records.confirm(restored[0], tap());
+  const from = net.log.length;
+  const outcome = plain(await second.records.post(restored[0]));
+  assert.deepEqual(outcome, { outcome: 'refused', op: preview.op, reason: 'pending' }, JSON.stringify(outcome));
+  assert.equal(net.log.length, from, 'the second tab made requests for an attempt still in flight');
+  net.held.shift()();
+  assert.equal(plain(await sending).outcome, 'posted');
+  assert.equal(net.posts().length, 1);
+});
+
+test('R7: a confirmed post sends one POST, even when GitHub refuses the token and a refresh would succeed', async () => {
+  const run = await boot();
+  const preview = await steerPreview(run);
+  run.records.confirm(preview, tap());
+  run.net.mode = 'expired';
+  const outcome = plain(await run.records.post(preview));
+  assert.equal(run.net.posts().length, 1, 'one confirm sent two POSTs');
+  assert.deepEqual(outcome, { outcome: 'refused', op: preview.op, reason: 'github' });
+});
+
+test('R7: an expired token is refreshed before the one POST, never after it', async () => {
+  const run = await boot({ expiresAt: Date.now() - 1000 });
+  const preview = await steerPreview(run);
+  run.records.confirm(preview, tap());
+  const outcome = plain(await run.records.post(preview));
+  assert.equal(outcome.outcome, 'posted', JSON.stringify(outcome));
+  assert.equal(run.net.posts().length, 1);
+  assert.equal(run.net.posts()[0].headers.authorization, `Bearer ${TOKEN}-renewed`);
+});
+
+test('R8: signing in again after an interrupted send restores the pending intent', async () => {
+  const net = new Net();
+  const storage = new Map();
+  const first = await boot({ net, storage });
+  const preview = await steerPreview(first);
+  first.records.confirm(preview, tap());
+  net.mode = 'void';
+  first.records.post(preview);
+  await settle();
+  net.mode = 'ok';
+  storage.delete('openwiz.app.auth');
+  const run = await boot({ net, storage, signedIn: false });
+  assert.deepEqual(plain(run.records.pending()), []);
+  await run.OW.data.finishSignIn('c0de', 'S'.repeat(43));
+  await settle();
+  assert.deepEqual(plain(run.records.pending().map(p => p.op)), [preview.op], 'the pending intent is missing after signing in again');
+});
+
+test('R8: an unconfirmed post makes zero requests, whatever is known about the account', async () => {
+  const run = await boot({ mode: 'off', known: false });
+  run.storage.set('openwiz.app.v2', '"on"');
+  const preview = await steerPreview(run);
+  const from = run.net.log.length;
+  const outcome = plain(await run.records.post(preview));
+  assert.equal(outcome.outcome, 'refused', JSON.stringify(outcome));
+  assert.deepEqual(run.net.log.slice(from).map(r => `${r.method} ${r.url}`), [], 'an unconfirmed post made a request');
+});
+
+async function grillRound(edit = {}) {
+  const input = await json(new URL('decision-yes-grill_round.input.json', FORMS));
+  const key = Object.keys(input.github).find(k => k.includes('/contents/'));
+  const comment = Object.keys(input.github).find(k => k.includes('/issues/comments/'));
+  const file = input.github[key].json;
+  let bytes = Buffer.from(file.content, 'base64');
+  if (edit.grill) bytes = Buffer.from(edit.grill(bytes.toString('utf8')), 'utf8');
+  if (edit.bytes) bytes = edit.bytes(bytes);
+  file.content = edit.content ? edit.content(bytes.toString('base64')) : bytes.toString('base64');
+  if (edit.path) file.path = edit.path;
+  if (edit.request) {
+    edit.request(input.action.item.request);
+    input.github[comment].json.body = `**Decision request** for the owner.\n\n\`\`\`json\n${JSON.stringify(input.action.item.request, null, 2)}\n\`\`\``;
+  }
+  const net = new Net(input.github);
+  const run = await boot({ net });
+  return { input, net, run, key };
+}
+
+test('R9: a later check of the same decision never authorises an older card\'s action', async () => {
+  const { input, net, run, key } = await grillRound();
+  const older = plain(await run.records.check(input.action.item));
+  assert.equal(older.result, 'matched');
+  const file = net.github[key].json;
+  file.content = Buffer.from(Buffer.from(file.content, 'base64').toString('utf8').replace('Feeds: the notes spec.', 'Feeds: the notes spec, edited.')).toString('base64');
+  const newer = plain(await run.records.check(input.action.item));
+  assert.equal(newer.result, 'matched');
+  assert.notEqual(newer.binding.digest, older.binding.digest);
+  const got = plain(await run.records.compose({ ...input.action, item: { ...input.action.item, checked_at: older.checked_at } }));
+  assert.deepEqual(got, { refused: 'source_changed' }, 'the older card composed against a newer check');
+});
+
+test('R9: the binding check returns is a copy the caller cannot use to change the kept one', async () => {
+  const { input, run } = await grillRound();
+  const checked = await run.records.check(input.action.item);
+  try { checked.binding.digest = '0'.repeat(64); } catch {}
+  const preview = plain(await run.records.compose({ ...input.action, item: { ...input.action.item, checked_at: checked.checked_at } }));
+  assert.match(preview.op ?? '', /^op-/, `the kept binding was changed through check's answer: ${JSON.stringify(preview)}`);
+});
+
+test('R10: a saved grill or request the grill parser refuses is never a current decision', async () => {
+  const twice = r => { r.questions[1].id = 'N1'; };
+  const cases = {
+    'duplicate question ids': { grill: g => g.replace('**N2 - Whether', '**N1 - Whether'), request: twice },
+    'an empty question context': { grill: g => g.replace('stay** Done notes can hide or stay.', 'stay** '), request: r => { r.questions[1].context = ''; } },
+    'a context line starting **': { grill: g => g.replace('hide or stay.\n', 'hide or stay.\n**Also** this.\n'),
+      request: r => { r.questions[1].context += '\n**Also** this.'; } },
+    'repeated answer progress': { request: r => { r.answered = ['N1', 'N1']; } },
+    'a byte order mark': { bytes: b => Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), b]) },
+    'base64 with spaces': { content: c => c.replace(/(.{8})/g, '$1 ') },
+    'another blob path': { path: 'docs/grills/2030-01-15-other.md' },
+  };
+  const accepted = [];
+  for (const [what, edit] of Object.entries(cases)) {
+    const { input, run } = await grillRound(edit);
+    const checked = plain(await run.records.check(input.action.item));
+    const got = plain(await run.records.compose({ ...input.action, item: { ...input.action.item, checked_at: checked.checked_at } }));
+    if (checked.result === 'matched' || !got.refused) accepted.push(`${what} (${checked.result}, ${got.refused ?? 'composed'})`);
+  }
+  assert.deepEqual(accepted, [], 'the grill parser refuses these, and the records layer accepted them');
+});
+
+test('R11: a newer record on the subject stops an older card\'s answer before it is sent', async () => {
+  const later = (id, body) => ({ id, user: { login: 'factory-bot[bot]', id: 5900 }, body, created_at: '2030-01-08T00:00:00.000Z' });
+  for (const [body, reason] of [
+    ['```json\n{"schema":"openwiz.decisions.v1","kind":"spec_confirmation","id":"sc_notes_2","status":"open","fingerprint":"2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f","risk":"ordinary","spec":41,"summary":["Keep notes in two lists."],"headline":"Keep your notes in one list.","tickets":[],"graph":[]}\n```', 'source_changed'],
+    ['```json\n{"schema":"openwiz.decisions.v1","kind":"spec_confirmation",\n```', 'source_unchecked'],
+  ]) {
+    const { input, net, run } = await specConfirmation();
+    const preview = await composeLike(run.records, input.action);
+    await confirmAll(run.records, preview);
+    net.add(41, later(9100009, body));
+    const outcome = plain(await run.records.post(preview));
+    assert.deepEqual(outcome, { outcome: 'refused', op: preview.op, reason }, JSON.stringify(outcome));
+    assert.deepEqual(net.posts(), [], 'an answer to a replaced request was sent');
+  }
+});
+
+test('R12: two comments that could be this send stay unknown, never posted', async () => {
+  const { net, storage, preview } = await genuineUnknown();
+  const mine = id => ({ id, user: { login: OWNER.login, id: OWNER.id }, body: preview.body, created_at: new Date().toISOString() });
+  net.add(41, mine(9100060));
+  net.add(41, mine(9100061));
+  const run = await boot({ net, storage });
+  const [restored] = run.records.pending();
+  await confirmAll(run.records, restored);
+  const outcome = plain(await run.records.post(restored));
+  assert.equal(outcome.outcome, 'unknown', JSON.stringify(outcome));
+  assert.equal(net.posts().length, 1);
+});
+
+test('R12: a match on an incomplete read stays unknown', async () => {
+  const input = await json(new URL('spec-not_now.input.json', FORMS));
+  const run = await boot();
+  const preview = await run.records.compose(input.action);
+  run.records.confirm(preview, tap());
+  run.net.mode = 'lost';
+  assert.equal(plain(await run.records.post(preview)).outcome, 'unknown');
+  run.net.mode = 'ok';
+  run.net.add(41, { id: 9100070, user: { login: 'someone', id: 77 }, body: 'hello', created_at: new Date().toISOString() });
+  run.net.pages = 'fail';
+  run.records.confirm(preview, tap());
+  const outcome = plain(await run.records.post(preview));
+  assert.equal(outcome.outcome, 'unknown', JSON.stringify(outcome));
+  assert.equal(run.net.posts().length, 1);
+});
+
+test('R12: an unreadable comment in the reconciling read never rules the earlier send out', async () => {
+  for (const entry of [{ id: 'x', body: 'stop' }, null, { id: 9100071, user: null, body: 'stop', created_at: new Date().toISOString() },
+    { id: 9100072, user: { login: OWNER.login, id: OWNER.id }, body: 'stop' }]) {
+    const run = await boot();
+    const preview = await steerPreview(run);
+    run.records.confirm(preview, tap());
+    run.net.mode = 'dropped';
+    assert.equal(plain(await run.records.post(preview)).outcome, 'unknown');
+    run.net.mode = 'ok';
+    run.net.add(41, entry);
+    run.records.confirm(preview, tap());
+    const outcome = plain(await run.records.post(preview));
+    assert.equal(outcome.outcome, 'unknown', `${JSON.stringify(entry)}: ${JSON.stringify(outcome)}`);
+    assert.equal(run.net.posts().length, 1, `${JSON.stringify(entry)}: sent again after an unreadable read`);
+  }
+});
+
+test('R13: a retired operation stays retired, even when its source returns to what was shown', async () => {
+  const { run, net, preview, outcome } = await lostPlanApproval('dropped');
+  assert.equal(outcome.reason, 'source_changed');
+  const issue = 'GET /repos/acme/factory/issues/41';
+  net.github[issue].json.body = net.github[issue].json.body.replace('Sync, later.', 'Sync.');
+  const counted = [];
+  for (let i = 0; i < preview.confirms; i += 1) counted.push(run.records.confirm(preview, tap()).confirmed);
+  const from = net.log.length;
+  const again = plain(await run.records.post(preview));
+  assert.deepEqual(again, { outcome: 'refused', op: preview.op, reason: 'source_changed' }, JSON.stringify(again));
+  assert.equal(net.log.length, from, 'a retired operation made requests');
+  assert.deepEqual(counted, counted.map(() => 0), 'a retired operation counted confirms');
+  assert.equal(net.posts().length, 1);
+});
+
+test('R15: a spec edited after its confirmation request was posted is never matched, whatever its headline', async () => {
+  for (const [edited, result] of [['2030-01-08T00:00:00Z', 'changed'], ['2030-01-07T07:06:40Z', 'unchecked'], ['fail', 'unchecked'], [null, 'matched'], ['2030-01-07T07:06:39Z', 'matched']]) {
+    const { input, net, run } = await specConfirmation();
+    net.edited[41] = edited;
+    const checked = plain(await run.records.check(input.action.item));
+    assert.equal(checked.result, result, `last edited ${edited}`);
+  }
 });
