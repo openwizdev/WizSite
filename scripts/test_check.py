@@ -824,8 +824,12 @@ class Checks(unittest.TestCase):
                         check_site(root, registry)
 
     def test_drivers_registry_links(self):
-        registry = ROOT / 'tests/market-fixtures/contract-index.json'
-        listings = json.loads(registry.read_text())['listings']
+        from check import fingerprinted_page
+
+        fixtures = ROOT / 'tests/market-fixtures'
+        snapshot = json.loads((fixtures / 'contract-index.json').read_text())
+        listed = json.loads((fixtures / 'edge-index.json').read_text())['listings'][0]
+        listings = sorted([*snapshot['listings'], listed], key=lambda item: item['id'])
         tracker = next(item for item in listings if item['id'] == 'example-tracker-harness')
         work = tracker['links'][0]['url']
         receipt = listings[0]['proof']['receipt']['url']
@@ -833,15 +837,27 @@ class Checks(unittest.TestCase):
             root = Path(temp) / 'dist'
             shutil.copytree(ROOT / 'dist', root)
             path = root / 'drivers/index.html'
-            rendered = subprocess.run(['node', '--input-type=module', '-e', """
-                import { readFile } from 'node:fs/promises';
+            registry = Path(temp) / 'registry.json'
+            registry.write_text(json.dumps({**snapshot, 'listings': listings}))
+            source = {name: fingerprinted_page((ROOT / name).read_text(), cta=True)
+                      for name in ('drivers/index.html', 'market/index.html')}
+            exports = subprocess.run(['node', '--input-type=module', '-e', """
+                import { readFileSync } from 'node:fs';
                 import { withDrivers } from './scripts/drivers.mjs';
-                import { readRegistry } from './scripts/market.mjs';
-                const [page, registry] = process.argv.slice(1);
-                process.stdout.write(withDrivers(await readFile(page, 'utf8'), await readRegistry(registry)));
-            """, str(path), str(registry)], cwd=ROOT, check=True, capture_output=True, text=True).stdout
+                import { readRegistry, render, withMarket } from './scripts/market.mjs';
+                const pages = JSON.parse(readFileSync(0, 'utf8'));
+                const registry = await readRegistry(process.argv[1]);
+                process.stdout.write(JSON.stringify({
+                  drivers: withDrivers(pages['drivers/index.html'], registry),
+                  market: withMarket(pages['market/index.html'], render(registry)),
+                }));
+            """, str(registry)], cwd=ROOT, input=json.dumps(source), check=True, capture_output=True, text=True).stdout
+            pages = json.loads(exports)
+            rendered = pages['drivers']
+            (root / 'market/index.html').write_text(pages['market'])
             self.assertIn(f'href="{escape(work)}"', rendered)
             self.assertIn(f'href="{receipt}"', rendered)
+            self.assertIn(f'href="{escape(listed["url"])}"', rendered)
             path.write_text(rendered)
             check_site(root, registry)
             unexpected = 'https://unrelated.example.com/'

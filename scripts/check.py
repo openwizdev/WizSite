@@ -654,7 +654,9 @@ def drivers_fallback(built, source):
         return opening + slots[name] + closing
 
     assert tuple(match[2] for match in DRIVER_SLOT.finditer(built)) == DRIVER_SLOTS, 'the Drivers export has its six build slots'
-    return DRIVER_SLOT.sub(restore, built), changed
+    fallback = DRIVER_SLOT.sub(restore, built)
+    fixed = DRIVER_SLOT.sub(lambda match: match[0] if match[3] == slots[match[2]] else match[1] + match[4], built)
+    return fallback, fixed, changed
 
 
 def driver_listing_urls(registry):
@@ -753,7 +755,7 @@ def check_site(root, registry=ROOT / 'market/registry.json'):
         if path == root / DRIVERS_PAGE:
             listing_urls = driver_listing_urls(registry)
             if listing_urls:
-                drivers_html, slots = drivers_fallback(drivers_html, (ROOT / DRIVERS_PAGE).read_text())
+                drivers_html, fixed, slots = drivers_fallback(drivers_html, (ROOT / DRIVERS_PAGE).read_text())
                 for markup in slots:
                     slot = DriverSlot(markup, listing_urls)
                     assert not slot.books, 'a booking link outside the team page'
@@ -761,7 +763,7 @@ def check_site(root, registry=ROOT / 'market/registry.json'):
                         'unexpected external URL'
                     for ref in slot.refs:
                         check_ref(root, path, ref, pages, slot.favicons)
-                page = Page(drivers_html)
+                page = Page(fixed)
         assert page.social and all(s.startswith(SITE_URL) and s.removeprefix(SITE_URL).split('?')[0] in STATIC for s in page.social), 'social image must be a built file on the site'
         assert path == root / TEAM_PAGE or not page.books, f'a booking link outside the team page: {path.name}'
         x_links = 2 if path == root / TEAM_PAGE else 1
