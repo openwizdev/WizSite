@@ -14,8 +14,7 @@ function section(heading) {
   const lines = contract.split('\n');
   const start = lines.findIndex(line => line === heading);
   assert.ok(start >= 0, `the contract has no "${heading}" section`);
-  const level = heading.match(/^#+/)[0].length;
-  const end = lines.findIndex((line, i) => i > start && /^#+ /.test(line) && line.match(/^#+/)[0].length <= level);
+  const end = lines.findIndex((line, i) => i > start && /^#+ /.test(line));
   return lines.slice(start + 1, end < 0 ? undefined : end);
 }
 function table(heading) {
@@ -45,7 +44,7 @@ function context(action) {
   const kind = action.item.request.kind;
   const row = table('### Context line').find(r => code(r['Request kind'])[0] === kind);
   assert.ok(row, `no context line for ${kind}`);
-  const from = Object.fromEntries(table('### Context values').map(r => [code(r.Key)[0], code(r.From)]));
+  const from = Object.fromEntries(table('### Context values').map(r => [code(r.Key)[0], code(r.From).filter(s => s.startsWith('action.'))]));
   const out = {};
   for (const key of code(row['Keys, in order'])) {
     assert.ok(from[key], `no source for context key ${key}`);
@@ -149,6 +148,7 @@ test('every refused fixture is refused for the reason the contract gives, first 
     assert.deepEqual(compose(input), { refused: reason }, name);
     reasons.add(reason);
   }
+  table('## Refusals').forEach((row, i) => assert.equal(row.Order, String(i + 1), `refusal ${row.Reason} is out of order`));
   for (const row of table('## Refusals')) assert.ok(reasons.has(code(row.Reason)[0]), `no refused fixture for ${row.Reason}`);
   const marked = table('### Refused forms').map(r => code(r.Marker)[0]);
   for (const marker of marked) {
