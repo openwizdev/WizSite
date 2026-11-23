@@ -11,6 +11,7 @@
 .market-browse a:hover,.market-tags a:hover{border-color:var(--brass)}
 .market-count{margin-top:10px;color:var(--grey);font-size:15px}
 .market-count code{font-family:var(--ow-font-mono)}
+.market-empty{margin-top:14px;max-width:720px;font-size:17px;line-height:1.5;color:var(--grey2)}
 .market-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,340px),1fr));gap:16px;margin-top:20px}
 .market-card{display:flex;flex-direction:column;gap:10px;min-width:0;padding:20px;border:1px solid var(--line);border-radius:var(--round);background:var(--panel)}
 .market-card:target{border-color:var(--brass)}
@@ -79,6 +80,6 @@
   </nav>
 </header>
 <main id="main" class="wrap market"><h1>Market</h1><p class="lead">Drivers, harnesses, skills and anything else that plugs into OpenWiz, listed by anyone in WizMarket. <strong>Verified</strong> means it passed its kind&#39;s test: a driver or harness by its kit receipt from its real host, a skill by its own check at a pinned commit. <strong>Listed</strong> is a link, not proven.</p>
-<template data-slot="market"></template><section class="market-publish" aria-labelledby="publish"><h2 id="publish">Publish your own</h2><p>Anyone with a GitHub account can list what they built: add one file, <code>listings/&lt;id&gt;.json</code>, to <a href="https://github.com/openwizdev/WizMarket">WizMarket</a> by pull request, and tag it with what it is, in your own words. <a href="https://github.com/openwizdev/WizMarket/blob/main/.github/pull_request_template.md">The pull-request template</a> walks you through it, and <a href="https://github.com/openwizdev/WizMarket/blob/main/contracts/listing.v1.md">the listing format</a> is one page. Once it merges, it appears here at the site&#39;s next refresh of the registry: verified if its proof passed WizMarket&#39;s check, listed otherwise.</p></section></main>
+<template data-slot="market"></template><section class="market-publish" aria-labelledby="publish"><h2 id="publish">Publish your own</h2><p>Anyone with a GitHub account can list what they built: add one file, <code>listings/&lt;id&gt;.json</code>, to <a href="https://github.com/openwizdev/WizMarket">WizMarket</a> by pull request, and tag it with what it is, in your own words. <a href="https://github.com/openwizdev/WizMarket/blob/main/contracts/listing.v1.md">The listing format</a> is one page: the fields, what proves a verified listing, and what stays out. Once it merges, it appears here at the site&#39;s next refresh of the registry: verified if its proof passed WizMarket&#39;s check, listed otherwise.</p></section></main>
 <template data-slot="footer"></template>
 </body></html>

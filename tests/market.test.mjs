@@ -49,7 +49,7 @@ function build(registry, after = () => null) {
   return { code: run.status, stderr: run.stderr, html, checked };
 }
 
-const checkSite = dir => spawnSync('python3', ['-B', '-c', 'import sys; sys.path.insert(0, "scripts"); from pathlib import Path; from check import check_site; check_site(Path("dist"), Path("market/registry.json"))'], { cwd: dir, encoding: 'utf8' });
+const checkSite = dir => spawnSync('python3', ['-B', '-c', 'import sys; sys.path.insert(0, "scripts"); from pathlib import Path; from check import check_site; check_site(Path("dist").resolve(), Path("market/registry.json"))'], { cwd: dir, encoding: 'utf8' });
 
 const fixture = name => readFileSync(join(FIXTURES, name), 'utf8');
 const bytes = name => readFileSync(join(FIXTURES, name));

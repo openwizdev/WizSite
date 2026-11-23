@@ -6,7 +6,6 @@ export const REGISTRY = new URL('market/registry.json', ROOT);
 export const START = '<!-- market:start -->';
 export const END = '<!-- market:end -->';
 export const WIZMARKET = 'https://github.com/openwizdev/WizMarket';
-export const TEMPLATE = `${WIZMARKET}/blob/main/.github/pull_request_template.md`;
 export const CONTRACT = `${WIZMARKET}/blob/main/contracts/listing.v1.md`;
 
 const ID = /^[a-z0-9-]{2,40}$/;
@@ -17,6 +16,13 @@ const LOGIN = /^[A-Za-z0-9](?:[A-Za-z0-9]|-(?=[A-Za-z0-9])){0,38}$/;
 const REPO = /^([A-Za-z0-9](?:[A-Za-z0-9]|-(?=[A-Za-z0-9])){0,38})\/([A-Za-z0-9._-]{1,100})$/;
 const FIELDS = { name: true, summary: true, tags: true, url: true, plugs_into: true, publisher: true, stage: true, status: true, login: false, links: false, proof: false };
 const RECEIPT_KINDS = ['driver', 'harness'];
+const PRIVATE = [
+  ['a token', /\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|glpat-[A-Za-z0-9_-]{20,}|xox[abposr]-[A-Za-z0-9-]{10,}|sk-[A-Za-z0-9_-]{16,}|AIza[0-9A-Za-z_-]{30,}|npm_[A-Za-z0-9]{30,}|(?:AKIA|ASIA)[0-9A-Z]{16}|eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.)/],
+  ['a token', /-----BEGIN [A-Z ]*PRIVATE KEY-----|[A-Za-z][A-Za-z0-9+.-]*:\/\/[^/\s:@]+:[^/\s@]+@/],
+  ['a token', /\b(?:password|passwd|secret|api[_-]?key|access[_-]?key|private[_-]?key|client[_-]?secret|auth[_-]?token|access[_-]?token)\b\s*[:=]\s*\S|\bbearer\s+[A-Za-z0-9._~+/-]{16,}/i],
+  ['a private id', /\bthr[_][A-Za-z0-9]|\b(?:proj|prj|mch|usr|acct|auto|sess?|sbx)_[A-Za-z0-9]|\bcr_[0-9a-fA-F]{8}-[0-9a-fA-F]{4}|\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b/],
+  ['a machine path', /(?<![\w.~%/-])\/(?:home|Users|root|tmp|var\/folders|private\/var)\/|(?<![A-Za-z0-9])[A-Za-z]:\\/],
+];
 
 const fail = (where, why) => { throw new Error(`market/registry.json: ${where}: ${why}`); };
 const isObject = value => value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -41,6 +47,7 @@ export function isUrl(value) {
   return port === undefined || (/^[1-9][0-9]*$/.test(port) && Number(port) <= 65535);
 }
 
+const calendarDate = value => typeof value === 'string' && DATE.test(value) && new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) === value;
 const url = (value, where) => isUrl(value) ? value : fail(where, 'not an https URL in the contract\'s grammar');
 
 function checkProof(listing, commit, where) {
@@ -57,7 +64,7 @@ function checkProof(listing, commit, where) {
   if (listing.proof.receipt) {
     const receipt = listing.proof.receipt;
     exactKeys(receipt, ['path', 'date', 'url'], `${where}.proof.receipt`);
-    if (typeof receipt.date !== 'string' || !DATE.test(receipt.date)) fail(`${where}.proof.receipt`, 'date is not YYYY-MM-DD');
+    if (!calendarDate(receipt.date)) fail(`${where}.proof.receipt`, 'date is not a calendar date, YYYY-MM-DD');
     const path = new RegExp(`^receipts/${listing.id}/${receipt.date}-[0-9a-f]{12}\\.txt$`);
     if (typeof receipt.path !== 'string' || !path.test(receipt.path)) fail(`${where}.proof.receipt`, 'path is not receipts/<id>/<date>-<commit>.txt');
     if (receipt.url !== `${WIZMARKET}/blob/${commit}/${receipt.path}`) fail(`${where}.proof.receipt`, 'url is not the receipt at the index\'s commit');
@@ -100,7 +107,35 @@ function checkListing(listing, commit, where) {
   checkProof(listing, commit, where);
 }
 
+function* strings(value, where) {
+  if (typeof value === 'string') yield [where, value];
+  else if (Array.isArray(value)) for (const [i, item] of value.entries()) yield* strings(item, `${where}[${i}]`);
+  else if (isObject(value)) for (const [key, item] of Object.entries(value)) { yield [`${where} key`, key]; yield* strings(item, `${where}.${key}`); }
+}
+
+function repeatedKey(text) {
+  const objects = [];
+  let previous;
+  for (const [token] of text.matchAll(/"(?:[^"\\]|\\.)*"|[{}[\],:]|[^\s{}[\],:"]+/g)) {
+    if (token === '{') objects.push(new Set());
+    else if (token === '[') objects.push(null);
+    else if (token === '}' || token === ']') objects.pop();
+    else if (token[0] === '"' && objects.at(-1) && (previous === '{' || previous === ',')) {
+      const key = JSON.parse(token);
+      if (objects.at(-1).has(key)) return key;
+      objects.at(-1).add(key);
+    }
+    previous = token;
+  }
+  return null;
+}
+
 export function validate(index) {
+  for (const [where, text] of strings(index, 'the index')) {
+    if (!text.isWellFormed()) fail(where, 'holds an unpaired surrogate, which is not UTF-8 text');
+    const found = PRIVATE.find(([, pattern]) => pattern.test(text));
+    if (found) fail(where, `holds what looks like ${found[0]}; listings are public`);
+  }
   exactKeys(index, ['commit', 'contract', 'listings'], 'the index');
   if (index.contract !== 'listing.v1') fail('the index', 'contract is not listing.v1');
   if (typeof index.commit !== 'string' || !HEX40.test(index.commit)) fail('the index', 'commit is not 40 lowercase hex');
@@ -112,18 +147,24 @@ export function validate(index) {
   return index;
 }
 
+export function decode(bytes) {
+  try { return new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes); } catch { fail('the index', 'not UTF-8 text'); }
+}
+
 export function parse(text) {
   let index;
-  try { index = JSON.parse(text); } catch (error) { fail('the index', `not JSON (${error.message})`); }
+  try { index = JSON.parse(text); } catch { fail('the index', 'not JSON'); }
+  const key = repeatedKey(text);
+  if (key !== null) fail('the index', `has the key ${/^[a-z_]{1,40}$/.test(key) ? key : '(not shown)'} twice in one object`);
   return validate(index);
 }
 
 export async function readRegistry(file = REGISTRY) {
-  return parse(await readFile(file, 'utf8'));
+  return parse(decode(await readFile(file)));
 }
 
 const esc = text => String(text).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
-const link = (href, text, extra = '') => `<a href="${esc(href)}"${extra}>${esc(text)}</a>`;
+const link = (href, text) => `<a href="${esc(href)}"${href.startsWith('#') ? '' : ' rel="noreferrer"'}>${esc(text)}</a>`;
 export const tagsOf = index => [...new Set(index.listings.flatMap(listing => listing.tags))].sort();
 
 function status(listing) {
@@ -159,6 +200,11 @@ function card(listing) {
 }
 
 export function render(index) {
+  if (!index.listings.length) {
+    return '<section class="market-all" aria-labelledby="all-listings"><h2 id="all-listings">Every listing</h2>'
+      + `<p class="market-count">0 listings, from WizMarket at commit <code>${index.commit.slice(0, 12)}</code>.</p>`
+      + '<p class="market-empty">No listings yet. Anyone can be the first: <a href="#publish">publish your own</a>.</p></section>';
+  }
   const tags = tagsOf(index);
   const count = tag => index.listings.filter(listing => listing.tags.includes(tag)).length;
   const verified = index.listings.filter(listing => listing.status === 'verified').length;
@@ -166,7 +212,7 @@ export function render(index) {
   const all = `<section class="market-all" aria-labelledby="all-listings"><h2 id="all-listings">Every listing</h2>`
     + `<p class="market-count">${index.listings.length} listing${index.listings.length === 1 ? '' : 's'}, ${verified} verified, from WizMarket at commit <code>${index.commit.slice(0, 12)}</code>.</p>`
     + `<div class="market-cards">${index.listings.map(card).join('')}</div></section>`;
-  const byTag = `<section class="market-by-tag" aria-labelledby="by-tag"><h2 id="by-tag">By tag</h2>${tags.map(tag => `<section class="market-tag" id="tag-${tag}" aria-labelledby="tag-${tag}-name"><h3 id="tag-${tag}-name">${esc(tag)}</h3><ul>`
+  const byTag = `<section class="market-by-tag" aria-labelledby="by-tag"><h2 id="by-tag">By tag</h2>${tags.map(tag => `<section class="market-tag" id="tag-${tag}" aria-labelledby="heading-tag-${tag}"><h3 id="heading-tag-${tag}">${esc(tag)}</h3><ul>`
     + index.listings.filter(listing => listing.tags.includes(tag)).map(listing => `<li>${link(`#listing-${listing.id}`, listing.name)} <span>${listing.status === 'verified' ? 'Verified' : 'Listed'}</span></li>`).join('')
     + '</ul></section>').join('')}</section>`;
   return browse + all + byTag;

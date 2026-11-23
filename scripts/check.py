@@ -449,17 +449,22 @@ def check_vector(data):
     assert MARK in svg and OLD_MARK not in svg, 'logo SVG must use the new mark (dark cream)'
 
 
-def market_urls(path=ROOT / 'market/registry.json'):
-    found, todo = set(), [json.loads(path.read_text())]
-    while todo:
-        item = todo.pop()
-        if isinstance(item, dict):
-            todo.extend(item.values())
-        elif isinstance(item, list):
-            todo.extend(item)
-        elif isinstance(item, str) and item.startswith('https://'):
-            found.add(item)
-    return frozenset(found)
+def market_urls(path):
+    found = set()
+    for listing in json.loads(path.read_text())['listings']:
+        found.add(listing['url'])
+        found.update(link['url'] for link in listing.get('links', ()))
+        found.update(proof['url'] for proof in listing.get('proof', {}).values())
+    return frozenset(url for url in found if isinstance(url, str) and url.startswith('https://'))
+
+
+def check_market_refs(root, path, page, pages, market):
+    resources = list(page.refs)
+    for href in (a['href'] for a in page.links if a.get('href')):
+        resources.remove(href)
+        check_ref(root, path, href, pages, page.favicons, market)
+    for ref in resources:
+        check_ref(root, path, ref, pages, page.favicons)
 
 
 def split_market(built):
@@ -483,6 +488,8 @@ def check_ref(root, source, ref, pages, favicons=(), market=None):
             assert url.scheme == 'https' and not url.username and not url.password, 'unexpected market URL parts'
             return
         if market is not None and (ref == MARKET_REPO or ref.startswith(MARKET_REPO + '/')):
+            path = unquote(url.path)
+            assert re.fullmatch(r'[\x21-\x7e]+', ref) and '\\' not in path and not {'.', '..'} & set(path.split('/')), 'unexpected repository link'
             assert not url.username and not url.password and not url.query, 'unexpected external URL parts'
             return
         assert url.scheme == 'https' and url.netloc == 'github.com', 'unexpected external URL'
@@ -531,13 +538,23 @@ def check_site(root, registry=ROOT / 'market/registry.json'):
         assert len(found) == len(re.findall(r'url\(', text, re.I)), 'unreadable url()'
         return [ref for _, ref in found]
     for path, page in pages.items():
+        if path == root / MARKET_PAGE:
+            fixed, section = (Page(part) for part in split_market(path.read_text()))
+            market = market_urls(registry)
+            assert not section.books, f'a booking link outside the team page: {path.name}'
+            for count, href in ((section.x_links, X_ACCOUNT), (section.cloudroom_links, CLOUDROOM_LINK), (section.report_links, REPORT_LINK)):
+                assert not count or href in market, 'unexpected external URL'
+            check_market_refs(root, path, section, pages, market)
+            page = fixed
         assert page.social and all(s.startswith(SITE_URL) and s.removeprefix(SITE_URL).split('?')[0] in STATIC for s in page.social), 'social image must be a built file on the site'
         assert path == root / TEAM_PAGE or not page.books, f'a booking link outside the team page: {path.name}'
         x_links = 2 if path == root / TEAM_PAGE else 1
         assert page.x_links == x_links, f'one X link per page, the footer\'s: {path.relative_to(root)} has {page.x_links}'
-        market = market_urls(registry) if path == root / MARKET_PAGE else None
-        for ref in page.refs:
-            check_ref(root, path, ref, pages, page.favicons, market)
+        if path == root / MARKET_PAGE:
+            check_market_refs(root, path, page, pages, frozenset())
+        else:
+            for ref in page.refs:
+                check_ref(root, path, ref, pages, page.favicons)
         assert page.cloudroom_links == (1 if path == root / 'index.html' else 0), \
             f'CloudRoom link, the landing install box\'s only: {path.relative_to(root)} has {page.cloudroom_links}'
         assert page.report_links == 1, f'Report a problem link: {path.relative_to(root)} has {page.report_links}, not 1'

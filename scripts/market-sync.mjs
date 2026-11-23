@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs';
 import { writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { REGISTRY, parse } from './market.mjs';
+import { REGISTRY, WIZMARKET, decode, parse } from './market.mjs';
 
 const git = (dir, ...args) => execFileSync('git', ['-C', dir, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
 
@@ -12,16 +12,20 @@ export async function sync(checkout, target = REGISTRY) {
   const refuse = why => { throw new Error(`market-sync: refused: ${why}`); };
   if (!existsSync(join(dir, '.git'))) refuse('not a git checkout');
   if (git(dir, 'status', '--porcelain', '--untracked-files=all').trim()) refuse('the checkout has uncommitted or untracked changes');
-  try { git(dir, 'rev-parse', '--verify', '--quiet', 'refs/remotes/origin/main'); } catch { refuse('the checkout has no origin/main'); }
-  try { git(dir, 'merge-base', '--is-ancestor', 'HEAD', 'refs/remotes/origin/main'); } catch { refuse('HEAD is not on origin/main'); }
+  let main;
+  try {
+    git(dir, 'fetch', '--quiet', '--no-tags', WIZMARKET, 'refs/heads/main');
+    main = git(dir, 'rev-parse', '--verify', '--quiet', 'FETCH_HEAD^{commit}').trim();
+  } catch { refuse(`could not fetch canonical WizMarket main from ${WIZMARKET}`); }
+  try { git(dir, 'merge-base', '--is-ancestor', 'HEAD', main); } catch { refuse(`HEAD is not on canonical WizMarket main (${WIZMARKET} at ${main.slice(0, 12)})`); }
   if (!existsSync(join(dir, 'check/check.py'))) refuse('the checkout has no check/check.py (WizMarket\'s index command)');
   let out;
   try {
-    out = execFileSync('python3', ['-I', 'check/check.py', 'index'], { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+    out = execFileSync('python3', ['-I', 'check/check.py', 'index'], { cwd: dir, stdio: ['ignore', 'pipe', 'pipe'] });
   } catch (error) {
     refuse(`check/check.py index exited ${error.status}: ${String(error.stderr).trim().split('\n').slice(-3).join(' / ')}`);
   }
-  const index = parse(out);
+  const index = parse(decode(out));
   if (index.commit !== git(dir, 'rev-parse', 'HEAD').trim()) refuse('the index names another commit than the checkout\'s HEAD');
   await writeFile(target, out);
   return index;
