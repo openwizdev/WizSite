@@ -264,6 +264,50 @@ async function launchVideo(page, where, name) {
   expect(facts.cues > 20, where, `the launch video's captions do not load (${facts.cues} cues)`);
 }
 
+const VOICES = `(() => {
+  const state = video => ({ playing: !video.paused && !video.ended, muted: video.muted, time: video.currentTime });
+  return { launch: state(document.querySelector('.launch-video')), spec: state(document.querySelector('.spec-video')) };
+})()`;
+const voices = async (page, test, ms = 8000) => {
+  const start = Date.now();
+  for (;;) {
+    const now = await page.evaluate(VOICES);
+    if (test(now) || Date.now() - start > ms) return now;
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+};
+const press = async (page, selector) => {
+  const at = await page.evaluate(`(() => { const el = document.querySelector('${selector}'); el.scrollIntoView({ block: 'center' });
+    const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+  await new Promise(resolve => setTimeout(resolve, 300));
+  await page.click(at.x, at.y);
+};
+const audible = side => side.playing && !side.muted;
+const keepsPlayhead = async (page, which, where, message) => {
+  const paused = await page.evaluate(VOICES);
+  await new Promise(resolve => setTimeout(resolve, 600));
+  const later = await page.evaluate(VOICES);
+  expect(!later[which].playing && later[which].time > 0 && Math.abs(later[which].time - paused[which].time) < 0.05, where, message);
+};
+
+async function oneVoice(page, where, name, first) {
+  const [one, other] = first === 'launch' ? ['.launch-play', '.spec-play'] : ['.spec-play', '.launch-play'];
+  const [a, b] = first === 'launch' ? ['launch', 'spec'] : ['spec', 'launch'];
+  await press(page, one);
+  let now = await voices(page, v => audible(v[a]) && v[a].time > 0.5);
+  expect(audible(now[a]), where, `the ${a} video does not play with sound`);
+  if (first === 'launch' && name === 'motion') {
+    await page.evaluate(`document.querySelector('.spec-video').scrollIntoView({ block: 'center' }), true`);
+    now = await voices(page, v => v.spec.playing);
+    expect(now.spec.playing && now.spec.muted && audible(now.launch), where, 'the spec\'s muted preview stopped, or stopped the launch video');
+  }
+  await press(page, other);
+  now = await voices(page, v => audible(v[b]) && !v[a].playing);
+  expect(audible(now[b]), where, `switching to the ${b} video does not play it with sound`);
+  expect(!now[a].playing, where, `starting the ${b} video with sound leaves the ${a} video talking`);
+  await keepsPlayhead(page, a, where, `the paused ${a} video lost its playhead`);
+}
+
 async function main() {
   const server = await serve();
   const origin = `http://127.0.0.1:${server.address().port}`;
@@ -279,6 +323,18 @@ async function main() {
           failures.push(`${where}: ${error.message}`);
         } finally {
           await page.close();
+        }
+        if (name === 'motion' || name === 'reduced') {
+          for (const first of ['launch', 'spec']) {
+            const page = await open(browser, origin, width, height, mode);
+            try {
+              await oneVoice(page, `${where}, ${first} first`, name, first);
+            } catch (error) {
+              failures.push(`${where}, ${first} first: ${error.message}`);
+            } finally {
+              await page.close();
+            }
+          }
         }
         const fresh = await open(browser, origin, width, height, mode);
         try {

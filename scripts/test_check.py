@@ -387,12 +387,14 @@ class Checks(unittest.TestCase):
         figure = re.compile(r'    <figure class="launch">[\s\S]*?</figure>\n')
         for page, old, new, error in (
                 ('index.html', 'preload="none" playsinline controls', 'preload="none" playsinline controls autoplay', 'launch recording must be opt-in'),
+                ('index.html', 'preload="none" playsinline controls', 'preload="auto" preload="none" playsinline controls', 'duplicate HTML attribute on <video>: preload'),
+                ('index.html', '<track kind="captions" src="/art/launch-video.vtt" srclang="en"', '<track kind="captions" src="/art/launch-video.vtt" srclang="fr"', 'its own English captions'),
                 ('index.html', 'preload="none" playsinline controls', 'preload="metadata" playsinline controls', 'launch recording must be opt-in'),
                 ('index.html', 'preload="none" playsinline controls', 'preload="none" playsinline controls muted', 'plays inline with sound'),
                 ('index.html', 'preload="none" playsinline controls', 'preload="none" controls', 'plays inline with sound'),
                 ('index.html', 'preload="none" playsinline controls', 'preload="none" playsinline', 'keeps native controls'),
                 ('index.html', 'poster="/art/launch-poster.webp"', 'poster="/art/spec-poster.webp"', 'pinned poster'),
-                ('index.html', '<track kind="captions" src="/art/launch-video.vtt" srclang="en" label="English">', '', 'needs its captions'),
+                ('index.html', '<track kind="captions" src="/art/launch-video.vtt" srclang="en" label="English">', '', 'needs its own English captions'),
                 ('index.html', ' aria-describedby="launch-about"', '', 'two-sentence text alternative'),
                 ('index.html', 'It then shows how', 'Then it shows. It shows how', 'two-sentence text alternative'),
                 ('index.html', 'class="launch-play" type="button" hidden>', 'class="launch-play" type="button">', 'motion controls must wait|hidden until the scripts run'),
@@ -420,6 +422,16 @@ class Checks(unittest.TestCase):
             text = text.replace(moved, '', 1).replace('  <section class="agent-row', moved.replace('    <figure', '  <figure', 1) + '  <section class="agent-row', 1)
             landing.write_text(text)
             with self.assertRaisesRegex(AssertionError, 'the launch video sits in the hero'):
+                check_site(root)
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / 'dist'
+            shutil.copytree(ROOT / 'dist', root)
+            landing = root / 'index.html'
+            text = landing.read_text()
+            track = re.search(r'\s*<track kind="captions" src="/art/launch-video.vtt"[^>]*>', text)[0]
+            spec_track = re.search(r'<track kind="captions" src="/art/todo-spec.vtt"[^>]*>', text)[0]
+            landing.write_text(text.replace(track, '', 1).replace(spec_track, spec_track + track, 1))
+            with self.assertRaisesRegex(AssertionError, 'the launch video needs its own English captions'):
                 check_site(root)
         with tempfile.TemporaryDirectory() as temp, mock.patch('check.LAUNCH_BUDGET', 1_000_000):
             root = Path(temp) / 'dist'

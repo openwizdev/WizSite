@@ -47,8 +47,8 @@ ART_HASHES = {
     'art/drivers-c-boat.webp': '39fd43d08aa36bce84e964699d493a03af090499a63dffbfaa43e61804b7e1ef',
     'art/moments-sea.webp': '903adfdf5e77c61d49bbbfba6b5aa7942a45a12293dbce40cf04175949d1fbb7',
     'art/team-boat-poster.webp': '656c0c75f92a17390beda0d8afb45be3f9164330357635295998406dad3a69d4',
-    'art/launch-video.mp4': '4bf8ef5d010ed55a972cb388edf59dc66e5512fa1d2bde388808fdb958972f0d',
-    'art/launch-poster.webp': 'f1e64e5f2d5f62962d4b0c044c33e2de84a14dcb0ec645b911ebc96245df9a02',
+    'art/launch-video.mp4': '1e775d875b23a946346748cb62bd7853abc9dcf278f76addf0cf60136f8662dc',
+    'art/launch-poster.webp': '2d27919d8cf70b2e4746b23eee605468f8308243452021e0418d021d8e2bfb3a',
     'art/launch-video.vtt': '591e52c30fb91d0afba1da4228e0240d08929c01e8291fe494102a1d76bfb4e4',
 }
 ART = set(ART_HASHES)
@@ -327,6 +327,8 @@ class Page(HTMLParser):
         self.images = []
         self.videos = []
         self.tracks = []
+        self.video_tracks = []
+        self.open_video = None
         self.links = []
         self.inline_scripts = 0
         self.books = []
@@ -337,7 +339,17 @@ class Page(HTMLParser):
         self.stylesheets, self.scripts = [], []
         self.feed(text)
 
+    def tracks_of(self, video):
+        return next((tracks for clip, tracks in zip(self.videos, self.video_tracks) if clip is video), [])
+
+    def handle_endtag(self, tag):
+        if tag == 'video':
+            self.open_video = None
+
     def handle_starttag(self, tag, attrs):
+        names = [name for name, _ in attrs]
+        duplicates = sorted({name for name in names if names.count(name) > 1})
+        assert not duplicates, f'duplicate HTML attribute on <{tag}>: {", ".join(duplicates)}'
         attrs = dict(attrs)
         if 'id' in attrs:
             assert attrs['id'] not in self.ids, 'duplicate HTML id'
@@ -368,8 +380,12 @@ class Page(HTMLParser):
             self.images.append(attrs)
         if tag == 'video':
             self.videos.append(attrs)
+            self.video_tracks.append([])
+            self.open_video = len(self.videos) - 1
         if tag == 'track':
             self.tracks.append(attrs)
+            if self.open_video is not None:
+                self.video_tracks[self.open_video].append(attrs)
         if tag == 'a':
             self.links.append(attrs)
         if tag == 'script' and not attrs.get('src'):
@@ -396,7 +412,8 @@ def check_launch(landing, page):
     about = re.search(r'<p class="sr-only" id="([^"]+)">([^<]+)</p>', landing)
     assert about and clip.get('aria-describedby') == about[1] and len(re.findall(r'[.!?](?:\s|$)', about[2])) == 2, \
         'the launch video needs a two-sentence text alternative it is described by'
-    assert any(t.get('kind') == 'captions' and t.get('src') == f'/{LAUNCH_CAPTIONS}' for t in page.tracks), 'the launch video needs its captions'
+    assert any(t.get('kind') == 'captions' and t.get('src') == f'/{LAUNCH_CAPTIONS}' and t.get('srclang') == 'en' for t in page.tracks_of(clip)), \
+        'the launch video needs its own English captions'
     play = re.search(r'<button class="launch-play" type="button" hidden>([\s\S]*?)</button>', landing)
     assert play and flat(play[1]) == LAUNCH_LABEL, f'the launch video needs one play button, hidden until the scripts run: {LAUNCH_LABEL}'
     post = re.search(r'<a class="launch-post" href="([^"]*)">([^<]*)</a>', landing)
@@ -563,7 +580,7 @@ def check_site(root, registry=ROOT / 'market/registry.json'):
     assert clip.get('preload') == 'none' and 'autoplay' not in clip, 'spec recording must be opt-in'
     assert 'muted' in clip and 'playsinline' in clip, 'spec video must start muted inline'
     assert clip.get('poster', '').removeprefix('/') in ART, 'spec video needs a pinned poster'
-    assert any(t.get('kind') == 'captions' and 'default' in t and t.get('src', '').removeprefix('/') in ART for t in page.tracks), 'spec video needs default captions'
+    assert any(t.get('kind') == 'captions' and 'default' in t and t.get('src', '').removeprefix('/') in ART for t in page.tracks_of(clip)), 'spec video needs default captions'
     assert any(a.get('href') == clip.get('src') and 'hidden' not in a for a in page.links), 'needs a plain link to the spec video'
     for attrs in page.buttons:
         if attrs.get('class') in ('demo-pause', 'spec-play', 'launch-play'):

@@ -641,7 +641,7 @@ body.landing > main { flex: 1 0 auto; }
 }
 .product-hero .launch { grid-column: 1 / -1; margin: clamp(8px, 2vw, 24px) 0 0; }
 .launch-frame { position: relative; overflow: hidden; border-radius: var(--round); background: #1b1816; box-shadow: 0 0 0 1px var(--line), 0 24px 60px #090706b0; }
-.launch-video { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; background: #1b1816; }
+.launch-video { display: block; width: 100%; height: auto; aspect-ratio: 1280 / 666; object-fit: contain; background: #1b1816; }
 .launch-video:focus-visible { outline: 2px solid var(--orchid); outline-offset: -2px; }
 .launch-video::cue { color: #fff; background: rgba(15, 17, 21, .85); }
 .launch-play { position: absolute; inset: 0; display: flex; align-items: flex-end; gap: clamp(10px, 1.6vw, 18px); padding: clamp(14px, 3vw, 40px); border: 0; background: linear-gradient(to top, rgb(14 12 10 / 72%), transparent 50%); color: var(--ink); font: 600 clamp(16px, 2.1vw, 24px)/1.2 var(--ow-font-sans); letter-spacing: -.01em; text-align: left; cursor: pointer; }
