@@ -4,6 +4,8 @@
   const API = 'https://api.github.com';
   const AUTH_KEY = 'openwiz.app.auth';
   const REPO_KEY = 'openwiz.app.repo';
+  const V2_KEY = 'openwiz.app.v2';
+  const V2_VALUES = ['on', 'dry-run', 'off'];
   const LOW = 100;
   const PAUSE_DEFAULT = 5 * 60 * 1000;
 
@@ -32,31 +34,58 @@
     signOut() {
       store.drop(AUTH_KEY);
       store.drop(REPO_KEY);
+      listed.clear();
       refreshing = null;
       stop();
       Object.assign(limit, { remaining: null, limit: null, pausedUntil: null });
     },
   };
+  const listed = new Map();
   const repo = {
     get: () => store.get(REPO_KEY),
     pick(full) {
       const [owner, name] = full.split('/');
-      store.set(REPO_KEY, { owner, name, full });
+      store.set(REPO_KEY, { owner, name, full, ...(listed.has(full) ? { private: listed.get(full) } : {}) });
     },
     forget: () => store.drop(REPO_KEY),
   };
+  const v2 = {
+    get() {
+      const value = store.get(V2_KEY);
+      return value === 'on' || value === 'dry-run' ? value : 'off';
+    },
+  };
+  {
+    const params = new URLSearchParams(location.search);
+    if (params.has('v2')) {
+      if (V2_VALUES.includes(params.get('v2'))) store.set(V2_KEY, params.get('v2'));
+      params.delete('v2');
+      const rest = params.toString();
+      history.replaceState(null, '', `${location.pathname}${rest ? `?${rest}` : ''}${location.hash}`);
+    }
+  }
 
 
   class Refused extends Error {}
-  function allowed(method, url, body) {
+  const WRITE = Symbol('the records layer');
+  let writerClaimed = false;
+  function oneComment(url, body) {
+    const picked = repo.get();
+    if (!picked || typeof picked.owner !== 'string' || typeof picked.name !== 'string' || v2.get() !== 'on') return false;
+    const base = `${API}/repos/${encodeURIComponent(picked.owner)}/${encodeURIComponent(picked.name)}/issues/`;
+    return url.startsWith(base) && /^[1-9][0-9]{0,9}\/comments$/.test(url.slice(base.length))
+      && Object.keys(body).length === 1 && typeof body.body === 'string';
+  }
+  function allowed(method, url, body, key) {
     if (url.startsWith(`${API}/`)) {
       if (method === 'GET') return true;
+      if (method === 'POST' && key === WRITE && oneComment(url, body)) return true;
       return method === 'POST' && url === `${API}/graphql` && /^\s*query\s/.test(body.query) && !/\b(mutation|subscription)\b/i.test(body.query);
     }
     return method === 'POST' && (url === '/api/sign-in/token' || url === '/api/sign-in/refresh');
   }
-  async function ask(method, url, body, headers = {}) {
-    if (!allowed(method, url, body || {})) throw new Refused(`the app never sends ${method} ${url}`);
+  async function ask(method, url, body, headers = {}, key) {
+    if (!allowed(method, url, body || {}, key)) throw new Refused(`the app never sends ${method} ${url}`);
     return fetch(url, {
       method,
       headers: { ...(body ? { 'Content-Type': 'application/json' } : {}), ...headers },
@@ -94,7 +123,7 @@
   class Ended extends Error {}
   class SignedOut extends Error {}
 
-  async function github(method, path, body) {
+  async function github(method, path, body, key) {
     const session = auth.session();
     if (!session) throw new Ended();
     const still = () => { if (auth.session() !== session) throw new Ended(); };
@@ -111,7 +140,7 @@
       const response = await ask(method, `${API}${path}`, body, {
         Authorization: `Bearer ${auth.get().token}`,
         Accept: 'application/vnd.github+json',
-      });
+      }, key);
       still();
       if (response.status !== 401) return response;
       const renewed = attempt === 0 && (await refresh(session));
@@ -166,12 +195,18 @@
       try {
         const page = await every(`/user/installations/${install.id}/repositories`, 'repositories');
         complete &&= page.complete;
-        for (const r of page.items) if (typeof r?.full_name === 'string') repos.push({ full: r.full_name, private: Boolean(r.private) });
+        for (const r of page.items) {
+          if (typeof r?.full_name !== 'string') continue;
+          repos.push({ full: r.full_name, private: Boolean(r.private) });
+          listed.set(r.full_name, Boolean(r.private));
+        }
       } catch (error) {
         if (error instanceof Ended || error instanceof SignedOut) throw error;
         complete = false;
       }
     }
+    const picked = repo.get();
+    if (picked && listed.has(picked.full) && picked.private !== listed.get(picked.full)) store.set(REPO_KEY, { ...picked, private: listed.get(picked.full) });
     return { repos: repos.sort((a, b) => a.full.localeCompare(b.full)), complete, installations: installs.items.length };
   }
 
@@ -537,8 +572,15 @@
     }
   });
 
+  function writer() {
+    if (writerClaimed) return null;
+    writerClaimed = true;
+    return { github: (method, path, body) => github(method, path, body, WRITE) };
+  }
+
   OW.data = {
-    auth, repo, feeds, limit, paused, finishSignIn, repositories, start, stop, refreshAll, SignedOut, Ended,
+    auth, repo, v2, feeds, limit, paused, finishSignIn, repositories, start, stop, refreshAll, SignedOut, Ended, Refused, noteLimit, writer,
+    github: (method, path, body) => github(method, path, body),
     onChange: listener => listeners.add(listener),
   };
 })();
