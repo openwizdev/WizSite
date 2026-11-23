@@ -297,9 +297,8 @@ test('R1: a check OW.records answers unchecked, or that throws, leaves the item 
     const round = await latestOf(run, ROUND);
     assert.equal(round.current, null);
     assert.equal(round.checked_at, null);
-    const spec = await latestOf(run, SPEC_DECISION);
-    assert.equal(spec.current, false);
-    assert.equal(typeof spec.checked_at, 'number');
+    const keys = await run.page.run(`[...document.querySelectorAll('.queue-item')].map(el => el.dataset.key)`);
+    assert.ok(keys.includes(ROUND) && !keys.includes(SPEC_DECISION), `a changed source still shows its card: ${keys}`);
   } finally {
     await run.close();
   }
