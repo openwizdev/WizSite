@@ -823,6 +823,41 @@ class Checks(unittest.TestCase):
                     with self.assertRaisesRegex(AssertionError, re.escape(error)):
                         check_site(root, registry)
 
+    def test_drivers_registry_links(self):
+        registry = ROOT / 'tests/market-fixtures/contract-index.json'
+        listings = json.loads(registry.read_text())['listings']
+        tracker = next(item for item in listings if item['id'] == 'example-tracker-harness')
+        work = tracker['links'][0]['url']
+        receipt = listings[0]['proof']['receipt']['url']
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / 'dist'
+            shutil.copytree(ROOT / 'dist', root)
+            path = root / 'drivers/index.html'
+            rendered = subprocess.run(['node', '--input-type=module', '-e', """
+                import { readFile } from 'node:fs/promises';
+                import { withDrivers } from './scripts/drivers.mjs';
+                import { readRegistry } from './scripts/market.mjs';
+                const [page, registry] = process.argv.slice(1);
+                process.stdout.write(withDrivers(await readFile(page, 'utf8'), await readRegistry(registry)));
+            """, str(path), str(registry)], cwd=ROOT, check=True, capture_output=True, text=True).stdout
+            self.assertIn(f'href="{escape(work)}"', rendered)
+            self.assertIn(f'href="{receipt}"', rendered)
+            path.write_text(rendered)
+            check_site(root, registry)
+            unexpected = 'https://unrelated.example.com/'
+            for old, new, reason in (
+                    (f'href="{escape(work)}"', f'href="{unexpected}"', 'registry URL'),
+                    (f'href="{escape(work)}"', f'href="{receipt}"', 'registry URL'),
+                    (f'href="{escape(work)}"', 'href="https://github.com/openwizdev/OpenWiz/issues/1"', 'registry URL'),
+                    (f'href="{escape(work)}"', f'href="{escape(work)}" src="{escape(work)}"', 'unexpected external URL'),
+                    ('</main>', f'<a href="{escape(work)}">Another link</a></main>', 'unexpected external URL'),
+                    (f'href="{escape(work)}"', f'href="{escape(work)}" ping="{escape(work)}"', 'resource attributes')):
+                with self.subTest(new=new):
+                    self.assertIn(old, rendered)
+                    path.write_text(rendered.replace(old, new, 1))
+                    with self.assertRaisesRegex(AssertionError, reason):
+                        check_site(root, registry)
+
     def test_report_a_problem_link(self):
         form = '<a href="https://github.com/openwizdev/openwiz/issues/new?template=feedback.yml" rel="noreferrer">Report a problem</a>'
         for page, count in {'index.html': 1, 'drivers/index.html': 1, 'team/index.html': 1, 'faq/index.html': 1, 'changelog/index.html': 1, 'app/index.html': 0}.items():
