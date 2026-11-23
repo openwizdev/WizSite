@@ -117,6 +117,10 @@
     const status = h('div', { class: 'spec-card-status', role: 'status', 'aria-live': 'polite' });
     const steer = h('div', { class: 'spec-card-steer' });
     let busy = false;
+    const setBusy = value => {
+      busy = value;
+      for (const control of steer.querySelectorAll('button, textarea')) control.disabled = value;
+    };
     const waitingHere = () => OW.records.pending().find(p => p.repository === item.repository
       && p.subject.kind === item.subject.kind && p.subject.number === item.subject.number);
 
@@ -129,43 +133,53 @@
         h('button', { type: 'button', onclick: () => compose({ form: 'spec.not_now', item }) }, 'Not now')));
     };
     let box = null;
+    let draftOp = null;
+    function clearDraft() {
+      box = null;
+      draftOp = null;
+    }
+
     function change() {
       status.replaceChildren();
-      box = box || h('textarea', { rows: 4, 'aria-label': 'What to change', placeholder: 'What should change?' });
+      box = box || h('textarea', { rows: 4, 'aria-label': 'What to change', placeholder: 'What should change?',
+        oninput: () => { draftOp = null; } });
       steer.replaceChildren(h('label', { class: 'spec-card-typed' }, 'What to change', box), h('div', { class: 'spec-card-buttons' },
         h('button', { type: 'button', class: 'primary', onclick: () => compose({ form: 'spec.change', item, words: box.value }, true) }, 'Preview'),
-        h('button', { type: 'button', onclick: () => { box = null; buttons(); } }, 'Cancel')));
+        h('button', { type: 'button', onclick: () => { clearDraft(); buttons(); } }, 'Cancel')));
       box.focus();
     }
 
     async function compose(action, typed) {
       if (busy) return;
-      busy = true;
+      setBusy(true);
       let preview;
       try {
         preview = await OW.records.compose(action);
       } catch {
         preview = { refused: 'source_unchecked' };
       } finally {
-        busy = false;
+        setBusy(false);
       }
       if (preview.refused) {
         if (!typed) buttons();
         say('refused', COMPOSE[preview.refused] || `The app can't write that (${preview.refused}).`);
         return;
       }
+      if (typed) draftOp = preview.op;
       confirm(preview, typed);
     }
 
     function confirm(preview, typed) {
       status.replaceChildren();
-      let left = preview.confirms;
       const post = h('button', { type: 'button', class: 'primary' }, 'Post it');
       post.addEventListener('click', event => {
         if (busy) return;
         const { confirmed, of } = OW.records.confirm(preview, event);
-        left = of - confirmed;
-        if (left > 0) { post.textContent = 'Yes, post it'; return; }
+        if (confirmed < of) {
+          if (confirmed > 0) post.textContent = 'Yes, post it';
+          return;
+        }
+        post.textContent = 'Sending…';
         send(preview);
       });
       steer.replaceChildren(h('div', { class: 'spec-card-preview', 'data-preview': '' },
@@ -176,7 +190,7 @@
     }
 
     async function send(preview) {
-      busy = true;
+      setBusy(true);
       say('sending', 'Sending…');
       let outcome;
       try {
@@ -184,10 +198,10 @@
       } catch {
         outcome = { outcome: 'unknown', op: preview.op, reason: 'network' };
       } finally {
-        busy = false;
+        setBusy(false);
       }
       if (outcome.outcome === 'posted') {
-        box = null;
+        if (preview.op === draftOp) clearDraft();
         buttons();
         say('posted', 'Posted. ', h('a', { href: outcome.comment.url, rel: 'noreferrer' }, 'See the comment'));
       } else if (outcome.outcome === 'refused') {
