@@ -152,7 +152,7 @@ test('the key-host section says where a host key lives, who reads it, where it g
   assert.doesNotMatch(text(section), /\bsix(th)?\b|\bexcept(ion)?\b|\bwaive/i, 'no extra or skipped check');
 });
 
-test('the rendered Drivers page shows Devin only as built, waiting on its live check', async () => {
+test('the rendered Drivers page shows exactly one visible Devin tile in a pre-live state', async () => {
   assert.ok(existsSync(join(DIST, 'drivers/index.html')), 'run npm run build first');
   const server = await serve();
   const origin = `http://127.0.0.1:${server.address().port}`;
@@ -173,44 +173,81 @@ test('the rendered Drivers page shows Devin only as built, waiting on its live c
     const loaded = new Promise(resolve => listeners.push(m => m.sessionId === sessionId && m.method === 'Page.loadEventFired' && resolve()));
     await page('Page.navigate', { url: `${origin}/drivers/` });
     await loaded;
-    const readDevin = async () => (await page('Runtime.evaluate', { returnByValue: true, expression: `(() => {
-      const norm = s => s.replace(/\\s+/g, ' ').trim();
+    const evaluate = async fn => {
+      const { result, exceptionDetails } = await page('Runtime.evaluate', {
+        expression: `(${fn})()`,
+        returnByValue: true,
+      });
+      assert.equal(exceptionDetails, undefined, result.description);
+      return result.value;
+    };
+    const readDevin = () => evaluate(() => {
+      const norm = s => s.replace(/\s+/g, ' ').trim();
       const tiles = document.querySelectorAll('#devin');
       if (tiles.length !== 1) return { tiles: tiles.length };
       const [tile] = tiles;
       const box = tile.getBoundingClientRect();
+      const state = tile.dataset.state;
+      const group = tile.parentElement.closest('[data-state]');
       const rest = document.documentElement.cloneNode(true);
       rest.querySelector('#devin').remove();
-      const released = '[data-state="live"], [data-state="passed"], [data-state="shipped"], .passed, .shipped';
+      const released = '[data-state="live"], [data-state="passed"], [data-state="shipped"], .live, .passed, .shipped';
       return {
         tiles: tiles.length,
-        visible: box.width > 0 && box.height > 0 && getComputedStyle(tile).visibility === 'visible',
-        inWaitingGroup: tile.matches('li.tile') && Boolean(tile.closest('#hosts-waiting[data-state="waiting"]')),
-        state: tile.dataset.state,
-        status: [...tile.querySelectorAll('.tile-state')].map(e => norm(e.innerText)),
+        visible: box.width > 0 && box.height > 0
+          && tile.checkVisibility({ opacityProperty: true, visibilityProperty: true }),
+        inHostGroup: tile.matches('li.tile') && group?.id === `hosts-${state}`
+          && group.dataset.state === state && Boolean(group.closest('#hosts')),
+        state,
+        names: [...tile.querySelectorAll('h4')].map(e => norm(e.innerText)),
         shown: norm(tile.innerText),
         links: [...tile.querySelectorAll('a')].map(a => [norm(a.innerText), a.href]),
         markedReleased: Boolean(tile.closest(released) || tile.querySelector(released)),
         devinElsewhere: /devin/i.test(rest.outerHTML),
-        comingSoon: /coming soon/i.test(tile.textContent),
+        comingSoon: /coming soon/i.test(norm(tile.textContent)),
       };
-    })()` })).result.value;
-    const assertDevin = card => assert.deepEqual(card, {
-      tiles: 1,
-      visible: true,
-      inWaitingGroup: true,
-      state: 'waiting',
-      status: ['Built, waiting on its live check'],
-      shown: 'Devin Built, waiting on its live check Login: held by Devin Pull request',
-      links: [['Pull request', 'https://github.com/openwizdev/OpenWiz/pull/2490']],
-      markedReleased: false,
-      devinElsewhere: false,
-      comingSoon: false,
     });
+
+    const labels = {
+      review: 'In review',
+      waiting: 'Built, waiting on its live check',
+      building: 'Being built',
+    };
+    const assertDevin = card => {
+      assert.equal(card.tiles, 1, 'exactly one Devin tile');
+      assert.equal(card.visible, true, 'the Devin tile is visible');
+      assert.ok(Object.hasOwn(labels, card.state), 'Devin has a pre-live state');
+      assert.equal(card.inHostGroup, true, 'Devin is in the host group for its state');
+      assert.equal(card.markedReleased, false, 'Devin has no live, passed or shipped marker');
+      assert.equal(card.comingSoon, false, 'Devin never says Coming soon');
+      assert.equal(card.devinElsewhere, false, 'there is no Devin claim outside its tile');
+      assert.deepEqual(card.names, ['Devin']);
+      assert.equal(card.links.length, 1, 'Devin has one pull request link');
+      const [[linkText, href]] = card.links;
+      assert.ok(linkText === 'Pull request' || (card.state === 'building' && linkText === 'Draft pull request'),
+        'Devin shows the pull request link');
+      assert.equal(href, 'https://github.com/openwizdev/OpenWiz/pull/2490');
+      const status = `Devin ${labels[card.state]}`;
+      const shown = [`${status} Login: held by Devin ${linkText}`];
+      if (card.state !== 'waiting') shown.push(`${status} ${linkText}`);
+      assert.ok(shown.includes(card.shown), 'Devin shows the expected copy for its state');
+    };
+
     assertDevin(await readDevin());
-    await page('Runtime.evaluate', { expression: "document.querySelector('#devin').style.opacity = '0'" });
+
+    await evaluate(() => {
+      document.querySelector('#hosts').insertAdjacentHTML('beforeend',
+        '<p id="extra-claim-probe">Use the Devin driver today.</p>');
+    });
+    const extraClaim = await readDevin();
+    assert.throws(() => assertDevin(extraClaim), /there is no Devin claim outside its tile/);
+
+    await evaluate(() => {
+      document.querySelector('#extra-claim-probe').remove();
+      document.querySelector('#devin').style.opacity = '0';
+    });
     const transparent = await readDevin();
-    assert.throws(() => assertDevin(transparent), /visible/);
+    assert.throws(() => assertDevin(transparent), /the Devin tile is visible/);
   } finally {
     await browser.close();
     server.close();
