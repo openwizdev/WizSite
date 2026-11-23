@@ -383,6 +383,17 @@
     </div>
   </section>
   <p class="logo-note wrap">Logos belong to their owners. They name the products these drivers and harnesses are for, not a partnership, and not what runs today: each tile says its state.</p>
+  <section class="wall wrap key-hosts" aria-labelledby="key-hosts-title">
+    <h2 id="key-hosts-title">Hosts that need an API key</h2>
+    <p class="wall-lead">Some hosts can be driven only through an API that takes your key. Their drivers keep one more rule of <a href="https://github.com/openwizdev/OpenWiz/blob/main/kernel/driver.v1.md#2-logins">the contract</a>:</p>
+    <ul class="wall-lead key-facts">
+      <li class="key-fact" data-fact="lives">The key lives only on your computer: in your system keychain, or in an environment variable you set.</li>
+      <li class="key-fact" data-fact="stored">OpenWiz never stores it. To revoke OpenWiz's use of it, clear every place you put it, both the keychain entry and the environment variable, then restart anything that inherited the variable.</li>
+      <li class="key-fact" data-fact="helper"><a href="https://github.com/openwizdev/OpenWiz/blob/main/kernel/driver-kit/hostkey.py"><code>hostkey.py</code></a>, one small helper in the kernel's driver kit, is the only thing that reads it. It sends the key only over HTTPS to that host's own registered address.</li>
+      <li class="key-fact" data-fact="driver">The driver never sees it, and the kit checks that.</li>
+      <li class="key-fact" data-fact="checks">Every driver still has to pass the same five checks, so a host that can't wake or stop a run gets no driver.</li>
+    </ul>
+  </section>
   <section class="own-driver wrap" aria-labelledby="own-title">
     <div class="own-copy">
       <h2 id="own-title">Write your own driver</h2>
