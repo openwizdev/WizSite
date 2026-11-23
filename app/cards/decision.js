@@ -55,7 +55,7 @@
           url && url.startsWith('https://github.com/') ? h('a', { href: url, target: '_blank', rel: 'noopener' }, 'See it on GitHub') : 'GitHub has it.');
       } else if (result.outcome === 'refused') {
         said.append(...(result.reason === 'dry_run' ? [h('strong', {}, REASONS.dry_run)]
-          : [h('strong', {}, `Not posted (${result.reason}).`), ' ', REASONS[result.reason] || '']));
+          : [h('strong', {}, `Not posted (${result.reason}).`), ' ', (Object.hasOwn(REASONS, result.reason) ? REASONS[result.reason] : '')]));
         lock(false);
       } else {
         said.dataset.outcome = 'unknown';
