@@ -103,7 +103,8 @@ async function mount(item, { rows = [], outcomes = [], dryRun = false, enabled =
     el.append(document.createElement('p'));
     document.body.prepend(el);
     document.getElementById('app')?.setAttribute('hidden', '');
-    window.cardReturned = OW.cards.decision(${JSON.stringify(item)}, el);
+    window.cardItem = ${JSON.stringify(item)};
+    window.cardReturned = OW.cards.decision(cardItem, el);
   })()`);
 }
 
@@ -298,6 +299,9 @@ test('a source_changed compose keeps the stale item unanswerable', async () => {
   await new Promise(resolve => setTimeout(resolve, 100));
   assert.deepEqual((await usable()).filter(c => ANSWERS.includes(c)), [], 'the stale request offered an answer again');
   assert.match(await cardText(), /can.t be answered here/i);
+  await page().run(`OW.cards.decision(cardItem, document.getElementById('card-under-test'))`);
+  assert.deepEqual(await controls(), [], 'drawing the same stale item again offered an answer');
+  assert.match(await cardText(), /changed since it was read/);
   await mount(input.action.item);
   assert.ok((await usable()).includes('Yes'), 'a fresh queue item that passed its checks is answerable');
 });
