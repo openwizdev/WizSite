@@ -309,21 +309,25 @@ test('the two built pages read the same driver listings and keep uncovered page 
     links: [{ label: 'Work ticket', url: 'https://example.com/openclaw/work' }],
   });
   const listed = fixtureListing('example-listed', 'Listed example', {});
-  const harness = fixtureListing('example-harness', 'Example harness', {
+  const local = fixtureListing('local', 'Example computer or VPS', {
+    status: 'verified', login: 'stays on your machine', proof: fixtureReceipt('local'),
+  });
+  const harness = fixtureListing('copilot-cli', 'Example harness', {
     stage: 'being-built', tags: ['harness'], links: [{ label: 'Example issue', url: 'https://example.com/harness/work' }],
   });
-  const { drivers, market } = await buildDriverFixture([building, shipped, harness, listed, passed]);
+  const { drivers, market } = await buildDriverFixture([harness, building, shipped, listed, local, passed]);
   const hostSection = id => drivers.match(new RegExp(`<section class="wall wrap" id="${id}"[\\s\\S]*?<\\/section>`))[0];
   const hostCards = drivers.slice(drivers.indexOf('<main'), drivers.indexOf(hostSection('harnesses')));
   const rendered = [...hostCards.matchAll(/<(article|li)\b(?=[^>]* data-listing="([^"]+)")([^>]*)>([\s\S]*?)<\/\1>/g)]
     .filter(([, , , attrs]) => !attrs.includes('data-host='));
-  assert.deepEqual(rendered.map(([, , id]) => id).sort(), [building.id, shipped.id, listed.id, passed.id].sort(),
+  assert.deepEqual(rendered.map(([, , id]) => id).sort(), [building.id, shipped.id, listed.id, local.id, passed.id].sort(),
     'exactly one Drivers card per registry driver, with harnesses excluded from hosts');
   const cards = Object.fromEntries(rendered.map(([card, , id]) => [id, card]));
   for (const [listing, name, expectedLinks] of [
     [shipped, 'Example &amp; Sons', [shipped.proof.receipt.url]],
     [building, building.name, [building.links[0].url]],
     [listed, listed.name, [listed.url]],
+    [local, local.name, [local.proof.receipt.url]],
     [passed, passed.name, [passed.links[0].url, passed.proof.receipt.url]],
   ]) {
     const card = cards[listing.id];
@@ -347,7 +351,17 @@ test('the two built pages read the same driver listings and keep uncovered page 
   const marks = [...drivers.matchAll(/<li data-host="([^"]+)"/g)].map(([, id]) => id);
   assert.deepEqual(marks.sort(), ['boat-dev', 'cloudroom', 'example-driver', 'vps']);
   assert.equal([...drivers.matchAll(/ id="openclaw"/g)].length, 1, 'the registry replaces the OpenClaw fallback in place');
-  for (const fallback of ['boat-dev', 'cloudroom', 'vps', 'grok-bot', 'devin', 'copilot']) {
-    assert.equal([...drivers.matchAll(new RegExp(` id="${fallback}"`, 'g'))].length, 1, `${fallback}: uncovered entry stays`);
+  assert.match(cards[local.id], / id="vps"/, 'the local seed replaces the existing computer or VPS card');
+  const harnessCard = hostSection('harnesses').match(/<li class="tile" id="copilot"[^>]*>[\s\S]*?<\/li>/)?.[0];
+  assert.ok(harnessCard?.includes('data-listing="copilot-cli"'), 'the harness seed replaces its existing row');
+  assert.deepEqual(cardLinks(harnessCard), [harness.links[0].url]);
+
+  const { drivers: empty } = await buildDriverFixture([]);
+  const fallbackCards = empty.matchAll(/<article class="driver[^"]*" id="([^"]+)"[\s\S]*?<\/article>|<li class="tile[^"]*" id="([^"]+)"[\s\S]*?<\/li>/g);
+  const replaced = new Set(['openclaw', 'vps', 'copilot']);
+  for (const [html, article, tile] of fallbackCards) {
+    const id = article ?? tile;
+    if (!replaced.has(id)) assert.ok(drivers.includes(html), `${id}: uncovered card retains its entire markup`);
+    assert.equal([...drivers.matchAll(new RegExp(` id="${id}"`, 'g'))].length, 1, `${id}: present exactly once`);
   }
 });
