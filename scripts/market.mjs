@@ -16,6 +16,7 @@ const LOGIN = /^[A-Za-z0-9](?:[A-Za-z0-9]|-(?=[A-Za-z0-9])){0,38}$/;
 const REPO = /^([A-Za-z0-9](?:[A-Za-z0-9]|-(?=[A-Za-z0-9])){0,38})\/([A-Za-z0-9._-]{1,100})$/;
 const FIELDS = { name: true, summary: true, tags: true, url: true, plugs_into: true, publisher: true, stage: true, status: true, login: false, links: false, proof: false };
 const RECEIPT_KINDS = ['driver', 'harness'];
+const SCHEMA_KEYS = new Set(['commit', 'contract', 'listings', 'id', ...Object.keys(FIELDS), 'label', 'receipt', 'skill', 'path', 'date', 'source', 'check']);
 const PRIVATE = [
   ['a token', /\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|glpat-[A-Za-z0-9_-]{20,}|xox[abposr]-[A-Za-z0-9-]{10,}|sk-[A-Za-z0-9_-]{16,}|AIza[0-9A-Za-z_-]{30,}|npm_[A-Za-z0-9]{30,}|(?:AKIA|ASIA)[0-9A-Z]{16}|eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.)/],
   ['a token', /-----BEGIN [A-Z ]*PRIVATE KEY-----|[A-Za-z][A-Za-z0-9+.-]*:\/\/[^/\s:@]+:[^/\s@]+@/],
@@ -47,7 +48,7 @@ export function isUrl(value) {
   return port === undefined || (/^[1-9][0-9]*$/.test(port) && Number(port) <= 65535);
 }
 
-const calendarDate = value => typeof value === 'string' && DATE.test(value) && new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) === value;
+const calendarDate = value => typeof value === 'string' && DATE.test(value) && !value.startsWith('0000') && new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) === value;
 const url = (value, where) => isUrl(value) ? value : fail(where, 'not an https URL in the contract\'s grammar');
 
 function checkProof(listing, commit, where) {
@@ -155,7 +156,7 @@ export function parse(text) {
   let index;
   try { index = JSON.parse(text); } catch { fail('the index', 'not JSON'); }
   const key = repeatedKey(text);
-  if (key !== null) fail('the index', `has the key ${/^[a-z_]{1,40}$/.test(key) ? key : '(not shown)'} twice in one object`);
+  if (key !== null) fail('the index', `has the key ${SCHEMA_KEYS.has(key) ? key : '(not shown)'} twice in one object`);
   return validate(index);
 }
 
