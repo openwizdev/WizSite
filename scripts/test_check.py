@@ -900,15 +900,22 @@ class Checks(unittest.TestCase):
                 ('<p class="tile-state">Held: its key header is unsupported</p>', '<p class="tile-state">Held: its key header is not supported yet</p>', 'reads exactly'),
                 ('<p class="tile-state">Parked: the host has no programmatic wake or stop</p>', '<p class="tile-state">Coming soon</p>', 'reads exactly'),
                 ('Being built</p>', 'Supported</p>', 'reads exactly'),
-                ('<h4 class="tile-name">Devin</h4>\n          <p class="tile-state">Being built</p>', '<h4 class="tile-name">Devin</h4>\n          <p class="tile-state">Built, waiting on its live check</p>', 'reads exactly'),
+                ('<h4 class="tile-name">Devin</h4>\n          <p class="tile-state">In review</p>', '<h4 class="tile-name">Devin</h4>\n          <p class="tile-state">Built, waiting on its live check</p>', 'reads exactly'),
+                ('<p class="driver-login">Login: held by GitHub</p>', '', 'its login line|a login line only on a driver card'),
+                ('<a class="tile-link" href="https://github.com/openwizdev/OpenWiz/pull/2490">Pull request</a>', '<a class="tile-link" href="https://github.com/openwizdev/OpenWiz/pull/2490">Pull request</a><p>Available now.</p>', 'nothing more'),
+                ('<div class="wall-group" id="hosts-review"', '<p>Devin is supported.</p><div class="wall-group" id="hosts-review"', 'shows only its kicker'),
+                ('<a class="tile-link" href="https://github.com/openwizdev/OpenWiz/pull/2490">', '<a class="tile-link" style="display:none" href="https://github.com/openwizdev/OpenWiz/pull/2490">', 'hides nothing'),
+                ('<li class="tile" id="devin" data-state="review">', '<li class="tile" id="devin" data-state="review" hidden>', 'hides nothing|waits for a script'),
+                ('</h2>\n    <p class="wall-lead">Each host', '</h2>\n    <a href="https://github.com/openwizdev/OpenWiz">Try it</a>\n    <p class="wall-lead">Each host', 'shows only its kicker|links only its tiles'),
                 ('/pull/2774">Pull request</a>', '/pull/2773">Pull request</a>', 'one link'),
                 ('/pull/2774">Pull request</a>', '/pull/2774">Pull request, released</a>', 'one link'),
                 ('<a class="tile-link" href="https://github.com/openwizdev/OpenWiz/issues/2540">Ticket</a>', '', 'one link'),
-                ('<b>15</b> being built', '<b>14</b> being built', 'true numbers'),
+                ('<b>14</b> being built', '<b>15</b> being built', 'true numbers'),
+                ('<b>6</b> waiting on live checks', '<b>5</b> waiting on live checks', 'true numbers'),
                 ('<b>3</b> shipped', '<b>4</b> shipped', 'true numbers'),
-                ('Being built <span class="group-count">6</span>', 'Being built <span class="group-count">7</span>', 'true count'),
+                ('Being built <span class="group-count">5</span>', 'Being built <span class="group-count">6</span>', 'true count'),
                 ('Being built <span>9</span>', 'Being built <span>8</span>', 'jump row'),
-                ('Logos belong to their owners and show what OpenWiz can run on, not a partnership.', 'Logos belong to their owners.', 'not a partnership'),
+                ('not a partnership, and not what runs today: each tile says its state.', 'and show what OpenWiz can run on.', 'not a partnership'),
                 (grok, grok + '<img src="/drivers/logos/cursor.svg" alt="Cursor logo">', 'no Grok logo'),
                 (vibe, vibe + '<img src="/drivers/logos/cursor.svg" alt="Cursor logo">', 'name only'),
                 ('<img src="/drivers/logos/pi.svg" alt="Pi logo"', '<img src="/drivers/logos/kiro.svg" alt="Pi logo"', 'official logo|alt text naming'),
@@ -918,6 +925,8 @@ class Checks(unittest.TestCase):
             text = main.replace('Held: no headless wake by session', 'Held: Cline has no headless wake by session')
             with self.assertRaisesRegex(AssertionError, 'five words'):
                 check.check_driver_wall(text)
+        self.broken('drivers/index.html', '', '', 'hidden by a style', css='\n.drivers-page .tile-link { display: none; }\n')
+        self.broken('drivers/index.html', '', '', 'hidden by a style', css='\n.drivers-page .tile .driver-login { visibility: hidden; }\n')
 
     def test_drivers_spotlight(self):
         page = 'drivers/index.html'

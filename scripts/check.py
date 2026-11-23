@@ -82,17 +82,13 @@ DRIVER_LOGOS = {
     'drivers/logos/capy.svg': ('578d3d133df15597ea8ffad90982f8b6b8acb6307c973b363c46672ae906bfd5', 'Capy'),
     'drivers/logos/cline.svg': ('4aeab2461289ccda34c6f4fe4624127ed37f69e2cab06e8e4bab3a333991bed9', 'Cline'),
     'drivers/logos/conductor.svg': ('f62a1ac6dee70ce4c996cbfa63b9fe2bd426b70cdca6ccbf9ad1a692593b9a8e', 'Conductor'),
-    'drivers/logos/copilot.svg': ('ae3ac7a6dc1415aeaf7064c7a749d9efd7f1ec49a68450590df7cf0da8d83781', 'GitHub Copilot'),
     'drivers/logos/crush.png': ('d91bbd007a6c3048a3b3d18203063c71f0489159cf0c3e115e5ee5b98b39fed0', 'Crush'),
     'drivers/logos/cursor.svg': ('878309a7f82021e76cdf211188dd052fe6aaf2f435c24887a731d8a19582d260', 'Cursor'),
     'drivers/logos/devin.svg': ('91aa298be0c31e2c6d889a78728852f345e7abf996349333abacd91f1f769463', 'Devin'),
     'drivers/logos/factory.svg': ('416ea4962d7b0b8be8bec7f7190c13c22d5f20fdcac401aa72886fd5c81d2fb2', 'Factory'),
-    'drivers/logos/fly.svg': ('f5c4a4d2b689004fe247b9747eb340e833bc36c2f989379a105e20edb6861b8a', 'Fly.io'),
     'drivers/logos/gemini-cli.svg': ('d2b511e4d9a97bb849526646cf1e7705ffa028a52eb53d847c6c3de1e9a40a73', 'Gemini CLI'),
-    'drivers/logos/github.svg': ('ccd84c89b1056345608fc3489357f8acc7397e49a3cdc2d418b6c8016911d47b', 'GitHub'),
     'drivers/logos/goose.png': ('9c81dc5407d48372013cf8145d8fc62234ba81749d4d6e454f377d4048a084f2', 'goose'),
     'drivers/logos/hermes.png': ('5fbced606189c9bfc2925a16f8903333041cabbf1f8699fe9fe9b3e24504048f', 'Hermes'),
-    'drivers/logos/junie.svg': ('7538303538b7323485817338b1f6929d29b5b98486b794f45506963851797de4', 'Junie'),
     'drivers/logos/kilo-code.svg': ('729bf088d9a114d567f133acf36f613cabd83662e4616afcea5ea403e87be8d2', 'Kilo Code'),
     'drivers/logos/kimi-code.svg': ('065fcf81c1920fe9c20edc847392d6b6bb419804975e97076d0e3524fe72930c', 'Kimi Code'),
     'drivers/logos/kiro.svg': ('774cbc1c7ecec8c935a6091595583d7a92fc8289d6f1db3f071c0f50c61c369f', 'Kiro'),
@@ -288,7 +284,7 @@ HOST_PILLS = (
     ('cloudroom', 'Cloudroom', 'passed 5 of 5', 'passed'),
     ('boat-dev', 'boat.dev', 'passed 5 of 5', 'passed'),
 )
-DRIVER_NUMBERS = {'2026', '11', '19', '20', '22', '1', '2', '3', '5', '6', '7', '9', '15'}
+DRIVER_NUMBERS = {'2026', '11', '19', '20', '22', '1', '2', '3', '5', '6', '7', '9', '14'}
 DRIVER_JARGON = re.compile(r'\b\d+\s+(?:drivers?|words?|checks?|commands?|passed)\b|\b(?!5 of 5\b)\d+\s+of\s+\d+\b', re.I)
 DRIVER_RESULT = re.compile(r'\ball five checks\b|\bfive passed checks\b|\bfive of five\b', re.I)
 DRIVER_RESULT_MAX = 2
@@ -319,9 +315,9 @@ DRIVER_WALL = (
     ('cursor', 'Cursor cloud agents', 'hosts', 'waiting', PR + '2021', 'cursor.svg'),
     ('factory', 'Factory', 'hosts', 'waiting', PR + '2022', 'factory.svg'),
     ('pane', 'Pane', 'hosts', 'waiting', PR + '2029', 'pane.svg'),
-    ('codespaces', 'GitHub Codespaces', 'hosts', 'review', PR + '2559', 'github.svg'),
-    ('sprites', 'Fly Sprites', 'hosts', 'review', PR + '2720', 'fly.svg'),
-    ('devin', 'Devin', 'hosts', 'building', PR + '2490', 'devin.svg'),
+    ('codespaces', 'GitHub Codespaces', 'hosts', 'waiting', PR + '2559', None),
+    ('sprites', 'Fly Sprites', 'hosts', 'review', PR + '2720', None),
+    ('devin', 'Devin', 'hosts', 'review', PR + '2490', 'devin.svg'),
     ('openhands', 'OpenHands Cloud', 'hosts', 'building', PR + '2567', 'openhands.svg'),
     ('warp-oz', 'Warp Oz', 'hosts', 'building', PR + '2555', 'warp.svg'),
     ('tembo', 'Tembo', 'hosts', 'building', PR + '2662', 'tembo.svg'),
@@ -329,7 +325,7 @@ DRIVER_WALL = (
     ('ona', 'Ona', 'hosts', 'building', PR + '2699', 'ona.svg'),
     ('opencomputer', 'OpenComputer', 'hosts', 'held', ISSUE + '2587', None),
     ('grok-bot', 'Grok Bot', 'hosts', 'parked', ISSUE + '2318', None),
-    ('copilot', 'GitHub Copilot CLI', 'harnesses', 'review', PR + '2782', 'copilot.svg'),
+    ('copilot', 'GitHub Copilot CLI', 'harnesses', 'review', PR + '2782', None),
     ('cursor-cli', 'Cursor CLI', 'harnesses', 'review', PR + '2778', 'cursor.svg'),
     ('gemini', 'Gemini CLI', 'harnesses', 'review', PR + '2776', 'gemini-cli.svg'),
     ('goose', 'Goose', 'harnesses', 'review', PR + '2779', 'goose.png'),
@@ -340,7 +336,7 @@ DRIVER_WALL = (
     ('antigravity', 'Antigravity CLI', 'harnesses', 'building', PR + '2773', 'antigravity.svg'),
     ('auggie', 'Augment Auggie', 'harnesses', 'building', PR + '2639', 'augment.svg'),
     ('crush', 'Crush', 'harnesses', 'building', PR + '2649', 'crush.png'),
-    ('junie', 'JetBrains Junie', 'harnesses', 'building', PR + '2638', 'junie.svg'),
+    ('junie', 'JetBrains Junie', 'harnesses', 'building', PR + '2638', None),
     ('kilo', 'Kilo Code', 'harnesses', 'building', PR + '2640', 'kilo-code.svg'),
     ('kiro', 'Kiro', 'harnesses', 'building', PR + '2631', 'kiro.svg'),
     ('vibe', 'Mistral Vibe', 'harnesses', 'building', PR + '2643', None),
@@ -366,8 +362,10 @@ DRIVER_REASONS = {
 DRIVER_WALL_LOGINS = {
     'openclaw': 'Login: stays on your machine', 'hermes': 'Login: stays on your machine', 'conductor': 'Login: held by Conductor',
     'cursor': 'Login: held by Cursor', 'factory': 'Login: held by Factory', 'pane': 'Login: stays on your machine',
+    'codespaces': 'Login: held by GitHub',
 }
-DRIVER_WALLS = (('hosts', 'Where your agents run'), ('harnesses', 'Which agent you already use'))
+DRIVER_WALLS = (('hosts', 'Where your agents run', 'Hosts'), ('harnesses', 'Which agent you already use', 'Harnesses'))
+DRIVER_WALL_HIDDEN = re.compile(r'\s(?:style|hidden|aria-hidden|inert)\b|\bclass="[^"]*\b(?:hidden|sr-only|visually-hidden)\b', re.I)
 DRIVER_WALL_LEADS = {
     'hosts': 'Each host gets its own driver. It ships only after it passes the same five-check test on its real host and lands in a release.',
     'harnesses': 'Harnesses run as rows on the local driver, on your computer or a VPS. Today that driver runs Claude Code and Codex; every row below is still on its way.',
@@ -375,7 +373,8 @@ DRIVER_WALL_LEADS = {
 DRIVER_RECEIPT = ('openclaw', '2026-11-22')
 DRIVER_TALLY = (('shipped', 'shipped'), ('live', 'passed live, ships next release'), ('waiting', 'waiting on live checks'),
                 ('review', 'in review'), ('building', 'being built'), ('planned', 'planned'), ('held', 'held'), ('parked', 'parked'))
-DRIVER_LOGO_NOTE = 'Logos belong to their owners and show what OpenWiz can run on, not a partnership.'
+DRIVER_LOGO_NOTE = ('Logos belong to their owners. They name the products these drivers and harnesses are for, '
+                    'not a partnership, and not what runs today: each tile says its state.')
 DRIVER_UNSHIPPED_CLAIM = re.compile(r'\b(?:supported|supports?|released|passed|passes|available|ready|works|ships?|shipped|soon|today|live)\b', re.I)
 
 
@@ -1221,12 +1220,14 @@ def tidy(text):
 
 def check_driver_wall(main):
     sections = re.findall(r'<section class="wall wrap" id="([^"]+)"[^>]*>([\s\S]*?)</section>', main)
-    assert [s[0] for s in sections] == [w for w, _ in DRIVER_WALLS], \
+    assert [s[0] for s in sections] == [w for w, *_ in DRIVER_WALLS], \
         f'two walls, hosts then harnesses: where your agents run, then which agent you already use: {[s[0] for s in sections]}'
     assert main.index('class="more-drivers') < main.index('class="wall wrap"') < main.index('class="own-driver'), \
         'the walls sit after the shipped drivers, before Write your own driver'
     states = list(DRIVER_LADDER)
-    for (wall, body), (_, title) in zip(sections, DRIVER_WALLS):
+    for (wall, body), (_, title, kicker) in zip(sections, DRIVER_WALLS):
+        hidden = DRIVER_WALL_HIDDEN.search(body)
+        assert not hidden, f'the {wall} wall hides nothing: every word and link in it is shown: {hidden[0]!r}'
         assert re.findall(rf'<h2 id="{wall}-title">([^<]*)</h2>', body) == [title], f'the {wall} wall is headed {title!r}'
         want = [row for row in DRIVER_WALL if row[2] == wall]
         want.sort(key=lambda row: states.index(row[3]))
@@ -1267,11 +1268,20 @@ def check_driver_wall(main):
                     f'{name}: its one official logo, {pinned}: {tile["images"]}'
             else:
                 assert not tile['images'] and not tile['svgs'], f'{name}: no official mark to show, so its name only: {tile["images"]}'
+            block = re.search(rf'<li class="tile[^"]*" id="{re.escape(key)}"[\s\S]*?</li>', body)[0]
+            visible = [name, said] + ([DRIVER_WALL_LOGINS[key]] if key in DRIVER_WALL_LOGINS else []) + [link_words + dated]
+            assert tidy(re.sub(r'<[^>]+>', ' ', block)).replace(' ,', ',') == ' '.join(visible), \
+                f'{name}: its tile shows exactly its name, state, login and link, nothing more: {tidy(re.sub(r"<[^>]+>", " ", block))!r}'
+            assert len(re.findall(r'<a\b', block)) == 1, f'{name}: one link in its tile'
             shown = tidy(' '.join([tile['said']] + [w for _, w in tile['links']] + tile['login']))
             if state == 'live':
                 shown = shown.replace(DRIVER_LADDER['live'][0], '').replace('Live check receipt', '')
             found = DRIVER_UNSHIPPED_CLAIM.search(shown.replace('live check', ''))
             assert not found, f'{name} is not in a release: never say or imply it is: {found[0]!r}'
+        rest = tidy(re.sub(r'<[^>]+>', ' ', re.sub(r'<li class="tile[\s\S]*?</li>', ' ', body)))
+        want_rest = ' '.join([kicker, title, DRIVER_WALL_LEADS[wall]] + [f'{DRIVER_LADDER[g[0]][0]} {g[2]}' for g in groups] * 2)
+        assert rest == want_rest, f'the {wall} wall shows only its kicker, heading, lead, jump row and group headings around its tiles: {rest!r}'
+        assert len(re.findall(r'<a\b', body)) == len(tiles) + len(groups), f'the {wall} wall links only its tiles and its jump row'
         leads = [plain(x) for x in re.findall(r'<p class="wall-lead">([\s\S]*?)</p>', body)]
         assert leads == [DRIVER_WALL_LEADS[wall]], f'the {wall} wall\'s lead reads exactly {DRIVER_WALL_LEADS[wall]!r}: {leads}'
     tally = re.findall(r'<ul class="tally"[^>]*>([\s\S]*?)</ul>', main)
@@ -1442,6 +1452,10 @@ def check_driver_css(css):
             if 'host-mark' in one and one != '.drivers-page .host-mark img' and re.search(r'img|host-(?:icon|tile|lockup)\b', one):
                 assert not re.search(r'(?<![-\w])(?:height|max-height|width)\s*:\s*\d', body), \
                     f'a host mark sized apart from its slot, so the pills are uneven: {one}'
+    for sel, body in re.findall(r'([^{}]+)\{([^{}]*)\}', css):
+        if re.search(r'\.(?:wall|tile|tally|group|logo-note)', sel):
+            assert not re.search(r'display\s*:\s*none|visibility\s*:\s*hidden|opacity\s*:\s*0(?![.\d])|font-size\s*:\s*0', body), \
+                f'nothing on the walls is hidden by a style: {sel.strip()}'
     for sel, body in re.findall(r'([^{}]+)\{([^{}]*)\}', css):
         if re.search(r'host-(?:tile|lockup|icon)\b|spot-logo|driver-logo|host-mark img|tile-mark img', sel):
             assert not re.search(r'(?<![-\w])(?:border-radius|clip-path|overflow|object-fit|mask)\s*:', body), \
