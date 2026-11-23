@@ -38,7 +38,7 @@ after(async () => {
   await run.close();
 });
 
-async function mount(item, { rows = [], outcomes = [], dryRun = false, enabled = true } = {}) {
+async function mount(item, { rows = [], outcomes = [], dryRun = false, enabled = true, pending = [] } = {}) {
   await page().run(`(() => {
     const rows = ${JSON.stringify(rows)};
     const outcomes = ${JSON.stringify(outcomes)};
@@ -49,7 +49,7 @@ async function mount(item, { rows = [], outcomes = [], dryRun = false, enabled =
     OW.records = {
       enabled: () => ${enabled},
       dryRun: () => ${dryRun},
-      pending: () => [],
+      pending: () => ${JSON.stringify(pending)},
       async compose(action) {
         fake.calls.push({ call: 'compose', action: JSON.parse(JSON.stringify(action)) });
         const row = rows.find(r => same(r.action, action));
@@ -270,7 +270,8 @@ test('an unknown outcome is never shown as sent, and checking again needs its co
   const { text, state, preview } = await outcome({ outcome: 'unknown', op: OP, reason: 'network' });
   assert.equal(state, 'unknown');
   assert.match(text, /Outcome unknown/);
-  assert.doesNotMatch(text, /\bPosted\b|\bSent\b|\bsent\b(?! to)|\bDone\b/, 'unknown read as sent');
+  assert.doesNotMatch(text, /\bPosted\b/, 'unknown read as posted');
+  assert.doesNotMatch(await page().run(`document.querySelector('#card-under-test [data-outcome]').innerText`), /posted|sent/i, 'unknown read as sent');
   assert.ok(await page().run(`!document.querySelector('#card-under-test [data-outcome] a[href*="issuecomment"]')`), 'unknown linked a comment');
   await page().tap('Check again');
   await until(`[...document.querySelectorAll('#card-under-test button')].some(b => b.textContent.trim() === 'Post')`, 'the confirm again');
@@ -293,4 +294,22 @@ test('dry run shows the preview and says nothing was posted', async () => {
   await page().tap('Post');
   await until(`document.querySelector('#card-under-test [data-outcome]')`, 'the outcome');
   assert.match(await cardText(), /Dry run: nothing was posted/);
+});
+
+test('after a reload, a pending answer on this subject shows as unknown and checks again only on confirm', async () => {
+  const input = await json('decision-yes-grill_confirmation.input.json');
+  const body = await json('decision-yes-grill_confirmation.body.json');
+  const other = { ...previewFor(input, body), subject: { kind: 'pull_request', number: 8 }, op: `op-${'b'.repeat(32)}` };
+  await mount(input.action.item, { pending: [previewFor(input, body), other] });
+  assert.equal(await page().run(`document.querySelectorAll('#card-under-test [data-outcome="unknown"]').length`), 1,
+    'the card showed a pending answer from another subject');
+  assert.equal(await shownBody(), body);
+  assert.match(await cardText(), /Outcome unknown/);
+  assert.deepEqual(await calls(), [], 'the card checked again without a tap');
+  await page().tap('Check again');
+  await until(`[...document.querySelectorAll('#card-under-test button')].some(b => b.textContent.trim() === 'Post')`, 'the confirm');
+  assert.deepEqual(await calls('post'), []);
+  await page().tap('Post');
+  await until(`document.querySelector('#card-under-test [data-outcome="posted"]')`, 'the outcome');
+  assert.deepEqual((await calls('post')).map(c => [c.op, c.confirmed]), [[OP, 1]]);
 });

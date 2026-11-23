@@ -1,1 +1,24 @@
-.card.decision { display: block; }
+.card.decision { display: block; --c: var(--em-you); }
+.decision-head { display: flex; flex-wrap: wrap; gap: 8px 12px; margin-bottom: 6px; font-size: 14px; color: var(--em-muted); }
+.decision-kind { text-transform: uppercase; letter-spacing: .06em; }
+.decision-risk.high { color: var(--em-amber); font-weight: 600; }
+.decision-question { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--em-line); }
+.decision-question h4 { margin: 0; font-size: 17px; font-weight: 600; }
+.decision-headline { color: var(--em-text); font-weight: 600; }
+.decision-summary, .decision-tickets { margin: 8px 0 0; padding-left: 20px; color: var(--em-text-2); }
+.card .decision-rec { color: var(--em-text); }
+.decision-answer { margin-top: 12px; display: grid; gap: 10px; }
+.decision-buttons { display: flex; flex-wrap: wrap; gap: 10px; }
+.decision-buttons .btn { min-height: var(--em-tap); min-width: 88px; }
+.decision-answer textarea { width: 100%; box-sizing: border-box; min-height: 80px; padding: 10px 12px; font: inherit; font-size: 16px;
+  color: var(--em-text); background: var(--em-bg); border: 1px solid var(--em-line); border-radius: var(--em-radius-sm); resize: vertical; }
+.decision-preview { padding: 12px; border: 1px solid var(--em-amber); border-radius: var(--em-radius-sm); }
+.decision-preview p { margin: 0 0 8px; }
+.decision-preview pre { margin: 0 0 10px; padding: 10px 12px; white-space: pre-wrap; overflow-wrap: anywhere; font: 400 14px/1.5 var(--em-mono);
+  color: var(--em-text); background: var(--em-bg); border-radius: var(--em-radius-sm); }
+.card .decision-risky { color: var(--em-amber); font-weight: 600; }
+.decision-outcome { margin-top: 8px; }
+.decision-outcome.posted strong { color: var(--em-merged); }
+.decision-outcome.refused strong { color: var(--em-held); }
+.decision-outcome.unknown strong { color: var(--em-unknown); }
+.card .decision-blocked, .decision-wait { color: var(--em-muted); }
