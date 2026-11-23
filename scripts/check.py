@@ -358,7 +358,7 @@ DRIVER_WALL = (
     ('cline', 'Cline', 'harnesses', 'held', ISSUE + '2530', 'cline.svg'),
 )
 DRIVER_LADDER = {
-    'live': ('Passed live, ships next release', 'Live check receipt'),
+    'live': ('Passed live, not in a release yet', 'Live check receipt'),
     'waiting': ('Built, waiting on its live check', 'Pull request'),
     'review': ('In review', 'Pull request'),
     'building': ('Being built', 'Draft pull request'),
@@ -383,7 +383,7 @@ DRIVER_WALL_LEADS = {
     'harnesses': 'Harnesses run as rows on the local driver, on your computer or a VPS. Today that driver runs Claude Code and Codex; every row below is still on its way.',
 }
 DRIVER_RECEIPT = ('openclaw', '2026-11-22')
-DRIVER_TALLY = (('shipped', 'shipped'), ('live', 'passed live, ships next release'), ('waiting', 'waiting on live checks'),
+DRIVER_TALLY = (('shipped', 'shipped'), ('live', 'passed live, not in a release yet'), ('waiting', 'waiting on live checks'),
                 ('review', 'in review'), ('building', 'being built'), ('planned', 'planned'), ('held', 'held'), ('parked', 'parked'))
 DRIVER_LOGO_NOTE = ('Logos belong to their owners. They name the products these drivers and harnesses are for, '
                     'not a partnership, and not what runs today: each tile says its state.')

@@ -61,7 +61,7 @@
         <li data-host="cloudroom" data-state="passed"><span class="host-mark"><img class="host-tile" src="/drivers/logos/cloudroom.png" alt="Cloudroom logo" width="256" height="256"></span><span class="host-name">Cloudroom</span> <span class="host-state">passed 5 of 5</span></li>
         <li data-host="boat-dev" data-state="passed"><span class="host-mark"><img class="host-lockup" src="/drivers/logos/boat-dev.svg" alt="boat.dev" width="390" height="109"></span> <span class="host-state">passed 5 of 5</span></li>
       </ul>
-      <ul class="tally" aria-label="Every driver and harness, by state"><li data-state="shipped"><b>3</b> shipped</li><li data-state="live"><b>1</b> passed live, ships next release</li><li data-state="waiting"><b>6</b> waiting on live checks</li><li data-state="review"><b>9</b> in review</li><li data-state="building"><b>14</b> being built</li><li data-state="planned"><b>2</b> planned</li><li data-state="held"><b>2</b> held</li><li data-state="parked"><b>1</b> parked</li></ul>
+      <ul class="tally" aria-label="Every driver and harness, by state"><li data-state="shipped"><b>3</b> shipped</li><li data-state="live"><b>1</b> passed live, not in a release yet</li><li data-state="waiting"><b>6</b> waiting on live checks</li><li data-state="review"><b>9</b> in review</li><li data-state="building"><b>14</b> being built</li><li data-state="planned"><b>2</b> planned</li><li data-state="held"><b>2</b> held</li><li data-state="parked"><b>1</b> parked</li></ul>
       <a class="voyage-pass" href="#boat-dev">See boat.dev's five passed checks</a>
     </div>
   </section>
@@ -114,14 +114,14 @@
     <p class="wall-kicker">Hosts</p>
     <h2 id="hosts-title">Where your agents run</h2>
     <p class="wall-lead">Each host gets its own driver. It ships only after it passes the same five-check test on its real host and lands in a release.</p>
-    <nav class="wall-jump" aria-label="Where your agents run, by state"><a href="#hosts-live" data-state="live">Passed live, ships next release <span>1</span></a><a href="#hosts-waiting" data-state="waiting">Built, waiting on its live check <span>6</span></a><a href="#hosts-review" data-state="review">In review <span>2</span></a><a href="#hosts-building" data-state="building">Being built <span>5</span></a><a href="#hosts-held" data-state="held">Held <span>1</span></a><a href="#hosts-parked" data-state="parked">Parked <span>1</span></a></nav>
+    <nav class="wall-jump" aria-label="Where your agents run, by state"><a href="#hosts-live" data-state="live">Passed live, not in a release yet <span>1</span></a><a href="#hosts-waiting" data-state="waiting">Built, waiting on its live check <span>6</span></a><a href="#hosts-review" data-state="review">In review <span>2</span></a><a href="#hosts-building" data-state="building">Being built <span>5</span></a><a href="#hosts-held" data-state="held">Held <span>1</span></a><a href="#hosts-parked" data-state="parked">Parked <span>1</span></a></nav>
     <div class="wall-group" id="hosts-live" data-state="live">
-      <h3 class="group-title">Passed live, ships next release <span class="group-count">1</span></h3>
+      <h3 class="group-title">Passed live, not in a release yet <span class="group-count">1</span></h3>
       <ul class="tiles">
         <li class="tile" id="openclaw" data-state="live">
           <span class="tile-mark"><img src="/drivers/logos/openclaw.svg" alt="OpenClaw logo" width="32" height="32" loading="lazy"></span>
           <h4 class="tile-name">OpenClaw</h4>
-          <p class="tile-state">Passed live, ships next release</p>
+          <p class="tile-state">Passed live, not in a release yet</p>
           <p class="driver-login">Login: stays on your machine</p>
           <a class="tile-link" href="https://github.com/openwizdev/OpenWiz/issues/1991#issuecomment-7087326408">Live check receipt, <time datetime="2026-11-22">2026-11-22</time></a>
         </li>

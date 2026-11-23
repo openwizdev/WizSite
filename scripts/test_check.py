@@ -1135,7 +1135,7 @@ class Checks(unittest.TestCase):
                 (cloud + 'passed">', cloud + 'works today">', "pill's state is 'passed'|shown as anything but passed"),
                 (boat + 'passed">', boat + 'coming soon">', "pill's state is 'passed'|shown as anything but passed"),
                 ('<p class="driver-kit passed" data-state="passed">', '<p class="driver-kit unrun" data-state="passed">', 'shown as anything but passed in its kit line'),
-                ('<p class="tile-state">Passed live, ships next release</p>', '<p class="tile-state">Passed live, ships in 0.1.1</p>', 'reads exactly|invented number'),
+                ('<p class="tile-state">Passed live, not in a release yet</p>', '<p class="tile-state">Passed live, ships next release</p>', 'reads exactly|invented number'),
                 ('<li data-host="boat-dev"', '<li data-host="openclaw" data-state="passed"><span class="host-name">OpenClaw</span> <span class="host-state">passed 5 of 5</span></li>\n        <li data-host="boat-dev"', 'host pills, in order|host pill only'),
                 ('Kit run, <time datetime="2026-11-20">2026-11-20</time>', 'Kit run, <time datetime="2026-11-21">2026-11-21</time>', 'dates its kit run 2026-11-20|invented number'),
                 ('<a href="https://github.com/openwizdev/OpenWiz/pull/1455#issuecomment-7034588211">', '<a href="https://github.com/openwizdev/OpenWiz/pull/1458#issuecomment-7034556153">', 'linked to its public evidence'),
