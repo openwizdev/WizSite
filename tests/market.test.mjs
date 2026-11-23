@@ -293,11 +293,12 @@ test('market-sync takes canonical main from git config it controls, never from t
   const repo = trusted();
   repo.git('commit', '-q', '--allow-empty', '-m', 'a fork only');
   repo.git('push', '-q', repo.fork, 'main');
-  const global = join(repo.dir, 'global.gitconfig');
-  writeFileSync(global, `[url "${repo.fork}"]\n\tinsteadOf = ${repo.canonical}\n`);
+  const home = join(repo.dir, 'home');
+  mkdirSync(home);
+  writeFileSync(join(home, '.gitconfig'), `[url "${repo.fork}"]\n\tinsteadOf = ${repo.canonical}\n`);
   for (const [where, env] of [
     ['the checkout\'s own config', {}],
-    ['global config', { GIT_CONFIG_GLOBAL: global }],
+    ['global config', { HOME: home, XDG_CONFIG_HOME: join(home, '.config') }],
     ['the environment', { GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: `url.${repo.fork}.insteadOf`, GIT_CONFIG_VALUE_0: repo.canonical }],
   ]) {
     if (!Object.keys(env).length) repo.git('config', `url.${repo.fork}.insteadOf`, repo.canonical);
