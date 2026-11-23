@@ -1,15 +1,25 @@
 'use strict';
 (() => {
-  const OW = (window.OW = window.OW || {});
+  const writer = window.OW.data.claim();
+  const OW = window.OW;
   const API = 'https://api.github.com';
-  const writer = OW.data.writer();
+  const lockRequest = (() => {
+    try { return typeof navigator.locks?.request === 'function' ? navigator.locks.request.bind(navigator.locks) : null; } catch { return null; }
+  })();
+  const eventType = (() => {
+    try { return Object.getOwnPropertyDescriptor(Event.prototype, 'type')?.get ?? null; } catch { return null; }
+  })();
+  const random = bytes => crypto.getRandomValues(bytes);
   const SKEW = 5 * 60 * 1000;
   const LONGEST = 65536;
   const MAX_PAGES = 50;
   const RISKS = ['ordinary', 'live', 'release', 'publish'];
-  const ACCOUNT_KEY = 'openwiz.app.v2.account';
   const RECEIPTS = 'openwiz.app.v2.receipts.';
   const PENDING = ['sending', 'unknown'];
+  const TERMINAL = ['refused', 'retired'];
+  const STATES = [...PENDING, 'posted', ...TERMINAL];
+  const REASONS = ['dry_run', 'disabled', 'not_composed', 'not_confirmed', 'signed_out', 'pending', 'source_changed', 'source_unchecked', 'github'];
+  const OP = /^op-[0-9a-f]{32}$/;
 
   const FIELDS = {
     'decision.yes': ['form', 'item'],
@@ -18,6 +28,13 @@
     'spec.ship': ['form', 'item'],
     'spec.not_now': ['form', 'item'],
     'spec.change': ['form', 'item', 'words'],
+  };
+  const COMMON = ['schema', 'kind', 'id', 'status', 'fingerprint', 'risk'];
+  const KEYS = {
+    grill_round: [...COMMON, 'grill_file', 'round', 'questions', 'answered'],
+    grill_confirmation: [...COMMON, 'grill_file', 'summary'],
+    spec_confirmation: [...COMMON, 'spec', 'summary', 'headline', 'tickets', 'graph'],
+    plan_approval: [...COMMON, 'spec', 'summary', 'headline', 'tickets', 'graph'],
   };
   const CONTEXT = {
     grill_round: ['grill_file', 'round', 'question_id'],
@@ -33,18 +50,35 @@
   };
   const STEERS = { 'spec.ship': () => 'go on', 'spec.not_now': () => 'stop', 'spec.change': action => action.words };
   const MARKERS = { line: ['launch-fleet:', '**Machine plan approval', '**Plan graph approved by', '**Late look by'], decisions: 'openwiz.decisions.' };
+  const IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
+  const QUESTION = /^[A-Z]{1,2}[1-9][0-9]*$/;
+  const GRILL_FILE = /^docs\/grills\/[A-Za-z0-9][A-Za-z0-9_.-]*\.md$/;
 
   const own = (o, key) => Object.prototype.hasOwnProperty.call(o, key);
   const object = v => v !== null && typeof v === 'object' && !Array.isArray(v);
   const positive = n => Number.isSafeInteger(n) && n > 0;
+  const text = v => typeof v === 'string' && v.length > 0;
+  const matches = (v, pattern) => typeof v === 'string' && pattern.test(v);
+  const exactly = (o, keys) => object(o) && Object.keys(o).length === keys.length && keys.every(k => own(o, k));
   const same = (a, b) => canonical(a) === canonical(b);
   function canonical(v) {
     if (Array.isArray(v)) return `[${v.map(canonical).join(',')}]`;
     if (object(v)) return `{${Object.keys(v).sort().map(k => `${JSON.stringify(k)}:${canonical(v[k])}`).join(',')}}`;
     return JSON.stringify(v) ?? 'undefined';
   }
+  function frozen(v) {
+    if (v !== null && typeof v === 'object') {
+      for (const key of Object.keys(v)) frozen(v[key]);
+      Object.freeze(v);
+    }
+    return v;
+  }
+  function snapshot(v) {
+    try { return frozen(structuredClone(v)); } catch { return null; }
+  }
   const refused = (op, reason) => ({ outcome: 'refused', op, reason });
-  const mode = () => (writer ? OW.data.v2.get() : 'off');
+  const unknown = (op, reason) => ({ outcome: 'unknown', op, reason });
+  const mode = () => (writer && lockRequest ? OW.data.v2.get() : 'off');
 
   function tokens(body) {
     const out = [];
@@ -83,13 +117,30 @@
     const keys = Object.keys(action);
     return keys.length !== fields.length || !fields.every(f => own(action, f));
   }
-  function requestShape(request) {
-    if (!object(request) || typeof request.kind !== 'string' || !own(CONTEXT, request.kind)) return false;
-    if (typeof request.id !== 'string' || typeof request.fingerprint !== 'string') return false;
-    if (request.kind === 'grill_round') return Array.isArray(request.questions) && Array.isArray(request.answered)
-      && typeof request.grill_file === 'string' && positive(request.round);
-    if (request.kind === 'grill_confirmation') return typeof request.grill_file === 'string';
-    return positive(request.spec);
+  const lines = v => Array.isArray(v) && v.length >= 1 && v.length <= 10 && v.every(line => text(line) && !/[\r\n]/.test(line));
+  function requestShape(r) {
+    if (!object(r) || typeof r.kind !== 'string' || !own(KEYS, r.kind) || !exactly(r, KEYS[r.kind])) return false;
+    if (r.schema !== 'openwiz.decisions.v1' || !matches(r.id, IDENTIFIER) || !['open', 'resolved', 'superseded'].includes(r.status)
+      || !matches(r.fingerprint, /^[0-9a-f]{64}$/) || ![...RISKS, 'unknown'].includes(r.risk)) return false;
+    if (r.kind === 'grill_round') {
+      if (!matches(r.grill_file, GRILL_FILE) || !positive(r.round) || !Array.isArray(r.questions) || r.questions.length < 1 || r.questions.length > 3) return false;
+      const ids = [];
+      for (const q of r.questions) {
+        if (!exactly(q, ['id', 'decides', 'context', 'recommendation']) || !Object.values(q).every(text) || !QUESTION.test(q.id) || ids.includes(q.id)) return false;
+        ids.push(q.id);
+      }
+      const answered = r.answered;
+      return Array.isArray(answered) && same(answered, ids.filter(id => answered.includes(id)))
+        && (r.status === 'superseded' || (r.status === 'resolved') === same(answered, ids));
+    }
+    if (r.kind === 'grill_confirmation') return matches(r.grill_file, GRILL_FILE) && lines(r.summary);
+    const tickets = Array.isArray(r.tickets) && (r.kind === 'spec_confirmation' ? r.tickets.length === 0
+      : r.tickets.every((t, i) => exactly(t, ['number', 'title', 'blockers']) && positive(t.number) && text(t.title)
+        && (i === 0 || r.tickets[i - 1].number < t.number) && Array.isArray(t.blockers)
+        && t.blockers.every((b, j) => positive(b) && b !== t.number && (j === 0 || t.blockers[j - 1] < b))));
+    const graph = Array.isArray(r.graph) && (r.kind === 'spec_confirmation' ? r.graph.length === 0
+      : r.graph.every(e => exactly(e, ['blocker', 'ticket']) && positive(e.blocker) && positive(e.ticket)));
+    return positive(r.spec) && lines(r.summary) && text(r.headline) && tickets && graph;
   }
 
   function bodyOf(action) {
@@ -104,18 +155,17 @@
     return `openwiz decision answer v1\n${JSON.stringify(context)}\n\n${segment}`;
   }
 
-  function precheck(action) {
+  function precheck(action, picked) {
     if (notAForm(action)) return 'not_a_form';
-    const picked = OW.data.repo.get();
-    if (!picked || action.item.repository !== picked.full) return 'other_repository';
+    if (picked !== undefined && (!object(picked) || action.item.repository !== picked.full)) return 'other_repository';
     if (action.item.type === 'decision') {
       const request = action.item.request;
       if (!requestShape(request)) return 'unreadable';
       if (request.status !== 'open') return 'not_open';
       if (action.item.current !== true) return 'not_current';
       if (!RISKS.includes(request.risk)) return 'risk_unknown';
-      if (request.kind === 'grill_round' && (!request.questions.some(q => q?.id === action.question_id)
-        || request.answered.includes(action.question_id) || typeof action.question_id !== 'string')) return 'answered';
+      if (request.kind === 'grill_round' && (typeof action.question_id !== 'string' || !request.questions.some(q => q.id === action.question_id)
+        || request.answered.includes(action.question_id))) return 'answered';
     }
     if (own(action, 'words') && (typeof action.words !== 'string' || !/\S/.test(action.words))) return 'empty';
     const body = bodyOf(action);
@@ -123,41 +173,74 @@
     if (body.length > LONGEST) return 'too_long';
     return null;
   }
+  function build(action, op, visibility, source) {
+    const { item } = action;
+    return {
+      op, form: action.form, body: bodyOf(action), repository: item.repository,
+      subject: { kind: item.subject.kind, number: item.subject.number }, url: item.url.replace(/#.*$/, ''), visibility,
+      confirms: item.type === 'decision' && item.request.risk !== 'ordinary' ? 2 : 1,
+      source,
+    };
+  }
 
-  async function read(path) {
-    const response = await writer.github('GET', path);
+  function context() {
+    const kept = OW.data.auth.get();
+    const picked = OW.data.repo.get();
+    const account = OW.data.auth.account();
+    if (!kept?.token || typeof kept.session !== 'string' || !account || !object(picked)) return null;
+    return { session: kept.session, account, owner: picked.owner, name: picked.name, full: picked.full };
+  }
+  async function read(pin, path) {
+    let response;
+    try { response = await writer.read(pin, path); } catch { return null; }
     OW.data.noteLimit(null, response);
     if (!response.ok) return null;
     return { json: await response.json().catch(() => undefined), response };
   }
-  async function pages(path) {
+  function following(response, pin, path, page) {
+    const next = (response.headers.get('Link') || '').split(',').filter(part => /;\s*rel="next"\s*$/.test(part));
+    if (!next.length) return 'done';
+    const link = next.length === 1 && next[0].match(/^\s*<([^>]*)>\s*;\s*rel="next"\s*$/);
+    let url;
+    try { url = link && new URL(link[1]); } catch { return 'unreadable'; }
+    const where = url && (url.pathname === `/repos/${pin.owner}/${pin.name}${path}` || new RegExp(`^/repositories/[1-9][0-9]*${path}$`).test(url.pathname));
+    return where && url.origin === API && !url.hash && url.searchParams.get('page') === String(page + 1)
+      && [...url.searchParams.keys()].every(k => k === 'per_page' || k === 'page') ? 'next' : 'unreadable';
+  }
+  async function pages(pin, path, readable) {
     const items = [];
     for (let page = 1; page <= MAX_PAGES; page += 1) {
-      const got = await read(`${path}?per_page=100&page=${page}`);
-      if (!got || !Array.isArray(got.json)) return { items, complete: false };
+      const got = await read(pin, `${path}?per_page=100&page=${page}`);
+      if (!got || !Array.isArray(got.json) || !got.json.every(readable)) return { items, complete: false };
       items.push(...got.json);
-      if (!/rel="next"/.test(got.response.headers.get('Link') || '')) return { items, complete: true };
+      const next = following(got.response, pin, path, page);
+      if (next !== 'next') return { items, complete: next === 'done' };
     }
     return { items, complete: false };
   }
+  const readableComment = c => object(c) && positive(c.id) && object(c.user) && positive(c.user.id) && typeof c.user.login === 'string'
+    && typeof c.body === 'string' && typeof c.created_at === 'string' && Number.isFinite(Date.parse(c.created_at)) && typeof c.html_url === 'string';
   async function sha256(bytes) {
     const data = typeof bytes === 'string' ? new TextEncoder().encode(bytes) : bytes;
     return [...new Uint8Array(await crypto.subtle.digest('SHA-256', data))].map(b => b.toString(16).padStart(2, '0')).join('');
   }
 
+  const PY_SPACE = /^[\t\n\v\f\r\x1c-\x1f \x85\xa0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]+/;
   function latest(source) {
     if (!source.startsWith('# Grill: ') || source.includes('\r')) return null;
+    const starts = [];
+    for (let at = source.indexOf('## '); at >= 0; at = source.indexOf('## ', at + 1)) if (at === 0 || source[at - 1] === '\n') starts.push(at);
     let selected = null;
     let previous = 0;
-    for (const section of source.split(/^## /m).slice(1)) {
-      const [heading, ...rest] = section.split('\n');
+    for (const [i, at] of starts.entries()) {
+      const [heading, ...rest] = source.slice(at + 3, starts[i + 1] ?? source.length).split('\n');
       if (heading.startsWith('Round ')) {
         const m = heading.match(/^Round ([1-9][0-9]*)$/);
-        if (!m || Number(m[1]) <= previous) return null;
+        if (!m || !Number.isSafeInteger(Number(m[1])) || Number(m[1]) <= previous) return null;
         previous = Number(m[1]);
         selected = { kind: 'grill_round', round: previous, rest };
       } else if (heading.startsWith('Summary')) {
-        if (!/^Summary(?:, corrected)?(?: \(shown to .+ for confirmation\))?$/.test(heading)) return null;
+        if (!/^Summary(?:, corrected)?(?: \(shown to [^\n]+ for confirmation\))?$/.test(heading)) return null;
         selected = { kind: 'grill_confirmation', rest };
       }
     }
@@ -165,7 +248,7 @@
     const first = selected.rest[0];
     const risk = first.startsWith('Risk: ') && RISKS.includes(first.slice(6)) ? first.slice(6) : 'unknown';
     const wording = first.startsWith('Risk:') ? selected.rest.slice(1) : selected.rest;
-    if (wording.some(l => /^(Risk:|```|~~~)/.test(l.trimStart()))) return null;
+    if (wording.some(l => /^(Risk:|```|~~~)/.test(l.replace(PY_SPACE, '')))) return null;
     const proposal = [];
     for (const line of wording) { if (line.startsWith('**') && line.endsWith(':**')) break; proposal.push(line); }
     if (selected.kind === 'grill_confirmation') {
@@ -175,23 +258,32 @@
         if (!line.startsWith(prefix) || line.length === prefix.length) return null;
         summary.push(line.slice(prefix.length));
       }
-      return { kind: selected.kind, risk, summary };
+      return summary.length >= 1 && summary.length <= 10 ? { kind: selected.kind, risk, summary } : null;
     }
     const questions = [];
     let pending = null;
     for (const line of proposal) {
       if (!pending) {
         if (!line) continue;
-        const m = line.match(/^\*\*([A-Z]{1,2}[1-9][0-9]*)(?:, re-asked)? - (.+?)\*\* (.*)$/);
+        const m = line.match(/^\*\*([A-Z]{1,2}[1-9][0-9]*)(?:, re-asked)? - ([^\n]+?)\*\* ([^\n]*)$/);
         if (!m) return null;
         pending = { id: m[1], decides: m[2], context: m[3] };
       } else if (line.startsWith('➡️ ')) {
+        if (!pending.context || !line.slice(3)) return null;
         questions.push({ ...pending, recommendation: line.slice(3) });
         pending = null;
-      } else pending.context += `\n${line}`;
+      } else {
+        if (line.startsWith('**')) return null;
+        pending.context += `\n${line}`;
+      }
     }
-    if (pending || questions.length < 1 || questions.length > 3) return null;
+    if (pending || questions.length < 1 || questions.length > 3 || new Set(questions.map(q => q.id)).size !== questions.length) return null;
     return { kind: selected.kind, risk, round: selected.round, questions };
+  }
+  function strictBase64(content) {
+    const plain = content.replace(/\n/g, '');
+    if (plain.length % 4 || !/^[A-Za-z0-9+/]*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(plain)) return null;
+    return Uint8Array.from(atob(plain), c => c.charCodeAt(0));
   }
   const untick = body => `${body}\n`.split('\n').map(l => l.replace(/^([ \t]*[-*+][ \t]+)\[[xX]\]$/, '$1[ ]')
     .replace(/^([ \t]*[-*+][ \t]+)\[[xX]\]([ \t\r])/, '$1[ ]$2')).join('\n');
@@ -199,42 +291,45 @@
     const section = String(body ?? '').split(/^## /m).find(part => part.startsWith('Changelog headline\n'));
     return section?.split('\n').slice(1).find(line => line.trim()) ?? null;
   }
-  const GRILL_FILE = /^docs\/grills\/[A-Za-z0-9][A-Za-z0-9_.-]*\.md$/;
-  function base64Bytes(text) {
-    const raw = atob(String(text).replace(/\s+/g, ''));
-    return Uint8Array.from(raw, c => c.charCodeAt(0));
+  const SPEC_EDIT = 'query SpecEdit($owner: String!, $name: String!, $number: Int!) { repository(owner: $owner, name: $name) { issue(number: $number) { lastEditedAt } } }';
+  async function lastEdited(pin, number) {
+    const response = await writer.query(pin, SPEC_EDIT, { owner: pin.owner, name: pin.name, number });
+    OW.data.noteLimit(null, response);
+    const answer = response.ok ? await response.json().catch(() => null) : null;
+    const issue = answer?.data?.repository?.issue;
+    if (!object(issue) || answer.errors !== undefined || !own(issue, 'lastEditedAt')) return undefined;
+    if (issue.lastEditedAt === null) return null;
+    const at = typeof issue.lastEditedAt === 'string' ? Date.parse(issue.lastEditedAt) : NaN;
+    return Number.isFinite(at) ? at : undefined;
   }
 
-  async function sourceCheck(item) {
+  const authors = () => OW.factory?.recordAuthors(OW.data.feeds.specs.data?.fleet?.text) ?? null;
+  async function sourceCheck(pin, item) {
     const unchecked = { result: 'unchecked' };
     try {
-      if (!writer) return unchecked;
-      const authors = OW.factory?.recordAuthors(OW.data.feeds.specs.data?.fleet?.text);
-      const picked = OW.data.repo.get();
+      const writers = authors();
       const r = item.request;
-      if (!authors || !picked || picked.full !== item.repository || !requestShape(r)) return unchecked;
-      const R = `/repos/${encodeURIComponent(picked.owner)}/${encodeURIComponent(picked.name)}`;
-      const comment = await read(`${R}/issues/comments/${item.comment_id}`);
-      if (!object(comment?.json)) return unchecked;
-      const c = comment.json;
-      let read1;
-      try { read1 = OW.factory.readRecord(c.body, item.subject.number); } catch { read1 = null; }
-      let fine = c.issue_url === `${API}${R}/issues/${item.subject.number}` && typeof c.user?.login === 'string'
-        && authors.has(c.user.login.toLowerCase()) && Boolean(read1?.record) && same(read1.record, r);
+      if (!writer || !writers || pin.full !== item.repository || !requestShape(r)) return unchecked;
+      const comment = await read(pin, `/issues/comments/${item.comment_id}`);
+      const c = comment?.json;
+      if (!object(c) || c.id !== item.comment_id || typeof c.body !== 'string') return unchecked;
+      let record;
+      try { record = OW.factory.readRecord(c.body, item.subject.number); } catch { record = null; }
+      let fine = c.issue_url === `${API}/repos/${pin.owner}/${pin.name}/issues/${item.subject.number}` && typeof c.user?.login === 'string'
+        && writers.has(c.user.login.toLowerCase()) && Boolean(record?.record) && same(record.record, r);
       let binding;
       if (r.kind === 'grill_round' || r.kind === 'grill_confirmation') {
-        if (item.subject.kind !== 'pull_request' || !GRILL_FILE.test(r.grill_file)) return { result: 'changed' };
-        const pull = await read(`${R}/pulls/${item.subject.number}`);
+        if (item.subject.kind !== 'pull_request') return { result: 'changed' };
+        const pull = await read(pin, `/pulls/${item.subject.number}`);
         const sha = pull?.json?.head?.sha;
-        if (!object(pull?.json) || typeof sha !== 'string' || !/^[0-9a-f]{40}$/.test(sha)) return unchecked;
-        const file = await read(`${R}/contents/${r.grill_file}?ref=${sha}`);
-        if (file?.json?.encoding !== 'base64' || typeof file.json.content !== 'string') return unchecked;
-        let bytes;
+        if (!object(pull?.json) || !matches(sha, /^[0-9a-f]{40}$/)) return unchecked;
+        const file = await read(pin, `/contents/${r.grill_file}?ref=${sha}`);
+        const blob = file?.json;
+        if (!object(blob) || blob.path !== r.grill_file || blob.encoding !== 'base64' || typeof blob.content !== 'string') return unchecked;
+        const bytes = strictBase64(blob.content);
+        if (!bytes) return unchecked;
         let saved;
-        try {
-          bytes = base64Bytes(file.json.content);
-          saved = latest(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
-        } catch { return unchecked; }
+        try { saved = latest(new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes)); } catch { return unchecked; }
         if (!saved) return unchecked;
         const want = r.kind === 'grill_round' ? { kind: r.kind, risk: r.risk, round: r.round, questions: r.questions }
           : { kind: r.kind, risk: r.risk, summary: r.summary };
@@ -242,26 +337,32 @@
         binding = { ref: sha, digest: await sha256(bytes) };
       } else {
         if (item.subject.kind !== 'issue') return { result: 'changed' };
-        const spec = await read(`${R}/issues/${r.spec}`);
+        const spec = await read(pin, `/issues/${r.spec}`);
         if (!object(spec?.json) || typeof spec.json.body !== 'string') return unchecked;
         fine = fine && spec.json.state === 'open' && headline(spec.json.body) === r.headline;
         binding = { ref: 'issue', digest: await sha256(spec.json.body) };
+        if (r.kind === 'spec_confirmation') {
+          const edited = await lastEdited(pin, r.spec);
+          const posted = Date.parse(c.created_at);
+          if (edited === undefined || !Number.isFinite(posted) || edited === posted) return unchecked;
+          fine = fine && (edited === null || edited < posted);
+        }
         if (r.kind === 'plan_approval') {
-          const subs = await pages(`${R}/issues/${r.spec}/sub_issues`);
-          if (!subs.complete || !subs.items.every(t => positive(t?.number) && typeof t.title === 'string')) return unchecked;
+          const subs = await pages(pin, `/issues/${r.spec}/sub_issues`, t => object(t) && positive(t.number) && typeof t.title === 'string');
+          if (!subs.complete) return unchecked;
           const tickets = [];
           for (const t of [...subs.items].sort((a, b) => a.number - b.number)) {
-            const by = await pages(`${R}/issues/${t.number}/dependencies/blocked_by`);
-            if (!by.complete || !by.items.every(b => positive(b?.number))) return unchecked;
+            const by = await pages(pin, `/issues/${t.number}/dependencies/blocked_by`, b => object(b) && positive(b.number));
+            if (!by.complete) return unchecked;
             tickets.push({ number: t.number, title: t.title, body: t.body ?? '', blockers: by.items.map(b => b.number).sort((a, b) => a - b) });
           }
-          const lines = ['plan-graph revision v2', `spec #${r.spec} body sha256 ${await sha256(untick(spec.json.body))}`];
+          const revision = ['plan-graph revision v2', `spec #${r.spec} body sha256 ${await sha256(untick(spec.json.body))}`];
           for (const t of tickets) {
-            lines.push(`ticket #${t.number} blocked-by ${t.blockers.map(b => `#${b}`).join(' ') || 'none'} body sha256 ${await sha256(untick(t.body))} title ${t.title}`);
+            revision.push(`ticket #${t.number} blocked-by ${t.blockers.map(b => `#${b}`).join(' ') || 'none'} body sha256 ${await sha256(untick(t.body))} title ${t.title}`);
           }
-          const revision = await sha256(`${lines.join('\n')}\n`);
-          fine = fine && same(tickets.map(({ number, title, blockers }) => ({ number, title, blockers })), r.tickets) && revision === r.fingerprint;
-          binding = { ref: 'revision-v2', digest: revision };
+          const digest = await sha256(`${revision.join('\n')}\n`);
+          fine = fine && same(tickets.map(({ number, title, blockers }) => ({ number, title, blockers })), r.tickets) && digest === r.fingerprint;
+          binding = { ref: 'revision-v2', digest };
         }
       }
       return fine ? { result: 'matched', binding } : { result: 'changed' };
@@ -269,230 +370,287 @@
       return unchecked;
     }
   }
+  function conversationCheck(list, item) {
+    const writers = authors();
+    const r = item.request;
+    const at = list.items.findIndex(c => c.id === item.comment_id);
+    if (!writers || at < 0) return 'source_unchecked';
+    for (const [i, c] of list.items.entries()) {
+      if (!writers.has(c.user.login.toLowerCase())) continue;
+      let got;
+      try { got = OW.factory.readRecord(c.body, item.subject.number); } catch { got = { malformed: true }; }
+      if (!got) continue;
+      if (i === at) {
+        if (!got.record || !same(got.record, r)) return 'source_changed';
+        continue;
+      }
+      if (got.record?.id === r.id) return 'source_unchecked';
+      if (i < at) continue;
+      if (!got.record) return 'source_unchecked';
+      const sameSource = r.kind === 'grill_round' || r.kind === 'grill_confirmation' ? got.record.grill_file === r.grill_file : got.record.spec === r.spec;
+      if (got.record.kind === r.kind && sameSource) return 'source_changed';
+    }
+    return null;
+  }
 
   const verified = new Map();
   const verifiedKey = item => `${item.repository}#${item.subject.number}:${item.comment_id}:${item.request?.id}`;
+  const itemCanon = item => canonical({ key: item.key, repository: item.repository, subject: item.subject, comment_id: item.comment_id, url: item.url, request: item.request });
+  let checks = 0;
+  let stamped = 0;
   async function check(item) {
-    if (!object(item) || item.type !== 'decision' || !itemShape(item, 'decision')) return { result: 'unchecked', checked_at: null };
-    const got = await sourceCheck(item);
-    if (got.result === 'matched') verified.set(verifiedKey(item), got.binding);
-    else verified.delete(verifiedKey(item));
-    return { ...got, checked_at: got.result === 'unchecked' ? null : Date.now() };
+    const snap = snapshot(item);
+    const pin = context();
+    if (!snap || !itemShape(snap, 'decision') || !pin) return { result: 'unchecked', binding: null, checked_at: null };
+    const seq = ++checks;
+    const got = await sourceCheck(pin, snap);
+    const checkedAt = got.result === 'unchecked' ? null : (stamped = Math.max(Date.now(), stamped + 1));
+    const key = verifiedKey(snap);
+    if (!(verified.get(key)?.seq > seq)) {
+      if (got.result === 'matched') {
+        verified.set(key, frozen({ seq, binding: { ...got.binding }, checked_at: checkedAt, session: pin.session, account: pin.account, item: itemCanon(snap) }));
+      } else verified.delete(key);
+    }
+    return { result: got.result, binding: got.result === 'matched' ? { ...got.binding } : null, checked_at: checkedAt };
   }
 
   const issued = new WeakMap();
   const usedTaps = new WeakSet();
   const inflight = new Map();
-
-  function freeze(preview) {
-    Object.freeze(preview.subject);
-    if (preview.source) Object.freeze(preview.source);
-    return Object.freeze(preview);
-  }
-  function issue(preview, item) {
-    freeze(preview);
-    issued.set(preview, { snapshot: JSON.stringify(preview), item, confirmed: 0 });
+  function issue(preview, action) {
+    frozen(preview);
+    issued.set(preview, { snapshot: JSON.stringify(preview), action, session: OW.data.auth.session(), confirmed: 0 });
     return preview;
+  }
+  function newOp() {
+    return `op-${[...random(new Uint8Array(16))].map(b => b.toString(16).padStart(2, '0')).join('')}`;
   }
 
   async function compose(action) {
-    const reason = precheck(action);
+    const snap = snapshot(action);
+    if (!snap) return { refused: 'not_a_form' };
+    const picked = OW.data.repo.get();
+    const reason = precheck(snap, picked);
     if (reason) return { refused: reason };
-    const { item } = action;
+    const { item } = snap;
+    const visibility = picked.private === true ? 'repository' : 'public';
     let source = null;
     if (item.type === 'decision') {
-      const got = await sourceCheck(item);
+      const kept = verified.get(verifiedKey(item));
+      const pin = context();
+      if (!pin) return { refused: 'source_unchecked' };
+      const ours = kept && kept.session === pin.session && kept.account === pin.account && kept.item === itemCanon(item);
+      const got = await sourceCheck(pin, item);
       if (got.result === 'changed') return { refused: 'source_changed' };
-      if (got.result !== 'matched') return { refused: 'source_unchecked' };
-      const known = verified.get(verifiedKey(item));
-      if (!known) return { refused: 'source_unchecked' };
-      if (!same(known, got.binding)) return { refused: 'source_changed' };
-      source = got.binding;
+      if (got.result !== 'matched' || !ours) return { refused: 'source_unchecked' };
+      if (kept.checked_at !== item.checked_at) return { refused: Number.isFinite(item.checked_at) && item.checked_at < kept.checked_at ? 'source_changed' : 'source_unchecked' };
+      if (!same(kept.binding, got.binding)) return { refused: 'source_changed' };
+      source = { ...kept.binding };
     }
-    const picked = OW.data.repo.get();
-    const bytes = crypto.getRandomValues(new Uint8Array(16));
-    const preview = {
-      op: `op-${[...bytes].map(b => b.toString(16).padStart(2, '0')).join('')}`,
-      form: action.form, body: bodyOf(action), repository: item.repository,
-      subject: { kind: item.subject.kind, number: item.subject.number }, url: item.url.replace(/#.*$/, ''),
-      visibility: picked.private === true ? 'repository' : 'public',
-      confirms: item.type === 'decision' && item.request.risk !== 'ordinary' ? 2 : 1,
-      source,
-    };
-    return issue(preview, structuredClone(item));
+    return issue(build(snap, newOp(), visibility, source), snap);
   }
 
+  function trustedClick(event) {
+    try {
+      if (!eventType || eventType.call(event) !== 'click') return false;
+      const trusted = Object.getOwnPropertyDescriptor(event, 'isTrusted');
+      return Boolean(trusted && !trusted.configurable && trusted.get && trusted.get.call(event) === true);
+    } catch { return false; }
+  }
   function confirm(preview, event) {
     const state = issued.get(preview);
-    const of = state ? preview.confirms : 0;
-    if (!state) return { confirmed: 0, of };
-    if (typeof Event === 'function' && event instanceof Event && event.isTrusted === true && event.type === 'click'
-      && !usedTaps.has(event) && state.confirmed < preview.confirms) {
+    if (!state) return { confirmed: 0, of: 0 };
+    const account = OW.data.auth.account();
+    const book = account ? ledger(account) : null;
+    if (book && (!book.ok || TERMINAL.includes(book.receipts[preview.op]?.state))) {
+      state.confirmed = 0;
+      return { confirmed: 0, of: preview.confirms };
+    }
+    if (trustedClick(event) && !usedTaps.has(event) && state.confirmed < preview.confirms) {
       usedTaps.add(event);
       state.confirmed += 1;
     }
-    return { confirmed: state.confirmed, of };
+    return { confirmed: state.confirmed, of: preview.confirms };
   }
 
-  function session() { return OW.data.auth.session(); }
-  function cachedAccount() {
-    try {
-      const kept = JSON.parse(localStorage.getItem(ACCOUNT_KEY));
-      return kept && kept.session === session() && positive(kept.id) ? kept.id : null;
-    } catch { return null; }
+  function validReceipt(key, r, account) {
+    if (!object(r) || r.v !== 1 || r.op !== key || !OP.test(key) || r.account !== account || !STATES.includes(r.state)) return null;
+    if (!positive(r.sent_at) || !Array.isArray(r.before) || !r.before.every(positive) || new Set(r.before).size !== r.before.length) return null;
+    const action = snapshot(r.action);
+    if (!action || precheck(action) !== null || !object(r.preview)) return null;
+    const p = r.preview;
+    if (!['public', 'repository'].includes(p.visibility)) return null;
+    const source = action.item.type === 'spec' ? null
+      : exactly(p.source, ['ref', 'digest']) && text(p.source.ref) && matches(p.source.digest, /^[0-9a-f]{64}$/) ? { ...p.source } : undefined;
+    if (source === undefined || canonical(build(action, key, p.visibility, source)) !== canonical(p)) return null;
+    if (r.state === 'posted' && !(exactly(r.comment, ['id', 'url']) && positive(r.comment.id) && typeof r.comment.url === 'string')) return null;
+    if (TERMINAL.includes(r.state) && !REASONS.includes(r.reason)) return null;
+    return frozen({ ...r, action });
   }
-  let reading = null;
-  async function account() {
-    const known = cachedAccount();
-    if (known) return known;
-    const mine = session();
-    if (!mine) return null;
-    if (reading?.session !== mine) {
-      reading = { session: mine, run: read('/user').then(got => {
-        if (!positive(got?.json?.id) || session() !== mine) return null;
-        localStorage.setItem(ACCOUNT_KEY, JSON.stringify({ session: mine, id: got.json.id }));
-        return got.json.id;
-      }).catch(() => null).finally(() => { if (reading?.session === mine) reading = null; }) };
+  function ledger(account) {
+    let all;
+    try { all = JSON.parse(localStorage.getItem(`${RECEIPTS}${account}`) ?? '{}'); } catch { return { ok: false }; }
+    if (!object(all)) return { ok: false };
+    const receipts = {};
+    for (const [key, r] of Object.entries(all)) {
+      const valid = validReceipt(key, r, account);
+      if (!valid) return { ok: false };
+      receipts[key] = valid;
     }
-    return reading.run;
+    return { ok: true, receipts };
   }
-  function receipts(id) {
-    try {
-      const all = JSON.parse(localStorage.getItem(`${RECEIPTS}${id}`));
-      return object(all) ? all : {};
-    } catch { return {}; }
-  }
-  function save(id, op, receipt) {
-    localStorage.setItem(`${RECEIPTS}${id}`, JSON.stringify({ ...receipts(id), [op]: receipt }));
-  }
-
-  function commentsPath(preview) {
-    const picked = OW.data.repo.get();
-    return `/repos/${encodeURIComponent(picked.owner)}/${encodeURIComponent(picked.name)}/issues/${preview.subject.number}/comments`;
+  async function commit(account, op, receipt) {
+    return lockRequest(`openwiz.app.v2.ledger.${account}`, () => {
+      const book = ledger(account);
+      if (!book.ok || !validReceipt(op, receipt, account)) return false;
+      localStorage.setItem(`${RECEIPTS}${account}`, JSON.stringify({ ...book.receipts, [op]: receipt }));
+      return true;
+    }).catch(() => false);
   }
 
-  async function reconcile(preview, id, prior) {
+  function reconcile(list, prior, book, account) {
+    if (!list.complete) return { unknown: 'incomplete' };
+    const claimed = new Set(Object.values(book.receipts).filter(r => r.op !== prior.op && r.comment).map(r => r.comment.id));
+    const earlier = new Set(prior.before);
+    const found = list.items.filter(c => c.user.id === account && c.body === prior.preview.body && !earlier.has(c.id) && !claimed.has(c.id)
+      && Date.parse(c.created_at) >= prior.sent_at - SKEW);
+    if (found.length > 1) return { unknown: 'ambiguous' };
+    return found.length ? { found: found[0] } : {};
+  }
+  function notSent(pin) {
+    if (OW.data.v2.get() !== 'on') return 'disabled';
+    const kept = OW.data.auth.get();
+    if (!kept?.token || kept.session !== pin.session || OW.data.auth.account() !== pin.account) return 'signed_out';
+    return 'not_composed';
+  }
+
+  async function send(preview, state, pin, base) {
     const op = preview.op;
-    const list = await pages(commentsPath(preview));
-    const ours = list.items.filter(c => object(c) && c.user?.id === id && c.body === preview.body && positive(c.id));
-    if (prior) {
-      const claimed = new Set(Object.entries(receipts(id)).filter(([key]) => key !== op).map(([, r]) => r?.comment?.id).filter(Boolean));
-      const earlier = new Set(Array.isArray(prior.before) ? prior.before : []);
-      const found = ours.find(c => !claimed.has(c.id) && !earlier.has(c.id) && Date.parse(c.created_at) >= prior.sent_at - SKEW);
-      if (found) {
-        const comment = { id: found.id, url: found.html_url };
-        save(id, op, { ...prior, state: 'posted', comment });
-        return { outcome: { outcome: 'posted', op, comment } };
-      }
-      if (!list.complete) {
-        save(id, op, { ...prior, state: 'unknown' });
-        return { outcome: { outcome: 'unknown', op, reason: 'incomplete' } };
-      }
-    } else if (!list.complete) {
-      return { outcome: refused(op, 'source_unchecked') };
-    }
-    return { before: ours.map(c => c.id) };
-  }
-
-  async function send(preview, state, id, before) {
-    const op = preview.op;
-    const path = commentsPath(preview);
-    save(id, op, { op, body: preview.body, repository: preview.repository, subject: preview.subject, source: preview.source,
-      preview, item: state.item, state: 'sending', sent_at: Date.now(), before });
+    const save = receipt => commit(pin.account, op, { ...base, ...receipt });
     let response;
     try {
-      response = await writer.github('POST', path, { body: preview.body });
+      response = await writer.comment(pin, preview.body);
     } catch (error) {
-      if (error instanceof OW.data.Refused) {
-        save(id, op, { ...receipts(id)[op], state: 'refused' });
-        return refused(op, 'disabled');
+      if (error instanceof OW.data.Refused || error instanceof OW.data.Ended || error instanceof OW.data.SignedOut) {
+        const reason = notSent(pin);
+        await save({ state: 'refused', reason });
+        return refused(op, reason);
       }
-      if (error instanceof OW.data.SignedOut || error instanceof OW.data.Ended) {
-        save(id, op, { ...receipts(id)[op], state: 'unknown' });
-        return { outcome: 'unknown', op, reason: 'signed_out' };
-      }
-      save(id, op, { ...receipts(id)[op], state: 'unknown' });
-      return { outcome: 'unknown', op, reason: 'network' };
+      await save({ state: 'unknown' });
+      return unknown(op, 'network');
     }
     OW.data.noteLimit(null, response);
     if (response.status >= 200 && response.status < 300) {
       const body = await response.json().catch(() => null);
       if (positive(body?.id) && typeof body.html_url === 'string') {
         const comment = { id: body.id, url: body.html_url };
-        save(id, op, { ...receipts(id)[op], state: 'posted', comment });
+        await save({ state: 'posted', comment });
         return { outcome: 'posted', op, comment };
       }
-      save(id, op, { ...receipts(id)[op], state: 'unknown' });
-      return { outcome: 'unknown', op, reason: 'unreadable' };
+      await save({ state: 'unknown' });
+      return unknown(op, 'unreadable');
     }
-    if (response.status >= 400 && response.status < 500) {
-      save(id, op, { ...receipts(id)[op], state: 'refused' });
+    if (response.type === 'opaqueredirect' || (response.status >= 300 && response.status < 500)) {
+      await save({ state: 'refused', reason: 'github' });
       return refused(op, 'github');
     }
-    save(id, op, { ...receipts(id)[op], state: 'unknown' });
-    return { outcome: 'unknown', op, reason: 'server' };
+    await save({ state: 'unknown' });
+    return unknown(op, 'server');
   }
 
-  async function run(preview, state) {
+  async function locked(preview, state, pin) {
     const op = preview.op;
-    const id = await account();
-    if (!id) return refused(op, 'signed_out');
-    const all = receipts(id);
-    const saved = all[op];
-    if (saved?.state === 'posted') return { outcome: 'posted', op, comment: saved.comment };
-    if (state.outcome?.outcome === 'posted') return state.outcome;
-    if (state.confirmed < preview.confirms) return refused(op, 'not_confirmed');
-    state.confirmed = 0;
-    const other = Object.values(all).find(r => object(r) && r.op !== op && PENDING.includes(r.state)
-      && r.repository === preview.repository && same(r.subject, preview.subject));
+    const book = ledger(pin.account);
+    if (!book.ok) return refused(op, 'pending');
+    const saved = book.receipts[op];
+    if (saved?.state === 'posted') return { outcome: 'posted', op, comment: { ...saved.comment } };
+    if (saved && TERMINAL.includes(saved.state)) return refused(op, saved.reason);
+    const other = Object.values(book.receipts).find(r => r.op !== op && PENDING.includes(r.state)
+      && r.preview.repository === preview.repository && same(r.preview.subject, preview.subject));
     if (other) return refused(op, 'pending');
     const prior = saved && PENDING.includes(saved.state) ? saved : null;
-    const read1 = await reconcile(preview, id, prior);
-    if (read1.outcome) return (state.outcome = read1.outcome);
-    if (state.item.type === 'decision') {
-      const got = await sourceCheck(state.item);
+    const list = await pages(pin, `/issues/${pin.number}/comments`, readableComment);
+    if (prior) {
+      const found = reconcile(list, prior, book, pin.account);
+      if (found.found) {
+        const comment = { id: found.found.id, url: found.found.html_url };
+        await commit(pin.account, op, { ...prior, state: 'posted', comment });
+        return { outcome: 'posted', op, comment };
+      }
+      if (found.unknown) {
+        await commit(pin.account, op, { ...prior, state: 'unknown' });
+        return unknown(op, found.unknown);
+      }
+    } else if (!list.complete) return refused(op, 'source_unchecked');
+    if (state.action.item.type === 'decision') {
+      const got = await sourceCheck(pin, state.action.item);
       const reason = got.result === 'unchecked' ? 'source_unchecked'
-        : got.result !== 'matched' || !same(got.binding, preview.source) ? 'source_changed' : null;
+        : got.result !== 'matched' || !same(got.binding, preview.source) ? 'source_changed' : conversationCheck(list, state.action.item);
       if (reason) {
-        if (prior) save(id, op, { ...prior, state: reason === 'source_changed' ? 'retired' : 'unknown' });
+        if (prior) await commit(pin.account, op, { ...prior, ...(reason === 'source_changed' ? { state: 'retired', reason } : { state: 'unknown' }) });
         return refused(op, reason);
       }
     }
-    const outcome = await send(preview, state, id, read1.before);
-    state.outcome = outcome;
-    return outcome;
+    const base = { v: 1, op, account: pin.account, preview: JSON.parse(JSON.stringify(preview)), action: state.action,
+      sent_at: Date.now(), before: list.items.filter(c => c.user.id === pin.account && c.body === preview.body).map(c => c.id) };
+    if (!(await commit(pin.account, op, { ...base, state: 'sending' }))) return refused(op, 'pending');
+    return send(preview, state, pin, base);
+  }
+
+  async function run(preview, state, pin) {
+    const op = preview.op;
+    const book = ledger(pin.account);
+    if (!book.ok) return refused(op, 'pending');
+    const saved = book.receipts[op];
+    if (saved?.state === 'posted') return { outcome: 'posted', op, comment: { ...saved.comment } };
+    if (saved && TERMINAL.includes(saved.state)) return refused(op, saved.reason);
+    if (state.outcome?.outcome === 'posted') return state.outcome;
+    if (state.confirmed < preview.confirms) return refused(op, 'not_confirmed');
+    state.confirmed = 0;
+    let entered = false;
+    try {
+      return await lockRequest(`openwiz.app.v2.subject.${pin.account}.${pin.full}#${pin.number}`, { ifAvailable: true }, lock => {
+        if (!lock) return refused(op, 'pending');
+        entered = true;
+        return locked(preview, state, pin);
+      });
+    } catch {
+      return entered ? unknown(op, 'failed') : refused(op, 'pending');
+    }
   }
 
   function post(preview) {
     const state = issued.get(preview);
-    const op = typeof preview?.op === 'string' ? preview.op : null;
+    const op = state ? preview.op : null;
     if (!state || state.snapshot !== JSON.stringify(preview)) return Promise.resolve(refused(op, 'not_composed'));
     const now = mode();
     if (now === 'off') return Promise.resolve(refused(op, 'disabled'));
     if (now === 'dry-run') return Promise.resolve(refused(op, 'dry_run'));
-    if (!OW.data.auth.signedIn()) return Promise.resolve(refused(op, 'signed_out'));
-    const picked = OW.data.repo.get();
-    if (!picked || picked.full !== preview.repository) return Promise.resolve(refused(op, 'not_composed'));
+    const found = context();
+    if (!OW.data.auth.signedIn() || !found) return Promise.resolve(refused(op, 'signed_out'));
+    if (found.full !== preview.repository || found.session !== state.session) return Promise.resolve(refused(op, 'not_composed'));
     if (inflight.has(op)) return inflight.get(op);
-    const promise = run(preview, state).catch(() => ({ outcome: 'unknown', op, reason: 'failed' }))
-      .finally(() => { if (inflight.get(op) === promise) inflight.delete(op); });
+    const pin = Object.freeze({ ...found, number: preview.subject.number });
+    const promise = run(preview, state, pin).then(outcome => {
+      if (outcome.outcome === 'posted') state.outcome = outcome;
+      return outcome;
+    }, () => unknown(op, 'failed')).finally(() => { if (inflight.get(op) === promise) inflight.delete(op); });
     inflight.set(op, promise);
     return promise;
   }
 
   function pending() {
-    const id = cachedAccount();
-    if (!id) return [];
-    return Object.values(receipts(id))
-      .filter(r => object(r) && PENDING.includes(r.state) && object(r.preview) && r.preview.op === r.op && object(r.item))
-      .sort((a, b) => (a.sent_at || 0) - (b.sent_at || 0))
-      .map(r => issue({ ...r.preview, subject: { ...r.preview.subject }, source: r.preview.source ? { ...r.preview.source } : null }, r.item));
+    const account = OW.data.auth.account();
+    if (!account) return [];
+    const book = ledger(account);
+    if (!book.ok) return [];
+    return Object.values(book.receipts).filter(r => PENDING.includes(r.state)).sort((a, b) => a.sent_at - b.sent_at)
+      .map(r => issue(JSON.parse(JSON.stringify(r.preview)), r.action));
   }
 
-  OW.records = {
+  OW.records = Object.freeze({
     enabled: () => mode() !== 'off',
     dryRun: () => mode() === 'dry-run',
     compose, confirm, post, pending, check,
-  };
-  if (mode() !== 'off' && OW.data.auth.signedIn()) account();
+  });
 })();

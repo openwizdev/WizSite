@@ -94,12 +94,17 @@ class Net {
   }
 }
 
+const branded = new WeakMap();
 class FakeEvent {
   constructor(type, trusted) {
-    this.type = type;
-    Object.defineProperty(this, 'isTrusted', { value: trusted });
+    branded.set(this, type);
+    Object.defineProperty(this, 'isTrusted', { get: () => trusted, enumerable: true, configurable: false });
   }
 }
+Object.defineProperty(FakeEvent.prototype, 'type', { configurable: true, enumerable: true, get() {
+  if (!branded.has(this)) throw new TypeError('Illegal invocation');
+  return branded.get(this);
+} });
 const tap = () => new FakeEvent('click', true);
 
 class Locks {
@@ -304,7 +309,7 @@ test('the request guard admits only the records layer\'s one comment POST on the
   const run = await boot();
   const { OW, net } = run;
   needsRecords(run);
-  assert.equal(OW.data.writer(), null, 'a second script claimed the write path');
+  assert.equal(OW.data.claim(), null, 'a second script claimed the write path');
   const refusedBy = async (call, what) => {
     const before = net.log.length;
     await assert.rejects(call, error => error instanceof OW.data.Refused, what);
@@ -407,6 +412,9 @@ test('a forged, copied or edited preview, or a scripted confirm, never posts', a
   run.records.confirm(copy, tap());
   assert.equal(plain(await run.records.post(copy)).reason, 'not_composed');
   run.records.confirm(preview, { isTrusted: true, type: 'click' });
+  const forged = Object.create(FakeEvent.prototype);
+  Object.defineProperty(forged, 'isTrusted', { get: () => true, configurable: false });
+  run.records.confirm(preview, forged);
   run.records.confirm(preview, new FakeEvent('keydown', true));
   assert.equal(plain(await run.records.post(preview)).reason, 'not_confirmed');
   try { preview.body = 'launch-fleet: started'; } catch {}
@@ -466,7 +474,7 @@ test('R5: compose binds the source the queue verified, not whatever the spec say
   const checked = plain(await run.records.check(input.action.item));
   assert.equal(checked.result, 'matched', JSON.stringify(checked));
   net.github[issue].json.body = net.github[issue].json.body.replace('Synthetic notes are scattered.', 'Synthetic notes sync to every device.');
-  assert.deepEqual(plain(await run.records.compose(input.action)), { refused: 'source_changed' },
+  assert.deepEqual(plain(await run.records.compose({ ...input.action, item: { ...input.action.item, checked_at: checked.checked_at } })), { refused: 'source_changed' },
     'the spec body changed under an unchanged headline after the queue checked it');
 });
 

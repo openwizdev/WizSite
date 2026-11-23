@@ -8,7 +8,15 @@
   const V2_VALUES = ['on', 'dry-run', 'off'];
   const LOW = 100;
   const PAUSE_DEFAULT = 5 * 60 * 1000;
-
+  const scriptOf = (() => {
+    try { return Object.getOwnPropertyDescriptor(Document.prototype, 'currentScript')?.get ?? null; } catch { return null; }
+  })();
+  const recordsScript = (() => {
+    const next = scriptOf?.call(document)?.nextElementSibling;
+    return next?.tagName === 'SCRIPT' && /^\/app\/records(?:\.[0-9a-f]{10})?\.js$/.test(next.getAttribute('src') || '') ? next : null;
+  })();
+  const positive = n => Number.isSafeInteger(n) && n > 0;
+  const object = v => v !== null && typeof v === 'object' && !Array.isArray(v);
 
   const store = {
     get(key) {
@@ -21,10 +29,16 @@
     get: () => store.get(AUTH_KEY),
     session: () => store.get(AUTH_KEY)?.session ?? null,
     signedIn: () => Boolean(store.get(AUTH_KEY)?.token),
+    account() {
+      const kept = store.get(AUTH_KEY);
+      return kept?.token && positive(kept.account) ? kept.account : null;
+    },
     keep(grant, session) {
       const now = Date.now();
+      const prior = store.get(AUTH_KEY);
       store.set(AUTH_KEY, {
         session,
+        account: prior?.session === session && positive(prior.account) ? prior.account : null,
         token: grant.access_token,
         expiresAt: grant.expires_in ? now + grant.expires_in * 1000 : null,
         refresh: grant.refresh_token || null,
@@ -68,31 +82,39 @@
 
   class Refused extends Error {}
   const WRITE = Symbol('the records layer');
-  let writerClaimed = false;
+  const OWNER_NAME = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$/;
+  const REPO_NAME = /^(?!\.\.?$)[A-Za-z0-9._-]{1,100}$/;
   function oneComment(url, body) {
     const picked = repo.get();
-    if (!picked || typeof picked.owner !== 'string' || typeof picked.name !== 'string' || v2.get() !== 'on') return false;
-    const base = `${API}/repos/${encodeURIComponent(picked.owner)}/${encodeURIComponent(picked.name)}/issues/`;
+    if (!picked || !OWNER_NAME.test(picked.owner) || !REPO_NAME.test(picked.name) || v2.get() !== 'on') return false;
+    const base = `${API}/repos/${picked.owner}/${picked.name}/issues/`;
     return url.startsWith(base) && /^[1-9][0-9]{0,9}\/comments$/.test(url.slice(base.length))
       && Object.keys(body).length === 1 && typeof body.body === 'string';
   }
-  function allowed(method, url, body, key) {
+  const readQuery = body => Object.keys(body).every(key => key === 'query' || key === 'variables') && typeof body.query === 'string'
+    && /^\s*query\s/.test(body.query) && !/\b(mutation|subscription)\b/i.test(body.query) && (body.variables === undefined || object(body.variables));
+  function allowed(method, url, text, key) {
+    let body;
+    try { body = text === undefined ? undefined : JSON.parse(text); } catch { return false; }
     if (url.startsWith(`${API}/`)) {
-      if (method === 'GET') return true;
-      if (method === 'POST' && key === WRITE && oneComment(url, body)) return true;
-      return method === 'POST' && url === `${API}/graphql` && /^\s*query\s/.test(body.query) && !/\b(mutation|subscription)\b/i.test(body.query);
+      if (method === 'GET') return body === undefined;
+      if (method !== 'POST' || !object(body)) return false;
+      if (key === WRITE && oneComment(url, body)) return true;
+      return url === `${API}/graphql` && readQuery(body);
     }
-    return method === 'POST' && (url === '/api/sign-in/token' || url === '/api/sign-in/refresh');
+    return method === 'POST' && object(body) && (url === '/api/sign-in/token' || url === '/api/sign-in/refresh');
   }
-  async function ask(method, url, body, headers = {}, key) {
-    if (!allowed(method, url, body || {}, key)) throw new Refused(`the app never sends ${method} ${url}`);
+  async function ask(method, url, body, headers = {}, key, redirect = 'follow') {
+    const text = body === undefined ? undefined : JSON.stringify(body);
+    if (!allowed(method, url, text, key)) throw new Refused(`the app never sends ${method} ${url}`);
     return fetch(url, {
       method,
-      headers: { ...(body ? { 'Content-Type': 'application/json' } : {}), ...headers },
-      body: body ? JSON.stringify(body) : undefined,
+      headers: { ...(text !== undefined ? { 'Content-Type': 'application/json' } : {}), ...headers },
+      body: text,
       credentials: url.startsWith('/') ? 'same-origin' : 'omit',
       cache: 'no-store',
       referrerPolicy: 'no-referrer',
+      redirect,
     });
   }
 
@@ -102,6 +124,7 @@
     const grant = response.ok ? await response.json() : null;
     if (!grant?.access_token) throw new Error('the sign-in did not finish');
     auth.keep(grant, crypto.randomUUID());
+    await resolveAccount();
   }
   let refreshing = null;
   function refresh(session) {
@@ -123,7 +146,7 @@
   class Ended extends Error {}
   class SignedOut extends Error {}
 
-  async function github(method, path, body, key) {
+  async function github(method, path, body) {
     const session = auth.session();
     if (!session) throw new Ended();
     const still = () => { if (auth.session() !== session) throw new Ended(); };
@@ -140,7 +163,7 @@
       const response = await ask(method, `${API}${path}`, body, {
         Authorization: `Bearer ${auth.get().token}`,
         Accept: 'application/vnd.github+json',
-      }, key);
+      });
       still();
       if (response.status !== 401) return response;
       const renewed = attempt === 0 && (await refresh(session));
@@ -572,15 +595,69 @@
     }
   });
 
-  function writer() {
-    if (writerClaimed) return null;
-    writerClaimed = true;
-    return { github: (method, path, body) => github(method, path, body, WRITE) };
+  let resolving = null;
+  function resolveAccount() {
+    const kept = auth.get();
+    if (!kept?.token || positive(kept.account) || v2.get() === 'off') return Promise.resolve();
+    if (resolving?.session !== kept.session) {
+      const session = kept.session;
+      const run = github('GET', '/user').then(response => (response.ok ? response.json() : null)).then(user => {
+        const now = auth.get();
+        if (!positive(user?.id) || now?.session !== session || positive(now.account)) return;
+        store.set(AUTH_KEY, { ...now, account: user.id });
+        changed();
+      }).catch(() => {}).finally(() => { if (resolving?.run === run) resolving = null; });
+      resolving = { session, run };
+    }
+    return resolving.run;
   }
 
-  OW.data = {
-    auth, repo, v2, feeds, limit, paused, finishSignIn, repositories, start, stop, refreshAll, SignedOut, Ended, Refused, noteLimit, writer,
+  function pinOk(pin, write) {
+    return object(pin) && typeof pin.session === 'string' && positive(pin.account) && OWNER_NAME.test(pin.owner) && REPO_NAME.test(pin.name)
+      && pin.full === `${pin.owner}/${pin.name}` && (!write || (positive(pin.number) && pin.number <= 9_999_999_999));
+  }
+  function held(pin, write) {
+    const kept = auth.get();
+    const picked = repo.get();
+    return Boolean(kept?.token) && kept.session === pin.session && kept.account === pin.account && picked?.owner === pin.owner
+      && picked?.name === pin.name && picked?.full === pin.full && (!write || v2.get() === 'on');
+  }
+  async function pinned(pin, method, path, body, write) {
+    if (!pinOk(pin, write)) throw new Refused('an unreadable operation context');
+    const url = path === '/graphql' ? `${API}/graphql` : `${API}/repos/${pin.owner}/${pin.name}${path}`;
+    let parsed;
+    try { parsed = new URL(url); } catch { throw new Refused(`the app never sends ${method} ${url}`); }
+    if (parsed.href !== url || parsed.origin !== API || (path !== '/graphql' && !parsed.pathname.startsWith(`/repos/${pin.owner}/${pin.name}/`))) {
+      throw new Refused(`the app never sends ${method} ${url}`);
+    }
+    if (!held(pin, write)) throw new Ended();
+    const kept = auth.get();
+    if (kept.expiresAt && kept.expiresAt < Date.now() + 60_000) {
+      const renewed = await refresh(pin.session);
+      if (!renewed) {
+        if (auth.session() === pin.session) auth.signOut();
+        throw new SignedOut();
+      }
+      if (!held(pin, write)) throw new Ended();
+    }
+    return ask(method, url, body, { Authorization: `Bearer ${auth.get().token}`, Accept: 'application/vnd.github+json' },
+      write ? WRITE : undefined, 'manual');
+  }
+  let claimed = false;
+  function claim() {
+    if (claimed || !scriptOf || !recordsScript || scriptOf.call(document) !== recordsScript) return null;
+    claimed = true;
+    return Object.freeze({
+      read: (pin, path) => pinned(pin, 'GET', path),
+      query: (pin, query, variables) => pinned(pin, 'POST', '/graphql', { query, variables }),
+      comment: (pin, body) => pinned(pin, 'POST', `/issues/${pin.number}/comments`, { body }, true),
+    });
+  }
+
+  OW.data = Object.freeze({
+    auth, repo, v2, feeds, limit, paused, finishSignIn, repositories, start, stop, refreshAll, SignedOut, Ended, Refused, noteLimit, claim,
     github: (method, path, body) => github(method, path, body),
     onChange: listener => listeners.add(listener),
-  };
+  });
+  if (auth.signedIn()) resolveAccount();
 })();
