@@ -47,6 +47,9 @@ ART_HASHES = {
     'art/drivers-c-boat.webp': '39fd43d08aa36bce84e964699d493a03af090499a63dffbfaa43e61804b7e1ef',
     'art/moments-sea.webp': '903adfdf5e77c61d49bbbfba6b5aa7942a45a12293dbce40cf04175949d1fbb7',
     'art/team-boat-poster.webp': '656c0c75f92a17390beda0d8afb45be3f9164330357635295998406dad3a69d4',
+    'art/launch-video.mp4': '1e775d875b23a946346748cb62bd7853abc9dcf278f76addf0cf60136f8662dc',
+    'art/launch-poster.webp': '2d27919d8cf70b2e4746b23eee605468f8308243452021e0418d021d8e2bfb3a',
+    'art/launch-video.vtt': '591e52c30fb91d0afba1da4228e0240d08929c01e8291fe494102a1d76bfb4e4',
 }
 ART = set(ART_HASHES)
 ICON_HASHES = {
@@ -64,6 +67,15 @@ VECTORS = ('favicon.svg', 'brand/openwiz-lockup.svg', 'app/mark.svg', 'app/icon.
 MARK, OLD_MARK = '#cfc6b8', '#2b2bff'
 SITE_URL = 'https://openwiz.dev/'
 ART_BUDGET = 2_000_000
+# External: Cloudflare Pages refuses any single site file over 25 MiB, https://developers.cloudflare.com/pages/platform/limits/
+LAUNCH_VIDEO = 'art/launch-video.mp4'
+LAUNCH_POSTER = 'art/launch-poster.webp'
+LAUNCH_CAPTIONS = 'art/launch-video.vtt'
+LAUNCH = (LAUNCH_VIDEO, LAUNCH_POSTER, LAUNCH_CAPTIONS)
+LAUNCH_BUDGET = 24_000_000
+LAUNCH_LABEL = 'Watch OpenWiz in two minutes'
+LAUNCH_POST = 'https://x.com/openwiz/status/2124709517665657224'
+LAUNCH_POST_TEXT = 'See the launch post'
 GSAP = 'vendor/gsap-3.15.1.min.js'
 VENDOR_HASHES = {
     'vendor/GSAP-LICENSE.txt': '791e7d34e6718aad2bd3e20fa5240a4c0e47d73ee3ca31424652cca52fe9acf0',
@@ -389,16 +401,29 @@ class Page(HTMLParser):
         self.images = []
         self.videos = []
         self.tracks = []
+        self.video_tracks = []
+        self.open_video = None
         self.links = []
         self.inline_scripts = 0
         self.books = []
         self.x_links = 0
+        self.launch_posts = 0
         self.report_links = 0
         self.cloudroom_links = 0
         self.stylesheets, self.scripts = [], []
         self.feed(text)
 
+    def tracks_of(self, video):
+        return next((tracks for clip, tracks in zip(self.videos, self.video_tracks) if clip is video), [])
+
+    def handle_endtag(self, tag):
+        if tag == 'video':
+            self.open_video = None
+
     def handle_starttag(self, tag, attrs):
+        names = [name for name, _ in attrs]
+        duplicates = sorted({name for name in names if names.count(name) > 1})
+        assert not duplicates, f'duplicate HTML attribute on <{tag}>: {", ".join(duplicates)}'
         attrs = dict(attrs)
         if 'id' in attrs:
             assert attrs['id'] not in self.ids, 'duplicate HTML id'
@@ -408,6 +433,9 @@ class Page(HTMLParser):
             attrs = {key: value for key, value in attrs.items() if key != 'href'}
         elif tag == 'a' and attrs.get('href') == X_ACCOUNT:
             self.x_links += 1
+            attrs = {key: value for key, value in attrs.items() if key != 'href'}
+        elif tag == 'a' and attrs.get('href') == LAUNCH_POST:
+            self.launch_posts += 1
             attrs = {key: value for key, value in attrs.items() if key != 'href'}
         elif tag == 'a' and attrs.get('href') == CLOUDROOM_LINK:
             self.cloudroom_links += 1
@@ -426,8 +454,12 @@ class Page(HTMLParser):
             self.images.append(attrs)
         if tag == 'video':
             self.videos.append(attrs)
+            self.video_tracks.append([])
+            self.open_video = len(self.videos) - 1
         if tag == 'track':
             self.tracks.append(attrs)
+            if self.open_video is not None:
+                self.video_tracks[self.open_video].append(attrs)
         if tag == 'a':
             self.links.append(attrs)
         if tag == 'script' and not attrs.get('src'):
@@ -442,6 +474,29 @@ class Page(HTMLParser):
             self.favicons.add(attrs.get('href'))
         if tag == 'meta' and (attrs.get('property') == 'og:image' or attrs.get('name') == 'twitter:image'):
             self.social.append(attrs.get('content') or '')
+
+
+def check_launch(landing, page):
+    flat = lambda html: re.sub(r'\s+', ' ', unescape(re.sub(r'<[^>]*>', ' ', html))).strip()
+    clip = next((v for v in page.videos if 'launch-video' in (v.get('class') or '').split()), None)
+    assert clip, 'the landing lost its launch video'
+    assert clip.get('src') == f'/{LAUNCH_VIDEO}' and clip.get('poster') == f'/{LAUNCH_POSTER}', 'the launch video must play the pinned file over its pinned poster'
+    assert clip.get('preload') == 'none' and 'autoplay' not in clip and 'loop' not in clip, 'the launch recording must be opt-in: preload="none", never autoplay'
+    assert 'muted' not in clip and 'playsinline' in clip and 'controls' in clip, 'the launch video plays inline with sound, and keeps native controls without scripts'
+    about = re.search(r'<p class="sr-only" id="([^"]+)">([^<]+)</p>', landing)
+    assert about and clip.get('aria-describedby') == about[1] and len(re.findall(r'[.!?](?:\s|$)', about[2])) == 2, \
+        'the launch video needs a two-sentence text alternative it is described by'
+    assert any(t.get('kind') == 'captions' and t.get('src') == f'/{LAUNCH_CAPTIONS}' and t.get('srclang') == 'en' for t in page.tracks_of(clip)), \
+        'the launch video needs its own English captions'
+    play = re.search(r'<button class="launch-play" type="button" hidden>([\s\S]*?)</button>', landing)
+    assert play and flat(play[1]) == LAUNCH_LABEL, f'the launch video needs one play button, hidden until the scripts run: {LAUNCH_LABEL}'
+    post = re.search(r'<a class="launch-post" href="([^"]*)">([^<]*)</a>', landing)
+    assert post and post[1] == LAUNCH_POST and post[2] == LAUNCH_POST_TEXT, f'a "{LAUNCH_POST_TEXT}" link under the player'
+    hero = re.search(r'<section class="product-hero[\s\S]*?</section>\n  <section class="agent-row', landing)
+    hero = hero[0] if hero else ''
+    order = [hero.find(mark) for mark in ('<h1>', 'class="install-box"', 'class="product-stage"', '<figure class="launch">', 'class="app-entry"')]
+    assert -1 not in order and order == sorted(order), 'the launch video sits in the hero, under its headline, install line and demo, above everything else'
+    assert landing.count('<figure class="launch">') == 1 and landing.count(LAUNCH_POST) == 1, 'one launch video, one launch post link'
 
 
 def check_webp(data):
@@ -593,15 +648,16 @@ def check_site(root, registry=ROOT / 'market/registry.json'):
     page = pages[root / 'index.html']
     assert page.scripts == [f'/{names[GSAP]}', f'/{names["site.js"]}', f'/{names["faq.js"]}'], 'load the pinned GSAP before site.js, then faq.js'
     assert not page.inline_scripts, 'landing motion must wait for both external scripts'
-    assert len(page.videos) == 1, 'expected one spec recording'
-    clip = page.videos[0]
+    assert len(page.videos) == 2, 'expected the launch video and one spec recording'
+    check_launch((root / 'index.html').read_text(), page)
+    clip = next((v for v in page.videos if 'spec-video' in (v.get('class') or '').split()), {})
     assert clip.get('preload') == 'none' and 'autoplay' not in clip, 'spec recording must be opt-in'
     assert 'muted' in clip and 'playsinline' in clip, 'spec video must start muted inline'
     assert clip.get('poster', '').removeprefix('/') in ART, 'spec video needs a pinned poster'
-    assert any(t.get('kind') == 'captions' and 'default' in t and t.get('src', '').removeprefix('/') in ART for t in page.tracks), 'spec video needs default captions'
+    assert any(t.get('kind') == 'captions' and 'default' in t and t.get('src', '').removeprefix('/') in ART for t in page.tracks_of(clip)), 'spec video needs default captions'
     assert any(a.get('href') == clip.get('src') and 'hidden' not in a for a in page.links), 'needs a plain link to the spec video'
     for attrs in page.buttons:
-        if attrs.get('class') in ('demo-pause', 'spec-play'):
+        if attrs.get('class') in ('demo-pause', 'spec-play', 'launch-play'):
             assert 'hidden' in attrs, 'motion controls must wait for both scripts'
     for name, digest in VENDOR_HASHES.items():
         data = (root / names.get(name, name)).read_bytes()
@@ -632,6 +688,8 @@ def check_site(root, registry=ROOT / 'market/registry.json'):
         assert page.cloudroom_links == (1 if path == root / 'index.html' else 0), \
             f'CloudRoom link, the landing install box\'s only: {path.relative_to(root)} has {page.cloudroom_links}'
         assert page.report_links == 1, f'Report a problem link: {path.relative_to(root)} has {page.report_links}, not 1'
+        assert page.launch_posts == (1 if path == root / 'index.html' else 0), \
+            f'the launch post link, the landing launch video\'s only: {path.relative_to(root)} has {page.launch_posts}'
         for ref in css_refs(path.read_text()):
             check_ref(root, path, ref, pages)
     for path in root.glob('*.css'):
@@ -720,7 +778,9 @@ def check_site(root, registry=ROOT / 'market/registry.json'):
     for name in ART:
         data = (root / name).read_bytes()
         check_art(name, data)
-        total += len(data)
+        total += len(data) if name not in LAUNCH else 0
+    launch = sum(len((root / name).read_bytes()) for name in LAUNCH)
+    assert launch <= LAUNCH_BUDGET, f'the launch video, poster and captions are {launch} bytes, over their {LAUNCH_BUDGET} budget (Cloudflare Pages refuses files over 25 MiB)'
     assert total <= ART_BUDGET, f'art is {total} bytes, over the {ART_BUDGET} budget'
     variant = sum(len((root / name).read_bytes()) for name in ART if name.startswith('art/drivers-'))
     assert variant <= DRIVER_ART_BUDGET, f'the drivers art is {variant} bytes, over its {DRIVER_ART_BUDGET} budget'
@@ -1686,7 +1746,7 @@ def main():
         check_privacy(name, path.read_bytes())
     for name in RUNTIME:
         check_privacy('dist/' + name, (output / name).read_bytes())
-    print('PASS: pinned WebP artwork and spec recording within budget')
+    print('PASS: pinned WebP artwork and spec recording within budget; the launch video within its own budget')
     print('PASS: exact export, local links/fragments, CSS resources, fonts/licences, copy and privacy')
     print('GAP: the landing page has no automated browser test (layout, keyboard, accessibility, animation); the app has npm run test:app')
     print('LIMIT: external URL destinations are constrained; remote availability is not checked')

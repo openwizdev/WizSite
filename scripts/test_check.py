@@ -362,12 +362,15 @@ class Checks(unittest.TestCase):
                     check_site(root)
 
     def test_spec_video_poster_captions_and_link(self):
+        def spec(change):
+            mark = '<li class="spec-moment">'
+            return lambda t: t.split(mark)[0] + mark + change(t.split(mark, 1)[1])
         for change, error in (
-                (lambda t: re.sub(r' poster="[^"]*"', '', t, count=1), 'spec video needs a pinned poster'),
-                (lambda t: re.sub(r'<track [^>]*>', '', t, count=1), 'spec video needs default captions'),
+                (spec(lambda t: re.sub(r' poster="[^"]*"', '', t, count=1)), 'spec video needs a pinned poster'),
+                (spec(lambda t: re.sub(r'<track [^>]*>', '', t, count=1)), 'spec video needs default captions'),
                 (lambda t: t.replace('class="spec-link"', 'class="spec-link" hidden', 1), 'plain link to the spec video'),
-                (lambda t: t.replace(' muted', '', 1), 'spec video must start muted inline'),
-                (lambda t: t.replace('preload="none"', 'preload="auto"', 1), 'recording must be opt-in')):
+                (spec(lambda t: t.replace(' muted', '', 1)), 'spec video must start muted inline'),
+                (spec(lambda t: t.replace('preload="none"', 'preload="auto"', 1)), 'recording must be opt-in')):
             with self.subTest(error=error), tempfile.TemporaryDirectory() as temp:
                 root = Path(temp) / 'dist'
                 shutil.copytree(ROOT / 'dist', root)
@@ -378,6 +381,63 @@ class Checks(unittest.TestCase):
                 landing.write_text(changed)
                 with self.assertRaisesRegex(AssertionError, error):
                     check_site(root)
+
+    def test_launch_video_under_the_hero(self):
+        post = 'https://x.com/openwiz/status/2124709517665657224'
+        figure = re.compile(r'    <figure class="launch">[\s\S]*?</figure>\n')
+        for page, old, new, error in (
+                ('index.html', 'preload="none" playsinline controls', 'preload="none" playsinline controls autoplay', 'launch recording must be opt-in'),
+                ('index.html', 'preload="none" playsinline controls', 'preload="auto" preload="none" playsinline controls', 'duplicate HTML attribute on <video>: preload'),
+                ('index.html', '<track kind="captions" src="/art/launch-video.vtt" srclang="en"', '<track kind="captions" src="/art/launch-video.vtt" srclang="fr"', 'its own English captions'),
+                ('index.html', 'preload="none" playsinline controls', 'preload="metadata" playsinline controls', 'launch recording must be opt-in'),
+                ('index.html', 'preload="none" playsinline controls', 'preload="none" playsinline controls muted', 'plays inline with sound'),
+                ('index.html', 'preload="none" playsinline controls', 'preload="none" controls', 'plays inline with sound'),
+                ('index.html', 'preload="none" playsinline controls', 'preload="none" playsinline', 'keeps native controls'),
+                ('index.html', 'poster="/art/launch-poster.webp"', 'poster="/art/spec-poster.webp"', 'pinned poster'),
+                ('index.html', '<track kind="captions" src="/art/launch-video.vtt" srclang="en" label="English">', '', 'needs its own English captions'),
+                ('index.html', ' aria-describedby="launch-about"', '', 'two-sentence text alternative'),
+                ('index.html', 'It then shows how', 'Then it shows. It shows how', 'two-sentence text alternative'),
+                ('index.html', 'class="launch-play" type="button" hidden>', 'class="launch-play" type="button">', 'motion controls must wait|hidden until the scripts run'),
+                ('index.html', 'Watch OpenWiz in two minutes</button>', 'Watch the launch video</button>', 'one play button'),
+                ('index.html', '>See the launch post</a>', '>The launch post</a>', 'See the launch post'),
+                ('index.html', post, post.replace('2124709517665657224', '1'), 'unexpected external URL|launch post'),
+                ('team/index.html', '</main>', f'<a href="{post}">See the launch post</a></main>', 'the launch post link, the landing launch video'),
+                ('index.html', '<figure class="launch">', '<figure class="launch" hidden>', 'the launch video sits in the hero'),
+        ):
+            with self.subTest(error=error, new=new), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp) / 'dist'
+                shutil.copytree(ROOT / 'dist', root)
+                path = root / page
+                text = path.read_text()
+                self.assertIn(old, text)
+                path.write_text(text.replace(old, new, 1))
+                with self.assertRaisesRegex(AssertionError, error):
+                    check_site(root)
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / 'dist'
+            shutil.copytree(ROOT / 'dist', root)
+            landing = root / 'index.html'
+            text = landing.read_text()
+            moved = figure.search(text)[0]
+            text = text.replace(moved, '', 1).replace('  <section class="agent-row', moved.replace('    <figure', '  <figure', 1) + '  <section class="agent-row', 1)
+            landing.write_text(text)
+            with self.assertRaisesRegex(AssertionError, 'the launch video sits in the hero'):
+                check_site(root)
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / 'dist'
+            shutil.copytree(ROOT / 'dist', root)
+            landing = root / 'index.html'
+            text = landing.read_text()
+            track = re.search(r'\s*<track kind="captions" src="/art/launch-video.vtt"[^>]*>', text)[0]
+            spec_track = re.search(r'<track kind="captions" src="/art/todo-spec.vtt"[^>]*>', text)[0]
+            landing.write_text(text.replace(track, '', 1).replace(spec_track, spec_track + track, 1))
+            with self.assertRaisesRegex(AssertionError, 'the launch video needs its own English captions'):
+                check_site(root)
+        with tempfile.TemporaryDirectory() as temp, mock.patch('check.LAUNCH_BUDGET', 1_000_000):
+            root = Path(temp) / 'dist'
+            shutil.copytree(ROOT / 'dist', root)
+            with self.assertRaisesRegex(AssertionError, 'over their 1000000 budget'):
+                check_site(root)
 
     def test_transition_duration_respects_reduced_motion(self):
         with self.assertRaisesRegex(AssertionError, 'motion outside'):
