@@ -8,6 +8,13 @@
   const ROUTES = () => OW.pages.map(page => page.id);
   let built = null;
   const INSTALL = 'https://github.com/apps/openwiz-viewer/installations/new';
+  const v2 = Boolean(OW.records?.enabled?.());
+  const queue = OW.pages.findIndex(page => page.v2);
+  if (queue >= 0) {
+    const [page] = OW.pages.splice(queue, 1);
+    if (v2) OW.pages.unshift(page);
+  }
+  const home = () => `#/${OW.pages[0].id}`;
 
   const route = () => {
     const [id, arg] = location.hash.replace(/^#\/?/, '').split('/');
@@ -32,7 +39,9 @@
       h('p', {}, 'See what needs you, every spec and the agents at work. Sign in to pick a repository.'),
       note ? h('div', { class: 'notices' }, h('div', { class: 'notice bad', role: 'alert' }, icon('warn'), h('span', {}, note))) : null,
       h('a', { class: 'btn primary', href: '/api/sign-in/start' }, 'Sign in with GitHub'),
-      h('p', { class: 'small' }, 'Read-only, on the repositories you choose. Your sign-in stays in this browser; the app talks only to GitHub.'),
+      h('p', { class: 'small' }, v2
+        ? 'On the repositories you choose, it posts only the comments you see and confirm. Your sign-in stays in this browser; the app talks only to GitHub.'
+        : 'Read-only, on the repositories you choose. Your sign-in stays in this browser; the app talks only to GitHub.'),
     );
   }
 
@@ -66,7 +75,7 @@
       );
     }
     const list = h('ul', { class: 'repos' }, repos.map(r => h('li', {},
-      h('button', { type: 'button', onclick: () => { data.repo.pick(r.full); location.hash = '#/you'; draw(); } }, r.full),
+      h('button', { type: 'button', onclick: () => { data.repo.pick(r.full); location.hash = home(); draw(); } }, r.full),
       h('span', { class: 'tag' }, r.private ? 'Private' : 'Public'))));
     screen(
       h('h1', {}, 'Pick a repository'),
@@ -172,11 +181,11 @@
       h('a', { class: 'skip', href: '#content', onclick: event => { event.preventDefault(); title.focus(); } }, 'Skip to the page'),
       h('div', { class: 'shell' },
         h('aside', { class: 'side' },
-          h('a', { class: 'brand', href: '#/you' }, logo(), h('span', {}, 'OpenWiz')),
+          h('a', { class: 'brand', href: home() }, logo(), h('span', {}, 'OpenWiz')),
           repoButton(),
           h('nav', { class: 'main', 'aria-label': 'Pages' }, side.map(item => item.link)),
           h('div', { class: 'foot' }, reads, h('div', { class: 'actions' }, refresh[0], signOutButton()))),
-        h('header', { class: 'top' }, h('a', { class: 'brand', href: '#/you' }, logo(), h('span', {}, 'OpenWiz')), repoButton()),
+        h('header', { class: 'top' }, h('a', { class: 'brand', href: home() }, logo(), h('span', {}, 'OpenWiz')), repoButton()),
         h('main', { id: 'content' }, h('div', { class: 'page-head' }, title, read), phoneReads, notices, body,
           h('div', { class: 'phone-actions' }, refresh[1], signOutButton())),
         h('nav', { class: 'tabs', 'aria-label': 'Pages' }, tabs.map(item => item.link))));

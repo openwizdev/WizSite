@@ -82,10 +82,13 @@ DRIVER_LOGOS = {
 HASHED = ('tokens.css', 'site.css', GSAP, 'site.js', 'faq.js')
 APP_PAGE = 'app/index.html'
 APP_STYLE = 'app/ember.css'
-APP_SCRIPTS = ('app/data.js', 'app/ui.js', 'app/pages/you.js', 'app/pages/specs.js', 'app/pages/spec.js', 'app/pages/agents.js', 'app/palette.js', 'app/shell.js')
+APP_FOLDERS = ('app/pages', 'app/cards')
+APP_PARTS, APP_PART_STYLES = (tuple(sorted(p.relative_to(ROOT).as_posix() for folder in APP_FOLDERS for p in (ROOT / folder).glob(f'*.{ext}')))
+                              for ext in ('js', 'css'))
+APP_SCRIPTS = ('app/data.js', 'app/ui.js') + APP_PARTS + ('app/palette.js', 'app/shell.js')
 APP_VENDOR = {'app/vendor/dagre-3.1.3.min.js': ('node_modules/@dagrejs/dagre/dist/dagre.min.js', 'app/pages/spec.js'),
               'app/vendor/dagre-LICENSE.txt': ('node_modules/@dagrejs/dagre/LICENSE', None)}
-HASHED += (APP_STYLE,) + APP_SCRIPTS
+HASHED += (APP_STYLE,) + APP_PART_STYLES + APP_SCRIPTS
 APP_CSP = ("default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; "
            "connect-src 'self' https://api.github.com; manifest-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
 
@@ -1379,8 +1382,14 @@ def check_app(root, names, pages):
     assert not page.x_links, 'one X link per page, the footer\'s: the app has one'
     assert not page.report_links, 'Report a problem link, the footer\'s: the app has one'
     assert not set(page.refs) & {f'/{name}' for name in HASHED}, 'the app uses an unfingerprinted style or script'
-    assert page.stylesheets == [f'/{names[APP_STYLE]}'], 'the app must apply exactly the fingerprinted ember.css'
-    assert page.scripts == [ref for name in APP_SCRIPTS for ref in [f'/{v}' for v, (_, before) in APP_VENDOR.items() if before == name] + [f'/{names[name]}']], \
+    styles = {f'/{names[name]}': name for name in APP_PART_STYLES}
+    assert page.stylesheets[:1] == [f'/{names[APP_STYLE]}'] and sorted(styles.get(ref, ref) for ref in page.stylesheets[1:]) == list(APP_PART_STYLES), \
+        'the app must apply exactly the fingerprinted ember.css, then each of its pages\' and cards\' styles once'
+    parts = {f'/{names[name]}': name for name in APP_PARTS}
+    shown = [parts[ref] for ref in page.scripts if ref in parts]
+    assert sorted(shown) == list(APP_PARTS), 'the app must load each of its pages\' and cards\' scripts once'
+    ordered = ('app/data.js', 'app/ui.js', *shown, 'app/palette.js', 'app/shell.js')
+    assert page.scripts == [ref for name in ordered for ref in [f'/{v}' for v, (_, before) in APP_VENDOR.items() if before == name] + [f'/{names[name]}']], \
         'the app must load its fingerprinted scripts (and each pinned file before its user) in order'
     assert not page.inline_scripts, 'the app allows no inline script'
     for ref in page.refs:
@@ -1390,8 +1399,9 @@ def check_app(root, names, pages):
     assert manifest['start_url'] == manifest['scope'] == '/app/' and manifest['display'] == 'standalone', 'the app manifest must open /app/ standalone'
     for icon in manifest['icons']:
         assert icon['src'].lstrip('/') in STATIC, f'manifest icon is not a built file: {icon["src"]}'
-    style = (root / names[APP_STYLE]).read_text()
-    assert not re.search(r'\b(animation|transition)\s*:', style), 'Ember allows no motion'
+    for name in (APP_STYLE,) + APP_PART_STYLES:
+        style = (root / names[name]).read_text()
+        assert not re.search(r'\b(animation|transition)\s*:', style), f'Ember allows no motion: {name}'
     headers = (root / '_headers').read_text()
     for path in ('/app/*',):
         rule = re.search(rf'^{re.escape(path)}\n((?:  .*\n?)*)', headers, re.M)

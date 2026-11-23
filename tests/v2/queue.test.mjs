@@ -189,3 +189,22 @@ test('switch on: the signed-out copy no longer says read-only, and the queue lea
     await run.close();
   }
 });
+
+test('a failed refresh never keeps an earlier true: the item turns unchecked and the queue shows a gap', async () => {
+  const failed = JSON.parse(await readFile(new URL('tests/v2/fixtures/queue/grill-refresh-failed.json', ROOT), 'utf8'));
+  const run = await start();
+  try {
+    await queueWorld(run, { specs: [], details: {}, grillAnswers: failed.refreshes[0].github, cards: true });
+    await openQueue(run, 'on');
+    await run.page.until(`window.drawn.some(item => item.key === 'decision:acme/factory#7:9100003' && item.current === true)`, 'the first, matched read');
+    assert.ok(!(await run.page.text()).includes('may be missing'));
+    run.world.record(failed.refreshes[1].github);
+    await run.page.click('Refresh now');
+    await run.page.until(`window.drawn.some(item => item.key === 'decision:acme/factory#7:9100003' && item.current === null)`, 'the refreshed, unchecked item');
+    const last = (await run.page.run('window.drawn')).filter(item => item.key === 'decision:acme/factory#7:9100003').pop();
+    assert.deepEqual(last, failed.refreshes[1].items[0]);
+    assert.match(await run.page.text(), /This list may be missing items: GitHub gave only part of #7's source check\./);
+  } finally {
+    await run.close();
+  }
+});
