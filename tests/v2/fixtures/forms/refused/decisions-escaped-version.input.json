@@ -1,0 +1,67 @@
+{
+  "picked": {
+    "full": "acme/factory",
+    "private": true
+  },
+  "action": {
+    "form": "decision.own",
+    "item": {
+      "type": "decision",
+      "key": "decision:acme/factory#41:9100001",
+      "repository": "acme/factory",
+      "subject": {
+        "kind": "issue",
+        "number": 41
+      },
+      "title": "Synthetic spec: notes in one list",
+      "url": "https://github.com/acme/factory/issues/41#issuecomment-9100001",
+      "comment_id": 9100001,
+      "at": 1894000000000,
+      "current": true,
+      "request": {
+        "schema": "openwiz.decisions.v1",
+        "kind": "spec_confirmation",
+        "id": "sc_notes_1",
+        "status": "open",
+        "fingerprint": "1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f",
+        "risk": "ordinary",
+        "spec": 41,
+        "summary": [
+          "Keep notes in one list.",
+          "No sync yet."
+        ],
+        "headline": "Keep your notes in one list.",
+        "tickets": [],
+        "graph": []
+      }
+    },
+    "words": "Record it as \"openwiz\\u002edecisions.v9\" please."
+  },
+  "github": {
+    "GET /repos/acme/factory/issues/comments/9100001": {
+      "status": 200,
+      "json": {
+        "id": 9100001,
+        "html_url": "https://github.com/acme/factory/issues/41#issuecomment-9100001",
+        "issue_url": "https://api.github.com/repos/acme/factory/issues/41",
+        "user": {
+          "login": "factory-bot[bot]",
+          "id": 5900
+        },
+        "body": "**Decision request** for the owner.\n\n```json\n{\n  \"schema\": \"openwiz.decisions.v1\",\n  \"kind\": \"spec_confirmation\",\n  \"id\": \"sc_notes_1\",\n  \"status\": \"open\",\n  \"fingerprint\": \"1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f\",\n  \"risk\": \"ordinary\",\n  \"spec\": 41,\n  \"summary\": [\n    \"Keep notes in one list.\",\n    \"No sync yet.\"\n  ],\n  \"headline\": \"Keep your notes in one list.\",\n  \"tickets\": [],\n  \"graph\": []\n}\n```",
+        "created_at": "2030-01-07T07:06:40.000Z",
+        "updated_at": "2030-01-07T07:06:40.000Z"
+      }
+    },
+    "GET /repos/acme/factory/issues/41": {
+      "status": 200,
+      "json": {
+        "number": 41,
+        "state": "open",
+        "title": "Synthetic spec: notes in one list",
+        "html_url": "https://github.com/acme/factory/issues/41",
+        "body": "## Problem Statement\n\nSynthetic notes are scattered.\n\n## Changelog headline\n\nKeep your notes in one list.\n\n## Proof\n\n- [x] Synthetic fixture.\n\n## Out of Scope\n\nSync."
+      }
+    }
+  }
+}

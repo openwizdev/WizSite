@@ -1,0 +1,46 @@
+{
+  "about": "While one intent on a subject is unknown, a new one there is refused with zero requests.",
+  "account": {
+    "id": 5001,
+    "login": "acme-owner"
+  },
+  "picked": {
+    "full": "acme/factory",
+    "private": true
+  },
+  "github": {},
+  "comments": {},
+  "steps": [
+    {
+      "compose": "spec-not_now",
+      "as": "a"
+    },
+    {
+      "confirm": "a",
+      "tap": 1
+    },
+    {
+      "post": "a",
+      "write": "dropped",
+      "expect": {
+        "outcome": "unknown"
+      }
+    },
+    {
+      "compose": "spec-ship",
+      "as": "b"
+    },
+    {
+      "confirm": "b",
+      "tap": 2
+    },
+    {
+      "post": "b",
+      "expect": {
+        "outcome": "refused",
+        "reason": "pending"
+      }
+    }
+  ],
+  "writes": 1
+}

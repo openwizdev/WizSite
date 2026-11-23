@@ -7,6 +7,7 @@
     "check": "node --check site.js && node --check faq.js && for f in app/*.js app/pages/*.js scripts/app-check.mjs; do node --check \"$f\" || exit 1; done && python3 -B scripts/check.py",
     "test": "python3 -B -m unittest discover -s scripts -p 'test_*.py'",
     "test:functions": "node --test tests/sign-in.test.mjs tests/drivers.test.mjs tests/ask-index.test.mjs tests/ask.test.mjs tests/ask-a-wiz.test.mjs tests/market.test.mjs",
+    "test:v2": "node --test 'tests/v2/*.test.mjs'",
     "test:app": "node scripts/app-check.mjs"
   },
   "dependencies": {
