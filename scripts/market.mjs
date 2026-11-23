@@ -1,5 +1,3 @@
-// The market page, generated at build time from market/registry.json: a saved copy of WizMarket's
-// `check/check.py index` output, the index shape of openwizdev/WizMarket contracts/listing.v1.md.
 import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 
@@ -32,7 +30,6 @@ const oneLine = (value, where) => {
   return value;
 };
 
-// The contract's URL grammar: https, a DNS name of two or more labels, an optional port, then printable ASCII.
 export function isUrl(value) {
   if (typeof value !== 'string') return false;
   const match = /^https:\/\/([^/?#:]+)(?::([0-9]+))?([/?#][\x21-\x7e]*)?$/.exec(value);
@@ -103,7 +100,6 @@ function checkListing(listing, commit, where) {
   checkProof(listing, commit, where);
 }
 
-// Refuses anything that is not the contract's index shape, so a malformed snapshot fails the build.
 export function validate(index) {
   exactKeys(index, ['commit', 'contract', 'listings'], 'the index');
   if (index.contract !== 'listing.v1') fail('the index', 'contract is not listing.v1');
@@ -122,7 +118,6 @@ export function parse(text) {
   return validate(index);
 }
 
-// The loader the Drivers page reuses: the checked registry snapshot.
 export async function readRegistry(file = REGISTRY) {
   return parse(await readFile(file, 'utf8'));
 }

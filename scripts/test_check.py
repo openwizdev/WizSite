@@ -1,3 +1,4 @@
+from html import escape
 from pathlib import Path
 import json
 import shutil
@@ -18,7 +19,7 @@ def edit_built(root, name, change):
     new = fingerprint(name, data)
     old.unlink()
     (root / new).write_bytes(data)
-    for page in ('index.html', 'changelog/index.html', 'drivers/index.html', 'team/index.html', 'faq/index.html', 'app/index.html'):
+    for page in ('index.html', 'changelog/index.html', 'drivers/index.html', 'team/index.html', 'faq/index.html', 'market/index.html', 'app/index.html'):
         path = root / page
         path.write_text(path.read_text().replace(f'"/{was}"', f'"/{new}"'))
 
@@ -725,6 +726,28 @@ class Checks(unittest.TestCase):
                 path.write_text(text.replace(old, new, 1))
                 with self.assertRaisesRegex(AssertionError, message.strip()):
                     check_site(root)
+
+    def test_market_links_only_the_registry_and_wizmarket(self):
+        listed = 'https://tracker.example.com/example-owner/example-harness/-/issues/1?view=full#note-2'
+        for page, href, error in (
+                ('market/index.html', listed, None),
+                ('market/index.html', 'https://github.com/openwizdev/WizMarket/tree/main/listings', None),
+                ('market/index.html', 'https://tracker.example.com/example-owner/example-harness/-/issues/1', 'unexpected external URL'),
+                ('market/index.html', 'https://example.com/example-driver/more', 'unexpected external URL'),
+                ('market/index.html', 'https://github.com/openwizdev/WizMarket/pulls?q=is%3Aopen', 'unexpected external URL parts'),
+                ('market/index.html', 'https://github.com/openwizdev/WizMarketing', 'unexpected repository link'),
+                ('drivers/index.html', listed, 'unexpected external URL'),
+                ('drivers/index.html', 'https://github.com/openwizdev/WizMarket', 'unexpected repository link')):
+            with self.subTest(page=page, href=href), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp) / 'dist'
+                shutil.copytree(ROOT / 'dist', root)
+                path = root / page
+                path.write_text(path.read_text().replace('</main>', f'<p><a href="{escape(href)}">x</a></p></main>', 1))
+                if error is None:
+                    check_site(root)
+                else:
+                    with self.assertRaisesRegex(AssertionError, re.escape(error)):
+                        check_site(root)
 
     def test_report_a_problem_link(self):
         form = '<a href="https://github.com/openwizdev/openwiz/issues/new?template=feedback.yml" rel="noreferrer">Report a problem</a>'

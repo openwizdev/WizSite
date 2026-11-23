@@ -1,5 +1,3 @@
-// The market page (openwizdev/OpenWiz#2500): built from a registry snapshot in the shape of WizMarket's
-// contracts/listing.v1.md index. Each build runs in a throwaway copy of the site, so dist/ is never touched.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
@@ -13,7 +11,6 @@ const C = 'd'.repeat(40);
 const RECEIPT = id => `https://github.com/openwizdev/WizMarket/blob/${C}/receipts/${id}/2026-11-01-aaaaaaaaaaaa.txt`;
 const SKILL = `https://github.com/example-owner/example-skills/tree/${'c'.repeat(40)}`;
 
-// Written out by hand from WizMarket's fixtures/index.json, never computed from it.
 const CONTRACT_LISTINGS = {
   'example-driver': { name: 'Example driver', status: 'verified', tags: ['driver', 'example-host'], proofs: [RECEIPT('example-driver')],
     stage: 'available', url: 'https://example.com/example-driver' },
@@ -147,7 +144,6 @@ test('the site builds its market page from the real snapshot', () => {
   assert.deepEqual(Object.keys(cards(html)), ids, 'one card for every listing in market/registry.json');
 });
 
-// market-sync: a throwaway WizMarket-shaped repository with a stand-in check/check.py that prints a given index.
 function wizmarket(index) {
   const dir = mkdtempSync(join(tmpdir(), 'market-sync-'));
   const origin = join(dir, 'origin.git');

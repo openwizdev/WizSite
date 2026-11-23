@@ -1,6 +1,3 @@
-// node scripts/market-sync.mjs <WizMarket checkout>
-// Rewrites market/registry.json from that checkout's `python3 -I check/check.py index`. The contract's index
-// reads only a clean checkout whose HEAD is origin/main or an ancestor of it, so this refuses any other checkout.
 import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { writeFile } from 'node:fs/promises';
