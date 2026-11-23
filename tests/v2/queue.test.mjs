@@ -48,20 +48,73 @@ async function queueWorld(run, { specs = SPECS, details, grillAnswers = grill.re
   const exported = real.replace('auth, repo, feeds, limit, paused,', 'auth, repo, feeds, limit, paused, github, noteLimit,');
   assert.notEqual(exported, real, 'the stub could not add github to OW.data');
   const stub = `${exported}
-OW.records = { enabled: () => ['on', 'dry-run'].includes(JSON.parse(localStorage.getItem('openwiz.app.v2'))), dryRun: () => false };
+OW.records = (() => {
+  const mode = () => JSON.parse(localStorage.getItem('openwiz.app.v2'));
+  const kept = new Map();
+  const at = item => item.repository + '#' + item.subject.number + ':' + item.comment_id;
+  let clock = 1900000000000;
+  window.checks = {};
+  window.checked = [];
+  window.composed = [];
+  return {
+    enabled: () => ['on', 'dry-run'].includes(mode()),
+    dryRun: () => mode() === 'dry-run',
+    async check(item) {
+      window.checked.push(item.key);
+      const result = window.checks[item.comment_id] || 'matched';
+      if (result === 'throw') throw new Error('synthetic check failure');
+      clock += 1;
+      if (result !== 'matched') {
+        kept.delete(at(item));
+        return { result, checked_at: result === 'unchecked' ? null : clock };
+      }
+      const binding = { ref: 'synthetic', digest: 'd'.repeat(64) };
+      kept.set(at(item), { binding, checked_at: clock });
+      return { result, binding: { ...binding }, checked_at: clock };
+    },
+    async compose(action) {
+      const known = kept.get(at(action.item));
+      const refused = !known ? 'source_unchecked' : action.item.checked_at !== known.checked_at ? 'source_changed' : null;
+      window.composed.push({ key: action.item.key, form: action.form, words: action.words ?? null, refused });
+      if (refused) return { refused };
+      return { op: 'op-' + window.composed.length, form: action.form, body: 'Synthetic preview of ' + action.form + (action.words ? ': ' + action.words : ''),
+        repository: action.item.repository, subject: { ...action.item.subject }, url: action.item.url, visibility: 'public', confirms: 1, source: known.binding };
+    },
+    confirm: () => ({ confirmed: 0, of: 1 }),
+    async post(preview) { return { outcome: 'refused', op: preview.op, reason: mode() === 'dry-run' ? 'dry_run' : 'disabled' }; },
+    pending: () => [],
+  };
+})();
 ${cards ? `window.drawn = [];
 OW.cards = { decision(item, el) { window.drawn.push(item); el.replaceChildren(Object.assign(document.createElement('p'), { textContent: 'Decision card ' + item.key })); },
   spec(item, el) { window.drawn.push(item); el.replaceChildren(Object.assign(document.createElement('p'), { textContent: 'Spec card ' + item.key })); } };` : ''}`;
   world.site[dataPath] = () => ({ status: 200, raw: Buffer.from(stub), type: 'js' });
 }
 
-async function openQueue(run, value) {
+const CARD = await readFile(new URL('app/cards/decision.js', ROOT), 'utf8');
+async function openQueue(run, value, { card = false } = {}) {
   await run.page.go(`${SITE}/app/`);
   await run.page.until(`document.readyState === 'complete'`, 'the app page');
   await run.page.run(`localStorage.setItem('openwiz.app.v2', ${JSON.stringify(JSON.stringify(value))})`);
   await signIn(run.page);
+  if (card) await run.page.run(CARD);
   await run.page.click('acme/factory');
 }
+const latestOf = (run, key) => run.page.run(`window.drawn.filter(item => item.key === ${JSON.stringify(key)}).pop() ?? null`);
+async function refreshed(run) {
+  const was = await run.page.run('OW.data.feeds.specs.readAt');
+  await run.page.click('Refresh now');
+  await run.page.until(`OW.data.feeds.specs.readAt !== ${was}`, 'the refreshed Specs read');
+  await new Promise(resolve => setTimeout(resolve, 700));
+}
+const ROUND = 'decision:acme/factory#7:9100003';
+const SPEC_DECISION = 'decision:acme/factory#60:9100021';
+const pageOne = 'GET /repos/acme/factory/pulls?state=open&per_page=100&page=1';
+const roundComments = 'GET /repos/acme/factory/issues/7/comments?per_page=100&page=1';
+const withComments = (change, base = grill.refreshes[0].github) => ({ ...base,
+  [roundComments]: { ...base[roundComments], json: change(structuredClone(base[roundComments].json)) } });
+const recordIn = c => JSON.parse(c.body.match(/```json\n([\s\S]*?)\n```/)[1]);
+const withRecord = (c, record) => ({ ...c, body: c.body.replace(/```json\n[\s\S]*?\n```/, `\`\`\`json\n${JSON.stringify(record, null, 2)}\n\`\`\``) });
 
 const pullsRead = world => world.log.filter(r => r.path === '/repos/acme/factory/pulls');
 
@@ -199,6 +252,7 @@ test('a failed refresh never keeps an earlier true: the item turns unchecked and
     await run.page.until(`window.drawn.some(item => item.key === 'decision:acme/factory#7:9100003' && item.current === true)`, 'the first, matched read');
     assert.ok(!(await run.page.text()).includes('may be missing'));
     run.world.record(failed.refreshes[1].github);
+    await run.page.run(`window.checks[9100003] = 'unchecked'`);
     await run.page.click('Refresh now');
     await run.page.until(`window.drawn.some(item => item.key === 'decision:acme/factory#7:9100003' && item.current === null)`, 'the refreshed, unchecked item');
     const last = (await run.page.run('window.drawn')).filter(item => item.key === 'decision:acme/factory#7:9100003').pop();
@@ -206,5 +260,212 @@ test('a failed refresh never keeps an earlier true: the item turns unchecked and
     assert.match(await run.page.text(), /This list may be missing items: GitHub gave only part of #7's source check\./);
   } finally {
     await run.close();
+  }
+});
+
+test('R1: the queue registers its check through OW.records.check, so a current decision composes', async () => {
+  const run = await start();
+  try {
+    await queueWorld(run, { cards: false });
+    await openQueue(run, 'dry-run', { card: true });
+    await run.page.until(`document.querySelectorAll('article.decision').length >= 2`, 'the decision cards');
+    assert.ok((await run.page.run('window.checked')).includes(SPEC_DECISION), 'the queue never called OW.records.check');
+    const yes = await run.page.run(`(() => { const card = document.querySelector('article.decision[data-key="${SPEC_DECISION}"]');
+      const b = [...card.querySelectorAll('button')].find(b => b.textContent === 'Yes'); b.scrollIntoView({ block: 'center' }); return !b.disabled; })()`);
+    assert.ok(yes, 'the current decision offers no Yes');
+    await run.page.tap('Yes');
+    await run.page.until(`window.composed.length === 1`, 'one compose');
+    const [composed] = await run.page.run('window.composed');
+    assert.deepEqual(composed, { key: SPEC_DECISION, form: 'decision.yes', words: null, refused: null }, 'the answer preview was refused');
+    await run.page.until(`document.body.innerText.includes('Synthetic preview of decision.yes')`, 'the preview');
+    assert.deepEqual(run.world.writes(), []);
+    assert.deepEqual(run.world.violations, []);
+  } finally {
+    await run.close();
+  }
+});
+
+test('R1: a check OW.records answers unchecked, or that throws, leaves the item unchecked with a gap', async () => {
+  const run = await start();
+  try {
+    await queueWorld(run, { cards: true });
+    await openQueue(run, 'on');
+    await run.page.until(`window.drawn.some(item => item.key === ${JSON.stringify(ROUND)} && item.current === true)`, 'the first, matched read');
+    await run.page.run(`window.checks[9100003] = 'throw'; window.checks[9100021] = 'changed'`);
+    await refreshed(run);
+    assert.match(await run.page.text(), /GitHub gave only part of #7's source check/);
+    const round = await latestOf(run, ROUND);
+    assert.equal(round.current, null);
+    assert.equal(round.checked_at, null);
+    const spec = await latestOf(run, SPEC_DECISION);
+    assert.equal(spec.current, false);
+    assert.equal(typeof spec.checked_at, 'number');
+  } finally {
+    await run.close();
+  }
+});
+
+test('R2: a failed Specs refresh clears every earlier true and shows the gap', async () => {
+  const run = await start();
+  try {
+    await queueWorld(run, { cards: true });
+    await openQueue(run, 'on');
+    await run.page.until(`window.drawn.some(item => item.key === ${JSON.stringify(SPEC_DECISION)} && item.current === true)`
+      + ` && window.drawn.some(item => item.key === ${JSON.stringify(ROUND)} && item.current === true)`, 'the first, matched read');
+    run.world.graphql.Specs = async () => ({ status: 502, json: { message: 'Bad Gateway' } });
+    await run.page.click('Refresh now');
+    await run.page.until(`document.body.innerText.includes("Couldn't read Specs")`, 'the failed refresh');
+    await new Promise(resolve => setTimeout(resolve, 700));
+    const shown = await run.page.run(`[...document.querySelectorAll('.queue-item')].map(el => el.dataset.key)`);
+    const current = {};
+    for (const key of [SPEC_DECISION, ROUND]) current[key] = (await latestOf(run, key)).current;
+    assert.deepEqual(current, { [SPEC_DECISION]: null, [ROUND]: null }, 'a failed refresh kept an earlier true');
+    assert.ok(shown.includes(SPEC_DECISION) && shown.includes(ROUND), 'the cards from the last good read went away');
+    assert.match(await run.page.text(), /GitHub gave only part of the latest spec read/);
+  } finally {
+    await run.close();
+  }
+});
+
+test('R2: a first Specs read with GraphQL errors and no nodes shows a gap, never the empty line', async () => {
+  const run = await start();
+  try {
+    await queueWorld(run, { specs: [], details: {}, grillAnswers: { [pageOne]: { status: 200, json: [] } } });
+    run.world.graphql.Specs = async () => ({ status: 200, json: { ...specsAnswer([]), errors: [{ message: 'synthetic', path: ['repository', 'issues'] }] } });
+    await openQueue(run, 'on');
+    await run.page.until(`document.querySelector('main h1')?.textContent === 'Queue' && document.body.innerText.includes('GitHub gave only part of')`
+      + ` || document.body.innerText.includes(${JSON.stringify(EMPTY)})`, 'the queue settling');
+    const text = await run.page.text();
+    assert.ok(!text.includes(EMPTY), 'a partial Specs read said the queue is empty');
+    assert.match(text, /This list may be missing items: GitHub gave only part of the spec read\./);
+  } finally {
+    await run.close();
+  }
+});
+
+test('R2: a Specs read with GraphQL errors makes no spec decision current', async () => {
+  const run = await start();
+  try {
+    await queueWorld(run, { cards: true });
+    run.world.graphql.Specs = async () => ({ status: 200, json: { ...specsAnswer(SPECS), errors: [{ message: 'synthetic', path: ['specSearch'] }] } });
+    await openQueue(run, 'on');
+    await run.page.until(`window.drawn.some(item => item.key === ${JSON.stringify(SPEC_DECISION)})`, 'the spec decision');
+    assert.equal((await latestOf(run, SPEC_DECISION)).current, null);
+    assert.ok(!(await run.page.run('window.checked')).includes(SPEC_DECISION), 'a partial spec read was source checked');
+  } finally {
+    await run.close();
+  }
+});
+
+test('R3: a later page of the pull request list that fails leaves page one\'s grill unchecked, with the gap', async () => {
+  const run = await start();
+  try {
+    const first = grill.refreshes[0].github;
+    await queueWorld(run, { cards: true, grillAnswers: { ...first, [pageOne]: { ...first[pageOne], next: true },
+      'GET /repos/acme/factory/pulls?state=open&per_page=100&page=2': { status: 502, json: { message: 'Bad Gateway' } } } });
+    await openQueue(run, 'on');
+    await run.page.until(`window.drawn.some(item => item.key === ${JSON.stringify(ROUND)})`, 'the grill round');
+    await run.page.until(`document.body.innerText.includes('may be missing items')`, 'the gap line');
+    const round = await latestOf(run, ROUND);
+    assert.deepEqual({ current: round.current, checked_at: round.checked_at }, { current: null, checked_at: null }, 'a partial pull list made a grill current');
+    assert.ok(!(await run.page.run('window.checked')).includes(ROUND));
+    assert.match(await run.page.text(), /GitHub gave only part of the open pull requests/);
+  } finally {
+    await run.close();
+  }
+});
+
+test('R4: a later record in the same second supersedes the earlier one, by comment id', async () => {
+  const run = await start();
+  try {
+    const answers = withComments(list => {
+      const older = list.find(c => c.id === 9100003);
+      const newer = withRecord({ ...older, id: 9100009, html_url: older.html_url.replace('9100003', '9100009') }, { ...recordIn(older), id: 'gr_notes_3' });
+      return [newer, ...list];
+    });
+    await queueWorld(run, { cards: true, grillAnswers: answers });
+    await openQueue(run, 'on');
+    await run.page.until(`window.drawn.some(item => item.key === 'decision:acme/factory#7:9100009')`, 'the newer request');
+    const current = {};
+    for (const id of [9100003, 9100009]) current[id] = (await latestOf(run, `decision:acme/factory#7:${id}`))?.current ?? 'not drawn';
+    assert.deepEqual(current, { 9100003: 'not drawn', 9100009: true }, 'two requests of one grill file are current');
+    assert.ok(!(await run.page.run('window.checked')).includes(ROUND), 'the superseded request was checked');
+  } finally {
+    await run.close();
+  }
+});
+
+test('R5: a successful recheck of the same decision keeps the typed draft, and the draft composes', async () => {
+  const run = await start();
+  try {
+    await queueWorld(run);
+    await openQueue(run, 'dry-run', { card: true });
+    await run.page.until(`document.querySelector('article.decision[data-key="${SPEC_DECISION}"] textarea')`, 'the reply box');
+    await run.page.run(`document.querySelector('article.decision[data-key="${SPEC_DECISION}"] textarea').focus()`);
+    await run.page.type('Keep it, but later');
+    await refreshed(run);
+    const draft = await run.page.run(`document.querySelector('article.decision[data-key="${SPEC_DECISION}"] textarea').value`);
+    assert.equal(draft, 'Keep it, but later', 'a recheck erased the draft');
+    await run.page.run(`(() => { const card = document.querySelector('article.decision[data-key="${SPEC_DECISION}"]');
+      [...card.querySelectorAll('button')].find(b => b.textContent === 'Preview reply').scrollIntoView({ block: 'center' }); })()`);
+    await run.page.tap('Preview reply');
+    await run.page.until(`window.composed.length === 1`, 'one compose');
+    assert.deepEqual((await run.page.run('window.composed'))[0],
+      { key: SPEC_DECISION, form: 'decision.own', words: 'Keep it, but later', refused: null }, 'the kept card composed with an old check');
+  } finally {
+    await run.close();
+  }
+});
+
+for (const [name, id] of [['an object with a string toString', { toString: 'N2' }], ['a one-element array', ['N2']]]) {
+  test(`R7: a question id that is ${name} makes one unreadable card and keeps the rest`, async () => {
+    const run = await start();
+    try {
+      const answers = withComments(list => list.map(c => {
+        if (c.id !== 9100003) return c;
+        const record = recordIn(c);
+        record.questions[1].id = id;
+        return withRecord(c, record);
+      }));
+      await queueWorld(run, { cards: true, grillAnswers: answers });
+      await openQueue(run, 'on');
+      await run.page.until(`document.querySelector('.queue-item') || document.body.innerText.includes('may be missing')`, 'the queue');
+      await new Promise(resolve => setTimeout(resolve, 700));
+      const keys = await run.page.run(`[...document.querySelectorAll('.queue-item')].map(el => el.dataset.key)`);
+      assert.deepEqual(keys, [SPEC_DECISION, ROUND, 'decision:acme/factory#7:9100005', 'spec:acme/factory#61', 'spec:acme/factory#60']);
+      const round = await latestOf(run, ROUND);
+      assert.equal(round.request, null, 'a non-string question id passed validation');
+      assert.ok(!(await run.page.run('window.checked')).includes(ROUND), 'a malformed record was source checked');
+      assert.ok(!(await run.page.text()).includes('may be missing'), 'a malformed record made a gap');
+    } finally {
+      await run.close();
+    }
+  });
+}
+
+test('R6: the app check refuses a page order that swaps You and Agents', async () => {
+  const { execFileSync } = await import('node:child_process');
+  const { mkdtemp, cp, writeFile, rm } = await import('node:fs/promises');
+  const { tmpdir } = await import('node:os');
+  const temp = await mkdtemp(`${tmpdir()}/queue-check-`);
+  try {
+    const dist = `${temp}/dist`;
+    await cp(new URL('dist/', ROOT), dist, { recursive: true });
+    const html = await readFile(`${dist}/app/index.html`, 'utf8');
+    const you = html.match(/<script src="\/app\/pages\/you\.[0-9a-f]+\.js" defer><\/script>/)[0];
+    const agents = html.match(/<script src="\/app\/pages\/agents\.[0-9a-f]+\.js" defer><\/script>/)[0];
+    await writeFile(`${dist}/app/index.html`, html.replace(you, '\0').replace(agents, you).replace('\0', agents));
+    const checker = `import sys; sys.path.insert(0, ${JSON.stringify(new URL('scripts/', ROOT).pathname)}); from pathlib import Path; from check import check_site
+try:
+    check_site(Path(sys.argv[1]))
+except AssertionError as error:
+    print('refused:', error)
+else:
+    print('accepted')`;
+    const run = root => execFileSync('python3', ['-B', '-c', checker, root], { encoding: 'utf8' }).trim();
+    assert.equal(run(new URL('dist/', ROOT).pathname), 'accepted', 'the built site itself fails the check');
+    assert.match(run(dist), /^refused:.*order/, 'a You and Agents swap passed the app check');
+  } finally {
+    await rm(temp, { recursive: true, force: true });
   }
 });
