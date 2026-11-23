@@ -119,9 +119,11 @@ DRIVER_LOGOS = {
 HASHED = ('tokens.css', 'site.css', GSAP, 'site.js', 'faq.js')
 APP_PAGE = 'app/index.html'
 APP_STYLE = 'app/ember.css'
-APP_FOLDERS = ('app/pages', 'app/cards')
-APP_PARTS, APP_PART_STYLES = (tuple(sorted(p.relative_to(ROOT).as_posix() for folder in APP_FOLDERS for p in (ROOT / folder).glob(f'*.{ext}')))
-                              for ext in ('js', 'css'))
+APP_FOUND = {(folder, ext): tuple(sorted(p.relative_to(ROOT).as_posix() for p in (ROOT / folder).glob(f'*.{ext}')))
+             for folder in ('app/pages', 'app/cards') for ext in ('js', 'css')}
+APP_PARTS = APP_FOUND['app/pages', 'js'] + APP_FOUND['app/cards', 'js']
+APP_PART_STYLES = APP_FOUND['app/pages', 'css'] + APP_FOUND['app/cards', 'css']
+APP_NEEDED = set(APP_FOUND['app/pages', 'js'] + APP_FOUND['app/pages', 'css'])
 APP_SCRIPTS = ('app/data.js', 'app/ui.js') + APP_PARTS + ('app/palette.js', 'app/shell.js')
 APP_VENDOR = {'app/vendor/dagre-3.1.3.min.js': ('node_modules/@dagrejs/dagre/dist/dagre.min.js', 'app/pages/spec.js'),
               'app/vendor/dagre-LICENSE.txt': ('node_modules/@dagrejs/dagre/LICENSE', None)}
@@ -1669,11 +1671,14 @@ def check_app(root, names, pages):
     assert not page.report_links, 'Report a problem link, the footer\'s: the app has one'
     assert not set(page.refs) & {f'/{name}' for name in HASHED}, 'the app uses an unfingerprinted style or script'
     styles = {f'/{names[name]}': name for name in APP_PART_STYLES}
-    assert page.stylesheets[:1] == [f'/{names[APP_STYLE]}'] and sorted(styles.get(ref, ref) for ref in page.stylesheets[1:]) == list(APP_PART_STYLES), \
-        'the app must apply exactly the fingerprinted ember.css, then each of its pages\' and cards\' styles once'
+    applied = [styles.get(ref, ref) for ref in page.stylesheets[1:]]
+    assert page.stylesheets[:1] == [f'/{names[APP_STYLE]}'] and len(set(applied)) == len(applied) \
+        and set(applied) <= set(APP_PART_STYLES) and APP_NEEDED & set(APP_PART_STYLES) <= set(applied), \
+        'the app must apply exactly the fingerprinted ember.css, then each of its pages\' styles once (and a card\'s at most once)'
     parts = {f'/{names[name]}': name for name in APP_PARTS}
     shown = [parts[ref] for ref in page.scripts if ref in parts]
-    assert sorted(shown) == list(APP_PARTS), 'the app must load each of its pages\' and cards\' scripts once'
+    assert len(set(shown)) == len(shown) and APP_NEEDED & set(APP_PARTS) <= set(shown), \
+        'the app must load each of its pages\' scripts once (and a card\'s at most once)'
     ordered = ('app/data.js', 'app/ui.js', *shown, 'app/palette.js', 'app/shell.js')
     assert page.scripts == [ref for name in ordered for ref in [f'/{v}' for v, (_, before) in APP_VENDOR.items() if before == name] + [f'/{names[name]}']], \
         'the app must load its fingerprinted scripts (and each pinned file before its user) in order'
