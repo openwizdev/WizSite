@@ -109,7 +109,7 @@ test('a non-verified listing never shows verified', () => {
 
 test('a malformed snapshot fails the build', () => {
   const broken = Object.fromEntries(readdirSync(join(FIXTURES, 'broken')).filter(name => name.endsWith('.json')).sort().map(name => [name, bytes(`broken/${name}`)]));
-  assert.ok(Object.keys(broken).length >= 25, 'the broken fixtures are there');
+  assert.equal(Object.keys(broken).length, 27, 'the broken fixtures are there');
   const valid = bytes('contract-index.json');
   const at = valid.indexOf('Example driver');
   broken['invalid UTF-8'] = Buffer.concat([valid.subarray(0, at), Buffer.from([0xc3, 0x28]), valid.subarray(at)]);
