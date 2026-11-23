@@ -141,17 +141,20 @@ test('the build refuses what WizMarket refuses: repeated keys, bad text, impossi
 });
 
 test('the privacy scan refuses every string WizMarket\'s own scan refuses, every BMP code point at every probe position', async () => {
-  const { validate } = await import('../scripts/market.mjs');
+  const { PRIVATE_SOURCE, privateKind, validate } = await import('../scripts/market.mjs');
   const run = spawnSync('python3', ['-I', join(FIXTURES, 'private-parity.py')], { encoding: 'utf8', maxBuffer: 1 << 28 });
   assert.equal(run.status, 0, run.stderr);
-  const { cases } = JSON.parse(run.stdout);
+  const { patterns, cases } = JSON.parse(run.stdout);
+  assert.deepEqual(PRIVATE_SOURCE.map(([label, source]) => [label, source]), patterns.map(([label, source, ignorecase]) => [label, ignorecase === source.startsWith('(?i)') ? source : `${source} (ignorecase set by flag)`]),
+    'the site scans with WizMarket\'s patterns, character for character');
+  assert.throws(() => validate(['A synthetic driver. pa\u017fsword: example']), /holds what looks like a token/, 'validate uses the same scan');
   assert.ok(cases.length > 400, 'the probes ran');
   const missed = [];
   for (const [probe, at, ranges] of cases) {
     for (const [first, last] of ranges) {
       for (let point = first; point <= last; point++) {
         const text = probe.slice(0, at) + String.fromCharCode(point) + probe.slice(at + 1);
-        try { validate([text]); } catch (error) { if (/holds what looks like/.test(error.message)) continue; }
+        if (privateKind(text)) continue;
         if (missed.push(`${JSON.stringify(probe)} at ${at}: U+${point.toString(16).toUpperCase().padStart(4, '0')}`) >= 20) break;
       }
     }

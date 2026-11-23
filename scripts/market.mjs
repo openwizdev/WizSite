@@ -17,13 +17,45 @@ const REPO = /^([A-Za-z0-9](?:[A-Za-z0-9]|-(?=[A-Za-z0-9])){0,38})\/([A-Za-z0-9.
 const FIELDS = { name: true, summary: true, tags: true, url: true, plugs_into: true, publisher: true, stage: true, status: true, login: false, links: false, proof: false };
 const RECEIPT_KINDS = ['driver', 'harness'];
 const SCHEMA_KEYS = new Set(['commit', 'contract', 'listings', 'id', ...Object.keys(FIELDS), 'label', 'receipt', 'skill', 'path', 'date', 'source', 'check']);
-const PRIVATE = [
-  ['a token', /\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|glpat-[A-Za-z0-9_-]{20,}|xox[abposr]-[A-Za-z0-9-]{10,}|sk-[A-Za-z0-9_-]{16,}|AIza[0-9A-Za-z_-]{30,}|npm_[A-Za-z0-9]{30,}|(?:AKIA|ASIA)[0-9A-Z]{16}|eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.)/],
-  ['a token', /-----BEGIN [A-Z ]*PRIVATE KEY-----|[A-Za-z][A-Za-z0-9+.-]*:\/\/[^/\s:@]+:[^/\s@]+@/],
-  ['a token', /\b(?:password|passwd|secret|api[_-]?key|access[_-]?key|private[_-]?key|client[_-]?secret|auth[_-]?token|access[_-]?token)\b\s*[:=]\s*\S|\bbearer\s+[A-Za-z0-9._~+/-]{16,}/i],
-  ['a private id', /\bthr[_][A-Za-z0-9]|\b(?:proj|prj|mch|usr|acct|auto|sess?|sbx)_[A-Za-z0-9]|\bcr_[0-9a-fA-F]{8}-[0-9a-fA-F]{4}|\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b/],
-  ['a machine path', /(?<![\w.~%/-])\/(?:home|Users|root|tmp|var\/folders|private\/var)\/|(?<![A-Za-z0-9])[A-Za-z]:\\/],
+export const PRIVATE_SOURCE = [
+  ['a token', String.raw`\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|glpat-[A-Za-z0-9_-]{20,}|xox[abposr]-[A-Za-z0-9-]{10,}|sk-[A-Za-z0-9_-]{16,}|AIza[0-9A-Za-z_-]{30,}|npm_[A-Za-z0-9]{30,}|(?:AKIA|ASIA)[0-9A-Z]{16}|eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.)`],
+  ['a token', String.raw`-----BEGIN [A-Z ]*PRIVATE KEY-----|[A-Za-z][A-Za-z0-9+.-]*://[^/\s:@]+:[^/\s@]+@`],
+  ['a token', String.raw`(?i)\b(?:password|passwd|secret|api[_-]?key|access[_-]?key|private[_-]?key|client[_-]?secret|auth[_-]?token|access[_-]?token)\b\s*[:=]\s*\S|\bbearer\s+[A-Za-z0-9._~+/-]{16,}`],
+  ['a private id', String.raw`\bthr_[A-Za-z0-9]|\b(?:proj|prj|mch|usr|acct|auto|sess?|sbx)_[A-Za-z0-9]|\bcr_[0-9a-fA-F]{8}-[0-9a-fA-F]{4}|\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b`],
+  ['a machine path', String.raw`(?<![\w.~%/-])/(?:home|Users|root|tmp|var/folders|private/var)/|(?<![A-Za-z0-9])[A-Za-z]:\\`],
 ];
+const PYTHON_SPACE = String.raw`\t\n\v\f\r\x1c-\x20\x85\xa0  -     　`;
+const PYTHON_IGNORECASE_ASCII = { 'İ': 'i', 'ı': 'i', 'ſ': 's', 'K': 'k' };
+const pythonIgnorecase = text => text.replace(/[İıſK]/g, c => PYTHON_IGNORECASE_ASCII[c]);
+
+function fromPython(source) {
+  const ignorecase = source.startsWith('(?i)');
+  let out = '';
+  let inClass = false;
+  for (let i = ignorecase ? 4 : 0; i < source.length; i++) {
+    const c = source[i];
+    if (c === '\\') {
+      const escaped = source[++i];
+      if (escaped === 's') out += inClass ? PYTHON_SPACE : `[${PYTHON_SPACE}]`;
+      else if (escaped === 'S' && !inClass) out += `[^${PYTHON_SPACE}]`;
+      else if ((escaped === 'b' && !inClass) || escaped === 'w' || /^[^A-Za-z0-9]$/.test(escaped ?? '')) out += `\\${escaped}`;
+      else throw new Error(`market privacy scan: no JavaScript port for \\${escaped} in a WizMarket pattern`);
+    } else {
+      if (c === '[' && !inClass) inClass = true;
+      else if (c === ']' && inClass) inClass = false;
+      else if (c === '(' && source[i + 1] === '?' && !inClass && !/^\(\?(?::|<!)/.test(source.slice(i))) throw new Error('market privacy scan: no JavaScript port for a group in a WizMarket pattern');
+      out += c;
+    }
+  }
+  return { pattern: new RegExp(out, ignorecase ? 'i' : ''), ignorecase };
+}
+
+const PRIVATE = PRIVATE_SOURCE.map(([label, source]) => [label, fromPython(source)]);
+
+export function privateKind(text) {
+  const folded = pythonIgnorecase(text);
+  return PRIVATE.find(([, { pattern, ignorecase }]) => pattern.test(ignorecase ? folded : text))?.[0] ?? null;
+}
 
 const fail = (where, why) => { throw new Error(`market/registry.json: ${where}: ${why}`); };
 const isObject = value => value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -134,8 +166,8 @@ function repeatedKey(text) {
 export function validate(index) {
   for (const [where, text] of strings(index, 'the index')) {
     if (!text.isWellFormed()) fail(where, 'holds an unpaired surrogate, which is not UTF-8 text');
-    const found = PRIVATE.find(([, pattern]) => pattern.test(text));
-    if (found) fail(where, `holds what looks like ${found[0]}; listings are public`);
+    const found = privateKind(text);
+    if (found) fail(where, `holds what looks like ${found}; listings are public`);
   }
   exactKeys(index, ['commit', 'contract', 'listings'], 'the index');
   if (index.contract !== 'listing.v1') fail('the index', 'contract is not listing.v1');
