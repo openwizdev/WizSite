@@ -50,26 +50,32 @@
     let raw = '';
     let was = '';
     let dropped = null;
+    let span = null;
     const at = n => { let i = 0; for (let k = 0; k < n; k++) i += raw.startsWith('\r\n', i) ? 2 : 1; return i; };
     const grab = event => {
       const data = event.clipboardData || event.dataTransfer;
       dropped = data ? data.getData('text/plain') : null;
+      span = event.type === 'paste' && typeof box.selectionStart === 'number' ? [box.selectionStart, box.selectionEnd] : null;
     };
     box.addEventListener('paste', grab);
     box.addEventListener('drop', grab);
     box.addEventListener('input', () => {
       const now = box.value;
       if (flat(raw) !== was) raw = was;
-      const caret = typeof box.selectionEnd === 'number' ? box.selectionEnd : now.length;
-      let tail = 0;
-      while (tail < was.length && tail < now.length - caret && was[was.length - 1 - tail] === now[now.length - 1 - tail]) tail++;
-      let head = 0;
-      while (head < Math.min(was.length, now.length) - tail && was[head] === now[head]) head++;
-      const added = now.slice(head, now.length - tail);
-      const text = dropped !== null && flat(dropped) === added ? dropped : added;
-      raw = raw.slice(0, at(head)) + text + raw.slice(at(was.length - tail));
+      if (span && dropped !== null && was.slice(0, span[0]) + flat(dropped) + was.slice(span[1]) === now) {
+        raw = raw.slice(0, at(span[0])) + dropped + raw.slice(at(span[1]));
+      } else {
+        const caret = typeof box.selectionEnd === 'number' ? box.selectionEnd : now.length;
+        let tail = 0;
+        while (tail < was.length && tail < now.length - caret && was[was.length - 1 - tail] === now[now.length - 1 - tail]) tail++;
+        let head = 0;
+        while (head < Math.min(was.length, now.length) - tail && was[head] === now[head]) head++;
+        const added = now.slice(head, now.length - tail);
+        const text = dropped !== null && flat(dropped) === added ? dropped : added;
+        raw = raw.slice(0, at(head)) + text + raw.slice(at(was.length - tail));
+      }
       was = now;
-      dropped = null;
+      dropped = span = null;
     });
     return () => flat(raw) === box.value ? raw : box.value;
   }
