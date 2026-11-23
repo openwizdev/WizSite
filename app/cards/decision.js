@@ -24,6 +24,7 @@
   };
 
   const staleItems = new WeakSet();
+  const counts = new Map();
   const STALE = 'The request or its source changed since it was read.';
   const onSubject = (p, item) => !!p && p.repository === item.repository && !!p.subject
     && p.subject.kind === item.subject.kind && p.subject.number === item.subject.number;
@@ -107,7 +108,7 @@
         h('strong', {}, `Outcome unknown (${reason}).`), ' ',
         'It may or may not be on GitHub. Check again before answering another way.',
         h('div', { class: 'decision-buttons' }, h('button', { class: 'btn', type: 'button',
-          onclick: () => show(slot.el, slot.preview, 0, () => { idle(slot, reason); lock(false); }, null, slot) }, 'Check again')));
+          onclick: () => show(slot.el, slot.preview, counts.get(slot.preview.op) || 0, () => { idle(slot, reason); lock(false); }, null, slot) }, 'Check again')));
       slot.el.replaceChildren(...(note ? [note] : []), h('pre', { 'data-preview-body': '' }, slot.preview.body), said);
     }
 
@@ -152,10 +153,13 @@
       const buttons = h('div', { class: 'decision-buttons' }, post, cancel);
       post.addEventListener('click', async event => {
         const counted = records.confirm(preview, event);
-        if (counted.confirmed < counted.of) {
-          if (counted.confirmed > confirmed) show(out, preview, counted.confirmed, back, note, slot);
+        const now = Math.min(counted.confirmed, counted.of - 1);
+        counts.set(preview.op, now);
+        if (counted.confirmed < counted.of || confirmed + 1 < counted.of) {
+          if (now !== confirmed) show(out, preview, now, back, note, slot);
           return;
         }
+        counts.delete(preview.op);
         buttons.replaceChildren(h('span', { class: 'decision-wait' }, 'Posting…'));
         let result;
         try { result = await records.post(preview); } catch { result = { outcome: 'unknown', op: preview.op, reason: 'error' }; }
