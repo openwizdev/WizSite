@@ -152,7 +152,7 @@ test('the key-host section says where a host key lives, who reads it, where it g
   assert.doesNotMatch(text(section), /\bsix(th)?\b|\bexcept(ion)?\b|\bwaive/i, 'no extra or skipped check');
 });
 
-test('the rendered Drivers page shows Devin only as In review', async () => {
+test('the rendered Drivers page shows Devin only as built, waiting on its live check', async () => {
   assert.ok(existsSync(join(DIST, 'drivers/index.html')), 'run npm run build first');
   const server = await serve();
   const origin = `http://127.0.0.1:${server.address().port}`;
@@ -185,7 +185,7 @@ test('the rendered Drivers page shows Devin only as In review', async () => {
       return {
         tiles: tiles.length,
         visible: box.width > 0 && box.height > 0 && getComputedStyle(tile).visibility === 'visible',
-        inReviewGroup: tile.matches('li.tile') && Boolean(tile.closest('#hosts-review[data-state="review"]')),
+        inWaitingGroup: tile.matches('li.tile') && Boolean(tile.closest('#hosts-waiting[data-state="waiting"]')),
         state: tile.dataset.state,
         status: [...tile.querySelectorAll('.tile-state')].map(e => norm(e.innerText)),
         shown: norm(tile.innerText),
@@ -198,10 +198,10 @@ test('the rendered Drivers page shows Devin only as In review', async () => {
     assert.deepEqual(result.value, {
       tiles: 1,
       visible: true,
-      inReviewGroup: true,
-      state: 'review',
-      status: ['In review'],
-      shown: 'Devin In review Pull request',
+      inWaitingGroup: true,
+      state: 'waiting',
+      status: ['Built, waiting on its live check'],
+      shown: 'Devin Built, waiting on its live check Login: held by Devin Pull request',
       links: [['Pull request', 'https://github.com/openwizdev/OpenWiz/pull/2490']],
       markedReleased: false,
       devinElsewhere: false,
