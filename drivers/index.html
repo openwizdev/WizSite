@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="A driver connects OpenWiz to wherever your agents run: your computer, a VPS, Cloudroom, boat.dev. Drivers answer the same four commands, plus their schema, and take the same five-check test: boat.dev, Cloudroom and your own computer or VPS passed all five checks; Grok Bot is on hold."><title>Drivers — OpenWiz</title><link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48"><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><meta property="og:image" content="https://openwiz.dev/brand/og.png?v=2"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="OpenWiz"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="https://openwiz.dev/brand/og.png?v=2"><link rel="preload" href="/fonts/Geist-var.woff2" as="font" type="font/woff2" crossorigin><link rel="preload" href="/art/drivers-d-sea.webp" as="image" type="image/webp"><link rel="stylesheet" href="/tokens.css"><link rel="stylesheet" href="/site.css"><script src="/vendor/gsap-3.15.1.min.js" defer></script><script src="/site.js" defer></script></head>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="A driver connects OpenWiz to wherever your agents run: your computer, a VPS, Cloudroom, boat.dev. Drivers answer the same four commands, plus their schema, and take the same five-check test: boat.dev, Cloudroom and your own computer or VPS passed all five checks and ship today; every other host and harness shows its true state."><title>Drivers — OpenWiz</title><link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48"><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><meta property="og:image" content="https://openwiz.dev/brand/og.png?v=2"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="OpenWiz"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="https://openwiz.dev/brand/og.png?v=2"><link rel="preload" href="/fonts/Geist-var.woff2" as="font" type="font/woff2" crossorigin><link rel="preload" href="/art/drivers-d-sea.webp" as="image" type="image/webp"><link rel="stylesheet" href="/tokens.css"><link rel="stylesheet" href="/site.css"><script src="/vendor/gsap-3.15.1.min.js" defer></script><script src="/site.js" defer></script></head>
 <body class="landing drivers-page">
 <a class="skip" href="#main">Skip to content</a>
 <header class="landing-nav wrap">
@@ -60,8 +60,8 @@
         <li data-host="vps" data-state="passed"><span class="host-mark"><img class="host-icon" src="/drivers/logos/monitor.svg" alt="Computer icon" width="24" height="24"></span><span class="host-name">Your computer or VPS</span> <span class="host-state">passed 5 of 5</span></li>
         <li data-host="cloudroom" data-state="passed"><span class="host-mark"><img class="host-tile" src="/drivers/logos/cloudroom.png" alt="Cloudroom logo" width="256" height="256"></span><span class="host-name">Cloudroom</span> <span class="host-state">passed 5 of 5</span></li>
         <li data-host="boat-dev" data-state="passed"><span class="host-mark"><img class="host-lockup" src="/drivers/logos/boat-dev.svg" alt="boat.dev" width="390" height="109"></span> <span class="host-state">passed 5 of 5</span></li>
-        <li data-host="grok-bot" data-state="on hold"><span class="host-name">Grok Bot</span> <span class="host-state">on hold</span></li>
       </ul>
+      <ul class="tally" aria-label="Every driver and harness, by state"><li data-state="shipped"><b>3</b> shipped</li><li data-state="live"><b>1</b> passed live, not in a release yet</li><li data-state="waiting"><b>7</b> waiting on live checks</li><li data-state="review"><b>8</b> in review</li><li data-state="building"><b>14</b> being built</li><li data-state="planned"><b>2</b> planned</li><li data-state="held"><b>2</b> held</li><li data-state="parked"><b>1</b> parked</li></ul>
       <a class="voyage-pass" href="#boat-dev">See boat.dev's five passed checks</a>
     </div>
   </section>
@@ -88,7 +88,7 @@
     </article>
   </section>
   <section class="more-drivers wrap" aria-labelledby="more-title">
-    <h2 id="more-title">More drivers</h2>
+    <h2 id="more-title">Also shipped</h2>
     <ul class="driver-list">
       <li>
       <article class="driver" id="vps" aria-labelledby="vps-name">
@@ -108,68 +108,291 @@
         <p class="driver-kit passed" data-state="passed"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7"/><path d="M4.6 8.3l2.3 2.3 4.5-4.8"/></svg><span>Kit: passed, 5 of 5</span></p>
       </article>
       </li>
-      <li>
-      <article class="driver" id="openclaw" aria-labelledby="openclaw-name">
-        <h3 class="driver-name" id="openclaw-name"><img class="driver-logo host-icon" src="/drivers/logos/monitor.svg" alt="Computer icon" width="24" height="24"><span>OpenClaw</span></h3>
-        <p class="driver-login">Login: stays on your machine</p>
-        <p class="driver-line">Passed its live check, 5 of 5 on a real host; not in a release yet</p>
-        <p class="driver-date"><a href="https://github.com/openwizdev/OpenWiz/issues/1991#issuecomment-7087326408">Kit run, <time datetime="2026-11-22">2026-11-22</time></a></p>
-        <p class="driver-kit passed" data-state="passed"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7"/><path d="M4.6 8.3l2.3 2.3 4.5-4.8"/></svg><span>Kit: passed, 5 of 5</span></p>
-      </article>
-      </li>
-      <li>
-      <article class="driver" id="grok-bot" aria-labelledby="grok-bot-name">
-        <h3 class="driver-name" id="grok-bot-name"><img class="driver-logo host-icon" src="/drivers/logos/bot.svg" alt="Generic bot icon" width="24" height="24"><span>Grok Bot</span></h3>
-        <p class="driver-line">On hold: Grok Bot has no way yet for a program to wake or stop a run</p>
-        <p class="driver-kit unrun" data-state="not yet run"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/></svg><span>Kit: not run yet</span></p>
-      </article>
-      </li>
     </ul>
   </section>
-  <section class="building wrap" aria-labelledby="building-title">
-    <h2 id="building-title">Being built now</h2>
-    <p class="building-lead">Each has a reviewed pull request whose driver passes the five-check test against a stand-in host. None is released: each waits for its live check on a real host before it can merge.</p>
-    <ul class="build-list">
-      <li>
-      <article class="build" id="build-hermes" aria-labelledby="build-hermes-name">
-        <h3 class="build-name" id="build-hermes-name">Hermes</h3>
-        <p class="driver-login">Login: stays on your machine</p>
-        <p class="build-line">Runs Hermes from its own command line on your computer.</p>
-        <p class="build-state"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/></svg><span>Not released: waits for its live check</span> <a href="https://github.com/openwizdev/OpenWiz/pull/2017">Pull request</a></p>
-      </article>
-      </li>
-      <li>
-      <article class="build" id="build-conductor" aria-labelledby="build-conductor-name">
-        <h3 class="build-name" id="build-conductor-name">Conductor</h3>
-        <p class="driver-login">Login: held by Conductor</p>
-        <p class="build-line">Runs each build in its own Conductor cloud workspace.</p>
-        <p class="build-state"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/></svg><span>Not released: waits for its live check</span> <a href="https://github.com/openwizdev/OpenWiz/pull/2020">Pull request</a></p>
-      </article>
-      </li>
-      <li>
-      <article class="build" id="build-cursor" aria-labelledby="build-cursor-name">
-        <h3 class="build-name" id="build-cursor-name">Cursor cloud agents</h3>
-        <p class="driver-login">Login: held by Cursor</p>
-        <p class="build-line">Runs each build as one Cursor cloud agent.</p>
-        <p class="build-state"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/></svg><span>Not released: waits for its live check</span> <a href="https://github.com/openwizdev/OpenWiz/pull/2021">Pull request</a></p>
-      </article>
-      </li>
-      <li>
-      <article class="build" id="build-factory" aria-labelledby="build-factory-name">
-        <h3 class="build-name" id="build-factory-name">Factory</h3>
-        <p class="driver-login">Login: held by Factory</p>
-        <p class="build-line">Runs each build as a Droid session on your computer.</p>
-        <p class="build-state"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/></svg><span>Not released: waits for its live check</span> <a href="https://github.com/openwizdev/OpenWiz/pull/2022">Pull request</a></p>
-      </article>
-      </li>
-      <li>
-      <article class="build" id="build-pane" aria-labelledby="build-pane-name">
-        <h3 class="build-name" id="build-pane-name">Pane</h3>
-        <p class="driver-login">Login: stays on your machine</p>
-        <p class="build-line">Runs each build in its own Pane worktree on your computer.</p>
-        <p class="build-state"><svg class="kit-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/></svg><span>Not released: waits for its live check</span> <a href="https://github.com/openwizdev/OpenWiz/pull/2029">Pull request</a></p>
-      </article>
-      </li>
+  <section class="wall wrap" id="hosts" aria-labelledby="hosts-title">
+    <p class="wall-kicker">Hosts</p>
+    <h2 id="hosts-title">Where your agents run</h2>
+    <p class="wall-lead">Each host gets its own driver. It ships only after it passes the same five-check test on its real host and lands in a release.</p>
+    <nav class="wall-jump" aria-label="Where your agents run, by state"><a href="#hosts-live" data-state="live">Passed live, not in a release yet <span>1</span></a><a href="#hosts-waiting" data-state="waiting">Built, waiting on its live check <span>7</span></a><a href="#hosts-review" data-state="review">In review <span>1</span></a><a href="#hosts-building" data-state="building">Being built <span>5</span></a><a href="#hosts-held" data-state="held">Held <span>1</span></a><a href="#hosts-parked" data-state="parked">Parked <span>1</span></a></nav>
+    <div class="wall-group" id="hosts-live" data-state="live">
+      <h3 class="group-title">Passed live, not in a release yet <span class="group-count">1</span></h3>
+      <ul class="tiles">
+        <li class="tile" id="openclaw" data-state="live">
+          <span class="tile-mark"><img src="/drivers/logos/openclaw.svg" alt="OpenClaw logo" width="32" height="32" loading="lazy"></span>
+          <h4 class="tile-name">OpenClaw</h4>
+          <p class="tile-state">Passed live, not in a release yet</p>
+          <p class="driver-login">Login: stays on your machine</p>
+          <a class="tile-link" href="https://github.com/openwizdev/OpenWiz/issues/1991#issuecomment-7087326408">Live check receipt, <time datetime="2026-11-22">2026-11-22</time></a>
+        </li>
+      </ul>
+    </div>
+    <div class="wall-group" id="hosts-waiting" data-state="waiting">
+      <h3 class="group-title">Built, waiting on its live check <span class="group-count">7</span></h3>
+      <ul class="tiles">
+        <li class="tile" id="hermes" data-state="waiting">
+          <span class="tile-mark"><img src="/drivers/logos/hermes.png" alt="Hermes logo" width="32" height="32" loading="lazy"></span>
+          <h4 class="tile-name">Hermes</h4>
+          <p class="tile-state">Built, waiting on its live check</p>
+          <p class="driver-login">Login: stays on your machine</p>
+          <a class="tile-link" href="https://github.com/openwizdev/OpenWiz/pull/2017">Pull request</a>
+        </li>
+        <li class="tile" id="conductor" data-state="waiting">
+          <span class="tile-mark"><img src="/drivers/logos/conductor.svg" alt="Conductor logo" width="32" height="32" loading="lazy"></span>
+          <h4 class="tile-name">Conductor</h4>
+          <p class="tile-state">Built, waiting on its live check</p>
+          <p class="driver-login">Login: held by Conductor</p>
+          <a class="tile-link" href="https://github.com/openwizdev/OpenWiz/pull/2020">Pull request</a>
+        </li>
+        <li class="tile" id="cursor" data-state="waiting">
+          <span class="tile-mark"><img src="/drivers/logos/cursor.svg" alt="Cursor logo" width="32" height="32" loading="lazy"></span>
+          <h4 class="tile-name">Cursor cloud agents</h4>
+          <p class="tile-state">Built, waiting on its live check</p>
+          <p class="driver-login">Login: held by Cursor</p>
+          <a class="tile-link" href="https://github.com/openwizdev/OpenWiz/pull/2021">Pull request</a>
+        </li>
+        <li class="tile" id="factory" data-state="waiting">
+          <span class="tile-mark"><img src="/drivers/logos/factory.svg" alt="Factory logo" width="32" height="32" loading="lazy"></span>
+          <h4 class="tile-name">Factory</h4>
+          <p class="tile-state">Built, waiting on its live check</p>
+          <p class="driver-login">Login: held by Factory</p>
+          <a class="tile-link" href="https://github.com/openwizdev/OpenWiz/pull/2022">Pull request</a>
+        </li>
+        <li class="tile" id="pane" data-state="waiting">
+          <span class="tile-mark"><img src="/drivers/logos/pane.svg" alt="Pane logo" width="32" height="32" loading="lazy"></span>
+          <h4 class="tile-name">Pane</h4>
+          <p class="tile-state">Built, waiting on its live check</p>
+          <p class="driver-login">Login: stays on your machine</p>
+          <a class="tile-link" href="https://github.com/openwizdev/OpenWiz/pull/2029">Pull request</a>
+        </li>
+        <li class="tile no-mark" id="codespaces" data-state="waiting">
+          <h4 class="tile-name">GitHub Codespaces</h4>
+          <p class="tile-state">Built, waiting on its live check</p>
+          <p class="driver-login">Login: held by GitHub</p>
+          <a class="tile-link" href="https://github.com/openwizdev/OpenWiz/pull/2559">Pull request</a>
+        </li>
+        <li class="tile" id="devin" data-state="waiting">
+          <span class="tile-mark"><img src="/drivers/logos/devin.svg" alt="Devin logo" width="32" height="32" loading="lazy"></span>
+          <h4 class="tile-name">Devin</h4>
+          <p class="tile-state">Built, waiting on its live check</p>
+          <p class="driver-login">Login: held by Devin</p>
+          <a class="tile-link" href="https://github.com/openwizdev/OpenWiz/pull/2490">Pull request</a>
+        </li>
+      </ul>
+    </div>
+    <div class="wall-group" id="hosts-review" data-state="review">
+      <h3 class="group-title">In review <span class="group-count">1</span></h3>
+      <ul class="tiles">
+        <li class="tile no-mark" id="sprites" data-state="review">
+          <h4 class="tile-name">Fly Sprites</h4>
+          <p class="tile-state">In review</p>
+          <a class="tile-link" href="https://github.com/openwizdev/OpenWiz/pull/2720">Pull request</a>
+        </li>
+      </ul>
+    </div>
+    <div class="wall-group" id="hosts-building" data-state="building">
+      <h3 class="group-title">Being built <span class="group-count">5</span></h3>
+      <ul class="tiles">
+        <li class="tile" id="openhands" data-state="building">
+          <span class="tile-mark"><img src="/drivers/logos/openhands.svg" alt="OpenHands logo" width="32" height="32" loading="lazy"></span>
+          <h4 class="tile-name">OpenHands Cloud</h4>
+          <p class="tile-state">Being built</p>
+          <a class="tile-link" href="https://github.com/openwizdev/OpenWiz/pull/2567">Draft pull request</a>
+        </li>
+        <li class="tile" id="warp-oz" data-state="building">
+          <span class="tile-mark"><img src="/drivers/logos/warp.svg" alt="Warp logo" width="32" height="32" loading="lazy"></span>
+          <h4 class="tile-name">Warp Oz</h4>
+          <p class="tile-state">Being built</p>
+          <a class="tile-link" href="https://github.com/openwizdev/OpenWiz/pull/2555">Draft pull request</a>
+        </li>
+        <li class="tile" id="tembo" data-state="building">
+          <span class="tile-mark"><img src="/drivers/logos/tembo.svg" alt="Tembo logo" width="32" height="32" loading="lazy"></span>
+          <h4 class="tile-name">Tembo</h4>
+          <p class="tile-state">Being built</p>
+          <a class="tile-link" href="https://github.com/openwizdev/OpenWiz/pull/2662">Draft pull request</a>
+        </li>
+        <li class="tile" id="capy" data-state="building">
+          <span class="tile-mark"><img src="/drivers/logos/capy.svg" alt="Capy logo" width="32" height="32" loading="lazy"></span>
+          <h4 class="tile-name">Capy</h4>
+          <p class="tile-state">Being built</p>
+          <a class="tile-link" href="https://github.com/openwizdev/OpenWiz/pull/2652">Draft pull request</a>
+        </li>
+        <li class="tile" id="ona" data-state="building">
+          <span class="tile-mark"><img src="/drivers/logos/ona.svg" alt="Ona logo" width="32" height="32" loading="lazy"></span>
+          <h4 class="tile-name">Ona</h4>
+          <p class="tile-state">Being built</p>
+          <a class="tile-link" href="https://github.com/openwizdev/OpenWiz/pull/2699">Draft pull request</a>
+        </li>
+      </ul>
+    </div>
+    <div class="wall-group" id="hosts-held" data-state="held">
+      <h3 class="group-title">Held <span class="group-count">1</span></h3>
+      <ul class="tiles">
+        <li class="tile no-mark" id="opencomputer" data-state="held">
+          <h4 class="tile-name">OpenComputer</h4>
+          <p class="tile-state">Held: its key header is unsupported</p>
+          <a class="tile-link" href="https://github.com/openwizdev/OpenWiz/issues/2587">Ticket</a>
+        </li>
+      </ul>
+    </div>
+    <div class="wall-group" id="hosts-parked" data-state="parked">
+      <h3 class="group-title">Parked <span class="group-count">1</span></h3>
+      <ul class="tiles">
+        <li class="tile no-mark" id="grok-bot" data-state="parked">
+          <h4 class="tile-name">Grok Bot</h4>
+          <p class="tile-state">Parked: the host has no programmatic wake or stop</p>
+          <a class="tile-link" href="https://github.com/openwizdev/OpenWiz/issues/2318">Ticket</a>
+        </li>
+      </ul>
+    </div>
+  </section>
+  <section class="wall wrap" id="harnesses" aria-labelledby="harnesses-title">
+    <p class="wall-kicker">Harnesses</p>
+    <h2 id="harnesses-title">Which agent you already use</h2>
+    <p class="wall-lead">Harnesses run as rows on the local driver, on your computer or a VPS. Today that driver runs Claude Code and Codex; every row below is still on its way.</p>
+    <nav class="wall-jump" aria-label="Which agent you already use, by state"><a href="#harnesses-review" data-state="review">In review <span>7</span></a><a href="#harnesses-building" data-state="building">Being built <span>9</span></a><a href="#harnesses-planned" data-state="planned">Planned <span>2</span></a><a href="#harnesses-held" data-state="held">Held <span>1</span></a></nav>
+    <div class="wall-group" id="harnesses-review" data-state="review">
+      <h3 class="group-title">In review <span class="group-count">7</span></h3>
+      <ul class="tiles">
+        <li class="tile no-mark" id="copilot" data-state="review">
+          <h4 class="tile-name">GitHub Copilot CLI</h4>
+          <p class="tile-state">In review</p>
+          <a class="tile-link" href="https://github.com/openwizdev/OpenWiz/pull/2782">Pull request</a>
+        </li>
+        <li class="tile" id="cursor-cli" data-state="review">
+          <span class="tile-mark"><img src="/drivers/logos/cursor.svg" alt="Cursor logo" width="32" height="32" loading="lazy"></span>
+          <h4 class="tile-name">Cursor CLI</h4>
+          <p class="tile-state">In review</p>
+          <a class="tile-link" href="https://github.com/openwizdev/OpenWiz/pull/2778">Pull request</a>
+        </li>
+        <li class="tile" id="gemini" data-state="review">
+          <span class="tile-mark"><img src="/drivers/logos/gemini-cli.svg" alt="Gemini CLI logo" width="32" height="32" loading="lazy"></span>
+          <h4 class="tile-name">Gemini CLI</h4>
+          <p class="tile-state">In review</p>
+          <a class="tile-link" href="https://github.com/openwizdev/OpenWiz/pull/2776">Pull request</a>
+        </li>
+        <li class="tile" id="goose" data-state="review">
+          <span class="tile-mark"><img src="/drivers/logos/goose.png" alt="goose logo" width="32" height="32" loading="lazy"></span>
+          <h4 class="tile-name">Goose</h4>
+          <p class="tile-state">In review</p>
+          <a class="tile-link" href="https://github.com/openwizdev/OpenWiz/pull/2779">Pull request</a>
+        </li>
+        <li class="tile" id="kimi" data-state="review">
+          <span class="tile-mark"><img src="/drivers/logos/kimi-code.svg" alt="Kimi Code logo" width="32" height="32" loading="lazy"></span>
+          <h4 class="tile-name">Kimi Code</h4>
+          <p class="tile-state">In review</p>
+          <a class="tile-link" href="https://github.com/openwizdev/OpenWiz/pull/2785">Pull request</a>
+        </li>
+        <li class="tile" id="pi" data-state="review">
+          <span class="tile-mark"><img src="/drivers/logos/pi.svg" alt="Pi logo" width="32" height="32" loading="lazy"></span>
+          <h4 class="tile-name">Pi</h4>
+          <p class="tile-state">In review</p>
+          <a class="tile-link" href="https://github.com/openwizdev/OpenWiz/pull/2774">Pull request</a>
+        </li>
+        <li class="tile" id="qwen" data-state="review">
+          <span class="tile-mark"><img src="/drivers/logos/qwen-code.svg" alt="Qwen Code logo" width="32" height="32" loading="lazy"></span>
+          <h4 class="tile-name">Qwen Code</h4>
+          <p class="tile-state">In review</p>
+          <a class="tile-link" href="https://github.com/openwizdev/OpenWiz/pull/2794">Pull request</a>
+        </li>
+      </ul>
+    </div>
+    <div class="wall-group" id="harnesses-building" data-state="building">
+      <h3 class="group-title">Being built <span class="group-count">9</span></h3>
+      <ul class="tiles">
+        <li class="tile" id="amp" data-state="building">
+          <span class="tile-mark"><img src="/drivers/logos/amp.svg" alt="Amp logo" width="32" height="32" loading="lazy"></span>
+          <h4 class="tile-name">Amp</h4>
+          <p class="tile-state">Being built</p>
+          <a class="tile-link" href="https://github.com/openwizdev/OpenWiz/pull/2767">Draft pull request</a>
+        </li>
+        <li class="tile" id="antigravity" data-state="building">
+          <span class="tile-mark"><img src="/drivers/logos/antigravity.svg" alt="Antigravity logo" width="32" height="32" loading="lazy"></span>
+          <h4 class="tile-name">Antigravity CLI</h4>
+          <p class="tile-state">Being built</p>
+          <a class="tile-link" href="https://github.com/openwizdev/OpenWiz/pull/2773">Draft pull request</a>
+        </li>
+        <li class="tile" id="auggie" data-state="building">
+          <span class="tile-mark"><img src="/drivers/logos/augment.svg" alt="Augment logo" width="32" height="32" loading="lazy"></span>
+          <h4 class="tile-name">Augment Auggie</h4>
+          <p class="tile-state">Being built</p>
+          <a class="tile-link" href="https://github.com/openwizdev/OpenWiz/pull/2639">Draft pull request</a>
+        </li>
+        <li class="tile" id="crush" data-state="building">
+          <span class="tile-mark"><img src="/drivers/logos/crush.png" alt="Crush logo" width="32" height="32" loading="lazy"></span>
+          <h4 class="tile-name">Crush</h4>
+          <p class="tile-state">Being built</p>
+          <a class="tile-link" href="https://github.com/openwizdev/OpenWiz/pull/2649">Draft pull request</a>
+        </li>
+        <li class="tile no-mark" id="junie" data-state="building">
+          <h4 class="tile-name">JetBrains Junie</h4>
+          <p class="tile-state">Being built</p>
+          <a class="tile-link" href="https://github.com/openwizdev/OpenWiz/pull/2638">Draft pull request</a>
+        </li>
+        <li class="tile" id="kilo" data-state="building">
+          <span class="tile-mark"><img src="/drivers/logos/kilo-code.svg" alt="Kilo Code logo" width="32" height="32" loading="lazy"></span>
+          <h4 class="tile-name">Kilo Code</h4>
+          <p class="tile-state">Being built</p>
+          <a class="tile-link" href="https://github.com/openwizdev/OpenWiz/pull/2640">Draft pull request</a>
+        </li>
+        <li class="tile" id="kiro" data-state="building">
+          <span class="tile-mark"><img src="/drivers/logos/kiro.svg" alt="Kiro logo" width="32" height="32" loading="lazy"></span>
+          <h4 class="tile-name">Kiro</h4>
+          <p class="tile-state">Being built</p>
+          <a class="tile-link" href="https://github.com/openwizdev/OpenWiz/pull/2631">Draft pull request</a>
+        </li>
+        <li class="tile no-mark" id="vibe" data-state="building">
+          <h4 class="tile-name">Mistral Vibe</h4>
+          <p class="tile-state">Being built</p>
+          <a class="tile-link" href="https://github.com/openwizdev/OpenWiz/pull/2643">Draft pull request</a>
+        </li>
+        <li class="tile" id="warp-local" data-state="building">
+          <span class="tile-mark"><img src="/drivers/logos/warp.svg" alt="Warp logo" width="32" height="32" loading="lazy"></span>
+          <h4 class="tile-name">Warp local agent</h4>
+          <p class="tile-state">Being built</p>
+          <a class="tile-link" href="https://github.com/openwizdev/OpenWiz/pull/2766">Draft pull request</a>
+        </li>
+      </ul>
+    </div>
+    <div class="wall-group" id="harnesses-planned" data-state="planned">
+      <h3 class="group-title">Planned <span class="group-count">2</span></h3>
+      <ul class="tiles">
+        <li class="tile" id="opencode" data-state="planned">
+          <span class="tile-mark"><img src="/drivers/logos/opencode.svg" alt="OpenCode logo" width="32" height="32" loading="lazy"></span>
+          <h4 class="tile-name">OpenCode</h4>
+          <p class="tile-state">Planned</p>
+          <a class="tile-link" href="https://github.com/openwizdev/OpenWiz/issues/2462">Ticket</a>
+        </li>
+        <li class="tile" id="sculptor" data-state="planned">
+          <span class="tile-mark"><img src="/drivers/logos/sculptor.svg" alt="Sculptor logo" width="32" height="32" loading="lazy"></span>
+          <h4 class="tile-name">Sculptor</h4>
+          <p class="tile-state">Planned</p>
+          <a class="tile-link" href="https://github.com/openwizdev/OpenWiz/issues/2540">Ticket</a>
+        </li>
+      </ul>
+    </div>
+    <div class="wall-group" id="harnesses-held" data-state="held">
+      <h3 class="group-title">Held <span class="group-count">1</span></h3>
+      <ul class="tiles">
+        <li class="tile" id="cline" data-state="held">
+          <span class="tile-mark"><img src="/drivers/logos/cline.svg" alt="Cline logo" width="32" height="32" loading="lazy"></span>
+          <h4 class="tile-name">Cline</h4>
+          <p class="tile-state">Held: no headless wake by session</p>
+          <a class="tile-link" href="https://github.com/openwizdev/OpenWiz/issues/2530">Ticket</a>
+        </li>
+      </ul>
+    </div>
+  </section>
+  <p class="logo-note wrap">Logos belong to their owners. They name the products these drivers and harnesses are for, not a partnership, and not what runs today: each tile says its state.</p>
+  <section class="wall wrap key-hosts" aria-labelledby="key-hosts-title">
+    <h2 id="key-hosts-title">Hosts that need an API key</h2>
+    <p class="wall-lead">Some hosts can be driven only through an API that takes your key. Their drivers keep one more rule of <a href="https://github.com/openwizdev/OpenWiz/blob/main/kernel/driver.v1.md#2-logins">the contract</a>:</p>
+    <ul class="wall-lead key-facts">
+      <li class="key-fact" data-fact="lives">The key lives only on your computer: in your system keychain, or in an environment variable you set.</li>
+      <li class="key-fact" data-fact="stored">OpenWiz never stores it. To revoke OpenWiz's use of it, clear every place you put it, both the keychain entry and the environment variable, then restart anything that inherited the variable.</li>
+      <li class="key-fact" data-fact="helper"><a href="https://github.com/openwizdev/OpenWiz/blob/main/kernel/driver-kit/hostkey.py"><code>hostkey.py</code></a>, one small helper in the kernel's driver kit, is the only thing that reads it. It sends the key only over HTTPS to that host's own registered address.</li>
+      <li class="key-fact" data-fact="driver">The driver never sees it, and the kit checks that.</li>
+      <li class="key-fact" data-fact="checks">Every driver still has to pass the same five checks, so a host that can't wake or stop a run gets no driver.</li>
     </ul>
   </section>
   <section class="own-driver wrap" aria-labelledby="own-title">
