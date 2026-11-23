@@ -22,3 +22,6 @@
 .decision-outcome.refused strong { color: var(--em-held); }
 .decision-outcome.unknown strong { color: var(--em-unknown); }
 .card .decision-blocked, .decision-wait { color: var(--em-muted); }
+.decision-subject { display: grid; gap: 10px; margin-top: 12px; }
+.decision-subject:empty, .decision-pending:empty { display: none; }
+.decision-pending { display: grid; gap: 10px; }
