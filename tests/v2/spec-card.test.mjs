@@ -159,14 +159,18 @@ for (const [button, file] of [['Ship it', 'spec-ship'], ['Not now', 'spec-not_no
       assert.deepEqual((await run.page.run('calls')).map(c => c.call), ['compose'], 'cancel confirmed or posted');
       await run.page.tap(button);
       await run.page.until(`document.querySelector('#under-test [data-preview]')`, 'the second preview');
+      await run.page.run(`document.querySelector('#under-test [data-preview] button').click()`);
+      assert.equal(await run.page.run(`calls.filter(c => c.call === 'post').length`), 0, 'a scripted click posted the preview');
+      assert.equal(await run.page.run(`document.querySelector('#under-test [data-preview] [data-body]')?.textContent`), body);
       await run.page.tap('Post it');
       await run.page.until(`calls.some(c => c.call === 'post')`, 'the post');
       const after = await run.page.run('calls');
-      assert.deepEqual(after.map(c => c.call), ['compose', 'compose', 'confirm', 'post']);
-      assert.equal(after[2].trusted, true, 'the confirm did not pass the trusted tap');
-      assert.equal(after[2].op, after[3].op);
-      assert.ok(after[2].issued && after[3].issued, 'the card passed a copy, not the preview compose returned');
-      assert.equal(after[3].body, body);
+      assert.deepEqual(after.map(c => c.call), ['compose', 'compose', 'confirm', 'confirm', 'post']);
+      assert.equal(after[2].trusted, false, 'the scripted click was trusted');
+      assert.equal(after[3].trusted, true, 'the confirm did not pass the trusted tap');
+      assert.equal(after[3].op, after[4].op);
+      assert.ok(after[3].issued && after[4].issued, 'the card passed a copy, not the preview compose returned');
+      assert.equal(after[4].body, body);
       await run.page.until(`document.querySelector('#under-test [data-outcome="posted"]')`, 'the posted outcome');
       assert.ok(await run.page.run(LINK('https://github.com/acme/factory/issues/41#issuecomment-9001')), 'no link to the posted comment');
       assert.deepEqual(run.world.writes(), []);
@@ -263,6 +267,103 @@ test('a steer still unknown after a reload shows on its card, and a pending refu
     await run.page.tap('Post it');
     await run.page.until(`calls.filter(c => c.call === 'post').length === 2`, 'the check again post');
     assert.equal((await run.page.run('calls')).filter(c => c.call === 'post')[1].op, waiting.op, 'check again posted a different intent');
+  } finally {
+    await run.close();
+  }
+});
+
+test('checking an earlier pending steer preserves a newer refused typed draft', async () => {
+  const run = await start();
+  try {
+    const item = await itemOf('spec-not_now.input.json', { video: null });
+    await card(run, item);
+    await run.page.run(`OW.records.compose({ form: 'spec.not_now', item: ${JSON.stringify(item)} }).then(preview => { window.waiting = preview; })`);
+    await run.page.tap('Change something');
+    const draft = 'Keep this newer draft.';
+    await run.page.type(draft);
+    await run.page.tap('Preview');
+    await run.page.until(`document.querySelector('#under-test [data-preview]')`, 'the typed preview');
+    await run.page.run(`OW.records.pending = () => [window.waiting]; outcomes.push({ outcome: 'refused', reason: 'pending' }); true`);
+    await run.page.tap('Post it');
+    await run.page.until(`document.querySelector('#under-test [data-outcome="unknown"]')`, 'the earlier steer');
+    assert.match(await run.page.text(), /another steer on this spec still has an unknown outcome/i);
+    assert.equal(await run.page.run(`document.querySelector('#under-test [data-body]').textContent`), await form('spec-not_now.body.json'));
+    await run.page.tap('Check again');
+    await run.page.tap('Post it');
+    await run.page.until(`document.querySelector('#under-test [data-outcome="posted"]')`, 'the earlier steer posted');
+    assert.deepEqual(await run.page.run(`calls.filter(c => c.call === 'post').map(c => c.body)`), [draft, await form('spec-not_now.body.json')]);
+    await run.page.tap('Change something');
+    assert.equal(await run.page.run(`document.querySelector('#under-test textarea').value`), draft, 'posting the earlier steer erased the newer draft');
+    assert.deepEqual(run.world.writes(), []);
+  } finally {
+    await run.close();
+  }
+});
+
+const STEER_CONTROLS = `[...document.querySelectorAll('#under-test .spec-card-steer :is(button, textarea)')]
+  .map(el => [el.tagName === 'TEXTAREA' ? el.value : el.textContent, el.disabled])`;
+
+test('a held post keeps the exact preview and disables both controls until it settles', async () => {
+  const run = await start();
+  try {
+    const item = await itemOf('spec-ship.input.json', { video: null });
+    const body = await form('spec-ship.body.json');
+    await card(run, item);
+    await run.page.run(`(() => {
+      const post = OW.records.post;
+      const held = new Promise(resolve => { window.releasePost = resolve; });
+      OW.records.post = async preview => {
+        const result = post(preview);
+        await held;
+        return result;
+      };
+    })()`);
+    await run.page.tap('Ship it');
+    await run.page.tap('Post it');
+    await run.page.until(`calls.filter(c => c.call === 'post').length === 1`, 'the held post');
+    assert.equal(await run.page.run(`document.querySelector('#under-test [data-preview] [data-body]').textContent`), body);
+    assert.deepEqual(await run.page.run(STEER_CONTROLS), [['Sending…', true], ['Cancel', true]], 'a control stayed enabled while posting');
+    await run.page.run(`document.querySelectorAll('#under-test [data-preview] button').forEach(button => button.click())`);
+    assert.deepEqual(await run.page.run(STEER_CONTROLS), [['Sending…', true], ['Cancel', true]]);
+    assert.equal(await run.page.run(`calls.filter(c => c.call === 'post').length`), 1);
+    await run.page.run('releasePost()');
+    await run.page.until(`document.querySelector('#under-test [data-outcome="posted"]')`, 'the posted outcome');
+    assert.deepEqual(await run.page.run(STEER_CONTROLS), [['Ship it', false], ['Change something', false], ['Not now', false]]);
+    assert.equal(await run.page.run(`calls.filter(c => c.call === 'post').length`), 1);
+    assert.deepEqual(run.world.writes(), []);
+  } finally {
+    await run.close();
+  }
+});
+
+test('a held compose keeps the typed words and disables the editor until it settles', async () => {
+  const run = await start();
+  try {
+    const item = await itemOf('spec-change.input.json', { video: null });
+    await card(run, item);
+    await run.page.run(`(() => {
+      const compose = OW.records.compose;
+      const held = new Promise(resolve => { window.releaseCompose = resolve; });
+      OW.records.compose = async action => {
+        const result = compose(action);
+        await held;
+        return result;
+      };
+    })()`);
+    await run.page.tap('Change something');
+    const draft = 'Keep these typed words.';
+    await run.page.type(draft);
+    await run.page.tap('Preview');
+    await run.page.until(`calls.filter(c => c.call === 'compose').length === 1`, 'the held compose');
+    assert.deepEqual(await run.page.run(STEER_CONTROLS), [[draft, true], ['Preview', true], ['Cancel', true]], 'the editor stayed enabled while composing');
+    await run.page.run('releaseCompose()');
+    await run.page.until(`document.querySelector('#under-test [data-preview]')`, 'the composed preview');
+    assert.equal(await run.page.run(`document.querySelector('#under-test [data-body]').textContent`), draft);
+    await run.page.tap('Post it');
+    await run.page.until(`document.querySelector('#under-test [data-outcome="posted"]')`, 'the typed steer posted');
+    await run.page.tap('Change something');
+    assert.equal(await run.page.run(`document.querySelector('#under-test textarea').value`), '', 'posting the typed preview left its own draft in the editor');
+    assert.deepEqual(run.world.writes(), []);
   } finally {
     await run.close();
   }
