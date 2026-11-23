@@ -121,7 +121,7 @@ test('the Write your own driver part shows the contract\'s copy line once, and C
   }
 });
 
-test('the key-host section says where a host key lives, who reads it, where it goes, and that the five checks have no exception; Devin is coming soon', async () => {
+test('the key-host section says where a host key lives, who reads it, where it goes, and that the five checks have no exception', async () => {
   const html = await readFile(join(ROOT, 'drivers/index.html'), 'utf8');
   const text = s => s.replace(/<[^>]+>/g, ' ').replace(/&#39;|&rsquo;/g, '\'').replace(/\s+/g, ' ').trim();
   const sections = html.match(/<section class="[^"]*\bkey-hosts\b[^"]*"[\s\S]*?<\/section>/g) ?? [];
@@ -150,11 +150,17 @@ test('the key-host section says where a host key lives, who reads it, where it g
   assert.match(fact.checks, /same five checks/, 'driver v1 section 3: the same five checks, no sixth');
   assert.match(fact.checks, /can't wake or stop a run gets no driver/, 'wake and stop are two of the five checks');
   assert.doesNotMatch(text(section), /\bsix(th)?\b|\bexcept(ion)?\b|\bwaive/i, 'no extra or skipped check');
-  const devin = section.match(/<article class="[^"]*" id="key-host-devin"[^>]*>([\s\S]*?)<\/article>/);
-  assert.ok(devin, 'Devin has its coming-soon card in the key-host section');
-  assert.match(text(devin[1]), /^Devin Coming soon: listed when its live check on a real Devin account records 5 of 5\./);
-  assert.match(devin[1], /href="https:\/\/github\.com\/openwizdev\/openwiz\/issues\/1997"/);
-  assert.doesNotMatch(text(devin[1]), /\bpassed\b|\blive\b(?! check)|\breleased\b|\bavailable\b/i, 'Devin is never shown as live');
-  const elsewhere = html.replace(section, '');
-  assert.doesNotMatch(elsewhere, /devin/i, 'Devin is named only in its coming-soon card');
+});
+
+test('Devin appears only in its In review tile', async () => {
+  const html = await readFile(join(ROOT, 'drivers/index.html'), 'utf8');
+  const tiles = html.match(/<li\b[^>]*\sid="devin"[^>]*>[\s\S]*?<\/li>/g) ?? [];
+  assert.equal(tiles.length, 1, 'the Drivers page has one Devin tile');
+  const [tile] = tiles;
+  assert.match(tile, /^<li\b[^>]*\sclass="tile"[^>]*>/);
+  assert.match(tile, /^<li\b[^>]*\sdata-state="review"[^>]*>/);
+  assert.match(tile, /<h4 class="tile-name">Devin<\/h4>/);
+  assert.match(tile, /<p class="tile-state">In review<\/p>/);
+  assert.doesNotMatch(tile, /coming soon|\b(?:live|passed|shipped)\b/i);
+  assert.doesNotMatch(html.replace(tile, ''), /devin/i, 'Devin is named only in its In review tile');
 });

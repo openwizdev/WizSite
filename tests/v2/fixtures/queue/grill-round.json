@@ -1,0 +1,196 @@
+{
+  "about": "A grill pull request with an unanswered round question: one current item; a fork, a stranger's record and a spec record on a pull request add nothing answerable.",
+  "picked": {
+    "full": "acme/factory",
+    "private": true
+  },
+  "fleet": "# Fleet\n\n## GitHub identity\n\n| What | Who |\n| --- | --- |\n| Record authors | `factory-bot[bot]` |\n",
+  "now": 1894000060000,
+  "refreshes": [
+    {
+      "github": {
+        "GET /repos/acme/factory/pulls?state=open&per_page=100&page=1": {
+          "status": 200,
+          "json": [
+            {
+              "number": 7,
+              "state": "open",
+              "title": "Synthetic grill: notes",
+              "html_url": "https://github.com/acme/factory/pull/7",
+              "head": {
+                "sha": "c0ffee0000000000000000000000000000000000",
+                "repo": {
+                  "full_name": "acme/factory"
+                }
+              }
+            },
+            {
+              "number": 8,
+              "state": "open",
+              "title": "Synthetic grill: notes",
+              "html_url": "https://github.com/acme/factory/pull/8",
+              "head": {
+                "sha": "c0ffee0000000000000000000000000000000000",
+                "repo": {
+                  "full_name": "acme-fork/factory"
+                }
+              }
+            }
+          ]
+        },
+        "GET /repos/acme/factory/issues/7/comments?per_page=100&page=1": {
+          "status": 200,
+          "json": [
+            {
+              "id": 9100007,
+              "html_url": "https://github.com/acme/factory/pull/7#issuecomment-9100007",
+              "issue_url": "https://api.github.com/repos/acme/factory/issues/7",
+              "user": {
+                "login": "acme-owner",
+                "id": 5001
+              },
+              "body": "Looks fine so far.",
+              "created_at": "2030-01-07T07:06:39.000Z",
+              "updated_at": "2030-01-07T07:06:39.000Z"
+            },
+            {
+              "id": 9100003,
+              "html_url": "https://github.com/acme/factory/pull/7#issuecomment-9100003",
+              "issue_url": "https://api.github.com/repos/acme/factory/issues/7",
+              "user": {
+                "login": "factory-bot[bot]",
+                "id": 5900
+              },
+              "body": "**Decision request** for the owner.\n\n```json\n{\n  \"schema\": \"openwiz.decisions.v1\",\n  \"kind\": \"grill_round\",\n  \"id\": \"gr_notes_2\",\n  \"status\": \"open\",\n  \"fingerprint\": \"3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d\",\n  \"risk\": \"ordinary\",\n  \"grill_file\": \"docs\/grills\/2030-01-15-notes.md\",\n  \"round\": 2,\n  \"questions\": [\n    {\n      \"id\": \"N1\",\n      \"decides\": \"Where notes live\",\n      \"context\": \"One list or many.\",\n      \"recommendation\": \"One list for now.\"\n    },\n    {\n      \"id\": \"N2\",\n      \"decides\": \"Whether done notes stay\",\n      \"context\": \"Done notes can hide or stay.\",\n      \"recommendation\": \"Keep them, greyed out.\"\n    }\n  ],\n  \"answered\": [\n    \"N1\"\n  ]\n}\n```",
+              "created_at": "2030-01-07T07:06:40.000Z",
+              "updated_at": "2030-01-07T07:06:40.000Z"
+            },
+            {
+              "id": 9100006,
+              "html_url": "https://github.com/acme/factory/pull/7#issuecomment-9100006",
+              "issue_url": "https://api.github.com/repos/acme/factory/issues/7",
+              "user": {
+                "login": "helpful-collaborator",
+                "id": 5800
+              },
+              "body": "My own idea:\n\n```json\n{\n  \"schema\": \"openwiz.decisions.v1\",\n  \"kind\": \"grill_round\",\n  \"id\": \"gr_other_1\",\n  \"status\": \"open\",\n  \"fingerprint\": \"3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d\",\n  \"risk\": \"ordinary\",\n  \"grill_file\": \"docs\/grills\/2030-01-15-notes.md\",\n  \"round\": 2,\n  \"questions\": [\n    {\n      \"id\": \"N1\",\n      \"decides\": \"Where notes live\",\n      \"context\": \"One list or many.\",\n      \"recommendation\": \"One list for now.\"\n    },\n    {\n      \"id\": \"N2\",\n      \"decides\": \"Whether done notes stay\",\n      \"context\": \"Done notes can hide or stay.\",\n      \"recommendation\": \"Keep them, greyed out.\"\n    }\n  ],\n  \"answered\": [\n    \"N1\"\n  ]\n}\n```",
+              "created_at": "2030-01-07T07:06:41.000Z",
+              "updated_at": "2030-01-07T07:06:41.000Z"
+            },
+            {
+              "id": 9100005,
+              "html_url": "https://github.com/acme/factory/pull/7#issuecomment-9100005",
+              "issue_url": "https://api.github.com/repos/acme/factory/issues/7",
+              "user": {
+                "login": "factory-bot[bot]",
+                "id": 5900
+              },
+              "body": "**Decision request**\n\n```json\n{\n  \"schema\": \"openwiz.decisions.v1\",\n  \"kind\": \"spec_confirmation\",\n  \"id\": \"sc_notes_1\",\n  \"status\": \"open\",\n  \"fingerprint\": \"1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f\",\n  \"risk\": \"ordinary\",\n  \"spec\": 41,\n  \"summary\": [\n    \"Keep notes in one list.\",\n    \"No sync yet.\"\n  ],\n  \"headline\": \"Keep your notes in one list.\",\n  \"tickets\": [],\n  \"graph\": []\n}\n```",
+              "created_at": "2030-01-07T07:06:42.000Z",
+              "updated_at": "2030-01-07T07:06:42.000Z"
+            }
+          ]
+        },
+        "GET /repos/acme/factory/issues/comments/9100003": {
+          "status": 200,
+          "json": {
+            "id": 9100003,
+            "html_url": "https://github.com/acme/factory/pull/7#issuecomment-9100003",
+            "issue_url": "https://api.github.com/repos/acme/factory/issues/7",
+            "user": {
+              "login": "factory-bot[bot]",
+              "id": 5900
+            },
+            "body": "**Decision request** for the owner.\n\n```json\n{\n  \"schema\": \"openwiz.decisions.v1\",\n  \"kind\": \"grill_round\",\n  \"id\": \"gr_notes_2\",\n  \"status\": \"open\",\n  \"fingerprint\": \"3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d\",\n  \"risk\": \"ordinary\",\n  \"grill_file\": \"docs\/grills\/2030-01-15-notes.md\",\n  \"round\": 2,\n  \"questions\": [\n    {\n      \"id\": \"N1\",\n      \"decides\": \"Where notes live\",\n      \"context\": \"One list or many.\",\n      \"recommendation\": \"One list for now.\"\n    },\n    {\n      \"id\": \"N2\",\n      \"decides\": \"Whether done notes stay\",\n      \"context\": \"Done notes can hide or stay.\",\n      \"recommendation\": \"Keep them, greyed out.\"\n    }\n  ],\n  \"answered\": [\n    \"N1\"\n  ]\n}\n```",
+            "created_at": "2030-01-07T07:06:40.000Z",
+            "updated_at": "2030-01-07T07:06:40.000Z"
+          }
+        },
+        "GET /repos/acme/factory/pulls/7": {
+          "status": 200,
+          "json": {
+            "number": 7,
+            "state": "open",
+            "title": "Synthetic grill: notes",
+            "html_url": "https://github.com/acme/factory/pull/7",
+            "head": {
+              "sha": "c0ffee0000000000000000000000000000000000",
+              "repo": {
+                "full_name": "acme/factory"
+              }
+            }
+          }
+        },
+        "GET /repos/acme/factory/contents/docs\/grills\/2030-01-15-notes.md?ref=c0ffee0000000000000000000000000000000000": {
+          "status": 200,
+          "json": {
+            "path": "docs\/grills\/2030-01-15-notes.md",
+            "encoding": "base64",
+            "content": "IyBHcmlsbDogU3ludGhldGljIG5vdGVzICgyMDMwLTAxLTE1KQoKKipQcml2YXRlLioqIEV2ZXJ5IHF1ZXN0aW9uIGFuZCByZXBseSBhcyB3cml0dGVuLiBTdGF0dXM6ICoqb3BlbioqLiBGZWVkczogdGhlIG5vdGVzIHNwZWMuCgojIyBSb3VuZCAxClJpc2s6IG9yZGluYXJ5CgoqKk0xIC0gV2hldGhlciBub3RlcyBuZWVkIHRpdGxlcyoqIFRpdGxlcyBvciBub25lLgrinqHvuI8gTm8gdGl0bGVzLgoKKipTeW50aGV0aWMgT3duZXI6KioKPiBubyB0aXRsZXMKClNldHRsZWQ6IE0xLiBPcGVuOiBub25lLgoKIyMgUm91bmQgMgpSaXNrOiBvcmRpbmFyeQoKKipOMSAtIFdoZXJlIG5vdGVzIGxpdmUqKiBPbmUgbGlzdCBvciBtYW55LgrinqHvuI8gT25lIGxpc3QgZm9yIG5vdy4KCioqTjIgLSBXaGV0aGVyIGRvbmUgbm90ZXMgc3RheSoqIERvbmUgbm90ZXMgY2FuIGhpZGUgb3Igc3RheS4K4p6h77iPIEtlZXAgdGhlbSwgZ3JleWVkIG91dC4KCioqU3ludGhldGljIE93bmVyOioqCj4gb25lIGxpc3QKClNldHRsZWQ6IE4xLiBPcGVuOiBOMi4K"
+          }
+        }
+      },
+      "items": [
+        {
+          "type": "decision",
+          "key": "decision:acme/factory#7:9100003",
+          "repository": "acme/factory",
+          "subject": {
+            "kind": "pull_request",
+            "number": 7
+          },
+          "title": "Synthetic grill: notes",
+          "url": "https://github.com/acme/factory/pull/7#issuecomment-9100003",
+          "comment_id": 9100003,
+          "at": 1894000000000,
+          "current": true,
+          "checked_at": 1894000060000,
+          "request": {
+            "schema": "openwiz.decisions.v1",
+            "kind": "grill_round",
+            "id": "gr_notes_2",
+            "status": "open",
+            "fingerprint": "3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d",
+            "risk": "ordinary",
+            "grill_file": "docs\/grills\/2030-01-15-notes.md",
+            "round": 2,
+            "questions": [
+              {
+                "id": "N1",
+                "decides": "Where notes live",
+                "context": "One list or many.",
+                "recommendation": "One list for now."
+              },
+              {
+                "id": "N2",
+                "decides": "Whether done notes stay",
+                "context": "Done notes can hide or stay.",
+                "recommendation": "Keep them, greyed out."
+              }
+            ],
+            "answered": [
+              "N1"
+            ]
+          }
+        },
+        {
+          "type": "decision",
+          "key": "decision:acme/factory#7:9100005",
+          "repository": "acme/factory",
+          "subject": {
+            "kind": "pull_request",
+            "number": 7
+          },
+          "title": "Synthetic grill: notes",
+          "url": "https://github.com/acme/factory/pull/7#issuecomment-9100005",
+          "comment_id": 9100005,
+          "at": 1894000002000,
+          "current": null,
+          "checked_at": null,
+          "request": null
+        }
+      ],
+      "gaps": []
+    }
+  ]
+}

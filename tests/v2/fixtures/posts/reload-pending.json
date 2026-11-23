@@ -1,0 +1,53 @@
+{
+  "about": "An unknown survives a reload for the same account, keeps its id, and checking it finds the comment.",
+  "account": {
+    "id": 5001,
+    "login": "acme-owner"
+  },
+  "picked": {
+    "full": "acme/factory",
+    "private": true
+  },
+  "github": {},
+  "comments": {},
+  "steps": [
+    {
+      "compose": "spec-not_now",
+      "as": "a"
+    },
+    {
+      "confirm": "a",
+      "tap": 1
+    },
+    {
+      "post": "a",
+      "write": "lost",
+      "expect": {
+        "outcome": "unknown"
+      }
+    },
+    {
+      "reload": {
+        "id": 5001,
+        "login": "acme-owner"
+      }
+    },
+    {
+      "pending": [
+        "a"
+      ]
+    },
+    {
+      "confirm": "a",
+      "tap": 2
+    },
+    {
+      "post": "a",
+      "expect": {
+        "outcome": "posted",
+        "same": "a"
+      }
+    }
+  ],
+  "writes": 1
+}

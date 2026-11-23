@@ -1,0 +1,49 @@
+{
+  "commit": "dddddddddddddddddddddddddddddddddddddddd",
+  "contract": "listing.v1",
+  "listings": [
+    {
+      "id": "example-listed-driver",
+      "links": [
+        {
+          "label": "Source \"code\"",
+          "url": "https://github.com/example-owner/listed-driver"
+        }
+      ],
+      "name": "Example <b>listed</b> driver & co",
+      "plugs_into": "The OpenWiz driver interface",
+      "publisher": "example-publisher",
+      "stage": "available",
+      "status": "listed",
+      "summary": "A synthetic driver with no receipt yet, so it is listed, not verified.",
+      "tags": [
+        "driver",
+        "example-host"
+      ],
+      "url": "https://example.com/listed-driver?a=1&b=2"
+    },
+    {
+      "id": "example-listed-skill",
+      "links": [
+        {
+          "label": "Ticket",
+          "url": "https://github.com/example-owner/listed-skill/issues/7"
+        },
+        {
+          "label": "Docs",
+          "url": "https://example.com/listed-skill/docs"
+        }
+      ],
+      "name": "Example listed skill",
+      "plugs_into": "The skills a fleet agent runs",
+      "publisher": "example-publisher",
+      "stage": "being-built",
+      "status": "listed",
+      "summary": "A synthetic skill whose check has not passed, so it is listed.",
+      "tags": [
+        "skill"
+      ],
+      "url": "https://example.com/listed-skill"
+    }
+  ]
+}

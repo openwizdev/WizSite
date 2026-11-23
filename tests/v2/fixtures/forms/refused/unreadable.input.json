@@ -1,0 +1,24 @@
+{
+  "picked": {
+    "full": "acme/factory",
+    "private": true
+  },
+  "action": {
+    "form": "decision.yes",
+    "item": {
+      "type": "decision",
+      "key": "decision:acme/factory#41:9100001",
+      "repository": "acme/factory",
+      "subject": {
+        "kind": "issue",
+        "number": 41
+      },
+      "title": "Synthetic spec: notes in one list",
+      "url": "https://github.com/acme/factory/issues/41#issuecomment-9100001",
+      "comment_id": 9100001,
+      "at": 1894000000000,
+      "current": true,
+      "request": null
+    }
+  }
+}

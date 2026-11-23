@@ -1,0 +1,132 @@
+{
+  "commit": "dddddddddddddddddddddddddddddddddddddddd",
+  "contract": "listing.v1",
+  "listings": [
+    {
+      "id": "example-driver",
+      "login": "Your own login on the example host",
+      "name": "Example driver",
+      "plugs_into": "The OpenWiz driver interface",
+      "proof": {
+        "receipt": {
+          "date": "2026-11-01",
+          "path": "receipts/example-driver/2026-11-01-aaaaaaaaaaaa.txt",
+          "url": "https://github.com/openwizdev/WizMarket/blob/dddddddddddddddddddddddddddddddddddddddd/receipts/example-driver/2026-11-01-aaaaaaaaaaaa.txt"
+        }
+      },
+      "publisher": "example-publisher",
+      "stage": "available",
+      "status": "verified",
+      "summary": "A synthetic driver that runs OpenWiz agents on an example host.",
+      "tags": [
+        "driver",
+        "example-host"
+      ],
+      "url": "https://example.com/example-driver"
+    },
+    {
+      "id": "example-driver-kit",
+      "name": "Example driver kit",
+      "plugs_into": "The OpenWiz driver interface",
+      "proof": {
+        "receipt": {
+          "date": "2026-11-01",
+          "path": "receipts/example-driver-kit/2026-11-01-aaaaaaaaaaaa.txt",
+          "url": "https://github.com/openwizdev/WizMarket/blob/dddddddddddddddddddddddddddddddddddddddd/receipts/example-driver-kit/2026-11-01-aaaaaaaaaaaa.txt"
+        },
+        "skill": {
+          "check": "python3 check/run.py --shard example-skill",
+          "source": "example-owner/example-skills@cccccccccccccccccccccccccccccccccccccccc",
+          "url": "https://github.com/example-owner/example-skills/tree/cccccccccccccccccccccccccccccccccccccccc"
+        }
+      },
+      "publisher": "example-publisher",
+      "stage": "available",
+      "status": "verified",
+      "summary": "A synthetic driver that ships its own skill.",
+      "tags": [
+        "driver",
+        "skill"
+      ],
+      "url": "https://example.com/example-driver-kit"
+    },
+    {
+      "id": "example-harness",
+      "links": [
+        {
+          "label": "Pull request",
+          "url": "https://github.com/example-owner/example-harness/pull/1"
+        }
+      ],
+      "login": "Your own example-harness login on your computer",
+      "name": "Example harness",
+      "plugs_into": "The local driver",
+      "publisher": "example-publisher",
+      "stage": "being-built",
+      "status": "listed",
+      "summary": "A synthetic harness still being built.",
+      "tags": [
+        "harness",
+        "cli"
+      ],
+      "url": "https://example.com/example-harness"
+    },
+    {
+      "id": "example-skill",
+      "name": "Example skill",
+      "plugs_into": "The skills a fleet agent runs",
+      "proof": {
+        "skill": {
+          "check": "python3 check/run.py --shard example-skill",
+          "source": "example-owner/example-skills@cccccccccccccccccccccccccccccccccccccccc",
+          "url": "https://github.com/example-owner/example-skills/tree/main"
+        }
+      },
+      "publisher": "example-publisher",
+      "stage": "available",
+      "status": "verified",
+      "summary": "A synthetic skill with its own check.",
+      "tags": [
+        "skill",
+        "example"
+      ],
+      "url": "https://example.com/example-skill"
+    },
+    {
+      "id": "example-tool",
+      "name": "Example tool",
+      "plugs_into": "The agent's MCP servers",
+      "publisher": "example-publisher",
+      "stage": "available",
+      "status": "listed",
+      "summary": "A synthetic tool, listed: a link, not proven.",
+      "tags": [
+        "mcp-server"
+      ],
+      "url": "https://example.com/example-tool"
+    },
+    {
+      "id": "example-tracker-harness",
+      "links": [
+        {
+          "label": "Ticket",
+          "url": "https://tracker.example.com/example-owner/example-harness/-/issues/1?view=full#note-2"
+        },
+        {
+          "label": "Discussion",
+          "url": "https://github.com/example-owner/example-harness/issues/1#issuecomment-2"
+        }
+      ],
+      "name": "Example tracker harness",
+      "plugs_into": "The local driver",
+      "publisher": "example-publisher",
+      "stage": "being-built",
+      "status": "listed",
+      "summary": "A synthetic harness being built, tracked outside GitHub.",
+      "tags": [
+        "harness"
+      ],
+      "url": "https://example.com/example-tracker-harness"
+    }
+  ]
+}
