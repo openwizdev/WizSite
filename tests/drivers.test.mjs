@@ -120,3 +120,47 @@ test('the Write your own driver part shows the contract\'s copy line once, and C
     server.close();
   }
 });
+
+test('the key-host section says where a host key lives, who reads it, where it goes, and that the five checks have no exception', async () => {
+  const html = await readFile(join(ROOT, 'drivers/index.html'), 'utf8');
+  const text = s => s.replace(/<[^>]+>/g, ' ').replace(/&#39;|&rsquo;/g, '\'').replace(/\s+/g, ' ').trim();
+  const sections = html.match(/<section class="[^"]*\bkey-hosts\b[^"]*"[\s\S]*?<\/section>/g) ?? [];
+  assert.equal(sections.length, 1, 'the Drivers page has one key-host section');
+  const section = sections[0];
+  const facts = [...section.matchAll(/<li class="key-fact" data-fact="([^"]+)">([\s\S]*?)<\/li>/g)].map(([, key, body]) => [key, text(body)]);
+  assert.deepEqual(facts.map(([key]) => key), ['lives', 'stored', 'helper', 'driver', 'checks'], 'the five facts, in order');
+  const fact = Object.fromEntries(facts);
+  assert.match(fact.lives, /only on your computer/, 'N4: the key lives only on the user\'s computer');
+  assert.match(fact.lives, /system keychain/, 'N4: read from the user\'s system keychain');
+  assert.match(fact.lives, /environment variable you set/, 'N4: or from the environment variable the user set');
+  assert.match(fact.stored, /OpenWiz never stores it/, 'N4: OpenWiz never stores a key');
+  assert.match(fact.stored, /revoke/, 'the fact says how the user revokes it');
+  assert.match(fact.stored, /clear every place you put it/, 'one copy left behind still works: clear every copy');
+  assert.match(fact.stored, /keychain entry/, 'a copy can sit in the keychain entry');
+  assert.match(fact.stored, /environment variable/, 'a copy can sit in the environment variable');
+  assert.match(fact.stored, /restart anything that inherited/, 'a running process keeps an inherited value until it restarts');
+  assert.doesNotMatch(fact.stored, /remove it from there/, 'no single-copy removal advice');
+  assert.match(fact.helper, /one small helper in the kernel's driver kit/, 'N4: one helper in the kit');
+  assert.match(fact.helper, /only thing that reads/, 'N4: the helper alone reads the key');
+  assert.match(fact.helper, /only over HTTPS to that host's own registered address/, 'N4: sent only over HTTPS to the host\'s registered address');
+  assert.match(section, /href="https:\/\/github\.com\/openwizdev\/OpenWiz\/blob\/main\/kernel\/driver-kit\/hostkey\.py"/);
+  assert.match(section, /href="https:\/\/github\.com\/openwizdev\/OpenWiz\/blob\/main\/kernel\/driver\.v1\.md#2-logins"/);
+  assert.match(fact.driver, /driver never sees it/, 'N4: the driver never reads or receives the key');
+  assert.match(fact.driver, /the kit checks that/, 'the token check runs the key check');
+  assert.match(fact.checks, /same five checks/, 'driver v1 section 3: the same five checks, no sixth');
+  assert.match(fact.checks, /can't wake or stop a run gets no driver/, 'wake and stop are two of the five checks');
+  assert.doesNotMatch(text(section), /\bsix(th)?\b|\bexcept(ion)?\b|\bwaive/i, 'no extra or skipped check');
+});
+
+test('Devin appears only in its In review tile', async () => {
+  const html = await readFile(join(ROOT, 'drivers/index.html'), 'utf8');
+  const tiles = html.match(/<li\b[^>]*\sid="devin"[^>]*>[\s\S]*?<\/li>/g) ?? [];
+  assert.equal(tiles.length, 1, 'the Drivers page has one Devin tile');
+  const [tile] = tiles;
+  assert.match(tile, /^<li\b[^>]*\sclass="tile"[^>]*>/);
+  assert.match(tile, /^<li\b[^>]*\sdata-state="review"[^>]*>/);
+  assert.match(tile, /<h4 class="tile-name">Devin<\/h4>/);
+  assert.match(tile, /<p class="tile-state">In review<\/p>/);
+  assert.doesNotMatch(tile, /coming soon|\b(?:live|passed|shipped)\b/i);
+  assert.doesNotMatch(html.replace(tile, ''), /devin/i, 'Devin is named only in its In review tile');
+});
