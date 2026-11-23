@@ -242,6 +242,34 @@ function enableMotion(gsap) {
   configure();
 }
 
+function oneVoiceAtATime() {
+  const players = [...document.querySelectorAll('.launch-video, .spec-video')];
+  const speaks = video => !video.paused && !video.muted;
+  const silenceOthers = ({ target }) => {
+    if (!speaks(target)) return;
+    for (const other of players) if (other !== target && speaks(other)) other.pause();
+  };
+  for (const video of players) {
+    video.addEventListener('playing', silenceOthers);
+    video.addEventListener('volumechange', silenceOthers);
+  }
+}
+
+function launchVideo() {
+  const video = document.querySelector('.launch-video');
+  const play = document.querySelector('.launch-play');
+  if (!video || !play) return;
+  video.controls = false;
+  play.hidden = false;
+  play.addEventListener('click', () => {
+    play.hidden = true;
+    video.controls = true;
+    video.muted = false;
+    video.focus();
+    video.play().catch(() => {});
+  }, { once: true });
+}
+
 function specVideo() {
   const video = document.querySelector('.spec-video');
   const sound = document.querySelector('.spec-play');
@@ -607,6 +635,8 @@ async function askAWiz() {
 enableCopy();
 askAWiz();
 showStars().catch(() => {});
+launchVideo();
 specVideo();
+oneVoiceAtATime();
 enableFamily(window.gsap);
 if (window.gsap) enableMotion(window.gsap);

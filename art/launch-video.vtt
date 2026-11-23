@@ -1,0 +1,82 @@
+WEBVTT
+
+00:02.200 --> 00:04.593
+Every app starts as an idea.
+
+00:08.400 --> 00:11.488
+OpenWiz asks you a few sharp questions,
+
+00:12.300 --> 00:14.892
+and turns your answers into a spec.
+
+00:16.100 --> 00:18.411
+The spec splits into tickets.
+
+00:19.200 --> 00:21.045
+Then you summon the fleet.
+
+00:24.300 --> 00:26.148
+One agent per ticket.
+
+00:27.300 --> 00:29.402
+They build at the same time.
+
+00:31.000 --> 00:33.710
+A second agent reviews every ticket.
+
+00:34.800 --> 00:36.784
+Approved work merges.
+
+00:38.400 --> 00:40.121
+And your app ships.
+
+00:42.200 --> 00:45.200
+You made the decisions. The fleet did the rest.
+
+00:45.200 --> 00:46.905
+So how does it work?
+
+00:47.100 --> 00:50.066
+OpenWiz is the kernel: small and open.
+
+00:50.066 --> 00:55.336
+GitHub is the ship's log: every spec, ticket and review is a GitHub record.
+
+00:56.500 --> 01:01.331
+Drivers pick the sea: your laptop, boat.dev, Cloudroom, or your own.
+
+01:01.331 --> 01:05.986
+Harnesses are your crew: Claude Code, Codex, Cursor and more.
+
+01:06.000 --> 01:11.277
+WizSkills is the spellbook: grill, to spec, to tickets, build, review.
+
+01:11.277 --> 01:13.300
+Plain files your agents read.
+
+01:13.300 --> 01:16.847
+WizPlugins bring OpenWiz into the tools you use.
+
+01:16.847 --> 01:20.553
+WizBar is your lookout: every ticket at a glance.
+
+01:20.800 --> 01:24.774
+The app shows your specs, tickets and agents, straight from GitHub.
+
+01:24.774 --> 01:27.250
+Next: a feed of spec videos.
+
+01:28.300 --> 01:31.790
+WizRoom is the war room: the factory's scoreboard.
+
+01:31.790 --> 01:33.642
+It's private, for now.
+
+01:35.800 --> 01:41.725
+And coming soon: WizMarket, a public marketplace where anything in the agent economy can list.
+
+01:41.725 --> 01:43.263
+Open to all.
+
+01:45.300 --> 01:47.984
+OpenWiz. Bring your own everything.
