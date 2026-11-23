@@ -1,0 +1,32 @@
+{
+  "about": "Two posts of one confirmed steer at once share one promise: exactly one write.",
+  "account": {
+    "id": 5001,
+    "login": "acme-owner"
+  },
+  "picked": {
+    "full": "acme/factory",
+    "private": true
+  },
+  "github": {},
+  "comments": {},
+  "steps": [
+    {
+      "compose": "spec-ship",
+      "as": "a"
+    },
+    {
+      "confirm": "a",
+      "tap": 1
+    },
+    {
+      "post": "a",
+      "write": "ok",
+      "twice": true,
+      "expect": {
+        "outcome": "posted"
+      }
+    }
+  ],
+  "writes": 1
+}

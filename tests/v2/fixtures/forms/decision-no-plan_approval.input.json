@@ -23,7 +23,7 @@
         "kind": "plan_approval",
         "id": "pa_notes_1",
         "status": "open",
-        "fingerprint": "2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e",
+        "fingerprint": "d50585ec1832be926e504bf715b97a2a73945a81fdd7a174be75b356d6d95ce8",
         "risk": "live",
         "spec": 41,
         "summary": [
@@ -51,6 +51,62 @@
           }
         ]
       }
+    }
+  },
+  "github": {
+    "GET /repos/acme/factory/issues/comments/9100002": {
+      "status": 200,
+      "json": {
+        "id": 9100002,
+        "html_url": "https://github.com/acme/factory/issues/41#issuecomment-9100002",
+        "issue_url": "https://api.github.com/repos/acme/factory/issues/41",
+        "user": {
+          "login": "factory-bot[bot]",
+          "id": 5900
+        },
+        "body": "**Decision request** for the owner.\n\n```json\n{\n  \"schema\": \"openwiz.decisions.v1\",\n  \"kind\": \"plan_approval\",\n  \"id\": \"pa_notes_1\",\n  \"status\": \"open\",\n  \"fingerprint\": \"d50585ec1832be926e504bf715b97a2a73945a81fdd7a174be75b356d6d95ce8\",\n  \"risk\": \"live\",\n  \"spec\": 41,\n  \"summary\": [\n    \"Keep notes in one list.\"\n  ],\n  \"headline\": \"Keep your notes in one list.\",\n  \"tickets\": [\n    {\n      \"number\": 42,\n      \"title\": \"Synthetic: store the notes\",\n      \"blockers\": []\n    },\n    {\n      \"number\": 43,\n      \"title\": \"Synthetic: list the notes\",\n      \"blockers\": [\n        42\n      ]\n    }\n  ],\n  \"graph\": [\n    {\n      \"blocker\": 42,\n      \"ticket\": 43\n    }\n  ]\n}\n```",
+        "created_at": "2030-01-07T07:06:40.000Z",
+        "updated_at": "2030-01-07T07:06:40.000Z"
+      }
+    },
+    "GET /repos/acme/factory/issues/41": {
+      "status": 200,
+      "json": {
+        "number": 41,
+        "state": "open",
+        "title": "Synthetic spec: notes in one list",
+        "html_url": "https://github.com/acme/factory/issues/41",
+        "body": "## Problem Statement\n\nSynthetic notes are scattered.\n\n## Changelog headline\n\nKeep your notes in one list.\n\n## Proof\n\n- [x] Synthetic fixture.\n\n## Out of Scope\n\nSync."
+      }
+    },
+    "GET /repos/acme/factory/issues/41/sub_issues?per_page=100&page=1": {
+      "status": 200,
+      "json": [
+        {
+          "number": 42,
+          "title": "Synthetic: store the notes",
+          "body": "Store them.\n\n- [ ] saved",
+          "state": "open"
+        },
+        {
+          "number": 43,
+          "title": "Synthetic: list the notes",
+          "body": "List them.\n- [x] listed",
+          "state": "open"
+        }
+      ]
+    },
+    "GET /repos/acme/factory/issues/42/dependencies/blocked_by?per_page=100&page=1": {
+      "status": 200,
+      "json": []
+    },
+    "GET /repos/acme/factory/issues/43/dependencies/blocked_by?per_page=100&page=1": {
+      "status": 200,
+      "json": [
+        {
+          "number": 42
+        }
+      ]
     }
   }
 }
