@@ -1,3 +1,4 @@
+from html import escape
 from pathlib import Path
 import json
 import shutil
@@ -18,7 +19,7 @@ def edit_built(root, name, change):
     new = fingerprint(name, data)
     old.unlink()
     (root / new).write_bytes(data)
-    for page in ('index.html', 'changelog/index.html', 'drivers/index.html', 'team/index.html', 'faq/index.html', 'app/index.html'):
+    for page in ('index.html', 'changelog/index.html', 'drivers/index.html', 'team/index.html', 'faq/index.html', 'market/index.html', 'app/index.html'):
         path = root / page
         path.write_text(path.read_text().replace(f'"/{was}"', f'"/{new}"'))
 
@@ -725,6 +726,42 @@ class Checks(unittest.TestCase):
                 path.write_text(text.replace(old, new, 1))
                 with self.assertRaisesRegex(AssertionError, message.strip()):
                     check_site(root)
+
+    def test_market_links_only_the_registry_and_wizmarket(self):
+        registry = ROOT / 'tests/market-fixtures/check-index.json'
+        listed = json.loads(registry.read_text())['listings'][0]['links'][0]['url']
+        prose = json.loads(registry.read_text())['listings'][0]['summary']
+        cloudroom = 'https://cloudroom.dev'
+        for place, html, error in (
+                ('generated', f'<a href="{escape(listed)}">x</a>', None),
+                ('generated', f'<a href="{cloudroom}">x</a>', None),
+                ('generated', '<a href="https://github.com/openwizdev/WizMarket/tree/main/listings">x</a>', None),
+                ('fixed', '<a href="https://github.com/openwizdev/WizMarket/blob/main/contracts/listing.v1.md">x</a>', None),
+                ('generated', f'<img src="{escape(listed)}" alt="x">', 'unexpected external URL'),
+                ('generated', f'<link rel="prefetch" href="{escape(listed)}">', 'unexpected external URL'),
+                ('generated', f'<a href="{prose}">x</a>', 'unexpected external URL'),
+                ('generated', '<a href="https://x.com/openwiz">x</a>', 'unexpected external URL'),
+                ('generated', '<a href="https://tracker.example.com/example-owner/example-tool/-/issues/1">x</a>', 'unexpected external URL'),
+                ('generated', '<a href="https://github.com/openwizdev/WizMarket/pulls?q=is%3Aopen">x</a>', 'unexpected external URL parts'),
+                ('generated', '<a href="https://github.com/openwizdev/WizMarketing">x</a>', 'unexpected repository link'),
+                ('generated', '<a href="https://github.com/openwizdev/WizMarket/../WizSite">x</a>', 'unexpected repository link'),
+                ('generated', '<a href="https://github.com/openwizdev/WizMarket/%2e%2e/WizSite">x</a>', 'unexpected repository link'),
+                ('generated', '<a href="https://github.com/openwizdev/WizMarket/.&#9;./WizSite">x</a>', 'unexpected repository link'),
+                ('fixed', f'<a href="{escape(listed)}">x</a>', 'unexpected external URL'),
+                ('fixed', f'<a href="{cloudroom}">x</a>', "CloudRoom link, the landing install box's only"),
+                ('drivers', f'<a href="{escape(listed)}">x</a>', 'unexpected external URL'),
+                ('drivers', '<a href="https://github.com/openwizdev/WizMarket">x</a>', 'unexpected repository link')):
+            with self.subTest(place=place, html=html), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp) / 'dist'
+                shutil.copytree(ROOT / 'dist', root)
+                path = root / ('drivers/index.html' if place == 'drivers' else 'market/index.html')
+                mark = '<!-- market:end -->' if place == 'generated' else '</main>'
+                path.write_text(path.read_text().replace(mark, html + mark, 1))
+                if error is None:
+                    check_site(root, registry)
+                else:
+                    with self.assertRaisesRegex(AssertionError, re.escape(error)):
+                        check_site(root, registry)
 
     def test_report_a_problem_link(self):
         form = '<a href="https://github.com/openwizdev/openwiz/issues/new?template=feedback.yml" rel="noreferrer">Report a problem</a>'

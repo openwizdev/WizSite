@@ -162,7 +162,7 @@ TEAM_NEVER = re.compile(r'\binstall|\bguarantee', re.I)
 REPORT_LINK = 'https://github.com/openwizdev/openwiz/issues/new?template=feedback.yml'
 FOOTER = (ROOT / 'footer.html').read_text()
 FOOTER_SLOT = '<template data-slot="footer"></template>\n'
-FOOTER_LINKS = (('/drivers/', 'Drivers'), ('/changelog/', 'Changelog'), ('https://github.com/openwizdev/openwiz#readme', 'Docs'),
+FOOTER_LINKS = (('/drivers/', 'Drivers'), ('/market/', 'Market'), ('/changelog/', 'Changelog'), ('https://github.com/openwizdev/openwiz#readme', 'Docs'),
                 ('/faq/', 'FAQ'), ('/app/', 'The app'), (REPORT_LINK, 'Report a problem'), ('/team/', 'For teams'),
                 ('https://github.com/openwizdev/openwiz', 'GitHub'), ('https://x.com/openwiz', 'X @openwiz'))
 FOOTER_LINE = 'Apache-2.0. Owned by no one.'
@@ -207,7 +207,7 @@ def with_cta(html):
 FINGERPRINTS = {name: fingerprint(name, (ROOT / name).read_bytes()) for name in HASHED}
 ASK_INDEX = 'ask-index.json'
 STATIC = {
-    'index.html', 'changelog/index.html', 'drivers/index.html', 'team/index.html', 'faq/index.html', '_headers', APP_PAGE, 'app/manifest.webmanifest',
+    'index.html', 'changelog/index.html', 'drivers/index.html', 'team/index.html', 'faq/index.html', 'market/index.html', '_headers', APP_PAGE, 'app/manifest.webmanifest',
     'fonts/Geist-var.woff2', 'fonts/GeistMono-var.woff2', 'fonts/OFL.txt',
 } | ART | set(ICON_HASHES) | set(VECTORS) | (set(VENDOR_HASHES) - {GSAP}) | set(APP_VENDOR) | set(DRIVER_LOGOS) | {ASK_INDEX}
 RUNTIME = STATIC | set(FINGERPRINTS.values())
@@ -232,7 +232,7 @@ FONT_HASHES = {
     'fonts/GeistMono-var.woff2': '55419aa06f58adcd7f145c6c920e56936416f17e528f60efc6032ffa4269972b',
     'fonts/OFL.txt': 'c683bfbcc7e087f5d37a54ef628f10387c451a83ddc459b151403a164ac46c90',
 }
-PAGES = ('index.html', 'changelog/index.html', 'drivers/index.html', TEAM_PAGE, FAQ_PAGE)
+PAGES = ('index.html', 'changelog/index.html', 'drivers/index.html', TEAM_PAGE, FAQ_PAGE, 'market/index.html')
 ALL_PAGES = PAGES + (APP_PAGE,)
 STORY_COPY = ('Build a to-do app', 'Bring any agent', 'Sign in with GitHub', 'Put the app on your phone')
 OLD_EXAMPLE = ('dark mode', 'dark-mode')
@@ -251,6 +251,10 @@ RELEASE_HEADLINE_MAX = 80
 PRE_RELEASES = 'https://github.com/openwizdev/OpenWiz/releases'
 MONTHS = ('Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec')
 DRIVERS_PAGE = 'drivers/index.html'
+MARKET_PAGE = 'market/index.html'
+MARKET = ('<!-- market:start -->', '<!-- market:end -->')
+MARKET_SLOT = '<template data-slot="market"></template>'
+MARKET_REPO = 'https://github.com/openwizdev/WizMarket'
 DRIVERS_LINKS = ('/drivers/', '/drivers')
 DRIVERS = (
     ('boat-dev', 'boat.dev', 'Passed all five checks', 'passed'),
@@ -520,7 +524,33 @@ def check_vector(data):
     assert MARK in svg and OLD_MARK not in svg, 'logo SVG must use the new mark (dark cream)'
 
 
-def check_ref(root, source, ref, pages, favicons=()):
+def market_urls(path):
+    found = set()
+    for listing in json.loads(path.read_text())['listings']:
+        found.add(listing['url'])
+        found.update(link['url'] for link in listing.get('links', ()))
+        found.update(proof['url'] for proof in listing.get('proof', {}).values())
+    return frozenset(url for url in found if isinstance(url, str) and url.startswith('https://'))
+
+
+def check_market_refs(root, path, page, pages, market):
+    resources = list(page.refs)
+    for href in (a['href'] for a in page.links if a.get('href')):
+        resources.remove(href)
+        check_ref(root, path, href, pages, page.favicons, market)
+    for ref in resources:
+        check_ref(root, path, ref, pages, page.favicons)
+
+
+def split_market(built):
+    start, end = MARKET
+    assert built.count(start) == 1 and built.count(end) == 1, 'the built Market page has one generated section'
+    before, rest = built.split(start)
+    section, after = rest.split(end)
+    return before + MARKET_SLOT + after, section
+
+
+def check_ref(root, source, ref, pages, favicons=(), market=None):
     if ref.startswith('data:image/svg+xml,') and not favicons:
         svg = unquote(ref.split(',', 1)[1])
         assert re.fullmatch(r"<svg xmlns='http://www.w3.org/2000/svg' viewBox='[0-9 ]+'><path d='[A-Za-z0-9 .-]+' fill='none' stroke='#[0-9a-f]{6}' stroke-width='[0-9.]+'/></svg>", svg), 'unexpected inline SVG'
@@ -529,6 +559,14 @@ def check_ref(root, source, ref, pages, favicons=()):
         assert ref in ('/favicon.ico', '/favicon.svg', '/app/icon.ico', '/app/icon.svg'), 'unexpected favicon'
     url = urlsplit(ref)
     if url.scheme or url.netloc:
+        if market is not None and ref in market:
+            assert url.scheme == 'https' and not url.username and not url.password, 'unexpected market URL parts'
+            return
+        if market is not None and (ref == MARKET_REPO or ref.startswith(MARKET_REPO + '/')):
+            path = unquote(url.path)
+            assert re.fullmatch(r'[\x21-\x7e]+', ref) and '\\' not in path and not {'.', '..'} & set(path.split('/')), 'unexpected repository link'
+            assert not url.username and not url.password and not url.query, 'unexpected external URL parts'
+            return
         assert url.scheme == 'https' and url.netloc == 'github.com', 'unexpected external URL'
         assert re.match(r'^/openwizdev/(?:openwiz|OpenWiz|WizSkills|WizPlugins)(?:/|$)', url.path), 'unexpected repository link'
         assert not url.username and not url.password and not url.query, 'unexpected external URL parts'
@@ -545,7 +583,7 @@ def check_ref(root, source, ref, pages, favicons=()):
         assert target in pages and unquote(url.fragment) in pages[target].ids, f'missing fragment: {ref}'
 
 
-def check_site(root):
+def check_site(root, registry=ROOT / 'market/registry.json'):
     files = {p.relative_to(root).as_posix() for p in root.rglob('*') if p.is_file()}
     names = built_fingerprints(root)
     assert files == STATIC | set(names.values()), 'unexpected or missing build output'
@@ -575,12 +613,23 @@ def check_site(root):
         assert len(found) == len(re.findall(r'url\(', text, re.I)), 'unreadable url()'
         return [ref for _, ref in found]
     for path, page in pages.items():
+        if path == root / MARKET_PAGE:
+            fixed, section = (Page(part) for part in split_market(path.read_text()))
+            market = market_urls(registry)
+            assert not section.books, f'a booking link outside the team page: {path.name}'
+            for count, href in ((section.x_links, X_ACCOUNT), (section.cloudroom_links, CLOUDROOM_LINK), (section.report_links, REPORT_LINK)):
+                assert not count or href in market, 'unexpected external URL'
+            check_market_refs(root, path, section, pages, market)
+            page = fixed
         assert page.social and all(s.startswith(SITE_URL) and s.removeprefix(SITE_URL).split('?')[0] in STATIC for s in page.social), 'social image must be a built file on the site'
         assert path == root / TEAM_PAGE or not page.books, f'a booking link outside the team page: {path.name}'
         x_links = 2 if path == root / TEAM_PAGE else 1
         assert page.x_links == x_links, f'one X link per page, the footer\'s: {path.relative_to(root)} has {page.x_links}'
-        for ref in page.refs:
-            check_ref(root, path, ref, pages, page.favicons)
+        if path == root / MARKET_PAGE:
+            check_market_refs(root, path, page, pages, frozenset())
+        else:
+            for ref in page.refs:
+                check_ref(root, path, ref, pages, page.favicons)
         assert page.cloudroom_links == (1 if path == root / 'index.html' else 0), \
             f'CloudRoom link, the landing install box\'s only: {path.relative_to(root)} has {page.cloudroom_links}'
         assert page.report_links == 1, f'Report a problem link: {path.relative_to(root)} has {page.report_links}, not 1'
@@ -1613,6 +1662,8 @@ def main():
         built = (output / name).read_text()
         if name == 'changelog/index.html':
             built = split_releases(built)[0]
+        if name == MARKET_PAGE:
+            built = split_market(built)[0]
         assert fingerprinted_page((ROOT / name).read_text(), cta=name != APP_PAGE) == built, f'export differs: {name}'
     paths = subprocess.check_output(['git', 'ls-files', '-z', '--cached', '--others', '--exclude-standard'], cwd=ROOT).decode().split('\0')
     for name in set(paths) - {''}:
