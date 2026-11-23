@@ -173,7 +173,7 @@ test('the rendered Drivers page shows Devin only as built, waiting on its live c
     const loaded = new Promise(resolve => listeners.push(m => m.sessionId === sessionId && m.method === 'Page.loadEventFired' && resolve()));
     await page('Page.navigate', { url: `${origin}/drivers/` });
     await loaded;
-    const { result } = await page('Runtime.evaluate', { returnByValue: true, expression: `(() => {
+    const readDevin = async () => (await page('Runtime.evaluate', { returnByValue: true, expression: `(() => {
       const norm = s => s.replace(/\\s+/g, ' ').trim();
       const tiles = document.querySelectorAll('#devin');
       if (tiles.length !== 1) return { tiles: tiles.length };
@@ -194,8 +194,8 @@ test('the rendered Drivers page shows Devin only as built, waiting on its live c
         devinElsewhere: /devin/i.test(rest.outerHTML),
         comingSoon: /coming soon/i.test(tile.textContent),
       };
-    })()` });
-    assert.deepEqual(result.value, {
+    })()` })).result.value;
+    const assertDevin = card => assert.deepEqual(card, {
       tiles: 1,
       visible: true,
       inWaitingGroup: true,
@@ -207,6 +207,10 @@ test('the rendered Drivers page shows Devin only as built, waiting on its live c
       devinElsewhere: false,
       comingSoon: false,
     });
+    assertDevin(await readDevin());
+    await page('Runtime.evaluate', { expression: "document.querySelector('#devin').style.opacity = '0'" });
+    const transparent = await readDevin();
+    assert.throws(() => assertDevin(transparent), /visible/);
   } finally {
     await browser.close();
     server.close();
