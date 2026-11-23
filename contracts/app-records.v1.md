@@ -211,6 +211,7 @@ Decision items first, oldest `at` first (decisions.v1's order); then spec items,
 
 - `enabled() -> boolean`: true when the switch is `on` or `dry-run`.
 - `dryRun() -> boolean`: true when the switch is `dry-run`.
+- `check(item) -> Promise<{ result: 'matched' | 'changed' | 'unchecked', binding, checked_at }>`: the queue's source check of a decision item (see "Source check"). It never writes, and it keeps the binding of the item's latest matched check, which `compose` requires.
 - `compose(action) -> Promise<preview | { refused: <reason> }>`: never writes. Its only reads are the source check.
 - `confirm(preview, event) -> { confirmed, of }`: records one explicit confirm of that exact preview and returns how many it has (`confirmed`) of how many it needs (`of`, the preview's `confirms`).
 - `post(preview) -> Promise<outcome>`: sends only a preview `compose` returned, unchanged, after all its recorded confirms.
