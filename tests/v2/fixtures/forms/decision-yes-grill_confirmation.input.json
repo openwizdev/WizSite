@@ -1,0 +1,36 @@
+{
+  "picked": {
+    "full": "acme/factory",
+    "private": true
+  },
+  "action": {
+    "form": "decision.yes",
+    "item": {
+      "type": "decision",
+      "key": "decision:acme/factory#7:9100004",
+      "repository": "acme/factory",
+      "subject": {
+        "kind": "pull_request",
+        "number": 7
+      },
+      "title": "Synthetic grill: notes",
+      "url": "https://github.com/acme/factory/pull/7#issuecomment-9100004",
+      "comment_id": 9100004,
+      "at": 1894000000000,
+      "current": true,
+      "request": {
+        "schema": "openwiz.decisions.v1",
+        "kind": "grill_confirmation",
+        "id": "gc_notes_1",
+        "status": "open",
+        "fingerprint": "4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c",
+        "risk": "ordinary",
+        "grill_file": "docs\/grills\/2030-01-15-notes.md",
+        "summary": [
+          "One list for now.",
+          "Done notes stay, greyed out."
+        ]
+      }
+    }
+  }
+}

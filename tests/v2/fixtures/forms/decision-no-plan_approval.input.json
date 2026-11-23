@@ -1,0 +1,56 @@
+{
+  "picked": {
+    "full": "acme/factory",
+    "private": true
+  },
+  "action": {
+    "form": "decision.no",
+    "item": {
+      "type": "decision",
+      "key": "decision:acme/factory#41:9100002",
+      "repository": "acme/factory",
+      "subject": {
+        "kind": "issue",
+        "number": 41
+      },
+      "title": "Synthetic spec: notes in one list",
+      "url": "https://github.com/acme/factory/issues/41#issuecomment-9100002",
+      "comment_id": 9100002,
+      "at": 1894000000000,
+      "current": true,
+      "request": {
+        "schema": "openwiz.decisions.v1",
+        "kind": "plan_approval",
+        "id": "pa_notes_1",
+        "status": "open",
+        "fingerprint": "2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e",
+        "risk": "live",
+        "spec": 41,
+        "summary": [
+          "Keep notes in one list."
+        ],
+        "headline": "Keep your notes in one list.",
+        "tickets": [
+          {
+            "number": 42,
+            "title": "Synthetic: store the notes",
+            "blockers": []
+          },
+          {
+            "number": 43,
+            "title": "Synthetic: list the notes",
+            "blockers": [
+              42
+            ]
+          }
+        ],
+        "graph": [
+          {
+            "blocker": 42,
+            "ticket": 43
+          }
+        ]
+      }
+    }
+  }
+}

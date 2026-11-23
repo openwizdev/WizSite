@@ -1,0 +1,51 @@
+{
+  "picked": {
+    "full": "acme/factory",
+    "private": true
+  },
+  "action": {
+    "form": "decision.yes",
+    "item": {
+      "type": "decision",
+      "key": "decision:acme/factory#7:9100003",
+      "repository": "acme/factory",
+      "subject": {
+        "kind": "pull_request",
+        "number": 7
+      },
+      "title": "Synthetic grill: notes",
+      "url": "https://github.com/acme/factory/pull/7#issuecomment-9100003",
+      "comment_id": 9100003,
+      "at": 1894000000000,
+      "current": true,
+      "request": {
+        "schema": "openwiz.decisions.v1",
+        "kind": "grill_round",
+        "id": "gr_notes_2",
+        "status": "open",
+        "fingerprint": "3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d",
+        "risk": "ordinary",
+        "grill_file": "docs\/grills\/2030-01-15-notes.md",
+        "round": 2,
+        "questions": [
+          {
+            "id": "N1",
+            "decides": "Where notes live",
+            "context": "One list or many.",
+            "recommendation": "One list for now."
+          },
+          {
+            "id": "N2",
+            "decides": "Whether done notes stay",
+            "context": "Done notes can hide or stay.",
+            "recommendation": "Keep them, greyed out."
+          }
+        ],
+        "answered": [
+          "N1"
+        ]
+      }
+    },
+    "question_id": "N2"
+  }
+}
