@@ -123,6 +123,7 @@ APP_FOUND = {(folder, ext): tuple(sorted(p.relative_to(ROOT).as_posix() for p in
              for folder in ('app/pages', 'app/cards') for ext in ('js', 'css')}
 APP_PARTS = APP_FOUND['app/pages', 'js'] + APP_FOUND['app/cards', 'js']
 APP_PART_STYLES = APP_FOUND['app/pages', 'css'] + APP_FOUND['app/cards', 'css']
+APP_LEGACY_ORDER = ('app/pages/you.js', 'app/pages/specs.js', 'app/pages/spec.js', 'app/pages/agents.js')
 APP_NEEDED = set(APP_FOUND['app/pages', 'js'] + APP_FOUND['app/pages', 'css'])
 APP_SCRIPTS = ('app/data.js', 'app/ui.js') + APP_PARTS + ('app/palette.js', 'app/shell.js')
 APP_VENDOR = {'app/vendor/dagre-3.1.3.min.js': ('node_modules/@dagrejs/dagre/dist/dagre.min.js', 'app/pages/spec.js'),
@@ -1679,6 +1680,8 @@ def check_app(root, names, pages):
     shown = [parts[ref] for ref in page.scripts if ref in parts]
     assert len(set(shown)) == len(shown) and APP_NEEDED & set(APP_PARTS) <= set(shown), \
         'the app must load each of its pages\' scripts once (and a card\'s at most once)'
+    assert [name for name in shown if name in APP_LEGACY_ORDER] == list(APP_LEGACY_ORDER), \
+        'the app must load You, Specs, Spec and Agents in that order: it sets the v1 pages\' order and default route'
     ordered = ('app/data.js', 'app/ui.js', *shown, 'app/palette.js', 'app/shell.js')
     assert page.scripts == [ref for name in ordered for ref in [f'/{v}' for v, (_, before) in APP_VENDOR.items() if before == name] + [f'/{names[name]}']], \
         'the app must load its fingerprinted scripts (and each pinned file before its user) in order'
