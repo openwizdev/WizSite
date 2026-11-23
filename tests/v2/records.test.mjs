@@ -4,6 +4,7 @@ import { readFile, readdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { webcrypto } from 'node:crypto';
 import vm from 'node:vm';
+import { SITE, signIn, start } from './browser.mjs';
 
 const ROOT = new URL('../../', import.meta.url);
 const FORMS = new URL('tests/v2/fixtures/forms/', ROOT);
@@ -777,7 +778,7 @@ async function grillRound(edit = {}) {
   if (edit.grill) bytes = Buffer.from(edit.grill(bytes.toString('utf8')), 'utf8');
   if (edit.bytes) bytes = edit.bytes(bytes);
   file.content = edit.content ? edit.content(bytes.toString('base64')) : bytes.toString('base64');
-  if (edit.path) file.path = edit.path;
+  if (edit.path) file.path = edit.path(file.path);
   if (edit.request) {
     edit.request(input.action.item.request);
     input.github[comment].json.body = `**Decision request** for the owner.\n\n\`\`\`json\n${JSON.stringify(input.action.item.request, null, 2)}\n\`\`\``;
@@ -818,7 +819,7 @@ test('R10: a saved grill or request the grill parser refuses is never a current 
     'repeated answer progress': { request: r => { r.answered = ['N1', 'N1']; } },
     'a byte order mark': { bytes: b => Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), b]) },
     'base64 with spaces': { content: c => c.replace(/(.{8})/g, '$1 ') },
-    'another blob path': { path: 'docs/grills/2030-01-15-other.md' },
+    'another blob path': { path: path => path.replace('notes', 'other') },
   };
   const accepted = [];
   for (const [what, edit] of Object.entries(cases)) {
@@ -913,5 +914,99 @@ test('R15: a spec edited after its confirmation request was posted is never matc
     net.edited[41] = edited;
     const checked = plain(await run.records.check(input.action.item));
     assert.equal(checked.result, result, `last edited ${edited}`);
+  }
+});
+
+test('R14: in the built app, a real tap confirms and posts once; a scripted click, a dispatched click and one tap counted twice do not', async () => {
+  const approval = await json(new URL('decision-yes-plan_approval.input.json', FORMS));
+  const steer = (await json(STEER)).action;
+  const run = await start();
+  const { world, page } = run;
+  try {
+    const request = { created_at: RECORDED_AT, ...approval.github['GET /repos/acme/factory/issues/comments/9100002'].json };
+    const lists = { 41: [request], 44: [] };
+    const held = [];
+    world.record(approval.github);
+    world.github['GET /user'] = () => ({ status: 200, json: OWNER });
+    for (const number of [41, 44]) {
+      world.github[`GET /repos/acme/factory/issues/${number}/comments`] = () => ({ status: 200, json: lists[number] });
+    }
+    world.github['POST /repos/acme/factory/issues/41/comments'] = entry => {
+      const comment = { id: 9100080 + lists[41].length, user: { login: OWNER.login, id: OWNER.id }, body: JSON.parse(entry.body).body,
+        created_at: new Date().toISOString(), html_url: `https://github.com/acme/factory/issues/41#issuecomment-${9100080 + lists[41].length}` };
+      lists[41].push(comment);
+      return { status: 201, json: comment };
+    };
+    world.github['POST /repos/acme/factory/issues/44/comments'] = () => ({ status: 307, json: {}, headers: { Location: `${API}/repos/acme/elsewhere/issues/44/comments` } });
+    await page.go(`${SITE}/app/?v2=on`);
+    await page.until(`document.readyState === 'complete' && window.OW && OW.records`, 'the app page');
+    await signIn(page);
+    await page.until('OW.data.auth.account() === 5001', 'the account read after signing in');
+    const setup = await page.run(`(async () => {
+      localStorage.setItem('openwiz.app.repo', JSON.stringify(${JSON.stringify(PICKED)}));
+      OW.data.feeds.specs.data = { fleet: { text: ${JSON.stringify(FLEET)} } };
+      window.taps = [];
+      window.twice = false;
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = 'Synthetic confirm';
+      b.onclick = e => {
+        window.taps.push(OW.records.confirm(window.preview, e));
+        if (window.twice) window.taps.push(OW.records.confirm(window.preview, e));
+      };
+      document.body.prepend(b);
+      window.preview = await OW.records.compose(${JSON.stringify(steer)});
+      return { enabled: OW.records.enabled(), claim: OW.data.claim(), op: window.preview.op };
+    })()`);
+    assert.deepEqual(setup.enabled, true, 'records.js got no write path from the built page');
+    assert.equal(setup.claim, null, 'a page script obtained the write path');
+    assert.match(setup.op, /^op-[0-9a-f]{32}$/);
+
+    await page.click('Synthetic confirm');
+    await page.run(`document.querySelector('button').dispatchEvent(new MouseEvent('click', { bubbles: true }))`);
+    const forged = await page.run(`(() => { const e = Object.create(MouseEvent.prototype); return OW.records.confirm(window.preview, e); })()`);
+    assert.deepEqual(await page.run('window.taps'), [{ confirmed: 0, of: 1 }, { confirmed: 0, of: 1 }], 'a scripted click confirmed');
+    assert.deepEqual(forged, { confirmed: 0, of: 1 });
+    assert.deepEqual(await page.run('OW.records.post(window.preview)'), { outcome: 'refused', op: setup.op, reason: 'not_confirmed' });
+    assert.deepEqual(world.writes(), []);
+
+    await page.tap('Synthetic confirm');
+    assert.deepEqual(await page.run('window.taps.at(-1)'), { confirmed: 1, of: 1 }, 'a real tap did not confirm');
+    const posted = await page.run('OW.records.post(window.preview)');
+    assert.equal(posted.outcome, 'posted', JSON.stringify(posted));
+    assert.equal(world.writes().length, 1);
+    assert.equal(world.writes()[0].body, JSON.stringify({ body: 'stop' }));
+
+    const item = approval.action.item;
+    const risky = await page.run(`(async () => {
+      const item = ${JSON.stringify(item)};
+      const checked = await OW.records.check(item);
+      window.preview = await OW.records.compose({ ...${JSON.stringify(approval.action)}, item: { ...item, checked_at: checked.checked_at } });
+      window.twice = true;
+      window.taps = [];
+      return window.preview;
+    })()`);
+    assert.equal(risky.confirms, 2, JSON.stringify(risky));
+    await page.tap('Synthetic confirm');
+    assert.deepEqual(await page.run('window.taps'), [{ confirmed: 1, of: 2 }, { confirmed: 1, of: 2 }], 'one tap counted twice');
+    assert.equal((await page.run('OW.records.post(window.preview)')).reason, 'not_confirmed');
+    assert.equal(world.writes().length, 1);
+    await page.run('window.twice = false');
+    await page.tap('Synthetic confirm');
+    const second = await page.run('OW.records.post(window.preview)');
+    assert.equal(second.outcome, 'posted', JSON.stringify(second));
+    assert.equal(world.writes().length, 2);
+
+    const moved = await page.run(`(async () => {
+      window.preview = await OW.records.compose(${JSON.stringify({ ...steer, item: { ...steer.item, key: 'spec:acme/factory#44', subject: { kind: 'issue', number: 44 }, url: 'https://github.com/acme/factory/issues/44' } })});
+      return window.preview.op;
+    })()`);
+    await page.tap('Synthetic confirm');
+    assert.deepEqual(await page.run('OW.records.post(window.preview)'), { outcome: 'refused', op: moved, reason: 'github' }, 'a redirected write');
+    assert.equal(world.writes().length, 3);
+    assert.ok(!world.log.some(r => r.path.includes('/elsewhere/')), 'the redirect was followed');
+    assert.deepEqual(world.violations, []);
+  } finally {
+    await run.close();
   }
 });
