@@ -242,6 +242,21 @@ function enableMotion(gsap) {
   configure();
 }
 
+function launchVideo() {
+  const video = document.querySelector('.launch-video');
+  const play = document.querySelector('.launch-play');
+  if (!video || !play) return;
+  video.controls = false;
+  play.hidden = false;
+  play.addEventListener('click', () => {
+    play.hidden = true;
+    video.controls = true;
+    video.muted = false;
+    video.focus();
+    video.play().catch(() => {});
+  }, { once: true });
+}
+
 function specVideo() {
   const video = document.querySelector('.spec-video');
   const sound = document.querySelector('.spec-play');
@@ -607,6 +622,7 @@ async function askAWiz() {
 enableCopy();
 askAWiz();
 showStars().catch(() => {});
+launchVideo();
 specVideo();
 enableFamily(window.gsap);
 if (window.gsap) enableMotion(window.gsap);
