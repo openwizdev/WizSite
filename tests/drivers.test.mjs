@@ -152,15 +152,63 @@ test('the key-host section says where a host key lives, who reads it, where it g
   assert.doesNotMatch(text(section), /\bsix(th)?\b|\bexcept(ion)?\b|\bwaive/i, 'no extra or skipped check');
 });
 
-test('Devin appears only in its In review tile', async () => {
-  const html = await readFile(join(ROOT, 'drivers/index.html'), 'utf8');
-  const tiles = html.match(/<li\b[^>]*\sid="devin"[^>]*>[\s\S]*?<\/li>/g) ?? [];
-  assert.equal(tiles.length, 1, 'the Drivers page has one Devin tile');
-  const [tile] = tiles;
-  assert.match(tile, /^<li\b[^>]*\sclass="tile"[^>]*>/);
-  assert.match(tile, /^<li\b[^>]*\sdata-state="review"[^>]*>/);
-  assert.match(tile, /<h4 class="tile-name">Devin<\/h4>/);
-  assert.match(tile, /<p class="tile-state">In review<\/p>/);
-  assert.doesNotMatch(tile, /coming soon|\b(?:live|passed|shipped)\b/i);
-  assert.doesNotMatch(html.replace(tile, ''), /devin/i, 'Devin is named only in its In review tile');
+test('the rendered Drivers page shows Devin only as built, waiting on its live check', async () => {
+  assert.ok(existsSync(join(DIST, 'drivers/index.html')), 'run npm run build first');
+  const server = await serve();
+  const origin = `http://127.0.0.1:${server.address().port}`;
+  const browser = await launch();
+  try {
+    const { send, listeners } = browser;
+    const { targetId } = await send('Target.createTarget', { url: 'about:blank' });
+    const { sessionId } = await send('Target.attachToTarget', { targetId, flatten: true });
+    const page = (method, params) => send(method, params, sessionId);
+    listeners.push(message => {
+      if (message.sessionId !== sessionId || message.method !== 'Fetch.requestPaused') return;
+      const { requestId, request } = message.params;
+      if (request.url.startsWith(origin + '/')) page('Fetch.continueRequest', { requestId }).catch(() => {});
+      else page('Fetch.failRequest', { requestId, errorReason: 'BlockedByClient' }).catch(() => {});
+    });
+    await page('Fetch.enable', { patterns: [{ urlPattern: '*', requestStage: 'Request' }] });
+    await page('Page.enable');
+    const loaded = new Promise(resolve => listeners.push(m => m.sessionId === sessionId && m.method === 'Page.loadEventFired' && resolve()));
+    await page('Page.navigate', { url: `${origin}/drivers/` });
+    await loaded;
+    const { result } = await page('Runtime.evaluate', { returnByValue: true, expression: `(() => {
+      const norm = s => s.replace(/\\s+/g, ' ').trim();
+      const tiles = document.querySelectorAll('#devin');
+      if (tiles.length !== 1) return { tiles: tiles.length };
+      const [tile] = tiles;
+      const box = tile.getBoundingClientRect();
+      const rest = document.documentElement.cloneNode(true);
+      rest.querySelector('#devin').remove();
+      const released = '[data-state="live"], [data-state="passed"], [data-state="shipped"], .passed, .shipped';
+      return {
+        tiles: tiles.length,
+        visible: box.width > 0 && box.height > 0 && getComputedStyle(tile).visibility === 'visible',
+        inWaitingGroup: tile.matches('li.tile') && Boolean(tile.closest('#hosts-waiting[data-state="waiting"]')),
+        state: tile.dataset.state,
+        status: [...tile.querySelectorAll('.tile-state')].map(e => norm(e.innerText)),
+        shown: norm(tile.innerText),
+        links: [...tile.querySelectorAll('a')].map(a => [norm(a.innerText), a.href]),
+        markedReleased: Boolean(tile.closest(released) || tile.querySelector(released)),
+        devinElsewhere: /devin/i.test(rest.outerHTML),
+        comingSoon: /coming soon/i.test(tile.textContent),
+      };
+    })()` });
+    assert.deepEqual(result.value, {
+      tiles: 1,
+      visible: true,
+      inWaitingGroup: true,
+      state: 'waiting',
+      status: ['Built, waiting on its live check'],
+      shown: 'Devin Built, waiting on its live check Login: held by Devin Pull request',
+      links: [['Pull request', 'https://github.com/openwizdev/OpenWiz/pull/2490']],
+      markedReleased: false,
+      devinElsewhere: false,
+      comingSoon: false,
+    });
+  } finally {
+    await browser.close();
+    server.close();
+  }
 });

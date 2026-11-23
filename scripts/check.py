@@ -328,8 +328,8 @@ DRIVER_WALL = (
     ('factory', 'Factory', 'hosts', 'waiting', PR + '2022', 'factory.svg'),
     ('pane', 'Pane', 'hosts', 'waiting', PR + '2029', 'pane.svg'),
     ('codespaces', 'GitHub Codespaces', 'hosts', 'waiting', PR + '2559', None),
+    ('devin', 'Devin', 'hosts', 'waiting', PR + '2490', 'devin.svg'),
     ('sprites', 'Fly Sprites', 'hosts', 'review', PR + '2720', None),
-    ('devin', 'Devin', 'hosts', 'review', PR + '2490', 'devin.svg'),
     ('openhands', 'OpenHands Cloud', 'hosts', 'building', PR + '2567', 'openhands.svg'),
     ('warp-oz', 'Warp Oz', 'hosts', 'building', PR + '2555', 'warp.svg'),
     ('tembo', 'Tembo', 'hosts', 'building', PR + '2662', 'tembo.svg'),
@@ -374,7 +374,7 @@ DRIVER_REASONS = {
 DRIVER_WALL_LOGINS = {
     'openclaw': 'Login: stays on your machine', 'hermes': 'Login: stays on your machine', 'conductor': 'Login: held by Conductor',
     'cursor': 'Login: held by Cursor', 'factory': 'Login: held by Factory', 'pane': 'Login: stays on your machine',
-    'codespaces': 'Login: held by GitHub',
+    'codespaces': 'Login: held by GitHub', 'devin': 'Login: held by Devin',
 }
 DRIVER_WALLS = (('hosts', 'Where your agents run', 'Hosts'), ('harnesses', 'Which agent you already use', 'Harnesses'))
 DRIVER_WALL_HIDDEN = re.compile(r'\s(?:style|hidden|aria-hidden|inert)\b|\bclass="[^"]*\b(?:hidden|sr-only|visually-hidden)\b', re.I)
