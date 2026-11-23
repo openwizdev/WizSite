@@ -307,9 +307,6 @@ OWN_DRIVER = 'Write your own driver'
 OPENWIZ_REPO = 'https://github.com/openwizdev/OpenWiz'
 DRIVER_DESCRIPTION = 'boat.dev, Cloudroom and your own computer or VPS passed all five checks and ship today; every other host and harness shows its true state'
 DRIVER_ART_BUDGET = 400_000
-# Every host and harness beyond the shipped three, each with exactly one state read from openwizdev/OpenWiz
-# (spec issues, their tickets and pull requests, adapters/ on main, releases) on 2026-11-23.
-# (key, name, wall, state, its ticket or pull request, its official logo or None for name only)
 PR, ISSUE = OPENWIZ_REPO + '/pull/', OPENWIZ_REPO + '/issues/'
 DRIVER_WALL = (
     ('openclaw', 'OpenClaw', 'hosts', 'live', ISSUE + '1991#issuecomment-7087326408', 'openclaw.svg'),
@@ -348,7 +345,7 @@ DRIVER_WALL = (
     ('sculptor', 'Sculptor', 'harnesses', 'planned', ISSUE + '2540', 'sculptor.svg'),
     ('cline', 'Cline', 'harnesses', 'held', ISSUE + '2530', 'cline.svg'),
 )
-DRIVER_LADDER = {  # state: (the words on the tile and its group, the link's words)
+DRIVER_LADDER = {
     'live': ('Passed live, ships next release', 'Live check receipt'),
     'waiting': ('Built, waiting on its live check', 'Pull request'),
     'review': ('In review', 'Pull request'),
@@ -357,7 +354,7 @@ DRIVER_LADDER = {  # state: (the words on the tile and its group, the link's wor
     'held': ('Held', 'Ticket'),
     'parked': ('Parked', 'Ticket'),
 }
-DRIVER_REASONS = {  # held or parked: the reason replaces the bare state word, five words for a hold
+DRIVER_REASONS = {
     'opencomputer': 'Held: its key header is unsupported',
     'cline': 'Held: no headless wake by session',
     'grok-bot': 'Parked: the host has no programmatic wake or stop',
@@ -1114,7 +1111,6 @@ def check_driver_logins(main):
 
 
 class WallTiles(HTMLParser):
-    """Each wall tile's id, state, name, state words, login, links and pictures."""
     def __init__(self, text):
         super().__init__(convert_charrefs=True)
         self.tiles, self.field, self.depth = [], None, 0
