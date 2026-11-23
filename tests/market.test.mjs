@@ -288,3 +288,67 @@ test('market-sync refuses a checkout the index would not read, and a malformed i
     assert.equal(out, readFileSync(join(ROOT, 'market/registry.json'), 'utf8'), `${name}: the snapshot is untouched`);
   }
 });
+
+function trusted() {
+  const dir = mkdtempSync(join(tmpdir(), 'market-trust-'));
+  const canonical = join(dir, 'WizMarket');
+  const fork = join(dir, 'fork.git');
+  const work = join(dir, 'work');
+  const ran = join(dir, 'ran');
+  const git = (...args) => execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@example.com', ...args], { cwd: work, stdio: 'pipe', encoding: 'utf8' });
+  execFileSync('git', ['init', '-q', '--bare', '-b', 'main', canonical]);
+  execFileSync('git', ['init', '-q', '--bare', '-b', 'main', fork]);
+  mkdirSync(join(work, 'check'), { recursive: true });
+  git('init', '-q', '-b', 'main');
+  writeFileSync(join(work, 'check/check.py'), `${fixture('wizmarket-private.py')}\nimport os\nimport subprocess\nimport sys\n\nif __name__ == "__main__":\n    open(${JSON.stringify(ran)}, "a").write(os.getcwd() + "\\n")\n`
+    + '    head = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()\n    sys.stdout.write(open("index.out").read().replace("HEAD", head))\n');
+  writeFileSync(join(work, 'index.out'), atHead);
+  git('add', '.');
+  git('commit', '-q', '-m', 'registry');
+  git('push', '-q', canonical, 'main');
+  git('push', '-q', fork, 'main');
+  return { dir, work, git, canonical, fork, ran: () => existsSync(ran) ? readFileSync(ran, 'utf8').trim().split('\n') : [] };
+}
+
+function trustedSync(repo, env = {}) {
+  const site = siteCopy();
+  const run = spawnSync(process.execPath, ['scripts/market-sync.mjs', repo.work], { cwd: site, encoding: 'utf8',
+    env: { ...process.env, GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: `url.${repo.dir}/.insteadOf`, GIT_CONFIG_VALUE_0: 'https://github.com/openwizdev/', ...env } });
+  const out = existsSync(join(site, 'market/registry.json')) ? readFileSync(join(site, 'market/registry.json'), 'utf8') : null;
+  rmSync(site, { recursive: true, force: true });
+  return { ...run, out };
+}
+
+test('market-sync takes canonical main from git config it controls, never from the checkout\'s', () => {
+  const snapshot = readFileSync(join(ROOT, 'market/registry.json'), 'utf8');
+  const repo = trusted();
+  repo.git('commit', '-q', '--allow-empty', '-m', 'a fork only');
+  repo.git('push', '-q', repo.fork, 'main');
+  repo.git('config', `url.${repo.fork}.insteadOf`, 'https://github.com/openwizdev/WizMarket');
+  const { status, stderr, out } = trustedSync(repo);
+  const ran = repo.ran();
+  rmSync(repo.dir, { recursive: true, force: true });
+  assert.equal(status, 1, `a checkout-local insteadOf rule chose the fork as canonical main: ${stderr.trim()}`);
+  assert.match(stderr, /HEAD is not on canonical WizMarket main/);
+  assert.deepEqual(ran, [], 'the fork\'s index command never ran');
+  assert.equal(out, snapshot, 'the snapshot is untouched');
+});
+
+test('market-sync runs no code from the checkout and reads its commit, not its working tree', () => {
+  const repo = trusted();
+  const head = repo.git('rev-parse', 'HEAD').trim();
+  const hook = join(repo.dir, 'hook-ran');
+  writeFileSync(join(repo.dir, 'fsmonitor.sh'), `#!/bin/sh\ntouch ${JSON.stringify(hook)}\nexit 1\n`, { mode: 0o755 });
+  repo.git('config', 'core.fsmonitor', join(repo.dir, 'fsmonitor.sh'));
+  writeFileSync(join(repo.work, 'index.out'), atHead.replace('Example driver', 'Example changed driver'));
+  repo.git('update-index', '--assume-unchanged', 'index.out');
+  const { status, stderr, out } = trustedSync(repo);
+  const ran = repo.ran();
+  const hooked = existsSync(hook);
+  rmSync(repo.dir, { recursive: true, force: true });
+  assert.equal(status, 0, stderr);
+  assert.equal(hooked, false, 'git ran the checkout\'s core.fsmonitor command');
+  assert.equal(out, atHead.replaceAll('HEAD', head), 'the snapshot is the commit\'s index, not the working tree\'s');
+  assert.equal(ran.length, 1, 'the index command ran once');
+  assert.ok(!ran[0].startsWith(repo.work), `the index command ran outside the checkout, not in ${ran[0]}`);
+});
