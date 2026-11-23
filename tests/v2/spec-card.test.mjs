@@ -20,29 +20,54 @@ const GRAPH = {
 
 const FAKE = `(() => {
   const calls = window.calls = [];
-  const issued = new WeakSet();
+  const issued = new WeakMap();
+  const used = new WeakSet();
+  const held = window.held = [];
+  const sent = window.sent = [];
   let n = 0;
   const outcomes = window.outcomes = [];
   window.bodies = window.bodies || {};
+  const snapshot = preview => JSON.stringify(preview);
+  const track = preview => (issued.set(preview, { snapshot: snapshot(preview), confirmed: 0, posted: null }), preview);
+  const tracked = preview => {
+    const entry = issued.get(preview);
+    return entry && entry.snapshot === snapshot(preview) ? entry : null;
+  };
+  const release = op => { const at = held.findIndex(p => p.op === op); if (at >= 0) held.splice(at, 1); };
+  window.restore = preview => { held.push(track(preview)); return true; };
   OW.records = {
     enabled: () => true,
     dryRun: () => false,
-    pending: () => [],
+    pending: () => held.slice(),
     async compose(action) {
       calls.push({ call: 'compose', action: JSON.parse(JSON.stringify(action)) });
       const body = action.form === 'spec.change' ? action.words : window.bodies[action.form];
-      const preview = { op: 'op-' + String(++n).padStart(32, '0'), form: action.form, body, repository: action.item.repository,
-        subject: action.item.subject, url: action.item.url, visibility: 'repository', confirms: 1, source: null };
-      issued.add(preview);
-      return preview;
+      return track({ op: 'op-' + String(++n).padStart(32, '0'), form: action.form, body, repository: action.item.repository,
+        subject: action.item.subject, url: action.item.url, visibility: 'repository', confirms: 1, source: null });
     },
     confirm(preview, event) {
-      calls.push({ call: 'confirm', op: preview.op, trusted: !!event && event.isTrusted === true, issued: issued.has(preview) });
-      return { confirmed: 1, of: 1 };
+      const entry = tracked(preview);
+      const trusted = !!event && event.isTrusted === true && event.type === 'click';
+      const counted = !!entry && trusted && !used.has(event) && entry.confirmed < preview.confirms;
+      if (counted) { used.add(event); entry.confirmed += 1; }
+      calls.push({ call: 'confirm', op: preview.op, trusted, issued: !!entry, counted });
+      return { confirmed: entry ? entry.confirmed : 0, of: preview.confirms };
     },
     async post(preview) {
-      calls.push({ call: 'post', op: preview.op, body: preview.body, issued: issued.has(preview) });
-      return { op: preview.op, ...(outcomes.shift() || { outcome: 'posted', comment: { id: 9001, url: preview.url + '#issuecomment-9001' } }) };
+      const entry = tracked(preview);
+      calls.push({ call: 'post', op: preview.op, body: preview.body, issued: !!entry });
+      const refused = reason => ({ outcome: 'refused', op: preview.op, reason });
+      if (!entry) return refused('not_composed');
+      if (entry.posted) return entry.posted;
+      if (entry.confirmed < preview.confirms) return refused('not_confirmed');
+      if (held.some(p => p.op !== preview.op && p.repository === preview.repository
+        && p.subject.kind === preview.subject.kind && p.subject.number === preview.subject.number)) return refused('pending');
+      entry.confirmed = 0;
+      const outcome = { op: preview.op, ...(outcomes.shift() || { outcome: 'posted', comment: { id: 9001, url: preview.url + '#issuecomment-9001' } }) };
+      sent.push({ op: preview.op, outcome: outcome.outcome });
+      if (outcome.outcome === 'unknown') { if (!held.some(p => p.op === preview.op)) held.push(preview); } else release(preview.op);
+      if (outcome.outcome === 'posted') entry.posted = outcome;
+      return outcome;
     },
   };
 })()`;
@@ -167,11 +192,14 @@ for (const [button, file] of [['Ship it', 'spec-ship'], ['Not now', 'spec-not_no
       const after = await run.page.run('calls');
       assert.deepEqual(after.map(c => c.call), ['compose', 'compose', 'confirm', 'confirm', 'post']);
       assert.equal(after[2].trusted, false, 'the scripted click was trusted');
+      assert.equal(after[2].counted, false, 'the records stand-in counted a scripted click');
       assert.equal(after[3].trusted, true, 'the confirm did not pass the trusted tap');
+      assert.equal(after[3].counted, true, 'the records stand-in refused the trusted tap');
       assert.equal(after[3].op, after[4].op);
       assert.ok(after[3].issued && after[4].issued, 'the card passed a copy, not the preview compose returned');
       assert.equal(after[4].body, body);
       await run.page.until(`document.querySelector('#under-test [data-outcome="posted"]')`, 'the posted outcome');
+      assert.deepEqual(await run.page.run('sent'), [{ op: after[4].op, outcome: 'posted' }], 'the tap did not post exactly once');
       assert.ok(await run.page.run(LINK('https://github.com/acme/factory/issues/41#issuecomment-9001')), 'no link to the posted comment');
       assert.deepEqual(run.world.writes(), []);
     } finally {
@@ -206,12 +234,16 @@ test('Change something keeps every byte typed, and an unknown outcome is never s
     await run.page.tap('Check again');
     await run.page.until(`document.querySelector('#under-test [data-preview]')`, 'the preview again');
     assert.equal((await run.page.run('calls')).filter(c => c.call === 'post').length, 1, 'check again posted without a confirm');
+    await run.page.run(`document.querySelector('#under-test [data-preview] button').click()`);
+    assert.equal((await run.page.run('calls')).filter(c => c.call === 'post').length, 1, 'a scripted click posted the unknown steer again');
+    assert.equal(await run.page.run(`document.querySelector('#under-test [data-preview] [data-body]').textContent`), typed);
     await run.page.tap('Post it');
     await run.page.until(`document.querySelector('#under-test [data-outcome="refused"]')`, 'the refused outcome');
     const calls = await run.page.run('calls');
     const posts = calls.filter(c => c.call === 'post');
     assert.equal(posts.length, 2);
     assert.equal(posts[0].op, posts[1].op, 'check again composed a new intent');
+    assert.deepEqual((await run.page.run('sent')).map(s => s.outcome), ['unknown', 'refused']);
     text = await run.page.text();
     assert.match(text, /Not posted/);
     assert.ok(!/\b(Posted|Sent)\b/.test(text));
@@ -249,24 +281,27 @@ test('a steer still unknown after a reload shows on its card, and a pending refu
     const waiting = { op: 'op-' + 'a'.repeat(32), form: 'spec.not_now', body, repository: 'acme/factory', subject: { kind: 'issue', number: 41 },
       url: fixture.action.item.url, visibility: 'repository', confirms: 1, source: null };
     await card(run, fixture.action.item);
-    await run.page.run(`window.waiting = ${JSON.stringify(waiting)}`);
-    await run.page.run(`OW.records.pending = () => [window.waiting]; OW.cards.spec(${JSON.stringify(fixture.action.item)}, document.querySelector('#under-test'))`);
+    await run.page.run(`window.waiting = ${JSON.stringify(waiting)}; restore(window.waiting)`);
+    await run.page.run(`OW.cards.spec(${JSON.stringify(fixture.action.item)}, document.querySelector('#under-test'))`);
     await run.page.until(`document.querySelector('#under-test [data-outcome="unknown"]')`, 'the restored unknown steer');
     assert.equal(await run.page.run(`document.querySelector('#under-test [data-body]').textContent`), body);
-    await run.page.run(`OW.records.pending = () => []; OW.cards.spec(${JSON.stringify(fixture.action.item)}, document.querySelector('#under-test'))`);
-    await run.page.run(`outcomes.push({ outcome: 'refused', reason: 'pending' })`);
+    await run.page.run(`held.length = 0; OW.cards.spec(${JSON.stringify(fixture.action.item)}, document.querySelector('#under-test'))`);
     await run.page.tap('Ship it');
     await run.page.until(`document.querySelector('#under-test [data-preview]')`, 'the preview');
-    await run.page.run(`OW.records.pending = () => [window.waiting]`);
+    await run.page.run(`held.push(window.waiting)`);
     await run.page.tap('Post it');
     await run.page.until(`document.querySelector('#under-test [data-outcome="unknown"]')`, 'the waiting steer after a pending refusal');
     assert.match(await run.page.text(), /another steer on this spec still has an unknown outcome/i);
     assert.equal(await run.page.run(`document.querySelector('#under-test [data-body]').textContent`), body, 'the waiting steer is not the one shown');
     await run.page.tap('Check again');
     await run.page.until(`document.querySelector('#under-test [data-preview]')`, 'the waiting steer to confirm again');
+    await run.page.run(`document.querySelector('#under-test [data-preview] button').click()`);
+    assert.equal(await run.page.run(`calls.filter(c => c.call === 'post').length`), 1, 'a scripted click posted the restored steer');
     await run.page.tap('Post it');
     await run.page.until(`calls.filter(c => c.call === 'post').length === 2`, 'the check again post');
     assert.equal((await run.page.run('calls')).filter(c => c.call === 'post')[1].op, waiting.op, 'check again posted a different intent');
+    await run.page.until(`document.querySelector('#under-test [data-outcome="posted"]')`, 'the restored steer posted');
+    assert.deepEqual(await run.page.run('sent'), [{ op: waiting.op, outcome: 'posted' }], 'the pending refusal sent the newer steer');
   } finally {
     await run.close();
   }
@@ -283,7 +318,7 @@ test('checking an earlier pending steer preserves a newer refused typed draft', 
     await run.page.type(draft);
     await run.page.tap('Preview');
     await run.page.until(`document.querySelector('#under-test [data-preview]')`, 'the typed preview');
-    await run.page.run(`OW.records.pending = () => [window.waiting]; outcomes.push({ outcome: 'refused', reason: 'pending' }); true`);
+    await run.page.run(`held.push(window.waiting)`);
     await run.page.tap('Post it');
     await run.page.until(`document.querySelector('#under-test [data-outcome="unknown"]')`, 'the earlier steer');
     assert.match(await run.page.text(), /another steer on this spec still has an unknown outcome/i);
@@ -292,6 +327,7 @@ test('checking an earlier pending steer preserves a newer refused typed draft', 
     await run.page.tap('Post it');
     await run.page.until(`document.querySelector('#under-test [data-outcome="posted"]')`, 'the earlier steer posted');
     assert.deepEqual(await run.page.run(`calls.filter(c => c.call === 'post').map(c => c.body)`), [draft, await form('spec-not_now.body.json')]);
+    assert.deepEqual(await run.page.run('sent.map(s => s.op)'), [await run.page.run('window.waiting.op')], 'the refused typed steer was sent');
     await run.page.tap('Change something');
     assert.equal(await run.page.run(`document.querySelector('#under-test textarea').value`), draft, 'posting the earlier steer erased the newer draft');
     assert.deepEqual(run.world.writes(), []);
