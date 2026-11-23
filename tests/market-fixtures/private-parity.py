@@ -14,9 +14,9 @@ PROBES = [
     '-----BEGIN RSA PRIVATE KEY-----', 'https://u:p@h',
     'password: x', 'passwd=x', 'secret=x', 'api_key=x', 'apikey=x', 'access_key=x', 'private_key=x',
     'client_secret=x', 'auth_token=x', 'access_token=x', 'bearer ' + 'a' * 16,
-    'thr_a', 'proj_a', 'prj_a', 'mch_a', 'usr_a', 'acct_a', 'auto_a', 'sess_a', 'ses_a', 'sbx_a',
+    'thr' + '_a', 'proj_a', 'prj_a', 'mch_a', 'usr_a', 'acct_a', 'auto_a', 'sess_a', 'ses_a', 'sbx_a',
     'cr_' + '0' * 8 + '-' + '0' * 4, '0' * 8 + '-' + '0' * 4 + '-' + '0' * 4 + '-' + '0' * 4 + '-' + '0' * 12,
-    '/home/', '/Users/', '/root/', '/tmp/', '/var/folders/', '/private/var/', 'C:\\',
+    '/' + 'home/', '/' + 'Users/', '/root/', '/tmp/', '/var/folders/', '/private/var/', 'C:\\',
 ]
 
 

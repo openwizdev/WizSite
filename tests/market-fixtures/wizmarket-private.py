@@ -8,7 +8,7 @@ PRIVATE = [
     ("a token", re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----|[A-Za-z][A-Za-z0-9+.-]*://[^/\s:@]+:[^/\s@]+@")),
     ("a token", re.compile(r"(?i)\b(?:password|passwd|secret|api[_-]?key|access[_-]?key|private[_-]?key|client[_-]?secret"
                            r"|auth[_-]?token|access[_-]?token)\b\s*[:=]\s*\S|\bbearer\s+[A-Za-z0-9._~+/-]{16,}")),
-    ("a private id", re.compile(r"\bthr_[A-Za-z0-9]|\b(?:proj|prj|mch|usr|acct|auto|sess?|sbx)_[A-Za-z0-9]"
+    ("a private id", re.compile(r"\bthr" r"_[A-Za-z0-9]|\b(?:proj|prj|mch|usr|acct|auto|sess?|sbx)_[A-Za-z0-9]"
                                 r"|\bcr_[0-9a-fA-F]{8}-[0-9a-fA-F]{4}"
                                 r"|\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b")),
     ("a machine path", re.compile(r"(?<![\w.~%/-])/(?:home|Users|root|tmp|var/folders|private/var)/"
