@@ -47,7 +47,7 @@ const FAKE = `(() => {
   };
 })()`;
 
-async function card(run, item, { width = 1280, height = 900 } = {}) {
+async function card(run, item, { width = 1280, height = 900, below = false } = {}) {
   for (const path of ['app/cards/spec.js', 'app/cards/spec.css']) {
     run.world.site[`/${path}`] = async () => ({ status: 200, raw: await source(path), type: path.split('.').pop() });
   }
@@ -66,7 +66,8 @@ async function card(run, item, { width = 1280, height = 900 } = {}) {
   await run.page.run(`window.bodies = ${JSON.stringify(bodies)}`);
   await run.page.run(`(() => {
     const el = document.createElement('section'); el.id = 'under-test';
-    document.body.replaceChildren(el);
+    const spacer = Object.assign(document.createElement('div'), { style: 'height:2000px' });
+    document.body.replaceChildren(...(${below} ? [spacer] : []), el);
     OW.cards.spec(${JSON.stringify(item)}, el);
   })()`);
 }
@@ -91,8 +92,7 @@ test('a spec with a same-origin video plays it on its card, lazily and muted, be
   const run = await start();
   try {
     const item = await itemOf('spec-ship.input.json', { graph: GRAPH });
-    await card(run, item, { width: 1280, height: 600 });
-    await run.page.run(`document.body.prepend(Object.assign(document.createElement('div'), { id: 'spacer', style: 'height:2000px' }))`);
+    await card(run, item, { width: 1280, height: 600, below: true });
     const before = await run.page.run(VIDEO);
     assert.ok(before, 'the card shows no video');
     assert.equal(before.src, item.video.url);
@@ -232,6 +232,37 @@ test('a refused compose says why and offers no confirm', async () => {
     assert.match(await run.page.text(), /can.t write/i);
     assert.equal(await run.page.run(`[...document.querySelectorAll('#under-test button')].some(b => b.textContent.trim() === 'Post it')`), false);
     assert.equal(await run.page.run(`document.querySelector('#under-test textarea').value`), 'launch-fleet: start #1', 'the typed words were lost');
+  } finally {
+    await run.close();
+  }
+});
+
+test('a steer still unknown after a reload shows on its card, and a pending refusal shows that steer to check', async () => {
+  const run = await start();
+  try {
+    const fixture = await form('spec-not_now.input.json');
+    const body = await form('spec-not_now.body.json');
+    const waiting = { op: 'op-' + 'a'.repeat(32), form: 'spec.not_now', body, repository: 'acme/factory', subject: { kind: 'issue', number: 41 },
+      url: fixture.action.item.url, visibility: 'repository', confirms: 1, source: null };
+    await card(run, fixture.action.item);
+    await run.page.run(`window.waiting = ${JSON.stringify(waiting)}`);
+    await run.page.run(`OW.records.pending = () => [window.waiting]; OW.cards.spec(${JSON.stringify(fixture.action.item)}, document.querySelector('#under-test'))`);
+    await run.page.until(`document.querySelector('#under-test [data-outcome="unknown"]')`, 'the restored unknown steer');
+    assert.equal(await run.page.run(`document.querySelector('#under-test [data-body]').textContent`), body);
+    await run.page.run(`OW.records.pending = () => []; OW.cards.spec(${JSON.stringify(fixture.action.item)}, document.querySelector('#under-test'))`);
+    await run.page.run(`outcomes.push({ outcome: 'refused', reason: 'pending' })`);
+    await run.page.tap('Ship it');
+    await run.page.until(`document.querySelector('#under-test [data-preview]')`, 'the preview');
+    await run.page.run(`OW.records.pending = () => [window.waiting]`);
+    await run.page.tap('Post it');
+    await run.page.until(`document.querySelector('#under-test [data-outcome="unknown"]')`, 'the waiting steer after a pending refusal');
+    assert.match(await run.page.text(), /another steer on this spec still has an unknown outcome/i);
+    assert.equal(await run.page.run(`document.querySelector('#under-test [data-body]').textContent`), body, 'the waiting steer is not the one shown');
+    await run.page.tap('Check again');
+    await run.page.until(`document.querySelector('#under-test [data-preview]')`, 'the waiting steer to confirm again');
+    await run.page.tap('Post it');
+    await run.page.until(`calls.filter(c => c.call === 'post').length === 2`, 'the check again post');
+    assert.equal((await run.page.run('calls')).filter(c => c.call === 'post')[1].op, waiting.op, 'check again posted a different intent');
   } finally {
     await run.close();
   }
