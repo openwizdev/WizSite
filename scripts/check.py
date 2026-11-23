@@ -596,6 +596,21 @@ def check_market_refs(root, path, page, pages, market):
         check_ref(root, path, ref, pages, page.favicons)
 
 
+MARKET_TAGS = {'section', 'nav', 'h2', 'h3', 'p', 'code', 'ul', 'li', 'div', 'article', 'dl', 'dt', 'dd', 'span', 'a'}
+MARKET_ATTRS = {'class', 'id', 'aria-label', 'aria-labelledby', 'data-listing', 'data-status', 'data-stage'}
+
+
+class MarketMarkup(HTMLParser):
+    def handle_starttag(self, tag, attrs):
+        allowed = MARKET_ATTRS | ({'href', 'rel'} if tag == 'a' else set())
+        assert tag in MARKET_TAGS and all(name in allowed for name, _ in attrs), 'unexpected markup in the generated Market section'
+        assert dict(attrs).get('rel', 'noreferrer') == 'noreferrer', 'unexpected markup in the generated Market section'
+
+
+def check_market_markup(section):
+    MarketMarkup(convert_charrefs=True).feed(section)
+
+
 def split_market(built):
     start, end = MARKET
     assert built.count(start) == 1 and built.count(end) == 1, 'the built Market page has one generated section'
@@ -675,6 +690,7 @@ def check_site(root, registry=ROOT / 'market/registry.json'):
             for count, href in ((section.x_links, X_ACCOUNT), (section.cloudroom_links, CLOUDROOM_LINK), (section.report_links, REPORT_LINK)):
                 assert not count or href in market, 'unexpected external URL'
             check_market_refs(root, path, section, pages, market)
+            check_market_markup(split_market(path.read_text())[1])
             page = fixed
         assert page.social and all(s.startswith(SITE_URL) and s.removeprefix(SITE_URL).split('?')[0] in STATIC for s in page.social), 'social image must be a built file on the site'
         assert path == root / TEAM_PAGE or not page.books, f'a booking link outside the team page: {path.name}'
