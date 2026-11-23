@@ -154,7 +154,6 @@ TEAM_FACTS = ('OpenWiz 0.01 is out: open source, Apache-2.0.',
               'One person built it, with fleets of agents.')
 TEAM_DESCRIPTION = ('A 30-minute call with Jake, who built OpenWiz. Bring your repository; leave with a pull request '
                     'your agents built and reviewed.')
-# Claims the team page may not make: a price, customers or results it cannot show, a promise, or that CloudRoom is optional (0.1.1, unreleased).
 TEAM_NEVER = re.compile(r'\binstall|\bguarantee|\bpric(?:e|es|ing)\b|\bcost|\bfree\b|\bcheckout|[$€£]\s*\d|\bper (?:month|seat|user)\b'
                         r'|\bcustomers?\b|\btrusted\b|\btestimonial|\bresults?\b|\bcloudroom\b|\bships on\b|\bminute \d'
                         r'|\b(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten) (?:drivers|hosts)\b|\b\d+ of \d+\b', re.I)
