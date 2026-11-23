@@ -286,6 +286,26 @@ test('a pasted reply keeps its CR and CRLF line endings through editing', async 
   assert.equal(await shownBody(), words, 'the preview shows the pasted line endings');
 });
 
+test('pasting a CRLF copy over the same LF draft keeps the clipboard bytes', async () => {
+  const input = await json('decision-own-spec_confirmation.input.json');
+  const clip = 'first\r\nlast';
+  const action = { ...input.action, words: clip };
+  await mount(input.action.item, { rows: [{ action, preview: previewFor({ action }, clip) }] });
+  await page().run(`document.querySelector('#card-under-test textarea').focus()`);
+  await page().type('first\nlast');
+  await page().run(`navigator.clipboard.writeText(${JSON.stringify(clip)})`);
+  assert.equal(await page().clipboard(), clip, 'the clipboard holds the CRLF copy');
+  await page().key('a', 'Ctrl');
+  assert.equal(await page().run(`(() => { const box = document.querySelector('#card-under-test textarea');
+    return box.value.slice(box.selectionStart, box.selectionEnd); })()`), 'first\nlast', 'Ctrl+A selected the LF draft');
+  await page().key('v', 'Ctrl');
+  assert.equal(await page().run(`document.querySelector('#card-under-test textarea').value`), 'first\nlast', 'the visible text did not change');
+  await page().tap('Preview reply');
+  await until(`document.querySelector('#card-under-test [data-preview-body], #card-under-test [data-outcome]')`, 'the preview');
+  assert.deepEqual((await calls('compose')).map(c => c.action.words), [clip], 'compose kept the LF draft, not the pasted CRLF');
+  assert.equal(await shownBody(), clip, 'the preview shows the pasted CRLF');
+});
+
 const usable = () => page().run(`[...document.querySelectorAll('#card-under-test button, #card-under-test textarea')]
   .filter(e => e.offsetParent !== null && !e.disabled).map(e => e.tagName === 'BUTTON' ? e.textContent.trim() : e.tagName.toLowerCase())`);
 const ANSWERS = ['Yes', 'No', 'textarea', 'Preview reply'];
@@ -478,4 +498,57 @@ test('every new intent gets a fresh operation id', async () => {
   const ops = await page().run(`[...fake.issued].map(p => p.op)`);
   assert.equal(new Set(ops).size, 3, 'two intents shared an id');
   assert.equal((await calls('post'))[0].op, ops[2], 'post sent an older intent');
+});
+
+for (const risk of ['live', 'release', 'publish']) {
+  test(`a cancelled ${risk} retry reopens at Confirm again and one tap never posts`, async () => {
+    const input = await json('decision-yes-plan_approval.input.json');
+    const body = await json('decision-yes-plan_approval.body.json');
+    const item = { ...input.action.item, request: { ...input.action.item.request, risk } };
+    const action = { ...input.action, item };
+    const preview = previewFor({ action }, body);
+    assert.equal(preview.confirms, 2);
+    await mount(item, { rows: [{ action, preview }], outcomes: [{ outcome: 'unknown', reason: 'network' }] });
+    await page().tap('Yes');
+    await until(`document.querySelector('#card-under-test [data-preview-body]')`, 'the preview');
+    await page().tap('Post');
+    await until(`[...document.querySelectorAll('#card-under-test button')].some(b => b.textContent.trim() === 'Confirm again')`, 'the second confirm');
+    await page().tap('Confirm again');
+    await until(`document.querySelector('#card-under-test [data-outcome="unknown"]')`, 'the unknown outcome');
+    assert.equal((await calls('post')).length, 1, 'the first send');
+    await page().tap('Check again');
+    await until(`[...document.querySelectorAll('#card-under-test button')].some(b => b.textContent.trim() === 'Post')`, 'the retry');
+    await page().tap('Post');
+    await until(`[...document.querySelectorAll('#card-under-test button')].some(b => b.textContent.trim() === 'Confirm again')`, 'the retry\'s second confirm');
+    await page().tap('Cancel');
+    await until(`![...document.querySelectorAll('#card-under-test button')].some(b => b.textContent.trim() === 'Confirm again')`, 'the cancelled retry');
+    await page().tap('Check again');
+    await until(`[...document.querySelectorAll('#card-under-test button')].some(b => ['Post', 'Confirm again'].includes(b.textContent.trim()))`, 'the reopened retry');
+    const screen = (await controls()).find(c => ['Post', 'Confirm again'].includes(c));
+    const said = await cardText();
+    await page().tap(screen);
+    await new Promise(resolve => setTimeout(resolve, 200));
+    const sent = (await calls('post')).length - 1;
+    assert.equal(screen, 'Confirm again', `one tap on the reopened "${screen}" screen sent ${sent} post(s)`);
+    assert.match(said, new RegExp(`Confirm again: this is a ${risk} decision`), 'the reopened retry did not say it is the second confirm');
+    const after = await calls('post');
+    assert.equal(after.length, 2, 'the retry did not post on its second confirm');
+    assert.deepEqual([after[1].op, after[1].confirmed, after[1].of], [after[0].op, 2, 2], 'the retry posted before its second confirm');
+  });
+}
+
+test('when Records holds more confirms than the screen showed, one tap posts nothing', async () => {
+  const input = await json('decision-yes-plan_approval.input.json');
+  const body = await json('decision-yes-plan_approval.body.json');
+  await mount(input.action.item, { pending: [previewFor(input, body)] });
+  await page().tap('Check again');
+  await until(`[...document.querySelectorAll('#card-under-test button')].some(b => b.textContent.trim() === 'Post')`, 'the retry');
+  await page().run(`fake.confirms.set(fake.pending[0], 1) && true`);
+  await page().tap('Post');
+  await new Promise(resolve => setTimeout(resolve, 200));
+  assert.deepEqual(await calls('post'), [], 'one tap on the first-confirm screen posted');
+  assert.ok((await controls()).includes('Confirm again'), 'the card did not ask for the second confirm');
+  await page().tap('Confirm again');
+  await until(`document.querySelector('#card-under-test [data-outcome="posted"]')`, 'the outcome');
+  assert.deepEqual((await calls('post')).map(c => [c.confirmed, c.of]), [[2, 2]]);
 });
