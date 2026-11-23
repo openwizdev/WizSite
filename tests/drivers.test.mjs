@@ -120,3 +120,136 @@ test('the Write your own driver part shows the contract\'s copy line once, and C
     server.close();
   }
 });
+
+test('the key-host section says where a host key lives, who reads it, where it goes, and that the five checks have no exception', async () => {
+  const html = await readFile(join(ROOT, 'drivers/index.html'), 'utf8');
+  const text = s => s.replace(/<[^>]+>/g, ' ').replace(/&#39;|&rsquo;/g, '\'').replace(/\s+/g, ' ').trim();
+  const sections = html.match(/<section class="[^"]*\bkey-hosts\b[^"]*"[\s\S]*?<\/section>/g) ?? [];
+  assert.equal(sections.length, 1, 'the Drivers page has one key-host section');
+  const section = sections[0];
+  const facts = [...section.matchAll(/<li class="key-fact" data-fact="([^"]+)">([\s\S]*?)<\/li>/g)].map(([, key, body]) => [key, text(body)]);
+  assert.deepEqual(facts.map(([key]) => key), ['lives', 'stored', 'helper', 'driver', 'checks'], 'the five facts, in order');
+  const fact = Object.fromEntries(facts);
+  assert.match(fact.lives, /only on your computer/, 'N4: the key lives only on the user\'s computer');
+  assert.match(fact.lives, /system keychain/, 'N4: read from the user\'s system keychain');
+  assert.match(fact.lives, /environment variable you set/, 'N4: or from the environment variable the user set');
+  assert.match(fact.stored, /OpenWiz never stores it/, 'N4: OpenWiz never stores a key');
+  assert.match(fact.stored, /revoke/, 'the fact says how the user revokes it');
+  assert.match(fact.stored, /clear every place you put it/, 'one copy left behind still works: clear every copy');
+  assert.match(fact.stored, /keychain entry/, 'a copy can sit in the keychain entry');
+  assert.match(fact.stored, /environment variable/, 'a copy can sit in the environment variable');
+  assert.match(fact.stored, /restart anything that inherited/, 'a running process keeps an inherited value until it restarts');
+  assert.doesNotMatch(fact.stored, /remove it from there/, 'no single-copy removal advice');
+  assert.match(fact.helper, /one small helper in the kernel's driver kit/, 'N4: one helper in the kit');
+  assert.match(fact.helper, /only thing that reads/, 'N4: the helper alone reads the key');
+  assert.match(fact.helper, /only over HTTPS to that host's own registered address/, 'N4: sent only over HTTPS to the host\'s registered address');
+  assert.match(section, /href="https:\/\/github\.com\/openwizdev\/OpenWiz\/blob\/main\/kernel\/driver-kit\/hostkey\.py"/);
+  assert.match(section, /href="https:\/\/github\.com\/openwizdev\/OpenWiz\/blob\/main\/kernel\/driver\.v1\.md#2-logins"/);
+  assert.match(fact.driver, /driver never sees it/, 'N4: the driver never reads or receives the key');
+  assert.match(fact.driver, /the kit checks that/, 'the token check runs the key check');
+  assert.match(fact.checks, /same five checks/, 'driver v1 section 3: the same five checks, no sixth');
+  assert.match(fact.checks, /can't wake or stop a run gets no driver/, 'wake and stop are two of the five checks');
+  assert.doesNotMatch(text(section), /\bsix(th)?\b|\bexcept(ion)?\b|\bwaive/i, 'no extra or skipped check');
+});
+
+test('the rendered Drivers page shows exactly one visible Devin tile in a pre-live state', async () => {
+  assert.ok(existsSync(join(DIST, 'drivers/index.html')), 'run npm run build first');
+  const server = await serve();
+  const origin = `http://127.0.0.1:${server.address().port}`;
+  const browser = await launch();
+  try {
+    const { send, listeners } = browser;
+    const { targetId } = await send('Target.createTarget', { url: 'about:blank' });
+    const { sessionId } = await send('Target.attachToTarget', { targetId, flatten: true });
+    const page = (method, params) => send(method, params, sessionId);
+    listeners.push(message => {
+      if (message.sessionId !== sessionId || message.method !== 'Fetch.requestPaused') return;
+      const { requestId, request } = message.params;
+      if (request.url.startsWith(origin + '/')) page('Fetch.continueRequest', { requestId }).catch(() => {});
+      else page('Fetch.failRequest', { requestId, errorReason: 'BlockedByClient' }).catch(() => {});
+    });
+    await page('Fetch.enable', { patterns: [{ urlPattern: '*', requestStage: 'Request' }] });
+    await page('Page.enable');
+    const loaded = new Promise(resolve => listeners.push(m => m.sessionId === sessionId && m.method === 'Page.loadEventFired' && resolve()));
+    await page('Page.navigate', { url: `${origin}/drivers/` });
+    await loaded;
+    const evaluate = async fn => {
+      const { result, exceptionDetails } = await page('Runtime.evaluate', {
+        expression: `(${fn})()`,
+        returnByValue: true,
+      });
+      assert.equal(exceptionDetails, undefined, result.description);
+      return result.value;
+    };
+    const readDevin = () => evaluate(() => {
+      const norm = s => s.replace(/\s+/g, ' ').trim();
+      const tiles = document.querySelectorAll('#devin');
+      if (tiles.length !== 1) return { tiles: tiles.length };
+      const [tile] = tiles;
+      const box = tile.getBoundingClientRect();
+      const state = tile.dataset.state;
+      const group = tile.parentElement.closest('[data-state]');
+      const rest = document.documentElement.cloneNode(true);
+      rest.querySelector('#devin').remove();
+      const released = '[data-state="live"], [data-state="passed"], [data-state="shipped"], .live, .passed, .shipped';
+      return {
+        tiles: tiles.length,
+        visible: box.width > 0 && box.height > 0
+          && tile.checkVisibility({ opacityProperty: true, visibilityProperty: true }),
+        inHostGroup: tile.matches('li.tile') && group?.id === `hosts-${state}`
+          && group.dataset.state === state && Boolean(group.closest('#hosts')),
+        state,
+        names: [...tile.querySelectorAll('h4')].map(e => norm(e.innerText)),
+        shown: norm(tile.innerText),
+        links: [...tile.querySelectorAll('a')].map(a => [norm(a.innerText), a.href]),
+        markedReleased: Boolean(tile.closest(released) || tile.querySelector(released)),
+        devinElsewhere: /devin/i.test(rest.outerHTML),
+        comingSoon: /coming soon/i.test(norm(tile.textContent)),
+      };
+    });
+
+    const labels = {
+      review: 'In review',
+      waiting: 'Built, waiting on its live check',
+      building: 'Being built',
+    };
+    const assertDevin = card => {
+      assert.equal(card.tiles, 1, 'exactly one Devin tile');
+      assert.equal(card.visible, true, 'the Devin tile is visible');
+      assert.ok(Object.hasOwn(labels, card.state), 'Devin has a pre-live state');
+      assert.equal(card.inHostGroup, true, 'Devin is in the host group for its state');
+      assert.equal(card.markedReleased, false, 'Devin has no live, passed or shipped marker');
+      assert.equal(card.comingSoon, false, 'Devin never says Coming soon');
+      assert.equal(card.devinElsewhere, false, 'there is no Devin claim outside its tile');
+      assert.deepEqual(card.names, ['Devin']);
+      assert.equal(card.links.length, 1, 'Devin has one pull request link');
+      const [[linkText, href]] = card.links;
+      assert.ok(linkText === 'Pull request' || (card.state === 'building' && linkText === 'Draft pull request'),
+        'Devin shows the pull request link');
+      assert.equal(href, 'https://github.com/openwizdev/OpenWiz/pull/2490');
+      const status = `Devin ${labels[card.state]}`;
+      const shown = [`${status} Login: held by Devin ${linkText}`];
+      if (card.state !== 'waiting') shown.push(`${status} ${linkText}`);
+      assert.ok(shown.includes(card.shown), 'Devin shows the expected copy for its state');
+    };
+
+    assertDevin(await readDevin());
+
+    await evaluate(() => {
+      document.querySelector('#hosts').insertAdjacentHTML('beforeend',
+        '<p id="extra-claim-probe">Use the Devin driver today.</p>');
+    });
+    const extraClaim = await readDevin();
+    assert.throws(() => assertDevin(extraClaim), /there is no Devin claim outside its tile/);
+
+    await evaluate(() => {
+      document.querySelector('#extra-claim-probe').remove();
+      document.querySelector('#devin').style.opacity = '0';
+    });
+    const transparent = await readDevin();
+    assert.throws(() => assertDevin(transparent), /the Devin tile is visible/);
+  } finally {
+    await browser.close();
+    server.close();
+  }
+});
