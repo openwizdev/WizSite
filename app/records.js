@@ -44,7 +44,7 @@
     return JSON.stringify(v) ?? 'undefined';
   }
   const refused = (op, reason) => ({ outcome: 'refused', op, reason });
-  const mode = () => OW.data.v2.get();
+  const mode = () => (writer ? OW.data.v2.get() : 'off');
 
   function tokens(body) {
     const out = [];
@@ -208,6 +208,7 @@
   async function sourceCheck(item) {
     const unchecked = { result: 'unchecked' };
     try {
+      if (!writer) return unchecked;
       const authors = OW.factory?.recordAuthors(OW.data.feeds.specs.data?.fleet?.text);
       const picked = OW.data.repo.get();
       const r = item.request;
@@ -269,9 +270,13 @@
     }
   }
 
+  const verified = new Map();
+  const verifiedKey = item => `${item.repository}#${item.subject.number}:${item.comment_id}:${item.request?.id}`;
   async function check(item) {
     if (!object(item) || item.type !== 'decision' || !itemShape(item, 'decision')) return { result: 'unchecked', checked_at: null };
     const got = await sourceCheck(item);
+    if (got.result === 'matched') verified.set(verifiedKey(item), got.binding);
+    else verified.delete(verifiedKey(item));
     return { ...got, checked_at: got.result === 'unchecked' ? null : Date.now() };
   }
 
@@ -299,6 +304,9 @@
       const got = await sourceCheck(item);
       if (got.result === 'changed') return { refused: 'source_changed' };
       if (got.result !== 'matched') return { refused: 'source_unchecked' };
+      const known = verified.get(verifiedKey(item));
+      if (!known) return { refused: 'source_unchecked' };
+      if (!same(known, got.binding)) return { refused: 'source_changed' };
       source = got.binding;
     }
     const picked = OW.data.repo.get();
@@ -363,24 +371,34 @@
     return `/repos/${encodeURIComponent(picked.owner)}/${encodeURIComponent(picked.name)}/issues/${preview.subject.number}/comments`;
   }
 
-  async function send(preview, state, id) {
+  async function reconcile(preview, id, prior) {
     const op = preview.op;
-    const saved = receipts(id)[op];
-    const path = commentsPath(preview);
-    if (saved?.state === 'unknown') {
-      const list = await pages(path);
-      const claimed = new Set(Object.values(receipts(id)).map(r => r?.comment?.id).filter(Boolean));
-      const found = list.items.find(c => c?.user?.id === id && c.body === preview.body && !claimed.has(c.id)
-        && Date.parse(c.created_at) >= saved.sent_at - SKEW);
+    const list = await pages(commentsPath(preview));
+    const ours = list.items.filter(c => object(c) && c.user?.id === id && c.body === preview.body && positive(c.id));
+    if (prior) {
+      const claimed = new Set(Object.entries(receipts(id)).filter(([key]) => key !== op).map(([, r]) => r?.comment?.id).filter(Boolean));
+      const earlier = new Set(Array.isArray(prior.before) ? prior.before : []);
+      const found = ours.find(c => !claimed.has(c.id) && !earlier.has(c.id) && Date.parse(c.created_at) >= prior.sent_at - SKEW);
       if (found) {
         const comment = { id: found.id, url: found.html_url };
-        save(id, op, { ...saved, state: 'posted', comment });
-        return { outcome: 'posted', op, comment };
+        save(id, op, { ...prior, state: 'posted', comment });
+        return { outcome: { outcome: 'posted', op, comment } };
       }
-      if (!list.complete) return { outcome: 'unknown', op, reason: 'incomplete' };
+      if (!list.complete) {
+        save(id, op, { ...prior, state: 'unknown' });
+        return { outcome: { outcome: 'unknown', op, reason: 'incomplete' } };
+      }
+    } else if (!list.complete) {
+      return { outcome: refused(op, 'source_unchecked') };
     }
+    return { before: ours.map(c => c.id) };
+  }
+
+  async function send(preview, state, id, before) {
+    const op = preview.op;
+    const path = commentsPath(preview);
     save(id, op, { op, body: preview.body, repository: preview.repository, subject: preview.subject, source: preview.source,
-      preview, item: state.item, state: 'sending', sent_at: Date.now() });
+      preview, item: state.item, state: 'sending', sent_at: Date.now(), before });
     let response;
     try {
       response = await writer.github('POST', path, { body: preview.body });
@@ -428,12 +446,19 @@
     const other = Object.values(all).find(r => object(r) && r.op !== op && PENDING.includes(r.state)
       && r.repository === preview.repository && same(r.subject, preview.subject));
     if (other) return refused(op, 'pending');
+    const prior = saved && PENDING.includes(saved.state) ? saved : null;
+    const read1 = await reconcile(preview, id, prior);
+    if (read1.outcome) return (state.outcome = read1.outcome);
     if (state.item.type === 'decision') {
       const got = await sourceCheck(state.item);
-      if (got.result === 'unchecked') return refused(op, 'source_unchecked');
-      if (got.result !== 'matched' || !same(got.binding, preview.source)) return refused(op, 'source_changed');
+      const reason = got.result === 'unchecked' ? 'source_unchecked'
+        : got.result !== 'matched' || !same(got.binding, preview.source) ? 'source_changed' : null;
+      if (reason) {
+        if (prior) save(id, op, { ...prior, state: reason === 'source_changed' ? 'retired' : 'unknown' });
+        return refused(op, reason);
+      }
     }
-    const outcome = await send(preview, state, id);
+    const outcome = await send(preview, state, id, read1.before);
     state.outcome = outcome;
     return outcome;
   }

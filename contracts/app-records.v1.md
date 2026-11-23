@@ -199,7 +199,7 @@ decisions.v1: `current` is known true "only after reading and checking those cur
 | `spec_confirmation` | `GET /repos/<repository>/issues/<spec>` | the spec is open, and the first nonblank line of its body's `## Changelog headline` section equals `headline` | `ref` `issue`, `digest` the SHA-256 of the issue body |
 | `plan_approval` | the `spec_confirmation` read, then `GET /repos/<repository>/issues/<spec>/sub_issues?per_page=100` (every page) and `GET /repos/<repository>/issues/<ticket>/dependencies/blocked_by?per_page=100` for each ticket | the `spec_confirmation` row holds, the tickets (number, title, sorted blockers) equal `tickets`, and the SHA-256 of the revision-v2 text, built exactly as `skills/to-tickets/revision.sh` in WizSkills prints it, equals `fingerprint` | `ref` `revision-v2`, `digest` that SHA-256 |
 
-A matched check gives the binding `{ ref, digest }`. `compose` puts it in the preview as `source`, and `post` repeats the whole check after the final confirm and sends only when it matches again with the same binding: a source edited after `compose`, between the confirms, or a check that can't finish, fails closed with zero writes. Spec steers carry `source: null` and have no source check.
+A matched check gives the binding `{ ref, digest }`. The queue runs the check as `OW.records.check(item)`, which answers `{ result: 'matched' | 'changed' | 'unchecked', binding, checked_at }` and keeps, per item, the binding of its latest matched check (any other result forgets it). That binding is what the owner saw marked current, and the spec's saved proposal for a `spec_confirmation`: its body digest, not just its headline. `compose` makes a fresh check and goes on only when it matches with exactly that kept binding: a different binding is `source_changed`, and no kept binding (an item no check of `OW.records` verified) is `source_unchecked`. `compose` puts the binding in the preview as `source`, and `post` repeats the whole check after the final confirm and sends only when it matches again with the same binding: a source edited after the queue's check, after `compose`, between the confirms, or a check that can't finish, fails closed with zero writes. Spec steers carry `source: null` and have no source check.
 
 ### Order
 
@@ -235,11 +235,11 @@ A **preview**:
 4. the intent's saved outcome is `posted`: that outcome, sending nothing;
 5. fewer recorded confirms than `confirms`: `not_confirmed`;
 6. another intent of this account on the same subject `sending` or `unknown`: `pending`;
-7. the source check (decision previews only), which must match with the preview's `source`: else `source_changed` or `source_unchecked`;
-8. after an earlier `unknown` of this intent, the unknown-outcome read below;
+7. the subject's comments, read in full: after an earlier `unknown` of this intent, or a `sending` receipt restored after a reload, this is the unknown-outcome read below, which may answer `posted` or `unknown`; before a first send it is the baseline read, and an incomplete one is `source_unchecked`;
+8. the source check (decision previews only), which must match with the preview's `source`: else `source_changed` or `source_unchecked`. When step 7 ruled out an earlier send and the check found a change, the intent is retired: its receipt becomes `retired`, no longer pending, and nothing is sent;
 9. save the `sending` receipt, then exactly one write.
 
-Steps 1 to 6 make no request.
+Steps 1 to 6 make no request. The reconciling read comes before the source check, so a changed source never hides a send that already landed, and every new write still needs a fresh source match.
 
 An **outcome**:
 
@@ -255,9 +255,9 @@ An **outcome**:
 
 `op` is `op-` and 32 lowercase hex digits from `crypto.getRandomValues` (16 bytes). `compose` gives every new intent a new id, so two separate steers with identical text on the same subject (Not now, Ship it, Not now) are three intents, three ids and three writes. An id is reused only for that same pending intent: a double tap (a `post` while its first is in flight returns the same promise), a retry of an `unknown`, and a reload (`pending()` restores it). A `posted` id returns its saved outcome and sends nothing.
 
-**Receipts.** Just before its one write (step 9), `post` saves the intent (`op`, `body`, `repository`, `subject`, `source`, the preview, for a decision its queue item, state `sending`, and `sent_at` the time just before the write) in `localStorage` under `openwiz.app.v2.receipts.<user id>`, the signed-in account's numeric GitHub id from `GET /user`. It then saves each outcome there. Receipts are per account: another account signed in on the same browser reads none of them, and signing out keeps them.
+**Receipts.** Just before its one write (step 9), `post` saves the intent (`op`, `body`, `repository`, `subject`, `source`, the preview, for a decision its queue item, state `sending`, `sent_at` the time just before the write, and `before`: the ids of this account's comments with exactly this body that step 7's complete read found, which are known to precede the attempt) in `localStorage` under `openwiz.app.v2.receipts.<user id>`, the signed-in account's numeric GitHub id from `GET /user`. It then saves each outcome there. Receipts are per account: another account signed in on the same browser reads none of them, and signing out keeps them.
 
-**Unknown outcomes.** Before sending again after an `unknown`, `post` reads every page of the subject's comments and looks only for comments that could have come from that send: author id the signed-in account's, body exactly the intent's, `created_at` no earlier than `sent_at` minus five minutes, and not already the comment of another receipt of this account. One found is `posted` with that comment. A complete read with none may send once more; an incomplete read stays `unknown`. A comment with the same words from another account, or from before the send, is never taken as this send.
+**Unknown outcomes.** A receipt still `sending` when the page reloads may have landed, so it is restored by `pending()` and reconciled exactly like an `unknown`. Before sending again after either, `post` reads every page of the subject's comments and looks only for comments that could have come from that send: author id the signed-in account's, body exactly the intent's, `created_at` no earlier than `sent_at` minus five minutes, not in the receipt's `before`, and not already the comment of another receipt of this account. One found is `posted` with that comment, whatever the source says now. A complete read with none rules the earlier send out: the intent may send once more only after a fresh source match, and is retired when the source changed; an incomplete read stays `unknown`. A comment with the same words from another account, or from before the attempt, is never taken as this send.
 
 ### Cards
 

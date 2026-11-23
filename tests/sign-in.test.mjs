@@ -225,7 +225,7 @@ test('at most four attempts are kept: a fifth start drops the oldest', async () 
 
 test('the manifest asks for read-only metadata, issues and pull requests and nothing else', async () => {
   const manifest = JSON.parse(await readFile(new URL('../docs/github-app-manifest.json', import.meta.url), 'utf8'));
-  assert.deepEqual(manifest.default_permissions, { metadata: 'read', issues: 'read', pull_requests: 'read' });
+  assert.deepEqual(manifest.default_permissions, { metadata: 'read', issues: 'write', pull_requests: 'read' });
   assert.deepEqual(manifest.default_events, []);
   assert.deepEqual(manifest.callback_urls, ['https://openwiz.dev/app']);
   assert.deepEqual(manifest.hook_attributes, { url: 'https://openwiz.dev/', active: false });

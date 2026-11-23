@@ -42,7 +42,7 @@ class Net {
     const answer = (status, body, extra = {}) => Response.json(body, { status, headers: extra });
     if (method === 'GET' && at.pathname === '/user') return answer(200, this.account);
     const comments = at.pathname.match(/^\/repos\/acme\/factory\/issues\/(\d+)\/comments$/);
-    if (comments && method === 'GET' && this.mode !== 'unlistable') {
+    if (comments && method === 'GET') {
       const page = Number(at.searchParams.get('page'));
       return answer(200, page === 1 ? this.list(comments[1]).map(c => ({ html_url: `https://github.com/acme/factory/issues/${comments[1]}#issuecomment-${c.id}`, ...c })) : []);
     }
@@ -71,7 +71,7 @@ class FakeEvent {
 }
 const tap = () => new FakeEvent('click', true);
 
-async function boot({ net = new Net(), storage = new Map(), mode = 'on', account = OWNER, picked = PICKED, search = '', signedIn = true } = {}) {
+async function boot({ net = new Net(), storage = new Map(), mode = 'on', account = OWNER, picked = PICKED, search = '', signedIn = true, before } = {}) {
   if (mode !== null) storage.set('openwiz.app.v2', JSON.stringify(mode));
   if (signedIn) storage.set('openwiz.app.auth', JSON.stringify({ session: `session-${account.id}`, token: TOKEN, expiresAt: null, refresh: null, refreshExpiresAt: null }));
   if (picked) storage.set('openwiz.app.repo', JSON.stringify(picked));
@@ -94,6 +94,7 @@ async function boot({ net = new Net(), storage = new Map(), mode = 'on', account
   vm.createContext(context);
   for (const script of SCRIPTS) {
     const file = new URL(script, ROOT);
+    if (script === 'app/records.js' && before) vm.runInContext(before, context);
     if (existsSync(file)) vm.runInContext(await readFile(file, 'utf8'), context, { filename: script });
   }
   const OW = context.OW;
@@ -459,4 +460,31 @@ test('R6: after an unknown, a new write needs a fresh source match', async () =>
   await confirmAll(run.records, preview);
   assert.deepEqual(plain(await run.records.post(preview)), { outcome: 'refused', op: preview.op, reason: 'source_unchecked' });
   assert.equal(net.writes().length, 1);
+});
+
+test('a script that claims the write path before records.js leaves the layer off, with zero writes', async () => {
+  const input = await json(new URL('spec-not_now.input.json', FORMS));
+  const run = await boot({ before: 'OW.stolen = OW.data.writer();' });
+  assert.equal(typeof run.OW.stolen?.github, 'function', 'the first claim got no handle');
+  assert.equal(run.records.enabled(), false);
+  const preview = await run.records.compose(input.action);
+  run.records.confirm(preview, tap());
+  assert.deepEqual(plain(await run.records.post(preview)), { outcome: 'refused', op: preview.op, reason: 'disabled' });
+  assert.deepEqual(run.net.writes(), []);
+});
+
+test('a 4xx answer is refused and frees the subject; a 5xx answer is unknown and holds it', async () => {
+  const input = await json(new URL('spec-not_now.input.json', FORMS));
+  const run = await boot();
+  const first = await run.records.compose(input.action);
+  run.records.confirm(first, tap());
+  run.net.mode = 'forbidden';
+  assert.deepEqual(plain(await run.records.post(first)), { outcome: 'refused', op: first.op, reason: 'github' });
+  assert.deepEqual(plain(run.records.pending()), []);
+  const second = await run.records.compose(input.action);
+  run.records.confirm(second, tap());
+  run.net.mode = 'server';
+  assert.equal(plain(await run.records.post(second)).outcome, 'unknown');
+  assert.deepEqual(plain(run.records.pending().map(p => p.op)), [second.op]);
+  assert.equal(run.net.writes().length, 2);
 });
