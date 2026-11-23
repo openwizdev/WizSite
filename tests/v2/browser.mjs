@@ -113,6 +113,7 @@ export class World {
     this.log = [];
     this.violations = [];
     this.github = {};
+    this.recorded = {};
     this.graphql = {};
     this.site = {};
     this.opened = [];
@@ -137,6 +138,8 @@ export class World {
       return { status: 204, raw: Buffer.alloc(0), headers: { 'Access-Control-Allow-Methods': 'GET, POST',
         'Access-Control-Allow-Headers': 'Authorization, Accept, Content-Type' } };
     }
+    const exact = this.recorded[`${request.method} ${url.pathname}${url.search}`];
+    if (exact) return { status: exact.status, json: exact.json, headers: exact.next ? { Link: `<${API}/next>; rel="next"` } : {} };
     const route = this.github[`${request.method} ${url.pathname}`];
     if (route) return route(entry, url);
     if (request.method === 'GET' && url.pathname === '/user/installations') return { status: 200, json: await fixture('installations.json') };
@@ -146,6 +149,11 @@ export class World {
       if (this.graphql[name]) return this.graphql[name](entry);
     }
     return { status: 404, json: { message: 'Not Found' } };
+  }
+
+  // A fixture's recorded answers, keyed `METHOD /path?query` exactly as the app asks (contracts/app-records.v1.md).
+  record(github) {
+    Object.assign(this.recorded, github);
   }
 
   writes() {
@@ -244,6 +252,18 @@ export async function open(browser, world) {
       if (!el) throw new Error('no visible control: ' + ${JSON.stringify(text)});
       el.click();
     })()`),
+    // A real mouse click (a trusted event), which OW.records.confirm requires; page.click's el.click() is not trusted.
+    async tap(text) {
+      const box = await page.run(`(() => {
+        ${LABEL}
+        const el = [...document.querySelectorAll('a, button')].find(e => e.offsetParent !== null && label(e) === ${JSON.stringify(text)});
+        if (!el) throw new Error('no visible control: ' + ${JSON.stringify(text)});
+        el.scrollIntoView({ block: 'center' });
+        const r = el.getBoundingClientRect();
+        return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+      })()`);
+      for (const type of ['mousePressed', 'mouseReleased']) await send('Input.dispatchMouseEvent', { type, x: box.x, y: box.y, button: 'left', clickCount: 1 });
+    },
     close: async () => {
       await browser.send('Target.closeTarget', { targetId });
       await browser.send('Target.disposeBrowserContext', { browserContextId });
