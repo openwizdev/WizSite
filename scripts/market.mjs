@@ -24,9 +24,9 @@ export const PRIVATE_SOURCE = [
   ['a private id', String.raw`\bthr${'_'}[A-Za-z0-9]|\b(?:proj|prj|mch|usr|acct|auto|sess?|sbx)_[A-Za-z0-9]|\bcr_[0-9a-fA-F]{8}-[0-9a-fA-F]{4}|\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b`],
   ['a machine path', String.raw`(?<![\w.~%/-])/(?:home|Users|root|tmp|var/folders|private/var)/|(?<![A-Za-z0-9])[A-Za-z]:\\`],
 ];
-const PYTHON_SPACE = String.raw`\t\n\v\f\r\x1c-\x20\x85\xa0  -     　`;
-const PYTHON_IGNORECASE_ASCII = { 'İ': 'i', 'ı': 'i', 'ſ': 's', 'K': 'k' };
-const pythonIgnorecase = text => text.replace(/[İıſK]/g, c => PYTHON_IGNORECASE_ASCII[c]);
+const PYTHON_SPACE = String.raw`\t\n\v\f\r\x1c-\x20\x85\xa0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000`;
+const PYTHON_IGNORECASE_ASCII = { '\u0130': 'i', '\u0131': 'i', '\u017f': 's', '\u212a': 'k' };
+const pythonIgnorecase = text => text.replace(/[\u0130\u0131\u017f\u212a]/g, c => PYTHON_IGNORECASE_ASCII[c]);
 
 function fromPython(source) {
   const ignorecase = source.startsWith('(?i)');
