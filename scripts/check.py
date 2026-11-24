@@ -144,7 +144,8 @@ SITE_HEADERS = (
     'Referrer-Policy: strict-origin-when-cross-origin',
 )
 TURNSTILE_ORIGIN = 'https://challenges.cloudflare.com'
-ASK_CSP = SITE_CSP.replace("script-src 'self';", f"script-src 'self' {TURNSTILE_ORIGIN};").replace("frame-src 'none';", f"frame-src {TURNSTILE_ORIGIN};")
+ASK_CSP = re.sub(r"(script-src [^;]*);", rf"\1 {TURNSTILE_ORIGIN};", SITE_CSP, count=1).replace("frame-src 'none';", f"frame-src {TURNSTILE_ORIGIN};")
+assert ASK_CSP.count(TURNSTILE_ORIGIN) == 2, 'the Ask a Wiz CSP must add Turnstile to script-src and frame-src'
 ASK_PATHS = ('/', '/faq/*')
 APP_CSP = ("default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; media-src 'self'; font-src 'self'; "
            "connect-src 'self' https://api.github.com; manifest-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
