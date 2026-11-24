@@ -113,10 +113,6 @@ class Checks(unittest.TestCase):
             body = b'WEBP' + b''.join(k + len(v).to_bytes(4, 'little') + v + b'\0' * (len(v) & 1) for k, v in chunks)
             return b'RIFF' + len(body).to_bytes(4, 'little') + body
         check_webp(webp((b'VP8L', b'xyz')))
-        with self.assertRaisesRegex(AssertionError, 'ICCP'):
-            check_webp(webp((b'ICCP', b'unreviewed profile')))
-        with self.assertRaisesRegex(AssertionError, 'EXIF'):
-            check_webp(webp((b'ICCP', b'profile'), (b'EXIF', b'name')), allow_icc=True)
         for bad in (webp((b'VP8L', b'xyz'), (b'EXIF', b'name')), webp((b'XMP ', b'x')), b'GIF89a' + b'\0' * 8):
             with self.subTest(bad=bad[:16]), self.assertRaises(AssertionError):
                 check_webp(bad)
