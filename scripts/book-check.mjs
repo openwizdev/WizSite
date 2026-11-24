@@ -383,6 +383,17 @@ async function runWidth(browser, srv, { name, width, height, shotsDir }) {
     assert(pickerCheck.navTeamBg === 'rgba(0, 0, 0, 0)' || pickerCheck.navTeamBg === 'transparent',
       `${name}: .nav-team should be a quiet link on /book, got bg ${pickerCheck.navTeamBg}`);
     assert(!pickerCheck.overflow, `${name}: horizontal overflow on picker`);
+    const monthCueCheck = await tab.evalJs(`(() => {
+      const changed = [...document.querySelectorAll('.book-day')].filter(b => b.querySelector('.book-day-month'));
+      return changed.map(b => ({
+        month: b.querySelector('.book-day-month')?.textContent?.trim(),
+        wd: b.querySelector('.book-day-wd')?.textContent?.trim(),
+      }));
+    })()`);
+    for (const item of monthCueCheck) {
+      assert(item.month && item.wd && /^(Mon|Tue|Wed|Thu|Fri|Sat|Sun)$/i.test(item.wd) && item.wd.toLowerCase() !== item.month.toLowerCase(),
+        `${name}: month change must keep weekday alongside month label: ${JSON.stringify(item)}`);
+    }
     await tab.shot(shotPath('picker'));
 
     const kbCheck = await tab.evalJs(`(() => {
@@ -528,8 +539,8 @@ async function runWidth(browser, srv, { name, width, height, shotsDir }) {
       document.querySelector('.book-submit').click();
     })()`);
     await tab.waitFor('Boolean(document.querySelector(".book-confirm") && !document.querySelector(".book-confirm").hidden)');
-    const skippedText = await tab.evalJs('document.querySelector(".book-confirm").textContent');
-    assert(skippedText.includes('You’re booked. Save the time below.') || skippedText.includes("You're booked. Save the time below."),
+    const skippedText = await tab.evalJs('document.querySelector("#book-confirm-note").textContent.trim()');
+    assert(skippedText === 'No email is coming, so add it to your calendar now.',
       `${name}: unexpected skipped-email wording: ${skippedText}`);
 
     srv.state.slotsMode = 'empty';
@@ -548,13 +559,16 @@ async function runWidth(browser, srv, { name, width, height, shotsDir }) {
       const link = box?.querySelector('a[href="/team/"]');
       const mailto = document.querySelector('a[href^="mailto:"]');
       const heading = box?.querySelector('h2')?.textContent?.trim() || '';
+      const body = box?.querySelector('#book-unavailable-text')?.textContent?.trim() || '';
       const overflow = document.documentElement.scrollWidth > window.innerWidth;
-      return { hasTeamLink: Boolean(link), hasMailto: Boolean(mailto), heading, overflow };
+      return { hasTeamLink: Boolean(link), hasMailto: Boolean(mailto), heading, body, overflow };
     })()`);
     assert(unavailCheck.hasTeamLink && !unavailCheck.hasMailto && !unavailCheck.overflow,
       `${name}: unavailable state check failed: ${JSON.stringify(unavailCheck)}`);
     assert(unavailCheck.heading === 'Booking is closed right now',
       `${name}: unexpected unavailable heading: ${unavailCheck.heading}`);
+    assert(unavailCheck.body === 'Check back soon, or see the team page for how the call works.',
+      `${name}: unavailable body should not repeat heading: ${unavailCheck.body}`);
     await tab.shot(shotPath('unavailable'));
 
     srv.state.cancelPayloads.length = 0;
@@ -680,6 +694,52 @@ async function runPwaAndOffline(browser, srv) {
   }
 }
 
+async function runDstChecks(browser, srv) {
+  const cases = [
+    { tz: 'America/New_York', nowIso: '2027-03-14T04:30:00Z', slotIso: '2027-03-15T18:00:00Z', mustInclude: ['2027-03-13', '2027-03-14', '2027-03-15'] },
+    { tz: 'America/New_York', nowIso: '2027-03-14T06:30:00Z', slotIso: '2027-03-15T18:00:00Z', mustInclude: ['2027-03-14', '2027-03-15', '2027-03-16'] },
+    { tz: 'Europe/London', nowIso: '2027-03-27T23:30:00Z', slotIso: '2027-03-29T18:00:00Z', mustInclude: ['2027-03-27', '2027-03-28', '2027-03-29'] },
+    { tz: 'Europe/London', nowIso: '2027-03-28T00:30:00Z', slotIso: '2027-03-29T18:00:00Z', mustInclude: ['2027-03-28', '2027-03-29', '2027-03-30'] },
+  ];
+  const savedSlots = srv.state.slotsData;
+  try {
+    for (const c of cases) {
+      srv.state.slotsMode = 'ok';
+      srv.state.slotsData = { ...savedSlots, slots: [c.slotIso] };
+      const tab = await openTab(browser, 390, 844);
+      try {
+        await browser.send('Emulation.setTimezoneOverride', { timezoneId: c.tz }, tab.sessionId);
+        await browser.send('Page.addScriptToEvaluateOnNewDocument', {
+          source: `(() => {
+            const fixed = Date.parse(${JSON.stringify(c.nowIso)});
+            const RealDate = Date;
+            class MockDate extends RealDate {
+              constructor(...args) { super(...(args.length ? args : [fixed])); }
+              static now() { return fixed; }
+            }
+            window.Date = MockDate;
+          })();`,
+        }, tab.sessionId);
+        await tab.goto(`${srv.origin}/book/`);
+        await tab.waitFor('document.querySelectorAll(".book-day").length >= 14');
+        const keys = await tab.evalJs('[...document.querySelectorAll(".book-day")].map(b => b.dataset.day)');
+        for (const req of c.mustInclude) {
+          assert(keys.includes(req), `DST ${c.tz} at ${c.nowIso}: missing day ${req} in ${keys.join(',')}`);
+        }
+        for (let i = 1; i < keys.length; i++) {
+          const prev = Date.parse(`${keys[i - 1]}T12:00:00Z`);
+          const cur = Date.parse(`${keys[i]}T12:00:00Z`);
+          assert(cur - prev === 86400000, `DST ${c.tz} at ${c.nowIso}: non-consecutive days ${keys[i - 1]} -> ${keys[i]}`);
+        }
+      } finally {
+        await tab.close();
+      }
+    }
+  } finally {
+    srv.state.slotsData = savedSlots;
+  }
+}
+
 async function main() {
   const { shots } = parseArgs(process.argv.slice(2));
   if (shots) await mkdir(shots, { recursive: true });
@@ -690,8 +750,9 @@ async function main() {
   try {
     await runWidth(browser, srv, { name: 'phone', width: 390, height: 844, shotsDir: shots });
     await runWidth(browser, srv, { name: 'desktop', width: 1280, height: 900, shotsDir: shots });
+    await runDstChecks(browser, srv);
     await runPwaAndOffline(browser, srv);
-    console.log('PASS: book-check (390px, 1280px, keyboard, states, cancel, installability, offline)');
+    console.log('PASS: book-check (390px, 1280px, keyboard, states, cancel, DST, installability, offline)');
   } finally {
     await browser.close();
     await srv.close();
