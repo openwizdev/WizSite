@@ -616,3 +616,40 @@ test('R9: a card marked stale by a timestamp mismatch recovers on the next succe
     await run.close();
   }
 });
+
+const STATE_CARDS = JSON.parse(await readFile(new URL('tests/v2/fixtures/feed-states/read-states.json', ROOT), 'utf8'));
+const stateCard = `(() => { const card = document.querySelector('.v2-queue-status .v2-state-card, .v2-state-card');
+  return card && { label: card.querySelector('.v2-label')?.textContent, warn: card.classList.contains('v2-state-warn'), text: card.textContent }; })()`;
+
+test('real v2 Feed shows a Read failed state card when the Specs read fails', async () => {
+  const run = await start();
+  try {
+    await queueWorld(run);
+    run.world.graphql.Specs = async () => STATE_CARDS.failed.specs;
+    await openQueue(run, 'dry-run');
+    await run.page.until(`${stateCard}?.label === 'Read failed'`, 'the Read failed card');
+    const card = await run.page.run(stateCard);
+    assert.equal(card.warn, true);
+    assert.match(card.text, /Feed couldn't be read from GitHub/);
+    assert.equal(await run.page.run(`Boolean(document.querySelector('.v2-lighthouse'))`), false, 'a failed read looked all clear');
+    assert.deepEqual(run.world.violations, []);
+  } finally {
+    await run.close();
+  }
+});
+
+test('real v2 Feed shows a Partial read state card when GitHub gives only part of the list', async () => {
+  const run = await start();
+  try {
+    await queueWorld(run, { specs: [], details: {}, grillAnswers: STATE_CARDS.partial.github });
+    await openQueue(run, 'dry-run');
+    await run.page.until(`${stateCard}?.label === 'Partial read'`, 'the Partial read card');
+    const card = await run.page.run(stateCard);
+    assert.equal(card.warn, true);
+    assert.match(card.text, /GitHub gave only part of the open pull requests/);
+    assert.ok(!card.text.includes(EMPTY), 'a partial read said the queue is empty');
+    assert.deepEqual(run.world.violations, []);
+  } finally {
+    await run.close();
+  }
+});

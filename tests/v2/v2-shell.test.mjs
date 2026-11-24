@@ -151,9 +151,20 @@ test('switch on + demo=1: renders v2 shell, deep links, interactions, and makes 
     assert.deepEqual(await badges(), [null, null]);
 
     await run.page.go(`${SITE}/app/?v2=dry-run&demo=1#/settings`);
-    await run.page.until(`document.querySelector('select[aria-label="Where it runs"]')?.value === 'Local workstation'`, 'settings screen');
-    await run.page.tap('Not connected');
-    assert.equal(await run.page.run(`document.querySelector('[aria-label="Notifications"]').getAttribute('aria-checked')`), 'true');
+    const hostValue = `document.querySelector('.v2-setting-trigger .v2-setting-value')?.textContent`;
+    await run.page.until(`${hostValue} === 'Local workstation'`, 'settings screen');
+    assert.equal(await run.page.run(`document.querySelectorAll('select, [role="switch"]').length`), 0);
+    const openRow = name => run.page.run(`[...document.querySelectorAll('.v2-setting-trigger')]
+      .find(el => el.querySelector('.v2-setting-label').textContent === ${JSON.stringify(name)}).click()`);
+    await openRow('Where it runs');
+    await run.page.until(`document.querySelector('.v2-setting-panel [aria-pressed="true"]')?.textContent === 'Local workstation'`, 'settings choices open with the current one checked');
+    await run.page.click('Cloud workspace');
+    await run.page.until(`${hostValue} === 'Cloud workspace' && !document.querySelector('.v2-setting-panel')
+      && document.querySelector('.v2-toast:not([hidden])')?.textContent === 'Saved'`, 'choosing applies the setting with a Saved toast');
+    await openRow('Connections');
+    await run.page.until(`document.querySelector('.v2-setting-panel')`, 'connections choices');
+    await run.page.run(`[...document.querySelectorAll('.v2-setting-option')].find(el => el.firstChild.textContent === 'Notifications').click()`);
+    await run.page.until(`[...document.querySelectorAll('.v2-setting-value')].some(el => el.textContent === '2 connected')`, 'connecting notifications');
 
     assert.deepEqual(apiRequests(run.world), [], 'demo mode sent an API or external network request');
     assert.deepEqual(await run.page.run(`performance.getEntriesByType('resource').filter(entry =>
@@ -235,6 +246,23 @@ test('real signed-in v2: welcome, picker, calm Chat card, Feed states, and truth
     assert.match(await run.page.text(), /GitHub\s+Connected/);
     assert.match(await run.page.text(), /acme\/factory/);
     assert.deepEqual(run.world.violations, []);
+  } finally {
+    await run.close();
+  }
+});
+
+test('demo welcome: the quiet GitHub link reopens a saved session instead of restarting sign-in', async () => {
+  const run = await start();
+  try {
+    await run.page.go(`${SITE}/app/?v2=dry-run&demo=1#/welcome`);
+    await run.page.until(`document.querySelector('.v2-welcome-sample')`, 'demo welcome');
+    assert.equal(await run.page.run(`document.querySelector('.v2-welcome-sample').getAttribute('href')`), '/api/sign-in/start');
+    assert.equal(await run.page.run(`document.querySelector('.v2-welcome-sub')?.textContent`), 'Answer a few questions. Watch it build. Ship it.');
+    await signIn(run.page);
+    await run.page.go(`${SITE}/app/?v2=dry-run&demo=1#/welcome`);
+    await run.page.until(`document.querySelector('.v2-welcome-sample')`, 'demo welcome with a saved session');
+    assert.equal(await run.page.run(`document.querySelector('.v2-welcome-sample').getAttribute('href')`), '/app/');
+    assert.deepEqual(apiRequests(run.world).filter(r => r.path.startsWith('/api/sign-in/start')), []);
   } finally {
     await run.close();
   }
