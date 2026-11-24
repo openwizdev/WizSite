@@ -1046,7 +1046,7 @@ test('R9 (#2923): an older check finishing after a newer changed or unchecked ch
     const gate = new Promise(resolve => { release = resolve; });
     let held = false;
     net.intercept = async (method, at) => {
-      if (method === 'GET' && at.pathname.includes('/contents/docs/grills/') && !held) {
+      if (`${method} ${at.pathname}${at.search}` === key && !held) {
         held = true;
         await gate;
         return Response.json(original.json, { status: original.status });
