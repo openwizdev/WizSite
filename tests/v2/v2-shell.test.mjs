@@ -4,6 +4,18 @@ import { SITE, signIn, start } from './browser.mjs';
 
 const apiRequests = world => world.log.filter(r => r.origin !== SITE || r.path.startsWith('/api/'));
 
+// The public app entry point on main, in document order, without build fingerprints.
+const mainAssets = {
+  styles: ['/app/ember.css', '/app/pages/queue.css', '/app/cards/decision.css'],
+  scripts: [
+    '/app/data.js', '/app/records.js', '/app/ui.js', '/app/pages/you.js', '/app/pages/queue.js',
+    '/app/pages/specs.js', '/app/vendor/dagre-3.1.3.min.js', '/app/pages/spec.js', '/app/pages/agents.js',
+    '/app/cards/decision.js', '/app/palette.js', '/app/shell.js',
+  ],
+};
+const withoutFingerprint = path => path.replace(/\.[a-f0-9]{10}(?=\.(css|js)$)/, '');
+
+
 test('switch off: none of the v2 shell renders and demo=1 is ignored', async () => {
   const run = await start();
   try {
@@ -14,6 +26,17 @@ test('switch off: none of the v2 shell renders and demo=1 is ignored', async () 
     assert.equal(await run.page.run(`Boolean(document.querySelector('.v2-shell, .v2-welcome-card'))`), false);
     assert.match(await run.page.text(), /Read-only, on the repositories you choose\./);
     assert.ok(!run.world.log.some(r => /^\/app\/pages\/v2\./.test(r.path)), 'switch off loaded a v2 asset');
+    const assets = await run.page.run(`({
+      styles: [...document.querySelectorAll('link[rel="stylesheet"]')].map(el => el.getAttribute('href')),
+      scripts: [...document.querySelectorAll('script[src]')].map(el => el.getAttribute('src')),
+    })`);
+    for (const kind of ['styles', 'scripts']) {
+      assert.deepEqual(assets[kind].map(withoutFingerprint), mainAssets[kind]);
+    }
+    assert.deepEqual(
+      run.world.log.map(r => withoutFingerprint(r.path)).filter(path => /\.(css|js)$/.test(path)).sort(),
+      [...mainAssets.styles, ...mainAssets.scripts].sort(),
+    );
     assert.deepEqual(apiRequests(run.world), []);
     assert.deepEqual(run.world.violations, []);
   } finally {
