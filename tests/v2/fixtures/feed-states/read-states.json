@@ -1,0 +1,10 @@
+{
+  "failed": {
+    "specs": { "status": 502, "json": { "message": "Bad Gateway" } }
+  },
+  "partial": {
+    "github": {
+      "GET /repos/acme/factory/pulls?state=open&per_page=100&page=1": { "status": 502, "json": { "message": "Bad Gateway" } }
+    }
+  }
+}
