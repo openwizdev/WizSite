@@ -27,9 +27,11 @@ Cloudflare Pages deploys from **main**. Configure the repository root as the bui
 
 Changes merge after green CI and one review from the other model family. No per-change maintainer approval is required. This repository contains no deployment credentials or separate deploy workflow; the Pages project owns the Git integration.
 
-## Security headers
+## Security and cache headers
 
 `_headers` sets site-wide security headers under `/*` (HSTS, a strict Content-Security-Policy with no `'unsafe-inline'` or `'unsafe-eval'`, `X-Frame-Options: DENY`, `Permissions-Policy`, `Cross-Origin-Opener-Policy: same-origin`, `X-Content-Type-Options: nosniff`, and `Referrer-Policy: strict-origin-when-cross-origin`). Under `/app/*`, `! Content-Security-Policy` and `! Referrer-Policy` detach the site-wide values before setting the stricter app policy so Cloudflare Pages does not comma-join both headers.
+
+For caching, `/*` defaults to `Cache-Control: public, max-age=0, must-revalidate` (keeping HTML and any unhashed `.css`/`.js` revalidated on every visit so a deploy never serves stale HTML pointing at removed hashed files). More-specific rules detach with `! Cache-Control` before setting a single value: fingerprinted and version-pinned styles/scripts (`/*.:hash.css`, `/*.:hash.js`) use `public, max-age=31536000, immutable`; fonts (`/fonts/*`) use `public, max-age=2592000, stale-while-revalidate=604800`; and unhashed images, icons, art, video, and captions (`/art/*`, `/brand/*`, `/drivers/logos/*`, root favicons, `/app/*.svg|png|ico`, `/*.mp4`, `/*.vtt`) use `public, max-age=604800, stale-while-revalidate=2592000`. These rules take effect when the zone's Browser Cache TTL is set to respect existing headers.
 
 To verify the effective merged headers locally after `npm run build`:
 
