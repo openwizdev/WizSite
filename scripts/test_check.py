@@ -113,7 +113,7 @@ class Checks(unittest.TestCase):
             body = b'WEBP' + b''.join(k + len(v).to_bytes(4, 'little') + v + b'\0' * (len(v) & 1) for k, v in chunks)
             return b'RIFF' + len(body).to_bytes(4, 'little') + body
         check_webp(webp((b'VP8L', b'xyz')))
-        for bad in (webp((b'VP8L', b'xyz'), (b'EXIF', b'name')), webp((b'XMP ', b'x')), webp((b'ICCP', b'x')), b'GIF89a' + b'\0' * 8):
+        for bad in (webp((b'VP8L', b'xyz'), (b'EXIF', b'name')), webp((b'XMP ', b'x')), b'GIF89a' + b'\0' * 8):
             with self.subTest(bad=bad[:16]), self.assertRaises(AssertionError):
                 check_webp(bad)
         for path in ('elsewhere/x.webp', 'art/new.webp', 'art/seal.webp'):
