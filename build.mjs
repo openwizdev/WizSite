@@ -14,7 +14,7 @@ const withHeader = (html, page) => {
   const slot = '<template data-slot="header"></template>\n';
   if (html.split(slot).length !== 2) throw new Error('a site page needs exactly one header slot');
   const href = '/' + page.replace(/index\.html$/, '');
-  return html.replace(slot, header.replace(`href="${href}"`, `href="${href}" aria-current="page"`));
+  return html.replace(slot, header.replace(`<a href="${href}"`, `<a href="${href}" aria-current="page"`));
 };
 const footer = await readFile(new URL('footer.html', root), 'utf8');
 const withFooter = html => {

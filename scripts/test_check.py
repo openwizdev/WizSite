@@ -689,7 +689,7 @@ class Checks(unittest.TestCase):
         book = re.compile(r'data-book href="[^"]*"')
         refused = {
             'buy button': ('changelog/index.html', lambda t: re.sub(r'<a class="nav-team"[^>]*>.*?</a>', '', t, count=1)),
-            'buy button to /team/': ('team/index.html', lambda t: t.replace('<a class="nav-team" href="/team/" aria-current="page">', '<a class="nav-team" href="/">', 1)),
+            'buy button to /team/': ('team/index.html', lambda t: t.replace('<a class="nav-team" href="/team/">', '<a class="nav-team" href="/">', 1)),
             'two booking links': ('team/index.html', lambda t: t.replace('</main>', '<a data-book href="https://cal.com/x">Book</a></main>', 1)),
             'one booking value': ('team/index.html', lambda t: book.sub('data-book href="https://cal.com/x"', t, count=1)),
             'outside the team page': ('index.html', lambda t: t.replace('</main>', '<a data-book href="https://cal.com/x">Book</a></main>', 1)),
@@ -1168,6 +1168,8 @@ class Checks(unittest.TestCase):
                 ('team/index.html', 'id="site-navigation"', 'id="site-navigation" hidden', 'without JavaScript'),
                 ('changelog/index.html', '<a href="/market/">Market</a>', '', 'phone menu needs Drivers'),
                 ('faq/index.html', ' aria-current="page">FAQ', '>FAQ', 'aria-current'),
+                ('index.html', 'class="landing-brand" href="/"', 'class="landing-brand" href="/" aria-current="page"', 'aria-current'),
+                ('team/index.html', 'class="nav-team" href="/team/"', 'class="nav-team" href="/team/" aria-current="page"', 'aria-current'),
                 ('market/index.html', 'aria-label="Main navigation"', 'aria-label="Navigation"', 'identical to the landing')):
             self.broken(name, old, new, error)
 
