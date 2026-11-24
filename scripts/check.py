@@ -153,11 +153,14 @@ TEAM_HEADLINE = 'Leave the call with a reviewed pull request.'
 TEAM_LEAD = ('Jake, who built OpenWiz, sets up an agent factory with your team on your own repository. '
              'Pick one small, real change: your agents build and review it. Merging stays your call.')
 TEAM_NEEDS = '30 minutes. Bring a repository with working CI and a signed-in Claude Code or Codex.'
+TEAM_EXAMPLE = ('your-org/your-repo', 'Example', '#128', 'Add CSV export to the reports page',
+                'Built by: your builder agent', 'Reviewed by: a second agent Approved',
+                'Checks: CI passed', 'Merge: your call')
 TEAM_STEPS = (('Connect', 'We connect OpenWiz to your repository and the coding agents you already use.'),
               ('Decide', 'You pick one small, real change and answer a few questions about it.'),
               ('Ship', 'Your agents build it, a second agent reviews it, and the pull request opens on your repository. '
                        'Merging is your call.'))
-TEAM_PARTS = ('On the call', 'What you’re setting up', 'One small change. One call.')
+TEAM_PARTS = ('On the call', 'Launch film', 'What you’re setting up', 'One small change. One call.')
 TEAM_FACTS = ('OpenWiz 0.01 is out: open source, Apache-2.0.',
               'It never touches a login and runs no server of ours.',
               'Which drivers passed their live check: the Drivers page.',
@@ -1509,27 +1512,40 @@ def check_team(htmls, pages):
                      r'<a class="team-book" id="book" data-book [^>]*>Book a call</a>\s*<p class="team-needs">([^<]*)</p>\s*</div>', hero)
     assert copy and tuple(map(unescape, copy.groups())) == (TEAM_KICKER, TEAM_LEAD, TEAM_NEEDS), \
         f'the hero, in order: who it is for, the headline, what happens on the call, Book a call, what to bring: {TEAM_KICKER} / {TEAM_LEAD} / {TEAM_NEEDS}'
+    example = re.fullmatch(r'\s*<figure class="team-pr">\s*<figcaption class="team-pr-heading">\s*'
+                           r'<p class="team-pr-meta"><code>([^<]+)</code> <span>([^<]+)</span></p>\s*'
+                           r'<p class="team-pr-title"><span>([^<]+)</span> ([^<]+)</p>\s*</figcaption>\s*'
+                           r'<dl class="team-pr-details">\s*'
+                           r'<div>(<dt>[^<]+</dt> <dd>[^<]+</dd>)</div>\s*'
+                           r'<div>(<dt>[^<]+</dt> <dd>[^<]+ <span class="team-pr-approved">[^<]+</span></dd>)</div>\s*'
+                           r'<div>(<dt>[^<]+</dt> <dd>[^<]+</dd>)</div>\s*'
+                           r'<div>(<dt>[^<]+</dt> <dd>[^<]+</dd>)</div>\s*</dl>\s*</figure>\s*', hero[copy.end():])
+    assert example and not hero[:copy.start()].strip() and tuple(unescape(plain(s)) for s in example.groups()) == TEAM_EXAMPLE, \
+        f'the hero ends with the labelled pull request example, in real text: {TEAM_EXAMPLE}'
     page = Page(main)
     assert len(page.videos) == 1, 'the team page has one video: the launch film'
     clip = page.videos[0]
-    assert hero.index('class="team-copy"') < hero.index('<figure class="launch team-film">'), 'the launch film sits in the hero, after Book a call'
-    assert clip.get('class') == 'launch-video' and clip.get('src') == f'/{LAUNCH_VIDEO}' and clip.get('poster') == f'/{LAUNCH_POSTER}', \
-        'the team film is the launch video over its pinned poster'
-    assert clip.get('preload') == 'none' and not {'autoplay', 'loop', 'muted'} & set(clip) and 'playsinline' in clip and 'controls' in clip, \
-        'the team film loads nothing until clicked, never autoplays, and plays with sound and native controls'
-    assert clip.get('aria-label') == 'OpenWiz in two minutes', 'the team film needs its accessible name'
-    about = re.search(r'<p class="sr-only" id="([^"]+)">([^<]+)</p>', hero)
-    assert about and clip.get('aria-describedby') == about[1] and len(re.findall(r'[.!?](?:\s|$)', about[2])) == 2, \
-        'the team film needs its two-sentence text alternative'
-    assert [(t.get('kind'), t.get('src'), t.get('srclang')) for t in page.tracks_of(clip)] == [('captions', f'/{LAUNCH_CAPTIONS}', 'en')], \
-        'the team film needs its English captions'
-    play = re.search(r'<button class="launch-play" type="button" hidden>([\s\S]*?)</button>', hero)
-    assert play and plain(play[1]) == LAUNCH_LABEL, f'the team film needs its one play button, hidden until site.js runs: {LAUNCH_LABEL}'
     steps = re.search(r'<section class="team-part team-call wrap" aria-labelledby="team-how">\s*'
                       r'<h2 id="team-how">[^<]*</h2>\s*<ol class="team-steps">([\s\S]*?)</ol>\s*</section>', main)
     found = re.findall(r'<li><h3>([\s\S]*?)</h3><p>([\s\S]*?)</p></li>', steps[1]) if steps else []
     assert tuple((plain(title), plain(text)) for title, text in found) == TEAM_STEPS and steps[1].count('<li') == len(TEAM_STEPS), \
         f'On the call: its three steps, in order: {TEAM_STEPS}'
+    film = re.match(r'\s*<section class="team-part wrap" aria-labelledby="team-launch">\s*'
+                    r'<h2 id="team-launch">[^<]*</h2>\s*<figure class="launch team-film">([\s\S]*?)</figure>\s*</section>',
+                    main[steps.end():])
+    assert film and Page(film[1]).videos == [clip], 'the launch film has its own section immediately after On the call'
+    assert clip.get('class') == 'launch-video' and clip.get('src') == f'/{LAUNCH_VIDEO}' and clip.get('poster') == f'/{LAUNCH_POSTER}', \
+        'the team film is the launch video over its pinned poster'
+    assert clip.get('preload') == 'none' and not {'autoplay', 'loop', 'muted'} & set(clip) and 'playsinline' in clip and 'controls' in clip, \
+        'the team film loads nothing until clicked, never autoplays, and plays with sound and native controls'
+    assert clip.get('aria-label') == 'OpenWiz in two minutes', 'the team film needs its accessible name'
+    about = re.search(r'<p class="sr-only" id="([^"]+)">([^<]+)</p>', film[1])
+    assert about and clip.get('aria-describedby') == about[1] and len(re.findall(r'[.!?](?:\s|$)', about[2])) == 2, \
+        'the team film needs its two-sentence text alternative'
+    assert [(t.get('kind'), t.get('src'), t.get('srclang')) for t in page.tracks_of(clip)] == [('captions', f'/{LAUNCH_CAPTIONS}', 'en')], \
+        'the team film needs its English captions'
+    play = re.search(r'<button class="launch-play" type="button" hidden>([\s\S]*?)</button>', film[1])
+    assert play and plain(play[1]) == LAUNCH_LABEL, f'the team film needs its one play button, hidden until site.js runs: {LAUNCH_LABEL}'
     facts = re.search(r'<section class="team-part wrap" aria-labelledby="team-what">\s*<h2 id="team-what">[^<]*</h2>\s*<ul class="team-facts">([\s\S]*?)</ul>\s*</section>', main)
     items = re.findall(r'<li>([\s\S]*?)</li>', facts[1]) if facts else []
     assert tuple(plain(i) for i in items) == TEAM_FACTS, f'What you\u2019re setting up: its four true lines, in order: {TEAM_FACTS}'

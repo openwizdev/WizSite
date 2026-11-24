@@ -52,14 +52,17 @@
     <a class="team-book" id="book" data-book href="https://cal.com/openwiz-jake/setup">Book a call</a>
     <p class="team-needs">30 minutes. Bring a repository with working CI and a signed-in Claude Code or Codex.</p>
   </div>
-  <figure class="launch team-film">
-    <div class="launch-frame">
-      <video class="launch-video" src="/art/launch-video.mp4" poster="/art/launch-poster.webp" preload="none" playsinline controls width="1280" height="666" aria-label="OpenWiz in two minutes" aria-describedby="launch-about">
-        <track kind="captions" src="/art/launch-video.vtt" srclang="en" label="English">
-      </video>
-      <button class="launch-play" type="button" hidden><span aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M5 3l8 5-8 5z"/></svg></span>Watch OpenWiz in two minutes</button>
-    </div>
-    <figcaption><p class="sr-only" id="launch-about">A painted two-minute film with narration: a wizard turns an idea for a to-do app into a spec, and a fleet of wizards on a ship’s deck builds, reviews and merges its tickets until the app ships at sunset. It then shows how OpenWiz fits together: the open kernel, GitHub as the ship’s log, drivers and harnesses, WizSkills, WizPlugins and WizBar, the app, WizRoom and the coming WizMarket.</p></figcaption>
+  <figure class="team-pr">
+    <figcaption class="team-pr-heading">
+      <p class="team-pr-meta"><code>your-org/your-repo</code> <span>Example</span></p>
+      <p class="team-pr-title"><span>#128</span> Add CSV export to the reports page</p>
+    </figcaption>
+    <dl class="team-pr-details">
+      <div><dt>Built by:</dt> <dd>your builder agent</dd></div>
+      <div><dt>Reviewed by:</dt> <dd>a second agent <span class="team-pr-approved">Approved</span></dd></div>
+      <div><dt>Checks:</dt> <dd>CI passed</dd></div>
+      <div><dt>Merge:</dt> <dd>your call</dd></div>
+    </dl>
   </figure>
 </div>
 <section class="team-part team-call wrap" aria-labelledby="team-how">
@@ -69,6 +72,18 @@
     <li><h3>Decide</h3><p>You pick one small, real change and answer a few questions about it.</p></li>
     <li><h3>Ship</h3><p>Your agents build it, a second agent reviews it, and the pull request opens on your repository. Merging is your call.</p></li>
   </ol>
+</section>
+<section class="team-part wrap" aria-labelledby="team-launch">
+  <h2 id="team-launch">Launch film</h2>
+  <figure class="launch team-film">
+    <div class="launch-frame">
+      <video class="launch-video" src="/art/launch-video.mp4" poster="/art/launch-poster.webp" preload="none" playsinline controls width="1280" height="666" aria-label="OpenWiz in two minutes" aria-describedby="launch-about">
+        <track kind="captions" src="/art/launch-video.vtt" srclang="en" label="English">
+      </video>
+      <button class="launch-play" type="button" hidden><span aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M5 3l8 5-8 5z"/></svg></span>Watch OpenWiz in two minutes</button>
+    </div>
+    <figcaption><p class="sr-only" id="launch-about">A painted two-minute film with narration: a wizard turns an idea for a to-do app into a spec, and a fleet of wizards on a ship’s deck builds, reviews and merges its tickets until the app ships at sunset. It then shows how OpenWiz fits together: the open kernel, GitHub as the ship’s log, drivers and harnesses, WizSkills, WizPlugins and WizBar, the app, WizRoom and the coming WizMarket.</p></figcaption>
+  </figure>
 </section>
 <section class="team-part wrap" aria-labelledby="team-what">
   <h2 id="team-what">What you’re setting up</h2>
