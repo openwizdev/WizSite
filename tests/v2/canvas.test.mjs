@@ -463,3 +463,64 @@ test('Canvas real data: reading a spec\'s extra comments leaves the kept board\'
     await run.close();
   }
 });
+
+test('Canvas: Waits for lists only open blockers, says Waits for nothing when all have merged, and keeps unreadable blockers', async () => {
+  const run = await start();
+  try {
+    world(run, {
+      tickets: list => {
+        const t44 = list.find(t => t.n === 44);
+        t44.state = 'CLOSED';
+        t44.reason = 'COMPLETED';
+        t44.labels = ['ready-for-agent'];
+        t44.pulls = [pull(114, { state: 'MERGED', review: 'APPROVED', checks: 'SUCCESS' })];
+        t44.notes = [];
+        const t47 = list.find(t => t.n === 47);
+        t47.blockers = [42];
+        t47.notes = [];
+      },
+    });
+    wrap(run, 'SpecTickets', reply => {
+      const repository = structuredClone(reply.json.data.repository);
+      const t45 = repository.s41.subIssues.nodes.find(n => n.number === 45);
+      t45.blockedBy.totalCount = 2;
+      return { status: 200, json: { data: { ...reply.json.data, repository } } };
+    });
+    await openCanvas(run);
+
+    assert.equal(await run.page.run(`document.querySelector('.cv-stack[data-ticket$="#46"] .cv-step').textContent`), 'Waits for #43');
+    assert.equal(await run.page.run(`document.querySelector('.cv-stack[data-ticket$="#47"] .cv-step').textContent`), 'Waits for nothing');
+    assert.equal(await run.page.run(`document.querySelector('.cv-stack[data-ticket$="#45"] .cv-behind .cv-card:last-child .cv-step').textContent`),
+      'Waits for 1 ticket GitHub couldn\'t read');
+    assert.ok(await run.page.run(`Boolean(document.querySelector('.cv-line[data-from$="#44"][data-to$="#46"]'))`), 'merged blocker edge stays on the board');
+
+    await run.page.run(`document.querySelector('.cv-stack[data-ticket$="#46"]').focus()`);
+    await run.page.key('Enter');
+    await run.page.until(`document.querySelector('.cv-focus')`, 'focused #46');
+    const focus46 = await run.page.text();
+    assert.match(focus46, /Waits for\s+#43 Price the basket \(review\)/);
+    assert.doesNotMatch(focus46, /Waits for[^\n]*#44/);
+    assert.match(focus46, /Done\s+#44 Shipping options \(merged\)/);
+    await run.page.key('Escape');
+    await run.page.until(`!document.querySelector('.cv-focus')`, 'board back');
+
+    await run.page.run(`document.querySelector('.cv-stack[data-ticket$="#47"]').focus()`);
+    await run.page.key('Enter');
+    await run.page.until(`document.querySelector('.cv-focus')`, 'focused #47');
+    const focus47 = await run.page.text();
+    assert.match(focus47, /Waits for\s+nothing/);
+    assert.match(focus47, /Done\s+#42 Cart contract \(merged\)/);
+    await run.page.key('Escape');
+    await run.page.until(`!document.querySelector('.cv-focus')`, 'board back');
+
+    await run.page.run(`document.querySelector('.cv-stack[data-ticket$="#45"]').focus()`);
+    await run.page.key('Enter');
+    await run.page.until(`document.querySelector('.cv-focus')`, 'focused #45');
+    const focus45 = await run.page.text();
+    assert.match(focus45, /Waits for\s+1 ticket GitHub couldn't read/);
+    assert.match(focus45, /Done\s+#42 Cart contract \(merged\)/);
+    assert.deepEqual(run.world.violations, []);
+  } finally {
+    await run.close();
+  }
+});
