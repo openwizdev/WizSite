@@ -39,7 +39,7 @@ ART_HASHES = {
     'art/todo-spec-poster.webp': '94a69b2033a98e4ae6663b61bf9f0af0ba06d5a4d4d28aa4b46247570cac5b72',
     'art/todo-spec.vtt': '47e9ffb41081dd72f541110c43312521a8dd92f1c8e58c11092ecd0daa74eee2',
     'art/todo-app.webp': 'ccc5be87687b1d4ac387cfb623033c0f567890cfe73570f8e4d4bb4b8a81de54',
-    'art/wiz-mark.webp': 'd13959b263f9fcf324d0c9e31ca7978727b778d0ca0b3b9208114b9c2d78ac7c',
+    'art/wiz-mark.webp': '74252ec31e8c420398b15118b7c985173e1f51b8ec311db50d8a6a236a4c44ee',
     'art/spec-video.mp4': 'feb357b9a80453d676123a31285a36c34b5873e102ed58c95728bfd6315bfe16',
     'art/spec-poster.webp': '4922f6d265ed8c0c57dead86a62288c94d97159dda34f95969db0ee42b72fdc4',
     'art/spec-video.vtt': '570f5621ff3d84152587612d1be5d78ba5e0fbf6a7da306088a5897c755dc09d',
