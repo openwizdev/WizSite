@@ -541,7 +541,6 @@ class Checks(unittest.TestCase):
             'Policy: https://github.com/openwizdev/OpenWiz/security/policy\n'
         )
         today = datetime(2027, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
-        # Far-future and exact 60-day boundary pass (including non-Z RFC 3339 offset).
         check_security_txt(base + 'Expires: 2028-01-01T00:00:00Z\n', now=today)
         check_security_txt(base + 'Expires: 2027-03-02T00:00:00Z\n', now=today)
         check_security_txt(base + 'Expires: 2028-01-01T05:00:00+05:00\n', now=today)
@@ -557,7 +556,6 @@ class Checks(unittest.TestCase):
         for name, text, error in bad_cases:
             with self.subTest(name), self.assertRaisesRegex(AssertionError, error):
                 check_security_txt(text, now=today)
-        # check_site forwards injectable now so expiry is enforced on the built site.
         with self.assertRaisesRegex(AssertionError, 'in the past'):
             check_site(ROOT / 'dist', now=datetime(2099, 1, 1, 0, 0, 0, tzinfo=timezone.utc))
 
