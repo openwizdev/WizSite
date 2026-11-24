@@ -13,6 +13,20 @@ test('switch off: none of the v2 shell renders and demo=1 is ignored', async () 
     assert.equal(v2Attr, null);
     assert.equal(await run.page.run(`Boolean(document.querySelector('.v2-shell, .v2-welcome-card'))`), false);
     assert.match(await run.page.text(), /Read-only, on the repositories you choose\./);
+    const assets = await run.page.run(`['link[rel="stylesheet"]', 'script[src]'].map(selector =>
+      [...document.querySelectorAll(selector)].map(el => new URL(el.href || el.src).pathname))`);
+    const unfingerprint = path => path.replace(/\.[a-f0-9]{10}(?=\.(?:css|js)$)/, '');
+    const mainAssets = [
+      ['/app/ember.css', '/app/pages/queue.css', '/app/cards/decision.css'],
+      [
+        '/app/data.js', '/app/records.js', '/app/ui.js', '/app/pages/you.js', '/app/pages/queue.js',
+        '/app/pages/specs.js', '/app/vendor/dagre-3.1.3.min.js', '/app/pages/spec.js', '/app/pages/agents.js',
+        '/app/cards/decision.js', '/app/palette.js', '/app/shell.js',
+      ],
+    ];
+    assert.deepEqual(assets.map(group => group.map(unfingerprint)), mainAssets);
+    const requested = run.world.log.filter(r => /\.(css|js)$/.test(r.path)).map(r => unfingerprint(r.path));
+    assert.deepEqual(requested.sort(), mainAssets.flat().sort());
     assert.ok(!run.world.log.some(r => /^\/app\/pages\/v2\./.test(r.path)), 'switch off loaded a v2 asset');
     assert.deepEqual(apiRequests(run.world), []);
     assert.deepEqual(run.world.violations, []);
