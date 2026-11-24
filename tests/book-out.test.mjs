@@ -435,6 +435,14 @@ test('googleInsert: inserts event with deterministic id, sendUpdates=none, and h
   assert.match(id1, /^[a-v0-9]{5,1024}$/);
   assert.equal(id2, id1);
 
+  const other = await googleInsert(GOOGLE_ENV, { ...BOOKING, id: 'bk_other_id_9876543210' }, {
+    fetch: makeRecorder([
+      () => Response.json({ access_token: ACCESS_TOKEN }),
+      (call) => Response.json({ id: JSON.parse(call.body).id }),
+    ]).fetch,
+  });
+  assert.notEqual(other, id1);
+
   assert.equal(calls[1].url, 'https://www.googleapis.com/calendar/v3/calendars/primary/events?sendUpdates=none');
   assert.equal(calls[1].method, 'POST');
   assert.equal(calls[1].headers.get('Authorization'), `Bearer ${ACCESS_TOKEN}`);
