@@ -200,8 +200,9 @@
       state.drafts.clear();
       if (state.deck) state.deck.activeKey = null;
     }
-    if (!picked || !specs.data || !specs.readAt || !OW.factory.model(feeds)) return;
+    if (!picked || !specs.data || !specs.readAt) return;
     if (specs.failedAt != null) state.failedSince = Math.max(state.failedSince ?? 0, specs.failedAt);
+    if (!OW.factory.model(feeds)) return;
     const readAt = specs.readAt;
     const key = `${picked.full}|${OW.data.auth.session() ?? ''}|${OW.data.auth.account() ?? ''}|${readAt}`;
     if (state.key === key) return;
@@ -268,7 +269,8 @@
   function view() {
     const result = state.result;
     if (!result || state.failedSince === null) return result;
-    return { ...result, items: result.items.map(item => (item.type === 'decision' && item.current === true ? { ...item, current: null, checked_at: null } : item)) };
+    return { ...result, gaps: [...new Set([...result.gaps, 'the latest spec read'])],
+      items: result.items.map(item => (item.type === 'decision' && item.current === true ? { ...item, current: null, checked_at: null } : item)) };
   }
   function saveDraft(kept) {
     if (!kept || kept.item.type !== 'decision' || kept.item.current !== true) return;
@@ -335,10 +337,14 @@
         for (const item of result.items) if (item.current === false) state.drafts.delete(item.key);
       }
     }
-    const gaps = result?.gaps || [];
-    const stale = state.failedSince !== null
-      ? `Couldn't read Specs. ${result ? 'Showing the last successful read. Some items may be missing.' : 'The Feed may be incomplete.'}` : '';
-    const partial = gaps.length ? `This list may be missing items: GitHub gave only part of ${gaps.join(', ')}.` : '';
+    const gaps = state.result?.gaps || [];
+    const partial = gaps.length ? `This list may be missing items: GitHub gave only part of ${gaps.join(', ')}.`
+      : deck.specRead.state === 'partial' ? 'GitHub gave only part of the spec read. Some items may be missing.' : '';
+    const stale = state.failedSince === null ? '' : [
+      "Couldn't read Specs.",
+      result ? 'Showing the last successful read.' : '',
+      partial ? '' : 'Some items may be missing.',
+    ].filter(Boolean).join(' ');
     const warning = [stale, partial].filter(Boolean).join(' ');
     const message = warning ? `${warning} The app tries again on its own.`
       : !result ? 'Reading GitHub…' : items.length ? '' : `${EMPTY}.`;
@@ -401,6 +407,7 @@
         state.deck.activeKey = null;
       }
       state.el = el;
+      state.deck.specRead = feeds.specs;
       refresh(feeds);
       updateDeck(el);
     },
