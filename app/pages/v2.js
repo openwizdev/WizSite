@@ -296,16 +296,22 @@
         'aria-label': 'Tell Wiz what to build or change',
       });
       input.value = demo.draft;
-      input.addEventListener('input', () => { demo.draft = input.value; });
+      const send = h('button', { type: 'submit', class: 'v2-send-btn', 'aria-label': 'Send message',
+        disabled: !demo.draft.trim() }, icon('up'));
+      input.addEventListener('input', () => {
+        demo.draft = input.value;
+        send.disabled = !demo.draft.trim();
+      });
       const composer = h('form', { class: 'v2-composer', onsubmit: event => {
         event.preventDefault();
         const text = input.value;
         if (!text.trim()) return;
         input.value = '';
         demo.draft = '';
+        send.disabled = true;
         submitChatPrompt(text);
         input.focus({ preventScroll: true });
-      } }, input, h('button', { type: 'submit', class: 'v2-send-btn', 'aria-label': 'Send message' }, icon('up')));
+      } }, input, send);
       el.replaceChildren(h('div', { class: 'v2-chat-wrap' }, scroll, h('div', { class: 'v2-composer-wrap' }, composer)));
       chatView = { scroll, thread, length: 0 };
     }

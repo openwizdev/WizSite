@@ -242,7 +242,7 @@
     const title = h('h1', { tabindex: '-1' });
     const refresh = demo ? null : h('button', {
       class: 'v2-btn subtle v2-refresh', type: 'button', onclick: () => data.refreshAll(), hidden: true,
-    }, icon('refresh'), 'Refresh now');
+    }, icon('refresh'), h('span', {}, 'Refresh now'));
     const pager = h('div', { class: 'v2-pager-slot' });
     const head = h('div', { class: 'v2-head' }, title, h('div', { class: 'v2-head-tools' }, pager, refresh));
     const phoneBar = h('header', { class: 'v2-phone-bar' },
@@ -387,8 +387,11 @@
         return OW.v2.renderWelcome(root, { demoMode: true });
       }
       if (!ROUTES().includes(route().id)) history.replaceState(null, '', home());
+      const entered = !built && root.querySelector('.v2-welcome');
       if (!built) buildShell();
-      return update();
+      update();
+      if (entered) built.title.focus();
+      return;
     }
     if (!data.auth.signedIn()) return signedOut();
     if (!data.repo.get()) return picker();
