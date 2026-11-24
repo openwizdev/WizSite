@@ -333,7 +333,9 @@ async function chrome(page, where, mode, path) {
     const bar = document.querySelector('header.landing-nav');
     const mark = bar?.querySelector('.landing-brand img');
     const star = bar?.querySelector('.github-star');
-    const count = star?.querySelector('[data-stars]');
+    const value = star?.querySelector('[data-stars]');
+    const starStyle = star && getComputedStyle(star);
+    const starBox = star?.getBoundingClientRect();
     const footer = document.querySelector('footer.landing-footer');
     const toggle = bar?.querySelector('.nav-toggle');
     const nav = document.getElementById(toggle?.getAttribute('aria-controls'));
@@ -341,8 +343,11 @@ async function chrome(page, where, mode, path) {
       scroll: document.scrollingElement.scrollWidth, inner: innerWidth,
       mark: shown(mark) && mark.getAttribute('src') === '/art/wiz-mark.webp' && mark.naturalWidth === 128,
       star: shown(star) && star.getAttribute('href') === 'https://github.com/openwizdev/openwiz' &&
-        shown(star.querySelector('.github-mark')) && shown(star.querySelector('.star-icon')) && star.innerText.includes('Star'),
-      count: shown(count) ? count.textContent : null, name: star?.getAttribute('aria-label'),
+        shown(star.querySelector('.star-icon')) && shown(star.querySelector('.github-mark')) === (innerWidth > 850),
+      value: shown(value) ? star.innerText.trim() : null, name: star?.getAttribute('aria-label'),
+      unboxed: starStyle?.borderStyle === 'none' && starStyle.backgroundColor === 'rgba(0, 0, 0, 0)' &&
+        starStyle.fontSize === '14px',
+      tapTarget: starBox?.width >= 40 && starBox.height >= 40,
       current: [...bar.querySelectorAll('[aria-current="page"]')].map(link => link.getAttribute('href')),
       toggle: shown(toggle), nav: [...nav.querySelectorAll('a')].filter(shown).map(a => a.getAttribute('href')),
       signIn: shown(bar?.querySelector('a.sign-in[href="/app/"]')),
@@ -354,8 +359,9 @@ async function chrome(page, where, mode, path) {
   const stars = mode.stars === 12345 ? '12.3k' : mode.stars === 0 ? '0' : null;
   expect(facts.scroll <= facts.inner, where, `sideways scroll (${facts.scroll}px content in a ${facts.inner}px window)`);
   expect(facts.mark, where, 'the top bar lacks the painted Wiz');
-  expect(facts.star && facts.count === stars && facts.name?.includes('GitHub') &&
-    (!stars || facts.name.includes(mode.stars.toLocaleString('en'))), where, `incorrect GitHub star control or count (${facts.count})`);
+  expect(facts.star && facts.value === (stars ?? 'Star') && facts.name?.includes('GitHub') &&
+    (!stars || facts.name.includes(mode.stars.toLocaleString('en'))), where, `incorrect GitHub star control or label (${facts.value})`);
+  expect(facts.unboxed && (facts.inner > 850 || facts.tapTarget), where, 'the stars link needs nav text styling and a 40 px phone target');
   expect(facts.current.join() === path, where, 'the top bar lacks its current-page link');
   expect(facts.toggle === phoneMenu && facts.signIn !== phoneMenu &&
     facts.nav.join() === (phoneMenu ? '' : '/drivers/,/market/,/changelog/,/faq/'),

@@ -1513,7 +1513,7 @@ def check_top_bars(pages):
         assert ('<img src="/art/wiz-mark.webp" alt="" width="128" height="128" decoding="async"><span>OpenWiz</span>' in bar), \
             f'the {name} top bar needs the painted Wiz and its live wordmark'
         star = re.search(r'<a class="github-star" href="https://github.com/openwizdev/openwiz" aria-label="Star on GitHub">([\s\S]*?)</a>', bar)
-        assert star and all(part in star[1] for part in ('class="github-mark"', 'class="star-icon"', 'Star<span data-stars hidden>')), \
+        assert star and all(part in star[1] for part in ('class="github-mark"', 'class="star-icon"', '<span data-stars>Star</span>')), \
             f'the {name} top bar needs its GitHub mark, star icon, Star label and count slot'
         assert '<a class="sign-in" href="/app/">Sign in</a>' in bar, f'the {name} top bar needs its Sign in link'
         assert '<span class="nav-team-long">Get it for your team</span><span class="nav-team-short">For teams</span>' in bar, \
