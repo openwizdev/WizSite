@@ -21,6 +21,10 @@ const json = async url => JSON.parse(await readFile(url, 'utf8'));
 const plain = value => JSON.parse(JSON.stringify(value));
 const names = async url => (await readdir(url)).filter(n => n.endsWith('.input.json')).map(n => n.slice(0, -'.input.json'.length)).sort();
 const settle = async () => { for (let i = 0; i < 20; i += 1) await new Promise(resolve => setImmediate(resolve)); };
+const REPOSITORY_PATH = '/repos/acme/factory';
+const FLEET_PATH = REPOSITORY_PATH + '/contents/docs/agents/fleet.md';
+const repository = visibility => ({ full_name: 'acme/factory', visibility, private: visibility !== 'public' });
+const fleetBlob = text => ({ path: 'docs/agents/fleet.md', encoding: 'base64', content: Buffer.from(text).toString('base64') });
 const RECORDED_AT = '2030-01-07T07:06:40.000Z';
 
 class Net {
@@ -32,6 +36,8 @@ class Net {
     this.next = 9100050;
     this.account = OWNER;
     this.edited = {};
+    this.repository = repository('private');
+    this.fleet = fleetBlob(FLEET);
     this.held = [];
     this.intercept = null;
     this.link = undefined;
@@ -62,6 +68,8 @@ class Net {
     }
     if (at.origin !== API) return Response.json({ error: 'not_found' }, { status: 404 });
     if (method === 'GET' && at.pathname === '/user') return answer(200, this.account);
+    if (method === 'GET' && at.pathname === REPOSITORY_PATH) return this.repository ? answer(200, this.repository) : answer(502, {});
+    if (method === 'GET' && at.pathname === FLEET_PATH) return this.fleet ? answer(200, this.fleet) : answer(502, {});
     if (method === 'POST' && at.pathname === '/graphql') {
       const query = JSON.parse(init.body);
       const number = query.variables?.number;
@@ -926,12 +934,79 @@ test('R13: a retired operation stays retired, even when its source returns to wh
   assert.equal(net.posts().length, 1);
 });
 
-test('R15: a spec edited after its confirmation request was posted is never matched, whatever its headline', async () => {
-  for (const [edited, result] of [['2030-01-08T00:00:00Z', 'changed'], ['2030-01-07T07:06:40Z', 'unchecked'], ['fail', 'unchecked'], [null, 'matched'], ['2030-01-07T07:06:39Z', 'matched']]) {
-    const { input, net, run } = await specConfirmation();
-    net.edited[41] = edited;
-    const checked = plain(await run.records.check(input.action.item));
-    assert.equal(checked.result, result, `last edited ${edited}`);
+test('R15: spec confirmations are always unchecked and cannot be composed', async () => {
+  const { input, net, run } = await specConfirmation();
+  const checked = plain(await run.records.check(input.action.item));
+  assert.deepEqual(checked, { result: 'unchecked', binding: null, checked_at: null });
+  for (const action of [input.action, { ...input.action, form: 'decision.no' }, { ...input.action, form: 'decision.own', words: 'Synthetic reply' }]) {
+    const preview = await run.records.compose({ ...action, item: { ...action.item, checked_at: checked.checked_at } });
+    assert.deepEqual(plain(preview), { refused: 'source_unchecked' });
+  }
+  assert.deepEqual(net.writes(), []);
+});
+
+test('R16: a broader or unverifiable audience refuses the send and requires a new preview', async () => {
+  for (const fresh of [repository('public'), null, { ...repository('private'), full_name: 'acme/other' },
+    { ...repository('private'), visibility: 'internal' }, { ...repository('public'), private: true }]) {
+    const run = await boot();
+    const preview = await steerPreview(run);
+    assert.equal(preview.visibility, 'repository');
+    run.net.repository = fresh;
+    await confirmAll(run.records, preview);
+    const reason = fresh?.visibility === 'public' && fresh.private === false ? 'audience_changed' : 'audience_unchecked';
+    const outcome = plain(await run.records.post(preview));
+    assert.deepEqual(outcome, { outcome: 'refused', op: preview.op, reason });
+    assert.deepEqual(run.net.writes(), []);
+
+    run.net.repository = repository('public');
+    await confirmAll(run.records, preview);
+    assert.deepEqual(plain(await run.records.post(preview)), outcome, 'the invalidated preview was reused');
+    const next = await steerPreview(run);
+    assert.equal(next.visibility, 'public');
+    assert.notEqual(next.op, preview.op);
+    assert.equal((await run.records.post(next)).reason, 'not_confirmed');
+    await confirmAll(run.records, next);
+    assert.equal((await run.records.post(next)).outcome, 'posted');
+    assert.equal(run.net.writes().length, 1);
+  }
+});
+
+test('R16: a restored receipt reconciles first, and a retry needs a fresh audience', async () => {
+  for (const mode of ['lost', 'dropped']) {
+    const first = await boot();
+    const preview = await steerPreview(first);
+    await confirmAll(first.records, preview);
+    first.net.mode = mode;
+    assert.equal((await first.records.post(preview)).outcome, 'unknown');
+    first.net.mode = 'ok';
+    first.net.repository = repository('public');
+    const next = await boot({ net: first.net, storage: first.storage });
+    const [restored] = next.records.pending();
+    await confirmAll(next.records, restored);
+    const result = await next.records.post(restored);
+    assert.equal(result.outcome, mode === 'lost' ? 'posted' : 'refused');
+    if (mode === 'dropped') assert.equal(result.reason, 'audience_changed');
+    assert.deepEqual(plain(next.records.pending()), []);
+    assert.equal(next.net.writes().length, 1);
+  }
+});
+
+test('R17: the pinned fleet file governs the record author even if the feed still lists them', async () => {
+  for (const [fleet, checked, reason] of [
+    [fleetBlob(FLEET.replace('factory-bot', 'replacement-bot')), 'changed', 'source_changed'],
+    [null, 'unchecked', 'source_unchecked'],
+    [{ ...fleetBlob(FLEET), content: 'not base64' }, 'unchecked', 'source_unchecked'],
+    [fleetBlob('# Fleet without a record-author list'), 'unchecked', 'source_unchecked'],
+  ]) {
+    const { input, net, run } = await grillRound();
+    const preview = await composeLike(run.records, input.action);
+    assert.match(preview.op ?? '', /^op-/);
+    assert.equal(run.OW.data.feeds.specs.data.fleet.text, FLEET);
+    net.fleet = fleet;
+    await confirmAll(run.records, preview);
+    assert.deepEqual(plain(await run.records.post(preview)), { outcome: 'refused', op: preview.op, reason });
+    assert.deepEqual(net.writes(), []);
+    assert.equal((await run.records.check(input.action.item)).result, checked);
   }
 });
 
