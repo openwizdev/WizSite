@@ -466,10 +466,10 @@ class Page(HTMLParser):
                 'Report a problem link needs rel="noreferrer"'
             self.report_links += 1
             attrs = {key: value for key, value in attrs.items() if key != 'href'}
-        for key in ('href', 'src', 'poster'):
+        for key in ('href', 'src', 'poster', 'data-src'):
             if attrs.get(key):
                 self.refs.append(attrs[key])
-        for item in (attrs.get('srcset') or '').split(','):
+        for item in (attrs.get('data-srcset') or '').split(','):
             if item.strip():
                 self.refs.append(item.split()[0])
         if tag == 'button':
@@ -775,10 +775,11 @@ def check_site(root, registry=ROOT / 'market/registry.json'):
     assert 'muted' in clip and 'playsinline' in clip, 'spec video must start muted inline'
     assert 'poster' not in clip, 'the spec video poster must not load with the page: use the lazy .spec-poster image'
     poster = next((i for i in page.images if i.get('class') == 'spec-poster'), {})
-    sources = [item.split() for item in (poster.get('srcset') or '').split(',') if item.strip()]
-    assert poster.get('loading') == 'lazy' and poster.get('src', '').removeprefix('/') in ART and poster.get('alt') == '' and poster.get('sizes') \
+    sources = [item.split() for item in (poster.get('data-srcset') or '').split(',') if item.strip()]
+    assert 'src' not in poster and 'srcset' not in poster and poster.get('loading') == 'lazy' and 'hidden' in poster \
+        and poster.get('data-src', '').removeprefix('/') in ART and poster.get('alt') == '' and poster.get('sizes') \
         and sources and all(len(s) == 2 and s[0].removeprefix('/') in ART for s in sources) and ['640w'] == [s[1] for s in sources if s[1] == '640w'], \
-        'spec video needs a pinned poster: a lazy decorative .spec-poster image with a 640w phone variant in its srcset'
+        'spec video needs a pinned poster: a lazy decorative .spec-poster image with a 640w phone variant in its data-srcset'
     assert any(t.get('kind') == 'captions' and 'default' in t and t.get('src', '').removeprefix('/') in ART for t in page.tracks_of(clip)), 'spec video needs default captions'
     assert any(a.get('href') == clip.get('src') and 'hidden' not in a for a in page.links), 'needs a plain link to the spec video'
     for attrs in page.buttons:

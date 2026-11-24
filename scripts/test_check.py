@@ -176,7 +176,7 @@ class Checks(unittest.TestCase):
     def test_product_first_landing(self):
         for change, error in (
                 (lambda t: t.replace('Build a to-do app', 'Build an app'), 'missing landing story copy|poster must carry the wish'),
-                (lambda t: t.replace('<h2 id="moments-title">From idea to shipped.</h2>', '<h2 id="moments-title">From idea to shipped.</h2><h3>Watch your spec</h3>'), 'no moment cards'),
+                (lambda t: t.replace('<h2 id="moments-title">One wish in. Merged code out.</h2>', '<h2 id="moments-title">One wish in. Merged code out.</h2><h3>Watch your spec</h3>'), 'no moment cards'),
                 (lambda t: t.replace('The real narrated spec of an OpenWiz-built to-do app', 'A sample spec'), "to-do app's real spec"),
                 (lambda t: t.replace('<p class="spec-wish"><span>The wish</span>Build a to-do app</p>', '<p class="spec-wish">A wish</p>'), 'poster must carry the wish'),
                 (lambda t: t.replace('<span class="spec-time">0:38</span>', ''), 'one play control with the duration'),
@@ -370,7 +370,10 @@ class Checks(unittest.TestCase):
             mark = '<div class="spec-moment">'
             return lambda t: t.split(mark)[0] + mark + change(t.split(mark, 1)[1])
         for change, error in (
-                (spec(lambda t: re.sub(r' poster="[^"]*"', '', t, count=1)), 'spec video needs a pinned poster'),
+                (spec(lambda t: re.sub(r'<img class="spec-poster"[^>]*>', '', t, count=1)), 'spec video needs a pinned poster'),
+                (spec(lambda t: t.replace('<video class="spec-video"', '<video class="spec-video" poster="/art/todo-spec-engraved.webp"', 1)), 'must not load with the page'),
+                (spec(lambda t: t.replace('data-src="/art/todo-spec-engraved.webp"', 'src="/art/todo-spec-engraved.webp"', 1)), 'spec video needs a pinned poster'),
+                (spec(lambda t: t.replace('/art/todo-spec-engraved-640.webp 640w, ', '', 1)), 'spec video needs a pinned poster'),
                 (spec(lambda t: re.sub(r'<track [^>]*>', '', t, count=1)), 'spec video needs default captions'),
                 (lambda t: t.replace('class="spec-link"', 'class="spec-link" hidden', 1), 'plain link to the spec video'),
                 (spec(lambda t: t.replace(' muted', '', 1)), 'spec video must start muted inline'),

@@ -150,8 +150,8 @@ const FACTS = `(() => {
   const track = video && [...video.textTracks].find(t => t.kind === 'captions');
   const still = moment?.querySelector('img.spec-poster');
   return {
-    video: shown(video), poster: !video?.getAttribute('poster') && still?.loading === 'lazy' && shown(still),
-    still: still?.complete && still.naturalWidth > 0 ? still.currentSrc : '', playing: !!video && !video.paused && !video.ended,
+    video: shown(video), poster: !video?.getAttribute('poster') && still?.loading === 'lazy' && !!still?.dataset.src && !!still?.dataset.srcset,
+    still: shown(still) && still.complete && still.naturalWidth > 0 ? still.currentSrc : '', controls: !!video?.controls, playing: !!video && !video.paused && !video.ended,
     muted: !!video?.muted, autoplay: !!video?.autoplay, preload: video?.getAttribute('preload'),
     sound: shown(sound) && /sound/i.test(sound.textContent + (sound.getAttribute('aria-label') || '')),
     link: shown(link), cues: track ? (track.cues?.length || 0) : -1, captions: track ? track.mode : 'none',
@@ -196,9 +196,13 @@ async function moment(page, where, name, width) {
   await page.evaluate(`${MOMENT}.querySelector('video').scrollIntoView({ block: 'center' }), true`);
   facts = await until(page, f => f.playing, 2500);
   expect(!facts.playing, where, 'in view, the video plays before anyone presses play');
-  facts = await until(page, f => f.still, 3000);
-  expect(facts.still && (width > 480) === !/-640\.webp$/.test(facts.still), where,
-    `near the viewport the poster is missing or the wrong size for this screen (${facts.still || 'not loaded'})`);
+  if (scripted) {
+    facts = await until(page, f => f.still, 3000);
+    expect(facts.still && (width > 480) === !/-640\.webp$/.test(facts.still), where,
+      `near the viewport the poster is missing or the wrong size for this screen (${facts.still || 'not loaded'})`);
+  } else {
+    expect(facts.controls && !loadedPoster(page), where, 'without scripts the spec video has no native controls or loads the poster eagerly');
+  }
   if (name === 'in-app browser') {
     const at = await page.evaluate(`(() => { const r = ${MOMENT}.querySelector('video').getBoundingClientRect();
       return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);

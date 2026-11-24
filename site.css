@@ -215,9 +215,9 @@ code,.v{font-family:var(--ow-font-mono)}
 .spec-video::cue { color: #fff; background: rgba(7, 10, 20, .85); }
 .spec-frame:not(.is-resting) .spec-video[controls] { height: calc(56.25cqw + max(9.375cqw, 36px)); aspect-ratio: auto; object-fit: contain; object-position: top; }
 .spec-video:fullscreen { object-position: center; }
-.spec-poster { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 45% 50%; image-rendering: pixelated; }
-.spec-poster ~ .spec-video { background: transparent; }
-.spec-frame.is-resting .spec-video { aspect-ratio: 1 / 1; }
+.spec-poster { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 45% 50%; image-rendering: pixelated; pointer-events: none; }
+.spec-poster[hidden] { display: none; }
+.spec-frame.is-resting .spec-video { aspect-ratio: 1 / 1; background: transparent; }
 .spec-over { display: none; }
 .spec-frame.is-resting .spec-over { position: absolute; inset: auto 0 0; display: grid; justify-items: start; gap: 24px; padding: 64px 24px 24px; background: linear-gradient(to top, var(--dot) 30%, rgb(7 10 20 / 80%) 62%, transparent); pointer-events: none; }
 .spec-wish { display: grid; gap: 8px; margin: 0; color: #f2f5ff; font-size: var(--t2); font-weight: 600; letter-spacing: -.035em; line-height: 1.1; }

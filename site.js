@@ -292,8 +292,27 @@ function specVideo() {
   video.controls = false;
   if (track) track.mode = 'hidden';
   sound.hidden = false;
+  let observer = null;
+  const loadPoster = () => {
+    if (!poster || poster.getAttribute('src')) return;
+    if (poster.dataset.srcset) poster.srcset = poster.dataset.srcset;
+    if (poster.dataset.src) poster.src = poster.dataset.src;
+    poster.hidden = false;
+    observer?.disconnect();
+  };
+  if (poster) {
+    if ('IntersectionObserver' in window) {
+      observer = new IntersectionObserver(entries => {
+        if (entries.some(e => e.isIntersecting)) loadPoster();
+      }, { rootMargin: '250px 0px' });
+      observer.observe(frame || video);
+    } else {
+      loadPoster();
+    }
+  }
   const listen = event => {
     if (!event.isTrusted || video.controls) return;
+    observer?.disconnect();
     frame?.classList.remove('is-resting');
     if (poster) poster.hidden = true;
     video.controls = true;
