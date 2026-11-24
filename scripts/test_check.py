@@ -504,12 +504,26 @@ class Checks(unittest.TestCase):
                     check_site(root)
 
     def test_headers_revalidate(self):
-        with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp) / 'dist'
-            shutil.copytree(ROOT / 'dist', root)
-            (root / '_headers').write_text('/*.css\n  Cache-Control: public, max-age=14400\n')
-            with self.assertRaises(AssertionError):
-                check_site(root)
+        cases = {
+            'broken file': lambda text: '/*.css\n  Cache-Control: public, max-age=14400\n',
+            'missing immutable detach': lambda text: text.replace('/*.:hash.css\n  ! Cache-Control\n', '/*.:hash.css\n'),
+            'missing font detach': lambda text: text.replace('/fonts/*\n  ! Cache-Control\n', '/fonts/*\n'),
+            'missing mp4 detach': lambda text: text.replace('/*.mp4\n  ! Cache-Control\n', '/*.mp4\n'),
+            'overbroad unhashed js': lambda text: text.replace('/*.:hash.js', '/*.js'),
+            'overbroad unhashed css': lambda text: text.replace('/*.:hash.css', '/*.css'),
+            'html stale-while-revalidate': lambda text: text.replace(
+                '  Cache-Control: public, max-age=0, must-revalidate\n',
+                '  Cache-Control: public, max-age=0, must-revalidate, stale-while-revalidate=60\n'),
+            'double splat pattern': lambda text: text.replace('/*.:hash.css', '/*.*.css'),
+        }
+        for name, spoil in cases.items():
+            with self.subTest(name), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp) / 'dist'
+                shutil.copytree(ROOT / 'dist', root)
+                headers = root / '_headers'
+                headers.write_text(spoil(headers.read_text()))
+                with self.assertRaises(AssertionError):
+                    check_site(root)
 
     def test_security_headers_and_well_known(self):
         cases = {
