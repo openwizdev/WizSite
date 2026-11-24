@@ -73,7 +73,8 @@ test('switch on + demo=1: renders v2 shell, deep links, interactions, and makes 
     await run.page.click('Open Harbor workspace');
     await run.page.until(`location.hash === '#/chat' && document.body.innerText.includes('Accept all 3')`, 'v2 chat with grill round');
     const nav = await run.page.run(`[...document.querySelectorAll('nav.main a')].map(a => a.getAttribute('href'))`);
-    assert.deepEqual(nav, ['#/chat', '#/feed', '#/settings']);
+    assert.deepEqual(nav, ['#/chat', '#/feed', '#/canvas', '#/settings']);
+    assert.deepEqual(await run.page.run(`[...document.querySelectorAll('nav.v2-tabs a')].map(a => a.getAttribute('href'))`), nav);
 
     await run.page.run(`window.originalMessages = [...document.querySelector('.v2-chat-thread').children];
       window.originalChoices = [...document.querySelectorAll('.v2-q-pill')];
@@ -136,7 +137,9 @@ test('switch on + demo=1: renders v2 shell, deep links, interactions, and makes 
     await run.page.click('Not now');
     await run.page.until(`location.hash === '#/feed/clear' && document.querySelector('.v2-clear-card h2')?.textContent === 'All clear.'`, 'all clear after the last decision');
     assert.deepEqual(await badges(), [null, null]);
-    assert.equal(await run.page.run(`document.querySelector('.v2-building progress').value`), 5);
+    assert.equal(await run.page.run(`[...document.querySelectorAll('.v2-building-row')].map(row => row.querySelector('.v2-building-title').textContent
+      + ' ' + row.querySelector('.v2-building-count').textContent + ' ' + row.querySelectorAll('.cv-blocks i').length).sort().join(', ')`),
+    'Audit log export 5 of 7 7, Project activity digest 2 of 4 4');
     await run.page.run(`document.querySelector('.v2-toast button').focus()`);
     await new Promise(resolve => setTimeout(resolve, 4700));
     assert.equal(await run.page.run(`document.querySelector('.v2-toast').hidden`), false, 'Undo expired while focused');
@@ -205,6 +208,16 @@ test('demo isolates a saved GitHub session from boot, visibility refresh, and th
     assert.equal(await run.page.run('OW.palette.shown()'), false);
     assert.doesNotMatch(await run.page.text(), /acme\/factory/);
     assert.deepEqual(await run.page.run(stored), session);
+    await run.page.go(`${SITE}/app/?demo=1#/canvas`);
+    await run.page.until(`document.querySelectorAll('.cv-stack[data-ticket]').length === 7`, 'the sample canvas');
+    await run.page.go(`${SITE}/app/?demo=1#/canvas/30`);
+    await run.page.until(`document.querySelectorAll('.cv-stack[data-ticket]').length === 4`, 'the second sample spec');
+    assert.doesNotMatch(await run.page.text(), /acme/);
+    assert.equal(await run.page.run(`document.querySelectorAll('main a[href^="http"]').length`), 0);
+    assert.deepEqual(await run.page.run(`performance.getEntriesByType('resource').filter(entry =>
+      ['fetch', 'xmlhttprequest', 'beacon'].includes(entry.initiatorType)).map(entry => entry.name)`), []);
+    assert.deepEqual(run.world.writes(), []);
+    assert.deepEqual(await run.page.run(stored), session);
     assert.deepEqual(apiRequests(run.world), [], 'demo used network access with a saved session');
     assert.deepEqual(run.world.violations, []);
   } finally {
@@ -263,6 +276,59 @@ test('demo welcome: the quiet GitHub link reopens a saved session instead of res
     await run.page.until(`document.querySelector('.v2-welcome-sample')`, 'demo welcome with a saved session');
     assert.equal(await run.page.run(`document.querySelector('.v2-welcome-sample').getAttribute('href')`), '/app/');
     assert.deepEqual(apiRequests(run.world).filter(r => r.path.startsWith('/api/sign-in/start')), []);
+  } finally {
+    await run.close();
+  }
+});
+
+const MACHINERY = /Builder|Reviewer|Claude|Codex|Opus|Sol 6|agent|harness|fleet/i;
+
+test('demo Canvas: the board shows tickets in plain states, a ticket opens its updates, and a Feed answer moves it', async () => {
+  const run = await start();
+  try {
+    await run.page.size(1440, 900, false);
+    await run.page.go(`${SITE}/app/?v2=dry-run&demo=1#/canvas`);
+    const states = () => run.page.run(`Object.fromEntries([...document.querySelectorAll('.cv-stack[data-ticket]')].map(el =>
+      [el.dataset.ticket.split('#').pop(), el.querySelector('.pill').textContent]))`);
+    await run.page.until(`document.querySelectorAll('.cv-stack[data-ticket]').length === 7`, 'the board');
+    assert.deepEqual(await states(), { 21: 'Done', 22: 'Done', 23: 'Done', 24: 'Done', 25: 'Done', 26: 'In review', 27: 'Needs you' });
+    assert.equal(await run.page.run(`document.querySelector('nav.main a[aria-current]').getAttribute('href')`), '#/canvas');
+    assert.equal(await run.page.run(`document.querySelector('.cv-board').classList.contains('far')`), false);
+    assert.ok(await run.page.run(`document.querySelectorAll('.cv-line').length`) >= 6);
+    assert.doesNotMatch(await run.page.text(), MACHINERY);
+    assert.doesNotMatch(await run.page.text(), /How long should deleted projects/, 'a note showed on the board');
+
+    await run.page.run(`document.querySelector('.cv-stack[data-ticket$="#27"]').click()`);
+    await run.page.until(`document.querySelector('.cv-focus')`, 'the ticket');
+    assert.match(await run.page.text(), /How long should deleted projects stay recoverable\?/);
+    assert.doesNotMatch(await run.page.text(), MACHINERY);
+    await run.page.key('Escape');
+    await run.page.until(`document.activeElement.dataset.ticket?.endsWith('#27')`, 'focus back on the ticket');
+    await run.page.key('Enter');
+    await run.page.until(`document.querySelector('.cv-focus .v2-btn.primary')`, 'the answer link');
+    await run.page.run(`document.querySelector('.cv-focus .v2-btn.primary').click()`);
+    await run.page.until(`location.hash === '#/feed/3' && document.querySelector('.v2-card-title')?.textContent.startsWith('Retention')`, 'its Feed card');
+    await run.page.click('Allow recovery for 30 days');
+    await run.page.run(`document.querySelector('.v2-building-row[href="#/canvas/20"]').click()`);
+    await run.page.until(`document.querySelector('.cv-stack[data-ticket$="#27"] .pill')?.textContent === 'Building'`, 'the answered ticket builds');
+
+    await run.page.size(390, 844, true);
+    await run.page.go(`${SITE}/app/?v2=dry-run&demo=1#/canvas`);
+    await run.page.until(`document.querySelectorAll('.cv-row').length === 17`, 'ticket rows on a phone');
+    assert.equal(await run.page.run(`document.querySelector('.cv-board')`), null);
+    assert.deepEqual(await run.page.run(`[...document.querySelectorAll('.cv-group')].map(g => g.querySelectorAll('.cv-blocks').length)`), [1, 1, 1]);
+    assert.equal(await run.page.run(`document.scrollingElement.scrollWidth <= innerWidth`), true);
+    await run.page.run(`document.querySelector('.cv-row[data-ticket$="#26"]').click()`);
+    await run.page.until(`document.querySelector('.cv-focus h3')?.textContent === '#26 Scheduled exports'`, 'the ticket on a phone');
+    await run.page.click('Back');
+    await run.page.until(`document.activeElement.dataset.ticket?.endsWith('#26')`, 'focus back on the row');
+    await run.page.run(`document.querySelector('.cv-row[data-ticket$="#33"]').click()`);
+    await run.page.until(`document.querySelector('.cv-focus h3')?.textContent === '#33 Weekly email'`, 'a ticket of another spec');
+    await run.page.click('Back');
+    await run.page.until(`document.activeElement.dataset.ticket?.endsWith('#33')`, 'focus back on its row');
+    assert.deepEqual(apiRequests(run.world), []);
+    assert.deepEqual(run.world.writes(), []);
+    assert.deepEqual(run.world.violations, []);
   } finally {
     await run.close();
   }

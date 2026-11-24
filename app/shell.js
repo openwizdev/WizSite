@@ -5,9 +5,7 @@
   const wiz = () => h('p', {}, h('img', { src: '/app/wiz-reviewer.svg', alt: '', width: 96, height: 105 }));
   const data = OW.data;
   const root = document.getElementById('app');
-  // Pages that open by address but have no nav entry (Canvas under the v2 shell, for now).
-  const hidden = [];
-  const ROUTES = () => [...OW.pages, ...hidden].map(page => page.id);
+  const ROUTES = () => OW.pages.map(page => page.id);
   let built = null;
   const INSTALL = 'https://github.com/apps/openwiz-viewer/installations/new';
   const v2 = Boolean(OW.records?.enabled?.());
@@ -46,7 +44,7 @@
   };
   const current = () => {
     const { id } = route();
-    return OW.pages.find(page => page.id === id) || hidden.find(page => page.id === id) || OW.pages.find(page => page.id === 'feed') || OW.pages[0];
+    return OW.pages.find(page => page.id === id) || OW.pages.find(page => page.id === 'feed') || OW.pages[0];
   };
 
   function screen(...children) {
@@ -54,9 +52,7 @@
     OW.palette.close();
     const view = h('div', { class: 'center' }, h('div', { class: 'panel' }, h('div', { class: 'brand' }, logo(), h('span', {}, 'OpenWiz')), ...children));
     if (v2 && OW.v2) {
-      root.replaceChildren(
-        h('div', { class: 'v2-backdrop', 'aria-hidden': 'true' }),
-        h('div', { class: 'v2-welcome-stage' }, view));
+      root.replaceChildren(h('div', { class: 'v2-welcome-stage' }, view));
     } else {
       root.replaceChildren(view);
     }
@@ -205,7 +201,7 @@
   }
 
   function freshnessNodes() {
-    const feeds = v2 ? [data.feeds.specs] : Object.values(data.feeds);
+    const feeds = v2 ? [data.feeds.specs, data.feeds.agents] : Object.values(data.feeds);
     const limit = data.limit;
     return [
       ...feeds.map(feed => h('div', {}, ...readLine(feed))),
@@ -217,11 +213,11 @@
   if (v2 && OW.v2) {
     const v2Pages = OW.v2.pages({
       updateBadges,
+      canvas: OW.pages.find(page => page.id === 'canvas'),
       repoSwitch: () => repoSwitch(data.repo.get()),
       freshnessNodes,
       signOut: () => { data.auth.signOut(); signedOut(); },
     });
-    hidden.push(...OW.pages.filter(page => page.id === 'canvas'));
     OW.pages.splice(0, OW.pages.length, ...v2Pages);
     OW.v2.setRedraw(() => update());
   }
@@ -255,7 +251,6 @@
     const view = h('div', { class: 'v2-view' }, notices, body);
     root.replaceChildren(
       h('a', { class: 'skip', href: '#content', onclick: event => { event.preventDefault(); title.focus(); } }, 'Skip to the page'),
-      h('div', { class: 'v2-backdrop', 'aria-hidden': 'true' }),
       h('div', { class: 'v2-frame' },
         h('div', { class: 'v2-shell' },
           h('aside', { class: 'v2-side' },
@@ -304,10 +299,12 @@
     built = { side, tabs, reads, refresh, title, read, phoneReads, notices, body, page: null };
   }
 
+  const labelOf = feed => (v2 && OW.v2 && feed === data.feeds.agents ? 'Progress' : feed.label);
   function readLine(feed) {
-    if (feed.state === 'loading') return [h('span', {}, `${feed.label}: reading…`)];
-    if (feed.state === 'unknown') return [h('span', { class: 'bad' }, `${feed.label}: unknown (couldn't read at ${time(feed.failedAt)})`)];
-    return [h('span', {}, `${feed.label} read `), h('b', {}, time(feed.readAt)), feed.state === 'stale' ? h('span', { class: 'bad' }, ' · last read failed') : null];
+    const label = labelOf(feed);
+    if (feed.state === 'loading') return [h('span', {}, `${label}: reading…`)];
+    if (feed.state === 'unknown') return [h('span', { class: 'bad' }, `${label}: unknown (couldn't read at ${time(feed.failedAt)})`)];
+    return [h('span', {}, `${label} read `), h('b', {}, time(feed.readAt)), feed.state === 'stale' ? h('span', { class: 'bad' }, ' · last read failed') : null];
   }
 
   function notice(kind, iconName, strong, text) {
@@ -348,7 +345,7 @@
       built.read.textContent = latest.length ? `Read ${time(Math.min(...latest))}` : '';
       built.phoneReads.replaceChildren(...mine.flatMap((feed, i) => [i ? ' · ' : '', ...readLine(feed)]).filter(part => part !== null && part !== ''));
     } else if (built.refresh) {
-      built.refresh.hidden = page.id !== 'feed';
+      built.refresh.hidden = page.id !== 'feed' && page.id !== 'canvas';
     }
     const notes = [];
     if (!v2 && data.paused()) {
@@ -356,9 +353,10 @@
     }
     if (!demo && !liveFeed) {
       for (const feed of mine) {
-        if (feed.state === 'unknown') notes.push(notice('bad', 'warn', `Couldn't read ${feed.label} from GitHub`, `at ${time(feed.failedAt)}. It shows as unknown, not as empty, until a read works.`));
-        if (feed.state === 'stale') notes.push(notice('bad', 'warn', `Couldn't read ${feed.label} at ${time(feed.failedAt)}.`, `Showing the read from ${time(feed.readAt)}.`));
-        if (feed.state === 'partial') notes.push(notice('bad', 'warn', 'Part of this read failed', `(${feed.label}, ${time(feed.readAt)}). What's missing shows as unknown.`));
+        const label = labelOf(feed);
+        if (feed.state === 'unknown') notes.push(notice('bad', 'warn', `Couldn't read ${label} from GitHub`, `at ${time(feed.failedAt)}. It shows as unknown, not as empty, until a read works.`));
+        if (feed.state === 'stale') notes.push(notice('bad', 'warn', `Couldn't read ${label} at ${time(feed.failedAt)}.`, `Showing the read from ${time(feed.readAt)}.`));
+        if (feed.state === 'partial') notes.push(notice('bad', 'warn', 'Part of this read failed', `(${label}, ${time(feed.readAt)}). What's missing shows as unknown.`));
       }
     }
     built.notices.replaceChildren(...notes);

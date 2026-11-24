@@ -313,7 +313,18 @@ test('switch on: #/canvas still opens the Canvas page under the v2 shell, which 
     assert.equal(await run.page.run('location.hash'), '#/canvas');
     assert.equal(await run.page.run(`document.querySelector('main h1')?.textContent`), 'Canvas');
     assert.deepEqual(await sheets(run), ['#41 Spec: checkout', '#48 Spec: accounts', 'Quiet · 1']);
-    assert.deepEqual(await run.page.run(`[...document.querySelectorAll('nav.main a')].map(a => a.getAttribute('href'))`), ['#/chat', '#/feed', '#/settings']);
+    assert.deepEqual(await run.page.run(`[...document.querySelectorAll('nav.main a')].map(a => a.getAttribute('href'))`), ['#/chat', '#/feed', '#/canvas', '#/settings']);
+    assert.deepEqual(await run.page.run(`Object.fromEntries([...document.querySelectorAll('.cv-stack[data-ticket]')].map(el =>
+      [el.dataset.ticket.split('#').pop(), el.querySelector('.pill').textContent]))`),
+    { 42: 'Done', 43: 'In review', 44: 'Needs you', 45: 'Needs you', 46: 'Waiting', 47: 'Stopped' });
+    const words = /Builder|Reviewer|Claude|Codex|Opus|Sol 6|\bagents?\b|which tax rule/i;
+    assert.doesNotMatch(await run.page.run(`document.querySelector('main').innerText`), words, 'the v2 board names the machinery');
+    await run.page.run(`document.querySelector('.cv-stack[data-ticket$="#45"]').click()`);
+    await run.page.until(`document.querySelector('.cv-focus')`, 'the focused ticket');
+    assert.match(await run.page.text(), /which tax rule applies to digital goods/);
+    assert.doesNotMatch(await run.page.text(), /Builder|Claude|Opus|ready-for-agent/);
+    await run.page.key('Escape');
+    await run.page.until(`document.querySelector('.cv-board')`, 'the board again');
     await run.page.go(`${SITE}/app/#/canvas/41`);
     await run.page.until(`document.querySelector('main h1')?.textContent === 'Canvas' && document.querySelectorAll('.cv-stack[data-ticket]').length >= 6`, 'the Canvas page at spec #41');
     assert.equal(await run.page.run('location.hash'), '#/canvas/41');
