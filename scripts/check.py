@@ -124,7 +124,8 @@ APP_FOUND = {(folder, ext): tuple(sorted(p.relative_to(ROOT).as_posix() for p in
 APP_PARTS = APP_FOUND['app/pages', 'js'] + APP_FOUND['app/cards', 'js']
 APP_PART_STYLES = APP_FOUND['app/pages', 'css'] + APP_FOUND['app/cards', 'css']
 APP_LEGACY_ORDER = ('app/pages/you.js', 'app/pages/specs.js', 'app/pages/spec.js', 'app/pages/agents.js')
-APP_NEEDED = set(APP_FOUND['app/pages', 'js'] + APP_FOUND['app/pages', 'css'])
+APP_V2_ASSETS = {'data-v2-script': 'app/pages/v2.js', 'data-v2-style': 'app/pages/v2.css'}
+APP_NEEDED = set(APP_FOUND['app/pages', 'js'] + APP_FOUND['app/pages', 'css']) - set(APP_V2_ASSETS.values())
 APP_SCRIPTS = ('app/data.js', 'app/records.js', 'app/ui.js') + APP_PARTS + ('app/palette.js', 'app/shell.js')
 APP_VENDOR = {'app/vendor/dagre-3.1.3.min.js': ('node_modules/@dagrejs/dagre/dist/dagre.min.js', 'app/pages/spec.js'),
               'app/vendor/dagre-LICENSE.txt': ('node_modules/@dagrejs/dagre/LICENSE', None)}
@@ -416,7 +417,7 @@ class Page(HTMLParser):
         self.launch_posts = 0
         self.report_links = 0
         self.cloudroom_links = 0
-        self.stylesheets, self.scripts = [], []
+        self.stylesheets, self.scripts, self.app_v2_assets = [], [], []
         self.feed(text)
 
     def tracks_of(self, video):
@@ -476,6 +477,10 @@ class Page(HTMLParser):
         if (tag == 'script' and attrs.get('src') and attrs.get('type', 'text/javascript') in ('text/javascript', 'module')
                 and 'nomodule' not in attrs):
             self.scripts.append(attrs['src'])
+            for key in APP_V2_ASSETS:
+                if key in attrs:
+                    self.app_v2_assets.append((attrs['src'], key, attrs[key]))
+                    self.refs.append(attrs[key])
         if tag == 'link' and attrs.get('rel') == 'icon':
             self.favicons.add(attrs.get('href'))
         if tag == 'meta' and (attrs.get('property') == 'og:image' or attrs.get('name') == 'twitter:image'):
@@ -1701,6 +1706,9 @@ def check_app(root, names, pages):
     ordered = ('app/data.js', 'app/records.js', 'app/ui.js', *shown, 'app/palette.js', 'app/shell.js')
     assert page.scripts == [ref for name in ordered for ref in [f'/{v}' for v, (_, before) in APP_VENDOR.items() if before == name] + [f'/{names[name]}']], \
         'the app must load its fingerprinted scripts (and each pinned file before its user) in order'
+    expected_assets = {(f'/{names["app/shell.js"]}', key, f'/{names[name]}') for key, name in APP_V2_ASSETS.items()}
+    assert set(page.app_v2_assets) == expected_assets and len(page.app_v2_assets) == len(expected_assets) \
+        and not (set(applied + shown) & set(APP_V2_ASSETS.values())), 'only the app shell may load v2 assets on demand'
     assert not page.inline_scripts, 'the app allows no inline script'
     for ref in page.refs:
         check_ref(root, root / APP_PAGE, ref, pages, page.favicons)

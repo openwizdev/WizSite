@@ -1,6 +1,19 @@
 'use strict';
-(() => {
+(async () => {
   const { h, icon, time } = OW.ui;
+  const v2 = OW.data.v2.get() !== 'off';
+  if (v2) {
+    const { v2Style, v2Script } = document.currentScript.dataset;
+    const load = element => new Promise(resolve => {
+      element.addEventListener('load', resolve, { once: true });
+      element.addEventListener('error', resolve, { once: true });
+      document.head.append(element);
+    });
+    await Promise.all([
+      load(h('link', { rel: 'stylesheet', href: v2Style })),
+      load(h('script', { src: v2Script })),
+    ]);
+  }
   const logo = () => h('img', { src: '/app/mark.svg', alt: '', width: 28, height: 28 });
   const wiz = () => h('p', {}, h('img', { src: '/app/wiz-reviewer.svg', alt: '', width: 96, height: 105 }));
   const data = OW.data;
@@ -8,8 +21,7 @@
   const ROUTES = () => OW.pages.map(page => page.id);
   let built = null;
   const INSTALL = 'https://github.com/apps/openwiz-viewer/installations/new';
-  const v2 = Boolean(OW.records?.enabled?.());
-  const demo = Boolean(OW.v2?.demo);
+  const demo = data.demo;
   if (v2) document.documentElement.dataset.v2 = '1';
   const queue = OW.pages.findIndex(page => page.v2);
   if (queue >= 0) {
@@ -371,7 +383,8 @@
     if (!built) return;
     if ((event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'k') {
       event.preventDefault();
-      return OW.palette.toggle();
+      if (!demo) OW.palette.toggle();
+      return;
     }
     if (OW.palette.shown() || event.altKey || event.ctrlKey || event.metaKey || /input|textarea|select/i.test(event.target.tagName)) return;
     if (event.key === '?') {
