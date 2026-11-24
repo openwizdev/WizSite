@@ -11,7 +11,7 @@ const ISOLATED = {
   GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: devNull, GIT_TERMINAL_PROMPT: '0',
 };
 const git = (dir, ...args) => execFileSync('git', ['-c', 'credential.helper=', '-c', `core.hooksPath=${devNull}`, '-c', 'core.fsmonitor=false', '-C', dir, ...args],
-  { encoding: 'utf8', env: ISOLATED, stdio: ['ignore', 'pipe', 'pipe'] });
+  { encoding: 'utf8', env: { ...ISOLATED, GIT_NO_LAZY_FETCH: '1' }, stdio: ['ignore', 'pipe', 'pipe'] });
 const PATTERNS = 'import json, re, sys; sys.path.insert(0, "check"); import check; print(json.dumps([[label, pattern.pattern, bool(pattern.flags & re.I)] for label, pattern in check.PRIVATE]))';
 
 export async function sync(checkout, target = REGISTRY, canonical = WIZMARKET) {
@@ -19,7 +19,7 @@ export async function sync(checkout, target = REGISTRY, canonical = WIZMARKET) {
   const refuse = why => { throw new Error(`market-sync: refused: ${why}`); };
   if (!existsSync(join(dir, '.git'))) refuse('not a git checkout');
   let head;
-  try { head = git(dir, 'rev-parse', '--verify', '--quiet', 'HEAD^{commit}').trim(); } catch { refuse('the checkout has no HEAD commit'); }
+  try { head = git(dir, 'rev-parse', '--verify', '--quiet', '--end-of-options', 'HEAD').trim(); } catch { refuse('the checkout has no HEAD ref'); }
   if (!/^[0-9a-f]{40}$/.test(head)) refuse('the checkout\'s HEAD is not a 40-hex commit');
   const temp = mkdtempSync(join(tmpdir(), 'market-sync-'));
   try {
