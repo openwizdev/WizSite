@@ -14,6 +14,7 @@ TODO_RUN = (
     ('openwizdev.github.io/todo-demo',),
 )
 TODO_APP = '/art/todo-app.webp'
+SPEC_STILL = ('art/todo-spec-engraved.webp', 'art/todo-spec-engraved-640.webp')
 MOMENT_STEPS = ('spec', '4 tickets', 'agents building', 'merged')
 MOMENT_LINKS = ('The questions', 'The spec', 'The live app')
 MOMENT_WORDS = 30
@@ -40,6 +41,7 @@ ART_HASHES = {
     'art/hero-steam-frames.webp': '20f057c963be16ebc3cabbf1d2ab849e2e8144d29a3e419344a867eef2c41f3c',
     'art/todo-spec.mp4': '52bb1fa94a154e17270f7512db19efcedae921e4769a28742bc8a36093d1c732',
     'art/todo-spec-engraved.webp': '177a5d4c8f4d2d9e1bdfb30fb8b87f4d76aa5e118ae22aa43f47bbd6ad27cc11',
+    'art/todo-spec-engraved-640.webp': 'a0666cf14ee72ac54b2433f4d3f9dc38299bf8d0531dbadf383f7f01accf457d',
     'art/todo-spec.vtt': '47e9ffb41081dd72f541110c43312521a8dd92f1c8e58c11092ecd0daa74eee2',
     'art/todo-app.webp': 'ccc5be87687b1d4ac387cfb623033c0f567890cfe73570f8e4d4bb4b8a81de54',
     'art/spec-video.mp4': 'feb357b9a80453d676123a31285a36c34b5873e102ed58c95728bfd6315bfe16',
@@ -419,6 +421,7 @@ class Page(HTMLParser):
         self.social = []
         self.buttons = []
         self.images = []
+        self.sources = []
         self.videos = []
         self.tracks = []
         self.video_tracks = []
@@ -465,13 +468,15 @@ class Page(HTMLParser):
                 'Report a problem link needs rel="noreferrer"'
             self.report_links += 1
             attrs = {key: value for key, value in attrs.items() if key != 'href'}
-        for key in ('href', 'src', 'poster'):
+        for key in ('href', 'src', 'poster', 'srcset'):
             if attrs.get(key):
                 self.refs.append(attrs[key])
         if tag == 'button':
             self.buttons.append(attrs)
         if tag == 'img':
             self.images.append(attrs)
+        if tag == 'source':
+            self.sources.append(attrs)
         if tag == 'video':
             self.videos.append(attrs)
             self.video_tracks.append([])
@@ -769,7 +774,14 @@ def check_site(root, registry=ROOT / 'market/registry.json'):
     clip = next((v for v in page.videos if 'spec-video' in (v.get('class') or '').split()), {})
     assert clip.get('preload') == 'none' and 'autoplay' not in clip and 'loop' not in clip, 'spec recording must be opt-in'
     assert 'muted' in clip and 'playsinline' in clip, 'spec video must start muted inline'
-    assert clip.get('poster', '').removeprefix('/') in ART, 'spec video needs a pinned poster'
+    assert 'poster' not in clip, 'the spec video poster must not load with the page: rest on the lazy still instead'
+    still = re.search(r'<picture class="spec-still">[\s\S]*?</picture>', (root / 'index.html').read_text())
+    still = Page(still[0]) if still else Page('')
+    wide, phone = SPEC_STILL
+    assert [i.get('src') for i in still.images] == [f'/{wide}'] and still.images[0].get('loading') == 'lazy' and still.images[0].get('alt') == '', \
+        'spec video needs a pinned poster: one lazy, decorative still'
+    assert [(s.get('srcset'), s.get('width')) for s in still.sources] == [(f'/{phone}', '640')] and still.sources[0].get('media'), \
+        'the spec still needs its pinned 640px phone crop'
     assert any(t.get('kind') == 'captions' and 'default' in t and t.get('src', '').removeprefix('/') in ART for t in page.tracks_of(clip)), 'spec video needs default captions'
     assert any(a.get('href') == clip.get('src') and 'hidden' not in a for a in page.links), 'needs a plain link to the spec video'
     for attrs in page.buttons:

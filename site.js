@@ -288,12 +288,23 @@ function specVideo() {
   const frame = video.closest('.spec-frame');
   const track = video.textTracks[0];
   frame?.classList.add('is-resting');
+  const later = frame?.querySelector('.spec-still-later');
+  if (later) {
+    const show = () => later.insertAdjacentHTML('afterend', later.textContent);
+    if (!('IntersectionObserver' in window)) show();
+    else {
+      const near = new IntersectionObserver(entries => {
+        if (entries.some(entry => entry.isIntersecting)) { near.disconnect(); show(); }
+      }, { rootMargin: '600px 0px' });
+      near.observe(frame);
+    }
+  }
   video.controls = false;
   if (track) track.mode = 'hidden';
   sound.hidden = false;
   const listen = event => {
     if (!event.isTrusted || video.controls) return;
-    frame?.classList.remove('is-resting');
+    frame?.classList.replace('is-resting', 'is-playing');
     video.controls = true;
     if (track) track.mode = 'showing';
     video.muted = false;

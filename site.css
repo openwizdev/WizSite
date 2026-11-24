@@ -206,16 +206,19 @@ code,.v{font-family:var(--ow-font-mono)}
 .app-panel figcaption span { white-space: nowrap; }
 .spec-link { color: var(--ink); font-size: 15px; font-weight: 500; line-height: 1.3; white-space: nowrap; text-decoration: underline 1px; text-decoration-color: var(--edge); text-decoration-skip-ink: auto; text-underline-offset: .3em; }
 .spec-link:hover { text-decoration-color: currentColor; }
-.spec-frame { position: relative; overflow: hidden; container-type: inline-size; border-radius: var(--round); background: var(--dot); box-shadow: 0 0 0 1px #24324f, 0 24px 60px #03050ab0; }
-.spec-video { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover; background: var(--dot); }
+.spec-frame { position: relative; display: grid; overflow: hidden; container-type: inline-size; border-radius: var(--round); background: var(--dot); box-shadow: 0 0 0 1px #24324f, 0 24px 60px #03050ab0; }
+.spec-still-later, .spec-still, .spec-video { grid-area: 1 / 1; }
+.spec-frame.is-resting .spec-video { aspect-ratio: 1 / 1; }
+.spec-still img { display: block; width: 100%; height: auto; aspect-ratio: 1 / 1; object-fit: cover; image-rendering: pixelated; }
+.spec-video { display: block; width: 100%; height: 100%; object-fit: contain; background: transparent; }
 .spec-video:not([controls]) { cursor: pointer; }
 .spec-video:focus-visible { outline: 2px solid var(--orchid); outline-offset: -2px; }
 .spec-video::cue { color: #fff; background: rgba(7, 10, 20, .85); }
-.spec-frame:not(.is-resting) .spec-video[controls] { height: calc(56.25cqw + max(9.375cqw, 36px)); aspect-ratio: auto; object-fit: contain; object-position: top; }
+.spec-frame.is-playing .spec-still { display: none; }
+.spec-frame.is-playing .spec-video { height: calc(56.25cqw + max(9.375cqw, 36px)); object-position: top; background: var(--dot); }
 .spec-video:fullscreen { object-position: center; }
-.spec-frame.is-resting .spec-video { aspect-ratio: 1 / 1; object-position: 45% 50%; image-rendering: pixelated; }
 .spec-over { display: none; }
-.spec-frame.is-resting .spec-over { position: absolute; inset: auto 0 0; display: grid; justify-items: start; gap: 14px; padding: 72px clamp(18px, 4cqw, 44px) clamp(18px, 4cqw, 40px); background: linear-gradient(to top, var(--dot) 30%, rgb(7 10 20 / 80%) 62%, transparent); pointer-events: none; }
+.spec-frame.is-resting .spec-over { grid-area: 2 / 1; display: grid; justify-items: start; gap: 12px; padding: 14px 16px 16px; pointer-events: none; }
 .spec-wish { display: grid; gap: 4px; margin: 0; color: #f2f5ff; font-size: clamp(24px, 3.6cqw, 40px); font-weight: 600; letter-spacing: -.035em; line-height: 1.05; }
 .spec-wish span { color: var(--frost); font: 500 12px/1.3 var(--ow-font-mono); letter-spacing: .06em; text-transform: uppercase; }
 .moments .spec-play { display: inline-flex; align-items: center; gap: 12px; min-height: 52px; padding: 0 20px 0 6px; border: 0; border-radius: 999px; background: var(--frost); color: var(--dot); font: 600 clamp(16px, 1.9cqw, 19px)/1 var(--ow-font-sans); letter-spacing: -.01em; cursor: pointer; pointer-events: auto; }
@@ -227,10 +230,20 @@ code,.v{font-family:var(--ow-font-mono)}
 .spec-time { color: #2b4a80; font: 500 14px/1 var(--ow-font-mono); }
 .spec-video[controls] ~ .spec-over .spec-play { display: none; }
 @media (min-width: 600px) {
-  .spec-frame.is-resting .spec-video { aspect-ratio: 16 / 9; }
+  .spec-still img, .spec-frame.is-resting .spec-video { aspect-ratio: 16 / 9; }
+  .spec-frame.is-resting .spec-over { position: absolute; inset: auto 0 0; grid-area: auto; gap: 14px; padding: 72px clamp(18px, 4cqw, 44px) clamp(18px, 4cqw, 40px); background: linear-gradient(to top, var(--dot) 30%, rgb(7 10 20 / 80%) 62%, transparent); }
+}
+@media (max-width: 599px) {
+  .moments { padding-block: 40px; }
+  .spec-moment { margin-top: 16px; }
+  .moment-steps { margin-top: 12px; }
+  .moment-links { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; margin-top: 10px; padding-top: 4px; }
+  .moment-links .moment-more > summary, .moment-links .spec-link { display: flex; align-items: center; min-height: 44px; }
+  .moment-links .moment-more[open] { grid-column: 1 / -1; }
 }
 @media (min-width: 1000px) {
-  .spec-frame.is-resting .spec-video { aspect-ratio: 12 / 5; object-position: 50% 72%; }
+  .spec-still img, .spec-frame.is-resting .spec-video { aspect-ratio: 12 / 5; }
+  .spec-still img { object-position: 50% 72%; }
   .moment-steps { justify-content: flex-start; gap: 14px; font-size: 14px; }
   .moment-steps li { flex: none; gap: 14px; }
 }

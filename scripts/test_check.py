@@ -370,7 +370,9 @@ class Checks(unittest.TestCase):
             mark = '<div class="spec-moment">'
             return lambda t: t.split(mark)[0] + mark + change(t.split(mark, 1)[1])
         for change, error in (
-                (spec(lambda t: re.sub(r' poster="[^"]*"', '', t, count=1)), 'spec video needs a pinned poster'),
+                (spec(lambda t: t.replace(' loading="lazy"', '', 1)), 'spec video needs a pinned poster'),
+                (spec(lambda t: t.replace(' preload="none"', ' poster="/art/todo-spec-engraved.webp" preload="none"', 1)), 'poster must not load with the page'),
+                (spec(lambda t: re.sub(r'<source [^>]*>', '', t, count=1)), 'pinned 640px phone crop'),
                 (spec(lambda t: re.sub(r'<track [^>]*>', '', t, count=1)), 'spec video needs default captions'),
                 (lambda t: t.replace('class="spec-link"', 'class="spec-link" hidden', 1), 'plain link to the spec video'),
                 (spec(lambda t: t.replace(' muted', '', 1)), 'spec video must start muted inline'),

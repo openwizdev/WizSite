@@ -126,7 +126,11 @@
     <h2 id="moments-title">From idea to shipped.</h2>
     <div class="spec-moment">
       <div class="spec-frame">
-        <video class="spec-video" src="/art/todo-spec.mp4" poster="/art/todo-spec-engraved.webp" preload="none" muted playsinline controls aria-label="The real narrated spec of an OpenWiz-built to-do app">
+        <noscript class="spec-still-later"><picture class="spec-still">
+          <source media="(max-width: 599px)" srcset="/art/todo-spec-engraved-640.webp" width="640" height="640">
+          <img src="/art/todo-spec-engraved.webp" alt="" width="1280" height="720" loading="lazy" decoding="async">
+        </picture></noscript>
+        <video class="spec-video" src="/art/todo-spec.mp4" preload="none" muted playsinline controls aria-label="The real narrated spec of an OpenWiz-built to-do app">
           <track kind="captions" src="/art/todo-spec.vtt" srclang="en" label="English" default>
         </video>
         <div class="spec-over">
