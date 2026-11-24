@@ -88,7 +88,6 @@ test('switch on: decisions and specs show in one ordered queue, drawn through th
     await openQueue(run, 'on', { cards: true });
     await run.page.until(`location.hash === '#/feed' && document.querySelector('main h1').textContent === 'Feed'`, 'the feed opening first');
     await run.page.until(`window.drawn.length >= 5`, 'five cards');
-    assert.equal(await run.page.run(`Boolean(document.querySelector('.v2-building'))`), false, 'specs with Feed cards show up in Building');
     const drawn = await run.page.run('window.drawn');
     assert.deepEqual(drawn.map(item => item.key), ['decision:acme/factory#60:9100021', 'decision:acme/factory#7:9100003',
       'decision:acme/factory#7:9100005', 'spec:acme/factory#61', 'spec:acme/factory#60']);
@@ -127,8 +126,7 @@ test('switch on without card modules: plain cards link to GitHub, in the same or
       ['https://github.com/acme/factory/pull/7#issuecomment-9100003', '_blank'], ['https://github.com/acme/factory/pull/7#issuecomment-9100005', '_blank'],
       ['https://github.com/acme/factory/issues/61', '_blank'], ['https://github.com/acme/factory/issues/60', '_blank']]);
     assert.match(await run.page.text(), /Plan to approve · #60/i);
-    const progress = await run.page.run(`[...document.querySelectorAll('.v2-building progress')].map(bar => [bar.value, bar.max])`);
-    assert.deepEqual(progress, [[0, 2], [1, 3]]);
+    assert.equal(await run.page.run(`Boolean(document.querySelector('.v2-building'))`), false, 'specs with Feed cards are repeated in Building');
     const visible = () => run.page.run(`[...document.querySelectorAll('.queue-item:not([hidden])')].map(e => e.dataset.key)`);
     assert.deepEqual(await visible(), [SPEC_DECISION]);
     await run.page.tap('Next card');
@@ -140,6 +138,9 @@ test('switch on without card modules: plain cards link to GitHub, in the same or
     assert.match(await run.page.text(), /Spec to watch · #61/i);
     assert.match(await run.page.text(), /0 of 2 tickets complete/);
     assert.equal(await run.page.run(`document.querySelector('.queue-item:not([hidden]) .v2-queue-video')?.href`), VIDEO);
+    await run.page.tap('Next card');
+    assert.match(await run.page.text(), /Spec to watch · #60/i);
+    assert.match(await run.page.text(), /1 of 3 tickets complete/);
     assert.deepEqual(run.world.violations, []);
   } finally {
     await run.close();
