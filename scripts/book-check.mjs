@@ -468,9 +468,13 @@ async function runWidth(browser, srv, { name, width, height, shotsDir }) {
       `${name}: POST error alert must be focused and visible in viewport: ${JSON.stringify(postErrorCheck)}`);
 
     srv.state.bookMode = 'slot_taken';
+    // Keep the old slot buttons in the DOM while the reload is pending.
+    srv.state.slotsDelayMs = 350;
     const callsBefore = srv.state.slotsCalls;
     await tab.evalJs('document.querySelector(".book-submit").click()');
     await tab.waitFor(`Boolean(document.querySelector('.book-alert')?.textContent?.toLowerCase().includes('taken'))`);
+    await tab.waitFor('Boolean(document.querySelector("#book-picker:not([hidden]) .book-slot"))');
+    srv.state.slotsDelayMs = 0;
     assert(srv.state.slotsCalls > callsBefore, `${name}: slot_taken should reload slots`);
     const keptValues = await tab.evalJs(`(() => ({
       name: document.querySelector('#book-name').value,
