@@ -533,6 +533,50 @@ class Checks(unittest.TestCase):
                 with self.assertRaises(AssertionError):
                     check_site(root)
 
+    def test_font_subset_and_fingerprinting(self):
+        def rewrite_tokens(root, transform):
+            old = FINGERPRINTS['tokens.css']
+            text = transform((root / old).read_text())
+            data = text.encode('utf-8')
+            new = fingerprint('tokens.css', data)
+            (root / old).unlink()
+            (root / new).write_bytes(data)
+            for page in root.rglob('*.html'):
+                page.write_text(page.read_text().replace(f'/{old}', f'/{new}'))
+
+        cases = {
+            'char outside subset in page': (
+                lambda root: (root / 'faq/index.html').write_text(
+                    (root / 'faq/index.html').read_text().replace('</main>', '<p>\u03a9</p></main>')),
+                'character outside font subset',
+            ),
+            'font-display switched to swap': (
+                lambda root: rewrite_tokens(root, lambda t: t.replace('font-display: optional;', 'font-display: swap;', 1)),
+                'font-display: optional',
+            ),
+            'missing unicode-range': (
+                lambda root: rewrite_tokens(root, lambda t: re.sub(r'\s*unicode-range:[^;]+;', '', t, count=1)),
+                'unicode-range',
+            ),
+            'missing font cache header': (
+                lambda root: (root / '_headers').write_text(
+                    (root / '_headers').read_text().replace('/fonts/*.woff2\n  Cache-Control: public, max-age=31536000, immutable\n', '')),
+                'cache fingerprinted fonts',
+            ),
+            'unfingerprinted font preload': (
+                lambda root: (root / 'index.html').write_text(
+                    (root / 'index.html').read_text().replace(f'/{FINGERPRINTS["fonts/Geist-var.woff2"]}', '/fonts/Geist-var.woff2', 1)),
+                'unfingerprinted',
+            ),
+        }
+        for name, (spoil, pattern) in cases.items():
+            with self.subTest(name), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp) / 'dist'
+                shutil.copytree(ROOT / 'dist', root)
+                spoil(root)
+                with self.assertRaisesRegex(AssertionError, pattern):
+                    check_site(root)
+
     def test_install_wording_only_in_the_install_box(self):
         for extra in ('<a href="/">Copy · coming soon</a>', '<p>Install now</p>', '<p>Inst&#97;ll today</p>',
                       '<p>in<b>stall</b> now</p>', '<p>Ins<span>t</span>all</p>', '<img alt="Install now" src="/favicon.svg">'):

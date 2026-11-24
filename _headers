@@ -15,6 +15,8 @@
   Cache-Control: public, max-age=0, must-revalidate
 /*.js
   Cache-Control: public, max-age=0, must-revalidate
+/fonts/*.woff2
+  Cache-Control: public, max-age=31536000, immutable
 /.well-known/security.txt
   Content-Type: text/plain; charset=utf-8
 # The app (openwiz.dev/app) reads only GitHub's API and this site (its sign-in helper): the browser refuses any
