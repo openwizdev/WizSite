@@ -527,7 +527,6 @@ async function askAWiz() {
       row.append(form, heading, body, actions);
       list.append(row);
       let question = '', controller = null, wait = null;
-      // The Wizes dance until the first words of the answer arrive (the status line already tells screen readers).
       const waiting = on => {
         if (!on) {
           wait?.remove();

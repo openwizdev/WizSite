@@ -117,7 +117,6 @@ DRIVER_LOGOS = {
 }
 
 PAGE_STYLES = {'changelog/index.html': 'changelog/changelog.css', 'market/index.html': 'market/market.css'}
-# The Wiz loader (dancing Wizes for any slow load): the app and the pages with Ask a Wiz load it. Its demo stays out of dist/.
 LOADER_STYLE, LOADER_SCRIPT = 'wiz-loader/wiz-loader.css', 'wiz-loader/wiz-loader.js'
 LOADER_PAGES = ('index.html', 'faq/index.html')
 LOADER_BUDGET = 10_240

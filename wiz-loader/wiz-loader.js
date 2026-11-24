@@ -1,5 +1,4 @@
 'use strict';
-// Dancing Wizes for slow loads: mount(el, { compact, lines }) -> { stop }, markup(compact) -> el.
 (() => {
   const LINES = ['Wizes are brewing your specs', 'Herding agents', 'Checking every ticket', 'Reading your repo',
     'Polishing the hats', 'Asking the reviewers nicely', 'Twirling the wands', 'Waking the sleepy Wizes',
@@ -13,7 +12,6 @@
   let masks = 0;
   const make = (tag, className) => Object.assign(document.createElement(tag), { className });
 
-  // Each SVG copy needs its own mask id.
   function ownMask(svg) {
     svg.querySelector('mask').id = `wlm${++masks}`;
     svg.querySelector('[mask]').setAttribute('mask', `url(#wlm${masks})`);
@@ -29,11 +27,9 @@
     let size = 1, beat = 0, casts = 0, next = 0, seen = false, swap;
     ownMask(leader.querySelector('svg'));
     if (options.lines) line.textContent = lines[next++];
-    // Screen readers hear the first line once.
     box.setAttribute('role', 'status');
     if (!box.querySelector('.wl-sr')) box.append(Object.assign(make('span', 'wl-sr'), { textContent: line.textContent }));
     line.setAttribute('aria-hidden', 'true');
-    // Stops once it has been on the page and left it.
     function alive() {
       if (box.isConnected) seen = true;
       else if (seen) return stop(), false;
@@ -53,13 +49,11 @@
     function onBeat() {
       if (!alive()) return;
       beat++;
-      // After a cast the hats shift one place.
       if (classes.contains('wl-cast')) {
         classes.remove('wl-cast', 'wl-cast-a', 'wl-cast-b', 'wl-cast-c');
         joined.forEach((slot, i) => { slot.className = slot.className.replace(/wl-c\d/, `wl-c${(i + casts) % 4 + 1}`); });
       }
       if (still.matches) return;
-      // A Wiz joins each beat from 4 s; casts at 14 s, then every 10 s.
       if (beat > 1 && size <= most) join();
       else if (beat > 6 && (beat - 7) % 5 === 0) classes.add('wl-cast', `wl-cast-${'abc'[casts++ % 3]}`);
     }

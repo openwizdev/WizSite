@@ -34,7 +34,6 @@
     return view;
   }
 
-  // A full-screen wait: the boot loader keeps dancing if it is still up, else a new one starts.
   function waitScreen(text) {
     built = null;
     OW.palette.close();
