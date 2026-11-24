@@ -839,6 +839,57 @@ class Checks(unittest.TestCase):
                     with self.assertRaisesRegex(AssertionError, re.escape(error)):
                         check_site(root, registry)
 
+    def test_drivers_registry_links(self):
+        from check import fingerprinted_page
+
+        fixtures = ROOT / 'tests/market-fixtures'
+        snapshot = json.loads((fixtures / 'contract-index.json').read_text())
+        listed = json.loads((fixtures / 'edge-index.json').read_text())['listings'][0]
+        listings = sorted([*snapshot['listings'], listed], key=lambda item: item['id'])
+        tracker = next(item for item in listings if item['id'] == 'example-tracker-harness')
+        work = tracker['links'][0]['url']
+        receipt = listings[0]['proof']['receipt']['url']
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / 'dist'
+            shutil.copytree(ROOT / 'dist', root)
+            path = root / 'drivers/index.html'
+            registry = Path(temp) / 'registry.json'
+            registry.write_text(json.dumps({**snapshot, 'listings': listings}))
+            source = {name: fingerprinted_page((ROOT / name).read_text(), cta=True)
+                      for name in ('drivers/index.html', 'market/index.html')}
+            exports = subprocess.run(['node', '--input-type=module', '-e', """
+                import { readFileSync } from 'node:fs';
+                import { withDrivers } from './scripts/drivers.mjs';
+                import { readRegistry, render, withMarket } from './scripts/market.mjs';
+                const pages = JSON.parse(readFileSync(0, 'utf8'));
+                const registry = await readRegistry(process.argv[1]);
+                process.stdout.write(JSON.stringify({
+                  drivers: withDrivers(pages['drivers/index.html'], registry),
+                  market: withMarket(pages['market/index.html'], render(registry)),
+                }));
+            """, str(registry)], cwd=ROOT, input=json.dumps(source), check=True, capture_output=True, text=True).stdout
+            pages = json.loads(exports)
+            rendered = pages['drivers']
+            (root / 'market/index.html').write_text(pages['market'])
+            self.assertIn(f'href="{escape(work)}"', rendered)
+            self.assertIn(f'href="{receipt}"', rendered)
+            self.assertIn(f'href="{escape(listed["url"])}"', rendered)
+            path.write_text(rendered)
+            check_site(root, registry)
+            unexpected = 'https://unrelated.example.com/'
+            for old, new, reason in (
+                    (f'href="{escape(work)}"', f'href="{unexpected}"', 'registry URL'),
+                    (f'href="{escape(work)}"', f'href="{receipt}"', 'registry URL'),
+                    (f'href="{escape(work)}"', 'href="https://github.com/openwizdev/OpenWiz/issues/1"', 'registry URL'),
+                    (f'href="{escape(work)}"', f'href="{escape(work)}" src="{escape(work)}"', 'unexpected external URL'),
+                    ('</main>', f'<a href="{escape(work)}">Another link</a></main>', 'unexpected external URL'),
+                    (f'href="{escape(work)}"', f'href="{escape(work)}" ping="{escape(work)}"', 'resource attributes')):
+                with self.subTest(new=new):
+                    self.assertIn(old, rendered)
+                    path.write_text(rendered.replace(old, new, 1))
+                    with self.assertRaisesRegex(AssertionError, reason):
+                        check_site(root, registry)
+
     def test_report_a_problem_link(self):
         form = '<a href="https://github.com/openwizdev/openwiz/issues/new?template=feedback.yml" rel="noreferrer">Report a problem</a>'
         for page, count in {'index.html': 1, 'drivers/index.html': 1, 'team/index.html': 1, 'faq/index.html': 1, 'changelog/index.html': 1, 'app/index.html': 0}.items():
