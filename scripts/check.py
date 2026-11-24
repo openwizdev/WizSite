@@ -148,22 +148,22 @@ CTA_LINK = '<a class="nav-team" href="/team/">'
 TOP_BAR_END = '  </nav>\n</header>'
 TEAM_PAGE = 'team/index.html'
 BOOK_PLACEHOLDER = '#book'
-TEAM_KICKER = 'For teams who use Claude Code or Codex'
-TEAM_HEADLINE = 'Leave the call with a reviewed pull request.'
-TEAM_LEAD = ('Jake, who built OpenWiz, sets up an agent factory with your team on your own repository. '
-             'Pick one small, real change: your agents build and review it. Merging stays your call.')
-TEAM_NEEDS = '30 minutes. Bring a repository with working CI and a signed-in Claude Code or Codex.'
-TEAM_STEPS = (('Connect', 'We connect OpenWiz to your repository and the coding agents you already use.'),
-              ('Decide', 'You pick one small, real change and answer a few questions about it.'),
-              ('Ship', 'Your agents build it, a second agent reviews it, and the pull request opens on your repository. '
-                       'Merging is your call.'))
-TEAM_PARTS = ('On the call', 'What you’re setting up', 'One small change. One call.')
-TEAM_FACTS = ('OpenWiz 0.01 is out: open source, Apache-2.0.',
-              'It never touches a login and runs no server of ours.',
-              'Which drivers passed their live check: the Drivers page.',
-              'One person built it, with fleets of agents.')
-TEAM_DESCRIPTION = ('A 30-minute call with Jake, who built OpenWiz. Bring your repository; leave with a pull request '
-                    'your agents built and reviewed.')
+TEAM_KICKER = 'For leads using Claude Code or Codex'
+TEAM_HEADLINE = 'See how your agents open a pull request'
+TEAM_LEAD = ('In 30 minutes, Jake, who built OpenWiz, walks your team through '
+             'how your coding agents can build and review a change from your backlog.')
+TEAM_NEEDS = 'Bring a repo with working CI. Sign in to Claude Code or Codex before the call.'
+TEAM_STEPS = (('Connect your tools', 'We connect OpenWiz to your repo and the coding agents you already use.'),
+              ('Pick a task', 'Choose one small change your team needs.'),
+              ('Review the change', 'Your agents build the change. A second agent reviews it, '
+               'then a pull request opens in your repo. You decide whether to merge.'))
+TEAM_PARTS = ('From task to pull request', 'About OpenWiz', 'Talk through a change with Jake')
+TEAM_FACTS = ('OpenWiz 0.01 is open source under Apache-2.0.',
+              'OpenWiz never touches your login. We run no server for it.',
+              'See which drivers passed a live check on the Drivers page.',
+              'Jake built OpenWiz on his own with fleets of agents.')
+TEAM_DESCRIPTION = ('Book 30 minutes with Jake, who built OpenWiz, to see how '
+                    'Claude Code or Codex can build and review a change in your repo.')
 TEAM_NEVER = re.compile(r'\binstall|\bguarantee|\bpric(?:e|es|ing)\b|\bcost|\bfree\b|\bcheckout|[$€£]\s*\d|\bper (?:month|seat|user)\b'
                         r'|\bcustomers?\b|\btrusted\b|\btestimonial|\bresults?\b|\bcloudroom\b|\bships on\b|\bminute \d'
                         r'|\b(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten) (?:drivers|hosts)\b|\b\d+ of \d+\b', re.I)
@@ -1529,10 +1529,10 @@ def check_team(htmls, pages):
                       r'<h2 id="team-how">[^<]*</h2>\s*<ol class="team-steps">([\s\S]*?)</ol>\s*</section>', main)
     found = re.findall(r'<li><h3>([\s\S]*?)</h3><p>([\s\S]*?)</p></li>', steps[1]) if steps else []
     assert tuple((plain(title), plain(text)) for title, text in found) == TEAM_STEPS and steps[1].count('<li') == len(TEAM_STEPS), \
-        f'On the call: its three steps, in order: {TEAM_STEPS}'
+        f'{TEAM_PARTS[0]}: its three steps, in order: {TEAM_STEPS}'
     facts = re.search(r'<section class="team-part wrap" aria-labelledby="team-what">\s*<h2 id="team-what">[^<]*</h2>\s*<ul class="team-facts">([\s\S]*?)</ul>\s*</section>', main)
     items = re.findall(r'<li>([\s\S]*?)</li>', facts[1]) if facts else []
-    assert tuple(plain(i) for i in items) == TEAM_FACTS, f'What you\u2019re setting up: its four true lines, in order: {TEAM_FACTS}'
+    assert tuple(plain(i) for i in items) == TEAM_FACTS, f'{TEAM_PARTS[1]}: its four true lines, in order: {TEAM_FACTS}'
     assert re.findall(r'href="([^"]*)"', facts[1]) == ['/drivers/'], 'the drivers line links to the live Drivers page, and restates no count'
     close = re.search(r'<section class="team-part team-close wrap" aria-labelledby="team-call">\s*<h2 id="team-call">[^<]*</h2>\s*'
                       r'<a class="team-book" data-book href="[^"]*">Book a call</a>\s*</section>\s*$', main)
