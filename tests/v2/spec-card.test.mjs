@@ -128,7 +128,15 @@ test('a spec with a same-origin video plays it on its card, lazily and muted, be
     assert.ok(!run.world.log.some(r => r.path === '/art/todo-spec.mp4'), 'the video loads before it is near the view');
     assert.equal(await run.page.run(PLAN), null, 'the plan picture shows beside a playable video');
     assert.ok(await run.page.run(LINK(item.video.url)), 'no plain link to the video');
-    await run.page.run(`document.querySelector('#under-test video').scrollIntoView({ block: 'center' }), true`);
+    await run.page.run(`new Promise((resolve, reject) => {
+      const video = document.querySelector('#under-test video');
+      const deadline = setTimeout(() => reject(new Error('in view, the video never loaded its first frame')), 10000);
+      video.addEventListener('loadeddata', () => {
+        clearTimeout(deadline);
+        resolve();
+      }, { once: true });
+      video.scrollIntoView({ block: 'center' });
+    })`);
     await run.page.until(`(${VIDEO}).playing && (${VIDEO}).muted`, 'the video playing muted in view', 10000);
     assert.ok(run.world.log.some(r => r.path === '/art/todo-spec.mp4'), 'in view, the video never loaded');
     await run.page.run('scrollTo(0, 0), true');
