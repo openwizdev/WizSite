@@ -65,13 +65,13 @@
         { title: 'Project activity digest', merged: 2, total: 4 },
       ],
       settings: {
-        host: 'Local workstation',
+        host: 'Home computer',
         effort: 'Balanced',
         models: 'Recommended',
         github: true,
         notifications: false,
         budget: '$25 / day',
-        repository: 'Harbor · main',
+        repository: 'harbor/app',
       },
     };
   }
@@ -112,11 +112,12 @@
         (returnTo?.isConnected && returnTo !== document.body ? returnTo : document.querySelector('.v2-head h1'))?.focus();
       }
     };
-    toastEl.replaceChildren(h('span', { 'aria-hidden': 'true' }, text), undo ? h('button', {
+    toastEl.replaceChildren(h('span', { 'aria-hidden': 'true' }, text));
+    if (undo) toastEl.append(h('button', {
       type: 'button',
       class: 'v2-btn subtle',
       onclick: () => { dismissToast(); undo(); },
-    }, 'Undo') : null);
+    }, 'Undo'));
     toastEl.hidden = false;
     toastStatus.textContent = text;
     scheduleToast();
@@ -410,12 +411,14 @@
         focusCard();
       });
     };
-    const details = decision
-      ? h('h3', { class: 'v2-recommendation' }, h('span', {}, 'Recommended:'), ' ', card.rec)
-      : h('div', { class: 'v2-progress-box' },
+    const details = decision ? null : h('div', { class: 'v2-progress-box' },
         h('p', {}, h('strong', {}, `${card.merged} of ${card.total}`), ' tickets merged'),
         h('div', { class: 'v2-pips', 'aria-hidden': 'true' },
           Array.from({ length: card.total }, (_, i) => h('span', { class: i < card.merged ? 'merged' : '' }))));
+    const primary = h('button', { type: 'button', class: 'v2-btn primary', 'data-focus': 'ship',
+      'aria-describedby': decision ? 'v2-recommended' : null,
+      onclick: () => resolve(decision ? 'decided' : 'shipped', `${decision ? 'Approved' : 'Shipped'} “${card.title}”`) },
+      icon('check'), decision ? card.rec : 'Ship it');
     const hero = h('article', { class: 'v2-hero-card' },
       h('div', { class: 'v2-card-top' },
         h('span', { class: 'v2-label' }, decision ? 'Needs you' : 'Ready to ship'),
@@ -424,8 +427,8 @@
       decision ? null : specPreview(card),
       details,
       h('div', { class: 'v2-card-actions' },
-        h('button', { type: 'button', class: 'v2-btn primary', 'data-focus': 'ship',
-          onclick: () => resolve(decision ? 'decided' : 'shipped', `${decision ? 'Approved' : 'Shipped'} “${card.title}”`) }, icon('check'), decision ? card.rec : 'Ship it'),
+        decision ? h('div', { class: 'v2-recommended' },
+          h('span', { class: 'v2-label', id: 'v2-recommended' }, 'Recommended'), primary) : primary,
         h('button', { type: 'button', class: 'v2-btn v2-change', 'data-focus': 'change',
           onclick: event => openSheet(card, event.currentTarget, undoChange => resolve('changing', 'Change sent', decision
             ? { undoChange } : { revision: { title: card.title, merged: 0, total: 1 } })) }, 'Change something'),
@@ -437,57 +440,128 @@
       hero, nextPreview(next, href => { go(href); focusCard(); }), buildingSection(demo.building)));
   }
 
-  const settingRow = (label, value) => h('div', { class: 'v2-set-row' }, h('span', {}, label), value);
-  const settingsGroup = (title, rows) => h('section', { class: 'v2-settings-group' }, h('h2', { class: 'v2-label' }, title), rows);
+  const settingIcons = {
+    host: 'M5 5h14v11H5zM5 16l-3 4h20l-3-4',
+    effort: 'M4 6h16M9 4v4M4 12h16M15 10v4M4 18h16M11 16v4',
+    models: 'm3 8 9-5 9 5-9 5-9-5Zm0 4 9 5 9-5m-18 4 9 5 9-5',
+    connections: 'm10 14 4-4m-6 6-2 2a3 3 0 0 1-4-4l4-4a3 3 0 0 1 4 0m4 4a3 3 0 0 0 4 0l4-4a3 3 0 0 0-4-4l-2 2',
+    budget: 'M4 7c0 2 4 3 8 3s8-1 8-3-4-4-8-4-8 2-8 4Zm0 0v10c0 2 4 4 8 4s8-2 8-4V7M4 12c0 2 4 3 8 3s8-1 8-3',
+    repository: 'm8 6-6 6 6 6m8-12 6 6-6 6',
+    exit: 'M9 4H4v16h5m0-8h12m-5-5 5 5-5 5',
+  };
+  const settingLabel = (key, label) => [
+    h('svg', { class: 'ic v2-setting-icon', viewBox: '0 0 24 24', 'aria-hidden': 'true' }, h('path', { d: settingIcons[key] })),
+    h('span', { class: 'v2-setting-label' }, label),
+  ];
+
+  function openSetting(opener, key, label, content, updateValue) {
+    const phone = matchMedia('(max-width: 760px)').matches;
+    const popover = !phone && typeof HTMLElement.prototype.showPopover === 'function';
+    const title = h('h2', { id: `v2-setting-${key}` }, label);
+    const panel = h(popover ? 'div' : 'dialog', {
+      class: `v2-setting-panel ${popover ? 'v2-setting-popover' : 'v2-sheet'}`,
+      popover: popover ? 'auto' : null, role: popover ? 'dialog' : null, 'aria-labelledby': title.id,
+    });
+    const reset = () => opener.setAttribute('aria-expanded', 'false');
+    const close = () => {
+      reset();
+      if (popover) panel.hidePopover();
+      else panel.close();
+    };
+    const save = apply => {
+      apply();
+      updateValue();
+      close();
+      opener.focus({ preventScroll: true });
+      showToast('Saved');
+    };
+    const closeButton = h('button', {
+      type: 'button', class: 'v2-btn subtle v2-setting-close', 'aria-label': `Close ${label}`, onclick: close,
+    }, '×');
+    panel.append(h('header', { class: 'v2-setting-head' }, title, closeButton), content(save));
+    const remove = () => {
+      reset();
+      if (panel.contains(document.activeElement)) opener.focus({ preventScroll: true });
+      panel.remove();
+    };
+    if (popover) {
+      panel.addEventListener('beforetoggle', event => { if (event.newState === 'closed') reset(); });
+      panel.addEventListener('toggle', event => { if (event.newState === 'closed') remove(); });
+    } else {
+      panel.addEventListener('close', remove, { once: true });
+    }
+    opener.closest('.v2-settings').append(panel);
+    opener.setAttribute('aria-expanded', 'true');
+    if (popover) panel.showPopover({ source: opener });
+    else panel.showModal();
+    (panel.querySelector('[aria-pressed="true"]') ?? panel.querySelector('.v2-setting-option') ?? closeButton).focus();
+    return close;
+  }
+
+  const settingOption = (label, selected, action, status) => h('button', {
+    class: 'v2-setting-option', type: 'button', 'aria-pressed': String(selected), onclick: action,
+  }, h('span', {}, label), status ? h('span', { class: 'v2-setting-status' }, status) : null,
+  h('span', { class: 'v2-setting-check', 'aria-hidden': 'true' }, selected ? icon('check') : null));
 
   function renderDemoSettings(el) {
     if (el.querySelector('.v2-settings')) return;
     const s = demo.settings;
-    const choose = (label, key, values) => {
-      const select = h('select', {
-        'aria-label': label,
-        onchange: () => { s[key] = select.value; },
-      }, values.map(value => h('option', { value, selected: value === s[key] }, value)));
-      return settingRow(label, h('div', { class: 'v2-set-control' }, select, icon('chevron')));
+    const row = (key, label, current, content) => {
+      const value = h('span', { class: 'v2-setting-value' }, current());
+      let close;
+      const opener = h('button', {
+        type: 'button', class: 'v2-set-row v2-setting-trigger', 'aria-haspopup': 'dialog', 'aria-expanded': 'false',
+        onclick: () => {
+          if (opener.getAttribute('aria-expanded') === 'true') return close();
+          close = openSetting(opener, key, label, content, () => { value.textContent = current(); });
+        },
+      }, settingLabel(key, label), value, icon('chevron'));
+      return opener;
     };
-    const connection = (label, key) => {
-      const update = () => {
-        button.textContent = s[key] ? 'Connected' : 'Not connected';
-        button.setAttribute('aria-checked', String(s[key]));
-      };
-      const button = h('button', { type: 'button', role: 'switch', 'aria-label': label,
-        onclick: () => { s[key] = !s[key]; update(); },
-      });
-      update();
-      return settingRow(label, h('div', { class: 'v2-set-control' }, button, icon('chevron')));
+    const choose = (key, label, values, details) => row(key, label, () => s[key], save =>
+      h('div', { class: 'v2-setting-choices' },
+        values.map(value => settingOption(value, value === s[key], () => save(() => { s[key] = value; }))),
+        details?.()));
+    const connectionSummary = () => {
+      if (s.github && s.notifications) return '2 connected';
+      if (s.github) return 'GitHub connected';
+      return s.notifications ? 'Notifications connected' : 'Not connected';
     };
+    const connectionChoices = save => h('div', { class: 'v2-setting-choices' },
+      Object.entries({ github: 'GitHub', notifications: 'Notifications' }).map(([key, label]) =>
+        settingOption(label, s[key], () => save(() => { s[key] = !s[key]; }), s[key] ? 'Connected' : 'Not connected')));
+    const modelPresets = {
+      Recommended: ['Claude Sonnet', 'GPT-5.2'],
+      Faster: ['Claude Haiku', 'GPT-5 Mini'],
+      'Higher accuracy': ['Claude Opus', 'GPT-5.2'],
+    };
+    const models = () => h('details', { class: 'v2-models' }, h('summary', {}, 'Models in this preset'),
+      h('ul', {}, modelPresets[s.models].map(model => h('li', {}, model))));
     el.replaceChildren(h('div', { class: 'v2-settings' },
-      settingsGroup('Workspace', [
-        choose('Where it runs', 'host', ['Local workstation', 'Cloud workspace']),
-        choose('Effort', 'effort', ['Balanced', 'Fast', 'Thorough']),
-        choose('Models', 'models', ['Recommended', 'Faster', 'Higher accuracy']),
-        choose('Budget', 'budget', ['$25 / day', '$50 / day', '$100 / day']),
-      ]),
-      settingsGroup('Connections', [connection('GitHub', 'github'), connection('Notifications', 'notifications')]),
-      settingsGroup('Account', [
-        choose('Repository', 'repository', ['Harbor · main', 'Harbor · staging']),
-        h('a', { class: 'v2-btn subtle v2-sign-out', href: '/app/' }, 'Exit sample workspace'),
-      ])));
+      choose('host', 'Where it runs', ['Home computer', 'Cloud workspace']),
+      choose('effort', 'Effort', ['Fast', 'Balanced', 'Thorough']),
+      choose('models', 'Models', Object.keys(modelPresets), models),
+      row('connections', 'Connections', connectionSummary, connectionChoices),
+      choose('budget', 'Budget', ['$25 / day', '$50 / day', '$100 / day']),
+      choose('repository', 'Repository', ['harbor/app', 'harbor/sandbox']),
+      h('a', { class: 'v2-set-row v2-sign-out', href: '/app/' }, settingLabel('exit', 'Exit sample workspace'))));
   }
 
   function renderLiveSettings(el, ctx) {
     let freshness = el.querySelector('.v2-freshness');
     if (!freshness) {
+      const readOnly = (key, label, value, className = '') => h('div', { class: 'v2-set-row' },
+        settingLabel(key, label), h('span', { class: `v2-setting-value ${className}` }, value));
       freshness = h('div', { class: 'v2-freshness' });
       el.replaceChildren(h('div', { class: 'v2-settings' },
-        settingsGroup('Workspace', ['Where it runs', 'Effort', 'Models', 'Budget'].map(label =>
-          settingRow(label, h('span', { class: 'v2-muted' }, 'Coming soon')))),
-        settingsGroup('Connections', [settingRow('GitHub', h('span', { class: 'v2-connected' }, 'Connected'))]),
-        settingsGroup('Account', [
-          settingRow('Repository', ctx.repoSwitch()),
-          h('button', { class: 'v2-btn subtle v2-sign-out', type: 'button', onclick: ctx.signOut }, 'Sign out'),
-        ]),
-        settingsGroup('Data freshness', [freshness])));
+        readOnly('host', 'Where it runs', 'Coming soon'),
+        readOnly('effort', 'Effort', 'Coming soon'),
+        readOnly('models', 'Models', 'Coming soon'),
+        readOnly('connections', 'Connections', 'GitHub connected', 'v2-connected'),
+        readOnly('budget', 'Budget', 'Coming soon'),
+        h('div', { class: 'v2-set-row' }, settingLabel('repository', 'Repository'), ctx.repoSwitch()),
+        h('button', { class: 'v2-set-row v2-sign-out', type: 'button', onclick: ctx.signOut }, settingLabel('exit', 'Sign out')),
+        h('section', { class: 'v2-settings-freshness' }, h('h2', { class: 'v2-label' }, 'Data freshness'), freshness)));
     }
     freshness.replaceChildren(...ctx.freshnessNodes());
   }
@@ -496,10 +570,10 @@
     const card = h('div', { class: 'v2-welcome-card' },
       h('h1', {}, 'Run your software factory from here.'),
       note ? h('div', { class: 'notice bad', role: 'alert' }, icon('warn'), h('span', {}, note)) : null,
-      h('a', { class: 'v2-btn primary', href: demoMode ? '#/chat' : '/api/sign-in/start' },
+      h('a', { class: 'v2-btn primary v2-welcome-primary', href: demoMode ? '#/chat' : '/api/sign-in/start' },
         demoMode ? 'Open Harbor workspace' : 'Continue with GitHub', icon('right')),
-      h('a', { class: 'v2-btn subtle v2-welcome-sample', href: demoMode ? '/app/' : '/app/?demo=1#/chat' },
-        demoMode ? 'Exit sample workspace' : 'See a sample factory'));
+      h('a', { class: 'v2-btn subtle v2-welcome-sample', href: demoMode ? '/api/sign-in/start' : '/app/?demo=1#/chat' },
+        demoMode ? 'Continue with GitHub' : 'See a sample factory'));
     card.prepend(h('header', { class: 'v2-welcome-head' },
       h('div', { class: 'v2-welcome-brand' }, mark(), h('span', {}, 'OpenWiz')),
       demoMode ? h('span', { class: 'v2-sample-tag' }, 'Sample data') : null));

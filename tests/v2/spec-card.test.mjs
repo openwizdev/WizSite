@@ -101,7 +101,7 @@ const VIDEO = `(() => {
   const v = document.querySelector('#under-test video');
   return v && { src: v.currentSrc || v.getAttribute('src'), preload: v.getAttribute('preload'), autoplay: v.hasAttribute('autoplay'),
     poster: !!v.getAttribute('poster'), muted: v.muted, playsinline: v.hasAttribute('playsinline'), playing: !v.paused && !v.ended,
-    time: v.currentTime };
+    ready: v.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA, time: v.currentTime };
 })()`;
 const PLAN = `(() => {
   const plan = document.querySelector('#under-test [data-plan]');
@@ -129,7 +129,7 @@ test('a spec with a same-origin video plays it on its card, lazily and muted, be
     assert.equal(await run.page.run(PLAN), null, 'the plan picture shows beside a playable video');
     assert.ok(await run.page.run(LINK(item.video.url)), 'no plain link to the video');
     await run.page.run(`document.querySelector('#under-test video').scrollIntoView({ block: 'center' }), true`);
-    await run.page.until(`(${VIDEO}).playing && (${VIDEO}).muted`, 'the video playing muted in view', 10000);
+    await run.page.until(`(${VIDEO}).ready && (${VIDEO}).playing && (${VIDEO}).muted`, 'the video playing muted in view', 10000);
     assert.ok(run.world.log.some(r => r.path === '/art/todo-spec.mp4'), 'in view, the video never loaded');
     await run.page.run('scrollTo(0, 0), true');
     await run.page.until(`!(${VIDEO}).playing`, 'the video pausing out of view');

@@ -63,7 +63,7 @@ test('switch on + demo=1: renders v2 shell, deep links, interactions, and makes 
     await run.page.until(`document.body.innerText.includes('Run your software factory from here.')`, 'v2 welcome screen');
     assert.equal(await run.page.run(`document.documentElement.dataset.v2`), '1');
     assert.equal(await run.page.run(`document.querySelector('.v2-sample-tag').textContent`), 'Sample data');
-    assert.equal(await run.page.run(`document.querySelector('.v2-welcome-sample').getAttribute('href')`), '/app/');
+    assert.equal(await run.page.run(`document.querySelector('.v2-welcome-sample').getAttribute('href')`), '/api/sign-in/start');
 
     await run.page.click('Open Harbor workspace');
     await run.page.until(`location.hash === '#/chat' && document.body.innerText.includes('Accept all 3')`, 'v2 chat with grill round');
@@ -105,7 +105,8 @@ test('switch on + demo=1: renders v2 shell, deep links, interactions, and makes 
 
     await run.page.go(`${SITE}/app/?v2=dry-run&demo=1#/feed/2`);
     await run.page.until(`document.querySelector('.v2-card-title')?.textContent === 'Keep the free plan?'`, 'deep link to decision card');
-    assert.match(await run.page.text(), /Recommended:\s+Keep it, cap at 3 seats/);
+    assert.equal(await run.page.run(`document.querySelector('#v2-recommended').textContent`), 'Recommended');
+    assert.equal((await run.page.text()).match(/Keep it, cap at 3 seats/g)?.length, 1);
     assert.equal(await run.page.run(`document.querySelector('.v2-hero-card .v2-preview')`), null);
     assert.equal(await run.page.run(`document.querySelector('.v2-hero-card button.primary').textContent`), 'Keep it, cap at 3 seats');
     await run.page.tap('Change something');
@@ -144,10 +145,40 @@ test('switch on + demo=1: renders v2 shell, deep links, interactions, and makes 
     await run.page.until(`document.querySelector('.v2-clear-card h2')?.textContent === 'All clear.'`, 'deep link to all clear');
     assert.deepEqual(await badges(), [null, null]);
 
+    await run.page.size(1440, 900, false);
     await run.page.go(`${SITE}/app/?v2=dry-run&demo=1#/settings`);
-    await run.page.until(`document.querySelector('select[aria-label="Where it runs"]')?.value === 'Local workstation'`, 'settings screen');
-    await run.page.tap('Not connected');
-    assert.equal(await run.page.run(`document.querySelector('[aria-label="Notifications"]').getAttribute('aria-checked')`), 'true');
+    await run.page.until(`document.querySelector('.v2-setting-value')?.textContent === 'Home computer'`, 'settings screen');
+    const stored = () => run.page.run('JSON.stringify(localStorage)');
+    const beforeSettings = await stored();
+    await run.page.tap('ModelsRecommended');
+    await run.page.until(`document.querySelector('.v2-setting-panel')?.matches(':popover-open')`, 'desktop settings popover');
+    assert.equal(await run.page.run(`document.activeElement.textContent`), 'Recommended');
+    await run.page.run(`document.querySelector('.v2-models summary').click()`);
+    assert.match(await run.page.text(), /Claude Sonnet/);
+    assert.equal(await run.page.run(`document.querySelector('.v2-models').open`), true);
+    await run.page.key('Escape');
+    await run.page.until(`document.activeElement.classList.contains('v2-setting-trigger') &&
+      !document.querySelector('.v2-setting-panel')`, 'Escape closes the popover and returns focus');
+    await run.page.tap('Where it runsHome computer');
+    await run.page.tap('Cloud workspace');
+    await run.page.until(`document.querySelector('.v2-setting-value')?.textContent === 'Cloud workspace' &&
+      document.querySelector('.v2-toast')?.textContent === 'Saved'`, 'setting saved');
+
+    await run.page.size(390, 844, true);
+    await run.page.tap('ConnectionsGitHub connected');
+    await run.page.until(`document.querySelector('.v2-setting-panel')?.matches(':modal')`, 'phone settings sheet');
+    assert.equal(await run.page.run(`document.querySelector('.v2-setting-option[aria-pressed="true"]').textContent`), 'GitHubConnected');
+    await run.page.tap('NotificationsNot connected');
+    await run.page.until(`!document.querySelector('.v2-setting-panel')`, 'connection saved');
+    await run.page.tap('Connections2 connected');
+    const enabled = await run.page.run(`[...document.querySelectorAll('.v2-setting-option[aria-pressed="true"]')].map(el => el.textContent)`);
+    assert.deepEqual(enabled, ['GitHubConnected', 'NotificationsConnected']);
+    await run.page.key('Escape');
+    await run.page.click('Chat');
+    await run.page.until(`location.hash === '#/chat'`, 'left Settings');
+    await run.page.click('Settings');
+    await run.page.until(`document.querySelector('.v2-setting-value')?.textContent === 'Cloud workspace'`, 'settings retained while navigating');
+    assert.equal(await stored(), beforeSettings, 'sample settings should remain in memory');
 
     assert.deepEqual(apiRequests(run.world), [], 'demo mode sent an API or external network request');
     assert.deepEqual(await run.page.run(`performance.getEntriesByType('resource').filter(entry =>
@@ -157,6 +188,40 @@ test('switch on + demo=1: renders v2 shell, deep links, interactions, and makes 
     await run.page.click('Exit sample workspace');
     await run.page.until(`location.pathname === '/app/' && !location.search && OW.data.demo === false
       && document.querySelector('.v2-welcome-sample')?.textContent === 'See a sample factory'`, 'exiting reaches the real welcome');
+  } finally {
+    await run.close();
+  }
+});
+
+
+test('a fresh sample workspace opens on the grill and ships in three taps at 390px', async () => {
+  const run = await start();
+  try {
+    await run.page.size(390, 844, true);
+    await run.page.go(`${SITE}/app/?v2=dry-run&demo=1`);
+    await run.page.until(`location.hash === '#/chat' && document.querySelector('.v2-grill-foot button')`, 'first grill without a tap');
+    const accept = await run.page.run(`(() => {
+      const bounds = document.querySelector('.v2-grill-foot button').getBoundingClientRect();
+      const scroll = document.querySelector('.v2-chat-scroll').getBoundingClientRect();
+      return bounds.top >= scroll.top && bounds.bottom <= scroll.bottom;
+    })()`);
+    assert.equal(accept, true, 'Accept all fits in the first phone view');
+    await run.page.tap('Accept all 3');
+    await run.page.tap('Answers saved · Open Feed');
+    await run.page.until(`location.hash === '#/feed' && document.querySelector('.v2-card-title')?.textContent === 'Magic-link sign-in'`, 'first ready spec');
+    const inFrame = await run.page.run(`(() => {
+      const view = document.querySelector('.v2-view');
+      const last = document.querySelector('.v2-building li:last-child');
+      view.scrollTop = view.scrollHeight;
+      return view.getBoundingClientRect().bottom - last.getBoundingClientRect().bottom;
+    })()`);
+    assert.ok(inFrame >= 31, 'the final Building row has 32px of scroll clearance');
+    await run.page.tap('Ship it');
+    await run.page.until(`location.hash === '#/feed/2' && document.querySelector('.v2-toast')?.textContent.includes('Shipped')`, 'shipped after three taps');
+    assert.equal(await run.page.run('document.documentElement.scrollWidth'), 390);
+    assert.deepEqual(apiRequests(run.world), []);
+    assert.deepEqual(run.world.writes(), []);
+    assert.deepEqual(run.world.violations, []);
   } finally {
     await run.close();
   }
