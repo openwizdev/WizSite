@@ -84,7 +84,7 @@
         "text": "# Fleet settings\n\n## GitHub identity\n\n| Setting | Value |\n| --- | --- |\n| App | Synthetic |\n| Record authors | `factory-bot[bot]`, `acme-owner` |\n\n## Next\n"
       },
       "youIssues": {
-        "totalCount": 2,
+        "totalCount": 1,
         "nodes": [
           {
             "number": 46,
@@ -98,7 +98,12 @@
                 }
               ]
             }
-          },
+          }
+        ]
+      },
+      "peopleIssues": {
+        "totalCount": 1,
+        "nodes": [
           {
             "number": 48,
             "title": "Register the notes domain",
