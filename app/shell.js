@@ -18,7 +18,7 @@
 
   const route = () => {
     const [id, arg] = location.hash.replace(/^#\/?/, '').split('/');
-    return id === 'specs' && /^[1-9]\d*$/.test(arg || '') ? { id, arg } : { id: arg === undefined ? id : '', arg: null };
+    return (id === 'specs' || id === 'canvas') && /^[1-9]\d*$/.test(arg || '') ? { id, arg } : { id: arg === undefined ? id : '', arg: null };
   };
   const current = () => {
     const { id } = route();
