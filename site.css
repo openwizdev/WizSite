@@ -562,6 +562,11 @@ body.landing > main { flex: 1 0 auto; }
 .team-film { margin: 0; }
 .team-part { padding-block: clamp(48px, 7vw, 104px); border-top: 1px solid var(--line); }
 .team-part h2 { font-size: clamp(26px, 2.6vw, 34px); font-weight: 740; line-height: 1.1; letter-spacing: -.04em; }
+.team-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px clamp(24px, 4vw, 56px); margin: clamp(24px, 3vw, 40px) 0 0; padding: 0; list-style: none; counter-reset: step; }
+.team-steps li { counter-increment: step; padding-top: 18px; border-top: 1px solid var(--edge); }
+.team-steps h3 { color: var(--ink); font-size: 19px; font-weight: 680; line-height: 1.25; letter-spacing: -.02em; }
+.team-steps h3::before { content: counter(step); margin-right: 12px; color: var(--brass); font: 600 14px/1 var(--ow-font-mono); }
+.team-steps p { margin-top: 8px; color: var(--grey2); font-size: 17px; line-height: 1.5; }
 .team-facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px clamp(20px, 3vw, 40px); margin: 28px 0 0; padding: 0; list-style: none; }
 .team-facts li { padding-top: 14px; border-top: 1px solid var(--edge); color: var(--grey2); font-size: 16px; line-height: 1.5; }
 .team-facts a { color: var(--ink); text-decoration: underline; text-decoration-color: var(--brass); text-underline-offset: 4px; }
@@ -573,6 +578,7 @@ body.landing > main { flex: 1 0 auto; }
 }
 @media (max-width: 850px) {
   .team { grid-template-columns: 1fr; gap: 24px; padding-top: 20px; }
+  .team-steps { grid-template-columns: 1fr; }
 }
 @media (max-width: 560px) {
   .team h1 { font-size: clamp(28px, 8vw, 36px); }
@@ -582,6 +588,7 @@ body.landing > main { flex: 1 0 auto; }
   .team-needs { font-size: 14px; }
   .team-facts { grid-template-columns: 1fr; gap: 14px; }
   .team-facts li { font-size: 15px; }
+  .team-steps p { font-size: 16px; }
 }
 .faq { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 24px clamp(32px, 5vw, 72px); align-items: start; padding-block: clamp(48px, 6vw, 88px); border-top: 1px solid var(--line); }
 .faq-title { font-size: clamp(28px, 3vw, 40px); font-weight: 740; line-height: 1.1; letter-spacing: -.04em; }
