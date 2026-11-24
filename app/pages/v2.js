@@ -5,6 +5,21 @@
   const mark = () => h('img', { src: '/app/mark.svg', alt: '', width: 28, height: 28 });
   const avatar = () => h('span', { class: 'v2-avatar' }, mark());
 
+  const ghostReady = (() => {
+    if (OW.ghost) return Promise.resolve(OW.ghost);
+    const { ghostStyle, ghostScript } = document.querySelector('script[data-ghost-script]')?.dataset || {};
+    if (!ghostStyle || !ghostScript) return Promise.resolve(null);
+    const load = el => new Promise((resolve, reject) => {
+      el.addEventListener('load', resolve, { once: true });
+      el.addEventListener('error', reject, { once: true });
+      document.head.append(el);
+    });
+    return Promise.all([
+      load(h('link', { rel: 'stylesheet', href: ghostStyle })),
+      load(h('script', { src: ghostScript })),
+    ]).then(() => OW.ghost || null, () => null);
+  })();
+
   function initialDemoState() {
     return {
       draft: '',
@@ -316,23 +331,46 @@
       const scroll = h('div', { class: 'v2-chat-scroll', role: 'log', 'aria-live': 'polite', 'aria-relevant': 'additions' });
       const thread = h('div', { class: 'v2-chat-thread' });
       scroll.append(thread);
-      const input = h('input', {
-        type: 'text',
+      const input = h('textarea', {
+        rows: 1,
         placeholder: 'Tell Wiz what to build or change…',
         'aria-label': 'Tell Wiz what to build or change',
       });
       input.value = demo.draft;
-      input.addEventListener('input', () => { demo.draft = input.value; });
-      const composer = h('form', { class: 'v2-composer', onsubmit: event => {
-        event.preventDefault();
+      let ghost = null;
+      let composing = false;
+      const send = () => {
         const text = input.value;
         if (!text.trim()) return;
         input.value = '';
         demo.draft = '';
+        ghost?.clear();
         submitChatPrompt(text);
         input.focus({ preventScroll: true });
+      };
+      input.addEventListener('compositionstart', () => { composing = true; });
+      input.addEventListener('compositionend', () => { composing = false; });
+      input.addEventListener('keydown', event => {
+        if (!composing && !event.isComposing && event.key === 'Enter' && !event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey) {
+          event.preventDefault();
+          send();
+        }
+      });
+      const composer = h('form', { class: 'v2-composer', onsubmit: event => {
+        event.preventDefault();
+        send();
       } }, input, h('button', { type: 'submit', class: 'v2-send-btn', 'aria-label': 'Send message' }, icon('up')));
       el.replaceChildren(h('div', { class: 'v2-chat-wrap' }, scroll, h('div', { class: 'v2-composer-wrap' }, composer)));
+      const wireGhost = mod => {
+        if (!mod || !input.isConnected || ghost) return;
+        ghost = mod.attach(input, { onInput: value => { demo.draft = value; } });
+        if (input.value && document.activeElement === input) ghost.sync();
+      };
+      if (OW.ghost) wireGhost(OW.ghost);
+      else {
+        input.addEventListener('input', () => { demo.draft = input.value; });
+        ghostReady.then(wireGhost);
+      }
       chatView = { scroll, thread, length: 0 };
     }
     const { scroll, thread, length } = chatView;
