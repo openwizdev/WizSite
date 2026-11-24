@@ -314,6 +314,8 @@ function teamReplay(replay) {
     clearTimeout(timer);
     while (next < events.length) reveal(events[next++]);
     control.textContent = playAgain;
+    // The finished run shows each ticket’s full history and lights the merged pull requests.
+    delete replay.dataset.running;
   }
 
   function advance() {
@@ -332,6 +334,7 @@ function teamReplay(replay) {
       track.querySelector('.team-waiting').hidden = false;
     }
     control.textContent = 'Finish replay';
+    replay.dataset.running = '';
     next = 0;
     start = performance.now();
     advance();

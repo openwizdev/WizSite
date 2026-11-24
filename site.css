@@ -560,73 +560,76 @@ body.landing > main { flex: 1 0 auto; }
 .team-book:focus-visible { outline: 2px solid var(--orchid); outline-offset: 3px; }
 .team-needs { margin-top: 14px; max-width: 42ch; color: var(--grey2); font-size: 15px; line-height: 1.45; }
 .team-replay {
-  --team-replay-inset: clamp(12px, 1.7vw, 24px);
+  --team-replay-inset: clamp(14px, 1.7vw, 24px);
+  position: relative;
   margin: 0;
   border: 1px solid var(--edge);
   border-radius: var(--round);
   background: var(--panel);
   box-shadow: var(--ow-shadow-panel);
 }
-.team-replay-heading { padding: var(--team-replay-inset); }
-.team-replay-meta {
-  color: var(--grey2);
-  font: 500 clamp(11px, 1vw, 13px)/1.45 var(--ow-font-mono);
-}
-.team-replay-title {
-  margin-top: 8px;
-  font-size: clamp(17px, 1.7vw, 24px);
-  font-weight: 680;
-  line-height: 1.2;
-  letter-spacing: -.025em;
-}
-.team-replay a { text-decoration: underline; text-decoration-color: var(--grey2); text-underline-offset: .2em; }
+.team-replay-heading { padding: var(--team-replay-inset) var(--team-replay-inset) 12px; }
+.team-replay-meta { padding-right: 15ch; color: var(--grey2); font: 500 12px/1.45 var(--ow-font-mono); }
+.team-replay-title { margin-top: 6px; font-size: clamp(16px, 1.5vw, 20px); font-weight: 650; line-height: 1.25; letter-spacing: -.02em; }
+.team-replay a { color: var(--ink); text-decoration: underline; text-decoration-color: var(--edge); text-underline-offset: .2em; }
 .team-replay a:hover { text-decoration-color: currentColor; }
-.team-replay-title a { color: var(--brass); }
 .team-tickets, .team-landings { margin: 0; padding: 0; list-style: none; }
-.team-tickets > li {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) max-content;
-  align-items: start;
-  gap: 8px 16px;
-  padding: 10px var(--team-replay-inset);
-  border-top: 1px solid var(--line);
+.team-tickets > li { display: grid; grid-template: auto 18px / minmax(0, 1fr) auto; align-items: center; gap: 2px 12px; padding: 9px var(--team-replay-inset); border-top: 1px solid var(--line); }
+.team-ticket { grid-area: 1 / 1; font-size: 15px; line-height: 1.35; }
+.team-ticket code { margin-right: 8px; color: var(--grey2); font: 500 12px var(--ow-font-mono); }
+.team-timeline { display: contents; color: var(--grey); font: 500 12px/1.5 var(--ow-font-mono); }
+/* Earlier states share one history line under the ticket, each in its own column. */
+.team-timeline > div:not([aria-current]) { grid-area: 2 / 1; position: relative; left: calc(3ch + 8px); width: 0; white-space: nowrap; transition: opacity .2s; }
+.team-timeline > div:nth-last-child(2):not([aria-current]) { left: calc(3ch + 8px + 29ch); }
+.team-timeline > [data-replay-pending] { display: none; }
+.team-timeline > div span { margin-right: .6ch; }
+.team-timeline > [aria-current], .team-waiting:not([hidden]) {
+  grid-area: 1 / 2; justify-self: end; display: inline-flex; white-space: nowrap; align-items: center; gap: 7px; margin: 0; padding: 2px 10px 2px 8px;
+  border: 1px solid var(--edge); border-radius: 999px; background: var(--ground); color: var(--ink); font: 500 12px/1.5 var(--ow-font-mono);
 }
-.team-ticket { font-size: 14px; line-height: 1.4; }
-.team-ticket code { color: var(--grey2); font: 500 12px var(--ow-font-mono); }
-.team-timeline, .team-landings {
-  color: var(--grey2);
-  font: 500 clamp(11px, .88vw, 13px)/1.5 var(--ow-font-mono);
-}
-.team-timeline { position: relative; }
-.team-timeline > div { display: grid; grid-template-columns: 9ch auto; gap: 1ch; }
-.team-timeline [aria-current] { color: var(--ink); }
-.team-timeline [aria-current] span, .team-landings li:last-child a { color: var(--brass); }
-.team-waiting { position: absolute; inset-block-start: 0; inset-inline-start: 0; color: var(--ink); }
-.team-landings {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 270px), 1fr));
-  gap: 4px 12px;
-  padding: 10px var(--team-replay-inset);
-  border-top: 1px solid var(--line);
-}
-.team-landings a { color: var(--ink); }
+.team-timeline > [aria-current] span { margin: 0; }
+.team-timeline > [aria-current]::before, .team-waiting::before { content: ""; width: 8px; height: 8px; border-radius: 50%; box-sizing: border-box; border: 2px solid var(--grey); }
+.team-timeline > [aria-current]:nth-last-child(3)::before { border-color: var(--orchid); border-right-color: transparent; }
+.team-timeline > [aria-current]:nth-last-child(2)::before { border-color: var(--orchid); background: var(--orchid); }
+.team-timeline > [aria-current]:last-child { border-color: color-mix(in srgb, var(--sea) 45%, var(--edge)); }
+.team-timeline > [aria-current]:last-child::before { border-color: var(--sea); background: var(--sea); }
+.team-waiting { color: var(--grey2); }
+.team-replay[data-running] .team-timeline > div:not([aria-current]) { opacity: 0; }
+.team-replay[data-running] .team-tickets > li:is(:hover, :focus-within) .team-timeline > div:not([aria-current]) { opacity: 1; }
 .team-replay [data-replay-pending] { visibility: hidden; }
-.team-replay-control {
-  margin: 0 0 10px var(--team-replay-inset);
-  padding: 5px 9px;
-  border: 1px solid var(--edge);
-  border-radius: 6px;
-  background: none;
-  color: var(--ink);
-  font: 500 12px/1.4 var(--ow-font-mono);
-  cursor: pointer;
-}
+.team-landed { margin: 12px var(--team-replay-inset) 0; padding: 14px 16px 16px; border: 1px solid var(--line); border-radius: 12px; transition: border-color .4s, background-color .4s; }
+.team-landed-label { color: var(--grey2); font: 600 12px/1.3 var(--ow-font-mono); letter-spacing: .06em; text-transform: uppercase; transition: color .4s; }
+.team-landings { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 16px; margin-top: 10px; }
+.team-landings li { display: flex; flex-direction: column; }
+.team-landings a { font-size: clamp(17px, 1.6vw, 21px); font-weight: 650; line-height: 1.25; letter-spacing: -.02em; }
+.team-landings time { color: var(--grey); font: 500 12px/1.5 var(--ow-font-mono); }
+.team-replay:not([data-running]) .team-landed { border-color: var(--brass); background: color-mix(in srgb, var(--brass) 7%, transparent); }
+.team-replay:not([data-running]) .team-landed-label { color: var(--brass); }
+.team-replay:not([data-running]) .team-landings a { text-decoration-color: var(--brass); }
+.team-replay[data-running] .team-landed:not(:has(li:not([data-replay-pending]))) .team-landed-label { visibility: hidden; }
+.team-landed { margin-bottom: var(--team-replay-inset); }
+.team-replay-control { position: absolute; top: calc(var(--team-replay-inset) - 4px); right: var(--team-replay-inset); padding: 5px 10px; border: 1px solid var(--edge); border-radius: 6px; background: none; color: var(--ink); font: 500 12px/1.4 var(--ow-font-mono); cursor: pointer; }
 .team-replay-control:hover { border-color: var(--grey2); }
-@media (max-width: 1050px) {
-  .team-tickets > li { grid-template-columns: minmax(0, 1fr); }
-  .team-timeline { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; }
-  .team-timeline > div { display: block; }
-  .team-timeline time { display: block; }
+@media (prefers-reduced-motion: no-preference) {
+  .team-replay[data-running] .team-timeline > [aria-current] { animation: team-step .35s ease-out; }
+}
+@keyframes team-step { from { opacity: .2; transform: translateY(3px); } }
+@media (max-width: 640px) {
+  .team-replay { --team-replay-inset: 14px; }
+  .team-replay-heading { padding-bottom: 8px; }
+  .team-replay-title { font-size: 15px; }
+  .team-tickets > li { grid-template-rows: auto; padding-block: 6px; }
+  .team-ticket { font-size: 14px; }
+  .team-ticket code { margin-right: 6px; font-size: 11px; }
+  /* Phones show one chip per ticket; the earlier states stay readable to screen readers only. */
+  .team-timeline > div:not([aria-current]) { position: absolute; left: auto; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .team-timeline > [aria-current] { display: grid; grid-template-columns: auto auto; justify-content: end; justify-items: end; align-items: center; gap: 0 6px; padding: 3px 9px; border-radius: 10px; font-size: 11px; line-height: 1.35; }
+  .team-timeline > [aria-current] time { grid-column: 1 / 3; color: var(--grey2); }
+  .team-waiting:not([hidden]) { padding: 3px 9px; font-size: 11px; line-height: 1.35; }
+  .team-landed { margin-block: 8px 12px; padding: 10px 12px; }
+  .team-landings { gap: 6px 12px; margin-top: 6px; }
+  .team-landings a { font-size: 16px; }
+  .team-landings time { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 }
 .team-film { max-width: 940px; margin: clamp(20px, 3vw, 40px) auto 0; }
 .team-part { padding-block: clamp(48px, 7vw, 104px); border-top: 1px solid var(--line); }
