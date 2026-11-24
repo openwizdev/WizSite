@@ -331,6 +331,10 @@ async function handoff(page, where) {
 async function chrome(page, where, mode, path) {
   const facts = await page.evaluate(`(() => { ${HELPERS}
     const bar = document.querySelector('header.landing-nav');
+    const row = bar?.querySelector('.nav-row');
+    const frame = row?.getBoundingClientRect();
+    const surface = row && getComputedStyle(row, '::before');
+    const engraving = row && getComputedStyle(row, '::after');
     const mark = bar?.querySelector('.landing-brand img');
     const star = bar?.querySelector('.github-star');
     const count = star?.querySelector('[data-stars]');
@@ -339,6 +343,11 @@ async function chrome(page, where, mode, path) {
     const nav = document.getElementById(toggle?.getAttribute('aria-controls'));
     return {
       scroll: document.scrollingElement.scrollWidth, inner: innerWidth,
+      capsule: frame.top === 12 && frame.left >= 12 && frame.right <= document.documentElement.clientWidth - 12 &&
+        surface.borderTopWidth === '1px' && surface.borderTopColor === 'rgb(58, 52, 46)' &&
+        surface.borderRadius === '14px' && surface.backdropFilter === 'blur(8px)' &&
+        engraving.left === '14px' && engraving.right === '14px' && engraving.maskImage.startsWith('linear-gradient'),
+      position: getComputedStyle(bar).position,
       mark: shown(mark) && mark.getAttribute('src') === '/art/wiz-mark.webp' && mark.naturalWidth === 128,
       star: shown(star) && star.getAttribute('href') === 'https://github.com/openwizdev/openwiz' &&
         shown(star.querySelector('.github-mark')) && shown(star.querySelector('.star-icon')) && star.innerText.includes('Star'),
@@ -353,6 +362,17 @@ async function chrome(page, where, mode, path) {
   const phoneMenu = !mode.noScript && facts.inner <= 850;
   const stars = mode.stars === 12345 ? '12.3k' : mode.stars === 0 ? '0' : null;
   expect(facts.scroll <= facts.inner, where, `sideways scroll (${facts.scroll}px content in a ${facts.inner}px window)`);
+  expect(facts.capsule, where, 'the framed top bar needs a top gap, rounded edge and inset engraving');
+  if (!mode.noScript || facts.inner > 850) {
+    const sticky = await page.evaluate(`(() => {
+      const header = document.querySelector('.landing-nav');
+      window.scrollTo(0, 250);
+      const pinned = !scrollY || header.getBoundingClientRect().top === 12;
+      window.scrollTo(0, 0);
+      return pinned;
+    })()`);
+    expect(facts.position === 'sticky' && sticky, where, 'the capsule loses its top gap on scroll');
+  }
   expect(facts.mark, where, 'the top bar lacks the painted Wiz');
   expect(facts.star && facts.count === stars && facts.name?.includes('GitHub') &&
     (!stars || facts.name.includes(mode.stars.toLocaleString('en'))), where, `incorrect GitHub star control or count (${facts.count})`);
@@ -373,12 +393,14 @@ async function buy(page, where, path) {
     stars.textContent = '12.3k';
     // Simulate a 17 px classic scrollbar even in headless Chromium.
     document.documentElement.style.width = (innerWidth - 17) + 'px';
-    const inside = el => shown(el) && el.getBoundingClientRect().left >= 0 &&
-      el.getBoundingClientRect().right <= innerWidth - 17 && el.scrollWidth <= el.clientWidth + 1;
+    const capsule = bar.getBoundingClientRect();
+    const inside = el => shown(el) && el.getBoundingClientRect().left >= capsule.left &&
+      el.getBoundingClientRect().right <= capsule.right && el.scrollWidth <= el.clientWidth + 1;
     const button = bar.querySelector('a.nav-team[href="/team/"]');
     const toggle = bar.querySelector('.nav-toggle');
     const facts = {
       scroll: document.scrollingElement.scrollWidth, inner: innerWidth,
+      framed: capsule.left > 0 && capsule.right < innerWidth - 17,
       clipped: [...bar.querySelectorAll('a, button')].filter(el => shown(el) && !inside(el)).map(el => el.className || el.getAttribute('href')),
       button: inside(button) && button.innerText === (innerWidth <= 850 ? 'For teams' : 'Get it for your team'),
       stars: inside(stars.closest('a')) && inside(stars),
@@ -392,6 +414,7 @@ async function buy(page, where, path) {
     return facts;
   })()`);
   expect(!facts.clipped.length, where, `the top bar clips with a star count and a scrollbar: ${facts.clipped.join(', ')}`);
+  expect(facts.framed, where, 'the capsule loses its side gaps with a scrollbar');
   expect(facts.scroll <= facts.inner, where, `sideways scroll (${facts.scroll}px content in a ${facts.inner}px window)`);
   expect(facts.button, where, 'the top bar lacks the buy button inside the window');
   expect(facts.stars, where, 'the top bar lacks a visible 12.3k star count');
@@ -408,9 +431,14 @@ async function phoneMenu(page, where) {
     const toggle = document.querySelector('.nav-toggle');
     const panel = document.getElementById(toggle.getAttribute('aria-controls'));
     const links = [...panel.querySelectorAll('a')];
+    const frame = toggle.closest('.nav-row').getBoundingClientRect();
+    const bounds = panel.getBoundingClientRect();
+    const style = getComputedStyle(panel);
     return {
       expanded: toggle.getAttribute('aria-expanded'), shown: shown(panel),
       destinations: links.filter(shown).map(link => link.getAttribute('href')),
+      framed: bounds.top === frame.bottom + 8 && bounds.left === frame.left && bounds.right === frame.right &&
+        style.borderRadius === '14px' && style.borderTopColor === 'rgb(58, 52, 46)',
       targets: links.every(link => link.getBoundingClientRect().height >= 40),
       scrollLocked: getComputedStyle(document.documentElement).overflowY === 'hidden' && document.querySelector('main').inert,
       firstFocused: document.activeElement === links[0], toggleFocused: document.activeElement === toggle,
@@ -420,6 +448,7 @@ async function phoneMenu(page, where) {
   const opened = await state();
   expect(opened.expanded === 'true' && opened.shown && opened.firstFocused && opened.scrollLocked && opened.targets &&
     opened.destinations.join() === '/drivers/,/market/,/changelog/,/faq/,/app/', where, 'the phone menu fails to open, focus, lock scrolling or show all links');
+  expect(opened.framed, where, 'the phone menu needs a matching rounded edge and an 8px gap under the capsule');
   await page.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
   const escaped = await state();
   expect(escaped.expanded === 'false' && !escaped.shown && escaped.toggleFocused && !escaped.scrollLocked,
