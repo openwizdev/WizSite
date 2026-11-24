@@ -440,21 +440,35 @@ function enableFamily(gsap) {
 
 function enableCopy() {
   const box = document.querySelector('.install-box[data-install="live"]');
-  if (!box || !navigator.clipboard) return;
+  if (!box) return;
   const button = box.querySelector('button.install');
-  const line = box.querySelector('.install-line').textContent;
+  const code = box.querySelector('.install-line');
+  const line = code.textContent;
   let timer;
+  const selectLine = () => {
+    const range = document.createRange();
+    range.selectNodeContents(code);
+    const selection = window.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
+  };
+  const fallback = () => {
+    selectLine();
+    try { return document.execCommand('copy'); } catch { return false; }
+  };
   button.textContent = 'Copy';
   button.disabled = false;
   button.addEventListener('click', async () => {
+    let copied = false;
     try {
       await navigator.clipboard.writeText(line);
-      button.textContent = 'Copied';
+      copied = true;
     } catch {
-      button.textContent = 'Select the line to copy';
+      copied = fallback();
     }
+    button.textContent = copied ? 'Copied' : 'Line selected: copy it';
     clearTimeout(timer);
-    timer = setTimeout(() => { button.textContent = 'Copy'; }, 2000);
+    timer = setTimeout(() => { button.textContent = 'Copy'; }, copied ? 2000 : 3000);
   });
 }
 
