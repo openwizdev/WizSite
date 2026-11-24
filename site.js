@@ -281,33 +281,82 @@ function launchVideo() {
 function teamReplay(replay) {
   const calm = matchMedia('(prefers-reduced-motion: reduce)');
   const control = replay.querySelector('.team-replay-control');
+  const toggle = replay.querySelector('.team-replay-toggle');
+  const summaryLine = toggle?.querySelector('.team-replay-event');
+  const dots = toggle ? [...toggle.querySelectorAll('[data-dot-state]')] : [];
+  const statusText = toggle?.querySelector('.team-replay-status');
+  const cueText = toggle?.querySelector('.team-replay-cue');
   const playAgain = control.textContent;
   const opened = Date.parse(replay.dataset.teamReplay);
-  const events = [...replay.querySelectorAll('[data-replay-event]')]
-    .map(node => ({ node, at: Date.parse(node.querySelector('time').dateTime) }))
-    .sort((a, b) => a.at - b.at);
-  // Use one scale for the entire run, including simultaneous events.
-  const duration = events.at(-1).at - opened;
-  const delay = event => (event.at - opened) / duration * 20_000;
-  const tracks = [...replay.querySelectorAll('[data-replay-stages]')].map(track => {
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const openedDate = new Date(opened);
+  const pad = n => String(n).padStart(2, '0');
+  const openedLine = `Waiting · ${pad(openedDate.getUTCDate())} ${months[openedDate.getUTCMonth()]} ${pad(openedDate.getUTCHours())}:${pad(openedDate.getUTCMinutes())} UTC`;
+  const trackMeta = new Map();
+  const tracks = [...replay.querySelectorAll('[data-replay-stages]')].map((track, index) => {
     const waiting = document.createElement('span');
     waiting.className = 'team-waiting';
     waiting.textContent = 'Waiting';
     waiting.hidden = true;
     track.prepend(waiting);
+    const ticketText = track.closest('li')?.querySelector('.team-ticket')?.textContent || '';
+    const code = ticketText.match(/\b([A-Z]+\d+)\b/)?.[1] || ticketText.match(/#\d+/)?.[0] || '';
+    trackMeta.set(track, { index, code });
     return track;
   });
+  const trackStates = tracks.map(() => 'merged');
+  const events = [...replay.querySelectorAll('[data-replay-event]')]
+    .map(node => {
+      const timeEl = node.querySelector('time');
+      const at = Date.parse(timeEl.dateTime);
+      const stamp = (timeEl.textContent || '').replace(/(\d\d:\d\d):\d\d/, '$1');
+      const track = node.closest('[data-replay-stages]');
+      if (track) {
+        const stage = node.querySelector('span')?.textContent || '';
+        const prev = stage === 'Building' ? 'Waiting' : stage === 'In review' ? 'Building' : 'In review';
+        const state = stage === 'Building' ? 'building' : stage === 'In review' ? 'review' : 'merged';
+        const { code } = trackMeta.get(track);
+        return { node, at, track, state, line: `${code} · ${prev} → ${stage} · ${stamp}` };
+      }
+      const pr = node.querySelector('a')?.textContent || '';
+      return { node, at, track: null, state: null, line: `${pr} · Merged · ${stamp}` };
+    })
+    .sort((a, b) => a.at - b.at || (a.track ? 1 : 0) - (b.track ? 1 : 0));
+  // Use one scale for the entire run, including simultaneous events.
+  const duration = events.at(-1).at - opened;
+  const delay = event => (event.at - opened) / duration * 20_000;
   let next = events.length;
   let timer;
   let start;
 
-  function reveal({ node }) {
+  function syncProgress() {
+    const counts = { merged: 0, review: 0, building: 0, waiting: 0 };
+    trackStates.forEach((state, i) => {
+      counts[state]++;
+      dots[i]?.setAttribute('data-dot-state', state);
+    });
+    if (!statusText) return;
+    if (counts.merged === trackStates.length) statusText.textContent = `${counts.merged} merged`;
+    else if (counts.waiting === trackStates.length) statusText.textContent = `${counts.waiting} waiting`;
+    else {
+      const parts = [];
+      if (counts.merged) parts.push(`${counts.merged} merged`);
+      if (counts.review) parts.push(`${counts.review} in review`);
+      if (counts.building) parts.push(`${counts.building} building`);
+      statusText.textContent = parts.join(' · ');
+    }
+  }
+
+  function reveal(event) {
+    const { node, track, state, line } = event;
     node.removeAttribute('data-replay-pending');
-    const track = node.closest('[data-replay-stages]');
+    if (summaryLine && line) summaryLine.textContent = line;
     if (!track) return;
     track.querySelector('.team-waiting').hidden = true;
     track.querySelector('[aria-current]')?.removeAttribute('aria-current');
     node.setAttribute('aria-current', 'step');
+    trackStates[trackMeta.get(track).index] = state;
+    syncProgress();
   }
 
   function finish() {
@@ -331,12 +380,26 @@ function teamReplay(replay) {
       track.querySelector('[aria-current]')?.removeAttribute('aria-current');
       track.querySelector('.team-waiting').hidden = false;
     }
+    trackStates.fill('waiting');
+    syncProgress();
+    if (summaryLine) summaryLine.textContent = openedLine;
     control.textContent = 'Finish replay';
     next = 0;
     start = performance.now();
     advance();
   }
 
+  if (toggle) {
+    toggle.hidden = false;
+    toggle.setAttribute('aria-expanded', 'false');
+    replay.setAttribute('data-replay-expanded', 'false');
+    toggle.addEventListener('click', () => {
+      const expanded = toggle.getAttribute('aria-expanded') !== 'true';
+      toggle.setAttribute('aria-expanded', String(expanded));
+      replay.setAttribute('data-replay-expanded', String(expanded));
+      if (cueText) cueText.textContent = expanded ? 'Hide tickets' : 'Show tickets';
+    });
+  }
   control.addEventListener('click', () => {
     if (next < events.length) finish();
     else play();

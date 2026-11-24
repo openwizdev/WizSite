@@ -25,22 +25,29 @@ function playback(reduced = false) {
   const tracks = [];
   const events = [];
   function event(markup, label, track) {
-    const [, dateTime] = markup.match(/datetime="([^"]+)"/);
+    const [, dateTime, timeText] = markup.match(/<time datetime="([^"]+)">([^<]+)<\/time>/);
     const attrs = new Set(markup.includes('aria-current="step"') ? ['aria-current'] : []);
     const node = {
       label, attrs, dateTime,
-      closest: () => track,
-      querySelector: () => ({ dateTime }),
+      closest: selector => selector === '[data-replay-stages]' ? track || null : null,
+      querySelector(selector) {
+        if (selector === 'time') return { dateTime, textContent: timeText };
+        if (selector === 'span') return { textContent: label };
+        if (selector === 'a') return { textContent: label };
+        return null;
+      },
       setAttribute: name => attrs.add(name),
       removeAttribute: name => attrs.delete(name),
     };
     events.push(node);
     return node;
   }
-  for (const [, number, steps] of html.matchAll(/<code>#(\d+)<\/code>[^\n]+\n\s*<div class="team-timeline" data-replay-stages>([\s\S]*?)\n\s*<\/div>\n\s*<\/li>/g)) {
+  for (const [, number, ticketText, steps] of html.matchAll(/<a class="team-ticket"[^>]*><code>#(\d+)<\/code>([^<]+)<\/a>\n\s*<div class="team-timeline" data-replay-stages>([\s\S]*?)\n\s*<\/div>\n\s*<\/li>/g)) {
     const stages = [];
+    const li = { querySelector: selector => selector === '.team-ticket' ? { textContent: `#${number}${ticketText}` } : null };
     const track = {
       number: Number(number), stages,
+      closest: selector => selector === 'li' ? li : null,
       prepend(waiting) { this.waiting = waiting; },
       querySelector(selector) {
         if (selector === '.team-waiting') return this.waiting;
@@ -60,13 +67,42 @@ function playback(reduced = false) {
     hidden: true,
     addEventListener(_type, click) { this.click = click; },
   };
+  const summaryLine = { textContent: html.match(/<span class="team-replay-event">([^<]+)<\/span>/)[1] };
+  const statusText = { textContent: html.match(/<span class="team-replay-status">([^<]+)<\/span>/)[1] };
+  const cueText = { textContent: html.match(/<span class="team-replay-cue">([^<]+)<\/span>/)[1] };
+  const dots = [...html.matchAll(/<span data-dot-state="([^"]+)"><\/span>/g)].map(([, state]) => ({
+    state,
+    getAttribute: name => name === 'data-dot-state' ? state : null,
+    setAttribute(name, value) { if (name === 'data-dot-state') this.state = value; },
+  }));
+  const toggleAttrs = new Map([['aria-expanded', html.match(/class="team-replay-toggle"[^>]*aria-expanded="([^"]+)"/)[1]]]);
+  const toggle = {
+    hidden: true,
+    getAttribute: name => toggleAttrs.get(name) ?? null,
+    setAttribute: (name, value) => toggleAttrs.set(name, value),
+    querySelector(selector) {
+      if (selector === '.team-replay-event') return summaryLine;
+      if (selector === '.team-replay-status') return statusText;
+      if (selector === '.team-replay-cue') return cueText;
+      return null;
+    },
+    querySelectorAll: selector => selector === '[data-dot-state]' ? dots : [],
+    addEventListener(_type, click) { this.click = click; },
+  };
   const motion = {
     matches: reduced,
     addEventListener(_type, change) { this.change = change; },
   };
+  const replayAttrs = new Map();
   const replay = {
     dataset: { teamReplay: html.match(/data-team-replay="([^"]+)"/)[1] },
-    querySelector: () => control,
+    getAttribute: name => replayAttrs.get(name) ?? null,
+    setAttribute: (name, value) => replayAttrs.set(name, value),
+    querySelector(selector) {
+      if (selector === '.team-replay-control') return control;
+      if (selector === '.team-replay-toggle') return toggle;
+      return null;
+    },
     querySelectorAll: selector => selector === '[data-replay-event]' ? events : tracks,
   };
   const timers = new Map();
@@ -97,7 +133,7 @@ function playback(reduced = false) {
     fetch() { reads++; throw new Error('unexpected read'); },
   });
   return {
-    tracks, events, control, motion, timers, replay,
+    tracks, events, control, toggle, summaryLine, statusText, cueText, dots, motion, timers, replay,
     reads: () => reads,
     advanceTo(time) {
       for (const [token, timer] of timers) {
@@ -164,4 +200,61 @@ test('the one control can finish and replay, and enabling reduced motion leaves 
   assert.equal(run.shown().length, 16);
   assert.equal(run.control.hidden, true);
   assert.equal(run.timers.size, 0);
+  assert.equal(run.summaryLine.textContent, 'WD3 · In review → Merged · 21 Nov 04:36 UTC');
+  assert.deepEqual(run.dots.map(dot => dot.state), ['merged', 'merged', 'merged', 'merged']);
+  assert.equal(run.statusText.textContent, '4 merged');
+  assert.equal(run.toggle.hidden, false);
+});
+
+test('phone compact card animates real events, updates its four-dot progress row, and toggles in place', () => {
+  const calmRun = playback(true);
+  assert.equal(calmRun.toggle.hidden, false);
+  assert.equal(calmRun.toggle.getAttribute('aria-expanded'), 'false');
+  assert.equal(calmRun.replay.getAttribute('data-replay-expanded'), 'false');
+  assert.equal(calmRun.summaryLine.textContent, 'WD3 · In review → Merged · 21 Nov 04:36 UTC');
+  assert.deepEqual(calmRun.dots.map(dot => dot.state), ['merged', 'merged', 'merged', 'merged']);
+  assert.equal(calmRun.statusText.textContent, '4 merged');
+  assert.equal(calmRun.cueText.textContent, 'Show tickets');
+
+  calmRun.toggle.click();
+  assert.equal(calmRun.toggle.getAttribute('aria-expanded'), 'true');
+  assert.equal(calmRun.replay.getAttribute('data-replay-expanded'), 'true');
+  assert.equal(calmRun.cueText.textContent, 'Hide tickets');
+
+  calmRun.toggle.click();
+  assert.equal(calmRun.toggle.getAttribute('aria-expanded'), 'false');
+  assert.equal(calmRun.replay.getAttribute('data-replay-expanded'), 'false');
+  assert.equal(calmRun.cueText.textContent, 'Show tickets');
+
+  const run = playback(false);
+  assert.equal(run.summaryLine.textContent, 'Waiting · 20 Nov 13:38 UTC');
+  assert.deepEqual(run.dots.map(dot => dot.state), ['waiting', 'waiting', 'waiting', 'waiting']);
+  assert.equal(run.statusText.textContent, '4 waiting');
+
+  const start = Date.parse(opened);
+  const duration = Date.parse(utc(landings['WizSkills #229'])) - start;
+  const at = stamp => (Date.parse(utc(stamp)) - start) / duration * 20_000 + .01;
+
+  run.advanceTo(at('20 15:45:24'));
+  assert.equal(run.summaryLine.textContent, 'WD1 · Waiting → Building · 20 Nov 15:45 UTC');
+  assert.deepEqual(run.dots.map(dot => dot.state), ['building', 'waiting', 'waiting', 'waiting']);
+  assert.equal(run.statusText.textContent, '1 building');
+
+  run.advanceTo(at('20 15:57:37'));
+  assert.equal(run.summaryLine.textContent, 'WD1 · Building → In review · 20 Nov 15:57 UTC');
+  assert.deepEqual(run.dots.map(dot => dot.state), ['review', 'waiting', 'waiting', 'waiting']);
+  assert.equal(run.statusText.textContent, '1 in review');
+
+  run.advanceTo(at('20 19:03:26'));
+  assert.equal(run.summaryLine.textContent, 'WD1 · In review → Merged · 20 Nov 19:03 UTC');
+  assert.deepEqual(run.dots.map(dot => dot.state), ['merged', 'review', 'waiting', 'review']);
+  assert.equal(run.statusText.textContent, '1 merged · 2 in review');
+
+  run.advanceTo(at('21 01:27:33'));
+  assert.equal(run.summaryLine.textContent, 'WizSkills #212 · Merged · 21 Nov 01:27 UTC');
+
+  run.advanceTo(at('21 04:36:53'));
+  assert.equal(run.summaryLine.textContent, 'WD3 · In review → Merged · 21 Nov 04:36 UTC');
+  assert.deepEqual(run.dots.map(dot => dot.state), ['merged', 'merged', 'merged', 'merged']);
+  assert.equal(run.statusText.textContent, '4 merged');
 });

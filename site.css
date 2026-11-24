@@ -622,11 +622,71 @@ body.landing > main { flex: 1 0 auto; }
   cursor: pointer;
 }
 .team-replay-control:hover { border-color: var(--grey2); }
+.team-replay-toggle { display: none; }
 @media (max-width: 1050px) {
   .team-tickets > li { grid-template-columns: minmax(0, 1fr); }
   .team-timeline { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; }
   .team-timeline > div { display: block; }
   .team-timeline time { display: block; }
+}
+@media (max-width: 600px) {
+  .team-replay-heading { padding: 14px var(--team-replay-inset) 12px; }
+  .team-replay-title { margin-top: 6px; font-size: 16px; }
+  .team-replay-toggle:not([hidden]) {
+    display: grid;
+    gap: 10px;
+    width: 100%;
+    padding: 12px var(--team-replay-inset);
+    border: 0;
+    border-top: 1px solid var(--line);
+    border-radius: 0 0 var(--round) var(--round);
+    background: none;
+    color: var(--ink);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+  .team-replay-toggle[aria-expanded="true"] { border-radius: 0; }
+  .team-replay-toggle:hover { background: rgba(255, 255, 255, .03); }
+  .team-replay-toggle:focus-visible { outline: 2px solid var(--orchid); outline-offset: -2px; }
+  .team-replay-event {
+    color: var(--ink);
+    font: 500 12px/1.4 var(--ow-font-mono);
+    overflow-wrap: anywhere;
+  }
+  .team-replay-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 10px;
+    color: var(--grey2);
+    font: 500 12px/1.3 var(--ow-font-mono);
+  }
+  .team-replay-dots { display: inline-flex; align-items: center; gap: 6px; }
+  .team-replay-dots span {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    border: 1.5px solid var(--edge);
+    box-sizing: border-box;
+  }
+  .team-replay-dots [data-dot-state="waiting"] { border-color: var(--edge); background: transparent; }
+  .team-replay-dots [data-dot-state="building"] {
+    border-color: var(--ink);
+    background: radial-gradient(circle, var(--ink) 38%, transparent 45%);
+  }
+  .team-replay-dots [data-dot-state="review"] {
+    border-color: var(--brass);
+    background: linear-gradient(90deg, var(--brass) 50%, transparent 50%);
+  }
+  .team-replay-dots [data-dot-state="merged"] { border-color: var(--brass); background: var(--brass); }
+  .team-replay-cue {
+    margin-left: auto;
+    color: var(--brass);
+    text-decoration: underline;
+    text-underline-offset: .2em;
+  }
+  .team-replay[data-replay-expanded="false"] .team-replay-details { display: none; }
 }
 .team-film { max-width: 940px; margin: clamp(20px, 3vw, 40px) auto 0; }
 .team-part { padding-block: clamp(48px, 7vw, 104px); border-top: 1px solid var(--line); }

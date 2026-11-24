@@ -158,6 +158,9 @@ TEAM_REPLAY_TITLE = 'Infra spec: write-driver, a skill that writes your own driv
 TEAM_REPLAY_SPEC = 'https://github.com/openwizdev/OpenWiz/issues/1927'
 TEAM_REPLAY_OPENED = '2026-11-20T13:38:32Z'
 TEAM_REPLAY_CONTROL = '<button class="team-replay-control" type="button" hidden>Play again</button>'
+TEAM_REPLAY_TOGGLE_START = '<button class="team-replay-toggle" type="button" aria-expanded="false" aria-controls="team-replay-details" hidden>'
+TEAM_REPLAY_SUMMARY = 'WD3 · In review → Merged · 21 Nov 04:36 UTC'
+TEAM_REPLAY_DOTS = '<span class="team-replay-dots" aria-hidden="true">' + '<span data-dot-state="merged"></span>' * 4 + '</span>'
 TEAM_REPLAY_WIZSITE = 'https://github.com/openwizdev/WizSite/pull/118'
 TEAM_REPLAY_TICKETS = (
     (1928, "Infra WD1: the write-driver contract: copy line, ticket format, live lessons and the timed report, first",
@@ -1528,7 +1531,11 @@ def check_team(htmls, pages):
     assert not forbidden, f'a word the team page never uses: {forbidden[0]}'
     assert "'" not in shown and "'" not in ' '.join(re.findall(r'aria-label="([^"]*)"', main)), \
         'the team page uses curly apostrophes'
-    controls = main.replace(TEAM_REPLAY_CONTROL, '').replace('<button class="launch-play" type="button" hidden><span aria-hidden="true">', '')
+    controls = (main
+                .replace(TEAM_REPLAY_CONTROL, '')
+                .replace(TEAM_REPLAY_TOGGLE_START, '', 1)
+                .replace(TEAM_REPLAY_DOTS, '', 1)
+                .replace('<button class="launch-play" type="button" hidden><span aria-hidden="true">', ''))
     assert not re.search(r'\bhidden\b|aria-hidden', controls), 'the team page hides none of its copy'
     parts = [plain(h) for h in re.findall(r'<h2\b[^>]*>([\s\S]*?)</h2>', main)]
     assert parts == list(TEAM_PARTS), f'the team page sections, in order: {parts}'
@@ -1550,7 +1557,17 @@ def check_team(htmls, pages):
         '<figcaption class="team-replay-heading">',
         f'<p class="team-replay-meta">{TEAM_REPLAY_LABEL}</p>',
         f'<p class="team-replay-title"><a href="{TEAM_REPLAY_SPEC}">{TEAM_REPLAY_TITLE}</a></p>',
-        '</figcaption>', '<ul class="team-tickets">',
+        '</figcaption>',
+        TEAM_REPLAY_TOGGLE_START,
+        f'<span class="team-replay-event">{TEAM_REPLAY_SUMMARY}</span>',
+        '<span class="team-replay-bar">',
+        TEAM_REPLAY_DOTS,
+        '<span class="team-replay-status">4 merged</span>',
+        '<span class="team-replay-cue">Show tickets</span>',
+        '</span>',
+        '</button>',
+        '<div class="team-replay-details" id="team-replay-details">',
+        '<ul class="team-tickets">',
     ]
     for number, title, *times in TEAM_REPLAY_TICKETS:
         replay += ['<li>',
@@ -1563,7 +1580,7 @@ def check_team(htmls, pages):
     replay += ['</ul>', '<ul class="team-landings">']
     replay += [f'<li data-replay-event><a href="{href}">{label}</a> · Merged {replay_time(at)}</li>'
                for label, href, at in TEAM_REPLAY_LANDINGS]
-    replay += ['</ul>', TEAM_REPLAY_CONTROL, '</figure>']
+    replay += ['</ul>', TEAM_REPLAY_CONTROL, '</div>', '</figure>']
     assert not hero[:copy.start()].strip() and re.sub(r'\s+', ' ', hero[copy.end():]).strip() == ' '.join(replay), \
         'the hero ends with the labelled real run, its ordered ticket history and its pull request landings'
     page = Page(main)
@@ -1597,8 +1614,8 @@ def check_team(htmls, pages):
     close = re.search(r'<section class="team-part team-close wrap" aria-labelledby="team-call">\s*<h2 id="team-call">[^<]*</h2>\s*'
                       r'<a class="team-book" data-book href="[^"]*" data-count="book-call">Book a call</a>\s*</section>\s*$', main)
     assert close, 'the page closes on its second Book a call'
-    assert len(page.links) == 4 + len(TEAM_REPLAY_TICKETS) + len(TEAM_REPLAY_LANDINGS) and len(page.buttons) == 2, \
-        'the team page offers its booking, driver and replay links and its two playback controls; nothing else'
+    assert len(page.links) == 4 + len(TEAM_REPLAY_TICKETS) + len(TEAM_REPLAY_LANDINGS) and len(page.buttons) == 3, \
+        'the team page offers its booking, driver and replay links and its three controls; nothing else'
 
 
 
