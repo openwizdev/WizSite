@@ -258,60 +258,170 @@ const esc = text => String(text).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 const link = (href, text) => `<a href="${esc(href)}"${clickLinkAttribute(href)}${href.startsWith('#') ? '' : ' rel="noreferrer"'}>${esc(text)}</a>`;
 export const tagsOf = index => [...new Set(index.listings.flatMap(listing => listing.tags))].sort();
 
+export const PER_PAGE = 48;
+export const MAX_KINDS = 24;
+export const SITE = 'https://openwiz.dev';
+export const SOURCE_TAG = 'public-source';
+export const SOURCE_LABEL = 'Listed from public source, unverified';
+export const NOTE = 'OpenWiz lists these from public catalogs. A listing is not an endorsement; verified means it passed its kind’s test.';
+export const HEAD_SLOT = '<template data-slot="market-head"></template>';
+export const HEAD = ['<!-- market-head:start -->', '<!-- market-head:end -->'];
+const SEARCH_SUMMARY = 64;
+const cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
+const rank = listing => listing.status === 'verified' ? 0 : listing.publisher === 'openwizdev' && !listing.tags.includes(SOURCE_TAG) ? 1 : 2;
+
+// One stable order for every page: verified, then OpenWiz's own, then the rest; each by name, then id.
+export const ordered = index => [...index.listings].sort((a, b) => rank(a) - rank(b) || cmp(a.name.toLowerCase(), b.name.toLowerCase()) || cmp(a.id, b.id));
+
+// The kind pages: the most used tags (public-source is a label, not a kind), most listings first.
+export function kinds(index) {
+  const counts = new Map();
+  for (const listing of index.listings) for (const tag of listing.tags) if (tag !== SOURCE_TAG) counts.set(tag, (counts.get(tag) ?? 0) + 1);
+  return [...counts].sort((a, b) => b[1] - a[1] || cmp(a[0], b[0])).slice(0, MAX_KINDS);
+}
+
+const kindPath = tag => `/market/kind/${tag}/`;
+const pagePath = (base, n) => n === 1 ? base : `${base}page/${n}/`;
+const sourceLinks = listing => {
+  const links = listing.links ?? [];
+  const catalog = links.find(l => l.label.startsWith(`${SOURCE_LABEL}:`));
+  const licence = links.find(l => l.label.startsWith('Licence:'));
+  return { catalog, licence, rest: links.filter(l => l !== catalog && l !== licence) };
+};
+
+function source(listing, lead) {
+  const { catalog, licence } = sourceLinks(listing);
+  return [catalog ? `${lead}: ${link(catalog.url, catalog.label.slice(SOURCE_LABEL.length + 1).trim())}` : lead,
+    licence ? link(licence.url, licence.label) : 'Licence: not stated'].join(' · ');
+}
+
 function status(listing) {
+  const fromSource = listing.tags.includes(SOURCE_TAG);
   if (listing.status !== 'verified') {
-    return '<p class="market-status" data-status="listed"><span class="market-badge">Listed</span> A link, not proven.</p>';
+    return fromSource
+      ? `<p class="market-status market-source" data-status="listed">${source(listing, '<span class="market-badge">Listed</span> from public source, unverified')}</p>`
+      : '<p class="market-status" data-status="listed"><span class="market-badge">Listed</span> A link, not proven.</p>';
   }
   const proofs = [];
   const { receipt, skill } = listing.proof;
   if (receipt) proofs.push(link(receipt.url, `Kit receipt: 5 of 5 checks on its real host, ${receipt.date}`));
   if (skill) proofs.push(link(skill.url, `Its check passed at ${skill.source.split('@')[0]}@${skill.source.split('@')[1].slice(0, 12)}`));
-  return `<p class="market-status" data-status="verified"><span class="market-badge">Verified</span> ${proofs.join('; ')}</p>`;
+  return `<p class="market-status" data-status="verified"><span class="market-badge">Verified</span> ${proofs.join('; ')}</p>`
+    + (fromSource ? `<p class="market-source">${source(listing, 'Listed from public source')}</p>` : '');
 }
 
-function stage(listing) {
-  if (listing.stage !== 'being-built') return '<p class="market-stage" data-stage="available">Available</p>';
-  const work = listing.links[0];
-  return `<p class="market-stage" data-stage="being-built">Being built: ${link(work.url, work.label)}</p>`;
-}
-
-function card(listing) {
-  const tags = listing.tags.map(tag => `<li>${link(`#tag-${tag}`, tag)}</li>`).join('');
-  const extra = (listing.links ?? []).slice(listing.stage === 'being-built' ? 1 : 0);
-  return `<article class="market-card" id="listing-${listing.id}" data-listing="${listing.id}" aria-labelledby="name-${listing.id}">`
+function card(listing, kindSet) {
+  const fromSource = listing.tags.includes(SOURCE_TAG);
+  const tags = listing.tags.map(tag => `<li>${kindSet.has(tag) ? link(kindPath(tag), tag) : `<span>${esc(tag)}</span>`}</li>`).join('');
+  const building = listing.stage === 'being-built';
+  const links = (fromSource ? sourceLinks(listing).rest : listing.links ?? []).filter(l => !building || l !== listing.links[0]);
+  return `<article class="market-card" id="listing-${listing.id}" data-listing="${listing.id}" data-stage="${listing.stage}" aria-labelledby="name-${listing.id}">`
     + `<h3 id="name-${listing.id}">${esc(listing.name)}</h3>`
     + `<p class="market-summary">${esc(listing.summary)}</p>`
-    + status(listing) + stage(listing)
+    + status(listing)
+    + (building ? `<p class="market-stage" data-stage="being-built">Being built: ${link(listing.links[0].url, listing.links[0].label)}</p>` : '')
     + `<dl><dt>Plugs into</dt><dd>${esc(listing.plugs_into)}</dd>`
     + (listing.login ? `<dt>Login</dt><dd>${esc(listing.login)}</dd>` : '')
-    + `<dt>Publisher</dt><dd>${esc(listing.publisher)}</dd></dl>`
+    + (fromSource ? '' : `<dt>Publisher</dt><dd>${esc(listing.publisher)}</dd>`) + '</dl>'
     + `<ul class="market-tags" aria-label="Tags">${tags}</ul>`
-    + `<p class="market-links">${[link(listing.url, 'Get it'), ...extra.map(l => link(l.url, l.label))].join(' · ')}</p>`
+    + `<p class="market-links">${[link(listing.url, 'Get it'), ...links.map(l => link(l.url, l.label))].join(' · ')}</p>`
     + '</article>';
 }
 
-export function render(index) {
-  if (!index.listings.length) {
-    return '<section class="market-all" aria-labelledby="all-listings"><h2 id="all-listings">Every listing</h2>'
-      + `<p class="market-count">0 listings, from WizMarket at commit <code>${index.commit.slice(0, 12)}</code>.</p>`
-      + '<p class="market-empty">No listings yet. Anyone can be the first: <a href="#publish">publish your own</a>.</p></section>';
-  }
-  const tags = tagsOf(index);
-  const count = tag => index.listings.filter(listing => listing.tags.includes(tag)).length;
-  const verified = index.listings.filter(listing => listing.status === 'verified').length;
-  const browse = `<nav class="market-browse" aria-label="Browse by tag"><h2>Browse by tag</h2><ul>${tags.map(tag => `<li>${link(`#tag-${tag}`, `${tag} (${count(tag)})`)}</li>`).join('')}</ul></nav>`;
-  const all = `<section class="market-all" aria-labelledby="all-listings"><h2 id="all-listings">Every listing</h2>`
-    + `<p class="market-count">${index.listings.length} listing${index.listings.length === 1 ? '' : 's'}, ${verified} verified, from WizMarket at commit <code>${index.commit.slice(0, 12)}</code>.</p>`
-    + `<div class="market-cards">${index.listings.map(card).join('')}</div></section>`;
-  const byTag = `<section class="market-by-tag" aria-labelledby="by-tag"><h2 id="by-tag">By tag</h2>${tags.map(tag => `<section class="market-tag" id="tag-${tag}" aria-labelledby="heading-tag-${tag}"><h3 id="heading-tag-${tag}">${esc(tag)}</h3><ul>`
-    + index.listings.filter(listing => listing.tags.includes(tag)).map(listing => `<li>${link(`#listing-${listing.id}`, listing.name)} <span>${listing.status === 'verified' ? 'Verified' : 'Listed'}</span></li>`).join('')
-    + '</ul></section>').join('')}</section>`;
-  return browse + all + byTag;
+// Every generated page: /market/, /market/page/<n>/, /market/kind/<tag>/ and /market/kind/<tag>/page/<n>/.
+export function plan(index) {
+  const all = ordered(index);
+  const kindList = kinds(index);
+  const pages = [];
+  const add = (base, list, kind) => {
+    const count = Math.max(1, Math.ceil(list.length / PER_PAGE));
+    for (let n = 1; n <= count; n++) pages.push({ base, kind, n, count, path: pagePath(base, n), listings: list.slice((n - 1) * PER_PAGE, n * PER_PAGE) });
+  };
+  add('/market/', all, null);
+  for (const [tag] of kindList) add(kindPath(tag), all.filter(listing => listing.tags.includes(tag)), tag);
+  return { all, kinds: kindList, pages };
 }
 
-export function withMarket(page, section) {
+function pager({ base, n, count }) {
+  if (count < 2) return '';
+  const shown = [...new Set([1, n - 2, n - 1, n, n + 1, n + 2, count])].filter(i => i >= 1 && i <= count).sort((a, b) => a - b);
+  const items = [];
+  shown.forEach((i, at) => {
+    if (at && i - shown[at - 1] > 1) items.push('<li><span>…</span></li>');
+    items.push(i === n ? `<li><a href="${pagePath(base, i)}" aria-current="page">${i}</a></li>` : `<li>${link(pagePath(base, i), String(i))}</li>`);
+  });
+  return '<nav class="market-pages" aria-label="Pages">'
+    + (n > 1 ? link(pagePath(base, n - 1), 'Previous') : '')
+    + `<ol>${items.join('')}</ol>`
+    + (n < count ? link(pagePath(base, n + 1), 'Next') : '')
+    + '</nav>';
+}
+
+function countLine(index) {
+  const verified = index.listings.filter(listing => listing.status === 'verified').length;
+  const n = index.listings.length;
+  return `<p class="market-count">${n} listing${n === 1 ? '' : 's'}: ${verified} verified, ${n - verified} listed, from WizMarket at <code>${index.commit.slice(0, 12)}</code>.</p>`;
+}
+
+const note = `<p class="market-note">${esc(NOTE)}</p>`;
+
+function section(index, p, page) {
+  if (!index.listings.length) {
+    return '<section class="market-all" aria-labelledby="all-listings"><h2 id="all-listings">Every listing</h2>'
+      + `<p class="market-count">0 listings, from WizMarket at commit <code>${index.commit.slice(0, 12)}</code>.</p>${note}`
+      + '<p class="market-empty">No listings yet. Anyone can be the first: <a href="#publish">publish your own</a>.</p></section>';
+  }
+  const chips = p.kinds.map(([tag, n]) => tag === page.kind
+    ? `<li><a href="${kindPath(tag)}" aria-current="page">${esc(tag)} (${n})</a></li>`
+    : `<li>${link(kindPath(tag), `${tag} (${n})`)}</li>`).join('');
+  const total = page.kind ? p.kinds.find(([tag]) => tag === page.kind)[1] : index.listings.length;
+  const where = page.count > 1 ? `Page ${page.n} of ${page.count}, ` : '';
+  const kindSet = new Set(p.kinds.map(([tag]) => tag));
+  return '<section class="market-all" aria-labelledby="all-listings">'
+    + countLine(index) + note
+    + '<p class="market-search"><a class="market-search-box" href="#kinds">Search listings, or browse by kind</a></p>'
+    + `<nav class="market-browse" id="kinds" aria-label="Browse by kind"><h2>Browse by kind</h2><ul>${page.kind ? `<li>${link('/market/', `all (${index.listings.length})`)}</li>` : ''}${chips}</ul></nav>`
+    + `<h2 id="all-listings">${page.kind ? `Kind: ${esc(page.kind)}` : 'Every listing'}</h2><p class="market-range">${where}${total} listing${total === 1 ? '' : 's'}.</p>`
+    + `<div class="market-cards">${page.listings.map(listing => card(listing, kindSet)).join('')}</div>`
+    + pager(page) + '</section>';
+}
+
+function head(page) {
+  const of = page.n > 1 ? `, page ${page.n} of ${page.count}` : '';
+  const what = page.kind ? `${page.kind}${of} — Market` : `Market${of}`;
+  const rel = (name, n) => `<link rel="${name}" href="${SITE}${pagePath(page.base, n)}">`;
+  return `${HEAD[0]}<title>${esc(what)} — OpenWiz</title>${rel('canonical', page.n)}`
+    + (page.n > 1 ? rel('prev', page.n - 1) : '') + (page.n < page.count ? rel('next', page.n + 1) : '') + HEAD[1];
+}
+
+// The first page's section.
+export function render(index) {
+  const p = plan(index);
+  return section(index, p, p.pages[0]);
+}
+
+// A compact search index: rows in page order, so a row's page on /market/ is 1 + its position / per.
+export function searchIndex(index, p = plan(index)) {
+  const tags = [...new Set(p.all.flatMap(listing => listing.tags))].sort();
+  const at = new Map(tags.map((tag, i) => [tag, i]));
+  const cut = text => [...text].length <= SEARCH_SUMMARY ? text : `${[...text].slice(0, SEARCH_SUMMARY - 1).join('').trimEnd()}…`;
+  return JSON.stringify({ commit: index.commit, per: PER_PAGE, tags,
+    rows: p.all.map(l => [l.id, l.name, cut(l.summary), l.tags.map(tag => at.get(tag)), l.status === 'verified' ? 1 : 0]) });
+}
+
+export function withMarket(page, section, headHtml = head(plan({ listings: [] }).pages[0])) {
   if (page.includes(START) || page.split('<template data-slot="market"></template>').length !== 2) throw new Error('market page: expected one market slot and no generated section');
-  return page.replace('<template data-slot="market"></template>', () => `${START}${section}${END}`);
+  if (page.split(HEAD_SLOT).length !== 2) throw new Error('market page: expected one market head slot');
+  return page.replace(HEAD_SLOT, () => headHtml).replace('<template data-slot="market"></template>', () => `${START}${section}${END}`);
+}
+
+// Every market file the build writes, from the market page template (fingerprinted, with its top bar and footer).
+export function marketFiles(index, template) {
+  const p = plan(index);
+  const files = {};
+  for (const page of p.pages) files[`${page.path.slice(1)}index.html`] = withMarket(template, section(index, p, page), head(page));
+  files['market/search.json'] = searchIndex(index, p);
+  return files;
 }
 
 export const summary = index => `${index.listings.length} listing${index.listings.length === 1 ? '' : 's'} at WizMarket ${index.commit.slice(0, 12)}`;
