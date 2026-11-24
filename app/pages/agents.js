@@ -253,14 +253,32 @@
       return notesOf({ ...issue, comments: { totalCount: nodes.length, nodes } }, home, comment => authors.get(comment), now).notes;
     }).filter(n => n.holds && n.note.state === 'working').map(n => n.key));
   }
-  function working(now = Date.now()) {
-    const home = OW.data.repo.get()?.full;
+  function readsNow() {
     const { agents, specs } = OW.data.feeds;
-    const reads = [
+    return [
       { name: 'agents', at: agents.readAt || 0, authors: OW.factory.recordAuthors(agents.data?.fleet?.text), issues: agents.data?.issues?.nodes || [] },
       { name: 'specs', at: specs.readAt || 0, authors: OW.factory.recordAuthors(specs.data?.fleet?.text),
         issues: Object.values(specs.data?.specs || {}).flatMap(spec => spec?.subIssues?.nodes || []) },
     ].sort((a, b) => a.at - b.at);
+  }
+  // Every ticket's notes from both reads, the newer edit of each comment winning; the issue is the agents read's when
+  // it has one, since only that read carries each pull request's checks.
+  function notes(now = Date.now()) {
+    const home = OW.data.repo.get()?.full;
+    const reads = readsNow();
+    const fresh = new Map((reads.find(r => r.name === 'agents').issues || []).filter(Boolean).map(issue => [keyOf(issue, home), issue]));
+    const out = new Map();
+    for (const [key, { issue, comments }] of reconcile(reads, home)) {
+      const nodes = [...comments.values()].map(kept => kept.comment);
+      const authors = new Map([...comments.values()].map(kept => [kept.comment, kept.authors]));
+      const read = notesOf({ ...issue, comments: { totalCount: nodes.length, nodes } }, home, comment => authors.get(comment), now);
+      out.set(key, { issue: fresh.get(key) || issue, notes: read.notes });
+    }
+    return out;
+  }
+  function working(now = Date.now()) {
+    const home = OW.data.repo.get()?.full;
+    const reads = readsNow();
     const [older, newer] = reads;
     const known = older.at < newer.at && !(order[newer.name].at === newer.at && order[newer.name].overlapped);
     const one = pulsing(reads, home, now);
@@ -269,7 +287,7 @@
     return new Set([...one].filter(key => other.has(key)));
   }
 
-  OW.agents = { readNote, picture, working };
+  OW.agents = { readNote, picture, working, notes, status, pullRequest, WORDS, KIND };
 
   OW.page({
     id: 'agents',
