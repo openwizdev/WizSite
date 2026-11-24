@@ -164,8 +164,8 @@ class World {
 
 const LABEL = `const label = e => { const c = e.cloneNode(true); c.querySelectorAll('[aria-hidden="true"]').forEach(x => x.remove()); return c.textContent.replace(/\\s+/g, ' ').trim(); };`;
 
-async function open(browser, world) {
-  const { browserContextId } = await browser.send('Target.createBrowserContext');
+async function open(browser, world, sharedContextId) {
+  const browserContextId = sharedContextId ?? (await browser.send('Target.createBrowserContext')).browserContextId;
   const { targetId } = await browser.send('Target.createTarget', { url: 'about:blank', browserContextId });
   const { sessionId } = await browser.send('Target.attachToTarget', { targetId, flatten: true });
   const send = (method, params) => browser.send(method, params, sessionId);
@@ -255,7 +255,7 @@ async function open(browser, world) {
     })()`),
     close: async () => {
       await browser.send('Target.closeTarget', { targetId });
-      await browser.send('Target.disposeBrowserContext', { browserContextId });
+      if (!sharedContextId) await browser.send('Target.disposeBrowserContext', { browserContextId });
     },
   };
   return page;
@@ -1666,6 +1666,53 @@ async function main() {
       checkRequestLog(world);
       await page.close();
     });
+
+    for (const surface of ['picker', 'sidebar']) {
+      await check(`#98: the ${surface} returns to sign-in when another tab clears the refused grant`, async () => {
+        const { browserContextId } = await browser.send('Target.createBrowserContext');
+        const fast = new World();
+        const slow = new World();
+        for (const world of [fast, slow]) {
+          world.graphql.Specs = ok('specs.json');
+          world.graphql.Agents = ok('agents.json');
+        }
+        const first = await open(browser, fast, browserContextId);
+        const second = await open(browser, slow, browserContextId);
+        const refused = { status: 401, json: { message: 'Bad credentials' } };
+        const held = Promise.withResolvers();
+        try {
+          await signIn(first, fast);
+          if (surface === 'sidebar') {
+            await first.click('acme/factory');
+            await first.until(`document.querySelector('aside.side button.repo')`, 'the first tab’s sidebar');
+          }
+          slow.rest['/user/installations'] = async () => {
+            await held.promise;
+            return refused;
+          };
+          await second.go(`${SITE}/app/`);
+          if (surface === 'sidebar') {
+            await second.until(`document.querySelector('aside.side button.repo')`, 'the second tab’s sidebar');
+            await second.click('acme/factory');
+          }
+          await waitFor(() => slow.log.some(r => r.method === 'GET' && r.path === '/user/installations'), 'the held installations request');
+          fast.rest['/user/installations'] = async () => refused;
+          fast.helper['/api/sign-in/refresh'] = async () => ({ status: 502, json: { error: 'github_refused' } });
+          if (surface === 'sidebar') await first.click('acme/factory');
+          else await first.go(`${SITE}/app/`);
+          await first.until(`/Your sign-in ended/.test(document.body.innerText)`, 'the first tab’s sign-in-ended screen');
+          held.resolve();
+          await second.until(`/Your sign-in ended/.test(document.body.innerText)`, 'the second tab’s sign-in-ended screen', 3000);
+          assert((await second.text()).includes('Sign in with GitHub'), 'the second tab has no sign-in link');
+          assert(!slow.log.some(r => r.path === '/api/sign-in/refresh'), 'the second tab tried to refresh a cleared grant');
+          checkRequestLog(fast);
+          checkRequestLog(slow);
+        } finally {
+          held.resolve();
+          await browser.send('Target.disposeBrowserContext', { browserContextId });
+        }
+      });
+    }
 
     await check('R6: a long repository name fits a phone', async () => {
       const world = new World();
