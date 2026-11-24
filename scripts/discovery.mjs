@@ -1,10 +1,13 @@
+import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { decode } from './ask-index.mjs';
 
 const site = 'https://openwiz.dev/';
 const github = 'https://github.com/openwizdev';
 const repo = github + '/OpenWiz';
 const skillsRepo = github + '/WizSkills';
-const skillsTag = 'v0.5.0';
+const skillsRef = 'maint/0.2';
+const repoRoot = fileURLToPath(new URL('..', import.meta.url));
 const sameAs = [github, repo, 'https://x.com/openwiz'];
 const organization = site + '#organization';
 const software = site + '#software';
@@ -132,8 +135,8 @@ export function crawlerFiles(about, faq) {
     'To install, paste this one line into your coding agent (Claude Code, Codex or another): "Install OpenWiz from github.com/openwizdev/OpenWiz". It shows every change first and waits for your yes.',
     '## Install', [
       `- [SKILL.md](${site}SKILL.md): a short Agent Skill that installs OpenWiz from the one line`,
-      `- [Install skill](${skillsRepo}/blob/${skillsTag}/skills/install/SKILL.md): the full install your agent follows (WizSkills ${skillsTag})`,
-      `- [Install guide](${repo}/blob/main/docs/install.md): every step and command, what it may change, and how to recover or remove it`,
+      `- [Install skill](${skillsRepo}/blob/${skillsRef}/skills/install/SKILL.md): the full install your agent follows (WizSkills ${skillsRef})`,
+      `- [Install guide](${repo}/blob/main/docs/install.md#openwiz-010): every step and command, what it may change, and how to recover or remove it`,
       `- [Release 0.1.0](${repo}/releases/tag/v0.1.0): the verified prebuilt packages`,
     ].join('\n'),
     '## Docs', [
@@ -171,9 +174,20 @@ export function crawlerFiles(about, faq) {
     ...faqEntries(faq).map(([question, answer]) => `### ${question}\n\n${answer}`),
   ].join('\n\n') + '\n';
 
-  const date = new Date().toISOString().slice(0, 10);
+  const fallbackDate = new Date().toISOString().slice(0, 10);
+  const lastModified = page => {
+    try {
+      const committed = execFileSync('git', ['log', '-1', '--format=%cs', '--', page], {
+        cwd: repoRoot,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+      }).trim();
+      if (/^\d{4}-\d{2}-\d{2}$/.test(committed)) return committed;
+    } catch {}
+    return fallbackDate;
+  };
   const urls = Object.entries(pages).filter(([, [, , robots]]) => !robots).map(([page]) =>
-    `  <url><loc>${urlFor(page)}</loc><lastmod>${date}</lastmod></url>`);
+    `  <url><loc>${urlFor(page)}</loc><lastmod>${lastModified(page)}</lastmod></url>`);
   return {
     'robots.txt': crawlers.map(agent => `User-agent: ${agent}\nAllow: /\nDisallow: /api/\n\n`).join('') + `Sitemap: ${site}sitemap.xml\n`,
     'sitemap.xml': ['<?xml version="1.0" encoding="UTF-8"?>', '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">', ...urls, '</urlset>', ''].join('\n'),
