@@ -85,34 +85,50 @@ code,.v{font-family:var(--ow-font-mono)}
 
 
 .landing { --m: clamp(18px, 4vw, 68px); --round: 18px; }
+html:has(.landing-nav) { scroll-padding-top: 88px; }
 .landing-nav {
   --nav-blue: #8fb4ff;
   --nav-edge: #766a60;
   --nav-height: 68px;
-  --nav-gutter: clamp(16px, 11vw - 85px, 76px);
+  --nav-top: 12px;
+  --nav-radius: 14px;
+  --nav-surface: rgb(34 31 27 / 92%);
+  --nav-menu-gap: 8px;
   --nav-engraving: repeating-linear-gradient(90deg, var(--nav-blue) 0 2px, transparent 2px 4px);
-  position: relative;
+  position: sticky;
+  top: var(--nav-top);
   z-index: 10;
-  background: var(--ground);
+  width: min(100% - 2 * var(--m), 1240px);
+  margin: var(--nav-top) auto 0;
   font-size: 14px;
   line-height: 20px;
 }
 .nav-row {
+  position: relative;
+  isolation: isolate;
   display: flex;
   align-items: center;
   gap: clamp(10px, 1.6vw, 24px);
   min-height: var(--nav-height);
-  max-width: 1440px;
-  margin-inline: auto;
-  padding-inline: var(--nav-gutter);
+  padding-inline: 16px;
 }
-.landing-nav::after, .nav-links::after {
+.nav-row::before {
   content: "";
   position: absolute;
-  inset: auto 0 0;
+  inset: 0;
+  z-index: -1;
+  border: 1px solid var(--line);
+  border-radius: var(--nav-radius);
+  background: var(--nav-surface);
+  backdrop-filter: blur(8px);
+}
+.nav-row::after, .nav-links::after {
+  content: "";
+  position: absolute;
+  inset: auto var(--nav-radius) 1px;
   height: 2px;
   background: var(--nav-engraving);
-  mask-image: linear-gradient(90deg, transparent 2%, #000 25%, #000 75%, transparent 98%);
+  mask-image: linear-gradient(90deg, transparent, #000 20%, #000 80%, transparent);
   opacity: .65;
   pointer-events: none;
 }
@@ -151,28 +167,40 @@ code,.v{font-family:var(--ow-font-mono)}
 }
 .sign-in, .nav-team { padding-inline: 13px; border-radius: 8px; font-weight: 600; }
 .sign-in { border: 1px solid var(--nav-edge); color: var(--grey2); }
-.github-star:hover, .sign-in:hover, .nav-toggle:hover { background: var(--panel); color: var(--ink); }
+.github-star:hover, .sign-in:hover, .nav-toggle:hover { background: var(--navy); color: var(--ink); }
 .nav-team { background: var(--brass); color: var(--on-brass); }
 .nav-team:hover { background: var(--brass-hi); }
 .nav-team[aria-current]::after { inset: auto 8px -5px; }
 .nav-team-short, .nav-toggle { display: none; }
 .footer-groups a:hover { text-decoration: underline; text-underline-offset: 4px; }
 
+@media (850px < width <= 940px) {
+  .nav-row { gap: 8px; padding-inline: 10px; }
+  .landing-brand img { width: 40px; height: 40px; }
+  .landing-brand[aria-current]::after { inset-inline-start: 48px; bottom: 2px; }
+  .nav-links { gap: 8px; margin-inline-end: 0; }
+  .github-star { padding-inline: 8px; }
+  .sign-in, .nav-team { padding-inline: 10px; }
+}
 @media (max-width: 850px) {
+  html:has(.landing-nav) { scroll-padding-top: 78px; }
   .landing-nav {
     --nav-height: 58px;
-    --nav-gutter: clamp(10px, 8vw - 20px, 20px);
+    width: min(100% - 24px, 100% - 2 * var(--m) + 12px);
+    container-type: inline-size;
   }
-  .nav-row { flex-wrap: wrap; gap: 0 5px; }
+  .landing-nav:has(.nav-toggle[hidden]) { position: relative; top: auto; }
+  .nav-row { flex-wrap: wrap; gap: 0 4px; padding-inline: 6px; }
   .landing-nav a, .nav-toggle { min-height: 40px; }
   .landing-brand { gap: 3px; margin-inline-end: auto; font-size: 14px; }
   .landing-brand img { width: 34px; height: 40px; object-fit: cover; }
   .landing-brand[aria-current]::after { inset-inline-start: 37px; }
-  .github-star { gap: 4px; padding-inline: 6px; font-size: 12px; }
+  .github-star { gap: 2px; padding-inline: 5px; font-size: 12px; }
   .github-mark, .star-icon { width: 14px; height: 14px; }
   .github-mark { margin-inline-end: 0; }
-  .github-star [data-stars] { margin-inline-start: 1px; padding-inline-start: 6px; font-size: 12px; }
+  .github-star [data-stars] { margin-inline-start: 0; padding-inline-start: 5px; font-size: 12px; }
   .nav-team { padding-inline: 7px; font-size: 13px; }
+  .nav-team[aria-current]::after { bottom: -3px; }
   .nav-team-long { display: none; }
   .nav-team-short { display: inline; }
   .nav-toggle {
@@ -206,30 +234,38 @@ code,.v{font-family:var(--ow-font-mono)}
   .landing-nav:has(.nav-toggle[aria-expanded="true"])::before {
     content: "";
     position: fixed;
-    inset: var(--nav-height) 0 0;
+    inset: 0;
     background: rgb(27 25 22 / 87%);
   }
   .nav-row:has(.nav-toggle:not([hidden])) { flex-wrap: nowrap; }
   .nav-row:has(.nav-toggle:not([hidden])) .nav-links {
     position: absolute;
-    inset: 100% 0 auto;
+    inset: calc(100% + var(--nav-menu-gap)) 0 auto;
     display: block;
-    max-height: calc(100dvh - var(--nav-height));
+    max-height: calc(100dvh - var(--nav-height) - var(--nav-top) - 2 * var(--nav-menu-gap));
     overflow: auto;
     overscroll-behavior: contain;
-    padding: 10px 0 0;
-    background: var(--panel);
+    padding: 8px;
+    border: 1px solid var(--line);
+    border-radius: var(--nav-radius);
+    background: var(--nav-surface);
+    backdrop-filter: blur(8px);
     box-shadow: 0 12px 24px rgb(0 0 0 / 25%);
   }
   .nav-row:has(.nav-toggle:not([hidden])) .nav-links[hidden] { display: none; }
-  .nav-row:has(.nav-toggle:not([hidden])) .nav-links a { min-height: 42px; padding-inline: 24px; }
-  .nav-row:has(.nav-toggle:not([hidden])) .nav-links [aria-current]::after { inset-inline-start: 24px; }
-  .nav-row:has(.nav-toggle:not([hidden])) .nav-links::after { display: block; position: sticky; bottom: 0; margin-top: 10px; }
+  .nav-row:has(.nav-toggle:not([hidden])) .nav-links a { min-height: 42px; padding-inline: 12px; }
+  .nav-row:has(.nav-toggle:not([hidden])) .nav-links [aria-current]::after { inset-inline-start: 12px; }
+  .nav-row:has(.nav-toggle:not([hidden])) .nav-links::after { display: block; }
   html:has(.nav-toggle[aria-expanded="true"]) { overflow: hidden; scrollbar-gutter: stable; }
 }
-@media (max-width: 382px) {
+@container (max-width: 347px) {
   .landing-brand span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
   .landing-brand[aria-current]::after { inset-inline-start: 0; bottom: 0; }
+}
+@container (max-width: 310px) {
+  .github-star { padding-inline: 4px; }
+  .github-mark, .star-icon { width: 12px; height: 12px; }
+  .nav-team { padding-inline: 5px; }
 }
 .product-hero { display: grid; grid-template-columns: minmax(0, .86fr) minmax(0, 1.25fr); gap: clamp(22px, 4vw, 60px); align-items: center; padding-block: clamp(40px, 6vw, 84px) 32px; }
 .hero-copy h1 { max-width: 8ch; font-size: clamp(52px, 6vw, 96px); font-weight: 760; line-height: .98; letter-spacing: -.06em; }
