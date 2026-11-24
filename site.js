@@ -517,7 +517,6 @@ function askEvent(line, text, sources) {
   if (!ok) throw new Error('not the contract\'s stream');
   return e;
 }
-// Cloudflare Turnstile, loaded only once a visitor first uses an Ask box and only when the probe says it is on.
 let turnstileScript = null;
 const loadTurnstile = () => turnstileScript ??= new Promise(resolve => {
   const script = Object.assign(document.createElement('script'), { src: 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit', async: true });
@@ -525,7 +524,6 @@ const loadTurnstile = () => turnstileScript ??= new Promise(resolve => {
   script.onerror = () => resolve(null);
   document.head.append(script);
 });
-// One invisible widget per Ask row. token() resolves a fresh token, or '' when Turnstile fails (the server then refuses as not_human).
 function askGate(sitekey, container) {
   let widget = null, ready = null, waiting = [];
   const settle = value => { const all = waiting; waiting = []; all.forEach(resolve => resolve(value)); };
@@ -649,7 +647,6 @@ async function askAWiz() {
         asking = true;
         let token = '';
         if (gate) {
-          // Tokens are single-use: wait for a fresh one with the form showing, in case Cloudflare needs a click.
           if (!gate.has() && row.dataset.state !== 'idle') { show('idle'); input.value = question; }
           token = await gate.token();
           gate.used();

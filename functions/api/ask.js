@@ -90,7 +90,6 @@ function caps(env) {
   return { calls: count, spend: dollars === null ? 0 : micro(dollars * 1_000_000) };
 }
 
-// Turnstile is on only when its secret is set; then the public site key must be valid too, or the function is unavailable.
 function turnstile(env) {
   const secret = env.TURNSTILE_SECRET_KEY;
   if (secret === undefined || secret === '') return { on: false };
@@ -99,7 +98,6 @@ function turnstile(env) {
   return { on: true, secret, site };
 }
 
-// One siteverify call per question. Anything but a clear pass for this action on this host is a refusal, a network error too.
 async function human(gate, request, timeout) {
   const token = request.headers.get(TURNSTILE_HEADER) ?? '';
   if (!token || token.length > MAX_TOKEN) return false;
@@ -111,7 +109,7 @@ async function human(gate, request, timeout) {
     if (response.status !== 200) { response.body?.cancel().catch(() => {}); return false; }
     const result = await response.json();
     if (result?.success !== true) return false;
-    // Cloudflare's test secrets pass any token and name no action and the host example.com; only the secret set here can produce one.
+    // External: Cloudflare's test secrets pass any token, name no action and the host example.com, https://developers.cloudflare.com/turnstile/troubleshooting/testing/
     if (result.metadata?.result_with_testing_key === true) return true;
     return result.action === TURNSTILE_ACTION && result.hostname === new URL(request.url).hostname;
   } catch {

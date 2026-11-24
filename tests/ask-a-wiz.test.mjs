@@ -105,7 +105,6 @@ before(async () => {
 });
 after(async () => { await browser?.close(); server?.close(); });
 
-// A stand-in for Cloudflare's Turnstile script: each widget issues a numbered token shortly after render and after each reset.
 const FAKE_TURNSTILE = `window.__ts = { renders: [], resets: 0, removes: 0 };
 window.turnstile = (() => { const widgets = {}; let n = 0;
   const issue = id => setTimeout(() => { const w = widgets[id]; if (!w) return; w.token = 'synthetic-token-' + id + '-' + (++w.count); w.options.callback(w.token); }, 50);

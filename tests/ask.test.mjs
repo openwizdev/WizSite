@@ -290,7 +290,6 @@ const TOKEN = 'synthetic-turnstile-token';
 const NOT_HUMAN = '{"type":"refused","reason":"not_human","message":"Please confirm you\'re human and try again."}\n';
 const gated = (secret = PASS_SECRET, extra = {}) => withCase({ settings: settingsWith({ TURNSTILE_SECRET_KEY: secret, TURNSTILE_SITE_KEY: PASS_SITE }),
   request: ask('Synthetic question: what does OpenWiz do?', { headers: { 'CF-Turnstile-Response': TOKEN, ...extra } }) });
-// A fake siteverify that answers like Cloudflare: the test secrets pass or fail any token, a real-looking secret gets `verdict`.
 const verifier = (verdict = null) => async call => {
   if (call.url !== SITEVERIFY) return upstreamAnswer({ chunks: ['Synthetic answer about OpenWiz agents.'], cost: 0.0001 })();
   const form = new URLSearchParams(call.body);

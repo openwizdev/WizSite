@@ -142,7 +142,6 @@ SITE_HEADERS = (
     'X-Content-Type-Options: nosniff',
     'Referrer-Policy: strict-origin-when-cross-origin',
 )
-# The pages that host Ask a Wiz may also load and frame Cloudflare Turnstile, and nothing else more; no other rule may.
 TURNSTILE_ORIGIN = 'https://challenges.cloudflare.com'
 ASK_CSP = SITE_CSP.replace("script-src 'self';", f"script-src 'self' {TURNSTILE_ORIGIN};").replace("frame-src 'none';", f"frame-src {TURNSTILE_ORIGIN};")
 ASK_PATHS = ('/', '/faq/*')
