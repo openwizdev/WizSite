@@ -269,13 +269,16 @@ function launchVideo() {
   if (!video || !play) return;
   video.controls = false;
   play.hidden = false;
-  play.addEventListener('click', () => {
+  const start = event => {
+    if (!event.isTrusted) return;
+    play.removeEventListener('click', start);
     play.hidden = true;
     video.controls = true;
     video.muted = false;
     video.focus();
     video.play().catch(() => {});
-  }, { once: true });
+  };
+  play.addEventListener('click', start);
 }
 
 function specVideo() {
@@ -288,7 +291,8 @@ function specVideo() {
   video.controls = false;
   if (track) track.mode = 'hidden';
   sound.hidden = false;
-  const listen = () => {
+  const listen = event => {
+    if (!event.isTrusted || video.controls) return;
     frame?.classList.remove('is-resting');
     video.controls = true;
     if (track) track.mode = 'showing';
@@ -296,7 +300,7 @@ function specVideo() {
     video.play().then(() => video.focus(), () => {});
   };
   sound.addEventListener('click', listen);
-  video.addEventListener('click', () => { if (!video.controls) listen(); });
+  video.addEventListener('click', listen);
 }
 
 const FAMILY = [

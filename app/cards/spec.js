@@ -4,7 +4,6 @@
   const { h, STATES } = OW.ui;
   const SVG = 'http://www.w3.org/2000/svg';
   const NODE = { width: 64, height: 34 };
-  const CALM = matchMedia('(prefers-reduced-motion: reduce)');
   let drawn = 0;
 
   const REASONS = {
@@ -69,40 +68,19 @@
   }
 
   function video(item, fallback) {
-    const player = h('video', { src: item.video.url, poster: '/app/mark.svg', preload: 'none', muted: true, playsinline: true, loop: true,
+    const player = h('video', { src: item.video.url, poster: '/app/mark.svg', preload: 'none', muted: true, playsinline: true,
       'aria-label': `The narrated spec video of #${item.subject.number}` });
     player.muted = true;
     const sound = h('button', { type: 'button', class: 'spec-card-sound' }, 'Play with sound');
-    let drives = false;
-    let inView = false;
-    const update = () => {
-      if (!player.isConnected && seen) {
-        watching.disconnect();
-        CALM.removeEventListener('change', update);
-        document.removeEventListener('visibilitychange', update);
-        return;
-      }
-      if (drives) return;
-      const ambient = inView && !CALM.matches && !document.hidden;
-      if (ambient && player.paused) { player.muted = true; player.play().catch(() => {}); }
-      else if (!ambient && !player.paused) player.pause();
-    };
-    const listen = () => {
-      drives = true;
+    const listen = event => {
+      if (!event.isTrusted || player.controls) return;
       player.controls = true;
       player.muted = false;
-      player.loop = false;
-      player.currentTime = 0;
       player.play().then(() => player.focus(), () => {});
     };
     sound.addEventListener('click', listen);
-    player.addEventListener('click', () => { if (!drives) listen(); });
+    player.addEventListener('click', listen);
     player.addEventListener('error', () => frame.replaceWith(fallback()));
-    let seen = false;
-    const watching = new IntersectionObserver(([entry]) => { seen = seen || player.isConnected; inView = entry.isIntersecting; update(); }, { threshold: 0.5 });
-    watching.observe(player);
-    CALM.addEventListener('change', update);
-    document.addEventListener('visibilitychange', update);
     const frame = h('div', { class: 'spec-card-frame' }, player, h('div', { class: 'spec-card-actions' }, sound,
       h('a', { href: item.video.url, rel: 'noreferrer' }, 'The video')));
     return frame;

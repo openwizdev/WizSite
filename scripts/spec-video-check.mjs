@@ -85,10 +85,11 @@ const MODES = {
   'in-app browser': { inApp: true },
 };
 const IN_APP = 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36 LinkedInApp';
+const PLAYERS = '.spec-play, .spec-video, .launch-play, .launch-video';
 const EARS = `(() => {
   window.__pressed = false;
   window.__heard = [];
-  for (const type of ['pointerdown', 'keydown']) addEventListener(type, e => { if (e.isTrusted) window.__pressed = true; }, true);
+  addEventListener('click', e => { if (e.isTrusted && e.target.closest?.('${PLAYERS}')) window.__pressed = true; }, true);
   const listen = ({ target }) => {
     if (target instanceof HTMLMediaElement && !target.paused && !target.muted && target.volume > 0 && !window.__pressed)
       window.__heard.push(target.className + ' at ' + target.currentTime.toFixed(1) + 's');
@@ -203,8 +204,19 @@ async function moment(page, where, name, width) {
   facts = await until(page, f => f.playing, 1500);
   expect(!facts.playing, where, 'scrolled away and back, the video starts by itself');
   expect(!loadedVideo(page), where, 'the video loads before anyone presses play');
+  if (scripted) {
+    await page.evaluate(`document.querySelector('.moments h2').scrollIntoView({ block: 'center' }), true`);
+    const h2 = await page.evaluate(`(() => { const r = document.querySelector('.moments h2').getBoundingClientRect();
+      return { x: r.left + 10, y: r.top + r.height / 2 }; })()`);
+    await page.click(h2.x, h2.y);
+    await page.evaluate(`['.spec-play', '.spec-video', '.launch-play'].forEach(s => document.querySelector(s).click()), true`);
+    facts = await until(page, f => f.playing, 1500);
+    const launch = await page.evaluate(`!document.querySelector('.launch-video').paused`);
+    expect(!facts.playing && !launch, where, 'after an unrelated click, a scripted click on a player starts it');
+    await page.evaluate(`${MOMENT}.querySelector('video').scrollIntoView({ block: 'center' }), true`);
+  }
   const heard = await page.evaluate('window.__heard');
-  expect(!heard?.length, where, `sound played before any press: ${heard}`);
+  expect(!heard?.length, where, `sound played before a press on a player: ${heard}`);
   expect(scripted ? facts.sound : true, where, 'no visible "Play with sound" control');
   if (scripted) expect(!facts.sideways, where, 'the page scrolls sideways with the moment in view');
   expect(facts.inside, where, 'the video, its control or its link sticks out of the moment\'s card');
