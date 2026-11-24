@@ -50,13 +50,13 @@ async function queueWorld(run, { specs = SPECS, details, record = RECORD, specBo
 const MOCK_CARDS = `window.drawn = [];
 OW.cards = { decision(item, el) { window.drawn.push(item); el.replaceChildren(Object.assign(document.createElement('p'), { textContent: 'Decision card ' + item.key })); },
   spec(item, el) { window.drawn.push(item); el.replaceChildren(Object.assign(document.createElement('p'), { textContent: 'Spec card ' + item.key })); } };`;
-async function openQueue(run, value, { plain = false, cards = false } = {}) {
+async function openQueue(run, value, { cards = false, noCards = false } = {}) {
   await run.page.go(`${SITE}/app/`);
   await run.page.until(`document.readyState === 'complete'`, 'the app page');
   await run.page.run(`localStorage.setItem('openwiz.app.v2', ${JSON.stringify(JSON.stringify(value))})`);
   await signIn(run.page);
+  if (noCards) await run.page.run('delete OW.cards');
   if (cards) await run.page.run(MOCK_CARDS);
-  if (plain) await run.page.run('delete OW.cards.decision');
   await run.page.click('acme/factory');
 }
 const wasChecked = (world, id) => world.log.some(r => r.method === 'GET' && r.path === `/repos/acme/factory/issues/comments/${id}`);
@@ -119,7 +119,7 @@ test('switch on without card modules: plain cards link to GitHub, in the same or
   const run = await start();
   try {
     await queueWorld(run);
-    await openQueue(run, 'dry-run', { plain: true });
+    await openQueue(run, 'dry-run', { noCards: true });
     await run.page.until(`document.querySelectorAll('.queue a.card').length === 5`, 'five plain cards');
     const links = await run.page.run(`[...document.querySelectorAll('.queue a.card')].map(a => [a.getAttribute('href'), a.target])`);
     assert.deepEqual(links, [['https://github.com/acme/factory/issues/60#issuecomment-9100021', '_blank'],
@@ -188,7 +188,7 @@ test('switch off: no queue, no pull request read, the You page first and the sig
     await run.page.until(`document.querySelector('main h1')?.textContent === 'You'`, 'the queue route falling back');
     await new Promise(resolve => setTimeout(resolve, 500));
     const nav = await run.page.run(`[...document.querySelectorAll('nav.main a')].map(a => a.getAttribute('href'))`);
-    assert.deepEqual(nav, ['#/you', '#/specs', '#/agents']);
+    assert.deepEqual(nav, ['#/you', '#/specs', '#/agents', '#/models']);
     assert.deepEqual(pullsRead(run.world), [], 'the switch off still read pull requests');
     assert.deepEqual(await run.page.run('window.drawn'), []);
   } finally {

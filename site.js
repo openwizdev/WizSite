@@ -1,3 +1,11 @@
+if (typeof navigator.sendBeacon === 'function') {
+  const countActions = new Set(['install-copy', 'github', 'star', 'book-call', 'market', 'drivers', 'docs', 'x']);
+  document.addEventListener('click', event => {
+    const action = event.target.closest?.('[data-count]')?.dataset.count;
+    if (countActions.has(action)) navigator.sendBeacon('/api/count', action);
+  });
+}
+
 async function showStars() {
   const response = await fetch('https://api.github.com/repos/openwizdev/OpenWiz');
   if (!response.ok) return;
@@ -572,7 +580,11 @@ async function askAWiz() {
         for (const [text, className] of paragraphs) a.firstChild.append(el('p', className, text));
         if (links.length) {
           const p = el('p', 'faq-ask-links');
-          links.forEach(([label, href], i) => p.append(...(i ? [' · '] : []), Object.assign(el('a', '', label), { href })));
+          links.forEach(([label, href], i) => {
+            const link = Object.assign(el('a', '', label), { href });
+            link.dataset.count = i === 0 ? 'book-call' : 'github';
+            p.append(...(i ? [' · '] : []), link);
+          });
           a.firstChild.append(p);
         }
         done.append(h, a);

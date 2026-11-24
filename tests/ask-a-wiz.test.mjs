@@ -146,6 +146,9 @@ const ROWS = `[...document.querySelectorAll('section.faq .faq-rows > *')].map(ro
   bold: !!row.querySelector('.faq-a b'),
   buttons: [...row.querySelectorAll('.faq-ask-actions button')].filter(b => b.getClientRects().length).map(b => b.textContent.trim()) }))`;
 const rows = page => page.evaluate(ROWS);
+const staticRowCount = 8;
+const waitForAnswers = (page, count, reason) =>
+  page.until(`document.querySelectorAll('.faq-rows > .faq-asked').length === ${count} && !!document.querySelector('.faq-ask input')`, reason);
 const told = page => page.evaluate(`document.querySelector('section.faq [aria-live="polite"]')?.textContent.trim()`);
 const focused = page => page.evaluate(`(e => e === document.body ? 'the page' : e.tagName === 'INPUT' ? 'input' : e.textContent.trim())(document.activeElement)`);
 const waitFake = async (test, what) => {
@@ -160,12 +163,12 @@ test('with the switch off the FAQ shows no input row, and asks nothing', async (
     { status: 200, body: '{"schema":"openwiz.ask-a-wiz.v1","enabled":true,"max_question_chars":299}' },
     { status: 200, body: '{"schema":"openwiz.ask-a-wiz.v1","enabled":true,"max_question_chars":300,"extra":1}' }]) {
     fake.probe = probe;
-    for (const path of ['/', '/team/', '/faq/']) {
+    for (const path of ['/', '/faq/']) {
       const probed = fake.probed, page = await open(path);
       await page.evaluate('new Promise(resolve => setTimeout(resolve, 300))');
       assert.equal(fake.probed, probed + 1, `${path}: asked once`);
       assert.equal(await page.evaluate(`document.querySelectorAll('section.faq input, section.faq form, .faq-ask').length`), 0, `${path} ${probe.status}`);
-      assert.equal((await rows(page)).length, 7, `${path}: only the seven hand-written rows`);
+      assert.equal((await rows(page)).length, staticRowCount, `${path}: only the hand-written rows`);
       await page.close();
     }
   }
@@ -198,7 +201,7 @@ test('an answer streams in, becomes a normal FAQ row, and a fresh input row appe
     await page.evaluate(`document.querySelector('footer a').focus()`);
     const away = await focused(page);
     fake.release();
-    await page.until(`document.querySelectorAll('.faq-rows > .faq-row').length === 9`, 'the converted row and a fresh one');
+    await waitForAnswers(page, 1, 'the converted row and a fresh one');
     let all = await rows(page);
     const done = all.at(-2);
     assert.equal(done.ask, false);
@@ -212,7 +215,7 @@ test('an answer streams in, becomes a normal FAQ row, and a fresh input row appe
     assert.equal(await page.evaluate(`new Set([...document.querySelectorAll('.faq-rows .faq-q')].map(h => h.tagName)).size`), 1, 'one heading level');
     assert.equal(await page.evaluate(`(() => { const b = document.querySelectorAll('.faq-rows .faq-q button'); return b[b.length - 1].getAttribute('aria-expanded'); })()`), 'true');
     await page.ask('Is markup shown?');
-    await page.until(`document.querySelectorAll('.faq-rows > .faq-row').length === 10`, 'the second answer');
+    await waitForAnswers(page, 2, 'the second answer');
     seen = (await rows(page)).at(-2);
     assert.match(seen.a, /^Synthetic answer: a row like <b>bold<\/b> shows as text, & stays text\./);
     assert.equal(seen.bold, false, 'text stays text');
@@ -223,7 +226,7 @@ test('an answer streams in, becomes a normal FAQ row, and a fresh input row appe
 test('stop ends the stream, shows nothing as finished, and retry asks again', async () => {
   probeOn();
   fake.answers.push({ lines: ANSWER.slice(0, 1), hold: true }, { lines: ANSWER });
-  const page = await open('/team/');
+  const page = await open('/faq/');
   await page.until(`document.querySelector('.faq-ask input')`);
   await page.ask('What does OpenWiz run?');
   await page.until(`document.querySelector('.faq-ask .faq-a')?.innerText.includes('Synthetic answer')`);
@@ -235,9 +238,9 @@ test('stop ends the stream, shows nothing as finished, and retry asks again', as
   let seen = (await rows(page)).at(-1);
   assert.deepEqual([seen.ask, seen.q, seen.buttons], [true, 'What does OpenWiz run?', ['Retry', 'Edit']]);
   assert.match(seen.a, /Stopped/);
-  assert.equal((await rows(page)).length, 8, 'no converted row');
+  assert.equal((await rows(page)).length, staticRowCount + 1, 'no converted row');
   await page.press('Retry');
-  await page.until(`document.querySelectorAll('.faq-rows > .faq-row').length === 9`, 'the retried answer');
+  await waitForAnswers(page, 1, 'the retried answer');
   assert.deepEqual(fake.asked.map(a => a.body.question), ['What does OpenWiz run?', 'What does OpenWiz run?']);
   assert.match((await rows(page)).at(-2).a, /^Synthetic answer: OpenWiz runs/);
   assert.equal(await focused(page), 'input', 'focus inside the row moves to the fresh input');
@@ -267,7 +270,7 @@ test('refusals and the not-covered answer show in the row\'s own style', async (
   assert.deepEqual([seen.a, seen.buttons], ["Ask a Wiz couldn't answer just now. Try again.", ['Retry', 'Edit']]);
   assert.deepEqual([await focused(page), await told(page)], [away, seen.a]);
   await page.press('Retry');
-  await page.until(`document.querySelectorAll('.faq-rows > .faq-row').length === 9`, 'the not-covered row');
+  await waitForAnswers(page, 1, 'the not-covered row');
   seen = (await rows(page)).at(-2);
   assert.deepEqual([seen.q, seen.a.startsWith(NOT_COVERED_TEXT), seen.links], ['Why did it fail?', true, LINKS.map(l => [l.label, l.href])]);
   assert.equal(await told(page), NOT_COVERED_TEXT);
@@ -292,7 +295,7 @@ test('a stream that breaks the contract\'s shape is never shown as an answer', a
   for (const [n, answer] of bad.entries()) {
     await page.until(`document.querySelector('.faq-ask')?.dataset.state === 'ended'`, `bad stream ${n}`);
     const seen = (await rows(page)).at(-1);
-    assert.deepEqual([seen.a, seen.buttons, (await rows(page)).length], ['The answer didn\u2019t finish. Try again.', ['Retry', 'Edit'], 8], `bad stream ${n}: ${JSON.stringify(answer)}`);
+    assert.deepEqual([seen.a, seen.buttons, (await rows(page)).length], ['The answer didn\u2019t finish. Try again.', ['Retry', 'Edit'], staticRowCount + 1], `bad stream ${n}: ${JSON.stringify(answer)}`);
     if (n < bad.length - 1) await page.press('Retry');
   }
   await page.close();
@@ -317,8 +320,8 @@ test('phone and laptop fit, and reduced motion keeps the row still', async () =>
     assert.equal(facts.moving.length === 0, reduced, `${width} ${reduced ? 'reduced' : 'motion'}: ${facts.moving}`);
     await page.shot(`streaming-${width}${reduced ? '-reduced' : ''}`);
     fake.release();
-    await page.until(`document.querySelectorAll('.faq-rows > .faq-row').length === 9`);
-    const done = await page.evaluate(`(() => { const row = document.querySelectorAll('.faq-rows > .faq-row')[7], panel = row.querySelector('.faq-a > div');
+    await waitForAnswers(page, 1);
+    const done = await page.evaluate(`(() => { const row = document.querySelector('.faq-rows > .faq-asked'), panel = row.querySelector('.faq-a > div');
       return { scroll: document.documentElement.scrollWidth - innerWidth, chevron: row.querySelector('.faq-chevron').getBoundingClientRect().right,
         clipped: panel.scrollWidth - panel.clientWidth, input: document.querySelector('.faq-ask input').getBoundingClientRect().height }; })()`);
     assert.deepEqual([done.scroll, done.clipped, done.chevron <= width], [0, 0, true], `${width}: the converted row fits: ${JSON.stringify(done)}`);

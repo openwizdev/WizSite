@@ -268,7 +268,7 @@
   function view() {
     const result = state.result;
     if (!result || state.failedSince === null) return result;
-    return { ...result,
+    return { ...result, gaps: [...new Set([...result.gaps, 'the latest spec read'])],
       items: result.items.map(item => (item.type === 'decision' && item.current === true ? { ...item, current: null, checked_at: null } : item)) };
   }
   function saveDraft(kept) {
@@ -339,7 +339,7 @@
         for (const item of result.items) if (item.current === false) state.drafts.delete(item.key);
       }
     }
-    const gaps = result?.gaps || [];
+    const gaps = unknown ? [] : state.result?.gaps || [];
     const pause = OW.data.paused() ? `GitHub’s rate limit paused reads until ${time(OW.data.limit.pausedUntil)}.` : '';
     const gap = gaps.length ? `This list may be missing items: GitHub gave only part of ${gaps.join(', ')}.` : '';
     const lastRead = result?.readAt ?? deck.specs.readAt;
