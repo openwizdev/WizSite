@@ -316,7 +316,7 @@ test('R2: a failed Specs refresh clears every earlier true and shows the gap', a
     await openQueue(run, 'on', { cards: true });
     await run.page.until(`window.drawn.some(item => item.key === ${JSON.stringify(SPEC_DECISION)} && item.current === true)`
       + ` && window.drawn.some(item => item.key === ${JSON.stringify(ROUND)} && item.current === true)`, 'the first, matched read');
-    run.world.graphql.Specs = async () => ({ status: 502, json: { message: 'Bad Gateway' } });
+    run.world.graphql.Specs = async () => ({ status: 429, json: { message: 'Too Many Requests' }, headers: { 'Retry-After': '60' } });
     await triggerRefresh(run);
     await run.page.until(`document.body.innerText.includes("Couldn't read Specs")`, 'the failed refresh');
     await new Promise(resolve => setTimeout(resolve, 700));
@@ -325,7 +325,9 @@ test('R2: a failed Specs refresh clears every earlier true and shows the gap', a
     for (const key of [SPEC_DECISION, ROUND]) current[key] = (await latestOf(run, key)).current;
     assert.deepEqual(current, { [SPEC_DECISION]: null, [ROUND]: null }, 'a failed refresh kept an earlier true');
     assert.ok(shown.includes(SPEC_DECISION) && shown.includes(ROUND), 'the cards from the last good read went away');
-    assert.match(await run.page.text(), /GitHub gave only part of the latest spec read/);
+    assert.match(await run.page.text(), /Couldn't read Specs\. Showing the last successful read\. Some items may be missing\./);
+    assert.equal(await run.page.run(`document.querySelectorAll('.v2-notices .notice, .v2-queue-status .unknown').length`), 1);
+    assert.match(await run.page.text(), /GitHub paused reads until/);
   } finally {
     await run.close();
   }

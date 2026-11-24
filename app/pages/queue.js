@@ -200,8 +200,9 @@
       state.drafts.clear();
       if (state.deck) state.deck.activeKey = null;
     }
-    if (!picked || !specs.data || !specs.readAt || !OW.factory.model(feeds)) return;
+    if (!picked || !specs.data || !specs.readAt) return;
     if (specs.failedAt != null) state.failedSince = Math.max(state.failedSince ?? 0, specs.failedAt);
+    if (!OW.factory.model(feeds)) return;
     const readAt = specs.readAt;
     const key = `${picked.full}|${OW.data.auth.session() ?? ''}|${OW.data.auth.account() ?? ''}|${readAt}`;
     if (state.key === key) return;
@@ -336,13 +337,20 @@
         for (const item of result.items) if (item.current === false) state.drafts.delete(item.key);
       }
     }
-    const gaps = result?.gaps || [];
-    const message = !result ? 'Reading GitHub…' : gaps.length
-      ? `This list may be missing items: GitHub gave only part of ${gaps.join(', ')}. The app tries again on its own.`
-      : items.length ? '' : `${EMPTY}.`;
+    const gaps = state.result?.gaps || [];
+    const partial = gaps.length ? `This list may be missing items: GitHub gave only part of ${gaps.join(', ')}.`
+      : deck.specRead.state === 'partial' ? 'GitHub gave only part of the spec read. Some items may be missing.' : '';
+    const stale = state.failedSince === null ? '' : [
+      "Couldn't read Specs.",
+      result ? 'Showing the last successful read.' : '',
+      partial ? '' : 'Some items may be missing.',
+    ].filter(Boolean).join(' ');
+    const warning = [stale, partial].filter(Boolean).join(' ');
+    const message = warning ? `${warning} The app tries again on its own.`
+      : !result ? 'Reading GitHub…' : items.length ? '' : `${EMPTY}.`;
     if (deck.message !== message) {
       deck.message = message;
-      const notice = message && (gaps.length ? OW.ui.unknown(message) : result
+      const notice = message && (warning ? OW.ui.unknown(message) : result
         ? h('div', { class: 'v2-clear-card' }, h('h2', {}, 'All clear'), h('p', {}, message)) : OW.ui.placeholder(message));
       deck.status.replaceChildren(...(notice ? [notice] : []));
     }
@@ -361,7 +369,8 @@
         deck.activeKey = deck.keys[next];
         updateDeck(el);
       };
-      const controls = OW.v2?.pager(index, items.length, go);
+      const { pager } = OW.v2 ?? {};
+      const controls = pager?.(index, items.length, go);
       deck.controls?.replaceChildren(...(controls ? [controls] : []));
       deck.position = position;
     }
@@ -398,6 +407,7 @@
         state.deck.activeKey = null;
       }
       state.el = el;
+      state.deck.specRead = feeds.specs;
       refresh(feeds);
       updateDeck(el);
     },

@@ -2,8 +2,7 @@
 (() => {
   const { h, icon } = OW.ui;
   const isDemo = OW.data.demo;
-  const mark = () => h('img', { src: '/app/mark.svg', alt: '', width: 28, height: 28 });
-  const avatar = () => h('img', { class: 'v2-avatar', src: '/art/family-01.webp', alt: '', width: 32, height: 32 });
+  const mark = cls => h('img', { class: cls, src: '/app/mark.svg', alt: '', width: 28, height: 28 });
 
   function initialDemoState() {
     return {
@@ -14,7 +13,7 @@
           id: 'm1',
           role: 'user',
           time: '9:12 AM',
-          text: 'Add usage-based seat billing. Keep upgrades simple for small teams.',
+          text: 'Add usage-based seat billing.',
         },
         {
           id: 'm2',
@@ -40,7 +39,7 @@
           id: 'c-spec-1',
           type: 'spec',
           status: 'ready',
-          kicker: 'Spec · Ready',
+          kicker: 'Ready to ship',
           title: 'Magic-link sign-in',
           goal: 'Passwordless sign-in with 15-minute links and automatic session refresh.',
           merged: 6,
@@ -57,7 +56,7 @@
           id: 'c-dec-1',
           type: 'decision',
           status: 'pending',
-          kicker: 'Decision · Needs you',
+          kicker: 'Needs a decision',
           title: 'Pricing copy on the checkout banner',
           goal: 'Show annual savings as a percentage or a dollar amount?',
           context: 'Annual plans save $240/yr per 10 seats. The rest of the pricing page uses percentages.',
@@ -68,7 +67,7 @@
           id: 'c-spec-2',
           type: 'spec',
           status: 'building',
-          kicker: 'Spec · Building',
+          kicker: 'Building',
           title: 'CSV export for audit log',
           goal: 'Export up to 90 days of workspace events as a streaming CSV file.',
           merged: 5,
@@ -85,7 +84,7 @@
           id: 'c-dec-2',
           type: 'decision',
           status: 'pending',
-          kicker: 'Decision · Needs you',
+          kicker: 'Needs a decision',
           title: 'Retention window for deleted projects',
           goal: 'Keep soft-deleted projects recoverable for 30 days or purge after 7 days?',
           context: 'Storage cost is under $2/mo; 30 days matches standard workspace recovery expectations.',
@@ -105,7 +104,7 @@
     };
   }
 
-  let demo = initialDemoState();
+  const demo = initialDemoState();
   let redraw = () => {};
   let toastTimer = null;
   let toastEl;
@@ -123,14 +122,16 @@
         (returnTo?.isConnected && returnTo !== document.body ? returnTo : document.querySelector('.v2-head h1'))?.focus();
       }
     };
-    toastEl.replaceChildren(h('span', {}, text), undo ? h('button', {
-      type: 'button',
-      class: 'v2-btn subtle',
-      onclick: () => { dismiss(); undo(); },
-    }, 'Undo') : null);
+    const notice = h('span', {}, text);
+    const actions = undo ? [
+      h('button', { type: 'button', class: 'v2-btn subtle', onclick: () => { dismiss(); undo(); } }, 'Undo'),
+      h('button', { type: 'button', class: 'v2-btn subtle v2-dismiss', 'aria-label': 'Dismiss notification', onclick: dismiss },
+        h('span', { 'aria-hidden': 'true' }, '×')),
+    ] : [];
+    toastEl.replaceChildren(notice, ...actions);
     toastEl.hidden = false;
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(dismiss, 4500);
+    if (!undo) toastTimer = setTimeout(dismiss, 4500);
   }
 
   function openSheet(card, opener) {
@@ -189,7 +190,7 @@
       id: `c-new-${Date.now()}`,
       type: 'spec',
       status: 'building',
-      kicker: 'Spec · Just started',
+      kicker: 'Building',
       title: grill.specTitle,
       goal: grill.specGoal,
       merged: 1,
@@ -228,30 +229,49 @@
   }
 
   function renderQuestions(message) {
-    const allRecommended = message.questions.every(q => q.selected === q.rec);
-    return h('article', { class: 'v2-grill', 'aria-label': message.specTitle },
-      h('div', { class: 'v2-grill-head' }, h('h2', {}, message.specTitle),
-        h('p', {}, allRecommended ? 'Recommended answers selected' : 'Review your selected answers')),
-      message.questions.map(q => h('div', { class: 'v2-grill-q' },
-        h('p', {}, q.prompt),
-        h('div', { class: 'v2-q-opts', role: 'group', 'aria-label': q.prompt }, q.options.map((option, i) => h('button', {
-          type: 'button',
-          class: 'v2-q-pill',
-          'aria-pressed': i === q.selected ? 'true' : 'false',
-          'aria-label': i === q.rec ? `${option} (recommended)` : option,
-          'data-focus': `answer:${message.id}:${q.id}:${i}`,
-          disabled: message.answered,
-          onclick: () => { q.selected = i; redraw(); },
-        }, i === q.rec ? icon('check') : null, option))))),
-      h('div', { class: 'v2-grill-foot' }, message.answered
-        ? h('a', { class: 'v2-btn subtle', href: '#/feed', 'data-focus': `send:${message.id}` }, icon('check'), 'Answers saved · Open Feed')
-        : h('button', { type: 'button', class: 'v2-btn primary', 'data-focus': `send:${message.id}`,
-          onclick: () => completeGrill(message) }, allRecommended ? 'Accept all 3' : 'Send 3 answers')));
+    const allRecommended = () => message.questions.every(q => q.selected === q.rec);
+    const hintText = () => allRecommended() ? 'Recommended answers selected' : 'Review your selected answers';
+    const sendText = () => allRecommended() ? 'Accept all 3' : 'Send 3 answers';
+    const hint = h('p', {}, hintText());
+    const saved = h('a', { class: 'v2-btn subtle', href: '#/feed', 'data-focus': `send:${message.id}` },
+      icon('check'), 'Answers saved · Open Feed');
+    const submit = h('button', { type: 'button', class: 'v2-btn primary', 'data-focus': `send:${message.id}`,
+      onclick: () => {
+        for (const answer of article.querySelectorAll('.v2-q-pill')) answer.disabled = true;
+        foot.replaceChildren(saved);
+        saved.focus({ preventScroll: true });
+        completeGrill(message);
+      },
+    }, sendText());
+    const foot = h('div', { class: 'v2-grill-foot' }, message.answered ? saved : submit);
+    const rows = message.questions.map(q => {
+      const options = q.options.map((option, i) => h('button', {
+        type: 'button',
+        class: 'v2-q-pill',
+        'aria-pressed': String(i === q.selected),
+        'aria-label': i === q.rec ? `${option} (recommended)` : option,
+        'data-focus': `answer:${message.id}:${q.id}:${i}`,
+        disabled: message.answered,
+        onclick: () => {
+          if (q.selected === i) return;
+          options[q.selected].setAttribute('aria-pressed', 'false');
+          q.selected = i;
+          options[i].setAttribute('aria-pressed', 'true');
+          if (hint.textContent !== hintText()) hint.textContent = hintText();
+          if (submit.textContent !== sendText()) submit.textContent = sendText();
+        },
+      }, i === q.rec ? icon('check') : null, option));
+      return h('div', { class: 'v2-grill-q' }, h('p', {}, q.prompt),
+        h('div', { class: 'v2-q-opts', role: 'group', 'aria-label': q.prompt }, options));
+    });
+    const article = h('article', { class: 'v2-grill', 'aria-label': message.specTitle },
+      h('div', { class: 'v2-grill-head' }, h('h2', {}, message.specTitle), hint), rows, foot);
+    return article;
   }
 
   function renderDemoChat(el) {
     if (!chatView || !el.contains(chatView.scroll)) {
-      const scroll = h('div', { class: 'v2-chat-scroll', role: 'log', 'aria-live': 'polite' });
+      const scroll = h('div', { class: 'v2-chat-scroll', role: 'log', 'aria-live': 'polite', 'aria-relevant': 'additions' });
       const thread = h('div', { class: 'v2-chat-thread' });
       scroll.append(thread);
       const input = h('input', {
@@ -275,16 +295,17 @@
     }
     const { scroll, thread, length } = chatView;
     const top = scroll.scrollTop;
-    thread.replaceChildren(...demo.messages.map(message => {
+    const additions = demo.messages.slice(length).map(message => {
       if (message.role === 'grill') return h('div', { class: 'v2-msg questions' }, renderQuestions(message));
       const fromWiz = message.role === 'wiz';
       return h('div', { class: `v2-msg ${fromWiz ? 'wiz' : 'user'}` },
-        fromWiz ? avatar() : null,
+        fromWiz ? mark('v2-avatar') : null,
         h('div', { class: 'v2-bubble' },
           h('div', { class: 'v2-meta' }, `${fromWiz ? 'Wiz' : 'You'} · ${message.time}`),
           h('p', {}, message.text),
           message.jumpFeed ? h('a', { class: 'v2-btn subtle', href: '#/feed', 'data-focus': 'chat-feed' }, 'Open in Feed', icon('right')) : null));
-    }));
+    });
+    thread.append(...additions);
     chatView.length = demo.messages.length;
     if (length && length < chatView.length) {
       const last = thread.lastElementChild;
@@ -334,6 +355,7 @@
       controls.replaceChildren();
       el.replaceChildren(h('div', { class: 'v2-feed-stage' },
         h('div', { class: 'v2-clear-card' },
+          h('span', { class: 'v2-clear-mark', 'aria-hidden': 'true' }, icon('check')),
           h('h2', {}, 'All clear'),
           h('p', {}, 'Nothing needs your attention right now.'),
           h('div', { class: 'v2-clear-actions' },
@@ -351,6 +373,7 @@
     const decision = card.type === 'decision';
     const go = next => {
       demo.feedIdx = next;
+      el.closest('.v2-view').scrollTop = 0;
       const number = demo.cards.indexOf(list[next]) + 1;
       history.replaceState(null, '', number === 1 ? '#/feed' : `#/feed/${number}`);
       redraw();
@@ -367,15 +390,18 @@
         redraw();
       });
     };
-    const poster = h('div', { class: `v2-preview${decision ? ' decision' : ''}` },
+    const magicLink = card.id === 'c-spec-1';
+    const poster = decision ? null : h('div', { class: 'v2-preview' },
       h('div', { class: 'v2-preview-art', 'aria-hidden': 'true' }),
-      decision ? null : h('div', { class: 'v2-preview-top' },
-        h('span', { class: 'v2-preview-label' }, 'Narrated spec'),
+      magicLink ? h('div', { class: 'v2-envelope', 'aria-hidden': 'true' },
+        h('span', { class: 'v2-envelope-seal' }, mark())) : null,
+      h('div', { class: 'v2-preview-top' }, h('span', { class: 'v2-preview-label' }, 'Narrated spec')),
+      h('div', { class: 'v2-preview-footer' },
+        h('p', { class: 'v2-preview-caption', 'aria-live': 'polite' }, card.scenes[card.sceneIdx]),
         h('button', { type: 'button', class: 'v2-preview-btn', 'data-focus': 'scene',
           'aria-label': `Next scene, scene ${card.sceneIdx + 1} of ${card.scenes.length}`,
           onclick: () => { card.sceneIdx = (card.sceneIdx + 1) % card.scenes.length; redraw(); },
-        }, `Scene ${card.sceneIdx + 1}/${card.scenes.length}`, icon('right'))),
-      decision ? null : h('div', { class: 'v2-preview-caption', 'aria-live': 'polite' }, card.scenes[card.sceneIdx]));
+        }, h('span', {}, `${card.sceneIdx + 1} / ${card.scenes.length}`), icon('right'))));
     const details = decision
       ? h('div', { class: 'v2-decision-box' },
         h('span', { class: 'v2-label' }, 'Recommendation'),
@@ -385,10 +411,10 @@
         h('p', {}, h('strong', {}, `${card.merged} of ${card.total}`), ' tickets merged'),
         h('div', { class: 'v2-pips', 'aria-hidden': 'true' },
           Array.from({ length: card.total }, (_, i) => h('span', { class: i < card.merged ? 'merged' : '' }))));
-    const hero = h('article', { class: 'v2-hero-card' },
+    const hero = h('article', { class: `v2-hero-card${decision ? ' v2-decision-card' : ''}` },
       h('div', { class: 'v2-card-top' },
         h('span', { class: 'v2-label' }, card.kicker),
-        h('h2', { class: 'v2-card-title' }, card.title),
+        h('h2', { class: 'v2-card-title', tabindex: '-1' }, card.title),
         h('p', { class: 'v2-card-goal' }, card.goal)),
       poster,
       details,
@@ -396,13 +422,22 @@
       h('div', { class: 'v2-card-actions' },
         h('button', { type: 'button', class: 'v2-btn primary', 'data-focus': 'ship',
           onclick: () => resolve(decision ? 'decided' : 'shipped', decision ? 'Approved' : 'Shipped') }, icon('check'), 'Ship it'),
-        h('button', { type: 'button', class: 'v2-btn', 'data-focus': 'change',
+        h('button', { type: 'button', class: 'v2-btn v2-outline', 'data-focus': 'change',
           onclick: event => openSheet(card, event.currentTarget) }, 'Change something'),
-        h('button', { type: 'button', class: 'v2-btn subtle', 'data-focus': 'defer',
+        h('button', { type: 'button', class: 'v2-btn v2-text-btn', 'data-focus': 'defer',
           onclick: () => resolve('deferred', 'Saved for later') }, 'Not now')));
     const navigation = pager(index, list.length, go);
     controls.replaceChildren(...(navigation ? [navigation] : []));
-    el.replaceChildren(h('div', { class: 'v2-feed-stage' }, hero));
+    const next = list[index + 1];
+    const nextPreview = next ? h('button', {
+      type: 'button', class: 'v2-next', 'data-focus': 'next-preview', onclick: () => {
+        go(index + 1);
+        el.querySelector('.v2-card-title').focus();
+      },
+    }, h('span', { class: 'v2-next-copy' },
+      h('span', { class: 'v2-label' }, `Next · ${next.kicker}`),
+      h('strong', {}, next.title)), icon('right')) : null;
+    el.replaceChildren(h('div', { class: 'v2-feed-stage' }, hero, nextPreview));
   }
 
   const settingRow = (label, value) => h('div', { class: 'v2-set-row' }, h('span', {}, label), value);
@@ -439,10 +474,7 @@
       settingsGroup('Connections', [connection('GitHub', 'github'), connection('Notifications', 'notifications')]),
       settingsGroup('Account', [
         choose('Repository', 'repository', ['Harbor · main', 'Harbor · staging']),
-        h('a', { class: 'v2-btn subtle v2-sign-out', href: '#/welcome', onclick: () => {
-          demo = initialDemoState();
-          if (toastEl) toastEl.hidden = true;
-        } }, 'Sign out'),
+        h('a', { class: 'v2-btn v2-text-btn v2-sign-out', href: '/app/' }, 'Exit sample workspace'),
       ])));
   }
 
@@ -456,7 +488,7 @@
         settingsGroup('Connections', [settingRow('GitHub', h('span', { class: 'v2-connected' }, 'Connected'))]),
         settingsGroup('Account', [
           settingRow('Repository', ctx.repoSwitch()),
-          h('button', { class: 'v2-btn subtle v2-sign-out', type: 'button', onclick: ctx.signOut }, 'Sign out'),
+          h('button', { class: 'v2-btn v2-text-btn v2-sign-out', type: 'button', onclick: ctx.signOut }, 'Sign out'),
         ]),
         settingsGroup('Data freshness', [freshness])));
     }
@@ -465,18 +497,18 @@
 
   function renderWelcome(root, { note, demoMode }) {
     const card = h('div', { class: 'v2-welcome-card' },
-      h('h1', {}, 'Your software factory, in one quiet room.'),
-      h('p', { class: 'v2-welcome-copy' }, demoMode
-        ? 'Answer a few questions. Watch specs build. Tap Ship it.'
-        : 'Review decisions and follow the work in your GitHub repository.'),
-      note ? h('div', { class: 'notice bad', role: 'alert' }, icon('warn'), h('span', {}, note)) : null,
-      h('a', { class: 'v2-btn primary', href: demoMode ? '#/chat' : '/api/sign-in/start' },
-        demoMode ? 'Open Harbor workspace' : 'Continue with GitHub', icon('right')));
-    root.replaceChildren(h('main', { class: 'v2-welcome' },
       h('header', { class: 'v2-welcome-head' },
         h('div', { class: 'v2-welcome-brand' }, mark(), h('span', {}, 'OpenWiz')),
         demoMode ? h('span', { class: 'v2-sample-tag' }, 'Sample data') : null),
-      card));
+      h('h1', {}, 'Run your software factory from here.'),
+      demoMode ? null : h('p', { class: 'v2-welcome-copy' }, 'Review decisions and follow the work in your GitHub repository.'),
+      note ? h('div', { class: 'notice bad', role: 'alert' }, icon('warn'), h('span', {}, note)) : null,
+      h('div', { class: 'v2-welcome-actions' },
+        h('a', { class: 'v2-btn primary', href: demoMode ? '#/chat' : '/api/sign-in/start' },
+          demoMode ? 'Open Harbor workspace' : 'Continue with GitHub', icon('right')),
+        h('a', { class: 'v2-btn v2-text-btn v2-welcome-link', href: demoMode ? '/api/sign-in/start' : '/app/?demo=1#/welcome' },
+          demoMode ? 'Continue with GitHub' : 'See a sample workspace')));
+    root.replaceChildren(h('main', { class: 'v2-welcome' }, card));
     document.title = 'OpenWiz';
   }
 
