@@ -243,8 +243,8 @@
     summary.replaceChildren(
       h('h2', { class: 'v2-label' }, 'In progress'),
       h('p', { class: 'v2-summary-title' }, title),
-      h('p', {}, detail),
-      showFeed ? h('a', { class: 'v2-queue-link', href: '#/feed' }, 'Open Feed', icon('right')) : null);
+      h('p', {}, detail));
+    if (showFeed) summary.append(h('a', { class: 'v2-queue-link', href: '#/feed' }, 'Open Feed', icon('right')));
   }
 
   function renderDemoChat(el) {

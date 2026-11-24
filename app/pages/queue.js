@@ -367,17 +367,21 @@
     deck.activeKey = items[index]?.key;
     deck.keys = items.map(item => item.key);
     const position = `${index}/${items.length}`;
+    const go = nextIndex => {
+      const arg = nextIndex === 0 ? null : String(nextIndex + 1);
+      history.replaceState(null, '', arg ? `#/feed/${arg}` : '#/feed');
+      deck.arg = arg;
+      deck.activeKey = deck.keys[nextIndex];
+      el.closest('.v2-view').scrollTop = 0;
+      updateDeck(el);
+    };
     const next = deck.controls && items[index + 1];
     if (deck.position !== position || deck.nextKey !== next?.key || deck.nextTitle !== next?.title) {
       deck.nextKey = next?.key;
       deck.nextTitle = next?.title;
       const href = `#/feed/${index + 2}`;
       const preview = next && nextPreview?.(next, href, () => {
-        history.replaceState(null, '', href);
-        deck.arg = String(index + 2);
-        deck.activeKey = next.key;
-        el.closest('.v2-view').scrollTop = 0;
-        updateDeck(el);
+        go(index + 1);
         const heading = deck.cards.querySelector('.queue-item:not([hidden]) :is(h2, h3)');
         if (heading) {
           heading.tabIndex = -1;
@@ -387,10 +391,6 @@
       deck.context.replaceChildren(...(preview ? [preview] : []));
     }
     if (deck.position !== position) {
-      const go = next => {
-        deck.activeKey = deck.keys[next];
-        updateDeck(el);
-      };
       const controls = pager?.(index, items.length, go);
       deck.controls?.replaceChildren(...(controls ? [controls] : []));
       deck.position = position;

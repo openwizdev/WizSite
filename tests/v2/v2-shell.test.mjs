@@ -51,11 +51,14 @@ test('switch on + demo=1: renders v2 shell, deep links, interactions, and makes 
     const nav = await run.page.run(`[...document.querySelectorAll('nav.main a')].map(a => a.getAttribute('href'))`);
     assert.deepEqual(nav, ['#/chat', '#/feed', '#/settings']);
     assert.match(await run.page.run(`document.querySelector('.v2-chat-summary').innerText`), /In progress\s+Usage-based seat billing/i);
+    assert.deepEqual(await run.page.run(`[...document.querySelector('.v2-chat-summary').childNodes]
+      .map(node => node.textContent)`), ['In progress', 'Usage-based seat billing', 'Waiting for your answers']);
     assert.equal(await run.page.run(`(() => {
       const rect = selector => document.querySelector(selector).getBoundingClientRect();
       const composer = rect('.v2-composer-wrap');
       const grill = rect('.v2-grill');
       return composer.left === grill.left && composer.right === grill.right
+        && rect('.v2-head').left === grill.left
         && rect('.v2-chat-summary').left > grill.right;
     })()`), true);
 

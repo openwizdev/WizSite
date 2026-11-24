@@ -118,6 +118,7 @@ test('switch on: decisions and specs show in one ordered queue, drawn through th
 test('switch on without card modules: plain cards link to GitHub, in the same order', async () => {
   const run = await start();
   try {
+    await run.page.size(1440, 900, false);
     await queueWorld(run);
     await openQueue(run, 'dry-run', { plain: true });
     await run.page.until(`document.querySelectorAll('.queue a.card').length === 5`, 'five plain cards');
@@ -128,6 +129,13 @@ test('switch on without card modules: plain cards link to GitHub, in the same or
     assert.match(await run.page.text(), /Plan to approve · #60/i);
     assert.equal(await run.page.run(`Boolean(document.querySelector('.v2-building'))`), false, 'specs with Feed cards are repeated in Building');
     const visible = () => run.page.run(`[...document.querySelectorAll('.queue-item:not([hidden])')].map(e => e.dataset.key)`);
+    assert.deepEqual(await visible(), [SPEC_DECISION]);
+    const nextTitle = await run.page.run(`document.querySelector('.v2-next-title').textContent`);
+    await run.page.tap(`Next ${nextTitle}`);
+    assert.deepEqual(await visible(), [ROUND]);
+    assert.equal(await run.page.run('location.hash'), '#/feed/2');
+    assert.equal(await run.page.run(`document.activeElement.textContent`), nextTitle);
+    await run.page.tap('Previous card');
     assert.deepEqual(await visible(), [SPEC_DECISION]);
     await run.page.tap('Next card');
     assert.deepEqual(await visible(), [ROUND]);
