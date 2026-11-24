@@ -46,8 +46,9 @@
     try {
       found = await data.repositories();
     } catch (error) {
-      if (data.auth.session() !== session || error instanceof data.Ended) return;
-      if (error instanceof data.SignedOut) return signedOut('Your sign-in ended. Sign in again.');
+      const now = data.auth.session();
+      if (error instanceof data.SignedOut && (now === null || now === session)) return signedOut('Your sign-in ended. Sign in again.');
+      if (now !== session || error instanceof data.Ended) return;
       return screen(h('h1', {}, 'Pick a repository'),
         h('div', { class: 'notices' }, h('div', { class: 'notice bad', role: 'alert' }, icon('warn'),
           h('span', {}, h('b', {}, 'Couldn\'t read your repositories. '), 'GitHub didn\'t answer, so the list is unknown, not empty.'))),
@@ -122,8 +123,9 @@
       try {
         found = await readRepositories();
       } catch (error) {
-        if (data.auth.session() !== session || error instanceof data.Ended) return;
-        if (error instanceof data.SignedOut) return signedOut('Your sign-in ended. Sign in again.');
+        const now = data.auth.session();
+        if (error instanceof data.SignedOut && (now === null || now === session)) return signedOut('Your sign-in ended. Sign in again.');
+        if (now !== session || error instanceof data.Ended) return;
         return list.replaceChildren(h('p', { class: 'bad' }, 'Couldn\'t read your repositories, so the list is unknown, not empty.'),
           h('button', { class: 'btn', type: 'button', onclick: fill }, icon('refresh'), 'Try again'));
       }
