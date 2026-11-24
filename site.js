@@ -5,10 +5,61 @@ async function showStars() {
   if (!Number.isSafeInteger(count) || count < 0) return;
   const formatted = new Intl.NumberFormat(document.documentElement.lang).format(count);
   for (const value of document.querySelectorAll('[data-stars]')) {
-    value.textContent = formatted;
+    const inHeader = value.parentElement.classList.contains('github-star');
+    value.textContent = inHeader && count >= 10_000
+      ? new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(count).toLowerCase()
+      : formatted;
     value.hidden = false;
-    value.parentElement.setAttribute('aria-label', `Star on GitHub · ${formatted} ${count === 1 ? 'star' : 'stars'}`);
+    value.parentElement.setAttribute('aria-label', inHeader
+      ? `GitHub stars: ${formatted}`
+      : `Star on GitHub · ${formatted} ${count === 1 ? 'star' : 'stars'}`);
   }
+}
+
+function enableSiteMenu() {
+  const toggle = document.querySelector('.nav-toggle');
+  if (!toggle) return;
+  const panel = document.getElementById(toggle.getAttribute('aria-controls'));
+  const header = toggle.closest('header');
+  const stars = header.querySelector('.github-star');
+  const phone = matchMedia('(max-width: 820px)');
+  const background = [...document.body.children].filter(element =>
+    element !== header && !element.inert && !element.matches('script, template'));
+
+  const setOpen = open => {
+    toggle.setAttribute('aria-expanded', String(open));
+    panel.hidden = phone.matches && !open;
+    panel.toggleAttribute('data-open', open);
+    for (const element of background) element.inert = open;
+    if (open) {
+      toggle.after(panel);
+      panel.querySelector('a').focus();
+    } else {
+      stars.before(panel);
+    }
+  };
+  const close = () => {
+    setOpen(false);
+    toggle.focus();
+  };
+
+  toggle.addEventListener('click', () => panel.hidden ? setOpen(true) : close());
+  header.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && panel.hasAttribute('data-open')) {
+      event.preventDefault();
+      close();
+    }
+  });
+  phone.addEventListener('change', () => {
+    const focused = panel.contains(document.activeElement) || document.activeElement === toggle;
+    setOpen(false);
+    if (focused) (phone.matches ? toggle : panel.querySelector('a')).focus();
+  });
+  window.addEventListener('pagehide', () => {
+    if (panel.hasAttribute('data-open')) close();
+  });
+  setOpen(false);
+  toggle.hidden = false;
 }
 
 const scenes = [
@@ -632,6 +683,7 @@ async function askAWiz() {
   }
 }
 
+enableSiteMenu();
 enableCopy();
 askAWiz();
 showStars().catch(() => {});
