@@ -723,6 +723,15 @@ class Checks(unittest.TestCase):
             'frozen GitHub spec snapshot  ': (T, lambda t: t.replace('>Merged</span>', '>Building</span>', 1)),
             'frozen GitHub spec snapshot   ': (T, lambda t: t.replace('14:33 UTC', '14:34 UTC', 1)),
             'frozen GitHub spec snapshot    ': (T, lambda t: t.replace('13:00:20Z', '13:00:21Z', 1)),
+            'frozen GitHub spec snapshot     ': (T, lambda t: t.replace('cx="41.2%"', 'cx="60%"', 1)),
+            'frozen GitHub spec snapshot      ': (T, lambda t: t.replace('>12:04</text>', '>12:05</text>', 1)),
+            'frozen GitHub spec snapshot       ': (T, lambda t: t.replace('class="team-spec-mark merged latest"', 'class="team-spec-mark merged"', 1)),
+            'frozen GitHub spec snapshot        ': (T, lambda t: t.replace('class="team-spec-mark merged" cx="41.2%"', 'class="team-spec-mark merged latest" cx="41.2%"', 1)),
+            'frozen GitHub spec snapshot         ': (T, lambda t: re.sub(r'<svg class="team-spec-track"[^\n]*?</svg>', '', t, count=1)),
+            'frozen GitHub spec snapshot          ': (T, lambda t: t.replace('Merged 12:04 UTC"', 'Merged 12:05 UTC"', 1)),
+            'frozen GitHub spec snapshot           ': (T, lambda t: t.replace('11:25</time> to', '11:20</time> to', 1)),
+            'frozen GitHub spec snapshot            ': (T, lambda t: t.replace('<span class="review">In review</span> ', '', 1)),
+            'never uses: Free': (T, lambda t: t.replace('<span class="team-spec-span">', '<span>Free</span> <span class="team-spec-span">', 1)),
             'unexpected repository link': (T, lambda t: t.replace('/WizSite/pull/183', '/WizSite/pull/189', 1)),
             'hides none of its copy ': (T, lambda t: t.replace('<ul class="team-spec-tickets">', '<ul class="team-spec-tickets" hidden>', 1)),
             'loads only GSAP and site.js': (T, lambda t: re.sub(r'src="/site\.[a-f0-9]+\.js"', 'src="/art/launch-poster.webp"', t, count=1)),
@@ -771,6 +780,24 @@ class Checks(unittest.TestCase):
         temp, root = planted('team/index.html', lambda t: book.sub('data-book href="https://cal.com/someone/intro"', t))
         with temp:
             check_site(root)
+
+    def test_team_tracks_place_real_times_on_the_spec_span(self):
+        import check
+        rows, key = check.TEAM_SPEC_ROWS, check.TEAM_SPEC_KEY
+        self.assertEqual(len(re.findall(r'class="team-spec-(?:mark|when)[^"]* latest"', ''.join(rows))), 2)
+        self.assertIn('class="team-spec-mark merged latest" cx="100%"', rows[2])
+        self.assertIn('class="team-spec-mark building" cx="0%"', rows[0])
+        self.assertIn('<time datetime="2026-11-24T11:25:30Z">24 Nov 2026, 11:25</time> to '
+                      '<time datetime="2026-11-24T13:00:20Z">13:00 UTC</time>', key)
+        # Two days, a missing stage and a lone mark.
+        rows, key = check.team_rows((('A', '2026-11-20T15:45:24Z', '2026-11-20T15:57:37Z', '2026-11-21T04:36:55Z'),
+                                     ('B', '2026-11-20T17:45:43Z', None, None)))
+        self.assertIn('aria-label="Building 20 Nov 15:45, In review 20 Nov 15:57, Merged 21 Nov 04:36 UTC"', rows[0])
+        self.assertIn('text-anchor="end">21 Nov 04:36</text>', rows[0])
+        self.assertNotIn('review', rows[1].split('<svg', 1)[1].replace('aria-label', ''))
+        self.assertNotIn('team-spec-run', rows[1])
+        self.assertIn('cx="15.6%"', rows[1])
+        self.assertIn('>21 Nov 2026, 04:36 UTC</time>', key)
 
     def test_footer_source(self):
         import check

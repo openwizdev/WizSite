@@ -14,32 +14,32 @@
     ]
   },
   "subIssues": [
-    {"number":2964,"title":"BK1: busy time from iCal and the open slots","html_url":"https://github.com/openwizdev/OpenWiz/issues/2964","state":"open","state_reason":null},
-    {"number":2965,"title":"BK3: confirmation email and Google Calendar","html_url":"https://github.com/openwizdev/OpenWiz/issues/2965","state":"open","state_reason":null},
-    {"number":2966,"title":"BK2: the booking API","html_url":"https://github.com/openwizdev/OpenWiz/issues/2966","state":"open","state_reason":null},
-    {"number":2967,"title":"BK4: the booking page and its installable app","html_url":"https://github.com/openwizdev/OpenWiz/issues/2967","state":"open","state_reason":null}
+    {"number":2964,"title":"BK1: busy time from iCal and the open slots","html_url":"https://github.com/openwizdev/OpenWiz/issues/2964","state":"open","state_reason":null,"closed_at":null},
+    {"number":2965,"title":"BK3: confirmation email and Google Calendar","html_url":"https://github.com/openwizdev/OpenWiz/issues/2965","state":"open","state_reason":null,"closed_at":null},
+    {"number":2966,"title":"BK2: the booking API","html_url":"https://github.com/openwizdev/OpenWiz/issues/2966","state":"open","state_reason":null,"closed_at":null},
+    {"number":2967,"title":"BK4: the booking page and its installable app","html_url":"https://github.com/openwizdev/OpenWiz/issues/2967","state":"open","state_reason":null,"closed_at":null}
   ],
   "timelines": {
     "2964": [
-      {"event":"commented","body":"launch-fleet: started"},
-      {"event":"cross-referenced","source":{"issue":{"number":2966,"title":"BK2: the booking API","html_url":"https://github.com/openwizdev/OpenWiz/issues/2966","state":"open","repository_url":"https://api.github.com/repos/openwizdev/OpenWiz"}}},
-      {"event":"cross-referenced","source":{"issue":{"number":180,"title":"BK1: busy time from iCal and the open slots","html_url":"https://github.com/openwizdev/WizSite/pull/180","state":"closed","repository_url":"https://api.github.com/repos/openwizdev/WizSite","pull_request":{"merged_at":"2026-11-24T12:04:33Z"}}}}
+      {"event":"commented","body":"launch-fleet: started","created_at":"2026-11-24T11:25:30Z"},
+      {"event":"cross-referenced","source":{"issue":{"number":2966,"title":"BK2: the booking API","html_url":"https://github.com/openwizdev/OpenWiz/issues/2966","state":"open","repository_url":"https://api.github.com/repos/openwizdev/OpenWiz","created_at":"2026-11-24T11:23:17Z"}},"created_at":"2026-11-24T11:25:35Z"},
+      {"event":"cross-referenced","source":{"issue":{"number":180,"title":"BK1: busy time from iCal and the open slots","html_url":"https://github.com/openwizdev/WizSite/pull/180","state":"closed","repository_url":"https://api.github.com/repos/openwizdev/WizSite","pull_request":{"merged_at":"2026-11-24T12:04:33Z"},"created_at":"2026-11-24T11:30:34Z"}},"created_at":"2026-11-24T11:30:35Z"}
     ],
     "2965": [
-      {"event":"commented","body":"launch-fleet: started"},
-      {"event":"cross-referenced","source":{"issue":{"number":2966,"title":"BK2: the booking API","html_url":"https://github.com/openwizdev/OpenWiz/issues/2966","state":"open","repository_url":"https://api.github.com/repos/openwizdev/OpenWiz"}}},
-      {"event":"cross-referenced","source":{"issue":{"number":179,"title":"BK3: confirmation email and Google Calendar","html_url":"https://github.com/openwizdev/WizSite/pull/179","state":"closed","repository_url":"https://api.github.com/repos/openwizdev/WizSite","pull_request":{"merged_at":"2026-11-24T11:49:33Z"}}}}
+      {"event":"commented","body":"launch-fleet: started","created_at":"2026-11-24T11:25:31Z"},
+      {"event":"cross-referenced","source":{"issue":{"number":2966,"title":"BK2: the booking API","html_url":"https://github.com/openwizdev/OpenWiz/issues/2966","state":"open","repository_url":"https://api.github.com/repos/openwizdev/OpenWiz","created_at":"2026-11-24T11:23:17Z"}},"created_at":"2026-11-24T11:25:35Z"},
+      {"event":"cross-referenced","source":{"issue":{"number":179,"title":"BK3: confirmation email and Google Calendar","html_url":"https://github.com/openwizdev/WizSite/pull/179","state":"closed","repository_url":"https://api.github.com/repos/openwizdev/WizSite","pull_request":{"merged_at":"2026-11-24T11:49:33Z"},"created_at":"2026-11-24T11:28:44Z"}},"created_at":"2026-11-24T11:28:45Z"}
     ],
     "2966": [
-      {"event":"commented","body":"Waits for BK1 (#2964) and BK3 (#2965) on `book`; its builder starts when both have merged there."},
-      {"event":"commented","body":"launch-fleet: started"},
-      {"event":"cross-referenced","source":{"issue":{"number":183,"title":"BK2: the booking API (#2966)","html_url":"https://github.com/openwizdev/WizSite/pull/183","state":"closed","repository_url":"https://api.github.com/repos/openwizdev/WizSite","pull_request":{"merged_at":"2026-11-24T13:00:20Z"}}}}
+      {"event":"commented","body":"Waits for BK1 (#2964) and BK3 (#2965) on `book`; its builder starts when both have merged there.","created_at":"2026-11-24T11:25:34Z"},
+      {"event":"commented","body":"launch-fleet: started","created_at":"2026-11-24T11:40:15Z"},
+      {"event":"cross-referenced","source":{"issue":{"number":183,"title":"BK2: the booking API (#2966)","html_url":"https://github.com/openwizdev/WizSite/pull/183","state":"closed","repository_url":"https://api.github.com/repos/openwizdev/WizSite","pull_request":{"merged_at":"2026-11-24T13:00:20Z"},"created_at":"2026-11-24T11:45:41Z"}},"created_at":"2026-11-24T11:45:42Z"}
     ],
     "2967": [
-      {"event":"commented","body":"launch-fleet: started"},
-      {"event":"cross-referenced","source":{"issue":{"number":181,"title":"BK4: the booking page and its installable app","html_url":"https://github.com/openwizdev/WizSite/pull/181","state":"closed","repository_url":"https://api.github.com/repos/openwizdev/WizSite","pull_request":{"merged_at":"2026-11-24T12:15:27Z"}}}},
-      {"event":"cross-referenced","source":{"issue":{"number":189,"title":"BK4 follow-up: DST calendar stepping, month label, closed and no-email copy","html_url":"https://github.com/openwizdev/WizSite/pull/189","state":"closed","repository_url":"https://api.github.com/repos/openwizdev/WizSite","pull_request":{"merged_at":"2026-11-24T12:32:28Z"}}}},
-      {"event":"cross-referenced","source":{"issue":{"number":192,"title":"Fix BK4 slot reload check and month label size","html_url":"https://github.com/openwizdev/WizSite/pull/192","state":"closed","repository_url":"https://api.github.com/repos/openwizdev/WizSite","pull_request":{"merged_at":"2026-11-24T12:55:24Z"}}}}
+      {"event":"commented","body":"launch-fleet: started","created_at":"2026-11-24T11:25:33Z"},
+      {"event":"cross-referenced","source":{"issue":{"number":181,"title":"BK4: the booking page and its installable app","html_url":"https://github.com/openwizdev/WizSite/pull/181","state":"closed","repository_url":"https://api.github.com/repos/openwizdev/WizSite","pull_request":{"merged_at":"2026-11-24T12:15:27Z"},"created_at":"2026-11-24T11:31:47Z"}},"created_at":"2026-11-24T11:31:48Z"},
+      {"event":"cross-referenced","source":{"issue":{"number":189,"title":"BK4 follow-up: DST calendar stepping, month label, closed and no-email copy","html_url":"https://github.com/openwizdev/WizSite/pull/189","state":"closed","repository_url":"https://api.github.com/repos/openwizdev/WizSite","pull_request":{"merged_at":"2026-11-24T12:32:28Z"},"created_at":"2026-11-24T12:23:21Z"}},"created_at":"2026-11-24T12:23:22Z"},
+      {"event":"cross-referenced","source":{"issue":{"number":192,"title":"Fix BK4 slot reload check and month label size","html_url":"https://github.com/openwizdev/WizSite/pull/192","state":"closed","repository_url":"https://api.github.com/repos/openwizdev/WizSite","pull_request":{"merged_at":"2026-11-24T12:55:24Z"},"created_at":"2026-11-24T12:44:35Z"}},"created_at":"2026-11-24T12:44:36Z"}
     ]
   },
   "replay": {

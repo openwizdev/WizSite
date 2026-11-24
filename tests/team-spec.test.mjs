@@ -6,6 +6,9 @@ import { runInNewContext } from 'node:vm';
 // Public fields from hill/team-r2-fixtures. No requests leave the test process.
 const fixtures = JSON.parse(readFileSync(new URL('./team-spec-fixtures.json', import.meta.url)));
 const site = readFileSync(new URL('../site.js', import.meta.url), 'utf8');
+const page = readFileSync(new URL('../team/index.html', import.meta.url), 'utf8');
+const bakedRows = page.split('<ul class="team-spec-tickets">')[1].split('</ul>')[0].match(/<li>.*?<\/li>/g);
+const bakedKey = page.match(/<p class="team-spec-key">.*?<\/p>/)[0];
 const api = 'https://api.github.com';
 const repo = '/repos/openwizdev/OpenWiz/issues';
 const searchUrl = '/search/issues?q=repo:openwizdev/OpenWiz+is:issue+in:title+%22spec:%22&sort=updated&per_page=20';
@@ -20,8 +23,10 @@ const responses = () => structuredClone({
 });
 
 class Node {
-  constructor(tag, text = '', children = []) {
+  constructor(tag, text = '', children = [], svg = false) {
     this.tag = tag;
+    this.svg = svg;
+    this.attributes = new Map();
     this.replaceChildren(...children);
     this.text = text;
   }
@@ -43,7 +48,16 @@ class Node {
   }
   querySelector(tag) { return this.children.find(child => child.tag === tag) || null; }
   contains(node) { return this === node || this.children.some(child => child.contains(node)); }
-  setAttribute() {}
+  setAttribute(name, value) { this.attributes.set(name, String(value)); }
+  // The markup the browser would hold, written the way team/index.html writes it.
+  get markup() {
+    const attributes = [...(this.className ? [['class', this.className]] : []),
+      ...(this.dateTime ? [['datetime', this.dateTime]] : []), ...this.attributes];
+    const open = this.tag + attributes.map(([name, value]) => ` ${name}="${value}"`).join('');
+    if (this.tag === '#text') return this.text;
+    if (this.svg && !this.text && !this.children.length) return `<${open}/>`;
+    return `<${open}>${this.text}${this.children.map(child => child.markup).join('')}</${this.tag}>`;
+  }
 }
 
 async function view({ data = responses(), cache = new Map(), at = now, hidden = false, timeout = false } = {}) {
@@ -52,13 +66,19 @@ async function view({ data = responses(), cache = new Map(), at = now, hidden = 
   const heading = new Node('h2', '', [new Node('code'), new Node('a')]);
   const list = new Node('ul');
   const merge = new Node('div', '', [new Node('p', 'Latest merged pull request'), new Node('a'), new Node('p')]);
-  const panel = { querySelector: name => ({ heading, tickets: list, merge, origin })[name.slice(11)] };
+  const key = new Node('p');
+  key.className = 'team-spec-key';
+  const panel = { querySelector: name => ({ heading, tickets: list, merge, origin, key })[name.slice(11)] };
   const footer = { children: [], setAttribute() {}, removeAttribute() {}, addEventListener() {} };
   const document = Object.assign(new EventTarget(), {
     visibilityState: hidden ? 'hidden' : 'visible',
     querySelector: selector => ({ '.team-spec': panel, '.family': footer, '.landing-footer': footer })[selector] || null,
     querySelectorAll: () => [],
     createElement: tag => new Node(tag),
+    createElementNS: (namespace, tag) => {
+      assert.equal(namespace, 'http://www.w3.org/2000/svg');
+      return new Node(tag, '', [], true);
+    },
   });
   const calls = [];
   const changeVisibility = state => {
@@ -86,7 +106,7 @@ async function view({ data = responses(), cache = new Map(), at = now, hidden = 
   });
   const settle = () => new Promise(resolve => setImmediate(resolve));
   await settle();
-  return { calls, origin, heading, list, merge, cache, changeVisibility, settle };
+  return { calls, origin, heading, list, merge, key, cache, changeVisibility, settle };
 }
 
 test('reads the first eligible spec, derives the frozen states and renders the last merge', async () => {
@@ -112,6 +132,70 @@ test('reads the first eligible spec, derives the frozen states and renders the l
   assert.equal(result.merge.lastElementChild.querySelector('time').textContent, '24 Nov 2026, 13:00 UTC');
   assert.equal(result.origin.textContent, 'Live from GitHub · read 14:34');
   assert.equal(result.origin.querySelector('time').dateTime, '2026-11-24T14:34:56.000Z');
+});
+
+test('a live read draws the same tracks and time key the still bakes from the frozen times', async () => {
+  const result = await view();
+  assert.equal(bakedRows.length, 4);
+  assert.deepEqual(result.list.children.map(row => row.markup), bakedRows);
+  assert.equal(result.key.markup, bakedKey);
+  const cached = JSON.parse(result.cache.get('openwiz-team-spec-v2'));
+  assert.deepEqual(cached.tickets.map(ticket => ticket.marks), fixtures.replay[2963].tickets.map(ticket => ({
+    building: ticket.building_at, review: ticket.review_at,
+    merged: ticket.pull_requests.map(pull => pull.merged).sort().at(-1),
+  })));
+});
+
+test('marks only recorded stages, uses the close time when completed and dates marks across days', async () => {
+  const data = responses();
+  const pull = fixtures.timelines[2964].find(event => event.event === 'cross-referenced' && event.source.issue.pull_request);
+  data[timeline(2964)] = [{ event: 'commented', body: 'launch-fleet: started', created_at: '2026-11-24T11:25:30Z' }];
+  data[timeline(2965)] = [
+    { event: 'commented', body: '<!-- openwiz:status v1 -->\nagent: builder', created_at: '2026-11-24T11:26:00Z' },
+    { event: 'commented', body: 'launch-fleet: started', created_at: '2026-11-24T11:25:00Z' },
+    structuredClone(pull),
+  ];
+  data[timeline(2965)][2].source.issue.state = 'open';
+  data[timeline(2965)][2].source.issue.pull_request.merged_at = null;
+  Object.assign(data[sub(2963)][2], { state: 'closed', state_reason: 'completed', closed_at: '2026-11-25T09:10:00Z' });
+  data[timeline(2966)] = [];
+  data[timeline(2967)] = [{ event: 'commented', body: 'Waits for BK1', created_at: '2026-11-24T11:25:34Z' }];
+  const result = await view({ data });
+  const states = result.list.children.map(row => row.children[1].textContent);
+  const tracks = result.list.children.map(row => row.children[2]);
+  assert.deepEqual(states, ['Building', 'In review', 'Merged', 'Waiting']);
+  assert.deepEqual(tracks.map(track => track.attributes.get('aria-label')), [
+    'Building 24 Nov 11:25', 'Building 24 Nov 11:25, In review 24 Nov 11:30', 'Merged 25 Nov 09:10', 'No recorded times',
+  ].map((label, i) => (i < 3 ? `${label} UTC` : label)));
+  assert.deepEqual(tracks.map(track => track.children.map(shape => shape.attributes.get('class'))), [
+    ['team-spec-axis', 'team-spec-mark building', 'team-spec-when'],
+    ['team-spec-axis', 'team-spec-run', 'team-spec-mark building', 'team-spec-mark review', 'team-spec-when'],
+    ['team-spec-axis', 'team-spec-mark merged latest', 'team-spec-when latest'],
+    ['team-spec-axis'],
+  ]);
+  assert.equal(tracks[1].children[2].attributes.get('cx'), '0%');
+  assert.equal(tracks[2].children[1].attributes.get('cx'), '100%');
+  assert.equal(tracks[2].children[2].textContent, '25 Nov 09:10');
+  assert.equal(tracks[2].children[2].attributes.get('text-anchor'), 'end');
+  assert.equal(result.key.children.at(-1).textContent, '24 Nov 2026, 11:25 to 25 Nov 2026, 09:10 UTC');
+
+  for (const empty of [timeline(2964), timeline(2965)]) data[empty] = [];
+  data[sub(2963)][2] = structuredClone(fixtures.subIssues[2]);
+  const none = await view({ data });
+  assert.equal(none.key.children.at(-1).textContent, 'No recorded times yet');
+  assert.ok(none.list.children.every(row => row.children[2].children.length === 1));
+});
+
+test('ignores an older cache and a cache with a malformed time', async () => {
+  const { cache } = await view();
+  const stored = cache.get('openwiz-team-spec-v2');
+  const old = await view({ cache: new Map([['openwiz-team-spec-v1', stored]]) });
+  assert.equal(old.calls.length, 6);
+  const bad = JSON.parse(stored);
+  bad.tickets[0].marks.merged = 'yesterday';
+  const malformed = await view({ cache: new Map([['openwiz-team-spec-v2', JSON.stringify(bad)]]), data: { [searchUrl]: 429 } });
+  assert.equal(malformed.calls.length, 1);
+  assert.equal(malformed.origin.textContent, still);
 });
 
 test('ticket rules distinguish waiting, builder note and fleet start, review and completed', async () => {

@@ -1,8 +1,10 @@
+from datetime import datetime, timezone
 from hashlib import sha256
 from html import escape, unescape
 from html.parser import HTMLParser
 from pathlib import Path
 import json
+import math
 import re
 import subprocess
 from urllib.parse import unquote, urlsplit
@@ -155,12 +157,67 @@ TEAM_LEAD = ('Jake, who built OpenWiz, sets up an agent factory with your team o
 TEAM_NEEDS = '30 minutes. Bring a repository with working CI and a signed-in Claude Code or Codex.'
 TEAM_SPEC_TITLE = 'spec: openwiz.dev/book, our own booking page for the team call'
 TEAM_SPEC_PR = 'https://github.com/openwizdev/WizSite/pull/183'
-TEAM_SPEC_TICKETS = ('BK1: busy time from iCal and the open slots',
-                     'BK3: confirmation email and Google Calendar',
-                     'BK2: the booking API',
-                     'BK4: the booking page and its installable app')
-TEAM_SPEC_ROWS = tuple(f'<li><span>{title}</span><span class="team-spec-state merged">Merged</span></li>'
-                       for title in TEAM_SPEC_TICKETS)
+# Frozen 2026-11-24 14:33 UTC: first builder note, first linked pull request opened, last linked merge.
+TEAM_SPEC_TRACKS = (('BK1: busy time from iCal and the open slots',
+                     '2026-11-24T11:25:30Z', '2026-11-24T11:30:34Z', '2026-11-24T12:04:33Z'),
+                    ('BK3: confirmation email and Google Calendar',
+                     '2026-11-24T11:25:31Z', '2026-11-24T11:28:44Z', '2026-11-24T11:49:33Z'),
+                    ('BK2: the booking API',
+                     '2026-11-24T11:40:15Z', '2026-11-24T11:45:41Z', '2026-11-24T13:00:20Z'),
+                    ('BK4: the booking page and its installable app',
+                     '2026-11-24T11:25:33Z', '2026-11-24T11:31:47Z', '2026-11-24T12:55:24Z'))
+TEAM_SPEC_TICKETS = tuple(track[0] for track in TEAM_SPEC_TRACKS)
+TEAM_STAGES = (('building', 'Building'), ('review', 'In review'), ('merged', 'Merged'))
+
+
+def team_ms(time):
+    return int(datetime.strptime(time, '%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=timezone.utc).timestamp() * 1000)
+
+
+def team_clock(time, days):
+    moment = datetime.fromtimestamp(team_ms(time) / 1000, timezone.utc)
+    return f'{moment.day} {moment:%b %H:%M}' if days else f'{moment:%H:%M}'
+
+
+def team_rows(tracks):
+    """The ticket rows and their time key, laid out exactly as site.js draws them."""
+    times = [time for _, *marks in tracks for time in marks if time]
+    start, end = min(map(team_ms, times)), max(map(team_ms, times))
+    days = times and team_clock(min(times, key=team_ms), True)[:-6] != team_clock(max(times, key=team_ms), True)[:-6]
+    latest = max(((team_ms(t), -i, -j) for i, (_, *marks) in enumerate(tracks) for j, t in enumerate(marks) if t))
+    rows = []
+    for i, (title, *marks) in enumerate(tracks):
+        x = {stage: math.floor((team_ms(t) - start) * 1000 / max(end - start, 1) + .5) / 10
+             for (stage, _), t in zip(TEAM_STAGES, marks) if t}
+        at = {stage: f'{x[stage]:g}%' for stage in x}
+        said = ', '.join(f'{label} {team_clock(t, days)}' for (_, label), t in zip(TEAM_STAGES, marks) if t)
+        shapes = ['<line class="team-spec-axis" x1="0" x2="100%" y1="18" y2="18"/>']
+        if len(x) > 1:
+            shapes.append(f'<line class="team-spec-run" x1="{at[min(x, key=x.get)]}" x2="{at[max(x, key=x.get)]}" y1="18" y2="18"/>')
+        last = None
+        for j, ((stage, _), t) in enumerate(zip(TEAM_STAGES, marks)):
+            if not t:
+                continue
+            mark = ' latest' if latest[1:] == (-i, -j) else ''
+            last = (t, stage, mark) if last is None or team_ms(t) >= team_ms(last[0]) else last
+            shapes.append(f'<line class="team-spec-mark review{mark}" x1="{at[stage]}" x2="{at[stage]}" y1="12" y2="24"/>'
+                          if stage == 'review' else
+                          f'<circle class="team-spec-mark {stage}{mark}" cx="{at[stage]}" cy="18" r="4"/>')
+        if last:
+            anchor = 'end' if x[last[1]] > 90 else 'start' if x[last[1]] < 10 else 'middle'
+            shapes.append(f'<text class="team-spec-when{last[2]}" x="{at[last[1]]}" y="7" text-anchor="{anchor}">'
+                          f'{team_clock(last[0], days)}</text>')
+        rows.append(f'<li><span>{title}</span><span class="team-spec-state merged">Merged</span>'
+                    f'<svg class="team-spec-track" role="img" aria-label="{f'{said} UTC' if said else 'No recorded times'}">{"".join(shapes)}</svg></li>')
+    first, final = (datetime.fromtimestamp(ms / 1000, timezone.utc) for ms in (start, end))
+    when = (f'<time datetime="{first:%Y-%m-%dT%H:%M:%SZ}">{first.day} {first:%b %Y, %H:%M}</time> to '
+            f'<time datetime="{final:%Y-%m-%dT%H:%M:%SZ}">{f"{final.day} {final:%b %Y, }" if days else ""}{final:%H:%M} UTC</time>')
+    key = ('<p class="team-spec-key">' + ' '.join(f'<span class="{stage}">{label}</span>' for stage, label in TEAM_STAGES) +
+           f' <span class="team-spec-span">{when}</span></p>')
+    return tuple(rows), key
+
+
+TEAM_SPEC_ROWS, TEAM_SPEC_KEY = team_rows(TEAM_SPEC_TRACKS)
 TEAM_SNAPSHOT = f'''
   <section class="team-spec" aria-labelledby="team-spec-title">
     <h2 class="team-spec-heading" id="team-spec-title">
@@ -170,6 +227,7 @@ TEAM_SNAPSHOT = f'''
     <ul class="team-spec-tickets">
       {' '.join(TEAM_SPEC_ROWS)}
     </ul>
+    {TEAM_SPEC_KEY}
     <div class="team-spec-merge">
       <p>Latest merged pull request</p>
       <a href="{TEAM_SPEC_PR}"><code>openwizdev/WizSite #183</code> <span>BK2: the booking API (#2966)</span></a>

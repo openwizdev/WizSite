@@ -651,7 +651,9 @@ if (teamSpecPanel) {
   const api = 'https://api.github.com';
   const repo = '/repos/openwizdev/OpenWiz';
   const issueBase = 'https://github.com/openwizdev/OpenWiz/issues/';
-  const cacheKey = 'openwiz-team-spec-v1';
+  const cacheKey = 'openwiz-team-spec-v2';
+  const stages = ticketStates.slice(1);
+  const svg = 'http://www.w3.org/2000/svg';
   const cacheAge = 10 * 60 * 1000;
   const stateLabels = Object.fromEntries(ticketStates);
   const hourMinute = new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC', hour: '2-digit', minute: '2-digit' });
@@ -660,6 +662,7 @@ if (teamSpecPanel) {
   const list = teamSpecPanel.querySelector('.team-spec-tickets');
   const merge = teamSpecPanel.querySelector('.team-spec-merge');
   const origin = teamSpecPanel.querySelector('.team-spec-origin');
+  const key = teamSpecPanel.querySelector('.team-spec-key');
 
   const issueNumber = number => Number.isSafeInteger(number) && number > 0;
   const titleFits = title => typeof title === 'string' && title.trim() &&
@@ -669,7 +672,7 @@ if (teamSpecPanel) {
     issue.html_url.toLowerCase() === (issueBase + issue.number).toLowerCase();
   const validPullLink = pull => /^openwizdev\/(?!\.{1,2}$)[\w.-]+$/i.test(pull?.repo) && issueNumber(pull.number) &&
     pull.url === `https://github.com/${pull.repo}/pull/${pull.number}`;
-  const validMergeTime = time => typeof time === 'string' &&
+  const validTime = time => typeof time === 'string' &&
     /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/.test(time) && Number.isFinite(Date.parse(time));
 
   function element(tag, text, className) {
@@ -679,17 +682,79 @@ if (teamSpecPanel) {
     return node;
   }
 
+  function shape(tag, attributes, text) {
+    const node = document.createElementNS(svg, tag);
+    for (const [name, value] of Object.entries(attributes)) node.setAttribute(name, value);
+    if (text !== undefined) node.textContent = text;
+    return node;
+  }
+
+  // Each ticket's recorded times on one scale: the spec's first to last recorded time, as check.py bakes the still.
+  function tracks(tickets) {
+    const times = tickets.flatMap(ticket => stages.map(([stage]) => ticket.marks[stage]).filter(Boolean)).map(Date.parse);
+    const start = Math.min(...times);
+    const end = Math.max(...times);
+    const day = ms => date.format(ms).replace(/ \d{4}$/, '');
+    const days = times.length > 0 && day(start) !== day(end);
+    const clock = ms => (days ? `${day(ms)} ` : '') + hourMinute.format(ms);
+    let latest = null;
+    tickets.forEach((ticket, row) => stages.forEach(([stage]) => {
+      const at = ticket.marks[stage] && Date.parse(ticket.marks[stage]);
+      if (at && (!latest || at > latest.at)) latest = { at, row, stage };
+    }));
+    const rows = tickets.map((ticket, row) => {
+      const marks = stages.filter(([stage]) => ticket.marks[stage]).map(([stage, label]) => {
+        const at = Date.parse(ticket.marks[stage]);
+        const x = Math.floor((at - start) * 1000 / Math.max(end - start, 1) + .5) / 10;
+        const kind = latest.row === row && latest.stage === stage ? ' latest' : '';
+        return { stage, label, at, x, kind, percent: `${x}%` };
+      });
+      const track = shape('svg', { class: 'team-spec-track', role: 'img',
+        'aria-label': marks.length ? `${marks.map(mark => `${mark.label} ${clock(mark.at)}`).join(', ')} UTC` : 'No recorded times' });
+      track.append(shape('line', { class: 'team-spec-axis', x1: '0', x2: '100%', y1: '18', y2: '18' }));
+      if (marks.length > 1) {
+        const byX = [...marks].sort((a, b) => a.x - b.x);
+        track.append(shape('line', { class: 'team-spec-run', x1: byX[0].percent, x2: byX.at(-1).percent, y1: '18', y2: '18' }));
+      }
+      let last = null;
+      for (const mark of marks) {
+        if (!last || mark.at >= last.at) last = mark;
+        track.append(mark.stage === 'review'
+          ? shape('line', { class: `team-spec-mark review${mark.kind}`, x1: mark.percent, x2: mark.percent, y1: '12', y2: '24' })
+          : shape('circle', { class: `team-spec-mark ${mark.stage}${mark.kind}`, cx: mark.percent, cy: '18', r: '4' }));
+      }
+      if (last) {
+        track.append(shape('text', { class: `team-spec-when${last.kind}`, x: last.percent, y: '7',
+          'text-anchor': last.x > 90 ? 'end' : last.x < 10 ? 'start' : 'middle' }, clock(last.at)));
+      }
+      return track;
+    });
+    const span = element('span', undefined, 'team-spec-span');
+    if (times.length) {
+      const from = element('time', `${date.format(start)}, ${hourMinute.format(start)}`);
+      from.dateTime = new Date(start).toISOString().replace('.000', '');
+      const to = element('time', `${days ? `${date.format(end)}, ` : ''}${hourMinute.format(end)} UTC`);
+      to.dateTime = new Date(end).toISOString().replace('.000', '');
+      span.append(from, ' to ', to);
+    } else {
+      span.textContent = 'No recorded times yet';
+    }
+    return { rows, span };
+  }
+
   function render({ spec, tickets, latest, readAt }) {
     const specLink = heading.querySelector('a');
     specLink.href = spec.html_url;
     specLink.textContent = spec.title.replaceAll("'", '’');
     heading.querySelector('code').textContent = `#${spec.number}`;
-    list.replaceChildren(...tickets.map(ticket => {
+    const drawn = tracks(tickets);
+    list.replaceChildren(...tickets.map((ticket, i) => {
       const row = element('li');
       row.append(element('span', ticket.title.replaceAll("'", '’')),
-        element('span', stateLabels[ticket.state], `team-spec-state ${ticket.state}`));
+        element('span', stateLabels[ticket.state], `team-spec-state ${ticket.state}`), drawn.rows[i]);
       return row;
     }));
+    key.replaceChildren(...stages.flatMap(([stage, label]) => [element('span', label, stage), ' ']), drawn.span);
     if (latest) {
       const link = merge.querySelector('a') || element('a');
       link.href = latest.url;
@@ -719,12 +784,17 @@ if (teamSpecPanel) {
     if (!Array.isArray(events) || events.length >= 100) throw new Error('Invalid or incomplete timeline');
     const pulls = [];
     let building = false;
+    let builtAt = null;
+    const earliest = (known, time) => (validTime(time) && (!known || time < known) ? time : known);
     for (const event of events) {
       if (typeof event?.event !== 'string') throw new Error('Invalid timeline event');
       if (event.event === 'commented') {
         if (typeof event.body !== 'string') throw new Error('Invalid timeline comment');
-        building ||= event.body.startsWith('launch-fleet: start') ||
-          (event.body.includes('<!-- openwiz:status v1 -->') && /\bagent:[ \t]*builder\b/.test(event.body));
+        if (event.body.startsWith('launch-fleet: start') ||
+            (event.body.includes('<!-- openwiz:status v1 -->') && /\bagent:[ \t]*builder\b/.test(event.body))) {
+          building = true;
+          builtAt = earliest(builtAt, event.created_at);
+        }
       }
       if (event.event !== 'cross-referenced') continue;
       const source = event.source?.issue;
@@ -738,17 +808,26 @@ if (teamSpecPanel) {
         url: source.html_url, mergedAt: source.pull_request.merged_at,
       };
       if (!validPullLink(pull) || typeof pull.title !== 'string' || !['open', 'closed'].includes(source.state) ||
-          (pull.mergedAt !== null && (source.state !== 'closed' || !validMergeTime(pull.mergedAt)))) {
+          (pull.mergedAt !== null && (source.state !== 'closed' || !validTime(pull.mergedAt)))) {
         throw new Error('Invalid pull request');
       }
-      pulls.push({ ...pull, open: source.state === 'open' });
+      pulls.push({ ...pull, open: source.state === 'open', openedAt: source.created_at });
     }
     let state = 'waiting';
     if ((issue.state === 'closed' && issue.state_reason === 'completed') ||
         (pulls.length && pulls.every(pull => pull.mergedAt))) state = 'merged';
     else if (pulls.some(pull => pull.open)) state = 'review';
     else if (issue.state === 'open' && !pulls.length && building) state = 'building';
-    return { title: issue.title, state, pulls };
+    // A stage with no record has no mark.
+    const completed = issue.state === 'closed' && issue.state_reason === 'completed' && validTime(issue.closed_at);
+    const lastMerge = pulls.length && pulls.every(pull => pull.mergedAt)
+      ? pulls.map(pull => pull.mergedAt).sort().at(-1) : null;
+    const marks = {
+      building: builtAt,
+      review: pulls.reduce((known, pull) => earliest(known, pull.openedAt), null),
+      merged: state === 'merged' ? (completed ? issue.closed_at : lastMerge) : null,
+    };
+    return { title: issue.title, state, pulls: pulls.map(({ openedAt, ...pull }) => pull), marks };
   }
 
   async function read() {
@@ -757,9 +836,10 @@ if (teamSpecPanel) {
       const stored = JSON.parse(localStorage.getItem(cacheKey));
       if (stored && Number.isSafeInteger(stored.readAt) && stored.readAt > 0 && stored.readAt <= Date.now() &&
           validIssue(stored.spec) && Array.isArray(stored.tickets) && stored.tickets.length >= 2 && stored.tickets.length <= 4 &&
-          stored.tickets.every(ticket => titleFits(ticket?.title) && Object.hasOwn(stateLabels, ticket.state)) &&
+          stored.tickets.every(ticket => titleFits(ticket?.title) && Object.hasOwn(stateLabels, ticket.state) &&
+            stages.every(([stage]) => ticket.marks?.[stage] === null || validTime(ticket.marks?.[stage]))) &&
           (stored.latest === null || (validPullLink(stored.latest) && titleFits(stored.latest.title) &&
-            validMergeTime(stored.latest.mergedAt)))) cached = stored;
+            validTime(stored.latest.mergedAt)))) cached = stored;
     } catch {
       // Storage can be unavailable or contain obsolete data.
     }
@@ -806,7 +886,7 @@ if (teamSpecPanel) {
       if (latest && !titleFits(latest.title)) return;
       const result = {
         spec: { number: spec.number, title: spec.title, html_url: spec.html_url },
-        tickets: records.map(({ title, state }) => ({ title, state })),
+        tickets: records.map(({ title, state, marks }) => ({ title, state, marks })),
         latest, readAt: Date.now(),
       };
       render(result);
