@@ -135,7 +135,8 @@ test('switch on + demo=1: renders v2 shell, deep links, interactions, and makes 
     await run.page.until(`location.hash === '#/feed/clear' && document.querySelector('.v2-lighthouse')`, 'approving the final decision clears Feed');
     assert.deepEqual(await badges(), [null, null]);
     await run.page.click('Settings');
-    await run.page.until(`location.hash === '#/settings' && document.querySelector('.v2-toast').hidden`, 'changing routes dismisses Undo');
+    await run.page.until(`location.hash === '#/settings' && document.querySelector('.v2-settings')`, 'Settings after leaving Feed');
+    assert.equal(await run.page.run(`document.querySelector('.v2-toast').hidden`), true, 'changing routes dismisses Undo immediately');
     await run.page.go(`${SITE}/app/?v2=dry-run&demo=1#/feed/clear`);
     await run.page.until(`document.querySelector('.v2-clear-card h2')?.textContent === 'All clear.'`, 'deep link to all clear');
     assert.deepEqual(await badges(), [null, null]);
