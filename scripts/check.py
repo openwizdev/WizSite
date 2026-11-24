@@ -1,3 +1,4 @@
+from datetime import date, datetime, timedelta, timezone
 from hashlib import sha256
 from html import escape, unescape
 from html.parser import HTMLParser
@@ -166,6 +167,8 @@ CACHE_HTML = 'public, max-age=0, must-revalidate'
 CACHE_IMMUTABLE = 'public, max-age=31536000, immutable'
 CACHE_MEDIA = 'public, max-age=604800, stale-while-revalidate=2592000'
 SECURITY_TXT = '.well-known/security.txt'
+SECURITY_TXT_MIN_DAYS = 60
+RFC3339 = re.compile(r'^\d{4}-\d{2}-\d{2}[Tt]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:[Zz]|[+-]\d{2}:\d{2})$')
 ROBOTS_TXT = 'robots.txt'
 
 
@@ -841,7 +844,40 @@ def check_drivers_export(built):
     assert expected == built, f'export differs: {DRIVERS_PAGE}'
 
 
-def check_site(root, registry=ROOT / 'market/registry.json'):
+def check_security_txt(text, now=None):
+    lines = text.splitlines()
+    for line in (
+        'Contact: https://github.com/openwizdev/OpenWiz/security/advisories/new',
+        'Preferred-Languages: en',
+        'Canonical: https://openwiz.dev/.well-known/security.txt',
+        'Policy: https://github.com/openwizdev/OpenWiz/security/policy',
+    ):
+        assert line in lines, f'{SECURITY_TXT} missing required line: {line}'
+    expires_lines = [line for line in lines if re.match(r'^expires:', line, re.I)]
+    assert expires_lines, f'{SECURITY_TXT} missing Expires field'
+    assert len(expires_lines) == 1, f'{SECURITY_TXT} has duplicate Expires fields'
+    assert expires_lines[0].startswith('Expires:'), f'{SECURITY_TXT} Expires field must be capitalized'
+    raw = expires_lines[0].removeprefix('Expires:').strip()
+    assert RFC3339.fullmatch(raw), f'{SECURITY_TXT} has unparsable RFC 3339 Expires: {raw!r}'
+    try:
+        expires = datetime.fromisoformat(raw).astimezone(timezone.utc)
+    except ValueError:
+        raise AssertionError(f'{SECURITY_TXT} has unparsable RFC 3339 Expires: {raw!r}')
+    if now is None:
+        today = datetime.now(timezone.utc)
+    elif type(now) is date:
+        today = datetime(now.year, now.month, now.day, tzinfo=timezone.utc)
+    elif now.tzinfo is None:
+        today = now.replace(tzinfo=timezone.utc)
+    else:
+        today = now.astimezone(timezone.utc)
+    assert expires > today, f'security.txt Expires {raw} is in the past; move it about a year out'
+    assert expires - today >= timedelta(days=SECURITY_TXT_MIN_DAYS), (
+        f'security.txt Expires {raw} is within {SECURITY_TXT_MIN_DAYS} days; move it about a year out'
+    )
+
+
+def check_site(root, registry=ROOT / 'market/registry.json', now=None):
     files = {p.relative_to(root).as_posix() for p in root.rglob('*') if p.is_file()}
     names = built_fingerprints(root)
     assert files == STATIC | set(names.values()), 'unexpected or missing build output'
@@ -975,6 +1011,7 @@ def check_site(root, registry=ROOT / 'market/registry.json'):
     ):
         assert line in sec_txt.splitlines(), f'{SECURITY_TXT} missing required line: {line}'
     assert re.search(r'^Expires: \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$', sec_txt, re.M), f'{SECURITY_TXT} missing RFC 3339 Expires'
+    check_security_txt(sec_txt, now=now)
     robots = (root / ROBOTS_TXT).read_text()
     for line in ('User-agent: *', 'Allow: /', 'Disallow: /api/'):
         assert line in robots.splitlines(), f'{ROBOTS_TXT} missing required line: {line}'
