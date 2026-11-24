@@ -264,7 +264,7 @@
           h('main', { id: 'content', class: 'v2-main' },
             phoneBar,
             demo ? h('span', { class: 'v2-sample-tag' }, 'Sample data') : null,
-            head,
+            h('div', { class: 'v2-head-wrap' }, head),
             view,
             h('nav', { class: 'v2-tabs', 'aria-label': 'Pages' }, tabs.map(item => item.link))))));
     built = { side, tabs, title, refresh, pager, notices, body, view, page: null, isV2: true };
@@ -375,11 +375,11 @@
 
   function draw() {
     if (demo) {
-      if (!location.hash || route().id === 'welcome') {
+      if (route().id === 'welcome') {
         built = null;
         return OW.v2.renderWelcome(root, { demoMode: true });
       }
-      if (!ROUTES().includes(route().id)) history.replaceState(null, '', home());
+      if (!ROUTES().includes(route().id)) history.replaceState(null, '', '#/chat');
       if (!built) buildShell();
       return update();
     }
@@ -403,7 +403,7 @@
     if (built) update();
   });
   document.addEventListener('keydown', event => {
-    if (!built || (v2 && (event.defaultPrevented || document.querySelector('.v2-sheet[open]')))) return;
+    if (!built || (v2 && (event.defaultPrevented || document.querySelector('.v2-sheet[open], .v2-setting-trigger[aria-expanded="true"]')))) return;
     if ((event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'k') {
       event.preventDefault();
       return OW.palette.toggle();
