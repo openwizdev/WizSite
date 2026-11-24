@@ -25,7 +25,7 @@
           answered: false,
           questions: [
             { prompt: 'When should we charge for new seats?', rec: 0, selected: 0, options: ['At month end', 'Right away'] },
-            { prompt: 'Should read-only viewers pay?', rec: 0, selected: 0, options: ['Keep viewers free', 'Count all members'] },
+            { prompt: 'Should read-only viewers pay?', rec: 0, selected: 0, options: ['Viewers free', 'Count all members'] },
             { prompt: 'How long before a failed renewal locks edits?', rec: 0, selected: 0, options: ['7 days', '48 hours'] },
           ],
         },
@@ -187,9 +187,9 @@
       specTitle: shortTitle,
       answered: false,
       questions: [
-        { prompt: 'Ship to everyone at once, or roll out to active workspaces first?', rec: 0, selected: 0, options: ['Active workspaces first', 'Everyone at once'] },
-        { prompt: 'Include an opt-out toggle in workspace settings?', rec: 0, selected: 0, options: ['Yes, one-click toggle', 'Always on'] },
-        { prompt: 'Should Wiz record a short walkthrough video for the Feed?', rec: 0, selected: 0, options: ['Yes, 10s walkthrough', 'Skip video'] },
+        { prompt: 'Ship to everyone at once, or roll out to active workspaces first?', rec: 0, selected: 0, options: ['Active workspaces', 'Everyone at once'] },
+        { prompt: 'Include an opt-out toggle in workspace settings?', rec: 0, selected: 0, options: ['One-click toggle', 'Always on'] },
+        { prompt: 'Should Wiz record a short walkthrough video for the Feed?', rec: 0, selected: 0, options: ['10s walkthrough', 'Skip video'] },
       ],
     });
     redraw();
@@ -507,12 +507,14 @@
   }
 
   function renderWelcome(root, { note, demoMode }) {
+    const githubHref = demoMode && OW.data.auth.signedIn() ? '/app/' : '/api/sign-in/start';
     const card = h('div', { class: 'v2-welcome-card' },
       h('h1', {}, 'Run your software factory from here.'),
+      h('p', { class: 'v2-welcome-sub' }, 'Answer a few questions. Watch it build. Ship it.'),
       note ? h('div', { class: 'notice bad', role: 'alert' }, icon('warn'), h('span', {}, note)) : null,
       h('a', { class: 'v2-btn primary', href: demoMode ? '#/chat' : '/api/sign-in/start' },
         demoMode ? 'Open Harbor workspace' : 'Continue with GitHub', icon('right')),
-      h('a', { class: 'v2-btn subtle v2-welcome-sample', href: demoMode ? '/api/sign-in/start' : '/app/?demo=1#/chat' },
+      h('a', { class: 'v2-btn subtle v2-welcome-sample', href: demoMode ? githubHref : '/app/?demo=1#/chat' },
         demoMode ? 'Continue with GitHub' : 'See a sample factory'));
     card.prepend(h('header', { class: 'v2-welcome-head' },
       h('div', { class: 'v2-welcome-brand' }, mark(), h('span', {}, 'OpenWiz')),
