@@ -1,3 +1,4 @@
+from datetime import date, datetime, timedelta, timezone
 from hashlib import sha256
 from html import escape, unescape
 from html.parser import HTMLParser
@@ -148,8 +149,76 @@ SITE_HEADERS = (
 )
 APP_CSP = ("default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; media-src 'self'; font-src 'self'; "
            "connect-src 'self' https://api.github.com; manifest-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
+CACHE_HTML = 'public, max-age=0, must-revalidate'
+CACHE_IMMUTABLE = 'public, max-age=31536000, immutable'
+CACHE_FONT = 'public, max-age=2592000, stale-while-revalidate=604800'
+CACHE_MEDIA = 'public, max-age=604800, stale-while-revalidate=2592000'
 SECURITY_TXT = '.well-known/security.txt'
+SECURITY_TXT_MIN_DAYS = 60
+RFC3339 = re.compile(r'^\d{4}-\d{2}-\d{2}[Tt]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:[Zz]|[+-]\d{2}:\d{2})$')
 ROBOTS_TXT = 'robots.txt'
+
+
+def parse_headers(text):
+    rules = []
+    current = None
+    for raw in text.splitlines():
+        if not raw.strip() or raw.lstrip().startswith('#'):
+            continue
+        if raw.startswith('/'):
+            pattern = raw.strip()
+            assert pattern.count('*') <= 1, f'_headers rule may contain at most one * splat: {pattern}'
+            parts = []
+            i = 0
+            while i < len(pattern):
+                if pattern[i] == '*':
+                    parts.append('.*')
+                    i += 1
+                elif pattern[i] == ':':
+                    m = re.match(r':[A-Za-z0-9_]+', pattern[i:])
+                    assert m, f'invalid :placeholder in _headers rule: {pattern}'
+                    parts.append('[^/]+')
+                    i += len(m[0])
+                else:
+                    parts.append(re.escape(pattern[i]))
+                    i += 1
+            current = (pattern, re.compile('^' + ''.join(parts) + '$'), [])
+            rules.append(current)
+        else:
+            assert current is not None, f'header line without a path rule: {raw}'
+            line = raw.strip()
+            if line.startswith('!'):
+                current[2].append(('!', line[1:].strip().lower(), None))
+            else:
+                name, sep, value = line.partition(':')
+                assert sep, f'malformed header line: {raw}'
+                current[2].append(('+', name.strip().lower(), value.strip()))
+    return rules
+
+
+def match_headers(rules, path):
+    values = {}
+    for _, regex, entries in rules:
+        if regex.match(path):
+            for op, name, value in entries:
+                if op == '!':
+                    values.pop(name, None)
+                else:
+                    values.setdefault(name, []).append(value)
+    return values
+
+
+def expected_cache_control(rel):
+    if rel.endswith(('.css', '.js')):
+        return CACHE_IMMUTABLE
+    if rel.startswith('fonts/'):
+        return CACHE_FONT
+    if (rel.startswith(('art/', 'brand/', 'drivers/logos/'))
+            or rel in ('favicon.ico', 'favicon.svg', 'apple-touch-icon.png')
+            or (rel.startswith('app/') and rel.endswith(('.svg', '.png', '.ico')))
+            or rel.endswith(('.mp4', '.vtt'))):
+        return CACHE_MEDIA
+    return CACHE_HTML
 
 
 def fingerprint(name, data):
@@ -751,7 +820,40 @@ def check_drivers_export(built):
     assert expected == built, f'export differs: {DRIVERS_PAGE}'
 
 
-def check_site(root, registry=ROOT / 'market/registry.json'):
+def check_security_txt(text, now=None):
+    lines = text.splitlines()
+    for line in (
+        'Contact: https://github.com/openwizdev/OpenWiz/security/advisories/new',
+        'Preferred-Languages: en',
+        'Canonical: https://openwiz.dev/.well-known/security.txt',
+        'Policy: https://github.com/openwizdev/OpenWiz/security/policy',
+    ):
+        assert line in lines, f'{SECURITY_TXT} missing required line: {line}'
+    expires_lines = [line for line in lines if re.match(r'^expires:', line, re.I)]
+    assert expires_lines, f'{SECURITY_TXT} missing Expires field'
+    assert len(expires_lines) == 1, f'{SECURITY_TXT} has duplicate Expires fields'
+    assert expires_lines[0].startswith('Expires:'), f'{SECURITY_TXT} Expires field must be capitalized'
+    raw = expires_lines[0].removeprefix('Expires:').strip()
+    assert RFC3339.fullmatch(raw), f'{SECURITY_TXT} has unparsable RFC 3339 Expires: {raw!r}'
+    try:
+        expires = datetime.fromisoformat(raw).astimezone(timezone.utc)
+    except ValueError:
+        raise AssertionError(f'{SECURITY_TXT} has unparsable RFC 3339 Expires: {raw!r}')
+    if now is None:
+        today = datetime.now(timezone.utc)
+    elif type(now) is date:
+        today = datetime(now.year, now.month, now.day, tzinfo=timezone.utc)
+    elif now.tzinfo is None:
+        today = now.replace(tzinfo=timezone.utc)
+    else:
+        today = now.astimezone(timezone.utc)
+    assert expires > today, f'security.txt Expires {raw} is in the past; move it about a year out'
+    assert expires - today >= timedelta(days=SECURITY_TXT_MIN_DAYS), (
+        f'security.txt Expires {raw} is within {SECURITY_TXT_MIN_DAYS} days; move it about a year out'
+    )
+
+
+def check_site(root, registry=ROOT / 'market/registry.json', now=None):
     files = {p.relative_to(root).as_posix() for p in root.rglob('*') if p.is_file()}
     names = built_fingerprints(root)
     assert files == STATIC | set(names.values()), 'unexpected or missing build output'
@@ -849,8 +951,30 @@ def check_site(root, registry=ROOT / 'market/registry.json'):
     sec_rule = re.search(r'^/\.well-known/security\.txt\n((?:  .*\n?)*)', headers, re.M)
     assert sec_rule and '  Content-Type: text/plain; charset=utf-8' in sec_rule[1].splitlines(), \
         '_headers must serve /.well-known/security.txt as text/plain; charset=utf-8'
-    for kind in ('css', 'js'):
-        assert re.search(rf'^/\*\.{kind}\n  Cache-Control: public, max-age=0, must-revalidate$', headers, re.M), f'_headers must revalidate .{kind}'
+    rules = parse_headers(headers)
+    site_header_pairs = [(h.split(':', 1)[0].strip().lower(), h.split(':', 1)[1].strip()) for h in SITE_HEADERS]
+    for file_path in sorted(p for p in root.rglob('*') if p.is_file() and p.name != '_headers'):
+        rel = file_path.relative_to(root).as_posix()
+        url_path = '/' if rel == 'index.html' else ('/' + rel[:-len('index.html')] if rel.endswith('/index.html') else '/' + rel)
+        merged = match_headers(rules, url_path)
+        want_cc = expected_cache_control(rel)
+        assert merged.get('cache-control') == [want_cc], (
+            f'_headers Cache-Control mismatch for {url_path}: got {merged.get("cache-control")}, want {[want_cc]}')
+        for name, value in site_header_pairs:
+            if url_path.startswith('/app/') and name == 'content-security-policy':
+                assert merged.get(name) == [APP_CSP], f'_headers {name} mismatch for {url_path}: {merged.get(name)}'
+            elif url_path.startswith('/app/') and name == 'referrer-policy':
+                assert merged.get(name) == ['no-referrer'], f'_headers {name} mismatch for {url_path}: {merged.get(name)}'
+            else:
+                assert merged.get(name) == [value], f'_headers {name} mismatch for {url_path}: {merged.get(name)}'
+    for unhashed in ('/site.js', '/tokens.css', '/app/shell.js', '/app/ember.css'):
+        merged = match_headers(rules, unhashed)
+        assert merged.get('cache-control') == [CACHE_HTML], (
+            f'_headers must keep unhashed {unhashed} at {CACHE_HTML}, got {merged.get("cache-control")}')
+    for media in ('/clip.mp4', '/clip.vtt'):
+        merged = match_headers(rules, media)
+        assert merged.get('cache-control') == [CACHE_MEDIA], (
+            f'_headers must cache {media} as {CACHE_MEDIA}, got {merged.get("cache-control")}')
     sec_txt = (root / SECURITY_TXT).read_text()
     for line in (
         'Contact: https://github.com/openwizdev/OpenWiz/security/advisories/new',
@@ -860,6 +984,7 @@ def check_site(root, registry=ROOT / 'market/registry.json'):
     ):
         assert line in sec_txt.splitlines(), f'{SECURITY_TXT} missing required line: {line}'
     assert re.search(r'^Expires: \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$', sec_txt, re.M), f'{SECURITY_TXT} missing RFC 3339 Expires'
+    check_security_txt(sec_txt, now=now)
     robots = (root / ROBOTS_TXT).read_text()
     for line in ('User-agent: *', 'Allow: /', 'Disallow: /api/'):
         assert line in robots.splitlines(), f'{ROBOTS_TXT} missing required line: {line}'
