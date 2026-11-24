@@ -89,7 +89,6 @@ class Supporters(unittest.TestCase):
             section = generate('--supporters', TWO)
             (root / 'supporters/index.html').write_text(fixed.replace('</main>', f'<!-- supporters:start -->{section}<!-- supporters:end --></main>', 1))
             check_site(root, supporters_file=TWO)
-            # An unapproved external link inside the generated section must be refused.
             (root / 'supporters/index.html').write_text(
                 (root / 'supporters/index.html').read_text().replace('https://github.com/ada-lovelace', 'https://github.com/someone-else', 1)
             )
