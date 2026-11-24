@@ -141,26 +141,39 @@ test('the build refuses what WizMarket refuses: repeated keys, bad text, impossi
   }
 });
 
-test('the privacy scan refuses every string WizMarket\'s own scan refuses, every BMP code point at every probe position', async () => {
-  const { PRIVATE_SOURCE, privateKind, validate } = await import('../scripts/market.mjs');
+test('the privacy scan refuses exactly what WizMarket\'s own scan refuses, every BMP code point at every probe position', async () => {
+  const { PRIVATE_SOURCE, parse, privateKind, validate } = await import('../scripts/market.mjs');
   const run = spawnSync('python3', ['-I', join(FIXTURES, 'private-parity.py')], { encoding: 'utf8', maxBuffer: 1 << 28 });
   assert.equal(run.status, 0, run.stderr);
-  const { patterns, cases } = JSON.parse(run.stdout);
+  const { unicode, word, patterns, cases } = JSON.parse(run.stdout);
   assert.deepEqual(PRIVATE_SOURCE.map(([label, source]) => [label, source]), patterns.map(([label, source, ignorecase]) => [label, ignorecase === source.startsWith('(?i)') ? source : `${source} (ignorecase set by flag)`]),
     'the site scans with WizMarket\'s patterns, character for character');
-  assert.throws(() => validate(['A synthetic driver. pa\u017fsword: example']), /holds what looks like a token/, 'validate uses the same scan');
+  assert.throws(() => validate(['A synthetic driver. paſsword: example']), /holds what looks like a token/, 'validate uses the same scan');
+  const cafe = fixture('contract-index.json').replace('A synthetic driver that ships its own skill.', 'See https://example.com/café/home/examples/ for more.');
+  assert.doesNotThrow(() => parse(cafe), 'a non-ASCII letter before /home/ is a word character, as in Python, so no machine path');
+  assert.throws(() => parse(cafe.replace('café/home', 'café /home')), /holds what looks like a machine path/, 'a real machine path is still refused');
   assert.ok(cases.length > 400, 'the probes ran');
-  const missed = [];
+  const hex = point => `U+${point.toString(16).toUpperCase().padStart(4, '0')}`;
+  const mismatches = [];
   for (const [probe, at, ranges] of cases) {
-    for (const [first, last] of ranges) {
-      for (let point = first; point <= last; point++) {
-        const text = probe.slice(0, at) + String.fromCharCode(point) + probe.slice(at + 1);
-        if (privateKind(text)) continue;
-        if (missed.push(`${JSON.stringify(probe)} at ${at}: U+${point.toString(16).toUpperCase().padStart(4, '0')}`) >= 20) break;
-      }
+    const python = new Set(ranges.flatMap(([first, last]) => Array.from({ length: last - first + 1 }, (_, i) => first + i)));
+    for (let point = 0; point < 0x10000 && mismatches.length < 20; point++) {
+      if (point >= 0xd800 && point < 0xe000) continue;
+      const site = privateKind(probe.slice(0, at) + String.fromCharCode(point) + probe.slice(at + 1)) !== null;
+      if (site !== python.has(point)) mismatches.push(`${JSON.stringify(probe)} at ${at}: ${hex(point)} ${site ? 'refused by the site only' : 'refused by WizMarket only'}`);
     }
   }
-  assert.deepEqual(missed, [], 'strings WizMarket refuses and the site would publish');
+  assert.deepEqual(mismatches, [], 'strings one scan refuses and the other accepts');
+  const python = new Set(word);
+  const words = [];
+  for (let point = 0; point < 0x110000 && words.length < 20; point++) {
+    if (point >= 0xd800 && point < 0xe000) continue;
+    const site = privateKind(String.fromCodePoint(point) + 'password: x') === null;
+    if (site === python.has(point)) continue;
+    if (unicode !== '14.0.0' && point > 0xffff && !site) continue;
+    words.push(`${hex(point)} before password: ${site ? 'a word character on the site only' : 'a word character in Python only'}`);
+  }
+  assert.deepEqual(words, [], `Python's Unicode word characters and boundaries, every code point (Python's Unicode ${unicode}; WizMarket's Python 3.11 is 14.0.0)`);
 });
 
 test('any tag set builds and passes the site checker: distinct ids, registry links in generated markup only', () => {

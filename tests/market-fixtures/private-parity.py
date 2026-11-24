@@ -56,5 +56,6 @@ if __name__ == '__main__':
     jobs = [(f' {probe} ', i) for probe in PROBES for i in positions_but_inside_a_run(f' {probe} ')]
     with Pool(min(4, os.cpu_count() or 1)) as pool:
         cases = pool.map(refused, jobs)
-    json.dump({'commit': SPACE['WIZMARKET_COMMIT'], 'patterns': [[label, pattern.pattern, bool(pattern.flags & SPACE['re'].I)] for label, pattern in PRIVATE],
+    word = [c for c in range(0x110000) if not 0xd800 <= c < 0xe000 and not private(chr(c) + 'password: x')]
+    json.dump({'unicode': __import__('unicodedata').unidata_version, 'word': word, 'commit': SPACE['WIZMARKET_COMMIT'], 'patterns': [[label, pattern.pattern, bool(pattern.flags & SPACE['re'].I)] for label, pattern in PRIVATE],
                'cases': cases}, sys.stdout)
