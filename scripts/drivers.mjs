@@ -48,7 +48,7 @@ function logo(listing, size, className = '') {
   const file = Object.hasOwn(logos, listing.id) ? logos[listing.id] : 'monitor.svg';
   const alt = file === 'monitor.svg' ? 'Computer icon' : `${listing.name} logo`;
   return `<img${className ? ` class="${className}"` : ''} src="/drivers/logos/${file}" alt="${esc(alt)}"`
-    + ` width="${size}" height="${size}"${className ? '' : ' loading="lazy"'}>`;
+    + ` width="${size}" height="${size}" loading="lazy">`;
 }
 
 function hostMark(listing, id, fallback = '') {

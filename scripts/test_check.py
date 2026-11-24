@@ -10,7 +10,7 @@ from unittest import mock
 
 import re
 
-from check import CTA, FAQ, FAQ_WHERE, FOOTER, INSTALL_NOTE_HTML, FINGERPRINTS, HASHED, INSTALL_SWITCH, ROOT, Page, check_changelog, check_release_data, check_releases, read_releases, split_releases, check_motion, check_privacy, check_ref, check_security_txt, check_site, check_vector, check_webp, fingerprint
+from check import ALL_PAGES, CTA, FAQ, FAQ_WHERE, FOOTER, INSTALL_NOTE_HTML, FINGERPRINTS, HASHED, INSTALL_SWITCH, ROOT, Page, check_changelog, check_release_data, check_releases, read_releases, split_releases, check_motion, check_privacy, check_ref, check_security_txt, check_site, check_vector, check_webp, fingerprint
 
 
 def edit_built(root, name, change):
@@ -20,7 +20,7 @@ def edit_built(root, name, change):
     new = fingerprint(name, data)
     old.unlink()
     (root / new).write_bytes(data)
-    for page in ('index.html', 'changelog/index.html', 'drivers/index.html', 'team/index.html', 'faq/index.html', 'market/index.html', 'app/index.html'):
+    for page in ALL_PAGES:
         path = root / page
         path.write_text(path.read_text().replace(f'"/{was}"', f'"/{new}"'))
 
@@ -57,6 +57,44 @@ def with_switch(state):
 class Checks(unittest.TestCase):
     def test_valid_site(self):
         check_site(ROOT / 'dist')
+
+    def test_missing_or_invalid_discovery_output(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / 'dist'
+            shutil.copytree(ROOT / 'dist', root)
+            failures = [
+                ('index.html', r'<title>.*?</title>', '', 'title'),
+                ('drivers/index.html', r'<meta name="description"[^>]*>', '', 'description'),
+                ('what-is-openwiz/index.html', r'<link rel="canonical"[^>]*>', '', 'canonical'),
+                ('team/index.html', r'<meta property="og:title"[^>]*>', '', 'og:title'),
+                ('faq/index.html', r'<meta property="og:image"[^>]*>', '', 'og:image'),
+                ('app/index.html', r'<meta name="robots"[^>]*>', '', 'noindex'),
+                ('faq/index.html', r'"mainEntity":', '?', 'invalid JSON-LD'),
+                ('faq/index.html', r'"text": "The open source kernel', '"text": "A kernel', 'FAQ JSON-LD'),
+                ('sitemap.xml', r'<url><loc>https://openwiz.dev/</loc>.*?</url>', '', 'sitemap must list'),
+            ]
+            for name, pattern, replacement, error in failures:
+                with self.subTest(file=name, error=error):
+                    path = root / name
+                    original = path.read_text()
+                    changed, count = re.subn(pattern, replacement, original, count=1)
+                    self.assertEqual(count, 1)
+                    path.write_text(changed)
+                    try:
+                        with self.assertRaisesRegex(AssertionError, error):
+                            check_site(root)
+                    finally:
+                        path.write_text(original)
+            for name in ('robots.txt', 'sitemap.xml', 'llms.txt', 'llms-full.txt', 'SKILL.md', '404.html'):
+                with self.subTest(missing=name):
+                    path = root / name
+                    original = path.read_bytes()
+                    path.unlink()
+                    try:
+                        with self.assertRaisesRegex(AssertionError, 'missing build output'):
+                            check_site(root)
+                    finally:
+                        path.write_bytes(original)
 
     def test_broken_targets_fragments_and_schemes(self):
         root = ROOT / 'dist'
@@ -209,7 +247,7 @@ class Checks(unittest.TestCase):
 
     def test_hero_names_no_approval_step(self):
         for name, old, new in (
-                ('index.html', 'Turn an idea into a spec and reviewed code.', 'Turn an idea into an approved plan and reviewed code.'),
+                ('index.html', 'Tell it your idea in plain words.', 'Tell it your idea in plain words and an approved plan.'),
                 ('index.html', '<p class="demo-status">', '<p class="demo-status">Approve the plan · '),
                 ('site.js', "label: 'Writing the spec'", "label: 'Approving the plan'")):
             with self.subTest(new=new), tempfile.TemporaryDirectory() as temp:
@@ -654,7 +692,7 @@ class Checks(unittest.TestCase):
 
     def test_install_line_and_its_switch(self):
         line = '<code class="install-line">Install OpenWiz from github.com/openwizdev/OpenWiz</code>'
-        hint = '<p class="install-hint">Paste this into your agent</p>'
+        hint = '<p class="install-hint">Paste this into your AI helper</p>'
         text = (ROOT / 'dist/index.html').read_text()
         shipped = re.findall(r'data-install="([^"]*)"', text)
         labels = {'coming-soon': 'Copy · coming soon', 'live': 'Copy'}
@@ -683,7 +721,7 @@ class Checks(unittest.TestCase):
                 (line, ''),
                 (line, line + line),
                 (hint, ''),
-                (hint, hint.replace('your agent', 'your terminal')),
+                (hint, hint.replace('your AI helper', 'your terminal')),
                 (switch, ''),
                 (switch, 'data-install="on"'),
                 (button_here, button_here.replace(' disabled', '')),
@@ -839,7 +877,7 @@ class Checks(unittest.TestCase):
             'team page copy': (T, lambda t: t.replace('>Book a call</a>', '>Talk</a>')),
             'team page copy ': (T, lambda t: t.replace('>Book a call</a>', '>Talk</a>', 1)),
             'missing fragment: /team/#book': (T, lambda t: t.replace('<a class="team-book" id="book" data-book', '<a class="team-book" data-book', 1)),
-            'the team page description': (T, lambda t: t.replace('built and reviewed.">', 'built.">', 1)),
+            'the team page description': (T, lambda t: t.replace('run a fleet on your own repository.', 'see the app.', 3)),
             'the team page headline': (T, lambda t: t.replace('Leave the call with a reviewed pull request.', 'Leave the call with a shipped pull request.', 1)),
             'the hero, in order': (T, lambda t: t.replace('For teams who use Claude Code or Codex', 'For solo builders and small teams', 1)),
             'the hero, in order ': (T, lambda t: t.replace('Merging stays your call.', 'Your first fleet merges it.', 1)),
@@ -948,7 +986,7 @@ class Checks(unittest.TestCase):
                 ('generated', f'<a href="{escape(listed)}" ping="{escape(listed)}">x</a>', 'unexpected markup in the generated Market section'),
                 ('generated', f'<svg><image xlink:href="{escape(listed)}"></image></svg>', 'unexpected markup in the generated Market section'),
                 ('generated', f'<a href="{escape(listed)}" rel="noreferrer prefetch">x</a>', 'unexpected markup in the generated Market section'),
-                ('fixed', '<img srcset="/favicon.svg 1x" alt="x">', None),
+                ('fixed', '<img srcset="/favicon.svg 1x" alt="x" width="32" height="32" loading="lazy">', None),
                 ('generated', f'<a href="{prose}">x</a>', 'unexpected external URL'),
                 ('generated', '<a href="https://x.com/openwiz">x</a>', 'unexpected external URL'),
                 ('generated', '<a href="https://tracker.example.com/example-owner/example-tool/-/issues/1">x</a>', 'unexpected external URL'),
@@ -991,6 +1029,10 @@ class Checks(unittest.TestCase):
             registry.write_text(json.dumps({**snapshot, 'listings': listings}))
             source = {name: fingerprinted_page((ROOT / name).read_text(), cta=True)
                       for name in ('drivers/index.html', 'market/index.html')}
+            for name, html in source.items():
+                built = (root / name).read_text()
+                metadata = re.search(r'<!-- metadata:start -->[\s\S]*?<!-- metadata:end -->', built)[0]
+                source[name] = html.replace('<template data-slot="page-metadata"></template>', metadata)
             exports = subprocess.run(['node', '--input-type=module', '-e', """
                 import { readFileSync } from 'node:fs';
                 import { withDrivers } from './scripts/drivers.mjs';
@@ -1065,7 +1107,7 @@ class Checks(unittest.TestCase):
             return temp, root
         for message, (page, change) in {
             'the index.html page needs the one Questions': ('index.html', lambda t: t.replace(FAQ, '', 1)),
-            'the faq/index.html page needs the one Questions': ('faq/index.html', lambda t: t.replace('What is a kernel?', 'What is a core?', 1)),
+            'the faq/index.html page needs the one Questions': ('faq/index.html', lambda t: t.replace('>What is a kernel?<', '>What is a core?<', 1)),
             'the team/index.html page shows no Questions|never uses: CloudRoom': ('team/index.html', lambda t: t.replace('</main>', FAQ + '</main>', 1)),
             'needs faq.js': ('faq/index.html', lambda t: re.sub(r'<script src="/faq\.[0-9a-f]+\.js" defer></script>', '', t)),
         }.items():
@@ -1091,13 +1133,13 @@ class Checks(unittest.TestCase):
         }.items():
             broken = change(FAQ)
             top = re.sub(r'<(/?)h3\b', r'<\1h2', re.sub(r'<(/?)h2\b', r'<\1h1', broken))
-            htmls = {'index.html': '</section>\n' + broken + '</main>', check.FAQ_PAGE: top + '</main>'}
+            htmls = {'index.html': '</section>\n' + broken + check.ABOUT_LINK + '</main>', check.FAQ_PAGE: top + check.ABOUT_LINK + '</main>'}
             pages = {name: mock.Mock(scripts=['/faq.0123456789.js']) for name in htmls}
             with self.subTest(message=message), mock.patch.multiple(check, FAQ=broken, FAQ_TOP=top,
                     FAQ_ON={'index.html': broken, check.FAQ_PAGE: top}), \
                     self.assertRaisesRegex(AssertionError, message.strip()):
                 check.check_faq(htmls, pages, names)
-        htmls = {'index.html': '</section>\n' + FAQ + '</main>', check.FAQ_PAGE: check.FAQ_TOP + '</main>', check.TEAM_PAGE: '<main></main>',
+        htmls = {'index.html': '</section>\n' + FAQ + check.ABOUT_LINK + '</main>', check.FAQ_PAGE: check.FAQ_TOP + check.ABOUT_LINK + '</main>', check.TEAM_PAGE: '<main></main>',
                  'drivers/index.html': '<main>' + FAQ + '</main>'}
         pages = {name: mock.Mock(scripts=[] if name == check.TEAM_PAGE else ['/faq.0123456789.js']) for name in htmls}
         with self.assertRaisesRegex(AssertionError, 'the drivers/index.html page shows no Questions'):
@@ -1248,7 +1290,6 @@ class Checks(unittest.TestCase):
                 ('<p class="driver-kit passed" data-state="passed">', '<p class="driver-kit passed" data-state="not yet run">', 'one kit line must read'),
                 ('<h2 id="more-title">Also shipped</h2>', '<h2 id="more-title">Also shipped</h2><p>4 words, 5 checks in the kit</p>', 'jargon count'),
                 ('<h2 id="more-title">Also shipped</h2>', '<h2 id="more-title">Also shipped</h2><p>1 passed, 3 of 5</p>', 'jargon count'),
-                ('Drivers answer the same four commands', 'Drivers answer 4 words', 'jargon count'),
                 ('<h2 id="more-title">Also shipped</h2>', '<h2 id="more-title">Also shipped</h2><p>boat.dev passed all five checks.</p>', 'at most 2 times'),
                 ('<div class="own-token"><dt><code>token</code></dt>', '<div class="own-token"><dt><code>tokens</code></dt>', 'fifth check, token'),
                 ('alt="Cloudroom logo" width="256"', 'alt="" width="256"', 'alt text naming Cloudroom|names its host'),
@@ -1365,11 +1406,10 @@ class Checks(unittest.TestCase):
                     check_site(root)
         self.broken('', '', '', 'hidden on phones', css='\n@media (max-width: 480px) { .landing-nav .nav-drivers { display: none; } }\n')
         for old, new, error in (
-                ('boat.dev, Cloudroom and your own computer or VPS passed all five checks', 'boat.dev passed all five checks', 'must say boat.dev, Cloudroom and your own computer or VPS passed'),
-                ('every other host and harness shows its true state', 'Grok Bot passed too', 'must say boat.dev|Grok Bot has not passed'),
-                ('A driver connects', 'Every driver passes the kit. A driver connects', 'must not say every driver passes'),
-                ('Drivers answer the same four commands', 'Drivers answer 4 words', 'jargon count'),
-                ('commands, plus their schema, and take', 'commands and take', 'description says')):
+                ('boat.dev, CloudRoom and your own computer or VPS', 'boat.dev', 'the drivers description must say'),
+                ('See results for the shipped drivers', 'Every driver passed', 'must not say every driver passes'),
+                ('use four commands', 'use 4 words', 'jargon count'),
+                ('See results for the shipped drivers:', 'Grok Bot passed:', 'Grok Bot has not passed')):
             with self.subTest(error=error), tempfile.TemporaryDirectory() as temp:
                 root = Path(temp) / 'dist'
                 shutil.copytree(ROOT / 'dist', root)
@@ -1377,7 +1417,7 @@ class Checks(unittest.TestCase):
                 text = page.read_text()
                 head = text[:text.index('</head>')]
                 self.assertIn(old, head)
-                page.write_text(text.replace(old, new, 1))
+                page.write_text(text.replace(old, new, 3))
                 with self.assertRaisesRegex(AssertionError, error):
                     check_site(root)
 
