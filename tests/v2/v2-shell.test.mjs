@@ -142,7 +142,7 @@ test('real v2 Settings works when Specs is unknown and the palette only offers l
     await run.page.until(`document.querySelector('.v2-panel .repo') && OW.data.feeds.specs.state === 'unknown'`, 'settings with a failed Specs read');
     assert.match(await run.page.text(), /Coming soon/);
     assert.match(await run.page.text(), /Sign out/);
-    assert.doesNotMatch(await run.page.text(), /Balanced|0\.02|Local computer/);
+    assert.doesNotMatch(await run.page.text(), /Balanced|0\.02|Local computer|Agents/);
     await run.page.key('k', 'Ctrl');
     await run.page.until(`OW.palette.shown()`, 'command palette');
     assert.doesNotMatch(await run.page.text(), /Show only (specs|tickets|agents)/i);

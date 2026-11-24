@@ -197,10 +197,10 @@
   }
 
   function freshnessNodes() {
-    const feeds = data.feeds;
+    const feeds = v2 ? [data.feeds.specs] : Object.values(data.feeds);
     const limit = data.limit;
     return [
-      ...Object.values(feeds).map(feed => h('div', {}, ...readLine(feed),
+      ...feeds.map(feed => h('div', {}, ...readLine(feed),
         v2 && feed.state === 'partial' ? ' · partial read' : null)),
       v2 && data.paused() ? h('div', {}, `GitHub reads are paused until ${time(limit.pausedUntil)}.`) : null,
       h('div', {}, limit.remaining === null ? 'GitHub limit: not read yet' : `GitHub limit: ${limit.remaining.toLocaleString()} left`),
