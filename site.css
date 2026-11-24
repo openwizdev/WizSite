@@ -653,3 +653,10 @@ body.landing > main { flex: 1 0 auto; }
 .launch figcaption { display: flex; justify-content: flex-end; }
 .launch-post { display: inline-flex; align-items: center; min-height: 44px; color: var(--grey2); font-size: 14px; text-decoration: underline 1px; text-decoration-color: var(--edge); text-underline-offset: .3em; }
 .launch-post:hover { color: var(--ink); text-decoration-color: currentColor; }
+
+.plain-page{max-width:720px;padding-block:clamp(40px,6vw,84px);overflow-wrap:anywhere}
+.plain-page h1{font-size:clamp(36px,5vw,64px);line-height:1.05}
+.plain-page h2{margin-top:1.5em}
+.plain-page p{margin-top:.75em}
+.plain-page a,.about-link a{text-decoration:underline;text-underline-offset:.2em}
+.about-link{margin-block:1rem 2rem}

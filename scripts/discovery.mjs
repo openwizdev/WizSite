@@ -1,0 +1,151 @@
+import { decode } from './ask-index.mjs';
+
+const site = 'https://openwiz.dev/';
+const github = 'https://github.com/openwizdev';
+const repo = github + '/OpenWiz';
+const sameAs = [github, repo, 'https://x.com/openwiz'];
+const organization = site + '#organization';
+const software = site + '#software';
+const schema = 'https://schema.org';
+
+export const aboutPage = 'what-is-openwiz/index.html';
+export const faqPage = 'faq/index.html';
+export const pages = {
+  'index.html': [
+    'OpenWiz: the open source agent factory for coding agents',
+    'OpenWiz is the open source kernel for agent factories. It runs fleets of coding agents like Claude Code and Codex on your own machines. Free, Apache-2.0.',
+  ],
+  [aboutPage]: [
+    'What is OpenWiz?',
+    'Learn how OpenWiz runs fleets of coding agents, where the agents run, how work is tracked on GitHub, and how to install it.',
+  ],
+  [faqPage]: [
+    'FAQ — OpenWiz',
+    'Questions about OpenWiz, the open source kernel for agent factories: what it is, what you need, where your agents run, what it costs.',
+  ],
+  'drivers/index.html': [
+    'Drivers — OpenWiz',
+    'OpenWiz drivers use four commands and one test kit. See results for the shipped drivers: boat.dev, CloudRoom and your own computer or VPS.',
+  ],
+  'changelog/index.html': [
+    'Changelog — OpenWiz',
+    'The OpenWiz changelog lists what each public release lets you do, newest first.',
+  ],
+  'market/index.html': [
+    'Market — OpenWiz',
+    'The OpenWiz market: drivers, harnesses, skills and anything else that plugs into OpenWiz, listed by anyone, verified when it passes its test.',
+  ],
+  'team/index.html': [
+    'For your team — OpenWiz',
+    'Book a 30-minute call to set up OpenWiz with your team and run a fleet on your own repository.',
+  ],
+  'app/index.html': ['The app — OpenWiz', 'Sign in with GitHub to see your OpenWiz specs, tickets and agents.', 'noindex'],
+  '404.html': ['Page not found — OpenWiz', 'Find the OpenWiz homepage, overview and frequently asked questions.', 'noindex'],
+};
+
+const urlFor = page => site + page.replace(/index\.html$/, '');
+const escape = text => text.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+const plain = html => decode(html.replace(/<svg\b[^>]*>[\s\S]*?<\/svg>/g, '').replace(/<[^>]*>/g, '')).replace(/\s+/g, ' ').trim();
+
+function faqEntries(html) {
+  const entries = [...html.matchAll(/<div class="faq-row">\s*<h3[^>]*><button[^>]*>([\s\S]*?)<\/button><\/h3>\s*<div class="faq-a"[^>]*><div>([\s\S]*?)<\/div><\/div>\s*<\/div>/g)]
+    .map(([, question, answer]) => [plain(question), plain(answer.replace(/<\/p>/g, ' '))]);
+  if (entries.length === 0 || entries.length !== html.split('class="faq-row"').length - 1) {
+    throw new Error('Every FAQ row needs a question and an answer');
+  }
+  return entries;
+}
+
+function structuredData(page, faq) {
+  if (page === 'index.html') {
+    return {
+      '@context': schema,
+      '@graph': [
+        { '@type': 'Organization', '@id': organization, name: 'OpenWiz', url: site, logo: site + 'brand/openwiz-lockup.svg', sameAs },
+        { '@type': 'WebSite', '@id': site + '#website', name: 'OpenWiz', url: site },
+        {
+          '@type': 'SoftwareApplication', '@id': software, name: 'OpenWiz', description: pages[page][1], url: site,
+          applicationCategory: 'DeveloperApplication', operatingSystem: 'macOS, Linux',
+          offers: { '@type': 'Offer', price: 0, priceCurrency: 'USD' },
+          license: 'https://www.apache.org/licenses/LICENSE-2.0', downloadUrl: repo + '/releases',
+          sameAs, publisher: { '@id': organization },
+        },
+      ],
+    };
+  }
+  if (page === faqPage) {
+    return {
+      '@context': schema, '@type': 'FAQPage', url: urlFor(page),
+      mainEntity: faqEntries(faq).map(([name, text]) => ({
+        '@type': 'Question', name, acceptedAnswer: { '@type': 'Answer', text },
+      })),
+    };
+  }
+  if (page === aboutPage) {
+    return { '@context': schema, '@type': 'AboutPage', url: urlFor(page), about: { '@id': software } };
+  }
+}
+
+export function withMetadata(page, html, faq) {
+  const [title, description, robots] = pages[page];
+  const url = urlFor(page);
+  const tags = [`<title>${escape(title)}</title>`, `<meta name="description" content="${escape(description)}">`];
+  if (page !== '404.html') tags.push(`<link rel="canonical" href="${url}">`);
+  if (robots) tags.push(`<meta name="robots" content="${robots}">`);
+  else {
+    for (const [key, value] of Object.entries({ type: 'website', site_name: 'OpenWiz', title, description, url })) {
+      tags.push(`<meta property="og:${key}" content="${escape(value)}">`);
+    }
+    for (const [key, value] of Object.entries({ site: '@openwiz', title, description })) {
+      tags.push(`<meta name="twitter:${key}" content="${escape(value)}">`);
+    }
+    const data = structuredData(page, faq);
+    if (data) {
+      tags.push(`<script type="application/ld+json">\n${JSON.stringify(data, null, 2).replaceAll('<', '\\u003c')}\n</script>`);
+    }
+  }
+  const slot = '<template data-slot="page-metadata"></template>';
+  if (html.split(slot).length !== 2) throw new Error(`${page} needs one metadata slot`);
+  return html.replace(slot, () => `<!-- metadata:start -->\n${tags.join('\n')}\n<!-- metadata:end -->`);
+}
+
+const crawlers = [
+  '*', 'GPTBot', 'OAI-SearchBot', 'ChatGPT-User', 'ClaudeBot', 'Claude-SearchBot', 'Claude-User',
+  'anthropic-ai', 'PerplexityBot', 'Perplexity-User', 'Google-Extended', 'Googlebot', 'Bingbot',
+  'Applebot', 'Applebot-Extended', 'DuckDuckBot', 'CCBot', 'meta-externalagent', 'Amazonbot', 'cohere-ai', 'YouBot',
+];
+
+export function crawlerFiles(about, faq) {
+  const main = about.match(/<main\b[^>]*>([\s\S]*?)<\/main>/)[1];
+  const [intro, ...body] = [...main.matchAll(/<(h1|h2|p|li)\b[^>]*>([\s\S]*?)<\/\1>/g)];
+  const link = /<a href="([^"]+)">([^<]+)<\/a>/g;
+  const markdown = html => plain(html.replace(link, (_, url, label) => `[${label}](${new URL(url, site)})`));
+  const links = body.filter(([, tag]) => tag === 'li').map(([, , html]) => '- ' + markdown(html).replace(') — ', '): '));
+  const [, , summary] = body.find(([, tag]) => tag === 'p');
+  const [, , whatItDoes] = body.filter(([, tag]) => tag === 'p')[1];
+  const llms = [
+    '# OpenWiz', `> ${plain(summary)}`, plain(whatItDoes),
+    '## Docs', [
+      `- [${plain(intro[2])}](${urlFor(aboutPage)}): What it does, where agents run, and how to install it.`,
+      links.find(line => line.startsWith('- [FAQ]')),
+      `- [Full OpenWiz text](${site}llms-full.txt): The overview and FAQ in one file.`,
+    ].join('\n'),
+    '## Links', links.filter(line => !line.startsWith('- [FAQ]')).join('\n'),
+  ].join('\n\n') + '\n';
+  const full = [
+    `# ${plain(intro[2])}`,
+    ...body.filter(([, tag]) => tag !== 'li').map(([, tag, html]) => tag === 'h2' ? '## ' + plain(html) : markdown(html)),
+    links.join('\n'), '## FAQ',
+    ...faqEntries(faq).map(([question, answer]) => `### ${question}\n\n${answer}`),
+  ].join('\n\n') + '\n';
+
+  const date = new Date().toISOString().slice(0, 10);
+  const urls = Object.entries(pages).filter(([, [, , robots]]) => !robots).map(([page]) =>
+    `  <url><loc>${urlFor(page)}</loc><lastmod>${date}</lastmod></url>`);
+  return {
+    'robots.txt': crawlers.map(agent => `User-agent: ${agent}\nAllow: /\nDisallow: /api/\n\n`).join('') + `Sitemap: ${site}sitemap.xml\n`,
+    'sitemap.xml': ['<?xml version="1.0" encoding="UTF-8"?>', '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">', ...urls, '</urlset>', ''].join('\n'),
+    'llms.txt': llms,
+    'llms-full.txt': full,
+  };
+}

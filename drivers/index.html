@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="A driver connects OpenWiz to wherever your agents run: your computer, a VPS, Cloudroom, boat.dev. Drivers answer the same four commands, plus their schema, and take the same five-check test: boat.dev, Cloudroom and your own computer or VPS passed all five checks and ship today; every other host and harness shows its true state."><title>Drivers — OpenWiz</title><link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48"><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><meta property="og:image" content="https://openwiz.dev/brand/og.png?v=2"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="OpenWiz"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="https://openwiz.dev/brand/og.png?v=2"><link rel="preload" href="/fonts/Geist-var.woff2" as="font" type="font/woff2" crossorigin><link rel="preload" href="/art/drivers-d-sea.webp" as="image" type="image/webp"><link rel="stylesheet" href="/tokens.css"><link rel="stylesheet" href="/site.css"><script src="/vendor/gsap-3.15.1.min.js" defer></script><script src="/site.js" defer></script></head>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><template data-slot="page-metadata"></template><link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48"><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><meta property="og:image" content="https://openwiz.dev/brand/og.png?v=2"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="OpenWiz"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="https://openwiz.dev/brand/og.png?v=2"><link rel="preload" href="/fonts/Geist-var.woff2" as="font" type="font/woff2" crossorigin><link rel="preload" href="/art/drivers-d-sea.webp" as="image" type="image/webp"><link rel="stylesheet" href="/tokens.css"><link rel="stylesheet" href="/site.css"><script src="/vendor/gsap-3.15.1.min.js" defer></script><script src="/site.js" defer></script></head>
 <body class="landing drivers-page">
 <a class="skip" href="#main">Skip to content</a>
 <header class="landing-nav wrap">
@@ -57,9 +57,9 @@
         <p class="voyage-sub">OpenWiz's agents build software from tickets, and every driver answers the same four commands, plus its schema, and must pass the same five-check test on its real host.</p>
       </div>
       <ul class="host-marks" aria-label="Where drivers run today"><template data-slot="drivers-marks-start"></template>
-        <li data-host="vps" data-state="passed"><span class="host-mark"><img class="host-icon" src="/drivers/logos/monitor.svg" alt="Computer icon" width="24" height="24"></span><span class="host-name">Your computer or VPS</span> <span class="host-state">passed 5 of 5</span></li>
-        <li data-host="cloudroom" data-state="passed"><span class="host-mark"><img class="host-tile" src="/drivers/logos/cloudroom.png" alt="Cloudroom logo" width="256" height="256"></span><span class="host-name">Cloudroom</span> <span class="host-state">passed 5 of 5</span></li>
-        <li data-host="boat-dev" data-state="passed"><span class="host-mark"><img class="host-lockup" src="/drivers/logos/boat-dev.svg" alt="boat.dev" width="390" height="109"></span> <span class="host-state">passed 5 of 5</span></li>
+        <li data-host="vps" data-state="passed"><span class="host-mark"><img class="host-icon" src="/drivers/logos/monitor.svg" alt="Computer icon" width="24" height="24" loading="lazy"></span><span class="host-name">Your computer or VPS</span> <span class="host-state">passed 5 of 5</span></li>
+        <li data-host="cloudroom" data-state="passed"><span class="host-mark"><img class="host-tile" src="/drivers/logos/cloudroom.png" alt="Cloudroom logo" width="256" height="256" loading="lazy"></span><span class="host-name">Cloudroom</span> <span class="host-state">passed 5 of 5</span></li>
+        <li data-host="boat-dev" data-state="passed"><span class="host-mark"><img class="host-lockup" src="/drivers/logos/boat-dev.svg" alt="boat.dev" width="390" height="109" loading="lazy"></span> <span class="host-state">passed 5 of 5</span></li>
       <template data-slot="drivers-marks-end"></template></ul>
       <ul class="tally" aria-label="Every driver and harness, by state"><template data-slot="drivers-tally-start"></template><li data-state="shipped"><b>3</b> shipped</li><li data-state="live"><b>1</b> passed live, not in a release yet</li><li data-state="waiting"><b>12</b> waiting on live checks</li><li data-state="review"><b>17</b> in review</li><li data-state="building"><b>0</b> being built</li><li data-state="planned"><b>2</b> planned</li><li data-state="held"><b>2</b> held</li><li data-state="parked"><b>1</b> parked</li><template data-slot="drivers-tally-end"></template></ul>
       <a class="voyage-pass" href="#boat-dev">See boat.dev's five passed checks</a>
@@ -68,7 +68,7 @@
   <section class="spotlight wrap" aria-labelledby="boat-dev-name">
     <template data-slot="drivers-spotlight-start"></template><article class="driver hero" id="boat-dev" aria-labelledby="boat-dev-name">
       <div class="proof-copy">
-        <h2 class="driver-name" id="boat-dev-name"><img class="spot-logo" src="/drivers/logos/boat-dev.svg" alt="boat.dev" width="390" height="109"></h2>
+        <h2 class="driver-name" id="boat-dev-name"><img class="spot-logo" src="/drivers/logos/boat-dev.svg" alt="boat.dev" width="390" height="109" loading="lazy"></h2>
         <p class="driver-login">Login: held by boat.dev</p>
         <p class="driver-line">Passed all five checks</p>
         <p class="driver-date"><a href="https://github.com/openwizdev/OpenWiz/pull/1444" data-count="github">On a real account, <time datetime="2026-11-19">2026-11-19</time></a></p><template data-slot="drivers-spotlight-end"></template>
@@ -92,7 +92,7 @@
     <ul class="driver-list"><template data-slot="drivers-shipped-start"></template>
       <li>
       <article class="driver" id="vps" aria-labelledby="vps-name">
-        <h3 class="driver-name" id="vps-name"><img class="driver-logo host-icon" src="/drivers/logos/monitor.svg" alt="Computer or VPS icon" width="24" height="24"><span>Your own computer or VPS</span></h3>
+        <h3 class="driver-name" id="vps-name"><img class="driver-logo host-icon" src="/drivers/logos/monitor.svg" alt="Computer or VPS icon" width="24" height="24" loading="lazy"><span>Your own computer or VPS</span></h3>
         <p class="driver-login">Login: stays on your machine</p>
         <p class="driver-line">Passed the kit on a Linux PC</p>
         <p class="driver-date"><a href="https://github.com/openwizdev/OpenWiz/pull/1455#issuecomment-7034588211" data-count="github">Kit run, <time datetime="2026-11-20">2026-11-20</time></a></p>
@@ -101,7 +101,7 @@
       </li>
       <li>
       <article class="driver" id="cloudroom" aria-labelledby="cloudroom-name">
-        <h3 class="driver-name" id="cloudroom-name"><img class="driver-logo host-tile" src="/drivers/logos/cloudroom.png" alt="Cloudroom logo" width="256" height="256"><span>Cloudroom</span></h3>
+        <h3 class="driver-name" id="cloudroom-name"><img class="driver-logo host-tile" src="/drivers/logos/cloudroom.png" alt="Cloudroom logo" width="256" height="256" loading="lazy"><span>Cloudroom</span></h3>
         <p class="driver-login">Login: held by Cloudroom</p>
         <p class="driver-line">Passed the kit, run from a Cloudroom cloud thread against real Cloudroom</p>
         <p class="driver-date"><a href="https://github.com/openwizdev/OpenWiz/pull/1458#issuecomment-7034556153" data-count="github">Kit run, <time datetime="2026-11-20">2026-11-20</time></a></p>
