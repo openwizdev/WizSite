@@ -3,7 +3,7 @@
   const { h, icon } = OW.ui;
   const isDemo = OW.data.demo;
   const mark = () => h('img', { src: '/app/mark.svg', alt: '', width: 28, height: 28 });
-  const avatar = () => h('img', { class: 'v2-avatar', src: '/art/family-01.webp', alt: '', width: 32, height: 32 });
+  const avatar = () => h('img', { class: 'v2-avatar', src: '/app/mark.svg', alt: '', width: 32, height: 32 });
 
   function initialDemoState() {
     return {
@@ -40,7 +40,7 @@
           id: 'c-spec-1',
           type: 'spec',
           status: 'ready',
-          kicker: 'Spec · Ready',
+          kicker: 'Ready to ship',
           title: 'Magic-link sign-in',
           goal: 'Passwordless sign-in with 15-minute links and automatic session refresh.',
           merged: 6,
@@ -57,7 +57,7 @@
           id: 'c-dec-1',
           type: 'decision',
           status: 'pending',
-          kicker: 'Decision · Needs you',
+          kicker: 'Needs you',
           title: 'Pricing copy on the checkout banner',
           goal: 'Show annual savings as a percentage or a dollar amount?',
           context: 'Annual plans save $240/yr per 10 seats. The rest of the pricing page uses percentages.',
@@ -85,7 +85,7 @@
           id: 'c-dec-2',
           type: 'decision',
           status: 'pending',
-          kicker: 'Decision · Needs you',
+          kicker: 'Needs you',
           title: 'Retention window for deleted projects',
           goal: 'Keep soft-deleted projects recoverable for 30 days or purge after 7 days?',
           context: 'Storage cost is under $2/mo; 30 days matches standard workspace recovery expectations.',
@@ -367,15 +367,15 @@
         redraw();
       });
     };
-    const poster = h('div', { class: `v2-preview${decision ? ' decision' : ''}` },
+    const poster = decision ? null : h('div', { class: 'v2-preview' },
       h('div', { class: 'v2-preview-art', 'aria-hidden': 'true' }),
-      decision ? null : h('div', { class: 'v2-preview-top' },
+      h('div', { class: 'v2-preview-top' },
         h('span', { class: 'v2-preview-label' }, 'Narrated spec'),
         h('button', { type: 'button', class: 'v2-preview-btn', 'data-focus': 'scene',
           'aria-label': `Next scene, scene ${card.sceneIdx + 1} of ${card.scenes.length}`,
           onclick: () => { card.sceneIdx = (card.sceneIdx + 1) % card.scenes.length; redraw(); },
         }, `Scene ${card.sceneIdx + 1}/${card.scenes.length}`, icon('right'))),
-      decision ? null : h('div', { class: 'v2-preview-caption', 'aria-live': 'polite' }, card.scenes[card.sceneIdx]));
+      h('div', { class: 'v2-preview-caption', 'aria-live': 'polite' }, card.scenes[card.sceneIdx]));
     const details = decision
       ? h('div', { class: 'v2-decision-box' },
         h('span', { class: 'v2-label' }, 'Recommendation'),
@@ -398,7 +398,7 @@
           onclick: () => resolve(decision ? 'decided' : 'shipped', decision ? 'Approved' : 'Shipped') }, icon('check'), 'Ship it'),
         h('button', { type: 'button', class: 'v2-btn', 'data-focus': 'change',
           onclick: event => openSheet(card, event.currentTarget) }, 'Change something'),
-        h('button', { type: 'button', class: 'v2-btn subtle', 'data-focus': 'defer',
+        h('button', { type: 'button', class: 'v2-btn v2-text-btn', 'data-focus': 'defer',
           onclick: () => resolve('deferred', 'Saved for later') }, 'Not now')));
     const navigation = pager(index, list.length, go);
     controls.replaceChildren(...(navigation ? [navigation] : []));

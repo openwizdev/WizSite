@@ -175,6 +175,8 @@ nav.v2-nav { flex: 1; gap: 4px; }
   text-decoration: none;
 }
 .v2-btn:disabled, .v2-send-btn:disabled, .v2-rail-btn:disabled, .v2-q-pill:disabled { opacity: .55; cursor: default; }
+.v2-text-btn.v2-btn { background: transparent; border-color: transparent; color: var(--em-text-2); }
+.v2-text-btn.v2-btn:hover { color: var(--em-text); text-decoration: underline; text-underline-offset: 4px; }
 .v2-btn.subtle { background-color: transparent; border-color: transparent; color: var(--em-text-2); }
 .v2-btn.subtle:hover { background-color: var(--em-card); color: var(--em-text); }
 .v2-btn.primary { background: var(--v2-dots) #a8caf6; border-color: #bad6f8; color: var(--em-on-amber); font-weight: 680; }
@@ -257,7 +259,6 @@ nav.v2-nav { flex: 1; gap: 4px; }
   mix-blend-mode: luminosity;
   opacity: .78;
 }
-.v2-preview.decision .v2-preview-art { background-image: url('/art/moments-sea.webp'); background-position: center 69%; }
 .v2-preview::after {
   content: '';
   position: absolute;
@@ -278,7 +279,8 @@ nav.v2-nav { flex: 1; gap: 4px; }
 .v2-pips span { flex: 1; height: 4px; background: #484e56; border-radius: 4px; }
 .v2-pips .merged { background: #a8b9c9; }
 .v2-decision-box strong { font-size: 20px; }
-.v2-card-actions { display: flex; gap: 8px; }
+.v2-card-actions { display: grid; grid-template-columns: minmax(200px, 2fr) minmax(max-content, 1fr) max-content; gap: 8px; }
+.v2-card-actions .primary { min-height: 48px; }
 .v2-card-actions .v2-btn { white-space: nowrap; }
 .v2-clear-card { padding-block: 40px; }
 .v2-clear-card h2, .v2-chat-empty h2 { margin: 0; font-size: 26px; letter-spacing: -.03em; }
@@ -336,7 +338,7 @@ nav.v2-nav { flex: 1; gap: 4px; }
 .v2-settings .repo .name { text-align: end; }
 .v2-settings .repo-list { margin: 4px 0 8px; }
 .v2-settings .repos button { min-height: 44px; }
-.v2-sign-out.v2-btn { margin-top: 8px; padding-inline: 0; color: #e9b1a9; }
+.v2-sign-out.v2-btn { margin-top: 8px; padding-inline: 0; color: var(--em-text-2); }
 .v2-freshness { color: var(--em-muted); font-size: 14px; }
 .v2-muted { color: var(--em-muted); }
 
