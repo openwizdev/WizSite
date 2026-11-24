@@ -149,10 +149,11 @@ test('the privacy scan refuses exactly what WizMarket\'s own scan refuses, every
   const { unicode, word, patterns, cases } = JSON.parse(run.stdout);
   assert.deepEqual(PRIVATE_SOURCE.map(([label, source]) => [label, source]), patterns.map(([label, source, ignorecase]) => [label, ignorecase === source.startsWith('(?i)') ? source : `${source} (ignorecase set by flag)`]),
     'the site scans with WizMarket\'s patterns, character for character');
-  assert.throws(() => validate(['A synthetic driver. paſsword: example']), /holds what looks like a token/, 'validate uses the same scan');
-  const cafe = fixture('contract-index.json').replace('A synthetic driver that ships its own skill.', 'See https://example.com/café/home/examples/ for more.');
-  assert.doesNotThrow(() => parse(cafe), 'a non-ASCII letter before /home/ is a word character, as in Python, so no machine path');
-  assert.throws(() => parse(cafe.replace('café/home', 'café /home')), /holds what looks like a machine path/, 'a real machine path is still refused');
+  assert.throws(() => validate(['A synthetic driver. PAſSWORD: example']), /holds what looks like a token/, 'validate uses the same scan');
+  const path = ['home', 'examples', ''].join('/');
+  const cafe = fixture('contract-index.json').replace('A synthetic driver that ships its own skill.', `See https://example.com/café/${path} for more.`);
+  assert.doesNotThrow(() => parse(cafe), 'a non-ASCII letter keeps the URL path inside a word');
+  assert.throws(() => parse(cafe.replace(`café/${path}`, `café /${path}`)), /holds what looks like a machine path/, 'a real machine path is still refused');
   assert.ok(cases.length > 400, 'the probes ran');
   const hex = point => `U+${point.toString(16).toUpperCase().padStart(4, '0')}`;
   const mismatches = [];

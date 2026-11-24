@@ -79,9 +79,9 @@ const PYTHON_WORD = [
   '1ee8b-1ee9b 1eea1-1eea3 1eea5-1eea9 1eeab-1eebb 1f100-1f10c 1fbf0-1fbf9 20000-2a6df 2a700-2b738 2b740-2b81d 2b820-2cea1 2ceb0-2ebe0 ',
   '2f800-2fa1d 30000-3134a ',
 ].join('').trim().split(' ').map(range => range.split('-').map(point => `\\u{${point}}`).join('-')).join('');
-const WORD = `(?-i:[${PYTHON_WORD}])`;
+const WORD = `[${PYTHON_WORD}]`;
 const PYTHON_IGNORECASE_ASCII = { '\u0130': 'i', '\u0131': 'i', '\u017f': 's', '\u212a': 'k' };
-const pythonIgnorecase = text => text.replace(/[\u0130\u0131\u017f\u212a]/g, c => PYTHON_IGNORECASE_ASCII[c]);
+const pythonIgnorecase = text => text.replace(/[A-Z\u0130\u0131\u017f\u212a]/g, c => PYTHON_IGNORECASE_ASCII[c] ?? c.toLowerCase());
 
 function fromPython(source) {
   const ignorecase = source.startsWith('(?i)');
@@ -101,10 +101,12 @@ function fromPython(source) {
       if (c === '[' && !inClass) inClass = true;
       else if (c === ']' && inClass) inClass = false;
       else if (c === '(' && source[i + 1] === '?' && !inClass && !/^\(\?(?::|<!)/.test(source.slice(i))) throw new Error('market privacy scan: no JavaScript port for a group in a WizMarket pattern');
-      out += c;
+      // INTEROP: WizMarket's case-insensitive pattern uses ASCII literals and ranges.
+      // Fold those and the input without applying JavaScript case folding to Python's word class.
+      out += ignorecase && c >= 'A' && c <= 'Z' ? c.toLowerCase() : c;
     }
   }
-  return { pattern: new RegExp(out, ignorecase ? 'iu' : 'u'), ignorecase };
+  return { pattern: new RegExp(out, 'u'), ignorecase };
 }
 
 const PRIVATE = PRIVATE_SOURCE.map(([label, source]) => [label, fromPython(source)]);
