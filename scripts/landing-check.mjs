@@ -424,7 +424,35 @@ async function footer(page, where, mode) {
   expect(facts.bottom >= facts.inner && facts.bottom >= facts.height - 1, where, `the footer ends at ${facts.bottom}px, above the window's bottom (${facts.inner}px)`);
 }
 
-const FAQ_PATHS = ['/', '/team/', '/faq/'];
+async function teamFilm(page, where, width, height, mode) {
+  const read = () => page.evaluate(`(() => { ${HELPERS}
+    const video = document.querySelector('.launch-video'), play = document.querySelector('.launch-play'), book = document.querySelector('#book');
+    const frame = document.querySelector('.launch-frame').getBoundingClientRect(), kicker = document.querySelector('.team-kicker').getBoundingClientRect();
+    return {
+      paused: video.paused, muted: video.muted, controls: video.controls, autoplay: video.autoplay, playHidden: play.hidden,
+      fetched: performance.getEntriesByType('resource').some(e => e.name.includes('launch-video.mp4')),
+      label: play.innerText.trim(), focused: document.activeElement === video,
+      fold: { kicker: kicker.bottom, h1: document.querySelector('h1').getBoundingClientRect().bottom, book: book.getBoundingClientRect().bottom, poster: frame.bottom },
+      height: innerHeight,
+    };
+  })()`);
+  const before = await read();
+  expect(before.paused && !before.autoplay && !before.fetched, where, 'the team film plays or loads before a click');
+  if (mode.noScript) return expect(before.controls, where, 'without scripts the team film keeps its native controls');
+  expect(!before.playHidden && before.label === 'Watch OpenWiz in two minutes' && !before.controls, where, 'the team film needs its play button');
+  if (width === 390) {
+    const { kicker, h1, book, poster } = before.fold;
+    expect(Math.max(kicker, h1, book, poster) <= height, where, `on a phone the first screen shows who, what, Book a call and the poster (${JSON.stringify(before.fold)})`);
+  }
+  const at = await page.evaluate(`(() => { const b = document.querySelector('.launch-play'); b.scrollIntoView({ block: 'center' }); b.focus();
+    const r = b.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+  await page.click(at.x, at.y);
+  await new Promise(resolve => setTimeout(resolve, 300));
+  const after = await read();
+  expect(after.playHidden && after.controls && !after.muted && after.focused, where, 'a click on the team film starts it with sound, controls and focus');
+}
+
+const FAQ_PATHS = ['/', '/faq/'];
 async function faq(page, where, width, mode) {
   const read = () => page.evaluate(`(() => { ${HELPERS}
     const faq = document.querySelector('section.faq');
@@ -506,6 +534,7 @@ async function main() {
             await chrome(other, `${path} ${where}`, name);
             await footer(other, `${path} ${where}`, name);
             if (FAQ_PATHS.includes(path)) await faq(other, `${path} ${where}`, width, name);
+            if (path === '/team/') await teamFilm(other, `${path} ${where}`, width, height, mode);
             if (process.env.SHOTS && name === 'motion' && path !== '/' && (width === 390 || width === 1280)) {
               await other.shot(join(process.env.SHOTS, `${path.slice(1, -1)}-${width}.png`));
             }

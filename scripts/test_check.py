@@ -687,6 +687,7 @@ class Checks(unittest.TestCase):
             path.write_text(change(path.read_text()))
             return temp, root
         book = re.compile(r'data-book href="[^"]*"')
+        T = 'team/index.html'
         refused = {
             'buy button': ('changelog/index.html', lambda t: t.replace(CTA, '', 1)),
             'buy button to /team/': ('team/index.html', lambda t: t.replace('<a class="nav-team" href="/team/">', '<a class="nav-team" href="/">', 1)),
@@ -700,46 +701,53 @@ class Checks(unittest.TestCase):
             'two booking links ': ('team/index.html', lambda t: t.replace('</main>', '<a data-book href="https://cal.com/openwiz-jake/setup">Again</a></main>', 1)),
             'two booking links  ': ('team/index.html', lambda t: re.sub(r'<a class="team-book" data-book[^>]*>Book a call</a>\n</section>', '</section>', t)),
             'two booking links   ': ('team/index.html', lambda t: re.sub(r'<a class="team-book" id="book" data-book[^>]*>Book a call</a>', '<span id="book"></span>', t)),
-            'shows no price': ('team/index.html', lambda t: t.replace('Custom pricing.', 'Custom pricing. From $99 per month.', 1)),
-            'team page copy': ('team/index.html', lambda t: t.replace('>Book a call</a>', '>Talk</a>')),
-            'team page copy ': ('team/index.html', lambda t: t.replace('>Book a call</a>', '>Talk</a>', 1)),
-            'missing team page copy': ('team/index.html', lambda t: t.replace(' No checkout.', '', 1)),
-            'the team page headline': ('team/index.html', lambda t: t.replace('Leave with a shipped pull request.', 'Leave with a pull request.', 1)),
-            'the terms': ('team/index.html', lambda t: re.sub(r'<ul class="team-terms"[^>]*>[\s\S]*?</ul>', '', t)),
-            'the terms ': ('team/index.html', lambda t: t.replace('<li>A small, real change of your choice.</li>', '', 1)),
-            'the terms: under the first Book a call': ('team/index.html', lambda t: re.sub(
-                r'(<a class="team-book" id="book"[^>]*>Book a call</a>)\s*(<p class="team-label"[\s\S]*?</ul>)', r'\2\1', t)),
-            'the ships line': ('team/index.html', lambda t: re.sub(r'<p class="team-ships">[\s\S]*?</p>', '', t)),
-            'hides none of its copy': ('team/index.html', lambda t: t.replace('<ul class="team-terms" aria-labelledby="team-how">', '<ul class="team-terms" aria-labelledby="team-how" hidden>', 1)),
-            'folds nothing away': ('team/index.html', lambda t: t.replace('<ol class="team-steps">', '<details><summary>Timeline</summary><ol class="team-steps">', 1).replace('</ol>', '</ol></details>', 1)),
-            'embeds no video': ('team/index.html', lambda t: t.replace('</main>', '<video src="/art/spec-video.mp4" preload="none"></video></main>', 1)),
-            'the boat poster': ('team/index.html', lambda t: t.replace(' loading="lazy"', '', 1)),
-            'the boat poster|one X link per page': ('team/index.html', lambda t: t.replace('href="https://x.com/openwiz" class="team-poster"', 'href="/drivers/" class="team-poster"', 1)),
-            'the boat poster: its label': ('team/index.html', lambda t: t.replace('Watch the fleet build it (49 s, on X)', 'Watch it', 1)),
-            'no Wizes in the team hero': ('team/index.html', lambda t: t.replace('For solo builders and small teams</p>', 'For solo builders and small teams. Wizes!</p>', 1)),
-            'never uses: install': ('team/index.html', lambda t: t.replace('No checkout.', 'No checkout. We install it.', 1)),
-            'never uses: guarantee': ('team/index.html', lambda t: t.replace('No checkout.', 'No checkout. We guarantee it.', 1)),
-            'the team page sections': ('team/index.html', lambda t: t.replace('<h2>Pricing</h2>', '<h2>Prices</h2>', 1)),
-            'the team page sections ': ('team/index.html', lambda t: re.sub(r'<section class="team-when"[\s\S]*?</section>\n', '', t)),
-            'four marks': ('team/index.html', lambda t: t.replace('<li class="team-end"><h3>Minute 30</h3><p>A pull request ships.</p></li>', '', 1)),
-            'four marks ': ('team/index.html', lambda t: t.replace('<h3>Minute 10</h3>', '<h3>Minute 15</h3>', 1)),
-            'the terms: under their label': ('team/index.html', lambda t: re.sub(r'<p class="team-label"[^>]*>How the call works</p>\s*', '', t, count=1)),
-            'the terms: under their label ': ('team/index.html', lambda t: t.replace('>How the call works</p>', '>How it works</p>', 1)),
-            'the timeline: in the hero': ('team/index.html', lambda t: re.sub(r'(\n  <section class="team-when"[\s\S]*?</section>)(\n</div>\n)', r'\2\1\n', t, count=1)),
-            'the hero shows no poster': ('team/index.html', lambda t: t.replace('<p class="team-kicker">', '<img src="/art/team-boat-poster.webp" alt="" width="1280" height="720"><p class="team-kicker">', 1)),
-            'Minute 30 is its one highlighted stop': ('team/index.html', lambda t: t.replace('<li class="team-end">', '<li>', 1)),
-            'Minute 30 is its one highlighted stop ': ('team/index.html', lambda t: t.replace('<li><h3>Minute 0</h3>', '<li class="team-end"><h3>Minute 0</h3>', 1)),
-            'curly apostrophes': ('team/index.html', lambda t: t.replace('No checkout.', "No checkout. It's quick.", 1)),
-            'curly apostrophes ': ('team/index.html', lambda t: t.replace('aria-label="Who it\u2019s for and pricing"', 'aria-label="Who it\'s for and pricing"', 1)),
-            'Proof: three cards': ('team/index.html', lambda t: re.sub(r'<li class="team-card">\s*<p>Our Drivers page[\s\S]*?</li>\n', '', t, count=1)),
-            'Proof: the first card': ('team/index.html', lambda t: t.replace('<small>5 of 5</small>', '', 1)),
-            'Proof: the first card   ': ('team/index.html', lambda t: t.replace('<h3>Three drivers passed all five checks</h3>', '<h3>Three drivers passed</h3>', 1)),
-            'Proof: the first card    ': ('team/index.html', lambda t: t.replace('version, start, wake, stop and token.', 'version and start.', 1)),
-            'the team page sections  ': ('team/index.html', lambda t: t.replace('<section class="team-part team-close', '<section class="team-part wrap"><h2>Where your agents run</h2></section>\n<section class="team-part team-close', 1)),
-            'Proof: the first card ': ('team/index.html', lambda t: t.replace('Grok Bot: on hold', 'Grok Bot', 1)),
-            'Proof: the first card  ': ('team/index.html', lambda t: t.replace('<a href="/drivers/" data-count="drivers">See how drivers work</a>', '<a href="/">See how drivers work</a>', 1)),
-            'Proof: the second card': ('team/index.html', lambda t: t.replace('>See the Drivers page</a>', '>Drivers</a>', 1)),
-            'the boat poster: Proof': ('team/index.html', lambda t: re.sub(r'<li class="team-card"><a href="https://x\.com/openwiz"[\s\S]*?</li>\n', '<li class="team-card"><a href="https://x.com/openwiz" class="team-poster">Watch the fleet build it (49 s, on X)</a></li>\n', t, count=1)),
+            'shows no price': (T, lambda t: t.replace('30 minutes.', '30 minutes, $99 per month.', 1)),
+            'shows no price ': (T, lambda t: t.replace('30 minutes.', '30 minutes. See pricing.', 1)),
+            'team page copy': (T, lambda t: t.replace('>Book a call</a>', '>Talk</a>')),
+            'team page copy ': (T, lambda t: t.replace('>Book a call</a>', '>Talk</a>', 1)),
+            'missing fragment: /team/#book': (T, lambda t: t.replace('<a class="team-book" id="book" data-book', '<a class="team-book" data-book', 1)),
+            'the team page description': (T, lambda t: t.replace('built and reviewed.">', 'built.">', 1)),
+            'the team page headline': (T, lambda t: t.replace('Leave the call with a reviewed pull request.', 'Leave the call with a shipped pull request.', 1)),
+            'the hero, in order': (T, lambda t: t.replace('For teams who use Claude Code or Codex', 'For solo builders and small teams', 1)),
+            'the hero, in order ': (T, lambda t: t.replace('Merging stays your call.', 'Your first fleet merges it.', 1)),
+            'the hero, in order  ': (T, lambda t: re.sub(r'(<a class="team-book" id="book"[^>]*>Book a call</a>)\s*(<p class="team-needs">[^<]*</p>)', r'\2\1', t)),
+            'the hero, in order   ': (T, lambda t: t.replace('with working CI and', 'and', 1)),
+            'no embed, form or script': (T, lambda t: t.replace('</main>', '<iframe src="/drivers/" title="x"></iframe></main>', 1)),
+            'no embed, form or script ': (T, lambda t: t.replace('</main>', '<form></form></main>', 1)),
+            'folds nothing away': (T, lambda t: t.replace('<ul class="team-facts">', '<details><summary>Facts</summary><ul class="team-facts">', 1).replace('</ul>', '</ul></details>', 1)),
+            'one video': (T, lambda t: t.replace('</main>', '<video src="/art/spec-video.mp4" preload="none"></video></main>', 1)),
+            'the launch film sits in the hero': (T, lambda t: re.sub(r'(<div class="team-copy">[\s\S]*?</div>\n)(  <figure class="launch team-film">[\s\S]*?</figure>\n)', r'\2\1', t, count=1)),
+            'over its pinned poster': (T, lambda t: t.replace('poster="/art/launch-poster.webp"', 'poster="/art/spec-poster.webp"', 1)),
+            'never autoplays': (T, lambda t: t.replace('preload="none" playsinline', 'preload="none" autoplay playsinline', 1)),
+            'never autoplays ': (T, lambda t: t.replace('preload="none" playsinline', 'preload="auto" playsinline', 1)),
+            'never autoplays  ': (T, lambda t: t.replace('preload="none" playsinline', 'preload="none" muted playsinline', 1)),
+            'never autoplays   ': (T, lambda t: t.replace('playsinline controls', 'playsinline', 1)),
+            'its accessible name': (T, lambda t: t.replace(' aria-label="OpenWiz in two minutes"', '', 1)),
+            'text alternative': (T, lambda t: t.replace(' aria-describedby="launch-about"', '', 1)),
+            'its English captions': (T, lambda t: t.replace('<track kind="captions" src="/art/launch-video.vtt" srclang="en" label="English">', '', 1)),
+            'its one play button|hides none of its copy': (T, lambda t: t.replace('class="launch-play" type="button" hidden>', 'class="launch-play" type="button">', 1)),
+            'its one play button ': (T, lambda t: t.replace('Watch OpenWiz in two minutes</button>', 'Play</button>', 1)),
+            'the team page sections  ': (T, lambda t: t.replace('>On the call</h2>', '>The call</h2>', 1)),
+            'its three steps': (T, lambda t: re.sub(r'    <li><h3>Ship</h3>[^\n]*</li>\n', '', t, count=1)),
+            'its three steps ': (T, lambda t: t.replace('<h3>Decide</h3>', '<h3>Choose</h3>', 1)),
+            'its three steps  ': (T, lambda t: t.replace('a second agent reviews it, and the pull request opens on your repository', 'and it merges', 1)),
+            'its three steps   ': (T, lambda t: re.sub(r'(    <li><h3>Connect</h3>[^\n]*\n)(    <li><h3>Decide</h3>[^\n]*\n)', r'\2\1', t, count=1)),
+            'its four true lines': (T, lambda t: t.replace('<li>One person built it, with fleets of agents.</li>', '', 1)),
+            'its four true lines ': (T, lambda t: t.replace('open source, Apache-2.0.', 'open source, Apache-2.0, for everyone.', 1)),
+            'restates no count': (T, lambda t: t.replace('<a href="/drivers/" data-count="drivers">the Drivers page</a>', '<a href="/changelog/">the Drivers page</a>', 1)),
+            'closes on its second Book a call': (T, lambda t: t.replace('<h2 id="team-call">', '<p>Soon.</p><h2 id="team-call">', 1).replace('Book a call</a>\n</section>', 'Book a call</a>\n<p>x</p></section>', 1)),
+            'nothing else': (T, lambda t: t.replace('<section class="team-part team-close', '<p><a href="/faq/">FAQ</a></p>\n<section class="team-part team-close', 1)),
+            'never uses: guarantee': (T, lambda t: t.replace('Merging stays your call.</p>', 'Merging stays your call.</p><p>We guarantee it.</p>', 1)),
+            'never uses: customers': (T, lambda t: t.replace('<h2 id="team-call">One small change. One call.', '<h2 id="team-call">Our customers ship.', 1)),
+            'never uses: Cloudroom': (T, lambda t: t.replace('runs no server of ours.', 'runs no server of ours, and Cloudroom is optional.', 1)),
+            'never uses: Three drivers': (T, lambda t: t.replace('Which drivers passed', 'Three drivers passed', 1)),
+            'never uses: 5 of 5': (T, lambda t: t.replace('their live check:', 'their live check, 5 of 5:', 1)),
+            'the team page sections': (T, lambda t: t.replace('One small change. One call.</h2>', 'Questions</h2>', 1)),
+            'the team page sections ': (T, lambda t: t.replace('<section class="team-part team-close', '<section class="team-part wrap"><h2>Proof</h2></section>\n<section class="team-part team-close', 1)),
+            'hides none of its copy': (T, lambda t: t.replace('<ul class="team-facts">', '<ul class="team-facts" hidden>', 1)),
+            'curly apostrophes': (T, lambda t: t.replace('Merging stays your call.', "Merging's your call.", 1)),
+            'curly apostrophes ': (T, lambda t: t.replace('aria-label="OpenWiz in two minutes"', 'aria-label="OpenWiz\'s two minutes"', 1)),
+            'one X link per page': (T, lambda t: t.replace('</main>', '<p><a href="https://x.com/openwiz">X</a></p></main>', 1)),
             'the one site footer|one X link per page': ('drivers/index.html', lambda t: t.replace(FOOTER, '', 1)),
             'the one site footer|one X link per page ': ('changelog/index.html', lambda t: t.replace('</main>', '</main>' + FOOTER, 1)),
             'the one site footer  ': ('index.html', lambda t: t.replace('X @openwiz', 'X', 1)),
@@ -922,12 +930,11 @@ class Checks(unittest.TestCase):
             path = root / page
             path.write_text(change(path.read_text()))
             return temp, root
-        close = '<section class="team-part team-close'
         for message, (page, change) in {
             'the index.html page needs the one Questions': ('index.html', lambda t: t.replace(FAQ, '', 1)),
             'the faq/index.html page needs the one Questions': ('faq/index.html', lambda t: t.replace('What is a kernel?', 'What is a core?', 1)),
-            'the team page sections': ('team/index.html', lambda t: t.replace(FAQ, '', 1).replace('</main>', FAQ + '</main>', 1)),
-            'needs faq.js': ('team/index.html', lambda t: re.sub(r'<script src="/faq\.[0-9a-f]+\.js" defer></script>', '', t)),
+            'the team/index.html page shows no Questions|never uses: CloudRoom': ('team/index.html', lambda t: t.replace('</main>', FAQ + '</main>', 1)),
+            'needs faq.js': ('faq/index.html', lambda t: re.sub(r'<script src="/faq\.[0-9a-f]+\.js" defer></script>', '', t)),
         }.items():
             temp, root = planted(page, change)
             with temp, self.subTest(message=message), self.assertRaisesRegex(AssertionError, message):
@@ -951,15 +958,15 @@ class Checks(unittest.TestCase):
         }.items():
             broken = change(FAQ)
             top = re.sub(r'<(/?)h3\b', r'<\1h2', re.sub(r'<(/?)h2\b', r'<\1h1', broken))
-            htmls = {'index.html': '</section>\n' + broken + '</main>', check.TEAM_PAGE: broken + close, check.FAQ_PAGE: top + '</main>'}
+            htmls = {'index.html': '</section>\n' + broken + '</main>', check.FAQ_PAGE: top + '</main>'}
             pages = {name: mock.Mock(scripts=['/faq.0123456789.js']) for name in htmls}
             with self.subTest(message=message), mock.patch.multiple(check, FAQ=broken, FAQ_TOP=top,
-                    FAQ_ON={'index.html': broken, check.TEAM_PAGE: broken, check.FAQ_PAGE: top}), \
+                    FAQ_ON={'index.html': broken, check.FAQ_PAGE: top}), \
                     self.assertRaisesRegex(AssertionError, message.strip()):
                 check.check_faq(htmls, pages, names)
-        htmls = {'index.html': '</section>\n' + FAQ + '</main>', check.TEAM_PAGE: FAQ + close, check.FAQ_PAGE: check.FAQ_TOP + '</main>',
+        htmls = {'index.html': '</section>\n' + FAQ + '</main>', check.FAQ_PAGE: check.FAQ_TOP + '</main>', check.TEAM_PAGE: '<main></main>',
                  'drivers/index.html': '<main>' + FAQ + '</main>'}
-        pages = {name: mock.Mock(scripts=['/faq.0123456789.js']) for name in htmls}
+        pages = {name: mock.Mock(scripts=[] if name == check.TEAM_PAGE else ['/faq.0123456789.js']) for name in htmls}
         with self.assertRaisesRegex(AssertionError, 'the drivers/index.html page shows no Questions'):
             check.check_faq(htmls, pages, names)
         del htmls['drivers/index.html']

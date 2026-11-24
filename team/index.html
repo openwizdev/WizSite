@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="Book a 30-minute call with Jake, who builds OpenWiz. Bring your repo and the coding agent you already use, and your first fleet ships a pull request on the call."><title>For your team — OpenWiz</title><link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48"><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><meta property="og:image" content="https://openwiz.dev/brand/og.png?v=2"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="OpenWiz"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="https://openwiz.dev/brand/og.png?v=2"><link rel="preload" href="/fonts/Geist-var.woff2" as="font" type="font/woff2" crossorigin><link rel="stylesheet" href="/tokens.css"><link rel="stylesheet" href="/site.css"><script src="/vendor/gsap-3.15.1.min.js" defer></script><script src="/site.js" defer></script><script src="/faq.js" defer></script></head>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="A 30-minute call with Jake, who built OpenWiz. Bring your repository; leave with a pull request your agents built and reviewed."><title>For your team — OpenWiz</title><link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48"><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><meta property="og:image" content="https://openwiz.dev/brand/og.png?v=2"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="OpenWiz"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="https://openwiz.dev/brand/og.png?v=2"><link rel="preload" href="/fonts/Geist-var.woff2" as="font" type="font/woff2" crossorigin><link rel="stylesheet" href="/tokens.css"><link rel="stylesheet" href="/site.css"><script src="/vendor/gsap-3.15.1.min.js" defer></script><script src="/site.js" defer></script></head>
 <body class="landing team-page">
 <a class="skip" href="#main">Skip to content</a>
 <header class="landing-nav wrap">
@@ -46,55 +46,41 @@
 <main id="main" class="team-main">
 <div class="team wrap">
   <div class="team-copy">
-    <p class="team-kicker">For solo builders and small teams</p>
-    <h1>Book 30 minutes. Leave with a shipped pull request.</h1>
-    <p class="team-lead">A 30-minute call with Jake, who builds OpenWiz. We connect it to your repo and the coding agent you already use, you pick one small change, and your first fleet ships it on your workflow.</p>
+    <p class="team-kicker">For teams who use Claude Code or Codex</p>
+    <h1>Leave the call with a reviewed pull request.</h1>
+    <p class="team-lead">Jake, who built OpenWiz, sets up an agent factory with your team on your own repository. Pick one small, real change: your agents build and review it. Merging stays your call.</p>
     <a class="team-book" id="book" data-book href="https://cal.com/openwiz-jake/setup" data-count="book-call">Book a call</a>
-    <p class="team-label" id="team-how">How the call works</p>
-    <ul class="team-terms" aria-labelledby="team-how">
-      <li>A small, real change of your choice.</li>
-      <li>On a repository with working CI and a signed-in coding agent (Claude Code or Codex).</li>
-    </ul>
+    <p class="team-needs">30 minutes. Bring a repository with working CI and a signed-in Claude Code or Codex.</p>
   </div>
-  <section class="team-when" aria-labelledby="team-when">
-    <h2 id="team-when">The 30 minutes, roughly</h2>
-    <ol class="team-steps">
-      <li><h3>Minute 0</h3><p>We connect your repo and your agents.</p></li>
-      <li><h3>Minute 10</h3><p>You answer a few questions about your change.</p></li>
-      <li><h3>Minute 20</h3><p>Your agents build it.</p></li>
-      <li class="team-end"><h3>Minute 30</h3><p>A pull request ships.</p></li>
-    </ol>
-    <p class="team-ships">Ships means a pull request opens on your repo, built by your agents and passing your CI. Merging is your call.</p>
-  </section>
+  <figure class="launch team-film">
+    <div class="launch-frame">
+      <video class="launch-video" src="/art/launch-video.mp4" poster="/art/launch-poster.webp" preload="none" playsinline controls width="1280" height="666" aria-label="OpenWiz in two minutes" aria-describedby="launch-about">
+        <track kind="captions" src="/art/launch-video.vtt" srclang="en" label="English">
+      </video>
+      <button class="launch-play" type="button" hidden><span aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M5 3l8 5-8 5z"/></svg></span>Watch OpenWiz in two minutes</button>
+    </div>
+    <figcaption><p class="sr-only" id="launch-about">A painted two-minute film with narration: a wizard turns an idea for a to-do app into a spec, and a fleet of wizards on a ship’s deck builds, reviews and merges its tickets until the app ships at sunset. It then shows how OpenWiz fits together: the open kernel, GitHub as the ship’s log, drivers and harnesses, WizSkills, WizPlugins and WizBar, the app, WizRoom and the coming WizMarket.</p></figcaption>
+  </figure>
 </div>
-<section class="team-part wrap" aria-labelledby="team-proof">
-  <h2 id="team-proof">Proof</h2>
-  <ul class="team-proof">
-    <li class="team-card">
-      <h3>Three drivers passed all five checks</h3>
-      <p>The same test for every place your agents run: version, start, wake, stop and token.</p>
-      <div class="team-logos">
-        <span class="team-logo"><img class="team-logo-icon" src="/drivers/logos/monitor.svg" alt="" width="24" height="24"><span>Your computer or VPS</span><small>5 of 5</small></span>
-        <span class="team-logo"><img class="team-logo-tile" src="/drivers/logos/cloudroom.png" alt="" width="256" height="256"><span>Cloudroom</span><small>5 of 5</small></span>
-        <span class="team-logo"><img class="team-logo-lockup" src="/drivers/logos/boat-dev.svg" alt="boat.dev" width="390" height="109"><small>5 of 5</small></span>
-      </div>
-      <p class="team-soon">Grok Bot: on hold</p>
-      <a href="/drivers/" data-count="drivers">See how drivers work</a>
-    </li>
-    <li class="team-card">
-      <p>Our Drivers page was built the same way: a fleet of agents drew six designs, a council of judges picked one, and it merged in one night.</p>
-      <a href="/drivers/" data-count="drivers">See the Drivers page</a>
-    </li>
-    <li class="team-card"><a href="https://x.com/openwiz" class="team-poster" data-count="x"><figure><img src="/art/team-boat-poster.webp" alt="Wizards on a boat: the fleet that built the Drivers page" width="1280" height="720" loading="lazy"><figcaption>Watch the fleet build it (49 s, on X)</figcaption></figure></a></li>
+<section class="team-part team-call wrap" aria-labelledby="team-how">
+  <h2 id="team-how">On the call</h2>
+  <ol class="team-steps">
+    <li><h3>Connect</h3><p>We connect OpenWiz to your repository and the coding agents you already use.</p></li>
+    <li><h3>Decide</h3><p>You pick one small, real change and answer a few questions about it.</p></li>
+    <li><h3>Ship</h3><p>Your agents build it, a second agent reviews it, and the pull request opens on your repository. Merging is your call.</p></li>
+  </ol>
+</section>
+<section class="team-part wrap" aria-labelledby="team-what">
+  <h2 id="team-what">What you’re setting up</h2>
+  <ul class="team-facts">
+    <li>OpenWiz 0.01 is out: open source, Apache-2.0.</li>
+    <li>It never touches a login and runs no server of ours.</li>
+    <li>Which drivers passed their live check: <a href="/drivers/" data-count="drivers">the Drivers page</a>.</li>
+    <li>One person built it, with fleets of agents.</li>
   </ul>
 </section>
-<section class="team-part team-fit wrap" aria-label="Who it’s for and pricing">
-  <div><h2>Who it’s for</h2><p>Solo builders and small teams who already use Claude Code or Codex.</p></div>
-  <div><h2>Pricing</h2><p>Custom pricing. No checkout.</p></div>
-</section>
-<template data-slot="faq"></template>
 <section class="team-part team-close wrap" aria-labelledby="team-call">
-  <h2 id="team-call">Your first fleet ships on the call.</h2>
+  <h2 id="team-call">One small change. One call.</h2>
   <a class="team-book" data-book href="https://cal.com/openwiz-jake/setup" data-count="book-call">Book a call</a>
 </section>
 </main>

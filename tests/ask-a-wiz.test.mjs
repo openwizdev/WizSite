@@ -163,7 +163,7 @@ test('with the switch off the FAQ shows no input row, and asks nothing', async (
     { status: 200, body: '{"schema":"openwiz.ask-a-wiz.v1","enabled":true,"max_question_chars":299}' },
     { status: 200, body: '{"schema":"openwiz.ask-a-wiz.v1","enabled":true,"max_question_chars":300,"extra":1}' }]) {
     fake.probe = probe;
-    for (const path of ['/', '/team/', '/faq/']) {
+    for (const path of ['/', '/faq/']) {
       const probed = fake.probed, page = await open(path);
       await page.evaluate('new Promise(resolve => setTimeout(resolve, 300))');
       assert.equal(fake.probed, probed + 1, `${path}: asked once`);
@@ -226,7 +226,7 @@ test('an answer streams in, becomes a normal FAQ row, and a fresh input row appe
 test('stop ends the stream, shows nothing as finished, and retry asks again', async () => {
   probeOn();
   fake.answers.push({ lines: ANSWER.slice(0, 1), hold: true }, { lines: ANSWER });
-  const page = await open('/team/');
+  const page = await open('/faq/');
   await page.until(`document.querySelector('.faq-ask input')`);
   await page.ask('What does OpenWiz run?');
   await page.until(`document.querySelector('.faq-ask .faq-a')?.innerText.includes('Synthetic answer')`);
