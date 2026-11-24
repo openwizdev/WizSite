@@ -207,11 +207,13 @@ def team_rows(tracks):
             anchor = 'end' if x[last[1]] > 90 else 'start' if x[last[1]] < 10 else 'middle'
             shapes.append(f'<text class="team-spec-when{last[2]}" x="{at[last[1]]}" y="7" text-anchor="{anchor}">'
                           f'{team_clock(last[0], days)}</text>')
+        aria = f'{said} UTC' if said else 'No recorded times'
         rows.append(f'<li><span>{title}</span><span class="team-spec-state merged">Merged</span>'
-                    f'<svg class="team-spec-track" role="img" aria-label="{f'{said} UTC' if said else 'No recorded times'}">{"".join(shapes)}</svg></li>')
+                    f'<svg class="team-spec-track" role="img" aria-label="{aria}">{"".join(shapes)}</svg></li>')
     first, final = (datetime.fromtimestamp(ms / 1000, timezone.utc) for ms in (start, end))
+    end_date = f'{final.day} {final:%b %Y, }' if days else ''
     when = (f'<time datetime="{first:%Y-%m-%dT%H:%M:%SZ}">{first.day} {first:%b %Y, %H:%M}</time> to '
-            f'<time datetime="{final:%Y-%m-%dT%H:%M:%SZ}">{f"{final.day} {final:%b %Y, }" if days else ""}{final:%H:%M} UTC</time>')
+            f'<time datetime="{final:%Y-%m-%dT%H:%M:%SZ}">{end_date}{final:%H:%M} UTC</time>')
     key = ('<p class="team-spec-key">' + ' '.join(f'<span class="{stage}">{label}</span>' for stage, label in TEAM_STAGES) +
            f' <span class="team-spec-span">{when}</span></p>')
     return tuple(rows), key
