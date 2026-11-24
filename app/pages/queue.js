@@ -182,6 +182,8 @@
   const state = { key: null, run: null, result: null, failedSince: null, el: null, cards: new Map() };
   const shown = item => item.type === 'spec' || item.request === null || (item.request.status === 'open' && item.current !== false);
 
+  const listeners = new Set();
+  const notify = () => { for (const fn of listeners) fn(); };
   function refresh(feeds) {
     const picked = OW.data.repo.get();
     const specs = feeds.specs;
@@ -206,6 +208,7 @@
       state.result = result;
       if (state.failedSince !== null && readAt > state.failedSince) state.failedSince = null;
       if (state.el?.isConnected) OW.factory.redraw(state.el, () => draw(state.el));
+      notify();
     }, error => {
       if (!still()) return;
       state.run = null;
@@ -213,6 +216,7 @@
       if (error instanceof OW.data.SignedOut) return OW.onSignedOut?.();
       state.result = { repository: picked.full, items: [], gaps: ['the queue\'s reads'], bindings: new Map() };
       if (state.el?.isConnected) OW.factory.redraw(state.el, () => draw(state.el));
+      notify();
     });
   }
 
@@ -268,6 +272,18 @@
       : missing ? null : OW.ui.placeholder(`${EMPTY}.`)].filter(Boolean));
   }
 
+  OW.queue = {
+    refresh,
+    count: () => view()?.items.filter(shown).length || null,
+    items: () => view()?.items.filter(shown) || [],
+    onUpdate: fn => listeners.add(fn),
+    render(el, feeds) {
+      state.el = el;
+      refresh(feeds);
+      OW.factory.redraw(el, () => draw(el));
+    },
+  };
+
   OW.page({
     id: 'queue',
     title: 'Queue',
@@ -276,9 +292,7 @@
     feeds: ['specs'],
     badge: () => view()?.items.filter(shown).length || null,
     render(el, feeds) {
-      state.el = el;
-      refresh(feeds);
-      OW.factory.redraw(el, () => draw(el));
+      OW.queue.render(el, feeds);
     },
   });
 })();

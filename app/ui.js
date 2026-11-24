@@ -39,6 +39,15 @@
     warn: 'M12 3 2 20h20ZM12 10v4M12 17v.5',
     pause: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18ZM10 9v6M14 9v6',
     refresh: 'M20 12a8 8 0 1 1-2.3-5.7L20 8M20 3v5h-5',
+    chat: 'M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H9l-5 4V6Z',
+    feed: 'M4 5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5ZM10 9l5 3-5 3V9Z',
+    settings: 'M4 7h10M18 7h2M4 12h4M12 12h8M4 17h12M20 17h0M14 5v4M8 10v4M16 15v4',
+    check: 'M5 13l4 4L19 7',
+    edit: 'M16.5 4.5a2.1 2.1 0 0 1 3 3L8 19l-4 1 1-4L16.5 4.5Z',
+    arrowUp: 'M12 19V5M6 11l6-6 6 6',
+    arrowDown: 'M12 5v14M6 13l6 6 6-6',
+    arrowRight: 'M5 12h14M13 6l6 6-6 6',
+    close: 'M6 6l12 12M18 6 6 18',
   };
   const icon = name => h('svg', { class: 'ic', viewBox: '0 0 24 24', 'aria-hidden': 'true' }, h('path', { d: ICONS[name] }));
   const logo = () => h('svg', { viewBox: '0 0 1000 1000', 'aria-hidden': 'true' },

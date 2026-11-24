@@ -69,6 +69,7 @@
       return value === 'on' || value === 'dry-run' ? value : 'off';
     },
   };
+  let demoFlag = false;
   {
     const params = new URLSearchParams(location.search);
     if (params.has('v2')) {
@@ -77,7 +78,9 @@
       const rest = params.toString();
       history.replaceState(null, '', `${location.pathname}${rest ? `?${rest}` : ''}${location.hash}`);
     }
+    demoFlag = params.get('demo') === '1';
   }
+  const demo = () => v2.get() !== 'off' && demoFlag;
 
 
   class Refused extends Error {}
@@ -105,6 +108,7 @@
     return method === 'POST' && object(body) && (url === '/api/sign-in/token' || url === '/api/sign-in/refresh');
   }
   async function ask(method, url, body, headers = {}, key, redirect = 'follow') {
+    if (demo()) throw new Refused('demo mode makes no network requests');
     const text = body === undefined ? undefined : JSON.stringify(body);
     if (!allowed(method, url, text, key)) throw new Refused(`the app never sends ${method} ${url}`);
     return fetch(url, {
@@ -655,9 +659,9 @@
   }
 
   OW.data = Object.freeze({
-    auth, repo, v2, feeds, limit, paused, finishSignIn, repositories, start, stop, refreshAll, SignedOut, Ended, Refused, noteLimit, claim,
+    auth, repo, v2, demo, feeds, limit, paused, finishSignIn, repositories, start, stop, refreshAll, SignedOut, Ended, Refused, noteLimit, claim,
     github: (method, path, body) => github(method, path, body),
     onChange: listener => listeners.add(listener),
   });
-  if (auth.signedIn()) resolveAccount();
+  if (!demo() && auth.signedIn()) resolveAccount();
 })();
