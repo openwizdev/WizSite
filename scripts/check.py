@@ -153,17 +153,41 @@ TEAM_HEADLINE = 'Leave the call with a reviewed pull request.'
 TEAM_LEAD = ('Jake, who built OpenWiz, sets up an agent factory with your team on your own repository. '
              'Pick one small, real change: your agents build and review it. Merging stays your call.')
 TEAM_NEEDS = '30 minutes. Bring a repository with working CI and a signed-in Claude Code or Codex.'
-TEAM_EXAMPLE = ('your-org/your-repo', 'Example', '#128', 'Add CSV export to the reports page',
-                'Built by: your builder agent', 'Reviewed by: a second agent Approved',
-                'Checks: CI passed', 'Merge: your call')
+TEAM_PANEL = '''<div class="team-factory" data-team-factory>
+    <section class="team-replay" aria-labelledby="team-replay-label">
+      <header class="team-replay-header">
+        <h2 class="team-source" id="team-replay-label">Replay of a real run · 20–21 Nov 2026</h2>
+      </header>
+      <h3 class="team-spec"><a href="https://github.com/openwizdev/OpenWiz/issues/1927">#1927 Infra spec: write-driver, a skill that writes your own driver</a></h3>
+      <ul class="team-tickets">
+        <li data-building="2026-11-20T15:45:24Z" data-review="2026-11-20T15:57:37Z"><a href="https://github.com/openwizdev/OpenWiz/issues/1928">#1928 Infra WD1: the write-driver contract: copy line, ticket format, live lessons and the timed report, first</a> <span class="team-ticket-status"><strong>Merged</strong><time datetime="2026-11-20T19:03:26Z">20 Nov · 19:03:26 UTC</time></span></li>
+        <li data-building="2026-11-20T17:45:43Z" data-review="2026-11-20T17:58:49Z"><a href="https://github.com/openwizdev/OpenWiz/issues/1929">#1929 Infra WD2: the write-driver skill takes a user from paste to a passing driver (WizSkills 0.2.1)</a> <span class="team-ticket-status"><strong>Merged</strong><time datetime="2026-11-21T01:27:35Z">21 Nov · 01:27:35 UTC</time></span></li>
+        <li data-building="2026-11-21T01:32:44Z" data-review="2026-11-21T02:00:06Z"><a href="https://github.com/openwizdev/OpenWiz/issues/1931">#1931 Infra WD3: write-driver’s end-to-end eval against the template’s fake host (WizSkills 0.2.1)</a> <span class="team-ticket-status"><strong>Merged</strong><time datetime="2026-11-21T04:36:53Z">21 Nov · 04:36:53 UTC</time></span></li>
+        <li data-building="2026-11-20T17:46:29Z" data-review="2026-11-20T17:58:49Z"><a href="https://github.com/openwizdev/OpenWiz/issues/1932">#1932 Infra WD4: the Drivers page’s Write your own driver copy line</a> <span class="team-ticket-status"><strong>Merged</strong><time datetime="2026-11-21T01:28:08Z">21 Nov · 01:28:08 UTC</time></span></li>
+      </ul>
+      <p class="team-landing"><a href="https://github.com/openwizdev/WizSkills/pull/229">WizSkills #229 · #1931: Infra WD3: write-driver’s end-to-end eval against the template’s fake host (WizSkills 0.2.1)</a> <span class="team-ticket-status"><strong>Pull request merged</strong><time datetime="2026-11-21T04:36:53Z">21 Nov · 04:36:53 UTC</time></span></p>
+    </section>
+    <section class="team-now" aria-labelledby="team-now-label">
+      <h2 id="team-now-label">Now in the factory</h2>
+      <p class="team-source">Snapshot · <time datetime="2026-11-24T14:33:00Z">24 Nov 2026, 14:33 UTC</time></p>
+      <h3 class="team-spec"><a href="https://github.com/openwizdev/OpenWiz/issues/2963">#2963 spec: openwiz.dev/book, our own booking page for the team call</a></h3>
+      <ul class="team-tickets">
+        <li><a href="https://github.com/openwizdev/OpenWiz/issues/2964">#2964 BK1: busy time from iCal and the open slots</a> <span class="team-ticket-status"><strong>Merged</strong></span></li>
+        <li><a href="https://github.com/openwizdev/OpenWiz/issues/2965">#2965 BK3: confirmation email and Google Calendar</a> <span class="team-ticket-status"><strong>Merged</strong></span></li>
+        <li><a href="https://github.com/openwizdev/OpenWiz/issues/2966">#2966 BK2: the booking API</a> <span class="team-ticket-status"><strong>Merged</strong></span></li>
+        <li><a href="https://github.com/openwizdev/OpenWiz/issues/2967">#2967 BK4: the booking page and its installable app</a> <span class="team-ticket-status"><strong>Merged</strong></span></li>
+      </ul>
+    </section>
+  </div>'''
 TEAM_STEPS = (('Connect', 'We connect OpenWiz to your repository and the coding agents you already use.'),
               ('Decide', 'You pick one small, real change and answer a few questions about it.'),
               ('Ship', 'Your agents build it, a second agent reviews it, and the pull request opens on your repository. '
                        'Merging is your call.'))
-TEAM_PARTS = ('On the call', 'Launch film', 'What you’re setting up', 'One small change. One call.')
+TEAM_PARTS = ('Replay of a real run · 20–21 Nov 2026', 'Now in the factory', 'On the call',
+              'OpenWiz in two minutes', 'What you’re setting up', 'One small change. One call.')
 TEAM_FACTS = ('OpenWiz 0.01 is out: open source, Apache-2.0.',
               'It never touches a login and runs no server of ours.',
-              'Which drivers passed their live check: the Drivers page.',
+              'Which drivers passed their check: the Drivers page.',
               'One person built it, with fleets of agents.')
 TEAM_DESCRIPTION = ('A 30-minute call with Jake, who built OpenWiz. Bring your repository; leave with a pull request '
                     'your agents built and reviewed.')
@@ -1502,7 +1526,9 @@ def check_team(htmls, pages):
         'the team page adds no embed, form or script beyond GSAP and site.js, and folds nothing away'
     main = team.split('<main', 1)[1].split('</main>', 1)[0]
     shown = re.sub(r'\s+', ' ', unescape(re.sub(r'<[^>]*>', ' ', main)))
-    assert not TEAM_NEVER.search(shown), f'a word the team page never uses: {TEAM_NEVER.search(shown)[0]}'
+    # “Installable” is part of the exact historical issue title pinned below.
+    claims = shown.replace('#2967 BK4: the booking page and its installable app', '', 1)
+    assert not TEAM_NEVER.search(claims), f'a word the team page never uses: {TEAM_NEVER.search(claims)[0]}'
     assert "'" not in shown and "'" not in ' '.join(re.findall(r'aria-label="([^"]*)"', main)), \
         'the team page uses curly apostrophes'
     assert not re.search(r'\bhidden\b|aria-hidden', re.sub(r'<button class="launch-play" type="button" hidden><span aria-hidden="true">', '', main)), 'the team page hides none of its copy'
@@ -1517,16 +1543,8 @@ def check_team(htmls, pages):
                      r'<a class="team-book" id="book" data-book [^>]*>Book a call</a>\s*<p class="team-needs">([^<]*)</p>\s*</div>', hero)
     assert copy and tuple(map(unescape, copy.groups())) == (TEAM_KICKER, TEAM_LEAD, TEAM_NEEDS), \
         f'the hero, in order: who it is for, the headline, what happens on the call, Book a call, what to bring: {TEAM_KICKER} / {TEAM_LEAD} / {TEAM_NEEDS}'
-    example = re.fullmatch(r'\s*<figure class="team-pr">\s*<figcaption class="team-pr-heading">\s*'
-                           r'<p class="team-pr-meta"><code>([^<]+)</code> <span>([^<]+)</span></p>\s*'
-                           r'<p class="team-pr-title"><span>([^<]+)</span> ([^<]+)</p>\s*</figcaption>\s*'
-                           r'<dl class="team-pr-details">\s*'
-                           r'<div>(<dt>[^<]+</dt> <dd>[^<]+</dd>)</div>\s*'
-                           r'<div>(<dt>[^<]+</dt> <dd>[^<]+ <span class="team-pr-approved">[^<]+</span></dd>)</div>\s*'
-                           r'<div>(<dt>[^<]+</dt> <dd>[^<]+</dd>)</div>\s*'
-                           r'<div>(<dt>[^<]+</dt> <dd>[^<]+</dd>)</div>\s*</dl>\s*</figure>\s*', hero[copy.end():])
-    assert example and not hero[:copy.start()].strip() and tuple(unescape(plain(s)) for s in example.groups()) == TEAM_EXAMPLE, \
-        f'the hero ends with the labelled pull request example, in real text: {TEAM_EXAMPLE}'
+    assert not hero[:copy.start()].strip() and hero[copy.end():].strip() == TEAM_PANEL, \
+        'the hero ends with the pinned replay and factory snapshot, with their recorded links, times and states'
     page = Page(main)
     assert len(page.videos) == 1, 'the team page has one video: the launch film'
     clip = page.videos[0]
@@ -1558,7 +1576,8 @@ def check_team(htmls, pages):
     close = re.search(r'<section class="team-part team-close wrap" aria-labelledby="team-call">\s*<h2 id="team-call">[^<]*</h2>\s*'
                       r'<a class="team-book" data-book href="[^"]*" data-count="book-call">Book a call</a>\s*</section>\s*$', main)
     assert close, 'the page closes on its second Book a call'
-    assert main.count('<a ') == 3 and main.count('<button') == 1, 'the team page offers Book a call twice, the Drivers link and the play button; nothing else'
+    assert main.count('<a ') == TEAM_PANEL.count('<a ') + 3 and main.count('<button') == 1, \
+        'the team page offers Book a call twice, the Drivers link, the pinned factory links and the play button; nothing else'
 
 
 

@@ -644,9 +644,214 @@ async function askAWiz() {
   }
 }
 
+function initTeamFactory() {
+  const panel = document.querySelector('[data-team-factory]');
+  if (!panel) return false;
+
+  const replay = panel.querySelector('.team-replay');
+  const landing = replay.querySelector('.team-landing');
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+  const tickets = [...replay.querySelectorAll('.team-tickets li')].map(row => ({
+    label: row.querySelector('strong'),
+    time: row.querySelector('time'),
+    stamps: [row.dataset.building, row.dataset.review, row.querySelector('time').dateTime],
+  }));
+  const utcStamp = new Intl.DateTimeFormat('en-GB', {
+    day: '2-digit', month: 'short', timeZone: 'UTC',
+    hourCycle: 'h23', hour: '2-digit', minute: '2-digit', second: '2-digit',
+  });
+  const setState = (ticket, state, stamp) => {
+    ticket.label.textContent = ticketStates[state][1];
+    if (stamp) ticket.time.dateTime = stamp;
+    else ticket.time.removeAttribute('datetime');
+    ticket.time.textContent = stamp ? utcStamp.format(new Date(stamp)).replace(', ', ' · ') + ' UTC' : '';
+  };
+  const lastMerge = landing.querySelector('time').dateTime;
+  const events = [...new Set([...tickets.flatMap(ticket => ticket.stamps), lastMerge])].sort();
+  const replayButton = document.createElement('button');
+  replayButton.className = 'team-replay-button';
+  replayButton.type = 'button';
+  let timers = [];
+  const finishReplay = () => {
+    timers.forEach(clearTimeout);
+    timers = [];
+    for (const ticket of tickets) setState(ticket, 3, ticket.stamps[2]);
+    delete replay.dataset.replaying;
+    landing.inert = false;
+    replayButton.textContent = 'Replay again';
+  };
+  const playReplay = () => {
+    replay.dataset.replaying = '';
+    landing.inert = true;
+    replayButton.textContent = 'Skip replay';
+    for (const ticket of tickets) setState(ticket, 0);
+    // Compress the gaps while keeping the recorded order and simultaneous events.
+    timers = events.map((stamp, index) => setTimeout(() => {
+      if (stamp === lastMerge) {
+        finishReplay();
+        return;
+      }
+      for (const ticket of tickets) {
+        const state = ticket.stamps.indexOf(stamp);
+        if (state !== -1) setState(ticket, state + 1, stamp);
+      }
+    }, 850 + 11_150 * index / (events.length - 1)));
+  };
+  replayButton.addEventListener('click', () => {
+    if ('replaying' in replay.dataset) finishReplay();
+    else playReplay();
+  });
+  const applyMotionPreference = () => {
+    if (reducedMotion.matches) {
+      finishReplay();
+      replayButton.remove();
+    } else {
+      replay.querySelector('.team-replay-header').append(replayButton);
+      playReplay();
+    }
+  };
+  reducedMotion.addEventListener('change', applyMotionPreference);
+  applyMotionPreference();
+
+  const project = '/repos/openwizdev/OpenWiz';
+  const issueURL = 'https://github.com/openwizdev/OpenWiz/issues/';
+  const cacheKey = 'openwiz-team-factory-v1';
+  const cacheLifetime = 10 * 60_000;
+  const now = panel.querySelector('.team-now');
+  const validIssue = issue => issue && Number.isSafeInteger(issue.number) && issue.number > 0
+    && typeof issue.title === 'string' && issue.title.trim() && issue.html_url === issueURL + issue.number;
+  const validTicket = ticket => validIssue(ticket) && Number.isInteger(ticket.stateCode)
+    && ticket.stateCode >= 0 && ticket.stateCode < ticketStates.length;
+  const validCount = count => Number.isInteger(count) && count >= 2 && count <= 6;
+  const labelTime = now.querySelector('time');
+  const setIssueLink = (link, issue) => {
+    link.href = issue.html_url;
+    link.textContent = `#${issue.number} ${issue.title.replaceAll("'", '’')}`;
+  };
+  const showRead = ({ spec, entries, readAt }) => {
+    const rows = entries.map(ticket => {
+      const row = document.createElement('li');
+      const link = document.createElement('a');
+      const status = document.createElement('span');
+      const label = document.createElement('strong');
+      setIssueLink(link, ticket);
+      status.className = 'team-ticket-status';
+      label.textContent = ticketStates[ticket.stateCode][1];
+      status.append(label);
+      row.append(link, status);
+      return row;
+    });
+    setIssueLink(now.querySelector('.team-spec a'), spec);
+    now.querySelector('.team-tickets').replaceChildren(...rows);
+    const iso = new Date(readAt).toISOString();
+    labelTime.dateTime = iso;
+    labelTime.textContent = iso.slice(11, 16);
+    labelTime.title = iso.slice(0, 10) + ' UTC';
+    now.querySelector('.team-source').replaceChildren('Live from GitHub · read ', labelTime);
+  };
+  const readCache = () => {
+    try {
+      const cached = JSON.parse(localStorage.getItem(cacheKey));
+      if (validIssue(cached?.spec) && Number.isSafeInteger(cached.readAt)
+          && cached.readAt > 0 && cached.readAt <= Date.now()
+          && Array.isArray(cached.entries) && validCount(cached.entries.length)
+          && cached.entries.length <= 4 && cached.entries.every(validTicket)) return cached;
+    } catch {
+      // Storage can be unavailable.
+    }
+    return null;
+  };
+  const invalidResponse = () => new Error('Invalid factory response');
+  const classify = (ticket, timeline) => {
+    if (!Array.isArray(timeline)) throw invalidResponse();
+    const pulls = [];
+    let builder = false;
+    for (const event of timeline) {
+      if (typeof event?.event !== 'string') throw invalidResponse();
+      if (event.event === 'commented') {
+        if (typeof event.body !== 'string') throw invalidResponse();
+        builder ||= event.body.startsWith('launch-fleet: start')
+          || (event.body.includes('<!-- openwiz:status v1 -->') && /^\s*agent:\s*builder\s*$/m.test(event.body));
+      }
+      if (event.event !== 'cross-referenced') continue;
+      const source = event.source?.issue;
+      if (!source) throw invalidResponse();
+      if (source.pull_request == null) continue;
+      const pull = source.pull_request;
+      if (typeof pull.html_url !== 'string') throw invalidResponse();
+      if (!/^https:\/\/github\.com\/openwizdev\/[\w.-]+\/pull\/[1-9]\d*$/i.test(pull.html_url)) continue;
+      if (!['open', 'closed'].includes(source.state)
+          || !(pull.merged_at === null || (typeof pull.merged_at === 'string' && Number.isFinite(Date.parse(pull.merged_at))))) {
+        throw invalidResponse();
+      }
+      pulls.push({ merged: pull.merged_at !== null, open: source.state === 'open' });
+    }
+    if (ticket.state === 'closed' && ticket.state_reason === 'completed') return 3;
+    if (pulls.length && pulls.every(pull => pull.merged)) return 3;
+    if (pulls.some(pull => pull.open)) return 2;
+    return ticket.state === 'open' && !pulls.length && builder ? 1 : 0;
+  };
+  const readFactory = async signal => {
+    const get = async path => {
+      signal.throwIfAborted();
+      const response = await fetch('https://api.github.com' + path, {
+        credentials: 'omit', redirect: 'error', cache: 'no-store',
+        signal: AbortSignal.any([signal, AbortSignal.timeout(5_000)]),
+      });
+      if (response.status !== 200) throw invalidResponse();
+      return response.json();
+    };
+    const search = await get('/search/issues?q=repo:openwizdev/OpenWiz+is:issue+in:title+%22spec:%22&sort=updated&per_page=20');
+    if (!Array.isArray(search?.items) || search.incomplete_results === true) throw invalidResponse();
+    const spec = search.items.find(item => {
+      if (!['open', 'closed'].includes(item?.state) || !Number.isSafeInteger(item.sub_issues_summary?.total)
+          || item.sub_issues_summary.total < 0) throw invalidResponse();
+      return item.state === 'open' && validCount(item.sub_issues_summary.total);
+    });
+    if (!validIssue(spec)) throw invalidResponse();
+    // Search and sub-issues leave room for four timelines within the request cap.
+    if (spec.sub_issues_summary.total > 4) return;
+    const subIssues = await get(`${project}/issues/${spec.number}/sub_issues?per_page=20`);
+    if (!Array.isArray(subIssues) || subIssues.length !== spec.sub_issues_summary.total
+        || !subIssues.every(ticket => validIssue(ticket) && ['open', 'closed'].includes(ticket.state))
+        || new Set(subIssues.map(ticket => ticket.number)).size !== subIssues.length) throw invalidResponse();
+    const entries = await Promise.all(subIssues.map(async ({ number, title, html_url, state, state_reason }) => {
+      const timeline = await get(`${project}/issues/${number}/timeline?per_page=100`);
+      return { number, title, html_url, stateCode: classify({ state, state_reason }, timeline) };
+    }));
+    if (signal.aborted || document.visibilityState !== 'visible') return;
+    const result = { spec: { number: spec.number, title: spec.title, html_url: spec.html_url }, entries, readAt: Date.now() };
+    showRead(result);
+    try { localStorage.setItem(cacheKey, JSON.stringify(result)); } catch { /* Storage is optional. */ }
+  };
+  const cached = readCache();
+  if (cached) showRead(cached);
+  const startRead = () => {
+    if (document.visibilityState !== 'visible') return;
+    document.removeEventListener('visibilitychange', startRead);
+    const latest = readCache();
+    if (latest) {
+      if (latest.readAt !== cached?.readAt) showRead(latest);
+      if (Date.now() - latest.readAt < cacheLifetime) return;
+    }
+    const controller = new AbortController();
+    const onVisibility = () => {
+      if (document.visibilityState !== 'visible') controller.abort();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    readFactory(controller.signal).catch(() => {
+      // Keep the snapshot or the last successful read.
+      controller.abort();
+    }).finally(() => document.removeEventListener('visibilitychange', onVisibility));
+  };
+  document.addEventListener('visibilitychange', startRead);
+  startRead();
+  return true;
+}
+
 enableCopy();
 askAWiz();
-showStars().catch(() => {});
+if (!initTeamFactory()) showStars().catch(() => {});
 launchVideo();
 specVideo();
 oneVoiceAtATime();

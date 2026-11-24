@@ -52,18 +52,32 @@
     <a class="team-book" id="book" data-book href="https://cal.com/openwiz-jake/setup" data-count="book-call">Book a call</a>
     <p class="team-needs">30 minutes. Bring a repository with working CI and a signed-in Claude Code or Codex.</p>
   </div>
-  <figure class="team-pr">
-    <figcaption class="team-pr-heading">
-      <p class="team-pr-meta"><code>your-org/your-repo</code> <span>Example</span></p>
-      <p class="team-pr-title"><span>#128</span> Add CSV export to the reports page</p>
-    </figcaption>
-    <dl class="team-pr-details">
-      <div><dt>Built by:</dt> <dd>your builder agent</dd></div>
-      <div><dt>Reviewed by:</dt> <dd>a second agent <span class="team-pr-approved">Approved</span></dd></div>
-      <div><dt>Checks:</dt> <dd>CI passed</dd></div>
-      <div><dt>Merge:</dt> <dd>your call</dd></div>
-    </dl>
-  </figure>
+  <div class="team-factory" data-team-factory>
+    <section class="team-replay" aria-labelledby="team-replay-label">
+      <header class="team-replay-header">
+        <h2 class="team-source" id="team-replay-label">Replay of a real run · 20–21 Nov 2026</h2>
+      </header>
+      <h3 class="team-spec"><a href="https://github.com/openwizdev/OpenWiz/issues/1927">#1927 Infra spec: write-driver, a skill that writes your own driver</a></h3>
+      <ul class="team-tickets">
+        <li data-building="2026-11-20T15:45:24Z" data-review="2026-11-20T15:57:37Z"><a href="https://github.com/openwizdev/OpenWiz/issues/1928">#1928 Infra WD1: the write-driver contract: copy line, ticket format, live lessons and the timed report, first</a> <span class="team-ticket-status"><strong>Merged</strong><time datetime="2026-11-20T19:03:26Z">20 Nov · 19:03:26 UTC</time></span></li>
+        <li data-building="2026-11-20T17:45:43Z" data-review="2026-11-20T17:58:49Z"><a href="https://github.com/openwizdev/OpenWiz/issues/1929">#1929 Infra WD2: the write-driver skill takes a user from paste to a passing driver (WizSkills 0.2.1)</a> <span class="team-ticket-status"><strong>Merged</strong><time datetime="2026-11-21T01:27:35Z">21 Nov · 01:27:35 UTC</time></span></li>
+        <li data-building="2026-11-21T01:32:44Z" data-review="2026-11-21T02:00:06Z"><a href="https://github.com/openwizdev/OpenWiz/issues/1931">#1931 Infra WD3: write-driver’s end-to-end eval against the template’s fake host (WizSkills 0.2.1)</a> <span class="team-ticket-status"><strong>Merged</strong><time datetime="2026-11-21T04:36:53Z">21 Nov · 04:36:53 UTC</time></span></li>
+        <li data-building="2026-11-20T17:46:29Z" data-review="2026-11-20T17:58:49Z"><a href="https://github.com/openwizdev/OpenWiz/issues/1932">#1932 Infra WD4: the Drivers page’s Write your own driver copy line</a> <span class="team-ticket-status"><strong>Merged</strong><time datetime="2026-11-21T01:28:08Z">21 Nov · 01:28:08 UTC</time></span></li>
+      </ul>
+      <p class="team-landing"><a href="https://github.com/openwizdev/WizSkills/pull/229">WizSkills #229 · #1931: Infra WD3: write-driver’s end-to-end eval against the template’s fake host (WizSkills 0.2.1)</a> <span class="team-ticket-status"><strong>Pull request merged</strong><time datetime="2026-11-21T04:36:53Z">21 Nov · 04:36:53 UTC</time></span></p>
+    </section>
+    <section class="team-now" aria-labelledby="team-now-label">
+      <h2 id="team-now-label">Now in the factory</h2>
+      <p class="team-source">Snapshot · <time datetime="2026-11-24T14:33:00Z">24 Nov 2026, 14:33 UTC</time></p>
+      <h3 class="team-spec"><a href="https://github.com/openwizdev/OpenWiz/issues/2963">#2963 spec: openwiz.dev/book, our own booking page for the team call</a></h3>
+      <ul class="team-tickets">
+        <li><a href="https://github.com/openwizdev/OpenWiz/issues/2964">#2964 BK1: busy time from iCal and the open slots</a> <span class="team-ticket-status"><strong>Merged</strong></span></li>
+        <li><a href="https://github.com/openwizdev/OpenWiz/issues/2965">#2965 BK3: confirmation email and Google Calendar</a> <span class="team-ticket-status"><strong>Merged</strong></span></li>
+        <li><a href="https://github.com/openwizdev/OpenWiz/issues/2966">#2966 BK2: the booking API</a> <span class="team-ticket-status"><strong>Merged</strong></span></li>
+        <li><a href="https://github.com/openwizdev/OpenWiz/issues/2967">#2967 BK4: the booking page and its installable app</a> <span class="team-ticket-status"><strong>Merged</strong></span></li>
+      </ul>
+    </section>
+  </div>
 </div>
 <section class="team-part team-call wrap" aria-labelledby="team-how">
   <h2 id="team-how">On the call</h2>
@@ -74,7 +88,7 @@
   </ol>
 </section>
 <section class="team-part wrap" aria-labelledby="team-launch">
-  <h2 id="team-launch">Launch film</h2>
+  <h2 id="team-launch">OpenWiz in two minutes</h2>
   <figure class="launch team-film">
     <div class="launch-frame">
       <video class="launch-video" src="/art/launch-video.mp4" poster="/art/launch-poster.webp" preload="none" playsinline controls width="1280" height="666" aria-label="OpenWiz in two minutes" aria-describedby="launch-about">
@@ -90,7 +104,7 @@
   <ul class="team-facts">
     <li>OpenWiz 0.01 is out: open source, Apache-2.0.</li>
     <li>It never touches a login and runs no server of ours.</li>
-    <li>Which drivers passed their live check: <a href="/drivers/" data-count="drivers">the Drivers page</a>.</li>
+    <li>Which drivers passed their check: <a href="/drivers/" data-count="drivers">the Drivers page</a>.</li>
     <li>One person built it, with fleets of agents.</li>
   </ul>
 </section>
