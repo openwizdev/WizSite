@@ -4,7 +4,7 @@
   "semver": "0.4.2",
   "date": "2026-11-23",
   "published": "2026-11-23T04:56:21Z",
-  "headline": "More portable packaged tools.",
+  "headline": "Start agent teams and sort feedback on different computers.",
   "bullets": [
     "Two packaged files no longer spell out a computer's home folder.",
     "The change covers the tools for starting teams of agents and sorting feedback."

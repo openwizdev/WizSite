@@ -8,7 +8,7 @@
   "bullets": [
     "Turn a feature idea into a written spec, then break it into tickets.",
     "Agents load less text when they pick up a job.",
-    "Debug checks also inspect the version of each file staged for commit."
+    "Debug checks also look at the exact changes you plan to commit."
   ],
   "notes": "https://github.com/openwizdev/WizSkills/releases/tag/v0.2.0"
 }

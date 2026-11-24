@@ -4,10 +4,10 @@
   "semver": "0.2.1",
   "date": "2026-11-20",
   "published": "2026-11-20T22:32:33Z",
-  "headline": "Use the handoff and team tools in a privacy-checked release.",
+  "headline": "Try passing work between agents and starting teams with sample data.",
   "bullets": [
-    "Packaged handoff examples use made-up identifiers and addresses.",
-    "Team-launch examples also use sample data so they can ship with OpenWiz."
+    "Examples for passing work between agents use made-up IDs and addresses.",
+    "Examples for starting teams also use sample data."
   ],
   "notes": "https://github.com/openwizdev/WizSkills/releases/tag/v0.2.1"
 }
