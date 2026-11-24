@@ -138,15 +138,14 @@ def fingerprint(name, data):
     return re.sub(r'\.(css|js)$', rf'.{sha256(data).hexdigest()[:10]}.\1', name)
 
 
-def fingerprinted_page(html, cta=False):
+def fingerprinted_page(html, page):
     for name, hashed in FINGERPRINTS.items():
         html = html.replace(f'"/{name}"', f'"/{hashed}"')
-    return with_faq(with_footer(with_cta(html))) if cta else html
+    return with_faq(with_footer(with_header(html, page))) if page != APP_PAGE else html
 
 
-CTA = (ROOT / 'header-cta.html').read_text()
-CTA_LINK = '<a class="nav-team" href="/team/">'
-TOP_BAR_END = '  </nav>\n</header>'
+HEADER = (ROOT / 'header.html').read_text()
+HEADER_SLOT = '<template data-slot="header"></template>\n'
 TEAM_PAGE = 'team/index.html'
 BOOK_PLACEHOLDER = '#book'
 TEAM_HEADLINE = 'Book 30 minutes. Leave with a shipped pull request.'
@@ -214,9 +213,10 @@ def with_faq(html):
     return html
 
 
-def with_cta(html):
-    assert html.count(TOP_BAR_END) == 1, 'a site page needs exactly one top bar'
-    return html.replace(TOP_BAR_END, CTA + TOP_BAR_END)
+def with_header(html, name):
+    assert html.count(HEADER_SLOT) == 1, 'a site page needs exactly one header slot'
+    href = f'href="/{name.removesuffix("index.html")}"'
+    return html.replace(HEADER_SLOT, HEADER.replace(href, f'{href} aria-current="page"', 1))
 
 
 FINGERPRINTS = {name: fingerprint(name, (ROOT / name).read_bytes()) for name in HASHED}
@@ -812,10 +812,10 @@ def check_site(root, registry=ROOT / 'market/registry.json'):
     assert not unused, f'unused drivers art: {unused}'
     check_driver_logo_files(root)
     check_drivers(landing, changelog, (root / DRIVERS_PAGE).read_text(), pages[root / DRIVERS_PAGE])
-    check_drivers_nav((root / names['site.css']).read_text(), {name: (root / name).read_text() for name in PAGES})
     check_changelog(landing, changelog)
     check_releases(releases, read_releases(), install_switch(landing) == 'live')
     check_team({name: (root / name).read_text() for name in PAGES}, {name: pages[root / name] for name in PAGES})
+    check_top_bar((root / names['site.css']).read_text(), {name: (root / name).read_text() for name in PAGES})
     check_footer({name: (root / name).read_text() for name in PAGES})
     check_faq({name: (root / name).read_text() for name in PAGES}, {name: pages[root / name] for name in PAGES}, names)
     main = re.search(r'<main\b[^>]*>[\s\S]*?</main>', changelog)
@@ -1022,7 +1022,7 @@ class DriverOutline(HTMLParser):
 
 
 def top_bar(html):
-    found = re.findall(r'<header class="landing-nav wrap">[\s\S]*?</header>', html)
+    found = re.findall(r'<header class="landing-nav">[\s\S]*?</header>', html)
     assert len(found) == 1, 'a page needs exactly one landing top bar'
     return found[0]
 
@@ -1032,10 +1032,11 @@ def check_drivers(landing, changelog, drivers, page):
     current = re.findall(r'<a [^>]*aria-current="page"[^>]*>([^<]*)</a>', bar)
     assert current == ['Drivers'] and re.search(r'<a class="nav-drivers" href="/drivers/" aria-current="page">Drivers</a>', bar), \
         'the drivers top bar must mark its Drivers link aria-current="page"'
-    assert bar.replace(' aria-current="page"', '') == top_bar(landing), 'the drivers top bar must be identical to the landing\'s'
     for name, html in (('landing', landing), ('Changelog', changelog)):
         links = [text for href, text in Outline(top_bar(html)).links if href in DRIVERS_LINKS]
         assert links == ['Drivers'], f'the {name} top bar needs one Drivers nav link: {links}'
+    assert bar.replace(' aria-current="page"', '') == top_bar(landing).replace(' aria-current="page"', ''), \
+        'the drivers top bar must be identical to the landing\'s'
     assert re.search(r'<body class="[^"]*\bdrivers-page\b', drivers), 'the drivers page body is scoped .drivers-page'
     description = re.findall(r'<meta name="description" content="([^"]*)"', drivers)
     assert len(description) == 1 and DRIVER_DESCRIPTION in description[0], \
@@ -1391,7 +1392,8 @@ def check_driver_token(drivers, main):
 def check_team(htmls, pages):
     for name, html in htmls.items():
         bar = top_bar(html)
-        assert bar.count('class="nav-team"') == 1 and bar.count(CTA_LINK) == 1, f'the {name} top bar needs its one buy button to /team/'
+        assert bar.count('class="nav-team"') == 1 and re.search(r'<a class="nav-team" href="/team/"(?: aria-current="page")?>', bar), \
+            f'the {name} top bar needs its one buy button to /team/'
         assert html.count('class="nav-team"') == 1, f'the {name} page needs exactly one buy button'
     books = [(name, href) for name, page in pages.items() for href in page.books]
     assert len(books) == 2 and all(name == TEAM_PAGE for name, _ in books), f'the site needs its two booking links, both on the team page: {books}'
@@ -1506,7 +1508,19 @@ def check_faq(htmls, pages, names):
     assert not re.search(r'<(?:form|input|textarea)\b', FAQ), 'part 1 asks nothing: no form or input in the Questions'
 
 
-def check_drivers_nav(css, pages):
+def check_top_bar(css, pages):
+    links = Outline(HEADER).links
+    for link in (('/', 'OpenWiz'), ('/drivers/', 'Drivers'), ('/market/', 'Market'),
+                 ('/changelog/', 'Changelog'), ('/faq/', 'FAQ')):
+        assert links.count(link) == 1, f'the shared top bar needs one {link[1]} link'
+    assert links.count(('/app/', 'Sign in')) == 2, 'the top bar and phone sheet each need Sign in'
+    assert '<img src="/art/wiz-mark.webp" width="32" height="32" alt="" decoding="async">' in HEADER, \
+        'the shared top bar needs the painted Wiz image'
+    stars = re.findall(r'<a class="github-star [^"]*" href="https://github.com/openwizdev/openwiz"[^>]*>(.*?)</a>', HEADER)
+    assert len(stars) == 2 and all('class="star-icon"' in link and '<span data-stars>Star</span>' in link for link in stars), \
+        'the top bar and phone sheet need a GitHub star icon and fallback label'
+    assert 'aria-expanded="false" aria-controls="site-menu" hidden' in HEADER and 'id="site-menu"' in HEADER, \
+        'the shared top bar needs a phone menu button and a reachable menu without scripts'
     hidden = set()
     for block in re.findall(r'@media[^{]*\{((?:[^{}]*\{[^{}]*\})*)[^{}]*\}', css):
         for selectors, body in re.findall(r'([^{}]+)\{([^{}]*)\}', block):
@@ -1518,6 +1532,8 @@ def check_drivers_nav(css, pages):
         assert len(found) == 1, f'the {name} top bar needs one Drivers nav link'
         classes = set((re.search(r'class="([^"]*)"', found[0]) or [None, ''])[1].split())
         assert not classes & hidden, f'the {name} Drivers nav link is hidden on phones by {sorted(classes & hidden)}'
+        expected = with_header(HEADER_SLOT, name).rstrip()
+        assert top_bar(html) == expected, f'the {name} top bar must match the shared header with its aria-current page'
 
 
 def css_rules(css, selector):
@@ -1773,7 +1789,7 @@ def main():
             built = split_releases(built)[0]
         if name == MARKET_PAGE:
             built = split_market(built)[0]
-        assert fingerprinted_page((ROOT / name).read_text(), cta=name != APP_PAGE) == built, f'export differs: {name}'
+        assert fingerprinted_page((ROOT / name).read_text(), name) == built, f'export differs: {name}'
     paths = subprocess.check_output(['git', 'ls-files', '-z', '--cached', '--others', '--exclude-standard'], cwd=ROOT).decode().split('\0')
     for name in set(paths) - {''}:
         path = ROOT / name

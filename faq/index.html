@@ -2,47 +2,7 @@
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="Questions about OpenWiz, the open source kernel for agent factories: what it is, what you need, where your agents run, what it costs."><title>Questions — OpenWiz</title><link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48"><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><meta property="og:image" content="https://openwiz.dev/brand/og.png?v=2"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="OpenWiz"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="https://openwiz.dev/brand/og.png?v=2"><link rel="preload" href="/fonts/Geist-var.woff2" as="font" type="font/woff2" crossorigin><link rel="stylesheet" href="/tokens.css"><link rel="stylesheet" href="/site.css"><script src="/vendor/gsap-3.15.1.min.js" defer></script><script src="/site.js" defer></script><script src="/faq.js" defer></script></head>
 <body class="landing faq-page">
 <a class="skip" href="#main">Skip to content</a>
-<header class="landing-nav wrap">
-  <a class="landing-brand" href="/"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" aria-hidden="true" width="34" height="34">
-    <defs><mask id="cutouts" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512">
-      <rect width="512" height="512" fill="white"/><g fill="black"><path d="M132 234 Q132 210 158 210 H354 Q380 210 380 236 V293
- C380 322 368 345 348 358 H164 C144 344 132 322 132 293 Z"/><path d="M148 325 C151 362 164 390 186 410 L207 391 L228 438
-      L247 405 L264 461 L283 405 L304 438 L325 391 L346 410
-      C368 388 379 358 380 325 C351 346 324 353 294 353 H220
-      C192 353 167 345 148 325 Z"/></g>
-      <g fill="white"><path d="M132 234 Q132 210 158 210 H354 Q380 210 380 236 V293
- C380 322 368 345 348 358 H164 C144 344 132 322 132 293 Z"/><path d="M148 325 C151 362 164 390 186 410 L207 391 L228 438
-      L247 405 L264 461 L283 405 L304 438 L325 391 L346 410
-      C368 388 379 358 380 325 C351 346 324 353 294 353 H220
-      C192 353 167 345 148 325 Z"/></g>
-      <g fill="black"><circle cx="219" cy="278" r="30"/><circle cx="291" cy="278" r="30"/><path d="M190 323 Q190 312 202 312 H310 Q322 312 322 324 V342 Q322 354 310 354 H202 Q190 354 190 342 Z"/></g>
-    </mask><mask id="hatcut" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512">
-      <rect width="512" height="512" fill="white"/><g fill="black"><path d="M154 222 L228 81 C249 40 281 25 313 30 C357 36 385 73 384 111
- C383 139 367 154 350 145 C336 138 342 110 323 96 C307 84 288 91 278 106
- L328 222 Z"/></g>
-      <g fill="white"><path d="M154 222 L228 81 C249 40 281 25 313 30 C357 36 385 73 384 111
- C383 139 367 154 350 145 C336 138 342 110 323 96 C307 84 288 91 278 106
- L328 222 Z"/></g>
-    </mask></defs>
-    <g fill="#cfc6b8" color="#cfc6b8">
-      <g mask="url(#cutouts)"><path d="M132 234 Q132 210 158 210 H354 Q380 210 380 236 V293
- C380 322 368 345 348 358 H164 C144 344 132 322 132 293 Z"/><path d="M148 325 C151 362 164 390 186 410 L207 391 L228 438
-      L247 405 L264 461 L283 405 L304 438 L325 391 L346 410
-      C368 388 379 358 380 325 C351 346 324 353 294 353 H220
-      C192 353 167 345 148 325 Z"/></g>
-      <circle cx="230" cy="273" r="8"/><circle cx="280" cy="284" r="8"/><path d="M220 313 V353 H228 V313 Z M252 313 V353 H260 V313 Z
- M284 313 V353 H292 V313 Z"/>
-      <path d="M154 222 L228 81 C249 40 281 25 313 30 C357 36 385 73 384 111
- C383 139 367 154 350 145 C336 138 342 110 323 96 C307 84 288 91 278 106
- L328 222 Z" mask="url(#hatcut)"/><path d="M96 210 Q96 190 117 190 H395 Q416 190 416 210 V228 Q416 246 397 246 H115 Q96 246 96 228 Z"/>
-    </g></svg>OpenWiz</a>
-  <nav aria-label="Main navigation">
-    <a class="nav-drivers" href="/drivers/">Drivers</a>
-    <a class="nav-log" href="/changelog/">Changelog</a>
-    <a class="github-star" href="https://github.com/openwizdev/openwiz" aria-label="Star on GitHub"><svg aria-hidden="true" viewBox="0 0 16 16" width="17" height="17" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg><span data-stars hidden></span></a>
-    <a class="sign-in" href="/app/" aria-label="Sign in with GitHub">Sign in</a>
-  </nav>
-</header>
+<template data-slot="header"></template>
 <main id="main" class="faq-main">
 <template data-slot="faq-h1"></template>
 </main>

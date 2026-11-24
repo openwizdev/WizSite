@@ -1,3 +1,4 @@
+from hashlib import sha256
 from html import escape
 from pathlib import Path
 import json
@@ -9,7 +10,7 @@ from unittest import mock
 
 import re
 
-from check import CTA, FAQ, FAQ_WHERE, FOOTER, INSTALL_NOTE_HTML, FINGERPRINTS, HASHED, INSTALL_SWITCH, ROOT, Page, check_changelog, check_release_data, check_releases, read_releases, split_releases, check_motion, check_privacy, check_ref, check_site, check_vector, check_webp, fingerprint
+from check import FAQ, FAQ_WHERE, FOOTER, INSTALL_NOTE_HTML, FINGERPRINTS, HASHED, INSTALL_SWITCH, ROOT, Page, check_changelog, check_release_data, check_releases, read_releases, split_releases, check_motion, check_privacy, check_ref, check_site, check_vector, check_webp, fingerprint
 
 
 def edit_built(root, name, change):
@@ -688,8 +689,8 @@ class Checks(unittest.TestCase):
             return temp, root
         book = re.compile(r'data-book href="[^"]*"')
         refused = {
-            'buy button': ('changelog/index.html', lambda t: t.replace(CTA, '', 1)),
-            'buy button to /team/': ('team/index.html', lambda t: t.replace('<a class="nav-team" href="/team/">', '<a class="nav-team" href="/">', 1)),
+            'buy button': ('changelog/index.html', lambda t: re.sub(r'<a class="nav-team"[^>]*>.*?</a>', '', t, count=1)),
+            'buy button to /team/': ('team/index.html', lambda t: t.replace('class="nav-team" href="/team/"', 'class="nav-team" href="/"', 1)),
             'two booking links': ('team/index.html', lambda t: t.replace('</main>', '<a data-book href="https://cal.com/x">Book</a></main>', 1)),
             'one booking value': ('team/index.html', lambda t: book.sub('data-book href="https://cal.com/x"', t, count=1)),
             'outside the team page': ('index.html', lambda t: t.replace('</main>', '<a data-book href="https://cal.com/x">Book</a></main>', 1)),
@@ -1021,8 +1022,9 @@ class Checks(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp) / 'dist'
             shutil.copytree(ROOT / 'dist', root)
-            (root / 'art/drivers-x-unused.webp').write_bytes((root / 'art/drivers-d-sea.webp').read_bytes())
-            with mock.patch.dict('check.ART_HASHES', {'art/drivers-x-unused.webp': 'f2699bd8fe4763993a492dfac2bdbfc3eae46ec33bae0ab74127ad6ebc6a6285'}), \
+            data = (root / 'art/family-01.webp').read_bytes()
+            (root / 'art/drivers-x-unused.webp').write_bytes(data)
+            with mock.patch.dict('check.ART_HASHES', {'art/drivers-x-unused.webp': sha256(data).hexdigest()}), \
                     mock.patch('check.ART', set(__import__('check').ART) | {'art/drivers-x-unused.webp'}), \
                     mock.patch('check.STATIC', set(__import__('check').STATIC) | {'art/drivers-x-unused.webp'}), \
                     self.assertRaisesRegex(AssertionError, 'unused drivers art'):
@@ -1159,18 +1161,16 @@ class Checks(unittest.TestCase):
                 ('<h2 id="more-title">Also shipped</h2>', '<h2 id="more-title">Also shipped</h2><p>Only boat.dev has passed.</p>', 'never the only one')):
             self.broken(page, old, new, error)
 
-    def test_drivers_nav_and_description(self):
+    def test_shared_top_bar(self):
         for name in ('index.html', 'changelog/index.html', 'drivers/index.html'):
-            with self.subTest(page=name), tempfile.TemporaryDirectory() as temp:
-                root = Path(temp) / 'dist'
-                shutil.copytree(ROOT / 'dist', root)
-                page = root / name
-                text = page.read_text()
-                self.assertIn('<a class="nav-drivers" href="/drivers/"', text)
-                page.write_text(text.replace('<a class="nav-drivers" href="/drivers/"', '<a class="nav-log" href="/drivers/"', 1))
-                with mock.patch('check.check_drivers'), self.assertRaisesRegex(AssertionError, 'hidden on phones'):
-                    check_site(root)
+            self.broken(name, '<a class="nav-drivers" href="/drivers/"',
+                        '<a class="nav-log" href="/drivers/"', 'match the shared header|aria-current|identical to the landing')
+        self.broken('market/index.html', ' aria-current="page">Market', '>Market', 'aria-current page')
+        self.broken('faq/index.html', '/art/wiz-mark.webp', '/art/family-01.webp', 'match the shared header')
+        self.broken('team/index.html', '<span data-stars>Star</span>', '<span data-stars></span>', 'match the shared header')
         self.broken('', '', '', 'hidden on phones', css='\n@media (max-width: 480px) { .landing-nav .nav-drivers { display: none; } }\n')
+
+    def test_drivers_description(self):
         for old, new, error in (
                 ('boat.dev, Cloudroom and your own computer or VPS passed all five checks', 'boat.dev passed all five checks', 'must say boat.dev, Cloudroom and your own computer or VPS passed'),
                 ('every other host and harness shows its true state', 'Grok Bot passed too', 'must say boat.dev|Grok Bot has not passed'),

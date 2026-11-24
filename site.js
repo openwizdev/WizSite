@@ -3,12 +3,59 @@ async function showStars() {
   if (!response.ok) return;
   const { stargazers_count: count } = await response.json();
   if (!Number.isSafeInteger(count) || count < 0) return;
-  const formatted = new Intl.NumberFormat(document.documentElement.lang).format(count);
+  const locale = document.documentElement.lang;
+  const formatted = new Intl.NumberFormat(locale).format(count);
+  const compact = count >= 10000
+    ? new Intl.NumberFormat(locale, { notation: 'compact', maximumFractionDigits: 1 }).format(count).toLowerCase()
+    : formatted;
   for (const value of document.querySelectorAll('[data-stars]')) {
-    value.textContent = formatted;
+    const header = value.closest('.landing-nav');
+    value.textContent = header ? compact : formatted;
     value.hidden = false;
-    value.parentElement.setAttribute('aria-label', `Star on GitHub · ${formatted} ${count === 1 ? 'star' : 'stars'}`);
+    const label = header
+      ? `GitHub stars: ${compact}${compact === formatted ? '' : ` (${formatted})`}`
+      : `Star on GitHub · ${formatted} ${count === 1 ? 'star' : 'stars'}`;
+    value.parentElement.setAttribute('aria-label', label);
   }
+}
+
+function enableNav() {
+  const bar = document.querySelector('.landing-nav');
+  if (!bar) return;
+  const brand = bar.querySelector('.landing-brand');
+  const actions = bar.querySelector('.nav-actions');
+  const toggle = bar.querySelector('.nav-toggle');
+  const menu = document.getElementById(toggle.getAttribute('aria-controls'));
+  const phone = matchMedia('(max-width: 840px)');
+  const behind = document.querySelectorAll('body > :is(.skip, main, footer)');
+  const stars = bar.querySelector('.nav-bar-stars');
+
+  const setOpen = (open, moveFocus) => {
+    toggle.setAttribute('aria-expanded', String(open));
+    toggle.setAttribute('aria-label', open ? 'Close menu' : 'Menu');
+    menu.hidden = phone.matches && !open;
+    for (const element of behind) element.inert = open;
+    stars.inert = open;
+    if (moveFocus) (open ? menu.querySelector('a') : toggle).focus({ preventScroll: true });
+  };
+  const sync = () => {
+    const hadMenuFocus = menu.contains(document.activeElement) || document.activeElement === toggle;
+    if (phone.matches) actions.after(menu);
+    else brand.after(menu);
+    setOpen(false, phone.matches && hadMenuFocus);
+    if (!phone.matches && hadMenuFocus) menu.querySelector('a').focus({ preventScroll: true });
+  };
+
+  toggle.hidden = false;
+  sync();
+  phone.addEventListener('change', sync);
+  toggle.addEventListener('click', () => setOpen(menu.hidden, true));
+  bar.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && toggle.getAttribute('aria-expanded') === 'true') {
+      event.preventDefault();
+      setOpen(false, true);
+    }
+  });
 }
 
 const scenes = [
@@ -634,6 +681,7 @@ async function askAWiz() {
 
 enableCopy();
 askAWiz();
+enableNav();
 showStars().catch(() => {});
 launchVideo();
 specVideo();
