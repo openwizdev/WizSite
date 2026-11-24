@@ -15,9 +15,9 @@ const specIssue = (number, title, updatedAt, total, completed) => ({ number, tit
 const SPECS = [specIssue(60, 'Spec: synthetic notes', '2030-01-02T00:00:00Z', 3, 1), specIssue(61, 'Spec: synthetic tags', '2030-01-04T00:00:00Z', 2, 0),
   specIssue(62, 'Spec: synthetic done', '2030-01-06T00:00:00Z', 2, 2)];
 const SPEC_BODY = '## Problem Statement\n\nSynthetic.\n\n## Changelog headline\n\nKeep your notes in one list.\n\n## User Stories\n';
-const RECORD = { schema: 'openwiz.decisions.v1', kind: 'spec_confirmation', id: 'sc_notes_1', status: 'open', fingerprint: '5e'.repeat(32),
-  risk: 'ordinary', spec: 60, summary: ['One list for now.'], headline: 'Keep your notes in one list.', tickets: [], graph: [] };
-const recordBody = record => `Spec ready for your confirm.\n\n\`\`\`json\n${JSON.stringify(record, null, 2)}\n\`\`\``;
+const RECORD = { schema: 'openwiz.decisions.v1', kind: 'plan_approval', id: 'pa_notes_1', status: 'open', fingerprint: '966fd8d7e2da4f19c7939755fad5440c9d2e33924ba87ac867f5c5307d66037b',
+  risk: 'ordinary', spec: 60, summary: ['One list for now.'], headline: 'Keep your notes in one list.', tickets: [{ number: 63, title: 'Synthetic notes ticket', blockers: [] }], graph: [] };
+const recordBody = record => `Plan ready for your approval.\n\n\`\`\`json\n${JSON.stringify(record, null, 2)}\n\`\`\``;
 const comment = (id, number, body, createdAt, login = 'factory-bot[bot]') => ({ databaseId: id, body,
   url: `https://github.com/acme/factory/issues/${number}#issuecomment-${id}`, createdAt, updatedAt: createdAt, author: { login } });
 const detail = (number, comments) => ({ number, comments: { totalCount: comments.length, nodes: comments }, subIssues: { totalCount: 0, nodes: [] } });
@@ -27,20 +27,24 @@ function specsAnswer(specs) {
     repository: { issues: { totalCount: specs.length, nodes: specs }, youIssues: { totalCount: 0, nodes: [] }, fleet: { text: FLEET } } } };
 }
 
-async function queueWorld(run, { specs = SPECS, details, grillAnswers = grill.refreshes[0].github } = {}) {
+async function queueWorld(run, { specs = SPECS, details, record = RECORD, specBody = SPEC_BODY, grillAnswers = grill.refreshes[0].github } = {}) {
   const world = run.world;
   world.github['GET /user'] = () => ({ status: 200, json: { id: 5001, login: 'acme-owner' } });
   world.graphql.Specs = async () => ({ status: 200, json: specsAnswer(specs) });
   world.graphql.SpecTickets = async () => ({ status: 200, json: { data: { rateLimit: RATE, repository: details ?? {
-    s60: detail(60, [comment(9100021, 60, recordBody(RECORD), '2030-01-05T00:00:00Z')]),
+    s60: detail(60, [comment(9100021, 60, recordBody(record), '2030-01-05T00:00:00Z')]),
     s61: detail(61, [comment(9100022, 61, `[Watch the narrated spec](${VIDEO})\n\nComment here to steer: stop, reset, or anything else.`, '2030-01-04T01:00:00Z')]),
     s62: detail(62, []) } } } });
-  world.graphql.SpecEdit = async () => ({ status: 200, json: { data: { repository: { issue: { lastEditedAt: null } } } } });
+  world.github['GET /repos/acme/factory/contents/docs/agents/fleet.md'] = () => ({ status: 200,
+    json: { path: 'docs/agents/fleet.md', encoding: 'base64', content: Buffer.from(FLEET).toString('base64') } });
+  world.github['GET /repos/acme/factory/issues/60/sub_issues'] = () => ({ status: 200,
+    json: [{ number: 63, title: 'Synthetic notes ticket', body: 'Synthetic ticket.' }] });
+  world.github['GET /repos/acme/factory/issues/63/dependencies/blocked_by'] = () => ({ status: 200, json: [] });
   world.record(grillAnswers);
   world.github['GET /repos/acme/factory/issues/comments/9100021'] = () => ({ status: 200, json: { id: 9100021,
     issue_url: 'https://api.github.com/repos/acme/factory/issues/60', user: { login: 'factory-bot[bot]', id: 5900 },
-    body: recordBody(RECORD), created_at: '2030-01-05T00:00:00Z' } });
-  world.github['GET /repos/acme/factory/issues/60'] = () => ({ status: 200, json: { number: 60, state: 'open', body: SPEC_BODY } });
+    body: recordBody(record), created_at: '2030-01-05T00:00:00Z' } });
+  world.github['GET /repos/acme/factory/issues/60'] = () => ({ status: 200, json: { number: 60, state: 'open', body: specBody } });
 }
 
 const CARD = await readFile(new URL('app/cards/decision.js', ROOT), 'utf8');
@@ -122,7 +126,7 @@ test('switch on without card modules: plain cards link to GitHub, in the same or
     assert.deepEqual(links, [['https://github.com/acme/factory/issues/60#issuecomment-9100021', '_blank'],
       ['https://github.com/acme/factory/pull/7#issuecomment-9100003', '_blank'], ['https://github.com/acme/factory/pull/7#issuecomment-9100005', '_blank'],
       ['https://github.com/acme/factory/issues/61', '_blank'], ['https://github.com/acme/factory/issues/60', '_blank']]);
-    assert.match(await run.page.text(), /Spec to confirm · #60/i);
+    assert.match(await run.page.text(), /Plan to approve · #60/i);
     const visible = () => run.page.run(`[...document.querySelectorAll('.queue-item:not([hidden])')].map(e => e.dataset.key)`);
     assert.deepEqual(await visible(), [SPEC_DECISION]);
     await run.page.tap('Next card');
@@ -271,7 +275,7 @@ test('R1: the queue registers its check through OW.records.check, so a current d
       const b = [...card.querySelectorAll('button')].find(b => b.textContent === 'Yes'); b.scrollIntoView({ block: 'center' }); return !b.disabled; })()`);
     assert.ok(yes, 'the current decision offers no Yes');
     await run.page.tap('Yes');
-    await run.page.until(`document.body.innerText.includes('openwiz decision answer v1') && document.body.innerText.includes('confirm spec #60')`, 'the real preview');
+    await run.page.until(`document.body.innerText.includes('openwiz decision answer v1') && document.body.innerText.includes('approve #60')`, 'the real preview');
     assert.deepEqual(run.world.writes(), []);
     assert.deepEqual(run.world.violations, []);
   } finally {
@@ -286,7 +290,7 @@ test('R1: a check OW.records answers unchecked, or that throws, leaves the item 
     await openQueue(run, 'on', { cards: true });
     await run.page.until(`window.drawn.some(item => item.key === ${JSON.stringify(ROUND)} && item.current === true)`, 'the first, matched read');
     run.world.record({ 'GET /repos/acme/factory/pulls/7': { status: 502, json: { message: 'Bad Gateway' } } });
-    run.world.graphql.SpecEdit = async () => ({ status: 200, json: { data: { repository: { issue: { lastEditedAt: '2030-01-06T00:00:00Z' } } } } });
+    run.world.github['GET /repos/acme/factory/issues/60'] = () => ({ status: 200, json: { number: 60, state: 'open', body: SPEC_BODY + 'Edited.' } });
     await refreshed(run);
     assert.match(await run.page.text(), /GitHub gave only part of #7's source check/);
     const round = await latestOf(run, ROUND);
@@ -471,5 +475,133 @@ else:
     assert.match(run(dist), /^refused:.*order/, 'a You and Agents swap passed the app check');
   } finally {
     await rm(temp, { recursive: true, force: true });
+  }
+});
+
+test('R8: a transient Specs 502 disables answering, keeps the draft in memory, and restores it on recovery', async () => {
+  const run = await start();
+  try {
+    await queueWorld(run);
+    await openQueue(run, 'dry-run', { card: true });
+    await run.page.until(`document.querySelector('article.decision[data-key="${SPEC_DECISION}"] textarea')`, 'the reply box');
+    await run.page.run(`document.querySelector('article.decision[data-key="${SPEC_DECISION}"] textarea').focus()`);
+    await run.page.type('Keep it through a 502');
+    run.world.graphql.Specs = async () => ({ status: 502, json: { message: 'Bad Gateway' } });
+    await run.page.click('Refresh now');
+    await run.page.until(`document.body.innerText.includes("Couldn't read Specs")`, 'the failed refresh');
+    await run.page.until(`document.querySelector('article.decision[data-key="${SPEC_DECISION}"] .decision-blocked')`, 'the unchecked card');
+    const enabledWhileFailed = await run.page.run(`[...document.querySelectorAll('article.decision[data-key="${SPEC_DECISION}"] button')].filter(b => !b.disabled).length`);
+    assert.equal(enabledWhileFailed, 0, 'answer actions stayed enabled during a Specs 502');
+    run.world.graphql.Specs = async () => ({ status: 200, json: specsAnswer(SPECS) });
+    await refreshed(run);
+    await run.page.until(`document.querySelector('article.decision[data-key="${SPEC_DECISION}"] textarea')`, 'the restored reply box');
+    const draft = await run.page.run(`document.querySelector('article.decision[data-key="${SPEC_DECISION}"] textarea').value`);
+    assert.equal(draft, 'Keep it through a 502', 'a transient Specs 502 erased the draft');
+    await run.page.run(`(() => { const card = document.querySelector('article.decision[data-key="${SPEC_DECISION}"]');
+      [...card.querySelectorAll('button')].find(b => b.textContent === 'Preview reply').scrollIntoView({ block: 'center' }); })()`);
+    await run.page.tap('Preview reply');
+    await run.page.until(`document.body.innerText.includes('openwiz decision answer v1') && document.body.innerText.includes('Keep it through a 502')`, 'the composed preview');
+    assert.deepEqual(run.world.writes(), []);
+    assert.deepEqual(run.world.violations, []);
+  } finally {
+    await run.close();
+  }
+});
+
+test('R8: a changed binding on recovery does not restore the old draft', async () => {
+  const run = await start();
+  try {
+    await queueWorld(run);
+    await openQueue(run, 'dry-run', { card: true });
+    await run.page.until(`document.querySelector('article.decision[data-key="${SPEC_DECISION}"] textarea')`, 'the reply box');
+    await run.page.run(`document.querySelector('article.decision[data-key="${SPEC_DECISION}"] textarea').focus()`);
+    await run.page.type('Draft for old binding');
+    run.world.graphql.Specs = async () => ({ status: 502, json: { message: 'Bad Gateway' } });
+    await run.page.click('Refresh now');
+    await run.page.until(`document.querySelector('article.decision[data-key="${SPEC_DECISION}"] .decision-blocked')`, 'the unchecked card');
+    const updatedBody = SPEC_BODY.replace('Synthetic.', 'Synthetic body edited.');
+    await queueWorld(run, { specBody: updatedBody,
+      record: { ...RECORD, fingerprint: '2326a9c116e7c4312266b9ecfa0cfb914e66268ce2a01e54b2ab0fe80095a84e' } });
+    await refreshed(run);
+    await run.page.until(`document.querySelector('article.decision[data-key="${SPEC_DECISION}"] textarea')`, 'the recovered reply box');
+    const draft = await run.page.run(`document.querySelector('article.decision[data-key="${SPEC_DECISION}"] textarea').value`);
+    assert.equal(draft, '', 'a changed binding restored a draft from the old binding');
+    assert.deepEqual(run.world.writes(), []);
+    assert.deepEqual(run.world.violations, []);
+  } finally {
+    await run.close();
+  }
+});
+
+test('R9: tapping Yes during a refresh with a slow later GitHub read composes without stale refusal', async () => {
+  const run = await start();
+  try {
+    await queueWorld(run);
+    await openQueue(run, 'dry-run', { card: true });
+    await run.page.until(`document.querySelectorAll('article.decision').length >= 2`, 'the decision cards');
+    const firstPulls = run.world.recorded[pageOne];
+    delete run.world.recorded[pageOne];
+    let pullsStarted;
+    let releasePulls;
+    const started = new Promise(resolve => { pullsStarted = resolve; });
+    const gate = new Promise(resolve => { releasePulls = resolve; });
+    run.world.github['GET /repos/acme/factory/pulls'] = async () => {
+      pullsStarted();
+      await gate;
+      return { status: 200, json: firstPulls.json };
+    };
+    await run.page.click('Refresh now');
+    await started;
+    await run.page.run(`(() => { const card = document.querySelector('article.decision[data-key="${SPEC_DECISION}"]');
+      [...card.querySelectorAll('button')].find(b => b.textContent === 'Yes').scrollIntoView({ block: 'center' }); })()`);
+    await run.page.tap('Yes');
+    await run.page.until(`document.body.innerText.includes('openwiz decision answer v1') && document.body.innerText.includes('approve #60')`
+      + ` || document.body.innerText.includes('Not posted (source_changed)')`, 'the preview or refusal');
+    const text = await run.page.text();
+    assert.ok(!text.includes('Not posted (source_changed)'), 'Yes during an in-flight refresh was refused as stale');
+    assert.match(text, /openwiz decision answer v1/);
+    assert.match(text, /approve #60/);
+    releasePulls();
+    await new Promise(resolve => setTimeout(resolve, 400));
+    assert.deepEqual(run.world.writes(), []);
+    assert.deepEqual(run.world.violations, []);
+  } finally {
+    await run.close();
+  }
+});
+
+test('R9: a card marked stale by a timestamp mismatch recovers on the next successful refresh and keeps its draft', async () => {
+  const run = await start();
+  try {
+    await queueWorld(run);
+    await openQueue(run, 'dry-run', { card: true });
+    await run.page.until(`document.querySelector('article.decision[data-key="${SPEC_DECISION}"] textarea')`, 'the reply box');
+    await run.page.run(`document.querySelector('article.decision[data-key="${SPEC_DECISION}"] textarea').focus()`);
+    await run.page.type('Draft survives stale recovery');
+    const changedBody = SPEC_BODY.replace('Keep your notes in one list.', 'Changed headline temporarily.');
+    run.world.github['GET /repos/acme/factory/issues/60'] = () => ({ status: 200, json: { number: 60, state: 'open', body: changedBody } });
+    await run.page.run(`(() => { const card = document.querySelector('article.decision[data-key="${SPEC_DECISION}"]');
+      [...card.querySelectorAll('button')].find(b => b.textContent === 'Yes').scrollIntoView({ block: 'center' }); })()`);
+    await run.page.tap('Yes');
+    await run.page.until(`document.querySelector('article.decision[data-key="${SPEC_DECISION}"] .decision-blocked')`, 'the stale card');
+    run.world.github['GET /repos/acme/factory/issues/60'] = () => ({ status: 200, json: { number: 60, state: 'open', body: SPEC_BODY } });
+    await refreshed(run);
+    await run.page.until(`!document.querySelector('article.decision[data-key="${SPEC_DECISION}"] .decision-blocked')`, 'the recovered card');
+    const state = await run.page.run(`(() => {
+      const card = document.querySelector('article.decision[data-key="${SPEC_DECISION}"]');
+      const yes = [...card.querySelectorAll('button')].find(b => b.textContent === 'Yes');
+      const box = card.querySelector('textarea');
+      return { blocked: Boolean(card.querySelector('.decision-blocked')), disabled: yes.disabled, draft: box.value };
+    })()`);
+    assert.deepEqual(state, { blocked: false, disabled: false, draft: 'Draft survives stale recovery' },
+      'the stale card stayed disabled or lost its draft after a successful refresh');
+    await run.page.run(`(() => { const card = document.querySelector('article.decision[data-key="${SPEC_DECISION}"]');
+      [...card.querySelectorAll('button')].find(b => b.textContent === 'Preview reply').scrollIntoView({ block: 'center' }); })()`);
+    await run.page.tap('Preview reply');
+    await run.page.until(`document.body.innerText.includes('openwiz decision answer v1') && document.body.innerText.includes('Draft survives stale recovery')`, 'the recovered compose');
+    assert.deepEqual(run.world.writes(), []);
+    assert.deepEqual(run.world.violations, []);
+  } finally {
+    await run.close();
   }
 });

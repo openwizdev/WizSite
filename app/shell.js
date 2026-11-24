@@ -8,8 +8,8 @@
   const ROUTES = () => OW.pages.map(page => page.id);
   let built = null;
   const INSTALL = 'https://github.com/apps/openwiz-viewer/installations/new';
-  const v2 = data.v2.get() !== 'off';
-  const demo = data.demo;
+  const v2 = Boolean(OW.records?.enabled?.());
+  const demo = v2 && data.demo;
   if (v2) {
     const { v2Style, v2Script } = document.currentScript.dataset;
     const load = el => new Promise((resolve, reject) => {

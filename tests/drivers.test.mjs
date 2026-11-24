@@ -1,11 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { createServer } from 'node:http';
 import { existsSync } from 'node:fs';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { link, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { extname, join, normalize } from 'node:path';
+import { dirname, extname, join, normalize } from 'node:path';
 
 const COPY_LINE = 'Write an OpenWiz driver for my host with the write-driver skill: https://github.com/openwizdev/WizSkills/tree/main/skills/write-driver';
 const ROOT = new URL('..', import.meta.url).pathname;
@@ -152,8 +152,10 @@ test('the key-host section says where a host key lives, who reads it, where it g
   assert.doesNotMatch(text(section), /\bsix(th)?\b|\bexcept(ion)?\b|\bwaive/i, 'no extra or skipped check');
 });
 
-test('the rendered Drivers page shows exactly one visible Devin tile in a pre-live state', async () => {
+test('the rendered Drivers page shows exactly one visible Devin entry', async () => {
   assert.ok(existsSync(join(DIST, 'drivers/index.html')), 'run npm run build first');
+  const snapshot = JSON.parse(await readFile(join(ROOT, 'market/registry.json'), 'utf8'));
+  const listing = snapshot.listings.find(item => item.id === 'devin' && item.tags.includes('driver'));
   const server = await serve();
   const origin = `http://127.0.0.1:${server.address().port}`;
   const browser = await launch();
@@ -183,14 +185,14 @@ test('the rendered Drivers page shows exactly one visible Devin tile in a pre-li
     };
     const readDevin = () => evaluate(() => {
       const norm = s => s.replace(/\s+/g, ' ').trim();
-      const tiles = document.querySelectorAll('#devin');
+      const tiles = document.querySelectorAll('article[data-listing="devin"], li.tile[data-listing="devin"], #devin');
       if (tiles.length !== 1) return { tiles: tiles.length };
       const [tile] = tiles;
       const box = tile.getBoundingClientRect();
       const state = tile.dataset.state;
       const group = tile.parentElement.closest('[data-state]');
       const rest = document.documentElement.cloneNode(true);
-      rest.querySelector('#devin').remove();
+      rest.querySelector('#' + CSS.escape(tile.id)).remove();
       const released = '[data-state="live"], [data-state="passed"], [data-state="shipped"], .live, .passed, .shipped';
       return {
         tiles: tiles.length,
@@ -199,14 +201,56 @@ test('the rendered Drivers page shows exactly one visible Devin tile in a pre-li
         inHostGroup: tile.matches('li.tile') && group?.id === `hosts-${state}`
           && group.dataset.state === state && Boolean(group.closest('#hosts')),
         state,
-        names: [...tile.querySelectorAll('h4')].map(e => norm(e.innerText)),
+        names: [...tile.querySelectorAll('h3, h4')].map(e => norm(e.innerText)),
         shown: norm(tile.innerText),
         links: [...tile.querySelectorAll('a')].map(a => [norm(a.innerText), a.href]),
         markedReleased: Boolean(tile.closest(released) || tile.querySelector(released)),
         devinElsewhere: /devin/i.test(rest.outerHTML),
         comingSoon: /coming soon/i.test(norm(tile.textContent)),
+        listing: tile.dataset.listing,
+        stage: tile.dataset.stage,
+        status: tile.dataset.status,
+        login: tile.querySelector('.driver-login')?.innerText,
+        summary: tile.querySelector('.build-line')?.innerText,
+        wording: tile.querySelector('.tile-state')?.innerText,
+        kit: tile.querySelector('.driver-kit')?.innerText,
+        marks: document.querySelectorAll('li[data-host][data-listing="devin"]').length,
       };
     });
+
+    if (listing) {
+      const entry = await readDevin();
+      assert.equal(entry.tiles, 1, 'exactly one registry-covered Devin card');
+      assert.equal(entry.visible, true);
+      assert.deepEqual([entry.listing, entry.stage, entry.status], [listing.id, listing.stage, listing.status]);
+      assert.deepEqual(entry.names, [listing.name]);
+      assert.equal(entry.login, listing.login ? 'Login: ' + listing.login : undefined);
+      const receipt = listing.proof?.receipt;
+      if (listing.stage === 'available' && receipt) {
+        assert.equal(entry.marks, 1);
+        assert.equal(entry.kit, 'Kit: passed, 5 of 5');
+        assert.deepEqual(entry.links, [['Kit run, ' + receipt.date, receipt.url]]);
+      } else {
+        assert.equal(entry.marks, 0);
+        assert.equal(entry.inHostGroup, true);
+        assert.equal(entry.summary, listing.summary);
+        if (listing.stage === 'being-built') {
+          const work = listing.links[0];
+          const links = [[work.label, work.url]];
+          if (receipt) {
+            assert.equal(entry.wording, 'Passed its live check, 5 of 5 on a real host; not in a release yet');
+            links.push(['Live check receipt, ' + receipt.date, receipt.url]);
+          } else {
+            assert.equal(entry.markedReleased, false);
+          }
+          assert.deepEqual(entry.links, links);
+        } else {
+          assert.equal(entry.markedReleased, false);
+          assert.deepEqual(entry.links, [['Get it', listing.url]]);
+        }
+      }
+      return;
+    }
 
     const labels = {
       review: 'In review',
@@ -251,5 +295,117 @@ test('the rendered Drivers page shows exactly one visible Devin tile in a pre-li
   } finally {
     await browser.close();
     server.close();
+  }
+});
+
+const REGISTRY_FILE = 'market/registry.json';
+
+async function buildDriverFixture(listings) {
+  const dir = await mkdtemp(join(tmpdir(), 'drivers-registry-'));
+  try {
+    const files = execFileSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard'], {
+      cwd: ROOT, encoding: 'utf8',
+    }).split('\0');
+    for (const file of new Set(files)) {
+      if (!file || file === REGISTRY_FILE) continue;
+      const target = join(dir, file);
+      await mkdir(dirname(target), { recursive: true });
+      await link(join(ROOT, file), target);
+    }
+    await symlink(join(ROOT, 'node_modules'), join(dir, 'node_modules'));
+    await writeFile(join(dir, REGISTRY_FILE), JSON.stringify({ contract: 'listing.v1', commit: 'd'.repeat(40), listings }));
+    execFileSync(process.execPath, ['build.mjs'], { cwd: dir, stdio: 'pipe' });
+    return {
+      drivers: await readFile(join(dir, 'dist/drivers/index.html'), 'utf8'),
+      market: await readFile(join(dir, 'dist/market/index.html'), 'utf8'),
+    };
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}
+
+function fixtureListing(id, name, fields) {
+  return {
+    id, name, stage: 'available', status: 'listed', tags: ['driver'],
+    summary: 'Runs agents on an example host.', plugs_into: 'OpenWiz drivers',
+    publisher: 'example-publisher', url: `https://example.com/${id}`, ...fields,
+  };
+}
+
+function fixtureReceipt(id) {
+  const date = '2026-11-01';
+  const path = `receipts/${id}/${date}-aaaaaaaaaaaa.txt`;
+  return { receipt: { date, path, url: `https://github.com/openwizdev/WizMarket/blob/${'d'.repeat(40)}/${path}` } };
+}
+
+const cardLinks = card => [...card.matchAll(/<a\b[^>]* href="([^"]+)"/g)].map(([, href]) => href.replaceAll('&amp;', '&'));
+
+test('the two built pages read the same driver listings and keep uncovered page entries', async () => {
+  const shipped = fixtureListing('example-driver', 'Example & Sons', {
+    status: 'verified', login: 'stays on your machine', proof: fixtureReceipt('example-driver'),
+  });
+  const building = fixtureListing('example-building', 'Example in progress', {
+    stage: 'being-built', login: 'held by the example host',
+    links: [{ label: 'Example issue', url: 'https://tracker.example.com/example/issues/5?a=1&b=2' }],
+  });
+  const passed = fixtureListing('openclaw', 'OpenClaw', {
+    stage: 'being-built', status: 'verified', proof: fixtureReceipt('openclaw'),
+    links: [{ label: 'Work ticket', url: 'https://example.com/openclaw/work' }],
+  });
+  const listed = fixtureListing('example-listed', 'Listed example', {});
+  const local = fixtureListing('local', 'Example computer or VPS', {
+    status: 'verified', login: 'stays on your machine', proof: fixtureReceipt('local'),
+  });
+  const harness = fixtureListing('copilot-cli', 'Example harness', {
+    stage: 'being-built', tags: ['harness'], links: [{ label: 'Example issue', url: 'https://example.com/harness/work' }],
+  });
+  const { drivers, market } = await buildDriverFixture([harness, building, shipped, listed, local, passed]);
+  const hostSection = id => drivers.match(new RegExp(`<section class="wall wrap" id="${id}"[\\s\\S]*?<\\/section>`))[0];
+  const hostCards = drivers.slice(drivers.indexOf('<main'), drivers.indexOf(hostSection('harnesses')));
+  const rendered = [...hostCards.matchAll(/<(article|li)\b(?=[^>]* data-listing="([^"]+)")([^>]*)>([\s\S]*?)<\/\1>/g)]
+    .filter(([, , , attrs]) => !attrs.includes('data-host='));
+  assert.deepEqual(rendered.map(([, , id]) => id).sort(), [building.id, shipped.id, listed.id, local.id, passed.id].sort(),
+    'exactly one Drivers card per registry driver, with harnesses excluded from hosts');
+  const cards = Object.fromEntries(rendered.map(([card, , id]) => [id, card]));
+  for (const [listing, name, expectedLinks] of [
+    [shipped, 'Example &amp; Sons', [shipped.proof.receipt.url]],
+    [building, building.name, [building.links[0].url]],
+    [listed, listed.name, [listed.url]],
+    [local, local.name, [local.proof.receipt.url]],
+    [passed, passed.name, [passed.links[0].url, passed.proof.receipt.url]],
+  ]) {
+    const card = cards[listing.id];
+    assert.ok(card.includes(`>${name}</`), `${listing.id}: registry display name`);
+    assert.ok(card.includes(`data-status="${listing.status}"`), `${listing.id}: registry verification state`);
+    assert.ok(card.includes(`data-stage="${listing.stage}"`), `${listing.id}: registry stage`);
+    assert.deepEqual(cardLinks(card).sort(), expectedLinks.sort(), `${listing.id}: only the registry links`);
+    const marketCard = market.match(new RegExp(`<article class="market-card" id="listing-${listing.id}"[\\s\\S]*?<\\/article>`))?.[0];
+    assert.ok(marketCard?.includes(`>${name}</`), `${listing.id}: adding it to the snapshot also adds it to Market`);
+    assert.ok(marketCard.includes(`data-status="${listing.status}"`) && marketCard.includes(`data-stage="${listing.stage}"`));
+    assert.ok(expectedLinks.every(link => cardLinks(marketCard).includes(link)), `${listing.id}: Market has the same links`);
+  }
+  assert.match(cards[shipped.id], /Login: stays on your machine/);
+  assert.match(cards[shipped.id], /Kit: passed, 5 of 5/);
+  assert.match(cards[shipped.id], /<time datetime="2026-11-01">2026-11-01<\/time>/);
+  assert.match(cards[shipped.id], /src="\/drivers\/logos\/monitor\.svg"/);
+  assert.match(cards[building.id], /Login: held by the example host/);
+  assert.ok(cards[building.id].includes(building.summary));
+  assert.match(cards[passed.id], />Passed its live check, 5 of 5 on a real host; not in a release yet<\//);
+  assert.match(cards[passed.id], /src="\/drivers\/logos\/openclaw\.svg"/);
+  const marks = [...drivers.matchAll(/<li data-host="([^"]+)"/g)].map(([, id]) => id);
+  assert.deepEqual(marks.sort(), ['boat-dev', 'cloudroom', 'example-driver', 'vps']);
+  assert.equal([...drivers.matchAll(/ id="openclaw"/g)].length, 1, 'the registry replaces the OpenClaw fallback in place');
+  assert.match(cards[local.id], / id="vps"/, 'the local seed replaces the existing computer or VPS card');
+  const harnessCard = hostSection('harnesses').match(/<li class="tile" id="copilot"[^>]*>[\s\S]*?<\/li>/)?.[0];
+  assert.ok(harnessCard?.includes('data-listing="copilot-cli"'), 'the harness seed replaces its existing row');
+  assert.deepEqual(cardLinks(harnessCard), [harness.links[0].url]);
+
+  const { drivers: empty } = await buildDriverFixture([]);
+  const fallbackCards = empty.matchAll(/<article class="driver[^"]*" id="([^"]+)"[\s\S]*?<\/article>|<li class="tile[^"]*" id="([^"]+)"[\s\S]*?<\/li>/g);
+  const replaced = new Set(['openclaw', 'vps', 'copilot']);
+  for (const [html, article, tile] of fallbackCards) {
+    const id = article ?? tile;
+    if (!replaced.has(id)) assert.ok(drivers.includes(html), `${id}: uncovered card retains its entire markup`);
+    assert.equal([...drivers.matchAll(new RegExp(` id="${id}"`, 'g'))].length, 1, `${id}: present exactly once`);
   }
 });
