@@ -22,6 +22,7 @@ html[data-v2='1'] :focus-visible { outline: 2px solid var(--em-amber); outline-o
 .v2-backdrop {
   position: fixed;
   inset: 0;
+  pointer-events: none;
   background: linear-gradient(#0c11184a, #0c11184a), url('/art/moments-sea.webp') center / cover;
 }
 .v2-frame, .v2-welcome-stage {
