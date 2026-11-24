@@ -10,15 +10,19 @@
   const INSTALL = 'https://github.com/apps/openwiz-viewer/installations/new';
   const v2 = Boolean(OW.records?.enabled?.());
   const isDemo = Boolean(v2 && data.demo?.());
-  const allPages = OW.pages.slice();
-  if (v2) {
-    document.documentElement.dataset.v2 = '1';
-    const order = ['chat', 'feed', 'settings'];
-    const shellPages = order.map(id => allPages.find(page => page.id === id)).filter(Boolean);
-    OW.pages.splice(0, OW.pages.length, ...shellPages);
-  } else {
-    for (let i = OW.pages.length - 1; i >= 0; i -= 1) {
-      if (OW.pages[i].v2 || OW.pages[i].v2Shell) OW.pages.splice(i, 1);
+  let allPages;
+
+  function registerPages() {
+    allPages = OW.pages.slice();
+    if (v2) {
+      document.documentElement.dataset.v2 = '1';
+      const order = ['chat', 'feed', 'settings'];
+      const shellPages = order.map(id => allPages.find(page => page.id === id)).filter(Boolean);
+      OW.pages.splice(0, OW.pages.length, ...shellPages);
+    } else {
+      for (let i = OW.pages.length - 1; i >= 0; i -= 1) {
+        if (OW.pages[i].v2 || OW.pages[i].v2Shell) OW.pages.splice(i, 1);
+      }
     }
   }
   const home = () => (v2 ? (isDemo ? '#/chat' : '#/feed') : `#/${OW.pages[0].id}`);
@@ -429,7 +433,6 @@
 
   data.onChange(update);
   if (v2 && OW.queue?.onUpdate) OW.queue.onUpdate(update);
-  if (isDemo && OW.demo?.onChange) OW.demo.onChange(update);
   OW.onSignedOut = () => signedOut('Your sign-in ended. Sign in again.');
   OW.onRepoReset = () => picker();
   window.addEventListener('hashchange', () => (isDemo ? draw() : built ? update() : null));
@@ -442,7 +445,8 @@
     }
     if ((event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'k') {
       event.preventDefault();
-      return OW.palette.toggle();
+      if (!isDemo) return OW.palette.toggle();
+      return;
     }
     if (OW.palette.shown() || event.altKey || event.ctrlKey || event.metaKey || /input|textarea|select/i.test(event.target.tagName)) return;
     if (isDemo && route().id === 'feed' && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
@@ -457,13 +461,32 @@
     }
     if (event.key === '?') {
       event.preventDefault();
-      return OW.palette.shortcuts();
+      if (!isDemo) return OW.palette.shortcuts();
+      return;
     }
     const page = OW.pages[Number(event.key) - 1];
     if (page) location.hash = `#/${page.id}`;
   });
 
   async function boot() {
+    if (v2) {
+      const assets = document.getElementById('v2-assets').content.children;
+      try {
+        await Promise.all(Array.from(assets, source => new Promise((resolve, reject) => {
+          const asset = document.createElement(source.localName);
+          for (const { name, value } of source.attributes) asset.setAttribute(name, value);
+          if (asset.localName === 'script') asset.async = false;
+          asset.onload = resolve;
+          asset.onerror = reject;
+          document.head.append(asset);
+        })));
+      } catch {
+        screen(h('h1', {}, 'OpenWiz couldn’t open'), h('a', { class: 'btn', href: location.href }, 'Try again'));
+        return;
+      }
+    }
+    registerPages();
+    if (isDemo) OW.demo.onChange(update);
     const params = new URLSearchParams(location.search);
     const code = params.get('code');
     const state = params.get('state');

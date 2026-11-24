@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { API, SITE, start } from './browser.mjs';
+import { API, SITE, signIn, start } from './browser.mjs';
 
 test('v2 switch off: none of the new v2 UI appears, and ?demo=1 stays signed out', async () => {
   const run = await start();
@@ -10,6 +10,7 @@ test('v2 switch off: none of the new v2 UI appears, and ?demo=1 stays signed out
     const v2Attr = await run.page.run('document.documentElement.dataset.v2 ?? null');
     assert.equal(v2Attr, null, 'v2 attribute leaked when switch is off');
     const hasV2 = await run.page.run(`Boolean(document.querySelector('.v2-welcome-card, .v2-shell'))`);
+    assert.ok(!run.world.log.some(r => /\/app\/pages\/(?:v2|v2-demo|chat|feed|settings)\.[a-f0-9]{10}\.(?:css|js)$/.test(r.path)));
     assert.equal(hasV2, false, 'v2 markup rendered when switch is off');
     assert.match(await run.page.text(), /Read-only, on the repositories you choose\./);
     assert.deepEqual(run.world.violations, []);
@@ -68,6 +69,39 @@ test('v2 switch on + demo: deep links render the new shell, work interactively, 
     const network = run.world.log.filter(r => r.origin === API || r.path.startsWith('/api/'));
     assert.deepEqual(network, [], `demo mode made network requests: ${JSON.stringify(network)}`);
     assert.deepEqual(run.world.violations, [], `CSP or runtime violations: ${JSON.stringify(run.world.violations)}`);
+  } finally {
+    await run.close();
+  }
+});
+
+test('demo leaves an existing GitHub session isolated and unchanged', async () => {
+  const run = await start();
+  const storage = 'JSON.stringify(Object.fromEntries(Object.entries(localStorage).sort()))';
+  try {
+    await signIn(run.page);
+    await run.page.click('acme/factory');
+    await run.page.until(`Object.values(OW.data.feeds).every(feed => feed.state !== 'loading' && !feed.busy)`, 'the signed-in reads to settle');
+    assert.equal(await run.page.run('OW.data.auth.signedIn() && OW.data.repo.get()?.full'), 'acme/factory');
+    assert.equal(await run.page.run('OW.data.auth.account()'), null);
+    const kept = await run.page.run(storage);
+    const afterSignIn = run.world.log.length;
+
+    await run.page.go(`${SITE}/app/?v2=dry-run&demo=1#/feed`);
+    await run.page.until(`document.querySelector('main h1')?.textContent === 'Feed'`, 'the sample Feed');
+    await run.page.run(`
+      Object.defineProperty(document, 'hidden', { value: false });
+      document.dispatchEvent(new Event('visibilitychange'));
+      OW.data.start();
+      OW.data.refreshAll();
+      Promise.allSettled([OW.data.github('GET', '/user'), OW.data.repositories()]);
+    `);
+    await run.page.key('k', 'Ctrl');
+    await run.page.key('k', 'Meta');
+    assert.equal(await run.page.run("Boolean(document.querySelector('dialog[open]'))"), false);
+    assert.doesNotMatch(await run.page.text(), /acme\/factory/);
+    assert.equal(await run.page.run(storage), kept);
+    assert.deepEqual(run.world.log.slice(afterSignIn).filter(r => r.origin === API || r.path.startsWith('/api/')), []);
+    assert.deepEqual(run.world.violations, []);
   } finally {
     await run.close();
   }
