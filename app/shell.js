@@ -28,7 +28,9 @@
 
   const route = () => {
     const [rawId, arg] = location.hash.replace(/^#\/?/, '').split('/');
-    const id = v2 && OW.v2 && rawId === 'queue' ? 'feed' : rawId;
+    const isQueue = v2 && OW.v2 && !demo && rawId === 'queue';
+    const id = isQueue ? 'feed' : rawId;
+    if (isQueue) return { id, arg: 'queue' };
     if (id === 'specs' && /^[1-9]\d*$/.test(arg || '')) return { id, arg };
     if (v2 && OW.v2 && id === 'feed' && /^[1-9]\d*$/.test(arg || '')) return { id, arg };
     return { id: arg === undefined ? id : '', arg: null };
@@ -143,7 +145,7 @@
     data.stop();
     data.repo.pick(full);
     if (route().arg) history.replaceState(null, '', `#/${route().id}`);
-    const side = document.activeElement?.closest?.('.side, .top')?.classList.contains('top') ? '.top' : '.side';
+    const side = built?.isV2 ? '.v2-body' : document.activeElement?.closest?.('.top') ? '.top' : '.side';
     built = null;
     buildShell();
     data.start();
@@ -198,25 +200,27 @@
     const feeds = data.feeds;
     const limit = data.limit;
     return [
-      ...Object.values(feeds).flatMap(feed => [h('div', {}, ...readLine(feed))]),
+      ...Object.values(feeds).map(feed => h('div', {}, ...readLine(feed),
+        v2 && feed.state === 'partial' ? ' · partial read' : null)),
+      v2 && data.paused() ? h('div', {}, `GitHub reads are paused until ${time(limit.pausedUntil)}.`) : null,
       h('div', {}, limit.remaining === null ? 'GitHub limit: not read yet' : `GitHub limit: ${limit.remaining.toLocaleString()} left`),
-    ];
+    ].filter(Boolean);
   }
 
   function registerV2Pages() {
     const v2Pages = OW.v2.pages({
-      get repoFull() { return data.repo.get()?.full || 'Harbor'; },
       repoSwitch: () => repoSwitch(data.repo.get()),
       freshnessNodes,
       signOut: () => { data.auth.signOut(); signedOut(); },
     });
     OW.pages.splice(0, OW.pages.length, ...v2Pages);
     OW.v2.setRedraw(() => update());
+    OW.queue.onDraw = () => { if (built?.isV2) updateNav(current()); };
   }
 
   function v2NavLinks(kind) {
     return OW.pages.map(page => {
-      const badge = h('span', { class: `v2-badge${page.hotBadge ? ' hot' : ''}`, hidden: true });
+      const badge = h('span', { class: 'v2-badge', 'aria-hidden': 'true', hidden: true });
       const cls = kind === 'main' ? `v2-nav-item${page.bottom ? ' v2-bottom' : ''}` : '';
       const link = h('a', { href: `#/${page.id}`, class: cls || null }, icon(page.icon), h('span', {}, page.title), badge);
       return { page, link, badge };
@@ -228,14 +232,13 @@
     const side = v2NavLinks('main');
     const tabs = v2NavLinks('tabs');
     const title = h('h1', { tabindex: '-1' });
-    const headSub = h('p', { class: 'v2-head-sub' });
-    const head = h('div', { class: 'v2-head' },
-      h('div', {}, title, headSub),
-      h('span', { class: 'v2-engraved-tag' }, demo ? 'Harbor · main' : workspace));
-    const phoneTitle = h('span', { class: 'v2-engraved-tag' });
-    const phoneBar = h('header', { class: 'v2-phone-bar' },
-      h('a', { class: 'v2-phone-brand', href: home() }, logo(), h('span', {}, 'OpenWiz'), phoneTitle),
-      demo ? h('span', { class: 'v2-sample-tag' }, 'Sample data') : null);
+    const refresh = demo ? null : h('button', {
+      class: 'v2-text-btn', type: 'button', hidden: true, onclick: () => data.refreshAll(),
+    }, icon('refresh'), 'Refresh now');
+    const head = h('header', { class: 'v2-head' },
+      h('a', { class: 'v2-phone-brand', href: home() }, logo(), h('span', {}, 'OpenWiz')),
+      title,
+      demo ? h('span', { class: 'v2-sample-tag' }, 'Sample data') : refresh);
     const notices = h('div', { class: 'notices v2-notices', role: 'status' });
     const body = h('section', { class: 'v2-body' });
     root.replaceChildren(
@@ -250,15 +253,13 @@
               h('span', { class: 'v2-brand-text' },
                 h('span', { class: 'v2-brand-name' }, 'OpenWiz'),
                 h('span', { class: 'v2-brand-sub' }, workspace))),
-            demo ? h('span', { class: 'v2-sample-tag' }, 'Sample data') : null,
             h('nav', { class: 'main v2-nav', 'aria-label': 'Pages' }, side.map(item => item.link))),
           h('main', { id: 'content', class: 'v2-main' },
-            phoneBar,
             head,
             notices,
             body,
             h('nav', { class: 'v2-tabs', 'aria-label': 'Pages' }, tabs.map(item => item.link))))));
-    built = { side, tabs, title, headSub, head, phoneTitle, notices, body, page: null, isV2: true };
+    built = { side, tabs, title, head, refresh, notices, body, page: null, isV2: true };
   }
 
   function buildShell() {
@@ -301,17 +302,37 @@
     return h('div', { class: `notice ${kind}` }, icon(iconName), h('span', {}, h('b', {}, strong), ' ', text));
   }
 
+  function updateNav(page) {
+    for (const { page: p, link, badge } of [...built.side, ...built.tabs]) {
+      if (p.id === page.id) link.setAttribute('aria-current', 'page');
+      else link.removeAttribute('aria-current');
+      const count = p.badge?.(data.feeds);
+      if (count) link.setAttribute('aria-label', `${p.title}, ${count} items`);
+      else link.removeAttribute('aria-label');
+      badge.hidden = !count;
+      badge.textContent = count ? String(count) : '';
+    }
+  }
+
   function update() {
     if (!built) return;
     const page = current();
     const feeds = data.feeds;
     const limit = data.limit;
-    for (const { page: p, link, badge, kind } of [...built.side.map(x => ({ ...x, kind: 'side' })), ...built.tabs.map(x => ({ ...x, kind: 'tabs' }))]) {
-      if (p.id === page.id) link.setAttribute('aria-current', 'page');
-      else link.removeAttribute('aria-current');
-      const count = kind === 'tabs' && p.tabBadge ? p.tabBadge(feeds) : p.badge?.(feeds);
-      badge.hidden = !count;
-      badge.textContent = count ? String(count) : '';
+    if (built.isV2) {
+      updateNav(page);
+      if (built.page !== page.id) {
+        built.body.replaceChildren();
+        built.body.scrollTop = 0;
+      }
+    } else {
+      for (const { page: p, link, badge, kind } of [...built.side.map(x => ({ ...x, kind: 'side' })), ...built.tabs.map(x => ({ ...x, kind: 'tabs' }))]) {
+        if (p.id === page.id) link.setAttribute('aria-current', 'page');
+        else link.removeAttribute('aria-current');
+        const count = kind === 'tabs' && p.tabBadge ? p.tabBadge(feeds) : p.badge?.(feeds);
+        badge.hidden = !count;
+        badge.textContent = count ? String(count) : '';
+      }
     }
     const mine = page.feeds.map(name => feeds[name]);
     if (!built.isV2) {
@@ -321,12 +342,14 @@
       built.read.textContent = latest.length ? `Read ${time(Math.min(...latest))}` : '';
       built.phoneReads.replaceChildren(...mine.flatMap((feed, i) => [i ? ' · ' : '', ...readLine(feed)]).filter(part => part !== null && part !== ''));
     } else {
-      built.headSub.textContent = page.sub || '';
-      built.phoneTitle.textContent = page.title;
-      built.head.classList.toggle('show-phone', Boolean(page.showPhoneHead));
+      built.head.dataset.page = page.id;
+      if (built.refresh) {
+        built.refresh.hidden = page.id !== 'feed';
+        built.refresh.disabled = data.paused();
+      }
     }
     const notes = [];
-    if (!demo && data.paused()) {
+    if (!demo && !built.isV2 && data.paused()) {
       notes.push(notice('slow', 'pause', 'GitHub\'s limit is low', `(${limit.remaining ?? 0} left). Reads are paused until ${time(limit.pausedUntil)}, then resume on their own.`));
     }
     if (!demo) {
@@ -342,7 +365,19 @@
     } else if (!demo && mine.length && mine.some(feed => feed.state === 'loading') && !mine.some(feed => feed.data)) {
       built.body.replaceChildren(OW.ui.placeholder('Reading GitHub…'));
     } else {
-      page.render(built.body, feeds, route().arg);
+      const render = () => page.render(built.body, feeds, route().arg);
+      if (built.isV2 && demo) {
+        const active = document.activeElement;
+        const keepFocus = built.body.contains(active);
+        const key = keepFocus ? active.dataset.focus : null;
+        render();
+        if (keepFocus && !active.isConnected) {
+          const replacement = key ? built.body.querySelector(`[data-focus="${key}"]:not(:disabled)`) : null;
+          (replacement || built.body.querySelector('.v2-card-title') || built.title).focus({ preventScroll: true });
+        }
+      } else {
+        render();
+      }
     }
     if (built.page !== page.id) {
       built.title.textContent = page.title;
@@ -354,7 +389,7 @@
 
   function draw() {
     if (demo) {
-      if (route().id === 'welcome') {
+      if (!location.hash || route().id === 'welcome') {
         built = null;
         return OW.v2.renderWelcome(root, { demoMode: true });
       }
@@ -363,6 +398,12 @@
       return update();
     }
     if (!data.auth.signedIn()) return signedOut();
+    if (v2 && route().id === 'welcome') {
+      built = null;
+      data.stop();
+      OW.palette.close();
+      return OW.v2.renderWelcome(root, { demoMode: false });
+    }
     if (!data.repo.get()) return picker();
     if (!ROUTES().includes(route().id)) history.replaceState(null, '', home());
     if (!built) {
@@ -374,9 +415,12 @@
 
   data.onChange(update);
   OW.onSignedOut = () => signedOut('Your sign-in ended. Sign in again.');
-  window.addEventListener('hashchange', () => (demo ? draw() : built ? update() : null));
+  window.addEventListener('hashchange', () => {
+    if (demo || (v2 && (route().id === 'welcome' || root.querySelector('.v2-welcome-card')))) draw();
+    else if (built) update();
+  });
   document.addEventListener('keydown', event => {
-    if (!built || demo || event.target.closest?.('dialog[open]')) return;
+    if (!built || demo) return;
     if ((event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'k') {
       event.preventDefault();
       return OW.palette.toggle();

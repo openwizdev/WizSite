@@ -179,7 +179,7 @@
     return { repository, items: [...items, ...specs], gaps: [...new Set(gaps)], bindings };
   }
 
-  const state = { key: null, run: null, result: null, failedSince: null, el: null, cards: new Map() };
+  const state = { key: null, run: null, result: null, failedSince: null, el: null, arg: null, cards: new Map() };
   const shown = item => item.type === 'spec' || item.request === null || (item.request.status === 'open' && item.current !== false);
 
   function refresh(feeds) {
@@ -205,20 +205,22 @@
       state.run = null;
       state.result = result;
       if (state.failedSince !== null && readAt > state.failedSince) state.failedSince = null;
-      if (state.el?.isConnected) OW.factory.redraw(state.el, () => draw(state.el));
+      if (state.el?.isConnected) redraw(state.el);
+      queuePage.onDraw?.();
     }, error => {
       if (!still()) return;
       state.run = null;
       if (error instanceof OW.data.Ended) return;
       if (error instanceof OW.data.SignedOut) return OW.onSignedOut?.();
       state.result = { repository: picked.full, items: [], gaps: ['the queue\'s reads'], bindings: new Map() };
-      if (state.el?.isConnected) OW.factory.redraw(state.el, () => draw(state.el));
+      if (state.el?.isConnected) redraw(state.el);
+      queuePage.onDraw?.();
     });
   }
 
   const WORDS = {
-    grill_round: 'Grill round to answer',
-    grill_confirmation: 'Grill summary to confirm',
+    grill_round: 'Questions to answer',
+    grill_confirmation: 'Answers to confirm',
     spec_confirmation: 'Spec to confirm',
     plan_approval: 'Plan to approve',
   };
@@ -241,15 +243,39 @@
     return { ...result, gaps: [...new Set([...result.gaps, 'the latest spec read'])],
       items: result.items.map(item => (item.type === 'decision' && item.current === true ? { ...item, current: null, checked_at: null } : item)) };
   }
-  function holder(item, bindings) {
-    const identity = JSON.stringify([{ ...item, checked_at: null }, bindings.get(item.key) ?? null]);
+  function feedCard(item) {
+    const isSpec = item.type === 'spec';
+    const label = isSpec ? 'Spec in progress' : WORDS[item.request?.kind] || 'Needs review';
+    const issue = isSpec && OW.data.feeds.specs.data?.specIssues?.nodes?.find(issue => issue?.number === item.subject.number);
+    const { total, completed } = issue?.subIssuesSummary || {};
+    const progress = Number.isInteger(total) && Number.isInteger(completed) && total >= completed
+      ? h('p', { class: 'v2-card-goal' }, `${completed} of ${total} tickets merged`) : null;
+    const summary = item.request?.headline || item.request?.summary?.[0];
+    const detail = !isSpec && item.current !== true ? 'Check this decision on GitHub.' : null;
+    return h('article', { class: 'v2-hero-card' },
+      h('header', { class: 'v2-card-head' },
+        h('span', { class: 'v2-label' }, `${label} · #${item.subject.number}`),
+        h('h2', { class: 'v2-card-title', tabindex: '-1' }, item.title),
+        summary ? h('p', { class: 'v2-card-goal' }, summary) : null,
+        detail ? h('p', { class: 'v2-card-goal' }, detail) : null),
+      progress,
+      h('div', { class: 'v2-live-actions' },
+        h('a', { class: 'v2-btn primary', href: item.url, target: '_blank', rel: 'noreferrer', 'data-focus': `open:${item.key}` }, 'Open on GitHub'),
+        item.video ? h('a', { class: 'v2-text-btn', href: item.video.url, target: '_blank', rel: 'noreferrer', 'data-focus': `video:${item.key}` }, 'Watch narrated spec') : null));
+  }
+
+  function holder(item, bindings, paged) {
+    const card = OW.cards?.[item.type];
+    const identity = JSON.stringify([{ ...item, checked_at: null }, bindings.get(item.key) ?? null, paged]);
+    if (paged && typeof card !== 'function') {
+      return h('div', { class: 'queue-item', 'data-key': item.key }, feedCard(item));
+    }
     const kept = state.cards.get(item.key);
     if (kept && kept.identity === identity) {
       kept.item.checked_at = item.checked_at;
       return kept.el;
     }
     const el = h('div', { class: 'queue-item', 'data-key': item.key });
-    const card = OW.cards?.[item.type];
     if (typeof card === 'function') card(item, el);
     else el.replaceChildren(plain(item));
     state.cards.set(item.key, { identity, item, el });
@@ -264,8 +290,30 @@
     for (const key of [...state.cards.keys()]) if (!keys.has(key)) state.cards.delete(key);
     const missing = result.gaps.length
       ? OW.ui.unknown(`This list may be missing items: GitHub gave only part of ${result.gaps.join(', ')}. The app tries again on its own.`) : null;
-    el.replaceChildren(...[missing, items.length ? h('div', { class: 'queue' }, items.map(item => holder(item, result.bindings)))
-      : missing ? null : OW.ui.placeholder(`${EMPTY}.`)].filter(Boolean));
+    const paged = Boolean(OW.v2 && state.arg !== 'queue');
+    const queue = items.length ? h('div', { class: 'queue' }, items.map(item => holder(item, result.bindings, paged))) : null;
+    let rail = null;
+    if (queue && paged) {
+      const index = Math.min(items.length - 1, Number(state.arg || 1) - 1);
+      rail = h('div', { class: 'v2-feed-toolbar' },
+        OW.v2.pager(index, items.length, n => { location.hash = n ? `#/feed/${n + 1}` : '#/feed'; }));
+      [...queue.children].forEach((card, i) => { card.hidden = i !== index; });
+    }
+    const empty = queue || missing ? null : paged
+      ? h('div', { class: 'v2-clear-card' }, h('h2', {}, 'All clear'), h('p', {}, 'Nothing is waiting on you.'))
+      : OW.ui.placeholder(`${EMPTY}.`);
+    el.replaceChildren(...[missing, rail, queue, empty].filter(Boolean));
+  }
+
+  function redraw(el) {
+    const active = document.activeElement;
+    const inside = el.contains(active);
+    const key = active?.dataset.focus;
+    draw(el);
+    if (!inside || el.contains(document.activeElement)) return;
+    const visible = node => node?.isConnected && !node.closest('[hidden]') && !node.disabled;
+    const same = key ? [...el.querySelectorAll('[data-focus]')].find(node => node.dataset.focus === key && visible(node)) : null;
+    (visible(active) ? active : same || el.querySelector('.queue-item:not([hidden]) .v2-card-title') || document.querySelector('main h1'))?.focus({ preventScroll: true });
   }
 
   const queuePage = {
@@ -274,11 +322,15 @@
     icon: 'clock',
     v2: true,
     feeds: ['specs'],
-    badge: () => view()?.items.filter(shown).length || null,
-    render(el, feeds) {
+    badge() {
+      const result = view();
+      return result?.repository === OW.data.repo.get()?.full ? result?.items.filter(shown).length : null;
+    },
+    render(el, feeds, arg) {
       state.el = el;
+      state.arg = arg;
       refresh(feeds);
-      OW.factory.redraw(el, () => draw(el));
+      redraw(el);
     },
   };
   OW.queue = queuePage;
