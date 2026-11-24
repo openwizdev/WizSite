@@ -300,11 +300,19 @@
       && (issue.subIssuesSummary?.total > 0 || labels(issue).includes('spec') || SPEC_TITLE.test(issue.title || '')));
     return { totalCount: nodes.length + Math.max(0, (search.totalCount ?? 0) - given.length), nodes };
   }
+  const MODELS = `query Models($owner: String!, $name: String!) {
+  rateLimit { limit remaining resetAt }
+  repository(owner: $owner, name: $name) {
+    fleet: object(expression: "HEAD:docs/agents/fleet.md") { ... on Blob { text } }
+    offered: object(expression: "HEAD:docs/agents/models-offered.json") { ... on Blob { text } }
+  }
+}`;
   const feeds = {
     specs: { label: 'Specs', every: 10 * 60 * 1000, query: SPECS, more: specTickets,
       variables: picked => ({ specs: SPEC_SEARCH(picked.full) }),
       shape: (data, answer) => { data.specIssues = specsOf(answer.specSearch); } },
     agents: { label: 'Agents', every: 2 * 60 * 1000, run: agentsRead },
+    models: { label: 'Models', every: 10 * 60 * 1000, query: MODELS },
   };
   for (const feed of Object.values(feeds)) Object.assign(feed, { state: 'loading', data: null, readAt: null, failedAt: null, timer: null, busy: false });
 
