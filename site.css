@@ -98,9 +98,10 @@ code,.v{font-family:var(--ow-font-mono)}
   line-height: 20px;
 }
 .nav-row {
+  --nav-gap: clamp(10px, 1.6vw, 24px);
   display: flex;
   align-items: center;
-  gap: clamp(10px, 1.6vw, 24px);
+  gap: var(--nav-gap);
   min-height: var(--nav-height);
   max-width: 1440px;
   margin-inline: auto;
@@ -121,8 +122,9 @@ code,.v{font-family:var(--ow-font-mono)}
 .landing-nav a, .nav-toggle { position: relative; display: inline-flex; align-items: center; min-height: 36px; white-space: nowrap; }
 .landing-brand { gap: 8px; font-size: 18px; font-weight: 650; letter-spacing: -.02em; }
 .landing-brand img { width: 44px; height: 44px; }
-.nav-links { display: flex; margin-inline: auto clamp(0px, 12vw - 105px, 66px); gap: clamp(12px, 6vw - 42px, 38px); color: var(--grey2); font-weight: 450; }
-.nav-links a:hover, .nav-links [aria-current] { color: var(--ink); }
+.nav-links { display: flex; margin-inline: auto clamp(0px, 12vw - 105px, 66px); gap: clamp(12px, 6vw - 42px, 38px); }
+.nav-links, .sign-in { color: var(--grey2); font-weight: 450; }
+.nav-links a:hover, .nav-links [aria-current], .sign-in:hover { color: var(--ink); }
 .landing-nav [aria-current]::after {
   content: "";
   position: absolute;
@@ -152,9 +154,19 @@ code,.v{font-family:var(--ow-font-mono)}
   opacity: .65;
   pointer-events: none;
 }
-.sign-in, .nav-team { padding-inline: 13px; border-radius: 8px; font-weight: 600; }
-.sign-in { border: 1px solid var(--nav-edge); color: var(--grey2); }
-.sign-in:hover, .nav-toggle:hover { background: var(--panel); color: var(--ink); }
+.sign-in { padding-inline: 6px; }
+.github-star + .sign-in::before {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: calc(100% + (var(--nav-gap) - 1px) / 2);
+  width: 1px;
+  height: 16px;
+  margin-block: auto;
+  background: var(--nav-edge);
+  pointer-events: none;
+}
+.nav-team { padding-inline: 13px; border-radius: 8px; font-weight: 600; }
 .nav-team { background: var(--brass); color: var(--on-brass); }
 .nav-team:hover { background: var(--brass-hi); }
 .nav-team[aria-current]::after { inset: auto 8px -5px; }
@@ -200,7 +212,9 @@ code,.v{font-family:var(--ow-font-mono)}
   }
   .nav-links a { display: flex; padding-inline: 8px; }
   .nav-links [aria-current]::after { inset-inline: 8px auto; width: 24px; }
-  .sign-in { order: 2; margin-bottom: 8px; }
+  .sign-in { order: 2; margin-bottom: 8px; padding-inline: 13px; border: 1px solid var(--nav-edge); border-radius: 8px; font-weight: 600; }
+  .github-star + .sign-in::before { content: none; }
+  .sign-in:hover, .nav-toggle:hover { background: var(--panel); color: var(--ink); }
   .nav-links .sign-in { margin: 0; border: 0; color: inherit; font-weight: inherit; }
 
   .landing-nav:has(.nav-toggle[aria-expanded="true"])::before {
