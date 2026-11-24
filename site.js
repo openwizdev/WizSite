@@ -278,6 +278,79 @@ function launchVideo() {
   }, { once: true });
 }
 
+function teamReplay(replay) {
+  const calm = matchMedia('(prefers-reduced-motion: reduce)');
+  const control = replay.querySelector('.team-replay-control');
+  const playAgain = control.textContent;
+  const opened = Date.parse(replay.dataset.teamReplay);
+  const events = [...replay.querySelectorAll('[data-replay-event]')]
+    .map(node => ({ node, at: Date.parse(node.querySelector('time').dateTime) }))
+    .sort((a, b) => a.at - b.at);
+  // Use one scale for the entire run, including simultaneous events.
+  const duration = events.at(-1).at - opened;
+  const delay = event => (event.at - opened) / duration * 20_000;
+  const tracks = [...replay.querySelectorAll('[data-replay-stages]')].map(track => {
+    const waiting = document.createElement('span');
+    waiting.className = 'team-waiting';
+    waiting.textContent = 'Waiting';
+    waiting.hidden = true;
+    track.prepend(waiting);
+    return track;
+  });
+  let next = events.length;
+  let timer;
+  let start;
+
+  function reveal({ node }) {
+    node.removeAttribute('data-replay-pending');
+    const track = node.closest('[data-replay-stages]');
+    if (!track) return;
+    track.querySelector('.team-waiting').hidden = true;
+    track.querySelector('[aria-current]')?.removeAttribute('aria-current');
+    node.setAttribute('aria-current', 'step');
+  }
+
+  function finish() {
+    clearTimeout(timer);
+    while (next < events.length) reveal(events[next++]);
+    control.textContent = playAgain;
+  }
+
+  function advance() {
+    const elapsed = performance.now() - start;
+    while (next < events.length && delay(events[next]) <= elapsed) {
+      reveal(events[next++]);
+    }
+    if (next === events.length) finish();
+    else timer = setTimeout(advance, delay(events[next]) - elapsed);
+  }
+
+  function play() {
+    for (const { node } of events) node.setAttribute('data-replay-pending', '');
+    for (const track of tracks) {
+      track.querySelector('[aria-current]')?.removeAttribute('aria-current');
+      track.querySelector('.team-waiting').hidden = false;
+    }
+    control.textContent = 'Finish replay';
+    next = 0;
+    start = performance.now();
+    advance();
+  }
+
+  control.addEventListener('click', () => {
+    if (next < events.length) finish();
+    else play();
+  });
+  calm.addEventListener('change', () => {
+    if (calm.matches) finish();
+    control.hidden = calm.matches;
+  });
+  if (!calm.matches) {
+    control.hidden = false;
+    play();
+  }
+}
+
 function specVideo() {
   const video = document.querySelector('.spec-video');
   const sound = document.querySelector('.spec-play');
@@ -646,7 +719,9 @@ async function askAWiz() {
 
 enableCopy();
 askAWiz();
-showStars().catch(() => {});
+const teamRun = document.querySelector('[data-team-replay]');
+if (teamRun) teamReplay(teamRun);
+else showStars().catch(() => {});
 launchVideo();
 specVideo();
 oneVoiceAtATime();
