@@ -176,10 +176,11 @@
     const byKey = (a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0);
     items.sort((a, b) => a.at - b.at || byKey(a, b));
     specs.sort((a, b) => b.at - a.at || byKey(a, b));
-    return { repository, items: [...items, ...specs], gaps: [...new Set(gaps)], bindings };
+    const progress = new Map(seen.specs.map(spec => [spec.number, { done: spec.done, total: spec.total }]));
+    return { repository, items: [...items, ...specs], gaps: [...new Set(gaps)], bindings, progress };
   }
 
-  const state = { key: null, run: null, result: null, failedSince: null, el: null, cards: new Map() };
+  const state = { key: null, run: null, result: null, failedSince: null, el: null, draw: null, cards: new Map() };
   const shown = item => item.type === 'spec' || item.request === null || (item.request.status === 'open' && item.current !== false);
 
   function refresh(feeds) {
@@ -205,14 +206,14 @@
       state.run = null;
       state.result = result;
       if (state.failedSince !== null && readAt > state.failedSince) state.failedSince = null;
-      if (state.el?.isConnected) OW.factory.redraw(state.el, () => draw(state.el));
+      if (state.el?.isConnected) state.draw();
     }, error => {
       if (!still()) return;
       state.run = null;
       if (error instanceof OW.data.Ended) return;
       if (error instanceof OW.data.SignedOut) return OW.onSignedOut?.();
       state.result = { repository: picked.full, items: [], gaps: ['the queue\'s reads'], bindings: new Map() };
-      if (state.el?.isConnected) OW.factory.redraw(state.el, () => draw(state.el));
+      if (state.el?.isConnected) state.draw();
     });
   }
 
@@ -222,7 +223,23 @@
     spec_confirmation: 'Spec to confirm',
     plan_approval: 'Plan to approve',
   };
-  function plain(item) {
+  function plain(item, progress) {
+    if (OW.v2) {
+      const title = item.type === 'spec' ? 'Spec to watch' : item.request?.kind === 'grill_round' ? 'Questions to answer'
+        : item.request?.kind === 'grill_confirmation' ? 'Summary to confirm' : WORDS[item.request?.kind] || 'Decision unreadable';
+      const detail = item.type === 'spec' ? 'Follow this spec on GitHub.'
+        : item.request && item.current ? 'Open it on GitHub to answer.' : 'Its source couldn’t be checked or read.';
+      return h('article', { class: 'v2-hero-card', 'data-kind': item.type },
+        h('header', {},
+          h('div', { class: 'v2-card-kicker v2-mono' }, `${title} · #${item.subject.number}`),
+          h('h2', { class: 'v2-card-title', tabindex: '-1' }, item.title),
+          h('p', { class: 'v2-card-goal' }, detail)),
+        item.request?.headline ? h('p', { class: 'v2-card-note' }, item.request.headline) : null,
+        item.type === 'spec' && progress?.total && Number.isInteger(progress.done)
+          ? OW.v2.progress(progress.done, progress.total, 'completed') : null,
+        h('div', { class: 'v2-card-actions single' },
+          h('a', { class: 'v2-btn primary', href: item.url, target: '_blank', rel: 'noreferrer', 'data-focus': `queue:${item.key}` }, 'Open on GitHub')));
+    }
     const head = (word, colour, tell) => h('a', { class: 'card you', href: item.url, target: '_blank', rel: 'noreferrer', '--c': colour, 'data-focus': `queue:${item.key}` },
       h('div', { class: 'num' }, `${word} · #${item.subject.number}${item.at ? ` · ${time(item.at)}` : ''}`), h('h3', {}, item.title), h('p', {}, tell));
     if (item.type === 'spec') {
@@ -237,12 +254,13 @@
   }
   function view() {
     const result = state.result;
-    if (!result || state.failedSince === null) return result;
+    if (!result || result.repository !== OW.data.repo.get()?.full) return null;
+    if (state.failedSince === null) return result;
     return { ...result, gaps: [...new Set([...result.gaps, 'the latest spec read'])],
       items: result.items.map(item => (item.type === 'decision' && item.current === true ? { ...item, current: null, checked_at: null } : item)) };
   }
-  function holder(item, bindings) {
-    const identity = JSON.stringify([{ ...item, checked_at: null }, bindings.get(item.key) ?? null]);
+  function holder(item, bindings, progress) {
+    const identity = JSON.stringify([{ ...item, checked_at: null }, bindings.get(item.key) ?? null, progress]);
     const kept = state.cards.get(item.key);
     if (kept && kept.identity === identity) {
       kept.item.checked_at = item.checked_at;
@@ -251,12 +269,12 @@
     const el = h('div', { class: 'queue-item', 'data-key': item.key });
     const card = OW.cards?.[item.type];
     if (typeof card === 'function') card(item, el);
-    else el.replaceChildren(plain(item));
+    else el.replaceChildren(plain(item, progress));
     state.cards.set(item.key, { identity, item, el });
     return el;
   }
 
-  function draw(el) {
+  function draw(el, present) {
     const result = view();
     if (!result) return el.replaceChildren(OW.ui.placeholder('Reading GitHub…'));
     const items = result.items.filter(shown);
@@ -264,8 +282,10 @@
     for (const key of [...state.cards.keys()]) if (!keys.has(key)) state.cards.delete(key);
     const missing = result.gaps.length
       ? OW.ui.unknown(`This list may be missing items: GitHub gave only part of ${result.gaps.join(', ')}. The app tries again on its own.`) : null;
-    el.replaceChildren(...[missing, items.length ? h('div', { class: 'queue' }, items.map(item => holder(item, result.bindings)))
-      : missing ? null : OW.ui.placeholder(`${EMPTY}.`)].filter(Boolean));
+    const cards = items.map(item => holder(item, result.bindings, item.type === 'spec' && result.progress?.get(item.subject.number)));
+    const empty = missing ? null : (OW.v2 ? OW.v2.allClear(`${EMPTY}.`) : OW.ui.placeholder(`${EMPTY}.`));
+    if (present) return present(missing, cards, empty);
+    el.replaceChildren(...[missing, cards.length ? h('div', { class: 'queue' }, cards) : empty].filter(Boolean));
   }
 
   const queuePage = {
@@ -275,10 +295,11 @@
     v2: true,
     feeds: ['specs'],
     badge: () => view()?.items.filter(shown).length || null,
-    render(el, feeds) {
+    render(el, feeds, present) {
       state.el = el;
+      state.draw = () => OW.factory.redraw(el, () => draw(el, present));
       refresh(feeds);
-      OW.factory.redraw(el, () => draw(el));
+      state.draw();
     },
   };
   OW.queue = queuePage;
