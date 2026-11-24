@@ -119,10 +119,16 @@ DRIVER_LOGOS = {
 HASHED = ('tokens.css', 'site.css', GSAP, 'site.js', 'faq.js')
 APP_PAGE = 'app/index.html'
 APP_STYLE = 'app/ember.css'
-APP_SCRIPTS = ('app/data.js', 'app/records.js', 'app/ui.js', 'app/pages/you.js', 'app/pages/specs.js', 'app/pages/spec.js', 'app/pages/agents.js', 'app/palette.js', 'app/shell.js')
+APP_FOUND = {(folder, ext): tuple(sorted(p.relative_to(ROOT).as_posix() for p in (ROOT / folder).glob(f'*.{ext}')))
+             for folder in ('app/pages', 'app/cards') for ext in ('js', 'css')}
+APP_PARTS = APP_FOUND['app/pages', 'js'] + APP_FOUND['app/cards', 'js']
+APP_PART_STYLES = APP_FOUND['app/pages', 'css'] + APP_FOUND['app/cards', 'css']
+APP_LEGACY_ORDER = ('app/pages/you.js', 'app/pages/specs.js', 'app/pages/spec.js', 'app/pages/agents.js')
+APP_NEEDED = set(APP_FOUND['app/pages', 'js'] + APP_FOUND['app/pages', 'css'])
+APP_SCRIPTS = ('app/data.js', 'app/records.js', 'app/ui.js') + APP_PARTS + ('app/palette.js', 'app/shell.js')
 APP_VENDOR = {'app/vendor/dagre-3.1.3.min.js': ('node_modules/@dagrejs/dagre/dist/dagre.min.js', 'app/pages/spec.js'),
               'app/vendor/dagre-LICENSE.txt': ('node_modules/@dagrejs/dagre/LICENSE', None)}
-HASHED += (APP_STYLE,) + APP_SCRIPTS
+HASHED += (APP_STYLE,) + APP_PART_STYLES + APP_SCRIPTS
 APP_CSP = ("default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; media-src 'self'; font-src 'self'; "
            "connect-src 'self' https://api.github.com; manifest-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
 
@@ -1681,8 +1687,19 @@ def check_app(root, names, pages):
     assert not page.x_links, 'one X link per page, the footer\'s: the app has one'
     assert not page.report_links, 'Report a problem link, the footer\'s: the app has one'
     assert not set(page.refs) & {f'/{name}' for name in HASHED}, 'the app uses an unfingerprinted style or script'
-    assert page.stylesheets == [f'/{names[APP_STYLE]}'], 'the app must apply exactly the fingerprinted ember.css'
-    assert page.scripts == [ref for name in APP_SCRIPTS for ref in [f'/{v}' for v, (_, before) in APP_VENDOR.items() if before == name] + [f'/{names[name]}']], \
+    styles = {f'/{names[name]}': name for name in APP_PART_STYLES}
+    applied = [styles.get(ref, ref) for ref in page.stylesheets[1:]]
+    assert page.stylesheets[:1] == [f'/{names[APP_STYLE]}'] and len(set(applied)) == len(applied) \
+        and set(applied) <= set(APP_PART_STYLES) and APP_NEEDED & set(APP_PART_STYLES) <= set(applied), \
+        'the app must apply exactly the fingerprinted ember.css, then each of its pages\' styles once (and a card\'s at most once)'
+    parts = {f'/{names[name]}': name for name in APP_PARTS}
+    shown = [parts[ref] for ref in page.scripts if ref in parts]
+    assert len(set(shown)) == len(shown) and APP_NEEDED & set(APP_PARTS) <= set(shown), \
+        'the app must load each of its pages\' scripts once (and a card\'s at most once)'
+    assert [name for name in shown if name in APP_LEGACY_ORDER] == list(APP_LEGACY_ORDER), \
+        'the app must load You, Specs, Spec and Agents in that order: it sets the v1 pages\' order and default route'
+    ordered = ('app/data.js', 'app/records.js', 'app/ui.js', *shown, 'app/palette.js', 'app/shell.js')
+    assert page.scripts == [ref for name in ordered for ref in [f'/{v}' for v, (_, before) in APP_VENDOR.items() if before == name] + [f'/{names[name]}']], \
         'the app must load its fingerprinted scripts (and each pinned file before its user) in order'
     assert not page.inline_scripts, 'the app allows no inline script'
     for ref in page.refs:
@@ -1692,8 +1709,9 @@ def check_app(root, names, pages):
     assert manifest['start_url'] == manifest['scope'] == '/app/' and manifest['display'] == 'standalone', 'the app manifest must open /app/ standalone'
     for icon in manifest['icons']:
         assert icon['src'].lstrip('/') in STATIC, f'manifest icon is not a built file: {icon["src"]}'
-    style = (root / names[APP_STYLE]).read_text()
-    assert not re.search(r'\b(animation|transition)\s*:', style), 'Ember allows no motion'
+    for name in (APP_STYLE,) + APP_PART_STYLES:
+        style = (root / names[name]).read_text()
+        assert not re.search(r'\b(animation|transition)\s*:', style), f'Ember allows no motion: {name}'
     headers = (root / '_headers').read_text()
     for path in ('/app/*',):
         rule = re.search(rf'^{re.escape(path)}\n((?:  .*\n?)*)', headers, re.M)
