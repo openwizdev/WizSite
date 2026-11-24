@@ -55,7 +55,7 @@ async function loadHeaders() {
       const pattern = new RegExp(`^${line.trim().replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*')}$`);
       current = { pattern, headers: {} };
       rules.push(current);
-    } else if (current) {
+    } else if (current && line.includes(':')) {
       const at = line.indexOf(':');
       current.headers[line.slice(0, at).trim()] = line.slice(at + 1).trim();
     }

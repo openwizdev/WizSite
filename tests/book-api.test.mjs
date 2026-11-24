@@ -160,6 +160,103 @@ afterEach(() => {
   assert.deepEqual(logs, []);
 });
 
+const TURNSTILE_URL = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
+const TURNSTILE_SITE_KEY = '1x00000000000000000000AA';
+const TURNSTILE_PASS_SECRET = '1x0000000000000000000000000000000AA';
+const TURNSTILE_FAIL_SECRET = '2x0000000000000000000000000000000AA';
+const TOKEN = 'synthetic-turnstile-token';
+
+test('slots advertise only the public Turnstile key when verification is enabled', async () => {
+  const env = makeEnv(fakeD1(), { TURNSTILE_SITE_KEY });
+  const disabled = await readJson(await slotsHandle(getReq('/api/book/slots'), env, { now: NOW }));
+  assert.equal('turnstileSiteKey' in disabled.json, false);
+  const enabled = await readJson(await slotsHandle(
+    getReq('/api/book/slots'), { ...env, TURNSTILE_SECRET_KEY: TURNSTILE_PASS_SECRET }, { now: NOW },
+  ));
+  assert.equal(enabled.status, 200);
+  assert.equal(enabled.json.turnstileSiteKey, TURNSTILE_SITE_KEY);
+  assertNoSecrets(enabled.text, [TURNSTILE_PASS_SECRET]);
+  delete env.TURNSTILE_SITE_KEY;
+  const missingKey = await readJson(await slotsHandle(
+    getReq('/api/book/slots'), { ...env, TURNSTILE_SECRET_KEY: TURNSTILE_PASS_SECRET }, { now: NOW },
+  ));
+  assert.equal(missingKey.json.turnstileSiteKey, null);
+});
+
+test('booking refuses failed Turnstile verification before any state or external service changes', async t => {
+  const cases = [
+    { name: 'missing token', token: '' },
+    { name: 'oversized token', token: 'x'.repeat(2049) },
+    { name: 'failure', result: { success: false } },
+    { name: 'wrong action', result: { success: true, action: 'ask', hostname: 'openwiz.dev' } },
+    { name: 'wrong hostname', result: { success: true, action: 'book', hostname: 'book.wizsite.pages.dev' } },
+    { name: 'network error' },
+  ];
+  for (const { name, result, token = TOKEN } of cases) {
+    await t.test(name, async () => {
+      const store = fakeD1();
+      const secret = name === 'failure' ? TURNSTILE_FAIL_SECRET : TURNSTILE_PASS_SECRET;
+      const env = makeEnv(store, {
+        TURNSTILE_SECRET_KEY: secret,
+        RESEND_API_KEY: RESEND_SECRET,
+        GOOGLE_CLIENT_ID,
+        GOOGLE_CLIENT_SECRET,
+        GOOGLE_REFRESH_TOKEN,
+      });
+      const body = bookingPayload('2026-11-25T21:00:00Z');
+      if (token) body.turnstileToken = token;
+      const calls = [];
+      const res = await readJson(await bookHandle(postJson('/api/book', body), env, {
+        now: NOW,
+        fetch: async (url, init) => {
+          calls.push([url, init]);
+          if (!result) throw new Error('synthetic network failure');
+          return Response.json(result);
+        },
+      }));
+      assert.equal(res.status, 403);
+      assert.equal(res.json.error, 'verification_failed');
+      assert.match(res.json.message, /Human verification failed/);
+      assertNoSecrets(res.text, [secret, TOKEN]);
+      assert.equal(store.dumpText(), '{}');
+      if (!body.turnstileToken || token.length > 2048) {
+        assert.deepEqual(calls, []);
+      } else {
+        assert.deepEqual(calls.map(([url]) => url), [TURNSTILE_URL]);
+        const [, init] = calls[0];
+        assert.equal(init.method, 'POST');
+        assert.ok(init.signal instanceof AbortSignal);
+        assert.deepEqual(Object.fromEntries(init.body), { secret, response: TOKEN, remoteip: VISITOR_IP });
+      }
+    });
+  }
+});
+
+test('booking succeeds after Turnstile passes, and keeps the legacy request when disabled', async () => {
+  for (const hostname of [null, 'openwiz.dev', 'book.wizsite.pages.dev', '99ebb37b.wizsite.pages.dev', '127.0.0.1']) {
+    const store = fakeD1();
+    const origin = hostname ? 'https://' + hostname : ORIGIN;
+    const env = makeEnv(store, hostname ? { TURNSTILE_SECRET_KEY: TURNSTILE_PASS_SECRET } : {});
+    const body = bookingPayload('2026-11-25T21:00:00Z', hostname ? { turnstileToken: TOKEN } : {});
+    const request = new Request(origin + '/api/book', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Origin: origin },
+      body: JSON.stringify(body),
+    });
+    const calls = [];
+    const res = await bookHandle(request, env, {
+      now: NOW,
+      fetch: async url => {
+        calls.push(url);
+        return Response.json({ success: true, action: 'book', hostname });
+      },
+    });
+    assert.equal(res.status, 200);
+    assert.equal(store.bookings().length, 1);
+    assert.deepEqual(calls, hostname ? [TURNSTILE_URL] : []);
+  }
+});
+
 test('GET /api/book/slots returns open slots in fake mode with no-store header', async () => {
   const store = fakeD1();
   const res = await readJson(await slotsHandle(getReq('/api/book/slots'), makeEnv(store), { now: NOW }));

@@ -10,6 +10,8 @@ import { handle as feedHandle } from '../functions/api/book/feed.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DIST_DIR = path.join(ROOT, 'dist');
+const bookingCsp = (await readFile(path.join(DIST_DIR, '_headers'), 'utf8'))
+  .match(/^\/book\/\*\n(?: +! [^\n]+\n)* +Content-Security-Policy: (.+)$/m)?.[1];
 const HOST = '127.0.0.1';
 const DEFAULT_PORT = 8801;
 
@@ -140,7 +142,9 @@ async function serveStatic(pathname, res) {
     if (info.isDirectory()) target = path.join(target, 'index.html');
     const data = await readFile(target);
     const ext = path.extname(target).toLowerCase();
-    res.writeHead(200, { 'Content-Type': MIME[ext] || 'application/octet-stream' });
+    const headers = { 'Content-Type': MIME[ext] || 'application/octet-stream' };
+    if (bookingCsp && pathname.startsWith('/book/')) headers['Content-Security-Policy'] = bookingCsp;
+    res.writeHead(200, headers);
     res.end(data);
   } catch {
     res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
@@ -157,10 +161,20 @@ const env = {
 };
 
 const options = {};
-if (env.BOOK_MODE.trim() === 'fake' && !env.RESEND_API_KEY?.trim()) {
-  env.RESEND_API_KEY = 'local-preview';
+if (env.BOOK_MODE.trim() === 'fake') {
+  const fakeMail = !env.RESEND_API_KEY?.trim();
+  if (fakeMail) env.RESEND_API_KEY = 'local-preview';
   options.fetch = async (url, init) => {
-    if (url !== 'https://api.resend.com/emails') return globalThis.fetch(url, init);
+    if (url === 'https://challenges.cloudflare.com/turnstile/v0/siteverify') {
+      const response = await globalThis.fetch(url, init);
+      if (!response.ok || init.body.get('secret') !== '1x0000000000000000000000000000000AA') return response;
+      const result = await response.json();
+      if (result.success === true && result.metadata?.result_with_testing_key === true) {
+        return Response.json({ ...result, action: 'book', hostname: HOST });
+      }
+      return Response.json(result);
+    }
+    if (!fakeMail || url !== 'https://api.resend.com/emails') return globalThis.fetch(url, init);
     const { text } = JSON.parse(init.body);
     const label = 'Need to cancel? ';
     const line = text.split('\n').find(value => value.startsWith(`${label}${origin}/book/?cancel=`));

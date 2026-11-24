@@ -26,6 +26,7 @@ const els = {
   emailErr: document.getElementById('book-email-error'),
   teamErr: document.getElementById('book-team-error'),
   submit: document.getElementById('book-submit'),
+  turnstile: document.getElementById('book-turnstile'),
   confirm: document.getElementById('book-confirm'),
   confirmWhen: document.getElementById('book-confirm-when'),
   confirmNote: document.getElementById('book-confirm-note'),
@@ -64,6 +65,7 @@ const state = {
   booking: null,
   cancelPair: null,
   currentView: els.loading,
+  turnstileSiteKey: undefined,
 };
 
 function announce(text) {
@@ -262,11 +264,51 @@ function selectDay(dayKey, announceChange) {
   }
 }
 
+let turnstileScript;
+let widgetId;
+
+function loadTurnstile() {
+  turnstileScript ??= new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    const fail = () => {
+      clearTimeout(timeout);
+      script.remove();
+      turnstileScript = undefined;
+      reject(new Error('Could not load Turnstile'));
+    };
+    const timeout = setTimeout(fail, 8000);
+    script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+    script.onload = () => {
+      if (!window.turnstile) return fail();
+      clearTimeout(timeout);
+      resolve(window.turnstile);
+    };
+    script.onerror = fail;
+    document.head.appendChild(script);
+  });
+  return turnstileScript;
+}
+
+async function prepareTurnstile() {
+  const sitekey = state.turnstileSiteKey;
+  if (!sitekey || !navigator.onLine) return;
+  const api = await loadTurnstile();
+  if (state.currentView !== els.form || sitekey !== state.turnstileSiteKey || widgetId !== undefined) return;
+  widgetId = api.render(els.turnstile, {
+    sitekey,
+    action: 'book',
+    appearance: 'interaction-only',
+    size: 'compact',
+    'response-field': false,
+  }) ?? undefined;
+}
+
 function chooseSlot(iso) {
   state.selectedSlot = iso;
   showAlert('');
   els.chosenWhen.textContent = formatFullSlot(iso);
   showView(els.form);
+  prepareTurnstile().catch(() => {});
   els.name.focus();
   announce(`Selected ${formatFullSlot(iso)}`);
 }
@@ -380,8 +422,10 @@ function downloadIcs() {
 
 async function submitBooking(event) {
   event.preventDefault();
+  if (els.submit.disabled) return;
   const fields = validateForm();
-  if (!fields || !state.selectedSlot) return;
+  const start = state.selectedSlot;
+  if (!fields || !start) return;
 
   if (!navigator.onLine) {
     showAlert('Booking needs an internet connection. Reconnect and try again.', { focus: true });
@@ -391,17 +435,37 @@ async function submitBooking(event) {
 
   showAlert('');
   els.submit.disabled = true;
+  let turnstileToken;
+  let attemptedWidget;
   try {
+    if (state.turnstileSiteKey !== undefined) {
+      try {
+        await prepareTurnstile();
+        if (state.currentView !== els.form || state.selectedSlot !== start) return;
+        if (widgetId === undefined) throw new Error('Turnstile is unavailable');
+        turnstileToken = window.turnstile.getResponse(widgetId);
+      } catch {
+        showAlert('Human verification is unavailable. Check your connection and try again.', { focus: true });
+        return;
+      }
+      if (!turnstileToken) {
+        showAlert('Complete human verification or wait for it to finish, then try again.');
+        return;
+      }
+      attemptedWidget = widgetId;
+    }
+
     const res = await fetch('/api/book', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify({
-        start: state.selectedSlot,
+        start,
         name: fields.name,
         email: fields.email,
         team: fields.team,
         website: fields.website,
         tz: visitorTz,
+        turnstileToken,
       }),
     });
     const data = await res.json().catch(() => ({}));
@@ -446,6 +510,9 @@ async function submitBooking(event) {
     }
   } finally {
     els.submit.disabled = false;
+    if (attemptedWidget !== undefined && attemptedWidget === widgetId) {
+      window.turnstile.reset(attemptedWidget);
+    }
   }
 }
 
@@ -475,6 +542,11 @@ async function loadSlots({ keepAlert = false } = {}) {
       return;
     }
 
+    if (data.turnstileSiteKey !== state.turnstileSiteKey && widgetId !== undefined) {
+      window.turnstile.remove(widgetId);
+      widgetId = undefined;
+    }
+    state.turnstileSiteKey = data.turnstileSiteKey;
     state.minutes = data.minutes || 30;
     const rawSlots = Array.isArray(data.slots) ? data.slots : [];
     state.dayList = buildDayList(rawSlots);
@@ -594,6 +666,7 @@ function init() {
     }
   });
   window.addEventListener('online', () => {
+    if (state.currentView === els.form) prepareTurnstile().catch(() => {});
     if (state.currentView === els.offline) {
       if (state.cancelPair) {
         showView(els.cancel);

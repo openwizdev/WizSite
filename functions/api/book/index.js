@@ -2,6 +2,7 @@ import { epochToWall, wallToEpochMs } from '../../../lib/book/ical.js';
 import { settings, window, openSlots } from '../../../lib/book/slots.js';
 import { googleReady, googleInsert } from '../../../lib/book/google.js';
 import { sendBookingMail } from '../../../lib/book/mail.js';
+import { verifyTurnstile } from '../../../lib/book/turnstile.js';
 import {
   DEFAULT_ICAL_TIMEOUT,
   DEFAULT_STORE_TIMEOUT,
@@ -88,7 +89,8 @@ export async function handle(request, env, options = {}) {
     return errorResponse(503, 'unavailable', 'Booking is not available right now.');
   }
 
-  const body = await readJsonBody(request, BOOK_KEYS);
+  const secret = env.TURNSTILE_SECRET_KEY?.trim();
+  const body = await readJsonBody(request, BOOK_KEYS, secret ? 'turnstileToken' : undefined);
   if (!body) {
     return errorResponse(400, 'bad_request', 'That booking request could not be read.');
   }
@@ -114,6 +116,10 @@ export async function handle(request, env, options = {}) {
     codePointLength(tz) > MAX_TZ
   ) {
     return errorResponse(400, 'bad_request', 'Please check your booking details and try again.');
+  }
+
+  if (secret && !await verifyTurnstile(request, secret, body.turnstileToken, fetch)) {
+    return errorResponse(403, 'verification_failed', 'Human verification failed. Please try again.');
   }
 
   const endMs = startMs + cfg.slotMin * 60_000;

@@ -84,6 +84,7 @@ export async function handle(request, env, options = {}) {
     mode: cfg.mode,
     timezone: cfg.timezone,
     minutes: cfg.slotMin,
+    ...(env.TURNSTILE_SECRET_KEY?.trim() && { turnstileSiteKey: env.TURNSTILE_SITE_KEY?.trim() || null }),
     slots,
   });
 }
