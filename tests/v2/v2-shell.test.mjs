@@ -77,7 +77,7 @@ test('switch on + demo=1: renders v2 shell, deep links, interactions, and makes 
 
     await run.page.run(`window.originalMessages = [...document.querySelector('.v2-chat-thread').children];
       window.originalChoices = [...document.querySelectorAll('.v2-q-pill')];
-      document.querySelector('.v2-composer input').focus()`);
+      document.querySelector('.v2-composer textarea').focus()`);
     await run.page.type('An unfinished idea');
     await run.page.click('Right away');
     assert.equal(await run.page.run(`document.activeElement.value`), 'An unfinished idea');

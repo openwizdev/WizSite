@@ -309,7 +309,7 @@ nav.v2-nav { flex: 1; gap: 4px; }
 .v2-q-pill .ic { color: var(--em-text-2); width: 15px; height: 15px; }
 .v2-grill-foot { display: grid; margin-top: 8px; }
 .v2-composer-wrap { flex: none; padding: 12px 0 16px; border-top: 1px solid var(--em-line); }
-.v2-composer { display: flex; width: 100%; padding: 4px; border: 1px solid var(--v2-control-line); border-radius: var(--v2-card-radius); background: var(--em-card); }
+.v2-composer { display: flex; align-items: flex-end; width: 100%; padding: 4px; border: 1px solid var(--v2-control-line); border-radius: var(--v2-card-radius); background: var(--em-card); }
 .v2-composer.is-disabled { opacity: .68; border-color: var(--em-line); }
 .v2-composer:focus-within { outline: 2px solid var(--em-amber); outline-offset: 2px; }
 .v2-composer input, .v2-sheet textarea {

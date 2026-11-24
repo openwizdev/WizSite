@@ -26,7 +26,8 @@ async function touchPoint(cdp, x, y, holdMs = 40) {
 
 async function openDemoChat(run) {
   await run.page.go(`${SITE}/app/?v2=on&demo=1#/chat`);
-  await run.page.until(`document.querySelector('.v2-composer textarea[data-ghost-ready="1"]')`, 'v2 demo composer with ghost text');
+  await run.page.until(`document.readyState === 'complete' && document.querySelector('.v2-composer textarea[data-ghost-ready="1"]')`, 'v2 demo composer with ghost text');
+  await run.page.run(`document.fonts.ready`);
   return attachCdp(run.browser);
 }
 
@@ -93,7 +94,7 @@ test('P3: demo composer shows every recall golden case with zero network request
     assert.equal(style.animationName, 'none');
 
     // Zero network requests while typing.
-    assert.equal(run.world.log.length, beforeRequests, 'typing in demo composer must make zero network requests');
+    assert.deepEqual(run.world.log.slice(beforeRequests), [], 'typing in demo composer must make zero network requests');
     assert.deepEqual(run.world.violations, [], 'no CSP or runtime errors');
   } finally {
     await run.close();
@@ -211,7 +212,7 @@ test('P2: Tab, word accept, Esc, typed-through steadiness, Tab hint limit, Enter
     state = await getState(run.page);
     assert.equal(state.suffix, ' all recs', 'ghost resumes after IME composition ends');
 
-    assert.equal(run.world.log.length, beforeRequests, 'zero network requests during key interactions');
+    assert.deepEqual(run.world.log.slice(beforeRequests), [], 'zero network requests during key interactions');
     assert.deepEqual(run.world.violations, [], 'no CSP or runtime errors');
   } finally {
     await run.close();
@@ -249,7 +250,7 @@ test('P2 phone touch: tap ghost accepts next word, long-press accepts all', asyn
     assert.equal(state.value, 'approve #42 and merge');
     assert.equal(state.suffix, '');
 
-    assert.equal(run.world.log.length, beforeRequests, 'zero network requests during touch interactions');
+    assert.deepEqual(run.world.log.slice(beforeRequests), [], 'zero network requests during touch interactions');
     assert.deepEqual(run.world.violations, [], 'no CSP or runtime errors');
   } finally {
     await run.close();
