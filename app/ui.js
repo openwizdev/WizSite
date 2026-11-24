@@ -80,6 +80,27 @@
   }
   const agentName = (harness, model) => `${HARNESSES[String(harness).toLowerCase()] || harness}, ${modelName(model)}`;
 
+  // The compact Wiz loader. While one with this text is on the page, the same node comes back, so a
+  // re-render through fill() keeps the dance going instead of restarting it on every data tick.
+  const waiting = new Map();
+  function loading(text) {
+    const known = waiting.get(text);
+    if (known?.isConnected) return known;
+    if (!window.WizLoader) return null;
+    const box = window.WizLoader.markup(true);
+    window.WizLoader.mount(box, { lines: [text, ...window.WizLoader.lines] });
+    waiting.set(text, box);
+    return box;
+  }
+
+  // replaceChildren that leaves nodes already in place where they are (moving a node restarts its animation).
+  function fill(el, ...kids) {
+    kids = kids.flat().filter(kid => kid !== null && kid !== undefined && kid !== false)
+      .map(kid => (kid instanceof Node ? kid : document.createTextNode(String(kid))));
+    for (const child of [...el.childNodes]) if (!kids.includes(child)) child.remove();
+    kids.forEach((kid, i) => { if (el.childNodes[i] !== kid) el.insertBefore(kid, el.childNodes[i] || null); });
+  }
+
   const ui = {
     h, icon, logo, time, STATES, agentName,
     pill: state => h('span', { class: 'pill', '--c': STATES[state].colour }, STATES[state].word),
@@ -94,7 +115,10 @@
       return el;
     },
     unknown: text => h('div', { class: 'unknown' }, h('b', {}, 'Unknown. '), text),
-    placeholder: text => h('div', { class: 'placeholder' }, text),
+    // 'Reading GitHub…' (any text ending in …) is a read still going: the Wizes dance until it lands.
+    placeholder: text => (/…$/.test(text) ? loading(text) : null) || h('div', { class: 'placeholder' }, text),
+    loading,
+    fill,
   };
   const pages = [];
   OW.ui = ui;

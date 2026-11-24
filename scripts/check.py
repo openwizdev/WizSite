@@ -117,7 +117,11 @@ DRIVER_LOGOS = {
 }
 
 PAGE_STYLES = {'changelog/index.html': 'changelog/changelog.css', 'market/index.html': 'market/market.css'}
-HASHED = ('tokens.css', 'site.css', *PAGE_STYLES.values(), GSAP, 'site.js', 'faq.js')
+# The Wiz loader (dancing Wizes for any slow load): the app and the pages with Ask a Wiz load it. Its demo stays out of dist/.
+LOADER_STYLE, LOADER_SCRIPT = 'wiz-loader/wiz-loader.css', 'wiz-loader/wiz-loader.js'
+LOADER_PAGES = ('index.html', 'faq/index.html')
+LOADER_BUDGET = 10_240
+HASHED = ('tokens.css', 'site.css', *PAGE_STYLES.values(), LOADER_STYLE, LOADER_SCRIPT, GSAP, 'site.js', 'faq.js')
 APP_PAGE = 'app/index.html'
 APP_STYLE = 'app/ember.css'
 APP_FOUND = {(folder, ext): tuple(sorted(p.relative_to(ROOT).as_posix() for p in (ROOT / folder).glob(f'*.{ext}')))
@@ -757,11 +761,18 @@ def check_site(root, registry=ROOT / 'market/registry.json'):
     for path, page in pages.items():
         rel = path.relative_to(root).as_posix()
         assert not set(page.refs) & {f'/{name}' for name in HASHED}, 'a page uses an unfingerprinted style or script'
-        expected = [f'/{names["tokens.css"]}', f'/{names["site.css"]}'] + ([f'/{names[PAGE_STYLES[rel]]}'] if rel in PAGE_STYLES else [])
+        expected = [f'/{names["tokens.css"]}', f'/{names["site.css"]}'] + ([f'/{names[PAGE_STYLES[rel]]}'] if rel in PAGE_STYLES else []) \
+            + ([f'/{names[LOADER_STYLE]}'] if rel in LOADER_PAGES else [])
         assert page.stylesheets == expected, f'{rel} must apply exactly {expected}, got {page.stylesheets}'
         assert not Outline(path.read_text()).styles, f'{rel} must not use inline <style> blocks'
     page = pages[root / 'index.html']
-    assert page.scripts == [f'/{names[GSAP]}', f'/{names["site.js"]}', f'/{names["faq.js"]}'], 'load the pinned GSAP before site.js, then faq.js'
+    assert page.scripts == [f'/{names[GSAP]}', f'/{names[LOADER_SCRIPT]}', f'/{names["site.js"]}', f'/{names["faq.js"]}'], \
+        'load the pinned GSAP and the Wiz loader before site.js, then faq.js'
+    for rel in LOADER_PAGES:
+        assert f'/{names[LOADER_SCRIPT]}' in pages[root / rel].scripts, f'{rel} has Ask a Wiz, so it needs the Wiz loader'
+    loader = sum(len((root / names[name]).read_bytes()) for name in (LOADER_STYLE, LOADER_SCRIPT))
+    assert loader < LOADER_BUDGET, f'the Wiz loader is {loader} bytes, over its {LOADER_BUDGET} budget'
+    assert 'prefers-reduced-motion' in (root / names[LOADER_STYLE]).read_text(), 'the Wiz loader must calm down for reduced motion'
     assert not page.inline_scripts, 'landing motion must wait for both external scripts'
     assert len(page.videos) == 2, 'expected the launch video and one spec recording'
     check_launch((root / 'index.html').read_text(), page)
@@ -1169,7 +1180,7 @@ def check_drivers(landing, changelog, drivers, page):
     assert not DRIVER_JARGON.search(description[0]), f'a jargon count in the drivers description: {description[0]}'
     assert not re.search(r'grok bot[^.;]*\bpass', description[0], re.I), f'Grok Bot has not passed: {description[0]}'
     assert DRIVER_DESCRIPTION_COMMANDS in description[0], f'the drivers description says {DRIVER_DESCRIPTION_COMMANDS!r}: {description[0]}'
-    assert page.scripts == [s for s in Page(landing).scripts if not s.startswith('/faq.')] and not page.inline_scripts, \
+    assert page.scripts == [s for s in Page(landing).scripts if not s.startswith(('/faq.', '/wiz-loader/'))] and not page.inline_scripts, \
         'the drivers page loads only the site\'s footer scripts (GSAP, site.js), never its own'
     main = re.search(r'<main\b[^>]*>[\s\S]*?</main>', drivers)
     assert main, 'the drivers page needs its main'
@@ -1812,17 +1823,17 @@ def check_app(root, names, pages):
     assert not page.report_links, 'Report a problem link, the footer\'s: the app has one'
     assert not set(page.refs) & {f'/{name}' for name in HASHED}, 'the app uses an unfingerprinted style or script'
     styles = {f'/{names[name]}': name for name in APP_PART_STYLES}
-    applied = [styles.get(ref, ref) for ref in page.stylesheets[1:]]
-    assert page.stylesheets[:1] == [f'/{names[APP_STYLE]}'] and len(set(applied)) == len(applied) \
+    applied = [styles.get(ref, ref) for ref in page.stylesheets[2:]]
+    assert page.stylesheets[:2] == [f'/{names[APP_STYLE]}', f'/{names[LOADER_STYLE]}'] and len(set(applied)) == len(applied) \
         and set(applied) <= set(APP_PART_STYLES) and APP_NEEDED & set(APP_PART_STYLES) <= set(applied), \
-        'the app must apply exactly the fingerprinted ember.css, then each of its pages\' styles once (and a card\'s at most once)'
+        'the app must apply exactly the fingerprinted ember.css and the Wiz loader, then each of its pages\' styles once (and a card\'s at most once)'
     parts = {f'/{names[name]}': name for name in APP_PARTS}
     shown = [parts[ref] for ref in page.scripts if ref in parts]
     assert len(set(shown)) == len(shown) and APP_NEEDED & set(APP_PARTS) <= set(shown), \
         'the app must load each of its pages\' scripts once (and a card\'s at most once)'
     assert [name for name in shown if name in APP_LEGACY_ORDER] == list(APP_LEGACY_ORDER), \
         'the app must load You, Specs, Spec and Agents in that order: it sets the v1 pages\' order and default route'
-    ordered = ('app/data.js', 'app/records.js', 'app/ui.js', *shown, 'app/palette.js', 'app/shell.js')
+    ordered = (LOADER_SCRIPT, 'app/data.js', 'app/records.js', 'app/ui.js', *shown, 'app/palette.js', 'app/shell.js')
     assert page.scripts == [ref for name in ordered for ref in [f'/{v}' for v, (_, before) in APP_VENDOR.items() if before == name] + [f'/{names[name]}']], \
         'the app must load its fingerprinted scripts (and each pinned file before its user) in order'
     assert not page.inline_scripts, 'the app allows no inline script'

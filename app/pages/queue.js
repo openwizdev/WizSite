@@ -301,7 +301,7 @@
 
   function draw(el) {
     const result = view();
-    if (!result) return el.replaceChildren(OW.ui.placeholder('Reading GitHub…'));
+    if (!result) return OW.ui.fill(el, OW.ui.placeholder('Reading GitHub…'));
     const items = result.items.filter(shown);
     const keys = new Set(items.map(item => item.key));
     for (const [key, kept] of [...state.cards.entries()]) {
