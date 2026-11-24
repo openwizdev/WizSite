@@ -38,12 +38,15 @@
     const lead = members[0] || null;
     const pr = issue && !t.outside ? OW.agents.pullRequest({ issue, note: lead?.row.note || null }) : null;
     if (pr) members.push({ kind: 'pr', pr });
-    if (!t.outside) members.push({ kind: 'ticket', labels: (sub?.labels?.nodes || []).filter(Boolean).map(l => l.name) });
+    const labels = (sub?.labels?.nodes || []).filter(Boolean).map(l => l.name);
+    const person = labels.includes('ready-for-human') && !labels.includes('needs-info');
+    if (!t.outside) members.push({ kind: 'ticket', labels });
     return {
       key: t.key, number: t.number, title: t.title, url: t.url, state: t.state, gap: false, outside: t.outside,
       blockers: t.blockers.filter(b => !b.startsWith('gap-')), missing: t.missing || 0, blocks: [],
       members, lead: lead ? lead.status : null,
-      you: t.state === 'you' || members.some(m => m.kind === 'note' && m.status === 'asking'),
+      person: person && t.state === 'you',
+      you: (t.state === 'you' && !person) || members.some(m => m.kind === 'note' && m.status === 'asking'),
       working: members.some(m => m.kind === 'note' && m.status === 'working'),
       activity: Math.max(0, ...rows.map(r => r.at)),
     };
@@ -65,8 +68,8 @@
     const empty = spec.total === 0 && !decisions.length;
     return {
       number: spec.number, title: spec.title, url: spec.url, total: spec.total, done: spec.done,
-      read: Boolean(spec.graph), unknown: spec.graph?.unknown || 0, tickets, decisions,
-      counts: { you, working, review: count('review'), building: count('building'), merged: count('merged') },
+      read: Boolean(spec.graph), unknown: spec.graph?.unknown || 0, staleAt: spec.staleAt || null, tickets, decisions,
+      counts: { you, person: own.filter(t => t.person && !t.you).length, working, review: count('review'), building: count('building'), merged: count('merged') },
       activity, quiet: !you && !working && (finished || idle || empty),
     };
   }
@@ -101,7 +104,7 @@
         step: note.row.note.step, agent: note.row.note.agent });
     }
     inbox.sort((a, b) => b.at - a.at);
-    return { sheets, inbox, gaps: seen.gaps.slice(), partial: seen.partialSpecs };
+    return { sheets, inbox, people: seen.people || [], peopleTotal: seen.peopleTotal || 0, why: seen.why, gaps: seen.gaps.slice(), partial: seen.partialSpecs };
   }
   const view = { sheet: null, cams: new Map(), mode: 'board', focus: null, spread: null, query: '', quietOpen: false, over: 0, aim: null, inboxAll: false };
   let last = null;
@@ -389,7 +392,8 @@
     const parts = [];
     if (c.you) parts.push(`${c.you} need${c.you === 1 ? 's' : ''} you`);
     if (c.working) parts.push(`${c.working} working`);
-    if (!sheet.read) parts.push('tickets unknown');
+    if (c.person) parts.push(`${c.person} for a person`);
+    if (!sheet.read) parts.push(sheet.total ? `${sheet.done} of ${sheet.total} done · tickets not read yet` : 'tickets not read yet');
     else if (sheet.total === 0) parts.push(sheet.decisions.length ? 'no tickets yet' : 'no tickets');
     else if (sheet.total) parts.push(`${sheet.done} of ${sheet.total} done`);
     return parts.join(' · ');
@@ -417,15 +421,27 @@
   const INBOX_SHOWN = 6;
   const INBOX_WORDS = {
     asking: item => `${item.agent ? `${OW.agents.KIND[item.agent]} asks` : 'Asking you'}: ${item.step}`,
-    ticket: () => 'Ticket marked for you',
+    ticket: item => `Waiting on your answer: ${item.title}`,
     spec_confirmation: () => 'Spec to confirm',
     plan_approval: () => 'Plan to approve',
     unreadable: () => 'A decision record that couldn\'t be read',
   };
+  function people(m) {
+    if (!m.people.length) return null;
+    const total = Math.max(m.peopleTotal, m.people.length);
+    const toggle = h('button', { type: 'button', class: 'cv-more-items', 'data-focus': 'people', 'aria-expanded': String(Boolean(view.peopleOpen)),
+      title: 'Tickets labelled ready-for-human: a person has to act on them. They are not questions from your agents.',
+      onclick: () => { view.peopleOpen = !view.peopleOpen; rerender(); } }, `${view.peopleOpen ? 'Hide' : 'Show'} ${plural(total, 'task')} for a person`);
+    if (!view.peopleOpen) return toggle;
+    return h('div', { class: 'cv-people' }, toggle, h('ul', { class: 'cv-people-list', 'aria-label': 'Tasks for a person' },
+      m.people.map(item => h('li', {}, h('a', { href: item.url, rel: 'noreferrer', target: '_blank' }, `#${item.number}`), ` ${item.title}`,
+        item.later ? h('span', { class: 'cv-calm' }, ' · waits on a blocker') : null))),
+      total > m.people.length ? h('p', { class: 'cv-calm' }, `and ${total - m.people.length} more on GitHub`) : null);
+  }
   function inbox(m) {
     if (!m.inbox.length) {
-      return h('p', { class: 'cv-inbox calm' }, m.gaps.length ? 'Nothing needs you in what GitHub gave; part of the read is missing, so this may change.'
-        : 'Nothing needs you right now.');
+      return h('div', {}, h('p', { class: 'cv-inbox calm' }, m.gaps.length ? 'Nothing needs you in what GitHub gave; part of the read is missing, so this may change.'
+        : 'Nothing needs you right now.'), people(m));
     }
     return h('div', { class: 'cv-inbox', role: 'list', 'aria-label': 'Needs you' },
       h('span', { class: 'cv-inbox-label' }, dot(STATES.you.colour), `Needs you · ${m.inbox.length}`),
@@ -435,7 +451,8 @@
         h('span', { class: 'num' }, item.ticket ? `#${item.number}` : `spec #${item.number}`), h('span', { class: 'cv-chip-text' }, INBOX_WORDS[item.kind](item))),
         h('a', { href: item.url, rel: 'noreferrer', target: '_blank', 'aria-label': `Open #${item.number} on GitHub`, 'data-focus': `inbox-link:${i}` }, 'GitHub ↗'))),
       m.inbox.length > INBOX_SHOWN ? h('button', { type: 'button', class: 'cv-more-items', 'data-focus': 'inbox-more', 'aria-expanded': String(Boolean(view.inboxAll)),
-        onclick: () => { view.inboxAll = !view.inboxAll; rerender(); } }, view.inboxAll ? 'Show fewer' : `${m.inbox.length - INBOX_SHOWN} more`) : null);
+        onclick: () => { view.inboxAll = !view.inboxAll; rerender(); } }, view.inboxAll ? 'Show fewer' : `${m.inbox.length - INBOX_SHOWN} more`) : null,
+      people(m));
   }
 
   function goTo(item) {
@@ -541,7 +558,7 @@
     const open = s ? h('button', { type: 'button', class: `cv-open${s.counts.you ? ' you' : ''}`, 'data-sheet': s.number, 'data-focus': `open:${s.number}`,
       'aria-label': `Open #${s.number} ${s.title}`, onclick: () => openAt(at) },
     h('span', { class: 'cv-open-head' }, h('span', { class: 'cv-sheet-name' }, `${String(at + 1).padStart(2, '0')} · #${s.number} ${s.title}`), h('span', { class: 'cv-sheet-line' }, sheetLine(s))),
-    tiles.length ? h('span', { class: 'cv-otiles' }, tiles) : h('span', { class: 'cv-calm' }, s.read ? 'No tickets yet.' : 'Its tickets couldn\'t be read.')) : null;
+    tiles.length ? h('span', { class: 'cv-otiles' }, tiles) : h('span', { class: 'cv-calm' }, s.read ? 'No tickets yet.' : 'Its tickets aren\'t read yet.')) : null;
     const el = h('section', { class: 'cv-over', 'aria-label': 'Every sheet', tabindex: '-1', 'data-focus': 'over' },
       more(Math.max(0, at - 3), 'above'),
       h('div', { class: 'cv-acc' }, ...above, open, ...below),
@@ -558,8 +575,9 @@
 
   function notices(m, sheet) {
     const out = [];
-    if (m.gaps.length) out.push(OW.ui.unknown(`GitHub gave only part of ${m.gaps.join(', ')}, so a sheet or stack may be missing. The app tries again on its own.`));
-    if (sheet && !sheet.read) out.push(OW.ui.unknown(`Spec #${sheet.number}'s tickets couldn't be read from GitHub, so its board is unknown.`));
+    const why = m.why === 'limit' ? 'GitHub\'s hourly read limit ran out' : 'GitHub gave only part of the read';
+    if (m.gaps.length) out.push(OW.ui.unknown(`${why}: missing ${m.gaps.join(', ')}. Nothing missing is shown as empty or done, and the app tries again on its own.`));
+    if (sheet?.staleAt) out.push(OW.ui.unknown(`#${sheet.number}'s board is from the read at ${OW.ui.time(sheet.staleAt)}; ${m.why === 'limit' ? 'GitHub\'s hourly limit' : 'a failed read'} stopped a newer one.`));
     if (sheet?.unknown) out.push(OW.ui.unknown(`${plural(sheet.unknown, 'ticket')} of #${sheet.number} couldn't be read, so ${sheet.unknown === 1 ? 'it shows' : 'they show'} as unknown.`));
     return out.map(n => css(n, { margin: '0 0 12px' }));
   }
@@ -593,8 +611,10 @@
     if (view.mode === 'over') stage = overview(m);
     else if (view.focus && sheet.tickets.find(t => t.key === view.focus)) stage = focusPane(sheet, sheet.tickets.find(t => t.key === view.focus), now);
     else if (!sheet.read || !sheet.tickets.length) {
-      stage = h('div', { class: 'cv-empty' }, sheet.read ? OW.ui.placeholder(sheet.decisions.length
-        ? 'No tickets yet: its spec or plan waits on you. Open it from the strip above.' : 'No tickets yet: its plan graph isn\'t written.') : null);
+      const said = sheet.total ? `GitHub counts ${sheet.done} of ${sheet.total} tickets done, ` : '';
+      stage = h('div', { class: 'cv-empty' }, OW.ui.placeholder(!sheet.read || sheet.total
+        ? `${said}but this read couldn't list them${m.why === 'limit' ? ' before GitHub\'s hourly limit ran out' : ''}. The board shows once a read lists them.`
+        : sheet.decisions.length ? 'No tickets yet: its spec or plan waits on you. Open it from the strip above.' : 'No tickets yet: its plan graph isn\'t written.'));
     } else {
       board = boardOf(sheet, now);
       stage = board.root;

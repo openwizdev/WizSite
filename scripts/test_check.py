@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from html import escape
 from pathlib import Path
 import json
@@ -9,7 +10,7 @@ from unittest import mock
 
 import re
 
-from check import ALL_PAGES, CTA, FAQ, FAQ_WHERE, FOOTER, INSTALL_NOTE_HTML, FINGERPRINTS, HASHED, INSTALL_SWITCH, ROOT, Page, check_changelog, check_release_data, check_releases, read_releases, split_releases, check_motion, check_privacy, check_ref, check_site, check_vector, check_webp, fingerprint
+from check import ALL_PAGES, CTA, FAQ, FAQ_WHERE, FOOTER, INSTALL_NOTE_HTML, FINGERPRINTS, HASHED, INSTALL_SWITCH, ROOT, Page, check_changelog, check_release_data, check_releases, read_releases, split_releases, check_motion, check_privacy, check_ref, check_security_txt, check_site, check_vector, check_webp, fingerprint
 
 
 def edit_built(root, name, change):
@@ -542,12 +543,26 @@ class Checks(unittest.TestCase):
                     check_site(root)
 
     def test_headers_revalidate(self):
-        with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp) / 'dist'
-            shutil.copytree(ROOT / 'dist', root)
-            (root / '_headers').write_text('/*.css\n  Cache-Control: public, max-age=14400\n')
-            with self.assertRaises(AssertionError):
-                check_site(root)
+        cases = {
+            'broken file': lambda text: '/*.css\n  Cache-Control: public, max-age=14400\n',
+            'missing immutable detach': lambda text: text.replace('/*.:hash.css\n  ! Cache-Control\n', '/*.:hash.css\n'),
+            'missing font detach': lambda text: text.replace('/fonts/*.woff2\n  ! Cache-Control\n', '/fonts/*.woff2\n'),
+            'missing mp4 detach': lambda text: text.replace('/*.mp4\n  ! Cache-Control\n', '/*.mp4\n'),
+            'overbroad unhashed js': lambda text: text.replace('/*.:hash.js', '/*.js'),
+            'overbroad unhashed css': lambda text: text.replace('/*.:hash.css', '/*.css'),
+            'html stale-while-revalidate': lambda text: text.replace(
+                '  Cache-Control: public, max-age=0, must-revalidate\n',
+                '  Cache-Control: public, max-age=0, must-revalidate, stale-while-revalidate=60\n'),
+            'double splat pattern': lambda text: text.replace('/*.:hash.css', '/*.*.css'),
+        }
+        for name, spoil in cases.items():
+            with self.subTest(name), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp) / 'dist'
+                shutil.copytree(ROOT / 'dist', root)
+                headers = root / '_headers'
+                headers.write_text(spoil(headers.read_text()))
+                with self.assertRaises(AssertionError):
+                    check_site(root)
 
     def test_security_headers_and_well_known(self):
         cases = {
@@ -571,6 +586,76 @@ class Checks(unittest.TestCase):
                 with self.assertRaises(AssertionError):
                     check_site(root)
 
+    def test_font_subset_and_fingerprinting(self):
+        def rewrite_tokens(root, transform):
+            old = FINGERPRINTS['tokens.css']
+            text = transform((root / old).read_text())
+            data = text.encode('utf-8')
+            new = fingerprint('tokens.css', data)
+            (root / old).unlink()
+            (root / new).write_bytes(data)
+            for page in root.rglob('*.html'):
+                page.write_text(page.read_text().replace(f'/{old}', f'/{new}'))
+
+        cases = {
+            'char outside subset in page': (
+                lambda root: (root / 'faq/index.html').write_text(
+                    (root / 'faq/index.html').read_text().replace('</main>', '<p>\u03a9</p></main>')),
+                'character outside font subset',
+            ),
+            'font-display switched to swap': (
+                lambda root: rewrite_tokens(root, lambda t: t.replace('font-display: optional;', 'font-display: swap;', 1)),
+                'font-display: optional',
+            ),
+            'missing unicode-range': (
+                lambda root: rewrite_tokens(root, lambda t: re.sub(r'\s*unicode-range:[^;]+;', '', t, count=1)),
+                'unicode-range',
+            ),
+            'missing font cache header': (
+                lambda root: (root / '_headers').write_text(
+                    (root / '_headers').read_text().replace('/fonts/*.woff2\n  ! Cache-Control\n  Cache-Control: public, max-age=31536000, immutable\n', '')),
+                'Cache-Control mismatch for /fonts/',
+            ),
+            'unfingerprinted font preload': (
+                lambda root: (root / 'index.html').write_text(
+                    (root / 'index.html').read_text().replace(f'/{FINGERPRINTS["fonts/Geist-var.woff2"]}', '/fonts/Geist-var.woff2', 1)),
+                'unfingerprinted',
+            ),
+        }
+        for name, (spoil, pattern) in cases.items():
+            with self.subTest(name), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp) / 'dist'
+                shutil.copytree(ROOT / 'dist', root)
+                spoil(root)
+                with self.assertRaisesRegex(AssertionError, pattern):
+                    check_site(root)
+
+    def test_security_txt_expiry(self):
+        base = (
+            'Contact: https://github.com/openwizdev/OpenWiz/security/advisories/new\n'
+            'Preferred-Languages: en\n'
+            'Canonical: https://openwiz.dev/.well-known/security.txt\n'
+            'Policy: https://github.com/openwizdev/OpenWiz/security/policy\n'
+        )
+        today = datetime(2027, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+        check_security_txt(base + 'Expires: 2028-01-01T00:00:00Z\n', now=today)
+        check_security_txt(base + 'Expires: 2027-03-02T00:00:00Z\n', now=today)
+        check_security_txt(base + 'Expires: 2028-01-01T05:00:00+05:00\n', now=today)
+        bad_cases = (
+            ('59 days out', base + 'Expires: 2027-03-01T00:00:00Z\n', 'within 60 days; move it about a year out'),
+            ('past', base + 'Expires: 2026-12-31T23:59:59Z\n', 'in the past; move it about a year out'),
+            ('missing', base, 'missing Expires'),
+            ('duplicate', base + 'Expires: 2028-01-01T00:00:00Z\nExpires: 2029-01-01T00:00:00Z\n', 'duplicate Expires'),
+            ('garbage', base + 'Expires: not-a-date\n', 'unparsable RFC 3339 Expires'),
+            ('invalid calendar date', base + 'Expires: 2028-02-30T00:00:00Z\n', 'unparsable RFC 3339 Expires'),
+            ('naive timestamp', base + 'Expires: 2028-01-01T00:00:00\n', 'unparsable RFC 3339 Expires'),
+        )
+        for name, text, error in bad_cases:
+            with self.subTest(name), self.assertRaisesRegex(AssertionError, error):
+                check_security_txt(text, now=today)
+        with self.assertRaisesRegex(AssertionError, 'in the past'):
+            check_site(ROOT / 'dist', now=datetime(2099, 1, 1, 0, 0, 0, tzinfo=timezone.utc))
+
     def test_install_wording_only_in_the_install_box(self):
         for extra in ('<a href="/">Copy · coming soon</a>', '<p>Install now</p>', '<p>Inst&#97;ll today</p>',
                       '<p>in<b>stall</b> now</p>', '<p>Ins<span>t</span>all</p>', '<img alt="Install now" src="/favicon.svg">'):
@@ -585,16 +670,18 @@ class Checks(unittest.TestCase):
     def test_install_line_and_its_switch(self):
         line = '<code class="install-line">Install OpenWiz from github.com/openwizdev/OpenWiz</code>'
         hint = '<p class="install-hint">Paste this into your agent</p>'
-        button = '<button class="btn install" type="button" disabled data-count="install-copy">Copy · coming soon</button>'
         text = (ROOT / 'dist/index.html').read_text()
         shipped = re.findall(r'data-install="([^"]*)"', text)
+        labels = {'coming-soon': 'Copy · coming soon', 'live': 'Copy'}
+        button = f'<button class="btn install" type="button" disabled data-count="install-copy">{labels[shipped[0]]}</button>'
         self.assertEqual(len(shipped), 1, 'one install switch')
         self.assertIn(shipped[0], INSTALL_SWITCH)
         for part in (line, hint, button):
             self.assertEqual(text.count(part), 1, part)
         for state in INSTALL_SWITCH:
             switch = f'data-install="{state}"'
-            variant = text.replace(f'data-install="{shipped[0]}"', switch)
+            variant = text.replace(f'data-install="{shipped[0]}"', switch).replace(button, button.replace(f'>{labels[shipped[0]]}<', f'>{labels[state]}<'))
+            button_here = button.replace(f'>{labels[shipped[0]]}<', f'>{labels[state]}<')
             changelog = with_switch(state)
             with self.subTest(state=state), tempfile.TemporaryDirectory() as temp:
                 root = Path(temp) / 'dist'
@@ -614,13 +701,13 @@ class Checks(unittest.TestCase):
                 (hint, hint.replace('your agent', 'your terminal')),
                 (switch, ''),
                 (switch, 'data-install="on"'),
-                (button, button.replace(' disabled', '')),
-                (button, button.replace(' disabled', ' aria-disabled="true"')),
-                (button, button.replace(' disabled', ' title=" disabled "')),
-                (button, button.replace(' disabled', ' disabled onclick="copy()"')),
-                (button, button.replace(' disabled', ' disabled onclick ="copy()"')),
-                (button, button.replace('Copy · coming soon', 'Copy')),
-                (button, button + button),
+                (button_here, button_here.replace(' disabled', '')),
+                (button_here, button_here.replace(' disabled', ' aria-disabled="true"')),
+                (button_here, button_here.replace(' disabled', ' title=" disabled "')),
+                (button_here, button_here.replace(' disabled', ' disabled onclick="copy()"')),
+                (button_here, button_here.replace(' disabled', ' disabled onclick ="copy()"')),
+                (button_here, button_here.replace(f'>{labels[state]}<', f'>{labels["live" if state == "coming-soon" else "coming-soon"]}<')),
+                (button_here, button_here + button_here),
             ]
             for good, bad in breaks:
                 with self.subTest(state=state, bad=bad), tempfile.TemporaryDirectory() as temp:
@@ -681,7 +768,7 @@ class Checks(unittest.TestCase):
         moved = lambda variant, trace: variant.replace(label, trace, 1).replace('</main>', label + '</main>', 1)
         relocations = ['<!-- OpenWiz 0.01 <small>0.1.0</small>. -->', f'<!-- {label} -->', '']
         for state in INSTALL_SWITCH:
-            variant = text.replace(shipped[0], f'data-install="{state}"')
+            variant = re.sub(r'(data-count="install-copy">)[^<]*<', lambda m: m[1] + ('Copy' if state == 'live' else 'Copy · coming soon') + '<', text.replace(shipped[0], f'data-install="{state}"'), count=1)
             changelog = with_switch(state)
             with self.subTest(state=state), tempfile.TemporaryDirectory() as temp:
                 root = Path(temp) / 'dist'
