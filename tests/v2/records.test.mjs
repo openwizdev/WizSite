@@ -1039,7 +1039,6 @@ test('R12 (#2923): a present but unreadable Link header is an incomplete read be
     `<${API}/repos/acme/factory/issues/41/comments?per_page=100&page=2>; rel="next", broken`,
   ];
   for (const bad of badLinks) {
-    // Reconcile empty branch: earlier send dropped, must stay unknown and never resend
     {
       const run = await boot();
       const preview = await steerPreview(run);
@@ -1053,7 +1052,6 @@ test('R12 (#2923): a present but unreadable Link header is an incomplete read be
       assert.deepEqual(outcome, { outcome: 'unknown', op: preview.op, reason: 'incomplete' }, `empty branch (${bad}): ${JSON.stringify(outcome)}`);
       assert.equal(run.net.posts().length, 1, `empty branch (${bad}): resent on unreadable Link`);
     }
-    // Reconcile found branch: earlier send landed on page 1, must still stay unknown on unreadable Link
     {
       const run = await boot();
       const preview = await steerPreview(run);
@@ -1067,7 +1065,6 @@ test('R12 (#2923): a present but unreadable Link header is an incomplete read be
       assert.deepEqual(outcome, { outcome: 'unknown', op: preview.op, reason: 'incomplete' }, `found branch (${bad}): ${JSON.stringify(outcome)}`);
       assert.equal(run.net.posts().length, 1, `found branch (${bad}): sent again`);
     }
-    // First-send baseline read: must refuse source_unchecked with zero writes
     {
       const run = await boot();
       const preview = await steerPreview(run);
@@ -1077,6 +1074,22 @@ test('R12 (#2923): a present but unreadable Link header is an incomplete read be
       assert.deepEqual(outcome, { outcome: 'refused', op: preview.op, reason: 'source_unchecked' }, `baseline (${bad}): ${JSON.stringify(outcome)}`);
       assert.equal(run.net.posts().length, 0, `baseline (${bad}): posted despite unreadable Link`);
     }
+  }
+  {
+    const run = await boot();
+    const preview = await steerPreview(run);
+    run.records.confirm(preview, tap());
+    run.net.intercept = async (method, at) => {
+      if (method === 'GET' && at.pathname === '/repos/acme/factory/issues/41/comments') {
+        const page = Number(at.searchParams.get('page'));
+        if (page === 1) return Response.json([], { status: 200, headers: { Link: `<${API}${at.pathname}?per_page=100&page=2>; rel="next", <${API}${at.pathname}?per_page=100&page=2>; rel="last"` } });
+        if (page === 2) return Response.json([], { status: 200, headers: { Link: `<${API}${at.pathname}?per_page=100&page=1>; rel="prev", <${API}${at.pathname}?per_page=100&page=1>; rel="first"` } });
+      }
+      return null;
+    };
+    const outcome = plain(await run.records.post(preview));
+    assert.equal(outcome.outcome, 'posted', `valid two-page Link header was refused: ${JSON.stringify(outcome)}`);
+    assert.equal(run.net.posts().length, 1);
   }
 });
 
