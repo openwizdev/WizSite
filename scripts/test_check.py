@@ -530,8 +530,8 @@ class Checks(unittest.TestCase):
                          (f'<link rel="stylesheet" href="/{css}">', f'<a href="/{css}">styles</a>'),
                          (f'<link rel="stylesheet" href="/{css}">', f'<link rel="stylesheet" href="/{css}" disabled>'),
                          (f'<link rel="stylesheet" href="/{css}">', f'<link rel="stylesheet" href="/{css}" media="print">'),
-                         (f'<script src="/{FINGERPRINTS["site.js"]}" defer>', f'<script type="text/plain" src="/{FINGERPRINTS["site.js"]}" defer>'),
-                         (f'<script src="/{FINGERPRINTS["site.js"]}" defer>', f'<script nomodule src="/{FINGERPRINTS["site.js"]}" defer>')):
+                         (f'<script src="/{FINGERPRINTS["site.js"]}" ', f'<script type="text/plain" src="/{FINGERPRINTS["site.js"]}" '),
+                         (f'<script src="/{FINGERPRINTS["site.js"]}" ', f'<script nomodule src="/{FINGERPRINTS["site.js"]}" ')):
             with self.subTest(new=new), tempfile.TemporaryDirectory() as temp:
                 root = Path(temp) / 'dist'
                 shutil.copytree(ROOT / 'dist', root)
@@ -541,6 +541,29 @@ class Checks(unittest.TestCase):
                 page.write_text(text.replace(old, new))
                 with self.assertRaises(AssertionError):
                     check_site(root)
+
+    def test_gsap_loads_after_the_page(self):
+        site, gsap = FINGERPRINTS['site.js'], FINGERPRINTS['vendor/gsap-3.15.1.min.js']
+        tag = f'<script src="/{site}" data-gsap="/{gsap}" defer></script>'
+        for page_name, new in (('index.html', f'<script src="/{gsap}" defer></script>{tag}'),
+                               ('team/index.html', f'<script src="/{site}" defer></script>'),
+                               ('drivers/index.html', f'<link rel="preload" href="/{gsap}" as="script">{tag}'),
+                               ('market/index.html', f'<script src="/{site}" data-gsap="/vendor/gsap-3.15.1.min.js" defer></script>')):
+            with self.subTest(page=page_name, new=new), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp) / 'dist'
+                shutil.copytree(ROOT / 'dist', root)
+                page = root / page_name
+                text = page.read_text()
+                self.assertIn(tag, text)
+                page.write_text(text.replace(tag, new))
+                with self.assertRaises(AssertionError):
+                    check_site(root)
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / 'dist'
+            shutil.copytree(ROOT / 'dist', root)
+            edit_built(root, 'site.js', lambda js: js.replace("addEventListener('load', loadMotion, { once: true });", 'loadMotion();'))
+            with self.assertRaises(AssertionError):
+                check_site(root)
 
     def test_headers_revalidate(self):
         cases = {

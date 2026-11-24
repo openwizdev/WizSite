@@ -81,6 +81,37 @@ DOC_HASHES = {
     'docs/evidence/speed/fonts/market-390x844.png': 'a183102af047c3fff12ad64437419255f0e3699e7545ca140d4c1b94f427b12e',
     'docs/evidence/speed/fonts/team-1280x800.png': '39341122e3a7f63eb6edc82f7be689f406fad216bf23d3e5fcff0eaa9e08cafd',
     'docs/evidence/speed/fonts/team-390x844.png': 'c1ba52e547ef48d4134271b1648bc8e67b6adf1ea6820165b90bc56e51d1267b',
+    'docs/evidence/speed/speed-gsap-after-load/after-changelog-1280x800.png': 'df00b6386ab36c2919b583345fb218a2182526ae4fea93db5bd336f853e14851',
+    'docs/evidence/speed/speed-gsap-after-load/after-changelog-390x844.png': 'a5418e5887e19336e540f579a538be4ca3a5262dbac0d0ba9a44e1c95d7c7318',
+    'docs/evidence/speed/speed-gsap-after-load/after-drivers-1280x800.png': '6737672f20f0cda9b279e8356272e44a1b003ade2b7042f2f9117589f4b79be6',
+    'docs/evidence/speed/speed-gsap-after-load/after-drivers-390x844.png': 'd674cc5a4f35f9668a35e13d3ed4f975208baa8d8455438179848817c19751a2',
+    'docs/evidence/speed/speed-gsap-after-load/after-faq-1280x800.png': '011896b855c625e370688da3cfc3660c8813d98e9c58098ce4948bb3398d5783',
+    'docs/evidence/speed/speed-gsap-after-load/after-faq-390x844.png': '78bfc111ae0b6a8620fe4d55ccb6c578a8bead6d5c5e9067a83ea91dda8f9817',
+    'docs/evidence/speed/speed-gsap-after-load/after-landing-1280x800.png': 'b94a9e5b459786ea69641b97eec3a8c96cd17d2cdb41bf17fb7ba250ba00bc3c',
+    'docs/evidence/speed/speed-gsap-after-load/after-landing-390x844.png': 'a31c02061e1665a0f7e153622a7b0ae870e3bd51daccc3092d98424db6f4c0e9',
+    'docs/evidence/speed/speed-gsap-after-load/after-landing-footer-1280x800.png': 'b998f2b0129c4a654c305a522b718f290082ac37189f9e4e8fbafb20620acdcb',
+    'docs/evidence/speed/speed-gsap-after-load/after-landing-footer-390x844.png': '8aa65f6a2504242122a3f31fc18f72a997e5a7565841c52d564990f39fdd8df8',
+    'docs/evidence/speed/speed-gsap-after-load/after-market-1280x800.png': '43e471c6622425f860e9d132d96df2331110c79182368595bf97df59ac27f06c',
+    'docs/evidence/speed/speed-gsap-after-load/after-market-390x844.png': '56d39c45cee590e6df6cf9bc729fe6166d5bb1801f8d028d669ce5534efce4a9',
+    'docs/evidence/speed/speed-gsap-after-load/after-team-1280x800.png': 'deeca3ce6b20ca9afd723d4e0a9ef8f4672740c3ef830b79fb95f7d7dae2e7d7',
+    'docs/evidence/speed/speed-gsap-after-load/after-team-390x844.png': '9ea9f03ac9bd2f344d6d10cc0296673ec18146c6226611bea79d0dff8340a5c3',
+    'docs/evidence/speed/speed-gsap-after-load/before-changelog-1280x800.png': 'df00b6386ab36c2919b583345fb218a2182526ae4fea93db5bd336f853e14851',
+    'docs/evidence/speed/speed-gsap-after-load/before-changelog-390x844.png': 'a5418e5887e19336e540f579a538be4ca3a5262dbac0d0ba9a44e1c95d7c7318',
+    'docs/evidence/speed/speed-gsap-after-load/before-drivers-1280x800.png': '6737672f20f0cda9b279e8356272e44a1b003ade2b7042f2f9117589f4b79be6',
+    'docs/evidence/speed/speed-gsap-after-load/before-drivers-390x844.png': 'd674cc5a4f35f9668a35e13d3ed4f975208baa8d8455438179848817c19751a2',
+    'docs/evidence/speed/speed-gsap-after-load/before-faq-1280x800.png': '011896b855c625e370688da3cfc3660c8813d98e9c58098ce4948bb3398d5783',
+    'docs/evidence/speed/speed-gsap-after-load/before-faq-390x844.png': '78bfc111ae0b6a8620fe4d55ccb6c578a8bead6d5c5e9067a83ea91dda8f9817',
+    'docs/evidence/speed/speed-gsap-after-load/before-landing-1280x800.png': 'b94a9e5b459786ea69641b97eec3a8c96cd17d2cdb41bf17fb7ba250ba00bc3c',
+    'docs/evidence/speed/speed-gsap-after-load/before-landing-390x844.png': 'a31c02061e1665a0f7e153622a7b0ae870e3bd51daccc3092d98424db6f4c0e9',
+    'docs/evidence/speed/speed-gsap-after-load/before-landing-footer-1280x800.png': 'b998f2b0129c4a654c305a522b718f290082ac37189f9e4e8fbafb20620acdcb',
+    'docs/evidence/speed/speed-gsap-after-load/before-landing-footer-390x844.png': '8aa65f6a2504242122a3f31fc18f72a997e5a7565841c52d564990f39fdd8df8',
+    'docs/evidence/speed/speed-gsap-after-load/before-market-1280x800.png': '43e471c6622425f860e9d132d96df2331110c79182368595bf97df59ac27f06c',
+    'docs/evidence/speed/speed-gsap-after-load/before-market-390x844.png': '56d39c45cee590e6df6cf9bc729fe6166d5bb1801f8d028d669ce5534efce4a9',
+    'docs/evidence/speed/speed-gsap-after-load/before-team-1280x800.png': 'deeca3ce6b20ca9afd723d4e0a9ef8f4672740c3ef830b79fb95f7d7dae2e7d7',
+    'docs/evidence/speed/speed-gsap-after-load/before-team-390x844.png': '9ea9f03ac9bd2f344d6d10cc0296673ec18146c6226611bea79d0dff8340a5c3',
+    'docs/evidence/speed/speed-gsap-after-load/motion-footer-wave-390.png': '5d8f76138de2f6f68e7656c0cf15544ce494fb141f9b2f2c1b6bc5ad5eaed6c7',
+    'docs/evidence/speed/speed-gsap-after-load/motion-hero-390.png': '07fc459d518ed9fe82187a32b4325779594672f208e10cabd83e9b45f151bf85',
+    'docs/evidence/speed/speed-gsap-after-load/waterfall-390.png': 'd0a02240a419ea61e38eeb59ee76b29ee2d5624ecf97e8834e49c6131d2cc2b9',
 }
 VECTORS = ('favicon.svg', 'brand/openwiz-lockup.svg', 'app/mark.svg', 'app/icon.svg', 'app/wiz-reviewer.svg')
 MARK, OLD_MARK = '#cfc6b8', '#2b2bff'
@@ -549,7 +580,7 @@ class Page(HTMLParser):
         self.report_links = 0
         self.cloudroom_links = 0
         self.install_links = {url: 0 for url in INSTALL_LINKS}
-        self.stylesheets, self.scripts = [], []
+        self.stylesheets, self.scripts, self.gsap = [], [], []
         self.feed(text)
 
     def tracks_of(self, video):
@@ -642,6 +673,9 @@ class Page(HTMLParser):
         if (tag == 'script' and attrs.get('src') and attrs.get('type', 'text/javascript') in ('text/javascript', 'module')
                 and 'nomodule' not in attrs):
             self.scripts.append(attrs['src'])
+        if tag == 'script' and 'data-gsap' in attrs:
+            self.gsap.append(attrs['data-gsap'])
+            self.refs.append(attrs['data-gsap'])
         if tag == 'link' and attrs.get('rel') == 'icon':
             self.favicons.add(attrs.get('href'))
         if tag == 'meta' and (attrs.get('property') == 'og:image' or attrs.get('name') == 'twitter:image'):
@@ -1048,8 +1082,13 @@ def check_site(root, registry=ROOT / 'market/registry.json', now=None):
         expected = [f'/{names["tokens.css"]}', f'/{names["site.css"]}'] + ([f'/{names[PAGE_STYLES[rel]]}'] if rel in PAGE_STYLES else [])
         assert page.stylesheets == expected, f'{rel} must apply exactly {expected}, got {page.stylesheets}'
         assert not Outline(path.read_text()).styles, f'{rel} must not use inline <style> blocks'
+        assert page.gsap == [f'/{names[GSAP]}'] and page.refs.count(f'/{names[GSAP]}') == 1, \
+            f'{rel} must name the pinned GSAP once, as site.js\'s data-gsap (site.js loads it after the load event), never as a <script> or preload'
+    site_js = (root / names['site.js']).read_text()
+    assert "dataset.gsap" in site_js and "addEventListener('load', loadMotion" in site_js, \
+        'site.js loads GSAP from data-gsap after the load event'
     page = pages[root / 'index.html']
-    assert page.scripts == [f'/{names[GSAP]}', f'/{names["site.js"]}', f'/{names["faq.js"]}'], 'load the pinned GSAP before site.js, then faq.js'
+    assert page.scripts == [f'/{names["site.js"]}', f'/{names["faq.js"]}'], 'the landing loads site.js, then faq.js; GSAP comes after the load event'
     assert not page.inline_scripts, 'landing motion must wait for both external scripts'
     assert len(page.videos) == 2, 'expected the launch video and one spec recording'
     check_launch((root / 'index.html').read_text(), page)
@@ -1505,7 +1544,7 @@ def check_drivers(landing, changelog, drivers, page):
     assert not re.search(r'grok bot[^.;]*\bpass', description[0], re.I), f'Grok Bot has not passed: {description[0]}'
     assert description == [DRIVER_DESCRIPTION], f'the drivers description must say {DRIVER_DESCRIPTION}: {description}'
     assert page.scripts == [s for s in Page(landing).scripts if not s.startswith('/faq.')] and not page.inline_scripts, \
-        'the drivers page loads only the site\'s footer scripts (GSAP, site.js), never its own'
+        'the drivers page loads only the site\'s footer script (site.js, which loads GSAP), never its own'
     main = re.search(r'<main\b[^>]*>[\s\S]*?</main>', drivers)
     assert main, 'the drivers page needs its main'
     main = main[0]
@@ -1869,8 +1908,8 @@ def check_team(htmls, pages):
     assert re.search(r'<a class="team-book" id="book" data-book href="[^"]*" data-count="book-call">', team), 'the first Book a call is #book, where the Questions link'
     description = re.search(r'<meta name="description" content="([^"]*)">', team)
     assert description and unescape(description[1]) == TEAM_DESCRIPTION, f'the team page description: {TEAM_DESCRIPTION}'
-    assert not re.search(r'<(?:iframe|embed|object|form|details)\b', team) and team.count('<script') == 2, \
-        'the team page adds no embed, form or script beyond GSAP and site.js, and folds nothing away'
+    assert not re.search(r'<(?:iframe|embed|object|form|details)\b', team) and team.count('<script') == 1, \
+        'the team page adds no embed, form or script beyond site.js (which loads GSAP), and folds nothing away'
     main = team.split('<main', 1)[1].split('</main>', 1)[0]
     shown = re.sub(r'\s+', ' ', unescape(re.sub(r'<[^>]*>', ' ', main)))
     assert not TEAM_NEVER.search(shown), f'a word the team page never uses: {TEAM_NEVER.search(shown)[0]}'

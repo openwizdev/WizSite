@@ -103,6 +103,8 @@ async function open(browser, origin, width, height, mode, path = '/') {
     return result.value;
   };
   await evaluate('document.fonts.ready.then(() => true)');
+  if (!mode.noScript) await evaluate(`new Promise(resolve => { const ready = () => document.querySelector('.family')?.getAttribute('role') === 'group'
+    ? resolve(true) : setTimeout(ready, 50); ready(); })`);
   const click = async (x, y) => {
     for (const type of ['mousePressed', 'mouseReleased']) {
       await send('Input.dispatchMouseEvent', { type, x, y, button: 'left', clickCount: 1 });
