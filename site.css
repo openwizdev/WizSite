@@ -119,11 +119,17 @@ code,.v{font-family:var(--ow-font-mono)}
 .nav-links::after { display: none; }
 .landing-nav [hidden] { display: none; }
 .landing-nav a, .nav-toggle { position: relative; display: inline-flex; align-items: center; min-height: 36px; white-space: nowrap; }
-.landing-brand { gap: 8px; font-size: 18px; font-weight: 650; letter-spacing: -.02em; }
-.landing-brand img { width: 44px; height: 44px; }
+.landing-brand { gap: 10px; font-size: 19px; font-weight: 650; letter-spacing: -.035em; }
+.landing-brand img {
+  flex: none;
+  width: 27px;
+  height: 36px;
+  object-fit: cover;
+  object-position: 48% center;
+}
 .nav-links { display: flex; margin-inline: auto clamp(0px, 12vw - 105px, 66px); gap: clamp(12px, 6vw - 42px, 38px); color: var(--grey2); font-weight: 450; }
 .nav-links a:hover, .nav-links [aria-current] { color: var(--ink); }
-.landing-nav [aria-current]::after {
+:where(.nav-links a, .nav-team)[aria-current="page"]::after {
   content: "";
   position: absolute;
   inset: auto 0 0;
@@ -131,7 +137,6 @@ code,.v{font-family:var(--ow-font-mono)}
   background: var(--nav-engraving);
   pointer-events: none;
 }
-.landing-brand[aria-current]::after { inset-inline-start: 52px; bottom: 4px; }
 .github-star { gap: 6px; padding-inline: 12px; border: 1px solid var(--nav-edge); border-radius: 999px; }
 .github-mark { margin-inline-end: 5px; }
 .github-star [data-stars]:not([hidden]) { display: inline-flex; }
@@ -165,9 +170,8 @@ code,.v{font-family:var(--ow-font-mono)}
   }
   .nav-row { flex-wrap: wrap; gap: 0 5px; }
   .landing-nav a, .nav-toggle { min-height: 40px; }
-  .landing-brand { gap: 3px; margin-inline-end: auto; font-size: 14px; }
-  .landing-brand img { width: 34px; height: 40px; object-fit: cover; }
-  .landing-brand[aria-current]::after { inset-inline-start: 37px; }
+  .landing-brand { margin-inline-end: auto; font-size: 17px; }
+  .landing-brand img { width: 24px; height: 32px; }
   .github-star { gap: 4px; padding-inline: 6px; font-size: 12px; }
   .github-mark, .star-icon { width: 14px; height: 14px; }
   .github-mark { margin-inline-end: 0; }
@@ -227,9 +231,8 @@ code,.v{font-family:var(--ow-font-mono)}
   .nav-row:has(.nav-toggle:not([hidden])) .nav-links::after { display: block; position: sticky; bottom: 0; margin-top: 10px; }
   html:has(.nav-toggle[aria-expanded="true"]) { overflow: hidden; scrollbar-gutter: stable; }
 }
-@media (max-width: 382px) {
+@media (max-width: 388px) {
   .landing-brand span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
-  .landing-brand[aria-current]::after { inset-inline-start: 0; bottom: 0; }
 }
 .product-hero { display: grid; grid-template-columns: minmax(0, .86fr) minmax(0, 1.25fr); gap: clamp(22px, 4vw, 60px); align-items: center; padding-block: clamp(40px, 6vw, 84px) 32px; }
 .hero-copy h1 { max-width: 8ch; font-size: clamp(52px, 6vw, 96px); font-weight: 760; line-height: .98; letter-spacing: -.06em; }
