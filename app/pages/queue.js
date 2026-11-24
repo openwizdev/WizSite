@@ -251,7 +251,7 @@
   function view() {
     const result = state.result;
     if (!result || state.failedSince === null) return result;
-    return { ...result, gaps: [...new Set([...result.gaps, 'the latest spec read'])],
+    return { ...result,
       items: result.items.map(item => (item.type === 'decision' && item.current === true ? { ...item, current: null, checked_at: null } : item)) };
   }
   function holder(item, result) {
@@ -276,19 +276,29 @@
 
   function draw(el) {
     const { deck } = state;
-    const result = view();
+    const { allClear, buildingSection, pager } = OW.v2 ?? {};
+    const unknown = deck.specs.state === 'unknown';
+    const stale = state.failedSince !== null;
+    const result = unknown ? null : view();
     const items = result ? result.items.filter(shown) : [];
     const keys = new Set(items.map(item => item.key));
     for (const key of state.cards.keys()) if (!keys.has(key)) state.cards.delete(key);
     const gaps = result?.gaps || [];
-    const message = !result ? 'Reading GitHub…' : gaps.length
-      ? `This list may be missing items: GitHub gave only part of ${gaps.join(', ')}. The app tries again on its own.`
+    const pause = OW.data.paused() ? `GitHub’s rate limit paused reads until ${time(OW.data.limit.pausedUntil)}.` : '';
+    const gap = gaps.length ? `This list may be missing items: GitHub gave only part of ${gaps.join(', ')}.` : '';
+    const message = unknown ? "Feed couldn't be read from GitHub. The app tries again on its own."
+      : stale ? `Couldn't read Specs from GitHub. Showing the last successful read.${gap ? ` ${gap}` : ''}`
+      : !result ? 'Reading GitHub…'
+      : gap ? `${gap} The app tries again on its own.`
       : items.length ? '' : `${EMPTY}.`;
-    if (deck.message !== message) {
+    if (deck.message !== message || deck.pause !== pause) {
       deck.message = message;
-      const notice = message && (gaps.length ? OW.ui.unknown(message) : result
-        ? OW.v2.allClear(message) : OW.ui.placeholder(message));
-      deck.status.replaceChildren(...(notice ? [notice] : []));
+      deck.pause = pause;
+      const notice = !message ? null
+        : unknown || stale || gap ? OW.ui.unknown(message)
+        : result ? (allClear?.(message) ?? OW.ui.placeholder(message))
+        : OW.ui.placeholder(message);
+      deck.status.replaceChildren(...[pause ? h('p', { class: 'v2-pause-note' }, pause) : null, notice].filter(Boolean));
     }
 
     if (!deck.activeKey) {
@@ -306,7 +316,7 @@
         const progress = result?.progress?.get(item.key);
         return progress && item.key !== deck.activeKey ? [{ title: item.title, href: item.url, ...progress }] : [];
       }).slice(0, 3);
-      const building = OW.v2.buildingSection(projects);
+      const building = buildingSection?.(projects);
       deck.building.replaceChildren(...(building ? [building] : []));
     }
     const position = `${index}/${items.length}`;
@@ -315,7 +325,7 @@
         deck.activeKey = deck.keys[next];
         updateDeck(el);
       };
-      const controls = OW.v2?.pager(index, items.length, go);
+      const controls = pager?.(index, items.length, go);
       deck.controls?.replaceChildren(...(controls ? [controls] : []));
       deck.position = position;
     }
@@ -353,6 +363,7 @@
         state.deck.activeKey = null;
       }
       state.el = el;
+      state.deck.specs = feeds.specs;
       refresh(feeds);
       updateDeck(el);
     },

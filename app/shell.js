@@ -313,6 +313,7 @@
   function updateBadges() {
     if (!built) return;
     const page = current();
+    if (built.isV2 && built.refresh) built.refresh.disabled = data.paused();
     for (const { page: p, link, badge } of [...built.side, ...built.tabs]) {
       if (p.id === page.id) link.setAttribute('aria-current', 'page');
       else link.removeAttribute('aria-current');
@@ -335,6 +336,7 @@
       built.view.scrollTop = 0;
     }
     const mine = page.feeds.map(name => feeds[name]);
+    const liveFeed = built.isV2 && !demo && page.id === 'feed';
     if (!built.isV2) {
       built.reads.replaceChildren(...freshnessNodes());
       for (const button of built.refresh) button.disabled = data.paused();
@@ -343,13 +345,12 @@
       built.phoneReads.replaceChildren(...mine.flatMap((feed, i) => [i ? ' · ' : '', ...readLine(feed)]).filter(part => part !== null && part !== ''));
     } else if (built.refresh) {
       built.refresh.hidden = page.id !== 'feed';
-      built.refresh.disabled = data.paused();
     }
     const notes = [];
     if (!v2 && data.paused()) {
       notes.push(notice('slow', 'pause', 'GitHub\'s limit is low', `(${limit.remaining ?? 0} left). Reads are paused until ${time(limit.pausedUntil)}, then resume on their own.`));
     }
-    if (!demo) {
+    if (!demo && !liveFeed) {
       for (const feed of mine) {
         if (feed.state === 'unknown') notes.push(notice('bad', 'warn', `Couldn't read ${feed.label} from GitHub`, `at ${time(feed.failedAt)}. It shows as unknown, not as empty, until a read works.`));
         if (feed.state === 'stale') notes.push(notice('bad', 'warn', `Couldn't read ${feed.label} at ${time(feed.failedAt)}.`, `Showing the read from ${time(feed.readAt)}.`));
@@ -357,9 +358,9 @@
       }
     }
     built.notices.replaceChildren(...notes);
-    if (!demo && mine.length && mine.every(feed => feed.state === 'unknown')) {
+    if (!demo && !liveFeed && mine.length && mine.every(feed => feed.state === 'unknown')) {
       built.body.replaceChildren(OW.ui.unknown(`${page.title} couldn't be read from GitHub. The app tries again on its own, or press Refresh now.`));
-    } else if (!demo && mine.length && mine.some(feed => feed.state === 'loading') && !mine.some(feed => feed.data)) {
+    } else if (!demo && !liveFeed && mine.length && mine.some(feed => feed.state === 'loading') && !mine.some(feed => feed.data)) {
       built.body.replaceChildren(OW.ui.placeholder('Reading GitHub…'));
     } else {
       page.render(built.body, feeds, route().arg, built.pager);

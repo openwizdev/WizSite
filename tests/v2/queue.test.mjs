@@ -123,6 +123,8 @@ test('switch on without card modules: plain cards link to GitHub, in the same or
       ['https://github.com/acme/factory/pull/7#issuecomment-9100003', '_blank'], ['https://github.com/acme/factory/pull/7#issuecomment-9100005', '_blank'],
       ['https://github.com/acme/factory/issues/61', '_blank'], ['https://github.com/acme/factory/issues/60', '_blank']]);
     assert.match(await run.page.text(), /Spec to confirm · #60/i);
+    const progress = await run.page.run(`[...document.querySelectorAll('.v2-building progress')].map(bar => [bar.value, bar.max])`);
+    assert.deepEqual(progress, [[0, 2], [1, 3]]);
     const visible = () => run.page.run(`[...document.querySelectorAll('.queue-item:not([hidden])')].map(e => e.dataset.key)`);
     assert.deepEqual(await visible(), [SPEC_DECISION]);
     await run.page.tap('Next card');
@@ -217,7 +219,12 @@ test('v2 Settings stays available after a failed Specs read and the palette offe
     run.world.graphql.Specs = async () => ({ status: 502, json: { message: 'Bad Gateway' } });
     await openQueue(run, 'dry-run');
     await run.page.until(`document.body.innerText.includes("Feed couldn't be read from GitHub")`, 'the unknown Feed');
+    assert.equal(await run.page.run(`document.querySelectorAll('.v2-notices .notice, .v2-queue-status .unknown').length`), 1);
+    run.world.graphql.Specs = async () => ({ status: 429, headers: { 'Retry-After': '600' }, json: { message: 'Rate limited' } });
     await run.page.tap('Refresh now');
+    await run.page.until(`document.querySelector('.v2-pause-note')?.textContent.includes('paused reads until')`, 'one rate-limit note in Feed');
+    assert.equal(await run.page.run(`document.querySelectorAll('.v2-pause-note').length`), 1);
+    assert.equal(await run.page.run(`document.querySelector('.v2-refresh').disabled`), true);
     await run.page.click('Settings');
     await run.page.until(`document.querySelector('.v2-settings .v2-sign-out')`, 'settings after the read failed');
     assert.match(await run.page.text(), /Where it runs\s+Coming soon/);
@@ -321,7 +328,9 @@ test('R2: a failed Specs refresh clears every earlier true and shows the gap', a
     for (const key of [SPEC_DECISION, ROUND]) current[key] = (await latestOf(run, key)).current;
     assert.deepEqual(current, { [SPEC_DECISION]: null, [ROUND]: null }, 'a failed refresh kept an earlier true');
     assert.ok(shown.includes(SPEC_DECISION) && shown.includes(ROUND), 'the cards from the last good read went away');
-    assert.match(await run.page.text(), /GitHub gave only part of the latest spec read/);
+    const text = await run.page.text();
+    assert.match(text, /Couldn't read Specs from GitHub\. Showing the last successful read\./);
+    assert.equal((text.match(/Couldn't read Specs/g) || []).length, 1, 'the Specs failure appears once');
   } finally {
     await run.close();
   }

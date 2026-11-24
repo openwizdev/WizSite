@@ -13,8 +13,8 @@ html[data-v2='1'] {
   --v2-content: 840px;
   --v2-gutter: 32px;
   --v2-label: 500 12px/1.4 var(--em-mono);
-  --v2-dots: radial-gradient(circle, #83b5ee54 .65px, transparent .95px) 0 0 / 4px 4px,
-    radial-gradient(circle, #0816277a .65px, transparent .95px) 2px 2px / 4px 4px;
+  --v2-dots: radial-gradient(circle, #83b5ee45 .55px, transparent .9px) 0 0 / 3px 3px,
+    repeating-linear-gradient(135deg, #08162733 0 1px, transparent 1px 4px);
   --v2-active: radial-gradient(circle, #9bbded23 .6px, transparent .9px) 0 0 / 4px 4px #1b2a40;
 }
 html[data-v2='1'] body { font-size: 16px; line-height: 1.5; }
@@ -130,7 +130,7 @@ nav.v2-nav { flex: 1; gap: 4px; }
   padding: 32px 0 16px;
 }
 .v2-head h1, .v2-welcome h1 {
-  font-size: 48px;
+  font-size: 40px;
   font-weight: 620;
   line-height: 1.02;
   letter-spacing: -.055em;
@@ -260,11 +260,12 @@ nav.v2-nav { flex: 1; gap: 4px; }
   inset: 0;
   display: grid;
   place-items: center;
-  background: repeating-linear-gradient(176deg, transparent 0 4px, #6089ae28 5px, transparent 6px) bottom / 100% 45% no-repeat,
-    linear-gradient(#142536ba, #13263db0), url('/art/moments-sea.webp') center 68% / cover;
+  background: repeating-linear-gradient(177deg, transparent 0 4px, #6f9fc120 5px, transparent 6px) bottom / 100% 40% no-repeat,
+    linear-gradient(#0d1a29cc, #203c577a), url('/art/moments-sea.webp') center 68% / cover #1b3d62;
+  background-blend-mode: normal, normal, luminosity;
 }
 .v2-envelope {
-  width: min(58%, 256px);
+  width: min(68%, 288px);
   color: #90b6de;
   transform: translateY(-16px) rotate(-6deg);
 }
@@ -314,7 +315,7 @@ nav.v2-nav { flex: 1; gap: 4px; }
   border-bottom: 1px solid var(--em-line);
 }
 .v2-next-preview:hover { color: var(--em-text); text-decoration: none; border-color: var(--em-muted); }
-.v2-next-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v2-next-title { overflow-wrap: anywhere; }
 .v2-next-task { color: var(--em-muted); font-size: 13px; }
 .v2-next-preview .ic { width: 16px; height: 16px; }
 .v2-feed-clear { padding-top: clamp(48px, 10vh, 96px); }
@@ -324,6 +325,8 @@ nav.v2-nav { flex: 1; gap: 4px; }
 .v2-clear-card p, .v2-chat-empty p { margin: 8px 0 0; color: var(--em-text-2); }
 .v2-chat-empty p { margin-bottom: 16px; }
 .v2-building { width: min(100%, 464px); margin: 24px auto 0; border-top: 1px solid var(--em-line); padding-top: 16px; }
+.v2-next-preview + .v2-building { width: 100%; margin-top: 0; border-top: 0; }
+.v2-spec-card + :last-child.v2-building { width: 100%; }
 .v2-live-feed .v2-building { margin-inline: 0; }
 .v2-building h2 { margin: 0 0 12px; font: var(--v2-label); color: var(--em-muted); text-transform: uppercase; letter-spacing: .08em; }
 .v2-building ul { display: grid; gap: 16px; margin: 0; padding: 0; list-style: none; }
@@ -344,12 +347,17 @@ nav.v2-nav { flex: 1; gap: 4px; }
 .v2-building progress::-webkit-progress-bar { border-radius: 4px; background: #383e46; }
 .v2-building progress::-webkit-progress-value { border-radius: 4px; background: #7998b8; }
 .v2-building progress::-moz-progress-bar { border-radius: 4px; background: #7998b8; }
+@media (761px <= width < 1040px) {
+  .v2-card-actions { grid-template-columns: minmax(0, 1fr) auto; }
+  .v2-card-actions .primary { grid-column: 1 / -1; }
+}
 @media (min-width: 761px) {
   .v2-decision-card { margin-top: clamp(16px, calc(100dvh - 730px), 112px); }
-  .v2-feed-decision .v2-next-preview { display: none; }
+  .v2-feed-decision :is(.v2-next-preview, .v2-building) { display: none; }
 }
 .v2-live-feed .queue-item[hidden], .v2-queue-status:empty { display: none; }
 .v2-queue-status { margin-bottom: 12px; }
+.v2-pause-note { margin: 0 0 12px; color: var(--em-muted); font-size: 14px; }
 .v2-live-card.card {
   padding: 24px;
   border: 1px solid var(--em-line);
@@ -370,16 +378,16 @@ nav.v2-nav { flex: 1; gap: 4px; }
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   align-items: start;
   gap: 8px;
-  min-height: 48px;
+  min-height: 56px;
   border-bottom: 1px solid var(--em-line);
 }
-.v2-set-row > span { align-self: start; padding: 12px 0; }
+.v2-set-row > span { align-self: start; padding: 16px 0; }
 .v2-set-row > :nth-child(2) { justify-self: end; min-width: 0; max-width: 100%; text-align: end; }
 .v2-set-control { position: relative; display: flex; align-items: center; }
 .v2-set-control .ic { position: absolute; right: 0; pointer-events: none; width: 16px; height: 16px; color: var(--em-muted); }
 .v2-set-control select, .v2-set-control button {
   width: 100%;
-  min-height: 48px;
+  min-height: 56px;
   padding: 0 20px 0 8px;
   border: 0;
   background: transparent;
@@ -395,7 +403,7 @@ nav.v2-nav { flex: 1; gap: 4px; }
 .v2-set-row > .repo-switch { display: contents; }
 .v2-set-row > .repo-switch .repo { grid-column: 2; grid-row: 1; }
 .v2-set-row > .repo-switch .repo-list { grid-column: 1 / -1; text-align: start; }
-.v2-settings .repo { background: none; border: 0; border-radius: 4px; padding-inline: 8px 0; gap: 4px; }
+.v2-settings .repo { background: none; border: 0; border-radius: 4px; padding-inline: 8px 0; gap: 4px; min-height: 56px; }
 .v2-settings .repo .ic:first-child { display: none; }
 .v2-settings .repo .name { text-align: end; }
 .v2-settings .repo-list { margin: 4px 0 8px; }
@@ -411,8 +419,16 @@ nav.v2-nav { flex: 1; gap: 4px; }
   min-height: 100dvh;
   max-width: none;
   padding: 32px clamp(24px, 6vw, 88px);
-  background: url('/art/drivers-d-ship.webp') 8% center / min(43vw, 640px) auto no-repeat,
-    linear-gradient(#11161d52, #11161d8c), url('/art/moments-sea.webp') center / cover;
+  position: relative;
+  isolation: isolate;
+}
+.v2-welcome::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background: linear-gradient(90deg, #15171ac7, transparent 68%), url('/art/drivers-c-boat.webp') center / cover;
+  transform: scaleX(-1);
 }
 .v2-welcome-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 24px; }
 .v2-welcome-card {
@@ -423,8 +439,7 @@ nav.v2-nav { flex: 1; gap: 4px; }
   background: var(--em-bg);
   box-shadow: 0 20px 72px #090c1270;
 }
-.v2-welcome h1 { font-size: clamp(40px, 4vw, 56px); text-wrap: balance; }
-.v2-welcome-copy { margin: 16px 0 24px; max-width: 40ch; color: var(--em-text-2); }
+.v2-welcome h1 { margin-bottom: 24px; font-size: clamp(40px, 4vw, 56px); text-wrap: balance; }
 .v2-welcome .notice { margin-bottom: 16px; }
 .v2-welcome .v2-btn { min-height: 48px; }
 .v2-welcome .v2-welcome-sample { display: flex; width: fit-content; padding-inline: 0; margin-top: 8px; text-decoration: underline; text-underline-offset: 4px; }
@@ -521,18 +536,18 @@ nav.v2-nav { flex: 1; gap: 4px; }
   .v2-grill-head { margin-bottom: 8px; }
   .v2-grill-q + .v2-grill-q { margin-top: 8px; }
   .v2-grill-q p { margin-bottom: 4px; font-size: 15px; }
-  .v2-q-pill { font-size: 14px; }
+  .v2-q-pill { font-size: 14px; gap: 4px; padding-inline: 6px; }
   .v2-grill-foot { margin-top: 12px; }
   .v2-composer-wrap { padding: 8px 0; }
 
   .v2-feed-stage, .v2-live-feed { padding: 12px 0 16px; }
   .v2-hero-card { padding: 16px; gap: 16px; border-radius: 12px; }
   .v2-decision-card { gap: 20px; }
-  .v2-card-title { font-size: 36px; }
+  .v2-card-title { font-size: 38px; max-width: 12ch; }
   .v2-card-goal, .v2-recommendation { font-size: 16px; }
   .v2-preview { min-height: 192px; }
   .v2-envelope { transform: translateY(-8px) rotate(-6deg); }
-  .v2-next-preview { min-height: 52px; margin-top: 8px; }
+  .v2-next-preview { min-height: 52px; margin-top: 8px; gap: 8px; }
   .v2-feed-clear { padding-top: 48px; }
   .v2-building { margin-top: 16px; }
   .v2-card-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -547,8 +562,10 @@ nav.v2-nav { flex: 1; gap: 4px; }
     padding: calc(32px + env(safe-area-inset-top)) 16px calc(40px + env(safe-area-inset-bottom));
     align-items: end;
     justify-items: center;
-    background: url('/art/drivers-d-ship.webp') center 19% / min(82vw, 392px) auto no-repeat,
-      linear-gradient(#11161d38, #11161d80), url('/art/moments-sea.webp') 48% center / cover;
+  }
+  .v2-welcome::before {
+    background: linear-gradient(0deg, #101316bd, transparent 66%), url('/art/drivers-c-boat.webp') 70% center / cover;
+    transform: none;
   }
   .v2-welcome-head { margin-bottom: 16px; }
   .v2-welcome-card { padding: 24px; }

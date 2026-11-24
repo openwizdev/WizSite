@@ -10,26 +10,23 @@
       draft: '',
       messages: [
         {
-          id: 'm1',
           role: 'user',
           time: '9:12 AM',
           text: 'Add usage-based seat billing. Keep upgrades simple for small teams.',
         },
         {
-          id: 'm2',
           role: 'wiz',
           time: '9:12 AM',
           text: 'Three quick choices before I draft the spec.',
         },
         {
-          id: 'g1',
           role: 'grill',
           specTitle: 'Usage-based seat billing',
           answered: false,
           questions: [
-            { id: 'Q1', prompt: 'When should we charge for new seats?', rec: 0, selected: 0, options: ['At month end', 'Right away'] },
-            { id: 'Q2', prompt: 'Should read-only viewers pay?', rec: 0, selected: 0, options: ['Keep viewers free', 'Count all members'] },
-            { id: 'Q3', prompt: 'How long before a failed renewal locks edits?', rec: 0, selected: 0, options: ['7 days', '48 hours'] },
+            { prompt: 'When should we charge for new seats?', rec: 0, selected: 0, options: ['At month end', 'Right away'] },
+            { prompt: 'Should read-only viewers pay?', rec: 0, selected: 0, options: ['Keep viewers free', 'Count all members'] },
+            { prompt: 'How long before a failed renewal locks edits?', rec: 0, selected: 0, options: ['7 days', '48 hours'] },
           ],
         },
       ],
@@ -79,32 +76,50 @@
     };
   }
 
-  let demo = initialDemoState();
+  const demo = initialDemoState();
+  if (isDemo && location.hash === '#/feed/clear') demo.cards = [];
   let redraw = () => {};
-  let toastTimer = null;
+  let toastTimer;
   let toastEl;
+  let toastStatus;
+  let dismissToast;
   let chatView;
+
+  function scheduleToast() {
+    clearTimeout(toastTimer);
+    if (!toastEl.hidden && !toastEl.matches(':hover, :focus-within')) {
+      toastTimer = setTimeout(dismissToast, 4500);
+    }
+  }
 
   function showToast(text, undo = null) {
     const returnTo = document.activeElement;
     if (!toastEl) {
-      toastEl = h('div', { class: 'v2-toast', role: 'status' });
-      document.body.append(toastEl);
+      toastEl = h('div', { class: 'v2-toast', hidden: true,
+        onpointerenter: () => clearTimeout(toastTimer),
+        onpointerleave: () => queueMicrotask(scheduleToast),
+        onfocusin: () => clearTimeout(toastTimer),
+        onfocusout: () => queueMicrotask(scheduleToast),
+      });
+      toastStatus = h('span', { class: 'visually-hidden', role: 'status' });
+      document.body.append(toastEl, toastStatus);
     }
-    const dismiss = () => {
+    dismissToast = () => {
+      clearTimeout(toastTimer);
+      const hadFocus = toastEl.contains(document.activeElement);
       toastEl.hidden = true;
-      if (toastEl.contains(document.activeElement)) {
+      if (hadFocus) {
         (returnTo?.isConnected && returnTo !== document.body ? returnTo : document.querySelector('.v2-head h1'))?.focus();
       }
     };
-    toastEl.replaceChildren(h('span', {}, text), undo ? h('button', {
+    toastEl.replaceChildren(h('span', { 'aria-hidden': 'true' }, text), undo ? h('button', {
       type: 'button',
       class: 'v2-btn subtle',
-      onclick: () => { dismiss(); undo(); },
+      onclick: () => { dismissToast(); undo(); },
     }, 'Undo') : null);
     toastEl.hidden = false;
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(dismiss, 4500);
+    toastStatus.textContent = text;
+    scheduleToast();
   }
 
   function openSheet(card, opener, onSend) {
@@ -148,9 +163,8 @@
     if (grill.answered) return;
     grill.answered = true;
     const summary = grill.questions.map(q => q.options[q.selected]).join(' · ');
-    demo.messages.push({ id: `u-${Date.now()}`, role: 'user', time: 'Just now', text: summary });
+    demo.messages.push({ role: 'user', time: 'Just now', text: summary });
     demo.messages.push({
-      id: `w-${Date.now() + 1}`,
       role: 'wiz',
       time: 'Just now',
       text: `“${grill.specTitle}” is now in Feed.`,
@@ -165,46 +179,62 @@
     const clean = text.trim();
     if (!clean) return;
     const shortTitle = clean.length > 42 ? `${clean.slice(0, 42).replace(/\s+\S*$/, '')}…` : clean;
-    demo.messages.push({ id: `u-${Date.now()}`, role: 'user', time: 'Just now', text: clean });
+    demo.messages.push({ role: 'user', time: 'Just now', text: clean });
     demo.messages.push({
-      id: `g-${Date.now() + 1}`,
       role: 'grill',
       specTitle: shortTitle,
       answered: false,
       questions: [
-        { id: 'Q1', prompt: 'Ship to everyone at once, or roll out to active workspaces first?', rec: 0, selected: 0, options: ['Active workspaces first', 'Everyone at once'] },
-        { id: 'Q2', prompt: 'Include an opt-out toggle in workspace settings?', rec: 0, selected: 0, options: ['Yes, one-click toggle', 'Always on'] },
-        { id: 'Q3', prompt: 'Should Wiz record a short walkthrough video for the Feed?', rec: 0, selected: 0, options: ['Yes, 10s walkthrough', 'Skip video'] },
+        { prompt: 'Ship to everyone at once, or roll out to active workspaces first?', rec: 0, selected: 0, options: ['Active workspaces first', 'Everyone at once'] },
+        { prompt: 'Include an opt-out toggle in workspace settings?', rec: 0, selected: 0, options: ['Yes, one-click toggle', 'Always on'] },
+        { prompt: 'Should Wiz record a short walkthrough video for the Feed?', rec: 0, selected: 0, options: ['Yes, 10s walkthrough', 'Skip video'] },
       ],
     });
     redraw();
   }
 
   function renderQuestions(message) {
-    const allRecommended = message.questions.every(q => q.selected === q.rec);
+    const description = h('p');
+    const saved = h('a', { class: 'v2-btn subtle', href: '#/feed' }, icon('check'), 'Answers saved · Open Feed');
+    const submit = h('button', { type: 'button', class: 'v2-btn primary', onclick: () => {
+      const hadFocus = document.activeElement === submit;
+      submit.replaceWith(saved);
+      groups.forEach(group => group.querySelectorAll('button').forEach(button => { button.disabled = true; }));
+      completeGrill(message);
+      if (hadFocus) saved.focus({ preventScroll: true });
+    } });
+    const updateSummary = () => {
+      const allRecommended = message.questions.every(q => q.selected === q.rec);
+      const hint = allRecommended ? 'Recommended answers selected' : 'Review your selected answers';
+      const action = allRecommended ? 'Accept all 3' : 'Send 3 answers';
+      if (description.textContent !== hint) description.textContent = hint;
+      if (submit.textContent !== action) submit.textContent = action;
+    };
+    const groups = message.questions.map(q => {
+      const choices = q.options.map((option, i) => h('button', {
+        type: 'button', class: 'v2-q-pill', disabled: message.answered,
+        'aria-pressed': String(i === q.selected),
+        'aria-label': i === q.rec ? `${option} (recommended)` : option,
+        onclick: () => {
+          if (i === q.selected) return;
+          choices[q.selected].setAttribute('aria-pressed', 'false');
+          choices[i].setAttribute('aria-pressed', 'true');
+          q.selected = i;
+          updateSummary();
+        },
+      }, i === q.rec ? icon('check') : null, option));
+      return h('div', { class: 'v2-grill-q' }, h('p', {}, q.prompt),
+        h('div', { class: 'v2-q-opts', role: 'group', 'aria-label': q.prompt }, choices));
+    });
+    updateSummary();
     return h('article', { class: 'v2-grill', 'aria-label': message.specTitle },
-      h('div', { class: 'v2-grill-head' }, h('h2', {}, message.specTitle),
-        h('p', {}, allRecommended ? 'Recommended answers selected' : 'Review your selected answers')),
-      message.questions.map(q => h('div', { class: 'v2-grill-q' },
-        h('p', {}, q.prompt),
-        h('div', { class: 'v2-q-opts', role: 'group', 'aria-label': q.prompt }, q.options.map((option, i) => h('button', {
-          type: 'button',
-          class: 'v2-q-pill',
-          'aria-pressed': i === q.selected ? 'true' : 'false',
-          'aria-label': i === q.rec ? `${option} (recommended)` : option,
-          'data-focus': `answer:${message.id}:${q.id}:${i}`,
-          disabled: message.answered,
-          onclick: () => { q.selected = i; redraw(); },
-        }, i === q.rec ? icon('check') : null, option))))),
-      h('div', { class: 'v2-grill-foot' }, message.answered
-        ? h('a', { class: 'v2-btn subtle', href: '#/feed', 'data-focus': `send:${message.id}` }, icon('check'), 'Answers saved · Open Feed')
-        : h('button', { type: 'button', class: 'v2-btn primary', 'data-focus': `send:${message.id}`,
-          onclick: () => completeGrill(message) }, allRecommended ? 'Accept all 3' : 'Send 3 answers')));
+      h('div', { class: 'v2-grill-head' }, h('h2', {}, message.specTitle), description),
+      groups, h('div', { class: 'v2-grill-foot' }, message.answered ? saved : submit));
   }
 
   function renderDemoChat(el) {
     if (!chatView || !el.contains(chatView.scroll)) {
-      const scroll = h('div', { class: 'v2-chat-scroll', role: 'log', 'aria-live': 'polite' });
+      const scroll = h('div', { class: 'v2-chat-scroll', role: 'log', 'aria-live': 'polite', 'aria-relevant': 'additions' });
       const thread = h('div', { class: 'v2-chat-thread' });
       scroll.append(thread);
       const input = h('input', {
@@ -227,8 +257,9 @@
       chatView = { scroll, thread, length: 0 };
     }
     const { scroll, thread, length } = chatView;
+    if (length === demo.messages.length) return;
     const top = scroll.scrollTop;
-    thread.replaceChildren(...demo.messages.map(message => {
+    thread.append(...demo.messages.slice(length).map(message => {
       if (message.role === 'grill') return h('div', { class: 'v2-msg questions' }, renderQuestions(message));
       const fromWiz = message.role === 'wiz';
       return h('div', { class: `v2-msg ${fromWiz ? 'wiz' : 'user'}` },
@@ -259,7 +290,7 @@
       h('div', { class: 'v2-composer-wrap' }, h('div', { class: 'v2-composer' }, input, send))));
   }
 
-  function visibleDemoCards() {
+  function pendingDemoCards() {
     return demo.cards.filter(card => card.status === 'ready' || card.status === 'pending');
   }
 
@@ -301,14 +332,19 @@
       h('h2', { id: 'v2-building-title' }, 'Building'),
       h('ul', {}, items.map(({ title, merged, total, href }) => h('li', {},
         h('div', { class: 'v2-building-row' },
-          href ? h('a', { href, target: '_blank', rel: 'noreferrer' }, title) : h('span', {}, title),
+          href ? h('a', { href, target: '_blank', rel: 'noreferrer', 'data-focus': `building:${href}` }, title) : h('span', {}, title),
           h('span', { class: 'v2-building-count' }, `${merged} of ${total}`)),
         h('progress', { value: merged, max: total, 'aria-label': `Tickets complete for ${title}` })))));
   }
 
-  function nextPreview(card) {
+  function nextPreview(card, go) {
     if (!card) return null;
-    return h('a', { class: 'v2-next-preview', href: cardHref(card), 'data-focus': 'next-preview' },
+    const href = cardHref(card);
+    return h('a', { class: 'v2-next-preview', href, onclick: event => {
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      event.preventDefault();
+      go(href);
+    } },
       h('span', { class: 'v2-label' }, 'Next'),
       h('span', { class: 'v2-next-title' }, card.title),
       h('span', { class: 'v2-next-task' }, card.type === 'decision' ? 'Decision' : 'Review'),
@@ -321,7 +357,9 @@
       h('path', { d: 'M36 28h168v94H36Z', fill: '#162b41', 'stroke-width': '1.5' }),
       h('path', { d: 'm37 121 66-52m100 52-66-52M36 29l68 52a26 26 0 0 0 32 0l68-52', 'stroke-width': '1.5' }),
       h('path', { d: 'M41 35v79m158-79v79M44 32h150M44 118h152m-154-6 56-43m100 43-56-43M46 41l60 45a23 23 0 0 0 28 0l60-45',
-        opacity: '.55', 'stroke-dasharray': '1 2' }),
+        opacity: '.68', 'stroke-dasharray': '1 2' }),
+      h('path', { d: 'M45 106h19m-18-4h24m-24-4h29m-29-4h35m-34-4h39m-40-4h45m52 0h55m-49 4h49m-43 4h43m-38 4h38m-32 4h32m-27 4h27',
+        opacity: '.48', 'stroke-dasharray': '.6 2' }),
       h('circle', { cx: 120, cy: 76, r: 15, fill: '#223f5d', 'stroke-width': '1.5' }),
       h('circle', { cx: 120, cy: 76, r: 11, opacity: '.65', 'stroke-dasharray': '1 2' }),
       h('path', { d: 'M115 77q3-4 6 0t6 0m-12 4q3-4 6 0t6 0' }));
@@ -337,7 +375,7 @@
   }
 
   function renderDemoFeed(el, arg, controls) {
-    const list = visibleDemoCards();
+    const list = pendingDemoCards();
     if (arg === 'clear' || !list.length) {
       controls.replaceChildren();
       el.replaceChildren(h('div', { class: 'v2-feed-stage v2-feed-clear' },
@@ -355,16 +393,17 @@
       el.closest('.v2-view').scrollTop = 0;
       redraw();
     };
+    const focusCard = () => el.querySelector('.v2-hero-card h2, .v2-clear-card h2')?.focus({ preventScroll: true });
     const resolve = (status, label, revision) => {
       const previous = card.status;
       card.status = status;
       if (revision) demo.building.unshift(revision);
       go(cardHref(next || list[index - 1]));
-      el.querySelector('.v2-hero-card h2, .v2-clear-card h2')?.focus({ preventScroll: true });
+      focusCard();
       showToast(label, status === 'changing' ? null : () => {
         card.status = previous;
         go(cardHref(card));
-        el.querySelector('.v2-hero-card h2')?.focus({ preventScroll: true });
+        focusCard();
       });
     };
     const details = decision
@@ -391,7 +430,7 @@
     const navigation = pager(index, list.length, i => go(cardHref(list[i])));
     controls.replaceChildren(...(navigation ? [navigation] : []));
     el.replaceChildren(h('div', { class: `v2-feed-stage${decision ? ' v2-feed-decision' : ''}` },
-      hero, nextPreview(next), decision ? null : buildingSection(demo.building)));
+      hero, nextPreview(next, href => { go(href); focusCard(); }), buildingSection(demo.building)));
   }
 
   const settingRow = (label, value) => h('div', { class: 'v2-set-row' }, h('span', {}, label), value);
@@ -428,10 +467,7 @@
       settingsGroup('Connections', [connection('GitHub', 'github'), connection('Notifications', 'notifications')]),
       settingsGroup('Account', [
         choose('Repository', 'repository', ['Harbor · main', 'Harbor · staging']),
-        h('a', { class: 'v2-btn subtle v2-sign-out', href: '#/welcome', onclick: () => {
-          demo = initialDemoState();
-          if (toastEl) toastEl.hidden = true;
-        } }, 'Sign out'),
+        h('a', { class: 'v2-btn subtle v2-sign-out', href: '/app/' }, 'Exit sample workspace'),
       ])));
   }
 
@@ -454,14 +490,12 @@
 
   function renderWelcome(root, { note, demoMode }) {
     const card = h('div', { class: 'v2-welcome-card' },
-      h('h1', {}, 'Your software factory, in one quiet room.'),
-      h('p', { class: 'v2-welcome-copy' }, demoMode
-        ? 'Answer a few questions. Watch specs build. Tap Ship it.'
-        : 'Review decisions and follow the work in your GitHub repository.'),
+      h('h1', {}, 'Run your software factory from here.'),
       note ? h('div', { class: 'notice bad', role: 'alert' }, icon('warn'), h('span', {}, note)) : null,
       h('a', { class: 'v2-btn primary', href: demoMode ? '#/chat' : '/api/sign-in/start' },
         demoMode ? 'Open Harbor workspace' : 'Continue with GitHub', icon('right')),
-      demoMode ? null : h('a', { class: 'v2-btn subtle v2-welcome-sample', href: '/app/?demo=1#/chat' }, 'See a sample factory'));
+      h('a', { class: 'v2-btn subtle v2-welcome-sample', href: demoMode ? '/api/sign-in/start' : '/app/?demo=1#/chat' },
+        demoMode ? 'Continue with GitHub' : 'See a sample factory'));
     card.prepend(h('header', { class: 'v2-welcome-head' },
       h('div', { class: 'v2-welcome-brand' }, mark(), h('span', {}, 'OpenWiz')),
       demoMode ? h('span', { class: 'v2-sample-tag' }, 'Sample data') : null));
@@ -492,7 +526,7 @@
           title: 'Feed',
           icon: 'feed',
           feeds: isDemo ? [] : ['specs'],
-          badge: () => (isDemo ? visibleDemoCards().length : OW.queue.badge()) || null,
+          badge: () => (isDemo ? pendingDemoCards().length : OW.queue.badge()) || null,
           render(el, feeds, arg, controls) {
             if (isDemo) OW.factory.redraw(el.closest('main'), () => renderDemoFeed(el, arg, controls));
             else OW.queue.render(el, feeds, { arg, controls, onCount: ctx.updateBadges });
