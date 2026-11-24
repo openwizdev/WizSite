@@ -581,7 +581,7 @@ body.landing > main { flex: 1 0 auto; }
 }
 .team-replay a { text-decoration: underline; text-decoration-color: var(--grey2); text-underline-offset: .2em; }
 .team-replay a:hover { text-decoration-color: currentColor; }
-.team-replay-title a { color: var(--brass); }
+.team-replay-title a { color: var(--ink); }
 .team-tickets, .team-landings { margin: 0; padding: 0; list-style: none; }
 .team-tickets > li {
   display: grid;
@@ -600,17 +600,65 @@ body.landing > main { flex: 1 0 auto; }
 .team-timeline { position: relative; }
 .team-timeline > div { display: grid; grid-template-columns: 9ch auto; gap: 1ch; }
 .team-timeline [aria-current] { color: var(--ink); }
-.team-timeline [aria-current] span, .team-landings li:last-child a { color: var(--brass); }
+.team-timeline [aria-current] span { color: var(--ink); font-weight: 600; }
 .team-waiting { position: absolute; inset-block-start: 0; inset-inline-start: 0; color: var(--ink); }
 .team-landings {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 270px), 1fr));
-  gap: 4px 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
   padding: 10px var(--team-replay-inset);
   border-top: 1px solid var(--line);
 }
 .team-landings a { color: var(--ink); }
+.team-pr {
+  margin: 0 var(--team-replay-inset) 12px;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--brass) 50%, var(--edge));
+  border-left: 3px solid var(--brass);
+  border-radius: 10px;
+  background: linear-gradient(155deg, rgb(255 143 128 / 12%), var(--ground) 72%);
+}
+.team-pr-repo {
+  color: var(--grey2);
+  font: 500 12px/1.4 var(--ow-font-mono);
+}
+.team-pr-repo code { color: var(--brass); }
+.team-pr-title {
+  margin-top: 4px;
+  font-size: 15px;
+  font-weight: 650;
+  line-height: 1.35;
+  letter-spacing: -.01em;
+}
+.team-pr-title a {
+  color: var(--ink);
+  text-decoration-color: var(--brass);
+}
+.team-pr-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  margin-top: 10px;
+  color: var(--grey2);
+  font: 500 12px/1.4 var(--ow-font-mono);
+}
+.team-pr-meta a { color: var(--ink); }
+.team-pr-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: var(--brass);
+  color: var(--on-brass);
+  font: 650 12px/1.4 var(--ow-font-sans);
+}
 .team-replay [data-replay-pending] { visibility: hidden; }
+@media (prefers-reduced-motion: no-preference) {
+  .team-pr { transition: opacity 280ms var(--ow-ease-out), transform 280ms var(--ow-ease-out); }
+  .team-pr[data-replay-pending] { opacity: 0; transform: translateY(6px); }
+}
 .team-replay-control {
   margin: 0 0 10px var(--team-replay-inset);
   padding: 5px 9px;

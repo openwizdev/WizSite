@@ -55,6 +55,13 @@ function playback(reduced = false) {
   for (const [markup, label] of html.matchAll(/<li data-replay-event><a [^>]*>([^<]+)<\/a> · Merged <time[^>]*>[^<]+<\/time><\/li>/g)) {
     event(markup, label);
   }
+  const payoffMatch = html.match(/<article class="team-pr" data-replay-event>([\s\S]*?)<\/article>/);
+  assert.ok(payoffMatch, 'expected payoff PR card in team/index.html');
+  const payoffMarkup = payoffMatch[1];
+  const payoff = event(payoffMarkup, 'WizSkills #229');
+  payoff.repo = payoffMarkup.match(/<p class="team-pr-repo">([^<]+)<code>#(\d+)<\/code><\/p>/).slice(1);
+  payoff.pr = payoffMarkup.match(/<p class="team-pr-title"><a href="([^"]+)">([^<]+)<\/a><\/p>/).slice(1);
+  payoff.closes = payoffMarkup.match(/Closes <a href="([^"]+)">#(\d+)<\/a>/).slice(1);
   const control = {
     textContent: html.match(/<button class="team-replay-control"[^>]*>([^<]+)/)[1],
     hidden: true,
@@ -97,7 +104,7 @@ function playback(reduced = false) {
     fetch() { reads++; throw new Error('unexpected read'); },
   });
   return {
-    tracks, events, control, motion, timers, replay,
+    tracks, events, payoff, control, motion, timers, replay,
     reads: () => reads,
     advanceTo(time) {
       for (const [token, timer] of timers) {
@@ -125,6 +132,13 @@ test('the still contains the packet’s ticket transitions and unique pull reque
   }
   assert.deepEqual(run.events.slice(-4).map(node => [node.label, node.dateTime]),
     Object.entries(landings).map(([label, at]) => [label, utc(at)]));
+  assert.deepEqual(run.payoff.repo, ['openwizdev/WizSkills ', '229']);
+  assert.deepEqual(run.payoff.pr, [
+    'https://github.com/openwizdev/WizSkills/pull/229',
+    '#1931: Infra WD3: write-driver’s end-to-end eval against the template’s fake host (WizSkills 0.2.1)',
+  ]);
+  assert.deepEqual(run.payoff.closes, ['https://github.com/openwizdev/OpenWiz/issues/1931', '1931']);
+  assert.ok(!run.payoff.attrs.has('data-replay-pending'));
   assert.equal(run.shown().length, 16);
   assert.equal(run.timers.size, 0);
   assert.equal(run.control.hidden, true);
@@ -136,15 +150,18 @@ test('replay reveals the recorded events in order on a 20-second clock', () => {
   assert.ok(run.tracks.every(track => !track.waiting.hidden && track.waiting.textContent === 'Waiting'));
   assert.equal(run.control.textContent, 'Finish replay');
   assert.equal(run.shown().length, 0);
+  assert.ok(run.payoff.attrs.has('data-replay-pending'));
   const start = Date.parse(opened);
   const duration = Date.parse(utc(landings['WizSkills #229'])) - start;
   for (const at of [...new Set(run.events.map(node => node.dateTime))].sort()) {
     const ms = (Date.parse(at) - start) / duration * 20_000;
     run.advanceTo(ms - .01);
     assert.deepEqual(run.shown(), run.events.filter(node => node.dateTime < at));
+    if (at === run.payoff.dateTime) assert.ok(run.payoff.attrs.has('data-replay-pending'));
     run.advanceTo(ms + .01);
     assert.deepEqual(run.shown(), run.events.filter(node => node.dateTime <= at));
   }
+  assert.ok(!run.payoff.attrs.has('data-replay-pending'));
   assert.ok(run.tracks.every(track => track.waiting.hidden && track.querySelector('[aria-current]').label === 'Merged'));
   assert.equal(run.timers.size, 0);
   assert.equal(run.control.textContent, 'Play again');

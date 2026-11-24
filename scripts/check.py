@@ -173,7 +173,19 @@ TEAM_REPLAY_LANDINGS = (
     ("OpenWiz #1945", "https://github.com/openwizdev/OpenWiz/pull/1945", "2026-11-20T19:03:26Z"),
     ("WizSkills #212", "https://github.com/openwizdev/WizSkills/pull/212", "2026-11-21T01:27:33Z"),
     ("WizSite #118", TEAM_REPLAY_WIZSITE, "2026-11-21T01:28:08Z"),
-    ("WizSkills #229", "https://github.com/openwizdev/WizSkills/pull/229", "2026-11-21T04:36:53Z"),
+)
+TEAM_REPLAY_PR = (
+    "openwizdev/WizSkills", 229,
+    "https://github.com/openwizdev/WizSkills/pull/229",
+    "#1931: Infra WD3: write-driver’s end-to-end eval against the template’s fake host (WizSkills 0.2.1)",
+    "2026-11-21T04:36:53Z",
+    1931, "https://github.com/openwizdev/OpenWiz/issues/1931",
+)
+TEAM_REPLAY_PR_ICON = (
+    '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" '
+    'stroke-width="1.6" stroke-linecap="round" aria-hidden="true">'
+    '<circle cx="4.5" cy="3.5" r="1.75"/><circle cx="4.5" cy="12.5" r="1.75"/>'
+    '<circle cx="11.5" cy="8.5" r="1.75"/><path d="M4.5 5.25v5.5M4.5 5.5c0 2 1.75 3 5.25 3"/></svg>'
 )
 TEAM_STEPS = (('Connect', 'We connect OpenWiz to your repository and the coding agents you already use.'),
               ('Decide', 'You pick one small, real change and answer a few questions about it.'),
@@ -1528,7 +1540,9 @@ def check_team(htmls, pages):
     assert not forbidden, f'a word the team page never uses: {forbidden[0]}'
     assert "'" not in shown and "'" not in ' '.join(re.findall(r'aria-label="([^"]*)"', main)), \
         'the team page uses curly apostrophes'
-    controls = main.replace(TEAM_REPLAY_CONTROL, '').replace('<button class="launch-play" type="button" hidden><span aria-hidden="true">', '')
+    controls = (main.replace(TEAM_REPLAY_CONTROL, '')
+                .replace(TEAM_REPLAY_PR_ICON, '', 1)
+                .replace('<button class="launch-play" type="button" hidden><span aria-hidden="true">', ''))
     assert not re.search(r'\bhidden\b|aria-hidden', controls), 'the team page hides none of its copy'
     parts = [plain(h) for h in re.findall(r'<h2\b[^>]*>([\s\S]*?)</h2>', main)]
     assert parts == list(TEAM_PARTS), f'the team page sections, in order: {parts}'
@@ -1563,7 +1577,17 @@ def check_team(htmls, pages):
     replay += ['</ul>', '<ul class="team-landings">']
     replay += [f'<li data-replay-event><a href="{href}">{label}</a> · Merged {replay_time(at)}</li>'
                for label, href, at in TEAM_REPLAY_LANDINGS]
-    replay += ['</ul>', TEAM_REPLAY_CONTROL, '</figure>']
+    pr_repo, pr_number, pr_href, pr_title, pr_at, pr_closes, pr_closes_href = TEAM_REPLAY_PR
+    replay += [
+        '</ul>',
+        '<article class="team-pr" data-replay-event>',
+        f'<p class="team-pr-repo">{pr_repo} <code>#{pr_number}</code></p>',
+        f'<p class="team-pr-title"><a href="{pr_href}">{pr_title}</a></p>',
+        f'<p class="team-pr-meta"><span class="team-pr-state">{TEAM_REPLAY_PR_ICON}Merged</span> '
+        f'{replay_time(pr_at)} <span class="team-pr-closes">Closes <a href="{pr_closes_href}">#{pr_closes}</a></span></p>',
+        '</article>',
+        TEAM_REPLAY_CONTROL, '</figure>',
+    ]
     assert not hero[:copy.start()].strip() and re.sub(r'\s+', ' ', hero[copy.end():]).strip() == ' '.join(replay), \
         'the hero ends with the labelled real run, its ordered ticket history and its pull request landings'
     page = Page(main)
@@ -1597,7 +1621,7 @@ def check_team(htmls, pages):
     close = re.search(r'<section class="team-part team-close wrap" aria-labelledby="team-call">\s*<h2 id="team-call">[^<]*</h2>\s*'
                       r'<a class="team-book" data-book href="[^"]*" data-count="book-call">Book a call</a>\s*</section>\s*$', main)
     assert close, 'the page closes on its second Book a call'
-    assert len(page.links) == 4 + len(TEAM_REPLAY_TICKETS) + len(TEAM_REPLAY_LANDINGS) and len(page.buttons) == 2, \
+    assert len(page.links) == 4 + len(TEAM_REPLAY_TICKETS) + len(TEAM_REPLAY_LANDINGS) + 2 and len(page.buttons) == 2, \
         'the team page offers its booking, driver and replay links and its two playback controls; nothing else'
 
 
