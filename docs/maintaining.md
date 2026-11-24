@@ -35,6 +35,8 @@ For caching, `/*` defaults to `Cache-Control: public, max-age=0, must-revalidate
 
 The site-wide policy allows exactly two outside origins besides GitHub's API, both for Cloudflare Web Analytics: `script-src` allows `https://static.cloudflareinsights.com`, where the beacon script Cloudflare injects into every HTML page is served from, and `connect-src` allows `https://cloudflareinsights.com`, where the beacon reports (`/cdn-cgi/rum`). The `/app/*` policy does not allow them, because analytics is meant to exclude the app.
 
+`npm run check` also validates `.well-known/security.txt` and fails when its `Expires` timestamp is within 60 days so renewal is enforced.
+
 To verify the effective merged headers locally after `npm run build`:
 
 ```sh
