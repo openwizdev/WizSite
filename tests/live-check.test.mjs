@@ -90,7 +90,7 @@ function makeFakeGitHub() {
           url: 'https://github.com/acme/factory/issues/50',
           updatedAt: fiveMinAgo,
           labels: { nodes: [{ name: 'spec' }] },
-          subIssuesSummary: { total: 3, completed: 1 },
+          subIssuesSummary: { total: 4, completed: 1 },
         },
       ],
     },
@@ -159,7 +159,7 @@ function makeFakeGitHub() {
       number: 50,
       comments: { totalCount: 0, nodes: [] },
       subIssues: {
-        totalCount: 3,
+        totalCount: 4,
         nodes: [
           {
             number: 51,
@@ -230,6 +230,29 @@ function makeFakeGitHub() {
                   }),
                   createdAt: twoHoursAgo,
                   updatedAt: twoHoursAgo,
+                  author: { login: 'factory-bot[bot]' },
+                },
+              ],
+            },
+          },
+          {
+            number: 54,
+            title: 'Search ranking',
+            url: 'https://github.com/acme/factory/issues/54',
+            state: 'OPEN',
+            stateReason: null,
+            repository: { nameWithOwner: 'acme/factory' },
+            labels: { nodes: [{ name: 'ready-for-agent' }] },
+            blockedBy: { totalCount: 0, nodes: [] },
+            closedByPullRequestsReferences: { totalCount: 0, nodes: [] },
+            comments: {
+              totalCount: 1,
+              nodes: [
+                {
+                  databaseId: 9103,
+                  body: statusNote({ agent: 'builder', state: 'asking', step: 'Confirm ranking weights', time: fiveMinAgo }),
+                  createdAt: fiveMinAgo,
+                  updatedAt: fiveMinAgo,
                   author: { login: 'factory-bot[bot]' },
                 },
               ],
@@ -383,6 +406,7 @@ test('isReadOnlyRequest allows only GET and GraphQL query reads', () => {
   assert.equal(isReadOnlyRequest('DELETE', 'https://api.github.com/repos/acme/factory/issues/1', ''), false);
   assert.equal(isReadOnlyRequest('PUT', 'https://api.github.com/repos/acme/factory/contents/a', '{}'), false);
   assert.equal(isReadOnlyRequest('GET', 'https://example.com/data', ''), false);
+  assert.equal(isReadOnlyRequest('GET', 'https://user:pass@api.github.com/repos/acme/factory', ''), false);
 });
 
 test('consistent repository passes all 5 pages, keeps real token out of browser, and refuses writes', async () => {
@@ -416,6 +440,8 @@ test('consistent repository passes all 5 pages, keeps real token out of browser,
   });
 
   assert.equal(result.ok, true, `expected all pages to pass, got:\n${formatResults(result)}`);
+  assert.equal(result.truth.canvasNeedsYou, 3);
+  assert.equal(result.truth.youNeedsYou, 2);
   assert.deepEqual(result.pages.map(p => p.page), PAGES);
   assert.equal(result.pages.every(p => p.pass), true);
   assert.equal(result.tokenLeaked, false);
