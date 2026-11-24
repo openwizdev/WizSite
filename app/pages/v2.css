@@ -179,7 +179,7 @@ nav.v2-nav { flex: 1; gap: 4px; }
 .v2-btn.subtle { background-color: transparent; border-color: transparent; color: var(--em-text-2); }
 .v2-btn.subtle:hover { background-color: var(--em-card); color: var(--em-text); }
 .v2-btn.primary { background: var(--v2-dots) #234c79; border-color: #658cb9; color: var(--em-text); font-weight: 650; }
-.v2-btn.primary:hover { background-color: #305b8c; }
+.v2-btn.primary:hover { background-color: #1c426c; }
 .v2-btn .ic { width: 18px; height: 18px; }
 .v2-label { color: var(--em-muted); font: var(--v2-label); text-transform: uppercase; letter-spacing: .07em; }
 
@@ -552,7 +552,7 @@ nav.v2-nav { flex: 1; gap: 4px; }
   .v2-building { margin-top: 16px; }
   .v2-card-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .v2-card-actions .primary { grid-column: 1 / -1; }
-  .v2-card-actions .v2-btn { padding-inline: 4px; font-size: 14px; }
+  .v2-card-actions .v2-btn { padding-inline: 4px; font-size: 14px; text-align: center; white-space: normal; }
 
   .v2-settings { padding: 12px 0 24px; }
   .v2-settings-group + .v2-settings-group { margin-top: 16px; }
