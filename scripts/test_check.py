@@ -19,7 +19,7 @@ def edit_built(root, name, change):
     new = fingerprint(name, data)
     old.unlink()
     (root / new).write_bytes(data)
-    for page in ('index.html', 'changelog/index.html', 'drivers/index.html', 'team/index.html', 'faq/index.html', 'market/index.html', 'app/index.html'):
+    for page in ('index.html', 'changelog/index.html', 'drivers/index.html', 'team/index.html', 'faq/index.html', 'market/index.html', 'book/index.html', 'app/index.html'):
         path = root / page
         path.write_text(path.read_text().replace(f'"/{was}"', f'"/{new}"'))
 
@@ -1220,6 +1220,50 @@ class Checks(unittest.TestCase):
             (root / 'brand/openwiz-lockup.svg').write_bytes(logo.replace(b'</svg>', b'<text>OpenWiz</text></svg>'))
             with self.assertRaises(AssertionError):
                 check_site(root)
+
+    def test_book_page(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / 'dist'
+            shutil.copytree(ROOT / 'dist', root)
+            page = root / 'book/index.html'
+            original = page.read_text()
+            page.write_text(original.replace('<link rel="manifest" href="/book/manifest.webmanifest">', '', 1))
+            with self.assertRaisesRegex(AssertionError, 'manifest'):
+                check_site(root)
+            page.write_text(original)
+            for price in ('$99', '€50', '£40', 'Custom pricing.', 'No checkout.', 'per month', 'cost', 'payment'):
+                with self.subTest(price=price):
+                    page.write_text(original.replace('</main>', f'<p>{price}</p></main>', 1))
+                    with self.assertRaisesRegex(AssertionError, 'price|cost'):
+                        check_site(root)
+                    page.write_text(original)
+            for bad_form in ('<form action="https://example.com/submit" method="post"></form>',
+                             '<form action="/other" method="post"></form>',
+                             '<form method="post" action="mailto:test@example.com"></form>'):
+                with self.subTest(bad_form=bad_form):
+                    page.write_text(original.replace('</main>', f'{bad_form}</main>', 1))
+                    with self.assertRaisesRegex(AssertionError, 'form'):
+                        check_site(root)
+                    page.write_text(original)
+            manifest = root / 'book/manifest.webmanifest'
+            manifest_raw = manifest.read_text()
+            manifest.write_text(manifest_raw.replace('"standalone"', '"browser"'))
+            with self.assertRaisesRegex(AssertionError, 'manifest'):
+                check_site(root)
+            manifest.write_text(manifest_raw)
+            sw = root / 'book/sw.js'
+            sw_raw = sw.read_text()
+            sw.write_text('self.addEventListener("fetch", e => e.respondWith(fetch(e.request)));')
+            with self.assertRaisesRegex(AssertionError, 'service worker|/api/'):
+                check_site(root)
+            sw.write_text(sw_raw)
+            headers = root / '_headers'
+            headers_raw = headers.read_text()
+            headers.write_text(headers_raw.replace('/book/*', '/book-disabled/*'))
+            with self.assertRaisesRegex(AssertionError, 'book CSP|_headers'):
+                check_site(root)
+            headers.write_text(headers_raw)
+
 
 if __name__ == '__main__':
     unittest.main()
