@@ -62,8 +62,8 @@ ICON_HASHES = {
 DOC_HASHES = {
     'docs/map.png': '19fc57ff3f588b36e2ca412f5656483eaf873718d0d19a39aceb83e007333e6b',
     'docs/map-phone.png': 'cdd21a74a880d3adab68ce794de1b18060d916d6df5d00ceb54eb06736cf3fd2',
-    'docs/evidence/pro/pro-390.png': 'fce17242874a2baf635cb3d70d7f2b32f7d9341b201df79b80c9e246fea0de88',
-    'docs/evidence/pro/pro-1280.png': '6d66e4ddc2fbfba0a2d121da82dc5dbeecd0ea9c9371cad20273c99993d3f78c',
+    'docs/evidence/pro/pro-390.png': 'cd18c70822ce55987607e8d22e83304d7184a44fc99ea8723bab706422c03893',
+    'docs/evidence/pro/pro-1280.png': 'cbbd21b5355c3cdb59e5712990a69e2ccd3e367479865bbb91b42a6d181a4560',
     'docs/evidence/pro/supporters-390.png': 'dfd238dbcf41f54fcb47da0c89d3e21e69c6d8b83128e98bf59ff44f850aa41d',
     'docs/evidence/pro/supporters-1280.png': 'f1ca88c9d8e27ba509879b6aeb412062f6ba41a49a8bed255c1bacb241d1836a',
 }
@@ -181,7 +181,7 @@ PRO_LIST_HEADING = '$20 a year'
 PRO_PERKS = (
     'New releases a few days early, in a private repository.',
     'A private channel with the people building OpenWiz.',
-    'Your issues read first, with a Pro badge.',
+    'Your issues read first, with a public Pro label.',
     'Your name on the supporters page, if you want it.',
 )
 PRO_BUTTON = 'Get Pro · $20 a year'

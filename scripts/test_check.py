@@ -782,10 +782,10 @@ class Checks(unittest.TestCase):
             'the pro page title': (P, lambda t: t.replace('<title>OpenWiz Pro · $20 a year</title>', '<title>Pro</title>', 1)),
             'the pro page heading': (P, lambda t: t.replace('<h1 id="pro-title">OpenWiz Pro</h1>', '<h1 id="pro-title">Back OpenWiz.</h1>', 1)),
             'the pro page copy': (P, lambda t: t.replace('Get Pro · $20 a year', 'Go Pro · $20 a year', 1)),
-            'the pro page perks': (P, lambda t: t.replace('Your issues read first, with a Pro badge.', 'Priority issues.', 1)),
+            'the pro page perks': (P, lambda t: t.replace('Your issues read first, with a public Pro label.', 'Priority issues.', 1)),
             'names only \\$20': (P, lambda t: t.replace('<h2 id="pro-price">$20 a year</h2>', '<h2 id="pro-price">$30 a year</h2>', 1)),
             'yearly only': (P, lambda t: t.replace('Get Pro · $20 a year', 'Get Pro · $20 per month', 1)),
-            'never mention Ultra': (P, lambda t: t.replace('Pro badge.', 'Pro and Ultra badge.', 1)),
+            'never mention Ultra': (P, lambda t: t.replace('public Pro label.', 'public Pro and Ultra label.', 1)),
             'never mention Ultra ': ('index.html', lambda t: t.replace('</main>', '<p>Ultra tier</p></main>', 1)),
             'offers only the checkout button': (P, lambda t: t.replace('</section>', '<a href="/faq/">FAQ</a></section>', 1)),
         }

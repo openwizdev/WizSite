@@ -137,6 +137,33 @@ class Supporters(unittest.TestCase):
         source = (ROOT / 'scripts/supporters.mjs').read_text()
         self.assertNotRegex(source, r'\bfetch\(|https?\.request|api\.github\.com')
 
+    def test_generator_fails_on_bad_entries(self):
+        valid = {'name': 'Ada Lovelace', 'github': 'ada', 'since': '2026-11'}
+        cases = (
+            ('{', 'not JSON'),
+            ('{}', 'must be a JSON list'),
+            (json.dumps([{**valid, 'name': ''}]), 'non-empty trimmed'),
+            (json.dumps([{**valid, 'name': 'x' * 81}]), 'over 80 characters'),
+            (json.dumps([{**valid, 'name': 'Ultra Backer'}]), 'Ultra'),
+            (json.dumps([{**valid, 'name': 'WizVault'}]), 'private repository'),
+            (json.dumps([{**valid, 'github': 'bad--name'}]), 'invalid GitHub login'),
+            (json.dumps([{**valid, 'since': '2026-13'}]), 'YYYY-MM'),
+            (json.dumps([{**valid, 'extra': True}]), 'unexpected supporter fields'),
+            (json.dumps([valid, {**valid, 'name': 'Other'}]), 'duplicate supporter GitHub login'),
+            (json.dumps([valid, {'name': 'ada lovelace', 'github': None, 'since': '2026-12'}]), 'duplicate supporter name'),
+        )
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / 'supporters.json'
+            for content, error in cases:
+                with self.subTest(error=error):
+                    path.write_text(content)
+                    done = subprocess.run(
+                        ['node', str(ROOT / 'scripts/supporters.mjs'), '--supporters', str(path)],
+                        capture_output=True, text=True, timeout=60,
+                    )
+                    self.assertNotEqual(done.returncode, 0)
+                    self.assertIn(error, done.stderr)
+
 
 if __name__ == '__main__':
     unittest.main()
