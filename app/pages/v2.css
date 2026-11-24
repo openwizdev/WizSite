@@ -242,8 +242,8 @@ nav.v2-nav { flex: 1; gap: 4px; }
   scrollbar-color: #48505a transparent;
 }
 @media (min-width: 761px) {
-  .v2-view[data-page='feed'], .v2-view[data-page='settings'] { display: flex; flex-direction: column; }
-  .v2-view[data-page='feed'] > .v2-body, .v2-view[data-page='settings'] > .v2-body { margin-block: auto; }
+  .v2-view[data-page='feed'] { display: flex; flex-direction: column; }
+  .v2-view[data-page='feed'] > .v2-body { margin-block: auto; }
   .v2-view, .v2-chat-scroll { scrollbar-gutter: stable both-edges; }
 }
 .v2-view { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; scroll-padding-block: 16px 32px; }
@@ -536,7 +536,7 @@ nav.v2-nav { flex: 1; gap: 4px; }
 .v2-settings { padding: 16px 0 32px; }
 .v2-set-row {
   display: grid;
-  grid-template-columns: 24px minmax(0, 5fr) minmax(0, 6fr) 16px;
+  grid-template-columns: 24px auto minmax(0, 1fr) 16px;
   align-items: center;
   gap: 16px;
   width: 100%;
@@ -553,7 +553,7 @@ nav.v2-nav { flex: 1; gap: 4px; }
 .v2-set-row .ic { width: 20px; height: 20px; color: var(--em-muted); }
 .v2-set-row > .ic:last-child { width: 16px; height: 16px; rotate: -90deg; }
 .v2-setting-label { font-weight: 550; }
-.v2-setting-value { color: var(--em-text-2); }
+.v2-setting-value { min-width: 0; overflow: hidden; color: var(--em-text-2); text-align: end; text-overflow: ellipsis; white-space: nowrap; }
 .v2-setting-trigger, .v2-sign-out { cursor: pointer; }
 .v2-setting-trigger:hover, .v2-setting-trigger[aria-expanded='true'], .v2-sign-out:hover {
   background: var(--em-card);
