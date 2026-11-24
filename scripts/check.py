@@ -119,7 +119,7 @@ DRIVER_LOGOS = {
 HASHED = ('tokens.css', 'site.css', GSAP, 'site.js', 'faq.js')
 APP_PAGE = 'app/index.html'
 APP_STYLE = 'app/ember.css'
-APP_SCRIPTS = ('app/data.js', 'app/ui.js', 'app/pages/you.js', 'app/pages/specs.js', 'app/pages/spec.js', 'app/pages/agents.js', 'app/palette.js', 'app/shell.js')
+APP_SCRIPTS = ('app/data.js', 'app/records.js', 'app/ui.js', 'app/pages/you.js', 'app/pages/specs.js', 'app/pages/spec.js', 'app/pages/agents.js', 'app/palette.js', 'app/shell.js')
 APP_VENDOR = {'app/vendor/dagre-3.1.3.min.js': ('node_modules/@dagrejs/dagre/dist/dagre.min.js', 'app/pages/spec.js'),
               'app/vendor/dagre-LICENSE.txt': ('node_modules/@dagrejs/dagre/LICENSE', None)}
 HASHED += (APP_STYLE,) + APP_SCRIPTS
