@@ -101,8 +101,6 @@ function fromPython(source) {
       if (c === '[' && !inClass) inClass = true;
       else if (c === ']' && inClass) inClass = false;
       else if (c === '(' && source[i + 1] === '?' && !inClass && !/^\(\?(?::|<!)/.test(source.slice(i))) throw new Error('market privacy scan: no JavaScript port for a group in a WizMarket pattern');
-      // INTEROP: WizMarket's case-insensitive pattern uses ASCII literals and ranges.
-      // Fold those and the input without applying JavaScript case folding to Python's word class.
       out += ignorecase && c >= 'A' && c <= 'Z' ? c.toLowerCase() : c;
     }
   }
