@@ -299,9 +299,6 @@ test('Canvas: widening the window refits a board that is still at its fitted vie
   }
 });
 
-// Real-data reads (openwizdev/OpenWiz, 2026-11-24): one large SpecTickets query hit GitHub's per-query resource limit and
-// came back with every ticket null, so a sheet said "9 of 11 done" next to "No tickets yet"; ready-for-human backlog
-// flooded Needs you; a read skipped for the hourly limit left "Agents: reading…" forever.
 const aliases = entry => [...JSON.parse(entry.body).query.matchAll(/\b(s\d+): issue\(/g)].map(m => m[1]);
 function wrap(run, name, change) {
   const original = run.world.graphql[name];
