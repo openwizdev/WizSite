@@ -113,7 +113,7 @@ async function itemOf(file, extra = {}) {
   return { ...(await form(file)).action.item, ...extra };
 }
 
-test('a spec with a same-origin video plays it on its card, lazily and muted, behind a poster', async () => {
+test('a spec with a same-origin video plays on its card only when pressed, behind a poster', async () => {
   const run = await start();
   try {
     const item = await itemOf('spec-ship.input.json', { graph: GRAPH });
@@ -129,10 +129,12 @@ test('a spec with a same-origin video plays it on its card, lazily and muted, be
     assert.equal(await run.page.run(PLAN), null, 'the plan picture shows beside a playable video');
     assert.ok(await run.page.run(LINK(item.video.url)), 'no plain link to the video');
     await run.page.run(`document.querySelector('#under-test video').scrollIntoView({ block: 'center' }), true`);
-    await run.page.until(`(${VIDEO}).playing && (${VIDEO}).muted`, 'the video playing muted in view', 10000);
-    assert.ok(run.world.log.some(r => r.path === '/art/todo-spec.mp4'), 'in view, the video never loaded');
-    await run.page.run('scrollTo(0, 0), true');
-    await run.page.until(`!(${VIDEO}).playing`, 'the video pausing out of view');
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    assert.equal((await run.page.run(VIDEO)).playing, false, 'in view, the video plays before it is pressed');
+    assert.ok(!run.world.log.some(r => r.path === '/art/todo-spec.mp4'), 'in view, the video loads before it is pressed');
+    await run.page.run(`document.querySelector('#under-test .spec-card-sound').click(), document.querySelector('#under-test video').click(), true`);
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    assert.equal((await run.page.run(VIDEO)).playing, false, 'a scripted click, not a press, starts the video');
     await run.page.tap('Play with sound');
     await run.page.until(`(${VIDEO}).playing && !(${VIDEO}).muted`, 'the video playing with sound');
     assert.deepEqual(run.world.violations, []);

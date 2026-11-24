@@ -5,7 +5,9 @@
   const wiz = () => h('p', {}, h('img', { src: '/app/wiz-reviewer.svg', alt: '', width: 96, height: 105 }));
   const data = OW.data;
   const root = document.getElementById('app');
-  const ROUTES = () => OW.pages.map(page => page.id);
+  // Pages that open by address but have no nav entry (Canvas under the v2 shell, for now).
+  const hidden = [];
+  const ROUTES = () => [...OW.pages, ...hidden].map(page => page.id);
   let built = null;
   const INSTALL = 'https://github.com/apps/openwiz-viewer/installations/new';
   const v2 = Boolean(OW.records?.enabled?.());
@@ -38,13 +40,13 @@
   const route = () => {
     const [rawId, arg] = location.hash.replace(/^#\/?/, '').split('/');
     const id = v2 && OW.v2 && rawId === 'queue' ? 'feed' : rawId;
-    if (id === 'specs' && /^[1-9]\d*$/.test(arg || '')) return { id, arg };
+    if ((id === 'specs' || id === 'canvas') && /^[1-9]\d*$/.test(arg || '')) return { id, arg };
     if (v2 && OW.v2 && id === 'feed' && (/^[1-9]\d*$/.test(arg || '') || (demo && arg === 'clear'))) return { id, arg };
     return { id: arg === undefined ? id : '', arg: null };
   };
   const current = () => {
     const { id } = route();
-    return OW.pages.find(page => page.id === id) || OW.pages.find(page => page.id === 'feed') || OW.pages[0];
+    return OW.pages.find(page => page.id === id) || hidden.find(page => page.id === id) || OW.pages.find(page => page.id === 'feed') || OW.pages[0];
   };
 
   function screen(...children) {
@@ -219,6 +221,7 @@
       freshnessNodes,
       signOut: () => { data.auth.signOut(); signedOut(); },
     });
+    hidden.push(...OW.pages.filter(page => page.id === 'canvas'));
     OW.pages.splice(0, OW.pages.length, ...v2Pages);
     OW.v2.setRedraw(() => update());
   }

@@ -7,11 +7,11 @@ const FLEET = JSON.parse(await readFile(new URL('fixtures/queue/grill-round.json
 
 const apiRequests = world => world.log.filter(r => r.origin !== SITE || r.path.startsWith('/api/'));
 const withoutFingerprint = path => path.replace(/\.[a-f0-9]{10}(?=\.(?:css|js)$)/, '');
-const mainStyles = ['/app/ember.css', '/app/pages/queue.css', '/app/cards/decision.css'];
+const mainStyles = ['/app/ember.css', '/app/pages/queue.css', '/app/pages/canvas.css', '/app/cards/decision.css'];
 const mainScripts = [
   '/app/data.js', '/app/records.js', '/app/ui.js', '/app/pages/you.js', '/app/pages/queue.js',
   '/app/pages/specs.js', '/app/vendor/dagre-3.1.3.min.js', '/app/pages/spec.js', '/app/pages/agents.js',
-  '/app/pages/models.js', '/app/cards/decision.js', '/app/palette.js', '/app/shell.js',
+  '/app/pages/canvas.js', '/app/pages/models.js', '/app/cards/decision.js', '/app/palette.js', '/app/shell.js',
 ];
 
 test('switch off: main’s assets, navigation and startup requests are kept, and demo=1 is ignored', async () => {
@@ -37,7 +37,7 @@ test('switch off: main’s assets, navigation and startup requests are kept, and
       Object.values(OW.data.feeds).every(feed => !feed.busy && feed.state !== 'loading')`, 'the legacy startup reads');
     const nav = await run.page.run(`['nav.main', 'nav.tabs'].map(selector =>
       [...document.querySelectorAll(selector + ' a')].map(link => link.getAttribute('href')))`);
-    const mainNav = ['#/you', '#/specs', '#/agents', '#/models'];
+    const mainNav = ['#/you', '#/specs', '#/agents', '#/canvas', '#/models'];
     assert.deepEqual(nav, [mainNav, mainNav]);
     await run.page.click('Models');
     await run.page.until(`location.hash === '#/models' && document.querySelector('main h1')?.textContent === 'Models'`, 'the Models page');

@@ -93,8 +93,17 @@ async function siteHeaders(path) {
       const pattern = new RegExp(`^${line.trim().replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*')}$`);
       match = pattern.test(path);
     } else if (match) {
-      const at = line.indexOf(':');
-      out[line.slice(0, at).trim()] = line.slice(at + 1).trim();
+      const trimmed = line.trim();
+      if (trimmed.startsWith('!')) {
+        const drop = trimmed.slice(1).trim().toLowerCase();
+        for (const key of Object.keys(out)) if (key.toLowerCase() === drop) delete out[key];
+      } else {
+        const at = trimmed.indexOf(':');
+        const name = trimmed.slice(0, at).trim();
+        const value = trimmed.slice(at + 1).trim();
+        const existing = Object.keys(out).find(k => k.toLowerCase() === name.toLowerCase());
+        out[existing || name] = existing ? `${out[existing]}, ${value}` : value;
+      }
     }
   }
   return out;
@@ -223,6 +232,16 @@ export async function open(browser, world) {
       if (width === null) return send('Emulation.clearDeviceMetricsOverride');
       await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: mobile ? 2 : 1, mobile });
       await new Promise(resolve => setTimeout(resolve, 200));
+    },
+    async touch(x, y, dx, dy, steps = 10) {
+      await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
+      await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+      for (let i = 1; i <= steps; i++) {
+        await send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x + dx * i / steps, y: y + dy * i / steps }] });
+        await new Promise(resolve => setTimeout(resolve, 16));
+      }
+      await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+      await new Promise(resolve => setTimeout(resolve, 300));
     },
     wheel: (x, y, deltaY) => send('Input.dispatchMouseEvent', { type: 'mouseWheel', x, y, deltaX: 0, deltaY }),
     media: features => send('Emulation.setEmulatedMedia', { features }),
