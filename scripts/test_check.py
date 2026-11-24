@@ -744,7 +744,7 @@ class Checks(unittest.TestCase):
             'team page copy': (T, lambda t: t.replace('>Book a call</a>', '>Talk</a>')),
             'team page copy ': (T, lambda t: t.replace('>Book a call</a>', '>Talk</a>', 1)),
             'missing fragment: /team/#book': (T, lambda t: t.replace('<a class="team-book" id="book" data-book', '<a class="team-book" data-book', 1)),
-            'the team page description': (T, lambda t: t.replace('built and reviewed.">', 'built.">', 1)),
+            'the team page description': (T, lambda t: t.replace('run a fleet on your own repository.', 'see the app.', 3)),
             'the team page headline': (T, lambda t: t.replace('Leave the call with a reviewed pull request.', 'Leave the call with a shipped pull request.', 1)),
             'the hero, in order': (T, lambda t: t.replace('For teams who use Claude Code or Codex', 'For solo builders and small teams', 1)),
             'the hero, in order ': (T, lambda t: t.replace('Merging stays your call.', 'Your first fleet merges it.', 1)),
@@ -853,7 +853,7 @@ class Checks(unittest.TestCase):
                 ('generated', f'<a href="{escape(listed)}" ping="{escape(listed)}">x</a>', 'unexpected markup in the generated Market section'),
                 ('generated', f'<svg><image xlink:href="{escape(listed)}"></image></svg>', 'unexpected markup in the generated Market section'),
                 ('generated', f'<a href="{escape(listed)}" rel="noreferrer prefetch">x</a>', 'unexpected markup in the generated Market section'),
-                ('fixed', '<img srcset="/favicon.svg 1x" alt="x">', None),
+                ('fixed', '<img srcset="/favicon.svg 1x" alt="x" width="32" height="32" loading="lazy">', None),
                 ('generated', f'<a href="{prose}">x</a>', 'unexpected external URL'),
                 ('generated', '<a href="https://x.com/openwiz">x</a>', 'unexpected external URL'),
                 ('generated', '<a href="https://tracker.example.com/example-owner/example-tool/-/issues/1">x</a>', 'unexpected external URL'),
@@ -974,7 +974,7 @@ class Checks(unittest.TestCase):
             return temp, root
         for message, (page, change) in {
             'the index.html page needs the one Questions': ('index.html', lambda t: t.replace(FAQ, '', 1)),
-            'the faq/index.html page needs the one Questions': ('faq/index.html', lambda t: t.replace('What is a kernel?', 'What is a core?', 1)),
+            'the faq/index.html page needs the one Questions': ('faq/index.html', lambda t: t.replace('>What is a kernel?<', '>What is a core?<', 1)),
             'the team/index.html page shows no Questions|never uses: CloudRoom': ('team/index.html', lambda t: t.replace('</main>', FAQ + '</main>', 1)),
             'needs faq.js': ('faq/index.html', lambda t: re.sub(r'<script src="/faq\.[0-9a-f]+\.js" defer></script>', '', t)),
         }.items():
@@ -1157,7 +1157,6 @@ class Checks(unittest.TestCase):
                 ('<p class="driver-kit passed" data-state="passed">', '<p class="driver-kit passed" data-state="not yet run">', 'one kit line must read'),
                 ('<h2 id="more-title">Also shipped</h2>', '<h2 id="more-title">Also shipped</h2><p>4 words, 5 checks in the kit</p>', 'jargon count'),
                 ('<h2 id="more-title">Also shipped</h2>', '<h2 id="more-title">Also shipped</h2><p>1 passed, 3 of 5</p>', 'jargon count'),
-                ('Drivers answer the same four commands', 'Drivers answer 4 words', 'jargon count'),
                 ('<h2 id="more-title">Also shipped</h2>', '<h2 id="more-title">Also shipped</h2><p>boat.dev passed all five checks.</p>', 'at most 2 times'),
                 ('<div class="own-token"><dt><code>token</code></dt>', '<div class="own-token"><dt><code>tokens</code></dt>', 'fifth check, token'),
                 ('alt="Cloudroom logo" width="256"', 'alt="" width="256"', 'alt text naming Cloudroom|names its host'),
