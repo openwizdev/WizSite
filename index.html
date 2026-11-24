@@ -126,19 +126,31 @@
     <h2 id="moments-title">From idea to shipped.</h2>
     <div class="spec-moment">
       <div class="spec-frame">
-        <video class="spec-video" src="/art/todo-spec.mp4" poster="/art/todo-spec-engraved.webp" preload="none" muted playsinline controls aria-label="The real narrated spec of an OpenWiz-built to-do app">
+        <picture class="spec-still">
+          <source media="(max-width: 599px)" data-srcset="/art/todo-spec-engraved-720.webp" width="720" height="720">
+          <img data-src="/art/todo-spec-engraved.webp" alt="" width="1280" height="720" decoding="async">
+        </picture>
+        <noscript><img class="spec-still" src="/art/todo-spec-engraved.webp" alt="" width="1280" height="720" loading="lazy" decoding="async"></noscript>
+        <video class="spec-video" src="/art/todo-spec.mp4" preload="none" muted playsinline controls aria-label="The real narrated spec of an OpenWiz-built to-do app">
           <track kind="captions" src="/art/todo-spec.vtt" srclang="en" label="English" default>
         </video>
         <div class="spec-over">
           <p class="spec-wish"><span>The wish</span>Build a to-do app</p>
           <button class="spec-play" type="button" hidden aria-label="Watch one wish ship, 0:38, with sound"><span class="spec-play-icon" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M5 3l8 5-8 5z"/></svg></span>Watch one wish ship <span class="spec-time">0:38</span></button>
         </div>
+        <svg class="spec-leaders" viewBox="0 0 1200 500" aria-hidden="true" focusable="false">
+          <polyline points="1044,82 640,82 554,113"/>
+          <polyline points="1044,147 780,147 664,211"/>
+          <polyline points="1044,212 900,212 538,326"/>
+          <polyline points="1044,300 1034,300 1018,284"/>
+          <circle cx="554" cy="113" r="3"/><circle cx="664" cy="211" r="3"/><circle cx="538" cy="326" r="3"/><circle cx="1018" cy="284" r="3"/>
+        </svg>
       </div>
-      <ol class="moment-steps" aria-label="What happens next">
-        <li>spec</li>
+      <ol class="spec-legend" aria-label="What happens next">
+        <li>Spec #1</li>
         <li>4 tickets</li>
-        <li>agents building</li>
-        <li>merged</li>
+        <li>Agents building</li>
+        <li>4 merged</li>
       </ol>
       <div class="moment-links">
         <details class="moment-more moment-grill">
