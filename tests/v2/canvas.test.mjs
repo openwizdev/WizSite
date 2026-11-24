@@ -298,3 +298,122 @@ test('Canvas: widening the window refits a board that is still at its fitted vie
     await run.close();
   }
 });
+
+const aliases = entry => [...JSON.parse(entry.body).query.matchAll(/\b(s\d+): issue\(/g)].map(m => m[1]);
+function wrap(run, name, change) {
+  const original = run.world.graphql[name];
+  run.world.graphql[name] = async entry => change(await original(entry), entry);
+}
+
+test('Canvas real data: a spec read over GitHub\'s per-query resource limit is retried spec by spec, and every board still draws', async () => {
+  const run = await start();
+  try {
+    world(run);
+    const sizes = [];
+    wrap(run, 'SpecTickets', (reply, entry) => {
+      const asked = aliases(entry);
+      sizes.push(asked.length);
+      const repository = Object.fromEntries(asked.map(a => [a, reply.json.data.repository[a]]));
+      if (asked.length === 1) return { status: 200, json: { data: { ...reply.json.data, repository } } };
+      const nulled = structuredClone(repository);
+      for (const detail of Object.values(nulled)) detail.subIssues.nodes = detail.subIssues.nodes.map(() => null);
+      return { status: 200, json: { data: { ...reply.json.data, repository: nulled },
+        errors: [{ type: 'RESOURCE_LIMITS_EXCEEDED', message: 'Resource limits for this query exceeded.', path: ['repository', asked[0], 'subIssues', 'nodes', 0, 'comments', 'nodes'] }] } };
+    });
+    await openCanvas(run);
+    assert.ok(sizes[0] > 1 && sizes.slice(1).every(n => n === 1), `one chunk, then one spec at a time: ${sizes}`);
+    assert.equal(Object.keys(await stacks(run)).length, 6);
+    const text = await run.page.text();
+    assert.doesNotMatch(text, /couldn't be read|No tickets yet/);
+    assert.deepEqual(run.world.violations, []);
+  } finally {
+    await run.close();
+  }
+});
+
+test('Canvas real data: tickets GitHub counts but won\'t list are never "No tickets yet", and the gap is one line, not one per spec', async () => {
+  const run = await start();
+  try {
+    world(run);
+    wrap(run, 'SpecTickets', reply => {
+      const repository = structuredClone(reply.json.data.repository);
+      repository.s41.subIssues.nodes = repository.s41.subIssues.nodes.map(() => null);
+      return { status: 200, json: { data: { ...reply.json.data, repository }, errors: [{ message: 'Something went wrong', path: ['repository', 's41', 'subIssues', 'nodes', 0] }] } };
+    });
+    await signIn(run.page);
+    await run.page.click('acme/factory');
+    await run.page.until(`document.querySelector('nav a[aria-current="page"]')`, 'the shell');
+    await run.page.go(`${SITE}/app/#/canvas/41`);
+    await run.page.until(`OW.data.feeds.specs.readAt && document.querySelector('.cv-empty')`, 'the unread sheet');
+    const text = await run.page.text();
+    assert.match(text, /GitHub counts 1 of 6 tickets done, but this read couldn't list them/);
+    assert.match(text, /1 of 6 done · tickets not read yet/);
+    assert.doesNotMatch(text, /No tickets yet|decision records/);
+    assert.equal((text.match(/missing #41's tickets/g) || []).length, 1);
+  } finally {
+    await run.close();
+  }
+});
+
+test('Canvas real data: ready-for-human tasks stay out of Needs you, behind one "tasks for a person" toggle', async () => {
+  const run = await start();
+  try {
+    world(run);
+    const task = { number: 90, title: 'Live check on a real phone (a person)', url: URL_OF(90), updatedAt: ago(1), labels: { nodes: [{ name: 'ready-for-human' }] },
+      issueDependenciesSummary: { blockedBy: 0 } };
+    wrap(run, 'Specs', (reply, entry) => {
+      const query = JSON.parse(entry.body).query;
+      assert.match(query, /youIssues: issues\([^)]*labels: \["needs-info"\]/, 'Needs you reads needs-info only');
+      const repository = structuredClone(reply.json.data.repository);
+      repository.peopleIssues = { totalCount: 1, nodes: [task] };
+      return { status: 200, json: { data: { ...reply.json.data, repository } } };
+    });
+    await openCanvas(run);
+    assert.deepEqual(await strip(run), ['ticket #44', 'asking #45', 'spec_confirmation spec #48']);
+    assert.match(await run.page.run(`document.querySelector('.cv-chip-go[data-item="ticket"]').textContent`), /Waiting on your answer: Shipping options/);
+    await run.page.click('Show 1 task for a person');
+    assert.match(await run.page.text(), /#90 Live check on a real phone \(a person\)/);
+  } finally {
+    await run.close();
+  }
+});
+
+test('Canvas real data: when the hourly limit stops a later spec read, the last good board stays, marked with its read time', async () => {
+  const run = await start();
+  try {
+    world(run);
+    await openCanvas(run);
+    const first = await run.page.run('OW.data.feeds.specs.readAt');
+    run.world.graphql.SpecTickets = async () => ({ status: 200, headers: { 'X-RateLimit-Remaining': '400', 'X-RateLimit-Reset': '4102444800' },
+      json: { data: null, errors: [{ type: 'RATE_LIMIT', message: 'API rate limit already exceeded for user ID 1.' }] } });
+    await run.page.run('OW.data.refreshAll()');
+    await run.page.until(`OW.data.feeds.specs.readAt > ${first}`, 'the second read');
+    assert.equal(Object.keys(await stacks(run)).length, 6, 'the board is kept, not emptied');
+    const text = await run.page.text();
+    assert.match(text, /#41's board is from the read at \d\d:\d\d; GitHub's hourly limit stopped a newer one/);
+    assert.match(text, /Part of this read failed/);
+  } finally {
+    await run.close();
+  }
+});
+
+test('Canvas real data: a read skipped while GitHub\'s limit is paused says it waits, never "reading…" forever', async () => {
+  const run = await start();
+  try {
+    world(run);
+    wrap(run, 'Specs', reply => {
+      const json = structuredClone(reply.json);
+      json.data.rateLimit = { ...json.data.rateLimit, remaining: 10 };
+      return { ...reply, json };
+    });
+    await signIn(run.page);
+    await run.page.click('acme/factory');
+    await run.page.until(`OW.data.paused() && OW.data.feeds.specs.readAt`, 'the pause');
+    await run.page.run('OW.data.stop(); OW.data.start()');
+    await run.page.until(`document.body.innerText.includes('Agents: waits for GitHub\\'s limit')`, 'the waiting line', 8000);
+    assert.doesNotMatch(await run.page.text(), /reading…/);
+    assert.match(await run.page.text(), /hourly read limit for your account is nearly used up/);
+  } finally {
+    await run.close();
+  }
+});
