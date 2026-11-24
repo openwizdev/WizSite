@@ -410,8 +410,8 @@ test('POST /api/book refuses slots outside hours, inside a buffer, or double-boo
 
   const validSlot = '2026-11-25T21:00:00Z';
   const [first, second] = await Promise.all([
-    readJson(await bookHandle(postJson('/api/book', bookingPayload(validSlot, { email: 'one@example.com' }), { ip: '198.51.100.1' }), env, { now: NOW, fetch: icalFetch })),
-    readJson(await bookHandle(postJson('/api/book', bookingPayload(validSlot, { email: 'two@example.com' }), { ip: '198.51.100.2' }), env, { now: NOW, fetch: icalFetch })),
+    bookHandle(postJson('/api/book', bookingPayload(validSlot, { email: 'one@example.com' }), { ip: '198.51.100.1' }), env, { now: NOW, fetch: icalFetch }).then(readJson),
+    bookHandle(postJson('/api/book', bookingPayload(validSlot, { email: 'two@example.com' }), { ip: '198.51.100.2' }), env, { now: NOW, fetch: icalFetch }).then(readJson),
   ]);
   const statuses = [first.status, second.status].sort();
   assert.deepEqual(statuses, [200, 409]);
@@ -638,4 +638,105 @@ test('onRequest entry points dispatch to handle for all four routes', async () =
   assert.equal((await bookOnRequest({ request: getReq('/api/book', { method: 'GET' }), env })).status, 405);
   assert.equal((await cancelOnRequest({ request: getReq('/api/book/cancel', { method: 'GET' }), env })).status, 405);
   assert.equal((await feedOnRequest({ request: getReq('/api/book/feed', { headers: { Authorization: `Bearer ${FEED_SECRET}` } }), env })).status, 200);
+});
+
+test('iCal follows HTTPS redirects and times out cleanly without leaking URL', async () => {
+  const store = fakeD1();
+  const env = makeEnv(store, { BOOK_MODE: 'live', BOOK_ICAL_URL: ICAL_SECRET_URL });
+  let hops = 0;
+  const redirectFetch = async url => {
+    hops += 1;
+    if (String(url) === ICAL_SECRET_URL) {
+      return new Response(null, { status: 302, headers: { Location: 'https://calendar.example.invalid/final.ics' } });
+    }
+    return new Response(SAMPLE_ICS, { status: 200 });
+  };
+  const ok = await readJson(await slotsHandle(getReq('/api/book/slots'), env, { now: NOW, fetch: redirectFetch }));
+  assert.equal(ok.status, 200);
+  assert.equal(hops, 2);
+
+  const hangingFetch = (_url, init = {}) => new Promise((_, reject) => {
+    init.signal?.addEventListener('abort', () => reject(new Error(`timeout ${ICAL_SECRET_URL}`)));
+  });
+  const timedOut = await readJson(await slotsHandle(getReq('/api/book/slots'), env, { now: NOW, fetch: hangingFetch, icalTimeout: 25 }));
+  assert.equal(timedOut.status, 503);
+  assert.equal(timedOut.json.error, 'unavailable');
+  assertNoSecrets(timedOut.text);
+});
+
+test('POST /api/book succeeds when Google insert fails and reports skipped or failed email', async () => {
+  const store = fakeD1();
+  const envSkipped = makeEnv(store, {
+    GOOGLE_CLIENT_ID,
+    GOOGLE_CLIENT_SECRET,
+    GOOGLE_REFRESH_TOKEN,
+  });
+  const slots = (await readJson(await slotsHandle(getReq('/api/book/slots'), envSkipped, { now: NOW }))).json.slots;
+  const failingFetch = async () => new Response('upstream error', { status: 500 });
+
+  const skipped = await readJson(await bookHandle(
+    postJson('/api/book', bookingPayload(slots[0], { email: 'skip@example.com' }), { ip: '198.51.100.11' }),
+    envSkipped,
+    { now: NOW, fetch: failingFetch },
+  ));
+  assert.equal(skipped.status, 200);
+  assert.equal(skipped.json.email, 'skipped');
+  assert.equal(store.bookings()[0].google_event, null);
+
+  const envFailedMail = makeEnv(store, { RESEND_API_KEY: RESEND_SECRET });
+  const failed = await readJson(await bookHandle(
+    postJson('/api/book', bookingPayload(slots[slots.length - 1], { email: 'fail@example.com' }), { ip: '198.51.100.12' }),
+    envFailedMail,
+    { now: NOW, fetch: failingFetch },
+  ));
+  assert.equal(failed.status, 200);
+  assert.equal(failed.json.email, 'failed');
+});
+
+test('concurrent double booking hits the unique index and returns one 200 and one 409', async () => {
+  const store = fakeD1();
+  const env = makeEnv(store, { BOOK_MODE: 'live', BOOK_ICAL_URL: ICAL_SECRET_URL });
+  let release;
+  let waiting = 0;
+  const barrier = new Promise(resolve => { release = resolve; });
+  const syncedFetch = async () => {
+    waiting += 1;
+    if (waiting === 2) release();
+    await barrier;
+    return new Response(SAMPLE_ICS, { status: 200 });
+  };
+  const slot = '2026-11-25T21:00:00Z';
+  const [a, b] = await Promise.all([
+    bookHandle(postJson('/api/book', bookingPayload(slot, { email: 'race1@example.com' }), { ip: '198.51.100.21' }), env, { now: NOW, fetch: syncedFetch }).then(readJson),
+    bookHandle(postJson('/api/book', bookingPayload(slot, { email: 'race2@example.com' }), { ip: '198.51.100.22' }), env, { now: NOW, fetch: syncedFetch }).then(readJson),
+  ]);
+  assert.deepEqual([a.status, b.status].sort(), [200, 409]);
+  assert.equal(store.bookings().length, 1);
+});
+
+test('GET /api/book/feed enforces the 7-day-back to horizon window and includes cancelled rows', async () => {
+  const store = fakeD1();
+  const env = makeEnv(store, { BOOK_FEED_TOKEN: FEED_SECRET });
+  await slotsHandle(getReq('/api/book/slots'), env, { now: NOW });
+
+  const dayMs = 86_400_000;
+  const insert = store.db.prepare(
+    'INSERT INTO book_bookings (id, start, end, name, email, team, tz, status, cancel_hash, google_event, created) ' +
+    'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?)',
+  );
+  insert.run('too-old', NOW - 8 * dayMs, NOW - 8 * dayMs + 1800_000, 'Old', 'old@example.com', 'T', 'UTC', 'booked', 'a'.repeat(64), NOW - 9 * dayMs);
+  insert.run('recent-cancel', NOW - 3 * dayMs, NOW - 3 * dayMs + 1800_000, 'Mid', 'mid@example.com', 'T', 'UTC', 'cancelled', 'b'.repeat(64), NOW - 4 * dayMs);
+  insert.run('future-ok', NOW + 2 * dayMs, NOW + 2 * dayMs + 1800_000, 'Fut', 'fut@example.com', 'T', 'UTC', 'booked', 'c'.repeat(64), NOW);
+  insert.run('too-far', NOW + 20 * dayMs, NOW + 20 * dayMs + 1800_000, 'Far', 'far@example.com', 'T', 'UTC', 'booked', 'd'.repeat(64), NOW);
+
+  const res = await readJson(await feedHandle(
+    getReq('/api/book/feed', { headers: { Authorization: `Bearer ${FEED_SECRET}` } }),
+    env,
+    { now: NOW },
+  ));
+  assert.equal(res.status, 200);
+  assert.deepEqual(res.json.bookings.map(b => [b.id, b.status]), [
+    ['recent-cancel', 'cancelled'],
+    ['future-ok', 'booked'],
+  ]);
 });
