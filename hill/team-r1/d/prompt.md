@@ -1,0 +1,21 @@
+# Candidate D design targets
+
+Generated with the built-in image tool using full-page screenshots of the pinned parent as visual references.
+
+## Desktop prompt
+
+```text
+Generate an OpenWiz website UI design target, a single full-page flat screenshot, matching the provided baseline image precisely for typography (Geist), warm near-black canvas, ink text, navigation, copy, film artwork, general spacing, and entire footer. The existing Book a call buttons use the site's salmon-brass accent, retain that exact color and placement. Make only these styling changes. In On the call, remove the individual top rules, turn the three existing step numbers 1, 2, 3 into small 34px astronomy instrument rings with faint outer tick marks, and draw one straight thin muted-grey path from node center to node center. Use brass only on the first (entry) node, with nodes two and three neutral grey. Keep Connect, Decide, Ship titles and descriptions intact. Add extremely restrained grey chart linework around the hero film (partial thin orbital ellipses and a few pinprick stars at the edges) and in the free space of the closing call (another cropped orbital arc, a few pinpricks); reserve clean background under text, no glow, no nebula, no gradients, no texture over the film or the words. Change the Drivers page text underline to neutral grey. Keep all the words and exactly two Book a call buttons, no other new labels or imagery. No framed device, no extra margins. 1440px-wide desktop with 100px gutters, complete page from top nav through the oversized OpenWiz footer. Put the three connected rings above the copy columns, aligned with their left edges. The path runs horizontally and stops at the third ring.
+```
+
+## Phone prompt
+
+```text
+Generate an OpenWiz website UI design target, a single full-page flat screenshot, matching the provided baseline image precisely for typography (Geist), warm near-black canvas, ink text, navigation, copy, film artwork, general spacing, and entire footer. The existing Book a call buttons use the site's salmon-brass accent, retain that exact color and placement. Make only these styling changes. In On the call, remove the individual top rules, turn the three existing step numbers 1, 2, 3 into small 34px astronomy instrument rings with faint outer tick marks, and draw one straight thin muted-grey path from node center to node center. Use brass only on the first (entry) node, with nodes two and three neutral grey. Keep Connect, Decide, Ship titles and descriptions intact. Add extremely restrained grey chart linework around the hero film (partial thin orbital ellipses and a few pinprick stars at the edges) and in the free space of the closing call (another cropped orbital arc, a few pinpricks); reserve clean background under text, no glow, no nebula, no gradients, no texture over the film or the words. Change the Drivers page text underline to neutral grey. Keep all the words and exactly two Book a call buttons, no other new labels or imagery. No framed device, no extra margins. 390px-wide phone, tall native content canvas, complete page from the navigation through the OpenWiz footer. Keep the first full-width Book a call at about y=335. Put the three numbers in a column on the left and each title and paragraph to its right. The fine path runs vertically down the left column, stopping at the third ring. On phone, keep the linework in free space beside the hero headline and above or below the closing content.
+```
+
+## Inspection
+
+Both targets show the full page, with the original video placement, two booking buttons, and the footer. The first numbered ring is accented, the other two are neutral, and the line runs horizontally on desktop and vertically on phone. The phone target had blank side margins, which were cropped before resizing. The desktop target was resized to 1440 pixels wide and the phone target to 390 pixels wide.
+
+The generated artwork shows stronger arcs than intended, shifts some of the existing rules, and approximates the film poster, typography, and fine copy. The implementation uses the original markup and assets, retains the rules outside the steps, and confines fainter linework to open space around the film and closing call.
