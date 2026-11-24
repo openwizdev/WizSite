@@ -21,8 +21,10 @@
   function screen(...children) {
     built = null;
     OW.palette.close();
-    root.replaceChildren(h('div', { class: 'center' }, h('div', { class: 'panel' }, h('div', { class: 'brand' }, logo(), h('span', {}, 'OpenWiz')), ...children)));
+    const view = h('div', { class: 'center' }, h('div', { class: 'panel' }, h('div', { class: 'brand' }, logo(), h('span', {}, 'OpenWiz')), ...children));
+    root.replaceChildren(view);
     document.title = 'OpenWiz';
+    return view;
   }
 
   function signedOut(note) {
@@ -41,13 +43,14 @@
   async function picker() {
     data.stop();
     const session = data.auth.session();
-    screen(h('h1', {}, 'Pick a repository'), h('p', {}, 'Reading your repositories from GitHub…'), h('p', { class: 'small' }, signOutButton()));
+    const view = screen(h('h1', {}, 'Pick a repository'), h('p', {}, 'Reading your repositories from GitHub…'), h('p', { class: 'small' }, signOutButton()));
     let found;
     try {
       found = await data.repositories();
     } catch (error) {
+      if (!view.isConnected) return;
       const now = data.auth.session();
-      if (error instanceof data.SignedOut && (now === null || now === session)) return signedOut('Your sign-in ended. Sign in again.');
+      if (now === null && (error instanceof data.SignedOut || error instanceof data.Ended)) return OW.onSignedOut();
       if (now !== session || error instanceof data.Ended) return;
       return screen(h('h1', {}, 'Pick a repository'),
         h('div', { class: 'notices' }, h('div', { class: 'notice bad', role: 'alert' }, icon('warn'),
@@ -123,8 +126,9 @@
       try {
         found = await readRepositories();
       } catch (error) {
+        if (!list.isConnected) return;
         const now = data.auth.session();
-        if (error instanceof data.SignedOut && (now === null || now === session)) return signedOut('Your sign-in ended. Sign in again.');
+        if (now === null && (error instanceof data.SignedOut || error instanceof data.Ended)) return OW.onSignedOut();
         if (now !== session || error instanceof data.Ended) return;
         return list.replaceChildren(h('p', { class: 'bad' }, 'Couldn\'t read your repositories, so the list is unknown, not empty.'),
           h('button', { class: 'btn', type: 'button', onclick: fill }, icon('refresh'), 'Try again'));
