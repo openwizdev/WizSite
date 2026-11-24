@@ -395,7 +395,13 @@
 
   data.onChange(update);
   OW.onSignedOut = () => signedOut('Your sign-in ended. Sign in again.');
-  window.addEventListener('hashchange', () => (demo ? draw() : built ? update() : null));
+  window.addEventListener('hashchange', () => {
+    if (demo) {
+      OW.v2.dismissToast();
+      return draw();
+    }
+    if (built) update();
+  });
   document.addEventListener('keydown', event => {
     if (!built || (v2 && (event.defaultPrevented || document.querySelector('.v2-sheet[open]')))) return;
     if ((event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'k') {

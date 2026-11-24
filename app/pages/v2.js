@@ -39,8 +39,8 @@
           merged: 6,
           total: 6,
           scenes: [
-            '0:02 · Enter your email to get a sign-in link.',
-            '0:05 · Open the link to start a session.',
+            '0:02 · Request a sign-in link.',
+            '0:05 · Open the link to sign in.',
             '0:08 · All six tickets merged.',
           ],
           sceneIdx: 0,
@@ -50,14 +50,14 @@
           status: 'pending',
           title: 'Keep the free plan?',
           goal: 'Harbor’s free plan costs about $40 a month to run.',
-          rec: 'keep it, cap at 3 seats',
+          rec: 'Keep it, cap at 3 seats',
         },
         {
           type: 'decision',
           status: 'pending',
           title: 'Retention window for deleted projects',
           goal: 'Deleted projects can stay recoverable for 7 or 30 days.',
-          rec: 'allow recovery for 30 days',
+          rec: 'Allow recovery for 30 days',
         },
       ],
       building: [
@@ -76,7 +76,7 @@
     };
   }
 
-  const demo = initialDemoState();
+  const demo = isDemo ? initialDemoState() : null;
   if (isDemo && location.hash === '#/feed/clear') demo.cards = [];
   let redraw = () => {};
   let toastTimer;
@@ -138,12 +138,14 @@
       event.preventDefault();
       const text = input.value.trim();
       if (!text) return input.focus();
-      demo.messages.push(
+      const sent = [
         { role: 'user', time: 'Just now', text: `On “${card.title}”: ${text}` },
-        { role: 'wiz', time: 'Just now', text: `I’ll update “${card.title}” and check it again.` });
+        { role: 'wiz', time: 'Just now', text: `I’ll update “${card.title}” and check it again.` },
+      ];
+      demo.messages.push(...sent);
       sheet.close();
       opener.focus();
-      onSend();
+      onSend(() => { demo.messages = demo.messages.filter(message => !sent.includes(message)); });
     } }, title, h('p', {}, card.title), input,
     h('div', { class: 'v2-quick-chips' }, chips),
     h('div', { class: 'v2-sheet-actions' },
@@ -389,30 +391,32 @@
     const next = list[index + 1];
     const decision = card.type === 'decision';
     const go = href => {
+      if (href !== location.hash) dismissToast?.();
       history.replaceState(null, '', href);
       el.closest('.v2-view').scrollTop = 0;
       redraw();
     };
     const focusCard = () => el.querySelector('.v2-hero-card h2, .v2-clear-card h2')?.focus({ preventScroll: true });
-    const resolve = (status, label, revision) => {
+    const resolve = (status, label, { revision, undoChange } = {}) => {
       const previous = card.status;
       card.status = status;
       if (revision) demo.building.unshift(revision);
       go(cardHref(next || list[index - 1]));
       focusCard();
-      showToast(label, status === 'changing' ? null : () => {
+      showToast(label, revision ? null : () => {
+        undoChange?.();
         card.status = previous;
         go(cardHref(card));
         focusCard();
       });
     };
     const details = decision
-      ? h('p', { class: 'v2-recommendation' }, 'Recommended: ', card.rec)
+      ? h('h3', { class: 'v2-recommendation' }, h('span', {}, 'Recommended:'), ' ', card.rec)
       : h('div', { class: 'v2-progress-box' },
         h('p', {}, h('strong', {}, `${card.merged} of ${card.total}`), ' tickets merged'),
         h('div', { class: 'v2-pips', 'aria-hidden': 'true' },
           Array.from({ length: card.total }, (_, i) => h('span', { class: i < card.merged ? 'merged' : '' }))));
-    const hero = h('article', { class: `v2-hero-card ${decision ? 'v2-decision-card' : 'v2-spec-card'}` },
+    const hero = h('article', { class: 'v2-hero-card' },
       h('div', { class: 'v2-card-top' },
         h('span', { class: 'v2-label' }, decision ? 'Needs you' : 'Ready to ship'),
         h('h2', { class: 'v2-card-title', tabindex: '-1' }, card.title),
@@ -421,15 +425,15 @@
       details,
       h('div', { class: 'v2-card-actions' },
         h('button', { type: 'button', class: 'v2-btn primary', 'data-focus': 'ship',
-          onclick: () => resolve(decision ? 'decided' : 'shipped', `${decision ? 'Approved' : 'Shipped'} “${card.title}”`) }, 'Ship it'),
+          onclick: () => resolve(decision ? 'decided' : 'shipped', `${decision ? 'Approved' : 'Shipped'} “${card.title}”`) }, icon('check'), decision ? card.rec : 'Ship it'),
         h('button', { type: 'button', class: 'v2-btn v2-change', 'data-focus': 'change',
-          onclick: event => openSheet(card, event.currentTarget, () => resolve('changing', 'Change sent', decision
-            ? null : { title: card.title, merged: 0, total: 1 })) }, 'Change something'),
+          onclick: event => openSheet(card, event.currentTarget, undoChange => resolve('changing', 'Change sent', decision
+            ? { undoChange } : { revision: { title: card.title, merged: 0, total: 1 } })) }, 'Change something'),
         h('button', { type: 'button', class: 'v2-btn subtle v2-defer', 'data-focus': 'defer',
           onclick: () => resolve('deferred', `Saved “${card.title}” for later`) }, 'Not now')));
     const navigation = pager(index, list.length, i => go(cardHref(list[i])));
     controls.replaceChildren(...(navigation ? [navigation] : []));
-    el.replaceChildren(h('div', { class: `v2-feed-stage${decision ? ' v2-feed-decision' : ''}` },
+    el.replaceChildren(h('div', { class: 'v2-feed-stage' },
       hero, nextPreview(next, href => { go(href); focusCard(); }), buildingSection(demo.building)));
   }
 
@@ -494,8 +498,8 @@
       note ? h('div', { class: 'notice bad', role: 'alert' }, icon('warn'), h('span', {}, note)) : null,
       h('a', { class: 'v2-btn primary', href: demoMode ? '#/chat' : '/api/sign-in/start' },
         demoMode ? 'Open Harbor workspace' : 'Continue with GitHub', icon('right')),
-      h('a', { class: 'v2-btn subtle v2-welcome-sample', href: demoMode ? '/api/sign-in/start' : '/app/?demo=1#/chat' },
-        demoMode ? 'Continue with GitHub' : 'See a sample factory'));
+      h('a', { class: 'v2-btn subtle v2-welcome-sample', href: demoMode ? '/app/' : '/app/?demo=1#/chat' },
+        demoMode ? 'Exit sample workspace' : 'See a sample factory'));
     card.prepend(h('header', { class: 'v2-welcome-head' },
       h('div', { class: 'v2-welcome-brand' }, mark(), h('span', {}, 'OpenWiz')),
       demoMode ? h('span', { class: 'v2-sample-tag' }, 'Sample data') : null));
@@ -507,7 +511,7 @@
     setRedraw: fn => { redraw = fn; },
     renderWelcome,
     allClear,
-    buildingSection,
+    dismissToast: () => dismissToast?.(),
     pager,
     pages(ctx) {
       return [

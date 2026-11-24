@@ -47,17 +47,16 @@ async function queueWorld(run, { specs = SPECS, details, record = RECORD, specBo
   world.github['GET /repos/acme/factory/issues/60'] = () => ({ status: 200, json: { number: 60, state: 'open', body: specBody } });
 }
 
-const CARD = await readFile(new URL('app/cards/decision.js', ROOT), 'utf8');
 const MOCK_CARDS = `window.drawn = [];
 OW.cards = { decision(item, el) { window.drawn.push(item); el.replaceChildren(Object.assign(document.createElement('p'), { textContent: 'Decision card ' + item.key })); },
   spec(item, el) { window.drawn.push(item); el.replaceChildren(Object.assign(document.createElement('p'), { textContent: 'Spec card ' + item.key })); } };`;
-async function openQueue(run, value, { card = false, cards = false } = {}) {
+async function openQueue(run, value, { plain = false, cards = false } = {}) {
   await run.page.go(`${SITE}/app/`);
   await run.page.until(`document.readyState === 'complete'`, 'the app page');
   await run.page.run(`localStorage.setItem('openwiz.app.v2', ${JSON.stringify(JSON.stringify(value))})`);
   await signIn(run.page);
   if (cards) await run.page.run(MOCK_CARDS);
-  if (card) await run.page.run(CARD);
+  if (plain) await run.page.run('delete OW.cards.decision');
   await run.page.click('acme/factory');
 }
 const wasChecked = (world, id) => world.log.some(r => r.method === 'GET' && r.path === `/repos/acme/factory/issues/comments/${id}`);
@@ -120,15 +119,14 @@ test('switch on without card modules: plain cards link to GitHub, in the same or
   const run = await start();
   try {
     await queueWorld(run);
-    await openQueue(run, 'dry-run');
+    await openQueue(run, 'dry-run', { plain: true });
     await run.page.until(`document.querySelectorAll('.queue a.card').length === 5`, 'five plain cards');
     const links = await run.page.run(`[...document.querySelectorAll('.queue a.card')].map(a => [a.getAttribute('href'), a.target])`);
     assert.deepEqual(links, [['https://github.com/acme/factory/issues/60#issuecomment-9100021', '_blank'],
       ['https://github.com/acme/factory/pull/7#issuecomment-9100003', '_blank'], ['https://github.com/acme/factory/pull/7#issuecomment-9100005', '_blank'],
       ['https://github.com/acme/factory/issues/61', '_blank'], ['https://github.com/acme/factory/issues/60', '_blank']]);
     assert.match(await run.page.text(), /Plan to approve · #60/i);
-    const progress = await run.page.run(`[...document.querySelectorAll('.v2-building progress')].map(bar => [bar.value, bar.max])`);
-    assert.deepEqual(progress, [[0, 2], [1, 3]]);
+    assert.equal(await run.page.run(`Boolean(document.querySelector('.v2-building'))`), false, 'specs with Feed cards are repeated in Building');
     const visible = () => run.page.run(`[...document.querySelectorAll('.queue-item:not([hidden])')].map(e => e.dataset.key)`);
     assert.deepEqual(await visible(), [SPEC_DECISION]);
     await run.page.tap('Next card');
@@ -140,6 +138,9 @@ test('switch on without card modules: plain cards link to GitHub, in the same or
     assert.match(await run.page.text(), /Spec to watch · #61/i);
     assert.match(await run.page.text(), /0 of 2 tickets complete/);
     assert.equal(await run.page.run(`document.querySelector('.queue-item:not([hidden]) .v2-queue-video')?.href`), VIDEO);
+    await run.page.tap('Next card');
+    assert.match(await run.page.text(), /Spec to watch · #60/i);
+    assert.match(await run.page.text(), /1 of 3 tickets complete/);
     assert.deepEqual(run.world.violations, []);
   } finally {
     await run.close();
@@ -274,7 +275,7 @@ test('R1: the queue registers its check through OW.records.check, so a current d
   const run = await start();
   try {
     await queueWorld(run);
-    await openQueue(run, 'dry-run', { card: true });
+    await openQueue(run, 'dry-run');
     await run.page.until(`document.querySelectorAll('article.decision').length >= 2`, 'the decision cards');
     assert.ok(wasChecked(run.world, 9100021), 'the queue never checked the spec decision through OW.records.check');
     assert.ok(wasChecked(run.world, 9100003), 'the queue never checked the grill decision through OW.records.check');
@@ -316,29 +317,32 @@ test('R1: a check OW.records answers unchecked, or that throws, leaves the item 
   }
 });
 
-test('R2: a failed Specs refresh clears every earlier true and shows the gap', async () => {
-  const run = await start();
-  try {
-    await queueWorld(run);
-    await openQueue(run, 'on', { cards: true });
-    await run.page.until(`window.drawn.some(item => item.key === ${JSON.stringify(SPEC_DECISION)} && item.current === true)`
-      + ` && window.drawn.some(item => item.key === ${JSON.stringify(ROUND)} && item.current === true)`, 'the first, matched read');
-    run.world.graphql.Specs = async () => ({ status: 502, json: { message: 'Bad Gateway' } });
-    await triggerRefresh(run);
-    await run.page.until(`document.body.innerText.includes("Couldn't read Specs")`, 'the failed refresh');
-    await new Promise(resolve => setTimeout(resolve, 700));
-    const shown = await run.page.run(`[...document.querySelectorAll('.queue-item')].map(el => el.dataset.key)`);
-    const current = {};
-    for (const key of [SPEC_DECISION, ROUND]) current[key] = (await latestOf(run, key)).current;
-    assert.deepEqual(current, { [SPEC_DECISION]: null, [ROUND]: null }, 'a failed refresh kept an earlier true');
-    assert.ok(shown.includes(SPEC_DECISION) && shown.includes(ROUND), 'the cards from the last good read went away');
-    const text = await run.page.text();
-    assert.match(text, /Couldn't read Specs from GitHub\. Showing the last successful read\./);
-    assert.equal((text.match(/Couldn't read Specs/g) || []).length, 1, 'the Specs failure appears once');
-  } finally {
-    await run.close();
-  }
-});
+for (const [status, headers] of [[429, { 'Retry-After': '600' }], [502, {}]]) {
+  test(`R2: a ${status} Specs refresh clears every earlier true and shows one warning with both times`, async () => {
+    const run = await start();
+    try {
+      await queueWorld(run);
+      await openQueue(run, 'on', { cards: true });
+      await run.page.until(`window.drawn.some(item => item.key === ${JSON.stringify(SPEC_DECISION)} && item.current === true)`
+        + ` && window.drawn.some(item => item.key === ${JSON.stringify(ROUND)} && item.current === true)`, 'the first, matched read');
+      run.world.graphql.Specs = async () => ({ status, headers, json: { message: 'Synthetic failure' } });
+      const lastRead = await run.page.run('OW.data.feeds.specs.readAt');
+      await triggerRefresh(run);
+      await run.page.until(`document.body.innerText.includes("Couldn't read Specs")`, 'the failed refresh');
+      const shown = await run.page.run(`[...document.querySelectorAll('.queue-item')].map(el => el.dataset.key)`);
+      const current = {};
+      for (const key of [SPEC_DECISION, ROUND]) current[key] = (await latestOf(run, key)).current;
+      assert.deepEqual(current, { [SPEC_DECISION]: null, [ROUND]: null }, 'a failed refresh kept an earlier true');
+      assert.ok(shown.includes(SPEC_DECISION) && shown.includes(ROUND), 'the cards from the last good read went away');
+      const text = await run.page.text();
+      const clocks = await run.page.run(`[OW.data.feeds.specs.failedAt, ${lastRead}].map(OW.ui.time)`);
+      assert.ok(text.includes(`Couldn't read Specs at ${clocks[0]}. Showing the read from ${clocks[1]}.`), text);
+      assert.equal((text.match(/Couldn't read Specs/g) || []).length, 1, 'the Specs failure appears once');
+    } finally {
+      await run.close();
+    }
+  });
+}
 
 test('R2: a first Specs read with GraphQL errors and no nodes shows a gap, never the empty line', async () => {
   const run = await start();
@@ -415,7 +419,7 @@ test('R5: a successful recheck of the same decision keeps the typed draft, and t
   const run = await start();
   try {
     await queueWorld(run);
-    await openQueue(run, 'dry-run', { card: true });
+    await openQueue(run, 'dry-run');
     await run.page.until(`document.querySelector('article.decision[data-key="${SPEC_DECISION}"] textarea')`, 'the reply box');
     await run.page.run(`document.querySelector('article.decision[data-key="${SPEC_DECISION}"] textarea').focus()`);
     await run.page.type('Keep it, but later');
@@ -489,7 +493,7 @@ test('R8: a transient Specs 502 disables answering, keeps the draft in memory, a
   const run = await start();
   try {
     await queueWorld(run);
-    await openQueue(run, 'dry-run', { card: true });
+    await openQueue(run, 'dry-run');
     await run.page.until(`document.querySelector('article.decision[data-key="${SPEC_DECISION}"] textarea')`, 'the reply box');
     await run.page.run(`document.querySelector('article.decision[data-key="${SPEC_DECISION}"] textarea').focus()`);
     await run.page.type('Keep it through a 502');
@@ -519,7 +523,7 @@ test('R8: a changed binding on recovery does not restore the old draft', async (
   const run = await start();
   try {
     await queueWorld(run);
-    await openQueue(run, 'dry-run', { card: true });
+    await openQueue(run, 'dry-run');
     await run.page.until(`document.querySelector('article.decision[data-key="${SPEC_DECISION}"] textarea')`, 'the reply box');
     await run.page.run(`document.querySelector('article.decision[data-key="${SPEC_DECISION}"] textarea').focus()`);
     await run.page.type('Draft for old binding');
@@ -544,7 +548,7 @@ test('R9: tapping Yes during a refresh with a slow later GitHub read composes wi
   const run = await start();
   try {
     await queueWorld(run);
-    await openQueue(run, 'dry-run', { card: true });
+    await openQueue(run, 'dry-run');
     await run.page.until(`document.querySelectorAll('article.decision').length >= 2`, 'the decision cards');
     const firstPulls = run.world.recorded[pageOne];
     delete run.world.recorded[pageOne];
@@ -581,7 +585,7 @@ test('R9: a card marked stale by a timestamp mismatch recovers on the next succe
   const run = await start();
   try {
     await queueWorld(run);
-    await openQueue(run, 'dry-run', { card: true });
+    await openQueue(run, 'dry-run');
     await run.page.until(`document.querySelector('article.decision[data-key="${SPEC_DECISION}"] textarea')`, 'the reply box');
     await run.page.run(`document.querySelector('article.decision[data-key="${SPEC_DECISION}"] textarea').focus()`);
     await run.page.type('Draft survives stale recovery');
