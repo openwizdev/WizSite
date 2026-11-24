@@ -237,10 +237,10 @@ test('slots: notice, horizon, day and hour edges', () => {
     BOOK_NOTICE_HOURS: '4',
     BOOK_HORIZON_DAYS: '3',
   });
-  const nowMs = iso('2026-05-01T15:00:00Z');
+  const nowMs = iso('2026-05-01T19:00:00Z');
   const slots = openSlots(cfg, [], [], nowMs);
-  assert.equal(slots[0], iso('2026-05-01T19:00:00Z'));
-  assert.equal(fmtLocal(slots[0], cfg.timezone), '2026-05-01, 12:00');
+  assert.equal(slots[0], iso('2026-05-01T23:00:00Z'));
+  assert.equal(fmtLocal(slots[0], cfg.timezone), '2026-05-01, 16:00');
   const fridaySlots = slots.filter((ms) => fmtLocal(ms, cfg.timezone).startsWith('2026-05-01'));
   assert.equal(fmtLocal(fridaySlots[fridaySlots.length - 1], cfg.timezone), '2026-05-01, 17:00');
   assert.ok(slots.every((ms) => {
@@ -248,7 +248,10 @@ test('slots: notice, horizon, day and hour edges', () => {
     return !local.startsWith('2026-05-02') && !local.startsWith('2026-05-03');
   }));
   const mondaySlots = slots.filter((ms) => fmtLocal(ms, cfg.timezone).startsWith('2026-05-04'));
-  assert.equal(fmtLocal(mondaySlots[0], cfg.timezone), '2026-05-04, 11:30');
+  assert.deepEqual(
+    mondaySlots.map((ms) => fmtLocal(ms, cfg.timezone)),
+    ['2026-05-04, 11:30', '2026-05-04, 12:00'],
+  );
   assert.ok(slots.every((ms) => ms <= nowMs + 3 * 86_400_000));
 });
 
@@ -299,7 +302,7 @@ test('slots: daily cap blocks the capped local day without blocking the next day
   const nowMs = iso('2026-05-04T15:00:00Z');
   const bookings = [
     { start: iso('2026-05-04T18:00:00Z'), end: iso('2026-05-04T18:30:00Z') },
-    { start: iso('2026-05-04T20:00:00Z'), end: iso('2026-05-04T20:30:00Z') },
+    { start: iso('2026-05-05T00:30:00Z'), end: iso('2026-05-05T01:00:00Z') },
   ];
   const slots = openSlots(cfg, [], bookings, nowMs);
   assert.equal(slots.filter((ms) => fmtLocal(ms, cfg.timezone).startsWith('2026-05-04')).length, 0);
