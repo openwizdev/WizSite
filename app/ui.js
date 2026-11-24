@@ -90,13 +90,17 @@
 
   const stillReading = text => text.endsWith('…');
   const waiting = new Map();
+  function dance(text, more = window.WizLoader?.lines) {
+    if (!window.WizLoader) return null;
+    const box = window.WizLoader.markup(true);
+    window.WizLoader.mount(box, { lines: [text, ...more] });
+    return box;
+  }
   function loading(text) {
     const known = waiting.get(text);
     if (known?.isConnected) return known;
-    if (!window.WizLoader) return null;
-    const box = window.WizLoader.markup(true);
-    window.WizLoader.mount(box, { lines: [text, ...window.WizLoader.lines] });
-    waiting.set(text, box);
+    const box = dance(text);
+    if (box) waiting.set(text, box);
     return box;
   }
 
@@ -122,6 +126,7 @@
     },
     unknown: text => h('div', { class: 'unknown' }, h('b', {}, 'Unknown. '), text),
     placeholder: text => (stillReading(text) ? loading(text) : null) || h('div', { class: 'placeholder' }, text),
+    dance,
     loading,
     fill,
   };

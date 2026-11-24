@@ -552,17 +552,28 @@
         h('button', { class: 'v2-set-row v2-sign-out', type: 'button', onclick: ctx.signOut }, settingLabel('exit', 'Sign out')),
         h('section', { class: 'v2-settings-freshness' }, h('h2', { class: 'v2-label' }, 'Data freshness'), freshness)));
     }
-    freshness.replaceChildren(...ctx.freshnessNodes());
+    OW.ui.fill(freshness, ctx.freshnessNodes());
+  }
+
+  let readingCard;
+  function readingState(text) {
+    if (!OW.data.paused() && readingCard?.isConnected && readingCard.querySelector('h2').textContent === text) return readingCard;
+    const wizes = OW.data.paused() ? null : OW.ui.dance(text);
+    const quiet = wizes ? 'visually-hidden' : null;
+    wizes?.removeAttribute('role');
+    wizes?.setAttribute('aria-hidden', 'true');
+    const card = h('div', { class: `placeholder v2-state-card${wizes ? ' v2-state-reading' : ''}`, role: 'status' },
+      h('span', { class: 'v2-label' }, 'Syncing'),
+      h('h2', { class: quiet }, text),
+      h('p', { class: quiet }, 'Checking your repository for open specs and decisions.'),
+      wizes);
+    readingCard = wizes ? card : null;
+    return card;
   }
 
   function stateCard(kind, text) {
     if (kind === 'pause') return h('div', { class: 'v2-pause-note', role: 'status' }, icon('pause'), h('span', {}, text));
-    if (kind === 'reading') {
-      return h('div', { class: 'placeholder v2-state-card', role: 'status' },
-        h('span', { class: 'v2-label' }, 'Syncing'),
-        h('h2', {}, text),
-        h('p', {}, 'Checking your repository for open specs and decisions.'));
-    }
+    if (kind === 'reading') return readingState(text);
     const labels = { failed: 'Read failed', stale: 'Showing earlier read', partial: 'Partial read' };
     return h('div', { class: 'unknown v2-state-card v2-state-warn', role: 'status' },
       h('div', { class: 'v2-state-head' }, icon('warn'), h('span', { class: 'v2-label' }, labels[kind] || 'Unknown')),

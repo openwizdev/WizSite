@@ -219,7 +219,7 @@
     const feeds = v2 ? [data.feeds.specs] : Object.values(data.feeds);
     const limit = data.limit;
     return [
-      ...feeds.map(feed => h('div', {}, ...readLine(feed))),
+      ...feeds.map(feed => (v2 && feed.state === 'loading' && feed.busy && OW.ui.loading(`${feed.label}: reading…`)) || h('div', {}, ...readLine(feed))),
       h('div', {}, limit.remaining === null ? 'GitHub limit: not read yet' : `GitHub limit: ${limit.remaining.toLocaleString()} left`),
       ...(v2 && data.paused() ? [h('div', {}, `Reads paused until ${time(limit.pausedUntil)}`)] : []),
     ];
