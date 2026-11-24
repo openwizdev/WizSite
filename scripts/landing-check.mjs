@@ -78,7 +78,7 @@ async function launch() {
 const MODES = {
   motion: {},
   reduced: { reduced: true },
-  'no GSAP': { block: ['*gsap*'] },
+  'no GSAP': { block: ['*gsap*'], stars: null },
   'no JavaScript': { noScript: true },
   'no FAQ script': { block: ['*/faq.*.js'] },
 };
@@ -94,6 +94,14 @@ async function open(browser, origin, width, height, mode, path = '/') {
   await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: width <= 480 });
   await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: mode.reduced ? 'reduce' : 'no-preference' }] });
   if (mode.noScript) await send('Emulation.setScriptExecutionDisabled', { value: true });
+  if (!mode.noScript && mode.stars !== null) {
+    await send('Page.addScriptToEvaluateOnNewDocument', { source: `
+      const realFetch = window.fetch.bind(window);
+      window.fetch = (url, ...args) => url === 'https://api.github.com/repos/openwizdev/OpenWiz'
+        ? Promise.resolve(Response.json({ stargazers_count: ${mode.stars ?? 12345} }))
+        : realFetch(url, ...args);
+    ` });
+  }
   const loaded = new Promise(resolve => browser.on(m => m.sessionId === sessionId && m.method === 'Page.loadEventFired' && resolve()));
   await send('Page.navigate', { url: `${origin}${path}` });
   await loaded;
@@ -324,22 +332,25 @@ async function handoff(page, where) {
 async function chrome(page, where, mode) {
   const facts = await page.evaluate(`(() => { ${HELPERS}
     const bar = document.querySelector('header.landing-nav');
-    const mark = bar?.querySelector('.landing-brand svg');
+    const mark = bar?.querySelector('.landing-brand img');
     const star = bar?.querySelector('.github-star');
     const footer = document.querySelector('footer.landing-footer');
     return {
-      scroll: document.scrollingElement.scrollWidth, inner: innerWidth,
-      mark: shown(mark) && mark.querySelector('[fill="#cfc6b8"]') !== null,
+      scroll: document.scrollingElement.scrollWidth, inner: document.documentElement.clientWidth,
+      mark: shown(mark) && mark.getAttribute('src') === '/art/wiz-mark.webp' && mark.naturalWidth === 128,
       star: shown(star) && star.getAttribute('href') === 'https://github.com/openwizdev/openwiz' && shown(star.querySelector('svg')),
-      signIn: shown(bar?.querySelector('a.sign-in[href="/app/"]')),
+      count: shown(star?.querySelector('[data-stars]')) && star.querySelector('[data-stars]').textContent,
+      name: star?.getAttribute('aria-label'),
       footer: shown(footer?.querySelector('.footer-wordmark')) && footer.querySelectorAll('.family-wiz').length === 12,
       font: getComputedStyle(document.body).fontFamily.split(',')[0].trim(),
     };
   })()`);
+  const fallback = mode === 'no JavaScript' || mode === 'no GSAP';
   expect(facts.scroll <= facts.inner, where, `sideways scroll (${facts.scroll}px content in a ${facts.inner}px window)`);
-  expect(facts.mark, where, 'the top bar lacks the cream mark');
-  expect(facts.star, where, 'the top bar lacks the GitHub logo link');
-  expect(facts.signIn, where, 'the top bar lacks Sign in');
+  expect(facts.mark, where, 'the top bar lacks the painted Wiz');
+  expect(facts.star, where, 'the top bar lacks the GitHub star icon link');
+  expect(facts.count === (fallback ? 'Star' : '12.3k'), where, `unexpected visible stars: ${facts.count}`);
+  expect(facts.name === (fallback ? 'GitHub stars' : 'GitHub stars: 12,345'), where, `unexpected GitHub stars label: ${facts.name}`);
   expect(facts.footer, where, 'the page lacks the landing footer (wordmark and Wizes)');
   expect(facts.font === 'Geist', where, `the page is not set in the landing's type (${facts.font})`);
 }
@@ -347,28 +358,75 @@ async function chrome(page, where, mode) {
 async function buy(page, where, path) {
   const facts = await page.evaluate(`(() => { ${HELPERS}
     const bar = document.querySelector('header.landing-nav');
-    // The worst case a visitor sees: a long star count and, above phone and tablet widths, a classic scrollbar taking 17 px.
-    const stars = bar?.querySelector('[data-stars]');
-    if (stars) { stars.hidden = false; stars.textContent = '12.3k'; }
-    if (innerWidth > 640) document.documentElement.style.width = (innerWidth - 17) + 'px';
-    const inside = el => shown(el) && el.getBoundingClientRect().left >= 0 && el.getBoundingClientRect().right <= innerWidth && el.scrollWidth <= el.clientWidth + 1;
-    const button = bar?.querySelector('a.nav-team[href="/team/"]');
+    const root = document.documentElement;
+    // Reserve 17 px for a classic scrollbar when the browser has none.
+    if (root.clientWidth === innerWidth) root.style.width = (innerWidth - 17) + 'px';
+    const width = Math.min(root.clientWidth, root.getBoundingClientRect().width);
+    const capsule = bar.querySelector('.nav-capsule').getBoundingClientRect();
+    const inside = el => {
+      if (!shown(el)) return false;
+      const { left, right } = el.getBoundingClientRect();
+      return left >= capsule.left && right <= Math.min(width, capsule.right) && el.scrollWidth <= el.clientWidth + 1;
+    };
+    const button = bar.querySelector('a.nav-team[href="/team/"]');
+    const phone = matchMedia('(max-width: 820px)').matches;
     const facts = {
-      scroll: document.scrollingElement.scrollWidth, inner: innerWidth,
-      clipped: [...bar.querySelectorAll('a')].filter(a => a.scrollWidth > a.clientWidth + 1).map(a => a.className || a.getAttribute('href')),
-      over: bar.scrollWidth - bar.clientWidth,
-      button: inside(button) && button.innerText.trim().length > 0,
-      drivers: inside(bar?.querySelector('a[href="/drivers/"]')),
+      scroll: document.scrollingElement.scrollWidth, inner: root.clientWidth,
+      clipped: [...bar.querySelectorAll('a, button')].filter(el => shown(el) && !inside(el)).map(el => el.className || el.getAttribute('href')),
+      button: inside(button) && button.innerText.trim() === (phone ? 'For teams' : 'Get it for your team'),
       book: [...document.querySelectorAll('a[data-book]')].filter(shown).length,
     };
-    document.documentElement.style.width = '';
+    root.style.width = '';
     return facts;
   })()`);
-  expect(facts.over <= 1 && !facts.clipped.length, where, `the top bar clips (with a star count and a scrollbar): ${facts.over}px over, links ${facts.clipped.join(', ')}`);
+  expect(!facts.clipped.length, where, `the top bar clips with a scrollbar: ${facts.clipped.join(', ')}`);
   expect(facts.scroll <= facts.inner, where, `sideways scroll (${facts.scroll}px content in a ${facts.inner}px window)`);
   expect(facts.button, where, 'the top bar lacks the buy button inside the window');
-  expect(facts.drivers, where, 'the top bar lacks the Drivers link inside the window');
   if (path === '/team/') expect(facts.book === 2, where, `the team page needs its two Book a call links (${facts.book})`);
+}
+
+async function menu(page, where, mode) {
+  const read = () => page.evaluate(`(() => { ${HELPERS}
+    const toggle = document.querySelector('.nav-toggle');
+    const panel = document.getElementById(toggle.getAttribute('aria-controls'));
+    const r = toggle.getBoundingClientRect();
+    return {
+      phone: matchMedia('(max-width: 820px)').matches,
+      x: r.left + r.width / 2, y: r.top + r.height / 2,
+      toggle: shown(toggle), expanded: toggle.getAttribute('aria-expanded'),
+      links: [...panel.querySelectorAll('a')].filter(shown).map(a => a.textContent),
+      targets: [...panel.querySelectorAll('a')].filter(shown).every(a => a.offsetHeight >= 40),
+      signIn: shown(document.querySelector('.nav-capsule > a.sign-in[href="/app/"]')),
+      firstFocused: document.activeElement === panel.querySelector('a'),
+      toggleFocused: document.activeElement === toggle,
+      locked: getComputedStyle(document.documentElement).overflowY === 'hidden' && document.querySelector('main').inert,
+    };
+  })()`);
+  const routes = 'Drivers,Market,Changelog,FAQ';
+  const start = await read();
+  if (!start.phone) {
+    expect(!start.toggle && start.links.join() === routes && start.signIn, where, 'desktop navigation links are missing');
+    return;
+  }
+  if (mode === 'no JavaScript') {
+    expect(!start.toggle && start.links.join() === routes + ',Sign in' && start.targets, where, 'phone links need JavaScript to show');
+    return;
+  }
+  expect(start.toggle && start.expanded === 'false' && !start.links.length && !start.signIn, where, 'the phone menu should start closed');
+  const click = () => page.click(start.x, start.y);
+  await click();
+  let state = await read();
+  expect(state.expanded === 'true' && state.links.join() === routes + ',Sign in' && state.targets, where, 'the phone menu lacks its five tap targets');
+  expect(state.firstFocused && state.locked, where, 'the open menu must move focus inside and lock the background');
+  await click();
+  state = await read();
+  expect(state.expanded === 'false' && state.toggleFocused && !state.links.length && !state.locked, where, 'a second tap must close the phone menu and restore focus');
+  await click();
+  for (const type of ['rawKeyDown', 'keyUp']) {
+    await page.send('Input.dispatchKeyEvent', { type, key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
+  }
+  state = await read();
+  expect(state.expanded === 'false' && state.toggleFocused && !state.links.length && !state.locked, where, 'Escape must close the phone menu and restore focus');
 }
 
 async function footer(page, where, mode) {
@@ -482,6 +540,7 @@ async function main() {
   const server = await serve();
   const origin = `http://127.0.0.1:${server.address().port}`;
   const browser = await launch();
+  const paths = ['/', '/drivers/', '/market/', '/changelog/', '/team/', '/faq/'];
   try {
     for (const [width, height] of WIDTHS) {
       for (const [name, mode] of Object.entries(MODES)) {
@@ -499,11 +558,12 @@ async function main() {
         } finally {
           await page.close();
         }
-        for (const path of ['/', '/changelog/', '/drivers/', '/team/', '/faq/']) {
+        for (const path of paths) {
           const other = await open(browser, origin, width, height, mode, path);
           try {
             await buy(other, `${path} ${where}`, path);
             await chrome(other, `${path} ${where}`, name);
+            await menu(other, `${path} ${where}`, name);
             await footer(other, `${path} ${where}`, name);
             if (FAQ_PATHS.includes(path)) await faq(other, `${path} ${where}`, width, name);
             if (process.env.SHOTS && name === 'motion' && path !== '/' && (width === 390 || width === 1280)) {
@@ -515,8 +575,8 @@ async function main() {
         }
       }
     }
-    for (const width of (process.env.WIDTHS || '481,500,560,640,641,700,760,761,800,900,960,1024').split(',').map(Number)) {
-      for (const path of ['/', '/changelog/', '/drivers/', '/team/', '/faq/']) {
+    for (const width of (process.env.WIDTHS || '351,375,481,500,560,640,641,700,760,761,768,800,820,821,900,960,1024').split(',').map(Number)) {
+      for (const path of paths) {
         const other = await open(browser, origin, width, 800, MODES.motion, path);
         try {
           await buy(other, `${path} ${width}px, motion`, path);
