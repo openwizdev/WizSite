@@ -4,9 +4,19 @@
   const API = 'https://api.github.com';
   const AUTH_KEY = 'openwiz.app.auth';
   const REPO_KEY = 'openwiz.app.repo';
+  const V2_KEY = 'openwiz.app.v2';
+  const V2_VALUES = ['on', 'dry-run', 'off'];
   const LOW = 100;
   const PAUSE_DEFAULT = 5 * 60 * 1000;
-
+  const scriptOf = (() => {
+    try { return Object.getOwnPropertyDescriptor(Document.prototype, 'currentScript')?.get ?? null; } catch { return null; }
+  })();
+  const recordsScript = (() => {
+    const next = scriptOf?.call(document)?.nextElementSibling;
+    return next?.tagName === 'SCRIPT' && /^\/app\/records(?:\.[0-9a-f]{10})?\.js$/.test(next.getAttribute('src') || '') ? next : null;
+  })();
+  const positive = n => Number.isSafeInteger(n) && n > 0;
+  const object = v => v !== null && typeof v === 'object' && !Array.isArray(v);
 
   const store = {
     get(key) {
@@ -19,10 +29,16 @@
     get: () => store.get(AUTH_KEY),
     session: () => store.get(AUTH_KEY)?.session ?? null,
     signedIn: () => Boolean(store.get(AUTH_KEY)?.token),
+    account() {
+      const kept = store.get(AUTH_KEY);
+      return kept?.token && positive(kept.account) ? kept.account : null;
+    },
     keep(grant, session) {
       const now = Date.now();
+      const prior = store.get(AUTH_KEY);
       store.set(AUTH_KEY, {
         session,
+        account: prior?.session === session && positive(prior.account) ? prior.account : null,
         token: grant.access_token,
         expiresAt: grant.expires_in ? now + grant.expires_in * 1000 : null,
         refresh: grant.refresh_token || null,
@@ -32,38 +48,73 @@
     signOut() {
       store.drop(AUTH_KEY);
       store.drop(REPO_KEY);
+      listed.clear();
       refreshing = null;
       stop();
       Object.assign(limit, { remaining: null, limit: null, pausedUntil: null });
     },
   };
+  const listed = new Map();
   const repo = {
     get: () => store.get(REPO_KEY),
     pick(full) {
       const [owner, name] = full.split('/');
-      store.set(REPO_KEY, { owner, name, full });
+      store.set(REPO_KEY, { owner, name, full, ...(listed.has(full) ? { private: listed.get(full) } : {}) });
     },
     forget: () => store.drop(REPO_KEY),
   };
+  const v2 = {
+    get() {
+      const value = store.get(V2_KEY);
+      return value === 'on' || value === 'dry-run' ? value : 'off';
+    },
+  };
+  {
+    const params = new URLSearchParams(location.search);
+    if (params.has('v2')) {
+      if (V2_VALUES.includes(params.get('v2'))) store.set(V2_KEY, params.get('v2'));
+      params.delete('v2');
+      const rest = params.toString();
+      history.replaceState(null, '', `${location.pathname}${rest ? `?${rest}` : ''}${location.hash}`);
+    }
+  }
 
 
   class Refused extends Error {}
-  function allowed(method, url, body) {
-    if (url.startsWith(`${API}/`)) {
-      if (method === 'GET') return true;
-      return method === 'POST' && url === `${API}/graphql` && /^\s*query\s/.test(body.query) && !/\b(mutation|subscription)\b/i.test(body.query);
-    }
-    return method === 'POST' && (url === '/api/sign-in/token' || url === '/api/sign-in/refresh');
+  const WRITE = Symbol('the records layer');
+  const OWNER_NAME = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$/;
+  const REPO_NAME = /^(?!\.\.?$)[A-Za-z0-9._-]{1,100}$/;
+  function oneComment(url, body) {
+    const picked = repo.get();
+    if (!picked || !OWNER_NAME.test(picked.owner) || !REPO_NAME.test(picked.name) || v2.get() !== 'on') return false;
+    const base = `${API}/repos/${picked.owner}/${picked.name}/issues/`;
+    return url.startsWith(base) && /^[1-9][0-9]{0,9}\/comments$/.test(url.slice(base.length))
+      && Object.keys(body).length === 1 && typeof body.body === 'string';
   }
-  async function ask(method, url, body, headers = {}) {
-    if (!allowed(method, url, body || {})) throw new Refused(`the app never sends ${method} ${url}`);
+  const readQuery = body => Object.keys(body).every(key => key === 'query' || key === 'variables') && typeof body.query === 'string'
+    && /^\s*query\s/.test(body.query) && !/\b(mutation|subscription)\b/i.test(body.query) && (body.variables === undefined || object(body.variables));
+  function allowed(method, url, text, key) {
+    let body;
+    try { body = text === undefined ? undefined : JSON.parse(text); } catch { return false; }
+    if (url.startsWith(`${API}/`)) {
+      if (method === 'GET') return body === undefined;
+      if (method !== 'POST' || !object(body)) return false;
+      if (key === WRITE && oneComment(url, body)) return true;
+      return url === `${API}/graphql` && readQuery(body);
+    }
+    return method === 'POST' && object(body) && (url === '/api/sign-in/token' || url === '/api/sign-in/refresh');
+  }
+  async function ask(method, url, body, headers = {}, key, redirect = 'follow') {
+    const text = body === undefined ? undefined : JSON.stringify(body);
+    if (!allowed(method, url, text, key)) throw new Refused(`the app never sends ${method} ${url}`);
     return fetch(url, {
       method,
-      headers: { ...(body ? { 'Content-Type': 'application/json' } : {}), ...headers },
-      body: body ? JSON.stringify(body) : undefined,
+      headers: { ...(text !== undefined ? { 'Content-Type': 'application/json' } : {}), ...headers },
+      body: text,
       credentials: url.startsWith('/') ? 'same-origin' : 'omit',
       cache: 'no-store',
       referrerPolicy: 'no-referrer',
+      redirect,
     });
   }
 
@@ -73,6 +124,7 @@
     const grant = response.ok ? await response.json() : null;
     if (!grant?.access_token) throw new Error('the sign-in did not finish');
     auth.keep(grant, crypto.randomUUID());
+    await resolveAccount();
   }
   let refreshing = null;
   function refresh(session) {
@@ -166,12 +218,18 @@
       try {
         const page = await every(`/user/installations/${install.id}/repositories`, 'repositories');
         complete &&= page.complete;
-        for (const r of page.items) if (typeof r?.full_name === 'string') repos.push({ full: r.full_name, private: Boolean(r.private) });
+        for (const r of page.items) {
+          if (typeof r?.full_name !== 'string') continue;
+          repos.push({ full: r.full_name, private: Boolean(r.private) });
+          listed.set(r.full_name, Boolean(r.private));
+        }
       } catch (error) {
         if (error instanceof Ended || error instanceof SignedOut) throw error;
         complete = false;
       }
     }
+    const picked = repo.get();
+    if (picked && listed.has(picked.full) && picked.private !== listed.get(picked.full)) store.set(REPO_KEY, { ...picked, private: listed.get(picked.full) });
     return { repos: repos.sort((a, b) => a.full.localeCompare(b.full)), complete, installations: installs.items.length };
   }
 
@@ -545,8 +603,69 @@
     }
   });
 
-  OW.data = {
-    auth, repo, feeds, limit, paused, finishSignIn, repositories, start, stop, refreshAll, SignedOut, Ended,
+  let resolving = null;
+  function resolveAccount() {
+    const kept = auth.get();
+    if (!kept?.token || positive(kept.account) || v2.get() === 'off') return Promise.resolve();
+    if (resolving?.session !== kept.session) {
+      const session = kept.session;
+      const run = github('GET', '/user').then(response => (response.ok ? response.json() : null)).then(user => {
+        const now = auth.get();
+        if (!positive(user?.id) || now?.session !== session || positive(now.account)) return;
+        store.set(AUTH_KEY, { ...now, account: user.id });
+        changed();
+      }).catch(() => {}).finally(() => { if (resolving?.run === run) resolving = null; });
+      resolving = { session, run };
+    }
+    return resolving.run;
+  }
+
+  function pinOk(pin, write) {
+    return object(pin) && typeof pin.session === 'string' && positive(pin.account) && OWNER_NAME.test(pin.owner) && REPO_NAME.test(pin.name)
+      && pin.full === `${pin.owner}/${pin.name}` && (!write || (positive(pin.number) && pin.number <= 9_999_999_999));
+  }
+  function held(pin, write) {
+    const kept = auth.get();
+    const picked = repo.get();
+    return Boolean(kept?.token) && kept.session === pin.session && kept.account === pin.account && picked?.owner === pin.owner
+      && picked?.name === pin.name && picked?.full === pin.full && (!write || v2.get() === 'on');
+  }
+  async function pinned(pin, method, path, body, write) {
+    if (!pinOk(pin, write)) throw new Refused('an unreadable operation context');
+    const url = path === '/graphql' ? `${API}/graphql` : `${API}/repos/${pin.owner}/${pin.name}${path}`;
+    let parsed;
+    try { parsed = new URL(url); } catch { throw new Refused(`the app never sends ${method} ${url}`); }
+    if (parsed.href !== url || parsed.origin !== API || (path !== '/graphql' && !parsed.pathname.startsWith(`/repos/${pin.owner}/${pin.name}/`))) {
+      throw new Refused(`the app never sends ${method} ${url}`);
+    }
+    if (!held(pin, write)) throw new Ended();
+    const kept = auth.get();
+    if (kept.expiresAt && kept.expiresAt < Date.now() + 60_000) {
+      const renewed = await refresh(pin.session);
+      if (!renewed) {
+        if (auth.session() === pin.session) auth.signOut();
+        throw new SignedOut();
+      }
+      if (!held(pin, write)) throw new Ended();
+    }
+    return ask(method, url, body, { Authorization: `Bearer ${auth.get().token}`, Accept: 'application/vnd.github+json' },
+      write ? WRITE : undefined, 'manual');
+  }
+  let claimed = false;
+  function claim() {
+    if (claimed || !scriptOf || !recordsScript || scriptOf.call(document) !== recordsScript) return null;
+    claimed = true;
+    return Object.freeze({
+      read: (pin, path) => pinned(pin, 'GET', path),
+      query: (pin, query, variables) => pinned(pin, 'POST', '/graphql', { query, variables }),
+      comment: (pin, body) => pinned(pin, 'POST', `/issues/${pin.number}/comments`, { body }, true),
+    });
+  }
+
+  OW.data = Object.freeze({
+    auth, repo, v2, feeds, limit, paused, finishSignIn, repositories, start, stop, refreshAll, SignedOut, Ended, Refused, noteLimit, claim,
+    github: (method, path, body) => github(method, path, body),
     onChange: listener => listeners.add(listener),
-  };
+  });
+  if (auth.signedIn()) resolveAccount();
 })();

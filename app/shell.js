@@ -8,6 +8,13 @@
   const ROUTES = () => OW.pages.map(page => page.id);
   let built = null;
   const INSTALL = 'https://github.com/apps/openwiz-viewer/installations/new';
+  const v2 = Boolean(OW.records?.enabled?.());
+  const queue = OW.pages.findIndex(page => page.v2);
+  if (queue >= 0) {
+    const [page] = OW.pages.splice(queue, 1);
+    if (v2) OW.pages.unshift(page);
+  }
+  const home = () => `#/${OW.pages[0].id}`;
 
   const route = () => {
     const [id, arg] = location.hash.replace(/^#\/?/, '').split('/');
@@ -21,8 +28,10 @@
   function screen(...children) {
     built = null;
     OW.palette.close();
-    root.replaceChildren(h('div', { class: 'center' }, h('div', { class: 'panel' }, h('div', { class: 'brand' }, logo(), h('span', {}, 'OpenWiz')), ...children)));
+    const view = h('div', { class: 'center' }, h('div', { class: 'panel' }, h('div', { class: 'brand' }, logo(), h('span', {}, 'OpenWiz')), ...children));
+    root.replaceChildren(view);
     document.title = 'OpenWiz';
+    return view;
   }
 
   function signedOut(note) {
@@ -32,7 +41,9 @@
       h('p', {}, 'See what needs you, every spec and the agents at work. Sign in to pick a repository.'),
       note ? h('div', { class: 'notices' }, h('div', { class: 'notice bad', role: 'alert' }, icon('warn'), h('span', {}, note))) : null,
       h('a', { class: 'btn primary', href: '/api/sign-in/start' }, 'Sign in with GitHub'),
-      h('p', { class: 'small' }, 'Read-only, on the repositories you choose. Your sign-in stays in this browser; the app talks only to GitHub.'),
+      h('p', { class: 'small' }, v2
+        ? 'On the repositories you choose, it posts only the comments you see and confirm. Your sign-in stays in this browser; the app talks only to GitHub.'
+        : 'Read-only, on the repositories you choose. Your sign-in stays in this browser; the app talks only to GitHub.'),
     );
   }
 
@@ -41,13 +52,15 @@
   async function picker() {
     data.stop();
     const session = data.auth.session();
-    screen(h('h1', {}, 'Pick a repository'), h('p', {}, 'Reading your repositories from GitHub…'), h('p', { class: 'small' }, signOutButton()));
+    const view = screen(h('h1', {}, 'Pick a repository'), h('p', {}, 'Reading your repositories from GitHub…'), h('p', { class: 'small' }, signOutButton()));
     let found;
     try {
       found = await data.repositories();
     } catch (error) {
-      if (data.auth.session() !== session || error instanceof data.Ended) return;
-      if (error instanceof data.SignedOut) return signedOut('Your sign-in ended. Sign in again.');
+      if (!view.isConnected) return;
+      const now = data.auth.session();
+      if (now === null && (error instanceof data.SignedOut || error instanceof data.Ended)) return OW.onSignedOut();
+      if (now !== session || error instanceof data.Ended) return;
       return screen(h('h1', {}, 'Pick a repository'),
         h('div', { class: 'notices' }, h('div', { class: 'notice bad', role: 'alert' }, icon('warn'),
           h('span', {}, h('b', {}, 'Couldn\'t read your repositories. '), 'GitHub didn\'t answer, so the list is unknown, not empty.'))),
@@ -66,7 +79,7 @@
       );
     }
     const list = h('ul', { class: 'repos' }, repos.map(r => h('li', {},
-      h('button', { type: 'button', onclick: () => { data.repo.pick(r.full); location.hash = '#/you'; draw(); } }, r.full),
+      h('button', { type: 'button', onclick: () => { data.repo.pick(r.full); location.hash = home(); draw(); } }, r.full),
       h('span', { class: 'tag' }, r.private ? 'Private' : 'Public'))));
     screen(
       h('h1', {}, 'Pick a repository'),
@@ -122,8 +135,10 @@
       try {
         found = await readRepositories();
       } catch (error) {
-        if (data.auth.session() !== session || error instanceof data.Ended) return;
-        if (error instanceof data.SignedOut) return signedOut('Your sign-in ended. Sign in again.');
+        if (!list.isConnected) return;
+        const now = data.auth.session();
+        if (now === null && (error instanceof data.SignedOut || error instanceof data.Ended)) return OW.onSignedOut();
+        if (now !== session || error instanceof data.Ended) return;
         return list.replaceChildren(h('p', { class: 'bad' }, 'Couldn\'t read your repositories, so the list is unknown, not empty.'),
           h('button', { class: 'btn', type: 'button', onclick: fill }, icon('refresh'), 'Try again'));
       }
@@ -172,11 +187,11 @@
       h('a', { class: 'skip', href: '#content', onclick: event => { event.preventDefault(); title.focus(); } }, 'Skip to the page'),
       h('div', { class: 'shell' },
         h('aside', { class: 'side' },
-          h('a', { class: 'brand', href: '#/you' }, logo(), h('span', {}, 'OpenWiz')),
+          h('a', { class: 'brand', href: home() }, logo(), h('span', {}, 'OpenWiz')),
           repoButton(),
           h('nav', { class: 'main', 'aria-label': 'Pages' }, side.map(item => item.link)),
           h('div', { class: 'foot' }, reads, h('div', { class: 'actions' }, refresh[0], signOutButton()))),
-        h('header', { class: 'top' }, h('a', { class: 'brand', href: '#/you' }, logo(), h('span', {}, 'OpenWiz')), repoButton()),
+        h('header', { class: 'top' }, h('a', { class: 'brand', href: home() }, logo(), h('span', {}, 'OpenWiz')), repoButton()),
         h('main', { id: 'content' }, h('div', { class: 'page-head' }, title, read), phoneReads, notices, body,
           h('div', { class: 'phone-actions' }, refresh[1], signOutButton())),
         h('nav', { class: 'tabs', 'aria-label': 'Pages' }, tabs.map(item => item.link))));

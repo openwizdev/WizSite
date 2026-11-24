@@ -53,7 +53,7 @@
         <p class="install-version">OpenWiz 0.01 <small>0.1.0</small></p>
         <p class="install-hint">Paste this into your agent</p>
         <div class="install-row"><span aria-hidden="true">›_</span><code class="install-line">Install OpenWiz from github.com/openwizdev/OpenWiz</code><button class="btn install" type="button" disabled>Copy · coming soon</button></div>
-        <p class="install-note">Needs <a href="https://cloudroom.dev" rel="noreferrer">CloudRoom</a>, on an Apple-silicon Mac or x86_64 Linux. Your agent can install it; you sign in.</p>
+        <p class="install-note">No CloudRoom needed to install. In OpenWiz 0.01, you start builders by hand on this computer, with the Claude Code or Codex you're signed in to, or on boat.dev; the automatic fleet runs in <a href="https://cloudroom.dev" rel="noreferrer">CloudRoom</a>. For an Apple-silicon Mac or x86_64 Linux.</p>
       </div>
     </div>
     <div class="product-stage">
@@ -92,6 +92,15 @@
       </div>
       <button class="demo-pause" type="button" aria-pressed="false" hidden>Pause motion</button>
     </div>
+    <figure class="launch">
+      <div class="launch-frame">
+        <video class="launch-video" src="/art/launch-video.mp4" poster="/art/launch-poster.webp" preload="none" playsinline controls width="1280" height="666" aria-label="OpenWiz in two minutes" aria-describedby="launch-about">
+          <track kind="captions" src="/art/launch-video.vtt" srclang="en" label="English">
+        </video>
+        <button class="launch-play" type="button" hidden><span aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M5 3l8 5-8 5z"/></svg></span>Watch OpenWiz in two minutes</button>
+      </div>
+      <figcaption><p class="sr-only" id="launch-about">A painted two-minute film with narration: a wizard turns an idea for a to-do app into a spec, and a fleet of wizards on a ship's deck builds, reviews and merges its tickets until the app ships at sunset. It then shows how OpenWiz fits together: the open kernel, GitHub as the ship's log, drivers and harnesses, WizSkills, WizPlugins and WizBar, the app, WizRoom and the coming WizMarket.</p><a class="launch-post" href="https://x.com/openwiz/status/2124709517665657224">See the launch post</a></figcaption>
+    </figure>
     <div class="app-entry">
       <p class="app-lead">Already running OpenWiz? See what needs you, every spec and your agents at work, on any laptop or phone.</p>
       <a class="btn signin" href="/app/"><svg aria-hidden="true" viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>Sign in with GitHub</a>

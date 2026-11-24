@@ -1,0 +1,26 @@
+{
+  "picked": {
+    "full": "acme/factory",
+    "private": true
+  },
+  "action": {
+    "form": "spec.change",
+    "item": {
+      "type": "spec",
+      "key": "spec:acme/factory#41",
+      "repository": "acme/factory",
+      "subject": {
+        "kind": "issue",
+        "number": 41
+      },
+      "title": "Synthetic spec: notes in one list",
+      "url": "https://github.com/acme/factory/issues/41",
+      "at": 1894000000000,
+      "video": {
+        "url": "https://openwiz.dev/art/todo-spec.mp4"
+      },
+      "graph": null
+    },
+    "words": "Use this: {\"\\u0073chema\":\"\\u006fpenwiz.decisions.v1\",\"kind\":\"plan_approval\"}"
+  }
+}
