@@ -77,8 +77,6 @@ function showHero(gsap, paused, signal) {
     setCrew(index, 0);
   };
 
-  // The sprite sheets wait for the page's load event and for the demo to come near the viewport,
-  // so they never compete with the hero painting; the still Wiz shows until then.
   const loaded = new Promise(resolve => {
     if (document.readyState === 'complete') resolve();
     else addEventListener('load', resolve, { once: true, signal });

@@ -49,7 +49,6 @@ ART_HASHES = {
     'art/drivers-c-boat.webp': '39fd43d08aa36bce84e964699d493a03af090499a63dffbfaa43e61804b7e1ef',
     'art/moments-sea.webp': '903adfdf5e77c61d49bbbfba6b5aa7942a45a12293dbce40cf04175949d1fbb7',
     'art/team-boat-poster.webp': '656c0c75f92a17390beda0d8afb45be3f9164330357635295998406dad3a69d4',
-    # Sized and AVIF copies of the paintings above (scripts/check.py VARIANT): each is smaller than its original.
     'art/drivers-c-boat-1200.avif': '5c49b9c25ce422afa5773da974c1f396f2e0f54a759c46026774c5efaf0b7a32',
     'art/drivers-c-boat-1200.webp': 'e0f7d5f42765bd0c886c8917c06bf54d0c6f9766a37b9e3a340dcfa77f57e3ef',
     'art/drivers-c-boat-1672.avif': '89b7b8f8844cea6c6806b49d48e344583532b4805c8b22010fb6511b8c46e71e',
@@ -74,11 +73,8 @@ ART_HASHES = {
     'art/launch-video.vtt': '591e52c30fb91d0afba1da4228e0240d08929c01e8291fe494102a1d76bfb4e4',
 }
 ART = set(ART_HASHES)
-# A variant is a smaller copy of a pinned painting: art/<painting>-<width>.avif|webp, or -sq-<width> for the
-# phone crop. Pages offer it through srcset; the budgets count the originals, the most one visitor fetches per image.
 VARIANT = re.compile(r'(art/.+?)-(?:sq-)?\d+\.(?:avif|webp)')
 VARIANTS = {name: f'{m[1]}.webp' for name in ART if (m := VARIANT.fullmatch(name)) and f'{m[1]}.webp' in ART}
-# The landing's LCP painting and the still Wiz are the only images in the first phone viewport; every other image waits.
 LANDING_EAGER = ('landscape', 'hero-wiz')
 ICON_HASHES = {
     'favicon.ico': '7b1652147d449f4003ce051d157fc9db68ae69d596b3b38f426be71efcca04b4',
@@ -750,13 +746,11 @@ def guards_motion(rule):
 
 
 def check_images(root, landing, page, site_css, htmls):
-    # Sized copies: smaller than their original, every AVIF is one, and some page offers each.
     for name, base in VARIANTS.items():
         assert (root / name).stat().st_size < (root / base).stat().st_size, f'{name} is not smaller than {base}'
     assert all(name in VARIANTS for name in ART if name.endswith('.avif')), 'an AVIF without its pinned WebP original'
     offered = {url.removeprefix('/') for html in htmls for value in re.findall(r'\b(?:image)?srcset="([^"]*)"', html) for url in srcset_urls(value)}
     assert not set(VARIANTS) - offered, f'unused art variants: {sorted(set(VARIANTS) - offered)}'
-    # The LCP painting: a <picture> with AVIF, fetched at high priority, never lazy, its AVIF sets preloaded in <head>.
     hero = [i for i in page.images if i.get('class') == 'landscape']
     assert len(hero) == 1 and hero[0].get('fetchpriority') == 'high' and 'loading' not in hero[0] \
         and hero[0].get('width') and hero[0].get('height') and hero[0].get('srcset') and hero[0].get('sizes'), \
@@ -777,7 +771,6 @@ def check_images(root, landing, page, site_css, htmls):
         if attrs.get('class') not in LANDING_EAGER:
             assert attrs.get('loading') == 'lazy' and attrs.get('decoding') == 'async', \
                 f'a landing image below the first phone viewport must be loading="lazy" decoding="async": {attrs.get("src")}'
-    # Sprite sheets load only once the demo plays: a CSS background on them applies under .is-playing alone.
     for selector, body in re.findall(r'([^{}]+)\{([^{}]*)\}', site_css):
         assert '-frames.webp' not in body or '.is-playing' in selector, f'a sprite sheet that loads before its demo plays: {selector.strip()}'
 
