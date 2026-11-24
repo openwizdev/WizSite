@@ -288,15 +288,18 @@ const graphqlCount = (world, names) => world.log.filter(r => r.origin === API &&
 const settle = (page, ms = 300) => page.run(`new Promise(resolve => setTimeout(resolve, ${ms}))`);
 const ok = name => async () => ({ status: 200, json: await fixture(name) });
 
-function checkRequestLog(world) {
+function checkRequestLog(world, { installCount = false } = {}) {
   assert(world.log.length > 0, 'no requests were logged');
+  const countRequests = world.log.filter(r => r.origin === SITE && r.path === '/api/count');
+  assert(countRequests.length === Number(installCount), `unexpected number of click count requests: ${countRequests.length}`);
   for (const r of world.log) {
     const where = `${r.method} ${r.url}`;
     assert(r.origin === SITE || r.origin === API, `request outside GitHub and the helper: ${where}`);
     if (r.origin === SITE) {
       const helper = r.path === '/api/sign-in/token' || r.path === '/api/sign-in/refresh';
-      assert(r.method === 'GET' || (r.method === 'POST' && helper), `the site was sent a write: ${where}`);
-      assert(!r.path.startsWith('/api/') || helper || r.path === '/api/sign-in/start', `unknown helper route: ${where}`);
+      const count = installCount && r.url === `${SITE}/api/count` && r.method === 'POST' && r.body === 'install-copy';
+      assert(r.method === 'GET' || (r.method === 'POST' && helper) || count, `the site was sent a write: ${where}`);
+      assert(!r.path.startsWith('/api/') || helper || count || r.path === '/api/sign-in/start', `unknown helper route: ${where}`);
       const auth = Object.keys(r.headers).some(key => key.toLowerCase() === 'authorization');
       assert(!auth, `the GitHub token was sent to the site: ${where}`);
     } else {
@@ -386,6 +389,7 @@ async function main() {
     await check('#1357 install box switched on: Copy is enabled and puts exactly the install line on the clipboard', async () => {
       const world = new World();
       servedAs(world, 'live');
+      world.site['/api/count'] = async () => ({ status: 204, raw: Buffer.alloc(0) });
       const page = await open(browser, world);
       await page.go(`${SITE}/`);
       await landed(page);
@@ -398,7 +402,8 @@ async function main() {
       await page.until(`document.querySelector('.install-box button.install').innerText.trim() === 'Copied'`, 'Copied');
       const copied = await page.clipboard();
       assert(copied === LINE, `the clipboard does not hold exactly the install line: ${JSON.stringify(copied)}`);
-      checkRequestLog(world);
+      await waitFor(() => world.answered('/api/count'), 'the install Copy count request');
+      checkRequestLog(world, { installCount: true });
       await page.close();
     });
 
