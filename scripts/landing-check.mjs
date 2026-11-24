@@ -131,7 +131,7 @@ function expect(ok, where, message) {
 
 async function layout(page, where, width, mode) {
   const facts = await page.evaluate(`(() => { ${HELPERS}
-    const list = document.querySelector('.moments ol');
+    const list = document.querySelector('.moments .moment-steps');
     const items = [...list.children].map(box);
     const rows = [...new Set(items.map(i => Math.round(i.top)))].map(top => items.filter(i => Math.round(i.top) === top));
     const pause = document.querySelector('.demo-pause');
@@ -140,7 +140,7 @@ async function layout(page, where, width, mode) {
     const tickets = [...document.querySelectorAll('.product-window .ember-ticket')].filter(shown);
     return {
       scroll: document.scrollingElement.scrollWidth, inner: innerWidth,
-      list: box(list), rows,
+      list: box(list), rows, poster: box(document.querySelector('.moments .spec-frame')),
       pause: shown(pause) ? box(pause) : null, window: box(document.querySelector('.product-window')),
       play: shown(play) ? box(play) : null,
       wizTops: [...new Set(wizes.map(w => Math.round(w.top)))],
@@ -152,11 +152,12 @@ async function layout(page, where, width, mode) {
     };
   })()`);
   expect(facts.scroll <= facts.inner, where, `sideways scroll (${facts.scroll}px content in a ${facts.inner}px window)`);
+  expect(facts.rows.length === 1, where, `the step line under the poster wraps onto ${facts.rows.length} rows`);
   for (const row of facts.rows) {
     const left = Math.min(...row.map(i => i.left));
     const right = Math.max(...row.map(i => i.right));
-    expect(left - facts.list.left < 2 && facts.list.right - right < 2, where,
-      `a row of ${row.length} moment(s) leaves an empty cell (${Math.round(left)}–${Math.round(right)} of ${Math.round(facts.list.left)}–${Math.round(facts.list.right)})`);
+    expect(left - facts.list.left > -1 && facts.list.right - right > -1 && facts.list.right - facts.list.left <= facts.poster.right - facts.poster.left + 1, where,
+      `the step line (${Math.round(left)}–${Math.round(right)}) spills past the poster (${Math.round(facts.poster.left)}–${Math.round(facts.poster.right)})`);
   }
   if (width <= 480) expect(facts.wizTops.length === 1, where, `footer Wizes in ${facts.wizTops.length} rows`);
   if (mode === 'motion') {

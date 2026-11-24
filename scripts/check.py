@@ -14,6 +14,9 @@ TODO_RUN = (
     ('openwizdev.github.io/todo-demo',),
 )
 TODO_APP = '/art/todo-app.webp'
+MOMENT_STEPS = ('spec', '4 tickets', 'agents building', 'merged')
+MOMENT_LINKS = ('The questions', 'The spec', 'The live app')
+MOMENT_WORDS = 30
 ART_HASHES = {
     'art/era-2-grill.webp': 'efaf213c3f389c8feb2f9d0436e94b1f9241d0ecf3cc3e793385d34f11cd11dd',
     'art/family-01.webp': '14532efb522eb7129ced9e1093f4b0321b1f00459301f059f2d9b5a8c2a7161f',
@@ -36,7 +39,7 @@ ART_HASHES = {
     'art/hero-samurai-frames.webp': '3a6eef42bfd2fc6f7b8e847d4355d75c283425a274b5fb9c95c3404f580725c5',
     'art/hero-steam-frames.webp': '20f057c963be16ebc3cabbf1d2ab849e2e8144d29a3e419344a867eef2c41f3c',
     'art/todo-spec.mp4': '52bb1fa94a154e17270f7512db19efcedae921e4769a28742bc8a36093d1c732',
-    'art/todo-spec-poster.webp': '94a69b2033a98e4ae6663b61bf9f0af0ba06d5a4d4d28aa4b46247570cac5b72',
+    'art/todo-spec-engraved.webp': '177a5d4c8f4d2d9e1bdfb30fb8b87f4d76aa5e118ae22aa43f47bbd6ad27cc11',
     'art/todo-spec.vtt': '47e9ffb41081dd72f541110c43312521a8dd92f1c8e58c11092ecd0daa74eee2',
     'art/todo-app.webp': 'ccc5be87687b1d4ac387cfb623033c0f567890cfe73570f8e4d4bb4b8a81de54',
     'art/spec-video.mp4': 'feb357b9a80453d676123a31285a36c34b5873e102ed58c95728bfd6315bfe16',
@@ -45,7 +48,6 @@ ART_HASHES = {
     'art/drivers-d-sea.webp': 'f2699bd8fe4763993a492dfac2bdbfc3eae46ec33bae0ab74127ad6ebc6a6285',
     'art/drivers-d-ship.webp': '885dd800aae2e75d45f2b88e1e69232bbf987df44beec9fa8070d4354b64cd04',
     'art/drivers-c-boat.webp': '39fd43d08aa36bce84e964699d493a03af090499a63dffbfaa43e61804b7e1ef',
-    'art/moments-sea.webp': '903adfdf5e77c61d49bbbfba6b5aa7942a45a12293dbce40cf04175949d1fbb7',
     'art/team-boat-poster.webp': '656c0c75f92a17390beda0d8afb45be3f9164330357635295998406dad3a69d4',
     'art/launch-video.mp4': '1e775d875b23a946346748cb62bd7853abc9dcf278f76addf0cf60136f8662dc',
     'art/launch-poster.webp': '2d27919d8cf70b2e4746b23eee605468f8308243452021e0418d021d8e2bfb3a',
@@ -875,33 +877,40 @@ def check_site(root, registry=ROOT / 'market/registry.json'):
     labels = re.findall(r"label: '([^']*)'", (root / names['site.js']).read_text())
     for reading in [hero_text.spaced()] + hero_text.shown + labels:
         assert not re.search(r'approv', reading, re.I), 'the hero names an approval step'
-    moments = ('Answer a few questions', 'Watch your spec', 'Watch it ship')
-    captions = re.findall(r'<h3>([^<]+)</h3>', landing)
-    assert tuple(captions) == moments, 'the three moments must appear in order'
-    assert 'The real spec of an OpenWiz-built to-do app' in flat, 'the spec video must say it is the to-do app\'s real spec'
+    assert not re.findall(r'<h3>([^<]+)</h3>', landing), 'the landing story is one headline, a poster and a step line: no moment cards'
     section = re.search(r'<section class="moments[\s\S]*?</section>', re.sub(r'<!--.*?-->', '', landing, flags=re.S))
     section = section[0] if section else ''
     links = Page(section)
     assert not links.books and not links.x_links and all(ref.startswith('/') and not ref.startswith('//') for ref in links.refs), \
         'the moments must keep visitors on the site: no link out'
+    clip = next((v for v in links.videos if 'spec-video' in (v.get('class') or '').split()), {})
+    assert 'The real narrated spec of an OpenWiz-built to-do app' in (clip.get('aria-label') or ''), 'the spec video must say it is the to-do app\'s real spec'
+    over = re.search(r'<div class="spec-over">(.*?)</div>', section, re.S)
+    over = re.sub(r'\s+', ' ', Text(over[1]).spaced()) if over else ''
+    assert 'Build a to-do app' in over, 'the poster must carry the wish, as real text: Build a to-do app'
+    assert re.search(r'Watch one wish ship \d:\d\d\b', over), 'the poster must carry one play control with the duration: Watch one wish ship 0:38'
+    steps = re.search(r'<ol class="moment-steps"[^>]*>(.*?)</ol>', section, re.S)
+    steps = tuple(re.sub(r'\s+', ' ', unescape(re.sub(r'<[^>]*>', '', li))).strip() for li in re.findall(r'<li>(.*?)</li>', steps[1], re.S)) if steps else ()
+    assert steps == MOMENT_STEPS, f'the step line must read {" → ".join(MOMENT_STEPS)}, got {steps}'
+    rest = re.sub(r'<details\b.*?</details>', '', section, flags=re.S)
+    count = len(Text(rest).spaced().split())
+    assert count <= MOMENT_WORDS, f'the moments show {count} words outside their small links, over {MOMENT_WORDS}: keep it to a headline, the wish and the step line'
     blocks = {}
-    for block in re.findall(r'<li class="(?:moment-step|spec-moment)[^"]*">.*?</(?:details|div)>\s*</li>', section, re.S):
-        blocks[re.search(r'<h3>([^<]+)</h3>', block)[1]] = Text(block).spaced()
-    for card, texts in zip(moments, TODO_RUN):
+    for block in re.findall(r'<details class="moment-more[^"]*">.*?</details>', section, re.S):
+        blocks[re.search(r'<summary>([^<]+)</summary>', block)[1]] = Text(block).spaced()
+    assert tuple(blocks) == MOMENT_LINKS, f'the small links must be {MOMENT_LINKS}, got {tuple(blocks)}'
+    for card, texts in zip(MOMENT_LINKS, TODO_RUN):
         for text in texts:
-            assert text in blocks.get(card, ''), f'the {card} moment must show the real to-do run in place: {text}'
+            assert text in blocks.get(card, ''), f'the "{card}" link must show the real to-do run in place: {text}'
     grill = TODO_RUN[0]
-    chat = re.search(r'<div class="moment-chat"[^>]*>(.*?)</div>', section, re.S)
     panel = re.search(r'<div class="moment-panel grill-panel">(.*?)</div>', section, re.S)
     for question, answer in zip(grill[::2], grill[1::2]):
         q, a = re.escape(escape(question, quote=False)), re.escape(escape(answer, quote=False))
-        assert chat and re.search(rf'<p class="ask">{q}</p>\s*<p class="reply">{a}</p>', chat[1]), \
-            f'the grill bubbles must show each question with its answer: {question}'
         assert panel and re.search(rf'<p class="ask"><strong>{q}</strong>[^<]*<span>[^<]*</span></p>\s*<p class="reply">{a}</p>', panel[1]), \
             f'the expanded grill must show each question with its answer: {question}'
-    ship = re.search(r'<li class="moment-step moment-ship">.*?</li>', section, re.S)
+    ship = re.search(r'<details class="moment-more moment-ship">.*?</details>', section, re.S)
     shot = next((i for i in Page(ship[0]).images if i.get('src') == TODO_APP and (i.get('alt') or '').strip()), None) if ship else None
-    assert shot, f'the Watch it ship moment lost its described capture of the live app: {TODO_APP}'
+    assert shot, f'The live app link lost its described capture of the live app: {TODO_APP}'
     for text in ('Illustration, not live data', 'Building in public'):
         assert text.lower() not in flat.lower(), f'cut copy is back: {text}'
     for text in STORY_COPY:

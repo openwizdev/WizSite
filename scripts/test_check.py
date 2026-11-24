@@ -175,24 +175,28 @@ class Checks(unittest.TestCase):
 
     def test_product_first_landing(self):
         for change, error in (
-                (lambda t: t.replace('Build a to-do app', 'Build an app'), 'missing landing story copy'),
-                (lambda t: t.replace('<h3>Watch your spec</h3>', '<h3>Watch it ship</h3>'), 'three moments'),
-                (lambda t: t.replace('<h3>Watch it ship</h3>', '<h3>Approve the plan</h3><h3>Watch it ship</h3>'), 'three moments'),
-                (lambda t: t.replace('The real spec of an OpenWiz-built to-do app', 'A sample spec'), "to-do app's real spec"),
-                (lambda t: t.replace('<p class="reply">Yes, greyed out.</p>', '<p class="reply">Yes.</p>'), 'Answer a few questions moment must show'),
-                (lambda t: t.replace('<h4>Problem Statement</h4>', '<!-- <h4>Problem Statement</h4> -->'), 'Watch your spec moment must show'),
-                (lambda t: t.replace('todo-demo.tasks.v1', 'tasks'), 'Watch your spec moment must show'),
-                (lambda t: re.sub(r'(<li class="moment-step moment-grill">.*?</li>)', r'<!-- \1 -->', t, count=1, flags=re.S), 'Answer a few questions moment must show'),
-                (lambda t: re.sub(r'(<li class="moment-step moment-ship">.*?</li>)', r'<!-- \1 -->', t, count=1, flags=re.S), 'Watch it ship moment must show|described capture'),
+                (lambda t: t.replace('Build a to-do app', 'Build an app'), 'missing landing story copy|poster must carry the wish'),
+                (lambda t: t.replace('<h2 id="moments-title">From idea to shipped.</h2>', '<h2 id="moments-title">From idea to shipped.</h2><h3>Watch your spec</h3>'), 'no moment cards'),
+                (lambda t: t.replace('The real narrated spec of an OpenWiz-built to-do app', 'A sample spec'), "to-do app's real spec"),
+                (lambda t: t.replace('<p class="spec-wish"><span>The wish</span>Build a to-do app</p>', '<p class="spec-wish">A wish</p>'), 'poster must carry the wish'),
+                (lambda t: t.replace('<span class="spec-time">0:38</span>', ''), 'one play control with the duration'),
+                (lambda t: t.replace('<li>4 tickets</li>', '<li>tickets</li>'), 'step line must read'),
+                (lambda t: t.replace('<li>merged</li>', '<li>merged</li><li>shipped</li>'), 'step line must read'),
+                (lambda t: t.replace('<ol class="moment-steps"', '<p>One wish becomes a spec, then four tickets, then agents build them and the pull requests merge.</p><ol class="moment-steps"'), 'words outside their small links'),
+                (lambda t: t.replace('<summary>The live app</summary>', '<summary>The app</summary>'), 'small links must be'),
+                (lambda t: t.replace('<p class="reply">Yes, greyed out.</p>', '<p class="reply">Yes.</p>'), '"The questions" link must show'),
+                (lambda t: t.replace('<h4>Problem Statement</h4>', '<!-- <h4>Problem Statement</h4> -->'), '"The spec" link must show'),
+                (lambda t: t.replace('todo-demo.tasks.v1', 'tasks'), '"The spec" link must show'),
+                (lambda t: re.sub(r'(<details class="moment-more moment-grill">.*?</details>)', r'<!-- \1 -->', t, count=1, flags=re.S), 'small links must be|"The questions" link must show'),
+                (lambda t: re.sub(r'(<details class="moment-more moment-ship">.*?</details>)', r'<!-- \1 -->', t, count=1, flags=re.S), 'small links must be|described capture'),
                 (lambda t: re.sub(r'<img class="app-shot"[^>]*>', '', t), 'described capture of the live app'),
                 (lambda t: t.replace('class="app-shot" src="/art/todo-app.webp" alt="The', 'class="app-shot" src="/art/todo-app.webp" alt=" " data-x="'), 'described capture of the live app'),
                 (lambda t: t.replace('<summary>The spec</summary>', '<summary>The spec</summary><a href="https://github.com/openwizdev/openwiz">x</a>'), 'keep visitors on the site'),
                 (lambda t: t.replace('<summary>The live app</summary>', '<summary><a href="https://openwizdev.github.io/todo-demo/">The live app</a></summary>'), 'keep visitors on the site|unexpected external URL'),
                 (lambda t: t.replace('<summary>The spec</summary>', "<summary>The spec</summary><a href='https://github.com/openwizdev/openwiz'>x</a>"), 'keep visitors on the site'),
                 (lambda t: t.replace('<summary>The spec</summary>', '<summary>The spec</summary><a href=//github.com/openwizdev/openwiz>x</a>'), 'keep visitors on the site|unexpected external URL'),
-                (lambda t: t.replace('</span></p>\n              <p class="reply">Yes, greyed out.</p>', '</span></p>\n'), 'expanded grill must show each question with its answer: Keep'),
-                (lambda t: t.replace('</span></p>\n              <p class="reply">One list for now.</p>', '</span></p>\n              <p class="reply">Several lists.</p>'), 'expanded grill must show each question with its answer: Where'),
-                (lambda t: t.replace('<p class="ask">Where should tasks live?</p><p class="reply">One list for now.</p>', '<p class="ask">Where should tasks live?</p>'), 'grill bubbles must show each question with its answer: Where'),
+                (lambda t: t.replace('</span></p>\n            <p class="reply">Yes, greyed out.</p>', '</span></p>\n'), 'expanded grill must show each question with its answer: Keep|"The questions" link must show the real to-do run in place: Yes, greyed out'),
+                (lambda t: t.replace('</span></p>\n            <p class="reply">One list for now.</p>', '</span></p>\n            <p class="reply">Several lists.</p>'), 'expanded grill must show each question with its answer: Where|"The questions" link must show the real to-do run in place: One list for now'),
                 (lambda t: t.replace('</main>', '<p>Add a dark mode toggle</p></main>'), 'old example'),
                 (lambda t: t.replace('Oil painting of Wiz scholars studying a to-do list', ''), 'painting without a description')):
             with self.subTest(error=error), tempfile.TemporaryDirectory() as temp:
@@ -363,7 +367,7 @@ class Checks(unittest.TestCase):
 
     def test_spec_video_poster_captions_and_link(self):
         def spec(change):
-            mark = '<li class="spec-moment">'
+            mark = '<div class="spec-moment">'
             return lambda t: t.split(mark)[0] + mark + change(t.split(mark, 1)[1])
         for change, error in (
                 (spec(lambda t: re.sub(r' poster="[^"]*"', '', t, count=1)), 'spec video needs a pinned poster'),
