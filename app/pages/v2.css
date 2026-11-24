@@ -489,8 +489,6 @@ nav.v2-nav { flex: 1; gap: 4px; }
 }
 .v2-state-card h2 { margin: 0; font-size: 24px; line-height: 1.2; font-weight: 600; letter-spacing: -.03em; color: var(--em-text); }
 .v2-state-card p { margin: 0; color: var(--em-text-2); }
-.v2-state-reading { animation: wl-show .4s .35s both; }
-.v2-state-reading .wiz-loader { animation: none; }
 html[data-v2='1'] [data-wiz-loader=compact] { width: 100%; padding: 0; border: 0; }
 html[data-v2='1'] [data-wiz-loader=compact] .wiz-loader-line { margin: 0; color: var(--em-muted); font-size: 13px; }
 .v2-state-warn { border-color: #6c464a; background: #1f1b20; }

@@ -562,7 +562,7 @@
     const quiet = wizes ? 'visually-hidden' : null;
     wizes?.removeAttribute('role');
     wizes?.setAttribute('aria-hidden', 'true');
-    const card = h('div', { class: `placeholder v2-state-card${wizes ? ' v2-state-reading' : ''}`, role: 'status' },
+    const card = h('div', { class: 'placeholder v2-state-card', role: 'status' },
       h('span', { class: 'v2-label' }, 'Syncing'),
       h('h2', { class: quiet }, text),
       h('p', { class: quiet }, 'Checking your repository for open specs and decisions.'),
