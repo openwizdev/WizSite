@@ -424,7 +424,42 @@ async function footer(page, where, mode) {
   expect(facts.bottom >= facts.inner && facts.bottom >= facts.height - 1, where, `the footer ends at ${facts.bottom}px, above the window's bottom (${facts.inner}px)`);
 }
 
-const FAQ_PATHS = ['/', '/team/', '/faq/'];
+async function team(page, where, width, height, mode) {
+  const read = () => page.evaluate(`(() => { ${HELPERS}
+    scrollTo(0, 0);
+    const hero = document.querySelector('section.team');
+    const video = hero.querySelector('video.launch-video'), play = hero.querySelector('button.launch-play');
+    const parts = ['.team-kicker', 'h1', '.team-lead', 'a[data-book]', '.launch-frame'].map(q => hero.querySelector(q));
+    const name = el => (el.getAttribute('aria-label') || el.innerText || '').trim();
+    const r = play.getBoundingClientRect();
+    return {
+      shown: parts.every(shown), bottom: Math.max(...parts.map(el => box(el).bottom)), inner: innerHeight,
+      inside: parts.every(el => el.getBoundingClientRect().left >= 0 && el.getBoundingClientRect().right <= innerWidth),
+      idle: video.paused && !video.autoplay && video.readyState === 0 && video.preload === 'none',
+      fetched: performance.getEntriesByType('resource').some(e => /launch-video/.test(e.name)),
+      play: shown(play), controls: video.controls, muted: video.muted, paused: video.paused, focus: document.activeElement === video,
+      at: { x: r.left + r.width / 2, y: r.top + r.height / 2 },
+      unnamed: [...document.querySelectorAll('main a, main button, main video')].filter(el => shown(el) && !name(el)).length,
+      tab: [video, play, ...hero.querySelectorAll('a')].every(el => el.tabIndex >= 0),
+      faq: !!document.querySelector('section.faq'),
+    };
+  })()`);
+  const facts = await read();
+  expect(facts.shown && facts.inside, where, 'the team hero lacks who it is for, the headline, what happens, Book a call or the video poster inside the window');
+  if (width === 390) expect(facts.bottom <= height, where, `the team hero ends at ${Math.round(facts.bottom)}px, below a phone's first screen (${height}px)`);
+  expect(facts.idle && !facts.fetched, where, 'the team launch video loads or plays before a click');
+  expect(facts.unnamed === 0 && facts.tab, where, `the team page has ${facts.unnamed} unnamed controls, or one the keyboard cannot reach`);
+  expect(!facts.faq, where, 'the team page shows Questions');
+  expect(facts.play !== facts.controls, where, `the team launch video needs one way to start: play button ${facts.play}, native controls ${facts.controls}`);
+  if (!facts.play || mode !== 'motion') return;
+  await page.click(facts.at.x, facts.at.y);
+  await new Promise(resolve => setTimeout(resolve, 600));
+  const after = await read();
+  expect(!after.play && after.controls && !after.muted && !after.paused && after.focus, where,
+    `a click on the team play button must start the video with sound and hand over the native controls: ${JSON.stringify(after)}`);
+}
+
+const FAQ_PATHS = ['/', '/faq/'];
 async function faq(page, where, width, mode) {
   const read = () => page.evaluate(`(() => { ${HELPERS}
     const faq = document.querySelector('section.faq');
@@ -506,6 +541,7 @@ async function main() {
             await chrome(other, `${path} ${where}`, name);
             await footer(other, `${path} ${where}`, name);
             if (FAQ_PATHS.includes(path)) await faq(other, `${path} ${where}`, width, name);
+            if (path === '/team/') await team(other, `${path} ${where}`, width, height, name);
             if (process.env.SHOTS && name === 'motion' && path !== '/' && (width === 390 || width === 1280)) {
               await other.shot(join(process.env.SHOTS, `${path.slice(1, -1)}-${width}.png`));
             }
