@@ -331,7 +331,13 @@ async function handoff(page, where) {
 async function chrome(page, where, mode, path) {
   const facts = await page.evaluate(`(() => { ${HELPERS}
     const bar = document.querySelector('header.landing-nav');
-    const mark = bar?.querySelector('.landing-brand img');
+    const brand = bar?.querySelector('.landing-brand');
+    const mark = brand?.querySelector('img');
+    const brandStyle = getComputedStyle(brand);
+    const markStyle = getComputedStyle(mark);
+    const phone = innerWidth <= 850;
+    const underlined = link => getComputedStyle(link, '::after').content !== 'none';
+    const currentLinks = [...bar.querySelectorAll('[aria-current="page"]')];
     const star = bar?.querySelector('.github-star');
     const count = star?.querySelector('[data-stars]');
     const footer = document.querySelector('footer.landing-footer');
@@ -340,10 +346,13 @@ async function chrome(page, where, mode, path) {
     return {
       scroll: document.scrollingElement.scrollWidth, inner: innerWidth,
       mark: shown(mark) && mark.getAttribute('src') === '/art/wiz-mark.webp' && mark.naturalWidth === 128,
+      lockup: markStyle.height === (phone ? '32px' : '36px') && markStyle.objectFit === 'cover' &&
+        brandStyle.gap === '10px' && brandStyle.fontSize === (phone ? '17px' : '19px') && brandStyle.fontWeight === '650',
       star: shown(star) && star.getAttribute('href') === 'https://github.com/openwizdev/openwiz' &&
         shown(star.querySelector('.github-mark')) && shown(star.querySelector('.star-icon')) && star.innerText.includes('Star'),
       count: shown(count) ? count.textContent : null, name: star?.getAttribute('aria-label'),
-      current: [...bar.querySelectorAll('[aria-current="page"]')].map(link => link.getAttribute('href')),
+      current: currentLinks.map(link => link.getAttribute('href')).join(),
+      marked: [...bar.querySelectorAll('a')].filter(underlined).map(link => link.getAttribute('href')).join(),
       toggle: shown(toggle), nav: [...nav.querySelectorAll('a')].filter(shown).map(a => a.getAttribute('href')),
       signIn: shown(bar?.querySelector('a.sign-in[href="/app/"]')),
       footer: shown(footer?.querySelector('.footer-wordmark')) && footer.querySelectorAll('.family-wiz').length === 12,
@@ -354,9 +363,11 @@ async function chrome(page, where, mode, path) {
   const stars = mode.stars === 12345 ? '12.3k' : mode.stars === 0 ? '0' : null;
   expect(facts.scroll <= facts.inner, where, `sideways scroll (${facts.scroll}px content in a ${facts.inner}px window)`);
   expect(facts.mark, where, 'the top bar lacks the painted Wiz');
+  expect(facts.lockup, where, 'the painted Wiz and wordmark have the wrong lockup dimensions');
   expect(facts.star && facts.count === stars && facts.name?.includes('GitHub') &&
     (!stars || facts.name.includes(mode.stars.toLocaleString('en'))), where, `incorrect GitHub star control or count (${facts.count})`);
-  expect(facts.current.join() === path, where, 'the top bar lacks its current-page link');
+  const current = path === '/' ? '' : path;
+  expect(facts.current === current && facts.marked === current, where, 'the top bar marks the wrong current-page link');
   expect(facts.toggle === phoneMenu && facts.signIn !== phoneMenu &&
     facts.nav.join() === (phoneMenu ? '' : '/drivers/,/market/,/changelog/,/faq/'),
   where, 'the top bar puts links in the wrong place');
@@ -382,6 +393,7 @@ async function buy(page, where, path) {
       clipped: [...bar.querySelectorAll('a, button')].filter(el => shown(el) && !inside(el)).map(el => el.className || el.getAttribute('href')),
       button: inside(button) && button.innerText === (innerWidth <= 850 ? 'For teams' : 'Get it for your team'),
       stars: inside(stars.closest('a')) && inside(stars),
+      wordmark: getComputedStyle(bar.querySelector('.landing-brand span')).clipPath === 'none',
       drivers: inside(bar.querySelector('a[href="/drivers/"]')),
       toggle: shown(toggle),
       book: [...document.querySelectorAll('a[data-book]')].filter(shown).length,
@@ -395,11 +407,12 @@ async function buy(page, where, path) {
   expect(facts.scroll <= facts.inner, where, `sideways scroll (${facts.scroll}px content in a ${facts.inner}px window)`);
   expect(facts.button, where, 'the top bar lacks the buy button inside the window');
   expect(facts.stars, where, 'the top bar lacks a visible 12.3k star count');
+  if (facts.inner >= 390) expect(facts.wordmark, where, 'the OpenWiz wordmark is hidden despite room for the lockup');
   expect(facts.toggle || facts.drivers, where, 'the top bar lacks the Drivers link or phone menu');
   if (path === '/team/') expect(facts.book === 2, where, `the team page needs its two Book a call links (${facts.book})`);
 }
 
-async function phoneMenu(page, where) {
+async function phoneMenu(page, where, path) {
   const toggle = await page.evaluate(`(() => {
     const { x, y, width, height } = document.querySelector('.nav-toggle').getBoundingClientRect();
     return { x: x + width / 2, y: y + height / 2 };
@@ -411,6 +424,8 @@ async function phoneMenu(page, where) {
     return {
       expanded: toggle.getAttribute('aria-expanded'), shown: shown(panel),
       destinations: links.filter(shown).map(link => link.getAttribute('href')),
+      marked: links.filter(link => shown(link) && getComputedStyle(link, '::after').content !== 'none')
+        .map(link => link.getAttribute('href')).join(),
       targets: links.every(link => link.getBoundingClientRect().height >= 40),
       scrollLocked: getComputedStyle(document.documentElement).overflowY === 'hidden' && document.querySelector('main').inert,
       firstFocused: document.activeElement === links[0], toggleFocused: document.activeElement === toggle,
@@ -420,6 +435,7 @@ async function phoneMenu(page, where) {
   const opened = await state();
   expect(opened.expanded === 'true' && opened.shown && opened.firstFocused && opened.scrollLocked && opened.targets &&
     opened.destinations.join() === '/drivers/,/market/,/changelog/,/faq/,/app/', where, 'the phone menu fails to open, focus, lock scrolling or show all links');
+  expect(opened.marked === (path === '/' || path === '/team/' ? '' : path), where, 'the phone menu marks the wrong row');
   await page.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
   const escaped = await state();
   expect(escaped.expanded === 'false' && !escaped.shown && escaped.toggleFocused && !escaped.scrollLocked,
@@ -565,7 +581,7 @@ async function main() {
             const location = `${path} ${where}`;
             await chrome(other, location, mode, path);
             await buy(other, location, path);
-            if (width <= 850 && !mode.noScript) await phoneMenu(other, location);
+            if (width <= 850 && !mode.noScript) await phoneMenu(other, location, path);
             await footer(other, `${path} ${where}`, name);
             if (FAQ_PATHS.includes(path)) await faq(other, `${path} ${where}`, width, name);
             if (process.env.SHOTS && name === 'motion' && path !== '/' && (width === 390 || width === 1280)) {

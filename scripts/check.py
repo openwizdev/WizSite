@@ -217,7 +217,8 @@ def with_faq(html):
 def with_header(html, page):
     assert html.count(HEADER_SLOT) == 1, 'a site page needs exactly one header slot'
     href = '/' + page.removesuffix('index.html')
-    return html.replace(HEADER_SLOT, HEADER.replace(f'href="{href}"', f'href="{href}" aria-current="page"', 1))
+    navigation = HEADER if href == '/' else HEADER.replace(f'href="{href}"', f'href="{href}" aria-current="page"', 1)
+    return html.replace(HEADER_SLOT, navigation)
 
 
 FINGERPRINTS = {name: fingerprint(name, (ROOT / name).read_bytes()) for name in HASHED}
@@ -1502,7 +1503,7 @@ def check_faq(htmls, pages, names):
 def check_top_bars(pages):
     expected_links = [('/drivers/', 'Drivers'), ('/market/', 'Market'),
                       ('/changelog/', 'Changelog'), ('/faq/', 'FAQ')]
-    home = top_bar(pages['index.html']).replace(' aria-current="page"', '')
+    home = top_bar(pages['index.html'])
     for name, html in pages.items():
         bar = top_bar(html)
         nav = re.search(r'<nav [^>]*id="site-navigation"[^>]*>[\s\S]*?</nav>', bar)
@@ -1519,8 +1520,9 @@ def check_top_bars(pages):
         assert '<span class="nav-team-long">Get it for your team</span><span class="nav-team-short">For teams</span>' in bar, \
             f'the {name} top bar needs both buy labels'
         href = '/' + name.removesuffix('index.html')
-        assert re.findall(r'href="([^"]+)" aria-current="page"', bar) == [href], \
-            f'the {name} top bar must mark {href} aria-current="page"'
+        current = [] if href == '/' else [href]
+        assert re.findall(r'href="([^"]+)" aria-current="page"', bar) == current, \
+            f'the {name} top bar has incorrect aria-current="page" links (expected {current})'
         assert bar.replace(' aria-current="page"', '') == home, f'the {name} top bar must be identical to the landing bar'
 
 

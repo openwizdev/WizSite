@@ -1162,6 +1162,7 @@ class Checks(unittest.TestCase):
     def test_shared_top_bar(self):
         for name, old, new, error in (
                 ('index.html', 'src="/art/wiz-mark.webp"', 'src="/favicon.svg"', 'painted Wiz'),
+                ('index.html', 'class="landing-brand" href="/"', 'class="landing-brand" href="/" aria-current="page"', 'aria-current'),
                 ('market/index.html', 'class="star-icon"', 'class="extra-icon"', 'star icon'),
                 ('faq/index.html', 'aria-controls="site-navigation"', 'aria-controls="main"', 'button linked'),
                 ('team/index.html', 'id="site-navigation"', 'id="site-navigation" hidden', 'without JavaScript'),
