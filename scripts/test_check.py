@@ -632,16 +632,18 @@ class Checks(unittest.TestCase):
     def test_install_line_and_its_switch(self):
         line = '<code class="install-line">Install OpenWiz from github.com/openwizdev/OpenWiz</code>'
         hint = '<p class="install-hint">Paste this into your agent</p>'
-        button = '<button class="btn install" type="button" disabled data-count="install-copy">Copy · coming soon</button>'
         text = (ROOT / 'dist/index.html').read_text()
         shipped = re.findall(r'data-install="([^"]*)"', text)
+        labels = {'coming-soon': 'Copy · coming soon', 'live': 'Copy'}
+        button = f'<button class="btn install" type="button" disabled data-count="install-copy">{labels[shipped[0]]}</button>'
         self.assertEqual(len(shipped), 1, 'one install switch')
         self.assertIn(shipped[0], INSTALL_SWITCH)
         for part in (line, hint, button):
             self.assertEqual(text.count(part), 1, part)
         for state in INSTALL_SWITCH:
             switch = f'data-install="{state}"'
-            variant = text.replace(f'data-install="{shipped[0]}"', switch)
+            variant = text.replace(f'data-install="{shipped[0]}"', switch).replace(button, button.replace(f'>{labels[shipped[0]]}<', f'>{labels[state]}<'))
+            button_here = button.replace(f'>{labels[shipped[0]]}<', f'>{labels[state]}<')
             changelog = with_switch(state)
             with self.subTest(state=state), tempfile.TemporaryDirectory() as temp:
                 root = Path(temp) / 'dist'
@@ -661,13 +663,13 @@ class Checks(unittest.TestCase):
                 (hint, hint.replace('your agent', 'your terminal')),
                 (switch, ''),
                 (switch, 'data-install="on"'),
-                (button, button.replace(' disabled', '')),
-                (button, button.replace(' disabled', ' aria-disabled="true"')),
-                (button, button.replace(' disabled', ' title=" disabled "')),
-                (button, button.replace(' disabled', ' disabled onclick="copy()"')),
-                (button, button.replace(' disabled', ' disabled onclick ="copy()"')),
-                (button, button.replace('Copy · coming soon', 'Copy')),
-                (button, button + button),
+                (button_here, button_here.replace(' disabled', '')),
+                (button_here, button_here.replace(' disabled', ' aria-disabled="true"')),
+                (button_here, button_here.replace(' disabled', ' title=" disabled "')),
+                (button_here, button_here.replace(' disabled', ' disabled onclick="copy()"')),
+                (button_here, button_here.replace(' disabled', ' disabled onclick ="copy()"')),
+                (button_here, button_here.replace(f'>{labels[state]}<', f'>{labels["live" if state == "coming-soon" else "coming-soon"]}<')),
+                (button_here, button_here + button_here),
             ]
             for good, bad in breaks:
                 with self.subTest(state=state, bad=bad), tempfile.TemporaryDirectory() as temp:
@@ -728,7 +730,7 @@ class Checks(unittest.TestCase):
         moved = lambda variant, trace: variant.replace(label, trace, 1).replace('</main>', label + '</main>', 1)
         relocations = ['<!-- OpenWiz 0.01 <small>0.1.0</small>. -->', f'<!-- {label} -->', '']
         for state in INSTALL_SWITCH:
-            variant = text.replace(shipped[0], f'data-install="{state}"')
+            variant = re.sub(r'(data-count="install-copy">)[^<]*<', lambda m: m[1] + ('Copy' if state == 'live' else 'Copy · coming soon') + '<', text.replace(shipped[0], f'data-install="{state}"'), count=1)
             changelog = with_switch(state)
             with self.subTest(state=state), tempfile.TemporaryDirectory() as temp:
                 root = Path(temp) / 'dist'
