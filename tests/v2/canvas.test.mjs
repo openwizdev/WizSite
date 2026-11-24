@@ -231,3 +231,70 @@ test('Canvas on a phone: the sheets scroll across, the board runs top to bottom 
     await run.close();
   }
 });
+
+test('Canvas on a phone: a vertical swipe on the board or a card scrolls the page, a sideways swipe pans the board', async () => {
+  const run = await start();
+  try {
+    world(run);
+    await run.page.size(390, 844, true);
+    await openCanvas(run);
+    const state = () => run.page.run(`(() => ({
+      scroll: document.querySelector('main').scrollTop || document.scrollingElement.scrollTop,
+      cam: document.querySelector('.cv-world').style.transform,
+    }))()`);
+    const spot = selector => run.page.run(`(() => {
+      const el = document.querySelector(${JSON.stringify(selector)});
+      el.scrollIntoView({ block: 'center' });
+      const r = el.getBoundingClientRect();
+      return { x: Math.round(r.left + 8), y: Math.round(r.top + r.height / 2) };
+    })()`);
+    await run.page.run(`(() => { const b = document.querySelector('.cv-board'); b.scrollIntoView({ block: 'start' }); })()`);
+    await new Promise(resolve => setTimeout(resolve, 200));
+    const before = await state();
+    const empty = await run.page.run(`(() => {
+      const r = document.querySelector('.cv-view').getBoundingClientRect();
+      return { x: Math.round(r.left + 6), y: Math.round(r.top + 60) };
+    })()`);
+    await run.page.touch(empty.x, empty.y, 0, 250);
+    const afterBoard = await state();
+    assert.ok(afterBoard.scroll < before.scroll - 100, `board swipe scrolled the page: ${JSON.stringify([before, afterBoard])}`);
+    assert.equal(afterBoard.cam, before.cam);
+    await new Promise(resolve => setTimeout(resolve, 200));
+    const card = await spot('.cv-stack[data-ticket$="#43"]');
+    const beforeCard = await state();
+    await run.page.touch(card.x, card.y, 0, 150);
+    const afterCard = await state();
+    assert.ok(afterCard.scroll < beforeCard.scroll - 50, `card swipe scrolled the page: ${JSON.stringify([beforeCard, afterCard])}`);
+    const side = await run.page.run(`(() => {
+      const r = document.querySelector('.cv-view').getBoundingClientRect();
+      return { x: Math.round(r.left + 6), y: Math.round((Math.max(r.top, 0) + Math.min(r.bottom, innerHeight)) / 2) };
+    })()`);
+    await run.page.touch(side.x, side.y, 120, 0);
+    const afterSide = await state();
+    assert.notEqual(afterSide.cam, afterCard.cam, 'sideways swipe pans the board');
+    assert.equal(afterSide.scroll, afterCard.scroll);
+    assert.deepEqual(run.world.violations, []);
+  } finally {
+    await run.close();
+  }
+});
+
+test('Canvas: widening the window refits a board that is still at its fitted view, and leaves a moved one alone', async () => {
+  const run = await start();
+  try {
+    world(run);
+    await run.page.size(900, 800, false);
+    await openCanvas(run);
+    const zoom = () => run.page.run(`parseInt(document.querySelector('.cv-zoom').textContent, 10)`);
+    const narrow = await zoom();
+    await run.page.size(1440, 900, false);
+    await run.page.until(`parseInt(document.querySelector('.cv-zoom').textContent, 10) > ${narrow}`, 'the board to refit');
+    await run.page.run(`document.querySelector('[aria-label="Zoom out"]').click()`);
+    const moved = await zoom();
+    await run.page.size(1100, 900, false);
+    assert.equal(await zoom(), moved);
+    assert.deepEqual(run.world.violations, []);
+  } finally {
+    await run.close();
+  }
+});

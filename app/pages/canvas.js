@@ -216,8 +216,29 @@
     const TOP = 56;
     const across = (r.width - 24) / width;
     const z = Math.max(ZOOM.min, Math.min(1, PHONE.matches ? across : Math.min(across, (r.height - TOP - 24) / height)));
-    view.cams.set(board.sheet.number, { z, x: (r.width - width * z) / 2, y: PHONE.matches ? TOP : Math.max(TOP, (r.height - height * z) / 2 + TOP / 2) });
+    const cam = { z, x: (r.width - width * z) / 2, y: PHONE.matches ? TOP : Math.max(TOP, (r.height - height * z) / 2 + TOP / 2) };
+    view.cams.set(board.sheet.number, cam);
+    if (PHONE.matches) css(board.root, { height: `${Math.max(380, Math.ceil(height * z + TOP + 24))}px` });
+    fitted.set(board.sheet.number, { ...cam });
     apply(board);
+  }
+  const fitted = new Map();
+  function stillFitted(number) {
+    const cam = camOf(number);
+    const at = fitted.get(number);
+    return !!cam && !!at && cam.x === at.x && cam.y === at.y && cam.z === at.z;
+  }
+  function refitOnResize(board) {
+    let width = 0;
+    let height = 0;
+    const watch = new ResizeObserver(([entry]) => {
+      if (!board.viewport.isConnected) return watch.disconnect();
+      const { width: w, height: ht } = entry.contentRect;
+      if (w === width && ht === height) return;
+      [width, height] = [w, ht];
+      if (w && ht && stillFitted(board.sheet.number)) fit(board);
+    });
+    watch.observe(board.viewport);
   }
   function zoomAt(board, factor, px, py) {
     const cam = camOf(board.sheet.number);
@@ -271,6 +292,7 @@
       button('Sheets', 'Show every sheet (L)', () => { view.mode = 'over'; view.over = Math.max(0, visibleSheets().findIndex(s => s.number === sheet.number)); rerender(); }));
     root.append(tools, viewport, minimap(board), legend());
     wirePan(board);
+    refitOnResize(board);
     return board;
   }
 
@@ -331,7 +353,7 @@
         return;
       }
       cam.x += event.clientX - was.x;
-      cam.y += event.clientY - was.y;
+      if (!PHONE.matches) cam.y += event.clientY - was.y;
       apply(board);
     });
     const up = event => {

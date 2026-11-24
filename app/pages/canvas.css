@@ -163,6 +163,7 @@
   .cv-rail { flex-direction: row; overflow-x: auto; padding-bottom: 4px; }
   .cv-rail .cv-sheet { flex: 0 0 210px; }
   .cv-board { height: 66vh; min-height: 380px; }
+  .cv-view { touch-action: pan-y; }
   .cv-legend { display: none; }
   .cv-focus-body { grid-template-columns: minmax(0, 1fr); }
   .cv-facts { border-left: 0; border-top: 1px solid var(--em-line); grid-template-columns: 96px minmax(0, 1fr); }

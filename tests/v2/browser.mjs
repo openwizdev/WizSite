@@ -224,6 +224,16 @@ export async function open(browser, world) {
       await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: mobile ? 2 : 1, mobile });
       await new Promise(resolve => setTimeout(resolve, 200));
     },
+    async touch(x, y, dx, dy, steps = 10) {
+      await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
+      await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+      for (let i = 1; i <= steps; i++) {
+        await send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x + dx * i / steps, y: y + dy * i / steps }] });
+        await new Promise(resolve => setTimeout(resolve, 16));
+      }
+      await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+      await new Promise(resolve => setTimeout(resolve, 300));
+    },
     wheel: (x, y, deltaY) => send('Input.dispatchMouseEvent', { type: 'mouseWheel', x, y, deltaX: 0, deltaY }),
     media: features => send('Emulation.setEmulatedMedia', { features }),
     async shot(path, width, height, mobile) {
