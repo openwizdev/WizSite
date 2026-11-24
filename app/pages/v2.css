@@ -20,6 +20,7 @@ html[data-v2='1'] :is(h1, h2, h3) { text-wrap: balance; }
 html[data-v2='1'] :focus-visible { outline: 2px solid var(--em-amber); outline-offset: 2px; }
 html[data-v2='1'] :is(h1, h2)[tabindex='-1']:focus { outline: none; }
 
+html[data-v2='1'] body > .visually-hidden { position: fixed; inset: 0 auto auto 0; }
 .v2-frame, .v2-welcome-stage { min-height: 100dvh; }
 .v2-welcome-stage { display: grid; place-items: center; padding: 32px; }
 .v2-welcome-stage .center { min-height: 0; width: 100%; padding: 0; }
@@ -624,14 +625,16 @@ nav.v2-nav { flex: 1; gap: 4px; }
 .v2-toast {
   position: fixed;
   z-index: 2;
-  bottom: 24px;
-  left: 50%;
+  bottom: 32px;
+  left: calc(50% + var(--em-side-width) / 2);
+  width: max-content;
   transform: translateX(-50%);
   display: flex;
   align-items: center;
   gap: 8px;
   max-width: calc(100% - 32px);
-  padding: 8px 12px;
+  min-height: 44px;
+  padding: 8px 16px;
   border: 1px solid var(--v2-edge);
   border-radius: var(--v2-radius);
   background: var(--em-card-hover);
@@ -669,6 +672,8 @@ html[data-v2='1'] .cv-search { align-self: start; min-height: 62px; border-color
 .cv-row .num { font: 400 13px var(--em-mono); color: var(--em-muted); }
 .cv-row-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cv-row .pill { font-size: 13px; }
+
+body:has(.v2-view[data-page='chat']) .v2-toast { bottom: 104px; }
 
 @media (max-width: 760px) {
   html[data-v2='1'] {
@@ -768,5 +773,8 @@ html[data-v2='1'] .cv-search { align-self: start; min-height: 62px; border-color
   .v2-welcome-wiz { width: 96px; height: 96px; margin: 0 0 24px -12px; }
   .v2-welcome h1 { font-size: 44px; }
   .v2-welcome-sub { margin-bottom: 32px; font-size: 18px; }
-  .v2-toast { bottom: calc(76px + env(safe-area-inset-bottom)); }
+  .v2-toast { left: 50%; bottom: calc(84px + env(safe-area-inset-bottom)); }
+  body:has(.v2-view[data-page='chat']) .v2-toast { bottom: calc(152px + env(safe-area-inset-bottom)); }
+  html[data-v2='1'] .cv-focus-head .cv-gap { flex: 0 0 100%; }
+  html[data-v2='1'] .cv-focus-head .v2-btn { flex: 1; }
 }

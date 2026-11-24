@@ -68,7 +68,7 @@
           ticket(22, 'Record sign-in events', 'merged', [21], ['Merged after one review.', 240]),
           ticket(23, 'Record project events', 'merged', [21], ['Merged.', 190]),
           ticket(24, 'CSV writer', 'merged', [21], ['Merged after one review.', 130]),
-          ticket(25, 'Export page', 'merged', [22, 24], ['Merged.', 55]),
+          ticket(25, 'Export page', 'merged', [22], ['Merged.', 55]),
           ticket(26, 'Scheduled exports', 'review', [24], ['Checks pass. The change is in review.', 4], ['Daily and weekly exports work.', 22]),
           ticket(27, 'Deleted-project events', 'you', [23], ['How long should deleted projects stay recoverable?', 6]),
         ] },
