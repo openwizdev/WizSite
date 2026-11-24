@@ -35,7 +35,6 @@ class Net {
     this.mode = 'ok';
     this.next = 9100050;
     this.account = OWNER;
-    this.edited = {};
     this.repository = repository('private');
     this.fleet = fleetBlob(FLEET);
     this.held = [];
@@ -70,13 +69,7 @@ class Net {
     if (method === 'GET' && at.pathname === '/user') return answer(200, this.account);
     if (method === 'GET' && at.pathname === REPOSITORY_PATH) return this.repository ? answer(200, this.repository) : answer(502, {});
     if (method === 'GET' && at.pathname === FLEET_PATH) return this.fleet ? answer(200, this.fleet) : answer(502, {});
-    if (method === 'POST' && at.pathname === '/graphql') {
-      const query = JSON.parse(init.body);
-      const number = query.variables?.number;
-      if (/lastEditedAt/.test(query.query) && Object.hasOwn(this.edited, number) && this.edited[number] === 'fail') return answer(502, {});
-      if (/lastEditedAt/.test(query.query)) return answer(200, { data: { repository: { issue: { lastEditedAt: this.edited[number] ?? null } } } });
-      return answer(200, { data: {} });
-    }
+    if (method === 'POST' && at.pathname === '/graphql') return answer(200, { data: {} });
     const comments = at.pathname.match(/^\/repos\/([^/]+\/[^/]+)\/issues\/(\d+)\/comments$/);
     if (comments && method === 'GET') {
       const [, full, number] = comments;
@@ -208,7 +201,7 @@ async function confirmAll(records, preview) {
   for (let i = 0; i < preview.confirms; i += 1) records.confirm(preview, tap());
 }
 
-test('every form fixture composes to its exact body, target and visibility', async () => {
+test('form fixtures compose to their exact body, target and visibility or fail closed for spec confirmation', async () => {
   const fixtures = await names(FORMS);
   assert.equal(fixtures.length, 15);
   for (const name of fixtures) {
@@ -217,6 +210,11 @@ test('every form fixture composes to its exact body, target and visibility', asy
     const run = await boot({ net: new Net(input.github), picked: { owner: 'acme', name: 'factory', ...input.picked } });
     const records = needsRecords(run);
     const preview = await composeLike(records, input.action);
+    if (input.action.item.request?.kind === 'spec_confirmation') {
+      assert.deepEqual(plain(preview), { refused: 'source_unchecked' }, name);
+      assert.deepEqual(run.net.writes(), [], name);
+      continue;
+    }
     assert.equal(preview.body, body, name);
     const { item } = input.action;
     assert.match(preview.op, /^op-[0-9a-f]{32}$/, name);
@@ -234,6 +232,7 @@ test('own words and escapes pass byte for byte, and a public repository previews
   for (const name of await names(ACCEPTED)) {
     const input = await json(new URL(`${name}.input.json`, ACCEPTED));
     const run = await boot({ net: new Net(input.github), picked: { owner: 'acme', name: 'factory', full: 'acme/factory', private: false } });
+    run.net.repository = repository('public');
     const preview = await composeLike(needsRecords(run), input.action);
     assert.equal(preview.body, await json(new URL(`${name}.body.json`, ACCEPTED)), name);
     assert.equal(preview.visibility, 'public', name);
@@ -478,15 +477,15 @@ test('R3: a comment of the same words that precedes the attempt is never taken a
   assert.equal(net.writes().length, 2);
 });
 
-async function specConfirmation() {
-  const input = await json(new URL('decision-yes-spec_confirmation.input.json', FORMS));
+async function specDecision(kind = 'plan_approval') {
+  const input = await json(new URL(`decision-yes-${kind}.input.json`, FORMS));
   const net = new Net(input.github);
   const run = await boot({ net });
   return { input, net, run, issue: 'GET /repos/acme/factory/issues/41' };
 }
 
 test('R5: compose binds the source the queue verified, not whatever the spec says by then', async () => {
-  const { input, net, run, issue } = await specConfirmation();
+  const { input, net, run, issue } = await specDecision();
   const checked = plain(await run.records.check(input.action.item));
   assert.equal(checked.result, 'matched', JSON.stringify(checked));
   net.github[issue].json.body = net.github[issue].json.body.replace('Synthetic notes are scattered.', 'Synthetic notes sync to every device.');
@@ -495,7 +494,7 @@ test('R5: compose binds the source the queue verified, not whatever the spec say
 });
 
 test('R5: compose refuses a current item no source check of OW.records verified', async () => {
-  const { input, run } = await specConfirmation();
+  const { input, run } = await specDecision();
   assert.deepEqual(plain(await run.records.compose(input.action)), { refused: 'source_unchecked' });
   assert.deepEqual(run.net.writes(), []);
 });
@@ -857,13 +856,15 @@ test('R10: a saved grill or request the grill parser refuses is never a current 
   assert.deepEqual(accepted, [], 'the grill parser refuses these, and the records layer accepted them');
 });
 
+const PLAN_REPLACEMENT = 'GET /repos/acme/factory/issues/comments/9100002';
+const laterPlan = input => input.github[PLAN_REPLACEMENT].json.body.replace('pa_notes_1', 'pa_notes_2');
+const UNREADABLE_PLAN = '```json\n{"schema":"openwiz.decisions.v1","kind":"plan_approval",\n```';
+
 test('R11: a newer record on the subject stops an older card\'s answer before it is sent', async () => {
   const later = (id, body) => ({ id, user: { login: 'factory-bot[bot]', id: 5900 }, body, created_at: '2030-01-08T00:00:00.000Z' });
-  for (const [body, reason] of [
-    ['```json\n{"schema":"openwiz.decisions.v1","kind":"spec_confirmation","id":"sc_notes_2","status":"open","fingerprint":"2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f","risk":"ordinary","spec":41,"summary":["Keep notes in two lists."],"headline":"Keep your notes in one list.","tickets":[],"graph":[]}\n```', 'source_changed'],
-    ['```json\n{"schema":"openwiz.decisions.v1","kind":"spec_confirmation",\n```', 'source_unchecked'],
-  ]) {
-    const { input, net, run } = await specConfirmation();
+  for (const reason of ['source_changed', 'source_unchecked']) {
+    const { input, net, run } = await specDecision();
+    const body = reason === 'source_changed' ? laterPlan(input) : UNREADABLE_PLAN;
     const preview = await composeLike(run.records, input.action);
     await confirmAll(run.records, preview);
     net.add(41, later(9100009, body));
@@ -935,7 +936,7 @@ test('R13: a retired operation stays retired, even when its source returns to wh
 });
 
 test('R15: spec confirmations are always unchecked and cannot be composed', async () => {
-  const { input, net, run } = await specConfirmation();
+  const { input, net, run } = await specDecision('spec_confirmation');
   const checked = plain(await run.records.check(input.action.item));
   assert.deepEqual(checked, { result: 'unchecked', binding: null, checked_at: null });
   for (const action of [input.action, { ...input.action, form: 'decision.no' }, { ...input.action, form: 'decision.own', words: 'Synthetic reply' }]) {
@@ -943,6 +944,33 @@ test('R15: spec confirmations are always unchecked and cannot be composed', asyn
     assert.deepEqual(plain(preview), { refused: 'source_unchecked' });
   }
   assert.deepEqual(net.writes(), []);
+});
+
+test('R15: a legacy confirmation receipt can reconcile and cannot resend', async () => {
+  const input = await json(new URL('decision-yes-spec_confirmation.input.json', FORMS));
+  const body = await json(new URL('decision-yes-spec_confirmation.body.json', FORMS));
+  const issueBody = input.github['GET /repos/acme/factory/issues/41'].json.body;
+  const digest = Buffer.from(await webcrypto.subtle.digest('SHA-256', new TextEncoder().encode(issueBody))).toString('hex');
+  const op = 'op-' + '9'.repeat(32);
+  const { item } = input.action;
+  const preview = { op, form: input.action.form, body, repository: item.repository, subject: item.subject,
+    url: item.url.split('#')[0], visibility: 'repository', confirms: 1, source: { ref: 'issue', digest } };
+  for (const landed of [true, false]) {
+    const net = new Net(input.github);
+    const sent_at = Date.now();
+    const receipt = { v: 1, op, account: OWNER.id, preview, action: input.action, sent_at, before: [], state: 'sending' };
+    const storage = new Map([[`openwiz.app.v2.receipts.${OWNER.id}`, JSON.stringify({ [op]: receipt })]]);
+    if (landed) net.add(41, { id: 9100082, user: OWNER, body, created_at: new Date(sent_at).toISOString() });
+    const run = await boot({ net, storage });
+    const [restored] = run.records.pending();
+    assert.equal(restored.op, op);
+    await confirmAll(run.records, restored);
+    const result = await run.records.post(restored);
+    assert.equal(result.outcome, landed ? 'posted' : 'refused');
+    if (!landed) assert.equal(result.reason, 'source_unchecked');
+    assert.deepEqual(net.writes(), []);
+    assert.deepEqual(plain(run.records.pending()), []);
+  }
 });
 
 test('R16: a broader or unverifiable audience refuses the send and requires a new preview', async () => {
@@ -1018,7 +1046,7 @@ test('R9 (#2923): an older check finishing after a newer changed or unchecked ch
     const gate = new Promise(resolve => { release = resolve; });
     let held = false;
     net.intercept = async (method, at) => {
-      if (method === 'GET' && at.pathname.includes('/contents/') && !held) {
+      if (method === 'GET' && at.pathname.includes('/contents/docs/grills/') && !held) {
         held = true;
         await gate;
         return Response.json(original.json, { status: original.status });
@@ -1049,10 +1077,9 @@ test('R9 (#2923): an older check finishing after a newer changed or unchecked ch
 
 test('R11 (#2923): a replacement or unreadable record posted while post source check runs is refused before dispatch, while landed sends still reconcile first', async () => {
   const later = (id, body) => ({ id, user: { login: 'factory-bot[bot]', id: 5900 }, body, created_at: '2030-01-08T00:00:00.000Z' });
-  const replacement = '```json\n{"schema":"openwiz.decisions.v1","kind":"spec_confirmation","id":"sc_notes_2","status":"open","fingerprint":"2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f","risk":"ordinary","spec":41,"summary":["Keep notes in two lists."],"headline":"Keep your notes in one list.","tickets":[],"graph":[]}\n```';
-  const unreadable = '```json\n{"schema":"openwiz.decisions.v1","kind":"spec_confirmation",\n```';
-  for (const [body, reason] of [[replacement, 'source_changed'], [unreadable, 'source_unchecked']]) {
-    const { input, net, run } = await specConfirmation();
+  for (const reason of ['source_changed', 'source_unchecked']) {
+    const { input, net, run } = await specDecision();
+    const body = reason === 'source_changed' ? laterPlan(input) : UNREADABLE_PLAN;
     const preview = await composeLike(run.records, input.action);
     await confirmAll(run.records, preview);
     let injected = false;
@@ -1069,7 +1096,7 @@ test('R11 (#2923): a replacement or unreadable record posted while post source c
     assert.deepEqual(net.posts(), [], `${reason}: post sent despite late record during source check`);
   }
   {
-    const { input, net, run } = await specConfirmation();
+    const { input, net, run } = await specDecision();
     const preview = await composeLike(run.records, input.action);
     await confirmAll(run.records, preview);
     net.mode = 'dropped';
@@ -1079,7 +1106,7 @@ test('R11 (#2923): a replacement or unreadable record posted while post source c
     net.intercept = async (method, at) => {
       if (method === 'GET' && at.pathname === '/repos/acme/factory/issues/41' && !injected) {
         injected = true;
-        net.add(41, later(9100020, replacement));
+        net.add(41, later(9100020, laterPlan(input)));
       }
       return null;
     };
@@ -1091,13 +1118,13 @@ test('R11 (#2923): a replacement or unreadable record posted while post source c
     assert.deepEqual(plain(run.records.pending()), [], 'retry: retired receipt stayed pending');
   }
   {
-    const { input, net, run } = await specConfirmation();
+    const { input, net, run } = await specDecision();
     const preview = await composeLike(run.records, input.action);
     await confirmAll(run.records, preview);
     net.mode = 'lost';
     assert.equal(plain(await run.records.post(preview)).outcome, 'unknown');
     net.mode = 'ok';
-    net.add(41, later(9100021, replacement));
+    net.add(41, later(9100021, laterPlan(input)));
     await confirmAll(run.records, preview);
     const outcome = plain(await run.records.post(preview));
     assert.equal(outcome.outcome, 'posted', `landed send was not reconciled first: ${JSON.stringify(outcome)}`);
@@ -1178,6 +1205,8 @@ test('R14: in the built app, a real tap confirms and posts once; a scripted clic
     const lists = { 41: [request], 44: [] };
     const held = [];
     world.record(approval.github);
+    world.github[`GET ${REPOSITORY_PATH}`] = () => ({ status: 200, json: repository('private') });
+    world.github[`GET ${FLEET_PATH}`] = () => ({ status: 200, json: fleetBlob(FLEET) });
     world.github['GET /user'] = () => ({ status: 200, json: OWNER });
     for (const number of [41, 44]) {
       world.github[`GET /repos/acme/factory/issues/${number}/comments`] = () => ({ status: 200, json: lists[number] });
