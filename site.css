@@ -630,6 +630,9 @@ body.landing > main { flex: 1 0 auto; }
 .faq-ask .faq-a p:empty { display: none; }
 .faq-ask[data-state="asking"] .faq-a p:empty { display: block; }
 .faq-ask[data-state="asking"] .faq-ask-answer::after { content: ""; display: inline-block; width: .5em; height: 1.1em; margin-left: 2px; vertical-align: text-bottom; background: var(--brass); }
+.faq-ask[data-state="asking"] .wiz-loader + p:empty { display: none; }
+.faq-a .wiz-loader { margin-bottom: 22px; }
+.faq-a .wiz-loader-line { max-width: none; padding: 0; }
 .faq-ask-actions { display: flex; flex-wrap: wrap; gap: 8px; padding-bottom: 22px; }
 .faq-ask-label { min-width: 0; overflow-wrap: anywhere; }
 :is(.faq-ask, .faq-asked) .faq-a p { overflow-wrap: anywhere; }

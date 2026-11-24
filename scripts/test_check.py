@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from html import escape
 from pathlib import Path
 import json
@@ -9,7 +10,7 @@ from unittest import mock
 
 import re
 
-from check import CTA, FAQ, FAQ_WHERE, FOOTER, INSTALL_NOTE_HTML, FINGERPRINTS, HASHED, INSTALL_SWITCH, ROOT, Page, check_changelog, check_release_data, check_releases, read_releases, split_releases, check_motion, check_privacy, check_ref, check_site, check_vector, check_webp, fingerprint
+from check import CTA, FAQ, FAQ_WHERE, FOOTER, INSTALL_NOTE_HTML, FINGERPRINTS, HASHED, INSTALL_SWITCH, ROOT, Page, check_changelog, check_release_data, check_releases, read_releases, split_releases, check_motion, check_privacy, check_ref, check_security_txt, check_site, check_vector, check_webp, fingerprint
 
 
 def edit_built(root, name, change):
@@ -504,12 +505,26 @@ class Checks(unittest.TestCase):
                     check_site(root)
 
     def test_headers_revalidate(self):
-        with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp) / 'dist'
-            shutil.copytree(ROOT / 'dist', root)
-            (root / '_headers').write_text('/*.css\n  Cache-Control: public, max-age=14400\n')
-            with self.assertRaises(AssertionError):
-                check_site(root)
+        cases = {
+            'broken file': lambda text: '/*.css\n  Cache-Control: public, max-age=14400\n',
+            'missing immutable detach': lambda text: text.replace('/*.:hash.css\n  ! Cache-Control\n', '/*.:hash.css\n'),
+            'missing font detach': lambda text: text.replace('/fonts/*\n  ! Cache-Control\n', '/fonts/*\n'),
+            'missing mp4 detach': lambda text: text.replace('/*.mp4\n  ! Cache-Control\n', '/*.mp4\n'),
+            'overbroad unhashed js': lambda text: text.replace('/*.:hash.js', '/*.js'),
+            'overbroad unhashed css': lambda text: text.replace('/*.:hash.css', '/*.css'),
+            'html stale-while-revalidate': lambda text: text.replace(
+                '  Cache-Control: public, max-age=0, must-revalidate\n',
+                '  Cache-Control: public, max-age=0, must-revalidate, stale-while-revalidate=60\n'),
+            'double splat pattern': lambda text: text.replace('/*.:hash.css', '/*.*.css'),
+        }
+        for name, spoil in cases.items():
+            with self.subTest(name), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp) / 'dist'
+                shutil.copytree(ROOT / 'dist', root)
+                headers = root / '_headers'
+                headers.write_text(spoil(headers.read_text()))
+                with self.assertRaises(AssertionError):
+                    check_site(root)
 
     def test_security_headers_and_well_known(self):
         cases = {
@@ -532,6 +547,32 @@ class Checks(unittest.TestCase):
                 spoil(root)
                 with self.assertRaises(AssertionError):
                     check_site(root)
+
+    def test_security_txt_expiry(self):
+        base = (
+            'Contact: https://github.com/openwizdev/OpenWiz/security/advisories/new\n'
+            'Preferred-Languages: en\n'
+            'Canonical: https://openwiz.dev/.well-known/security.txt\n'
+            'Policy: https://github.com/openwizdev/OpenWiz/security/policy\n'
+        )
+        today = datetime(2027, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+        check_security_txt(base + 'Expires: 2028-01-01T00:00:00Z\n', now=today)
+        check_security_txt(base + 'Expires: 2027-03-02T00:00:00Z\n', now=today)
+        check_security_txt(base + 'Expires: 2028-01-01T05:00:00+05:00\n', now=today)
+        bad_cases = (
+            ('59 days out', base + 'Expires: 2027-03-01T00:00:00Z\n', 'within 60 days; move it about a year out'),
+            ('past', base + 'Expires: 2026-12-31T23:59:59Z\n', 'in the past; move it about a year out'),
+            ('missing', base, 'missing Expires'),
+            ('duplicate', base + 'Expires: 2028-01-01T00:00:00Z\nExpires: 2029-01-01T00:00:00Z\n', 'duplicate Expires'),
+            ('garbage', base + 'Expires: not-a-date\n', 'unparsable RFC 3339 Expires'),
+            ('invalid calendar date', base + 'Expires: 2028-02-30T00:00:00Z\n', 'unparsable RFC 3339 Expires'),
+            ('naive timestamp', base + 'Expires: 2028-01-01T00:00:00\n', 'unparsable RFC 3339 Expires'),
+        )
+        for name, text, error in bad_cases:
+            with self.subTest(name), self.assertRaisesRegex(AssertionError, error):
+                check_security_txt(text, now=today)
+        with self.assertRaisesRegex(AssertionError, 'in the past'):
+            check_site(ROOT / 'dist', now=datetime(2099, 1, 1, 0, 0, 0, tzinfo=timezone.utc))
 
     def test_install_wording_only_in_the_install_box(self):
         for extra in ('<a href="/">Copy · coming soon</a>', '<p>Install now</p>', '<p>Inst&#97;ll today</p>',

@@ -471,6 +471,8 @@ const ASK_REFUSALS = {
 };
 const ASK_NOT_COVERED = 'The OpenWiz docs don\'t cover that yet, so I won\'t guess. Book a call or open a GitHub issue, and we\'ll answer it.';
 const ASK_LINKS = [['Book a call', 'https://openwiz.dev/team/#book'], ['GitHub issues', 'https://github.com/openwizdev/openwiz/issues']];
+const ASK_LINES = ['A Wiz is reading the docs', 'Flipping through the spellbook', 'Finding the right page',
+  'Asking the other Wizes', 'Checking every source', 'Polishing the answer'];
 const askKeys = value => value && typeof value === 'object' && !Array.isArray(value) ? Object.keys(value).sort().join() : '';
 const askText = value => typeof value === 'string' && value.length > 0;
 function askEvent(line, text, sources) {
@@ -524,7 +526,18 @@ async function askAWiz() {
       for (const name of ['Stop', 'Retry', 'Edit']) actions.append(buttons[name] = Object.assign(el('button', '', name), { type: 'button' }));
       row.append(form, heading, body, actions);
       list.append(row);
-      let question = '', controller = null;
+      let question = '', controller = null, wait = null;
+      const waiting = on => {
+        if (!on) {
+          wait?.remove();
+          wait = null;
+        }
+        if (!on || wait || !window.WizLoader) return;
+        wait = window.WizLoader.markup(true);
+        window.WizLoader.mount(wait, { lines: ASK_LINES });
+        wait.setAttribute('aria-hidden', 'true');
+        answer.before(wait);
+      };
       const show = (state, message = '', retry = true, focus = true) => {
         const inside = row.contains(document.activeElement);
         row.dataset.state = state;
@@ -532,6 +545,7 @@ async function askAWiz() {
         heading.hidden = body.hidden = state === 'idle';
         heading.textContent = question;
         answer.textContent = message;
+        waiting(state === 'asking');
         buttons.Stop.hidden = state !== 'asking';
         buttons.Retry.hidden = state !== 'ended' || !retry;
         buttons.Edit.hidden = state !== 'ended';
@@ -583,7 +597,7 @@ async function askAWiz() {
             for (let at; (at = buffer.indexOf('\n')) >= 0; buffer = buffer.slice(at + 1)) {
               if (end) throw new Error('data after the last event');
               const event = askEvent(buffer.slice(0, at), text, sources);
-              if (event.type === 'text') answer.textContent = text += event.text;
+              if (event.type === 'text') waiting(false), answer.textContent = text += event.text;
               else if (event.type === 'sources') sources = event.sources.map(s => s.title);
               else end = event;
             }

@@ -64,6 +64,16 @@
     return view;
   }
 
+  function waitScreen(text) {
+    built = null;
+    OW.palette.close();
+    let box = root.querySelector(':scope > .wiz-loader');
+    if (!box) root.replaceChildren(box = window.WizLoader.markup());
+    for (const line of box.querySelectorAll('.wiz-loader-line, .wl-sr')) line.textContent = text;
+    window.WizLoader.mount(box);
+    document.title = 'OpenWiz';
+  }
+
   function signedOut(note) {
     data.stop();
     if (v2 && OW.v2) {
@@ -82,12 +92,13 @@
     );
   }
 
+  const reading = text => OW.ui.loading(text) || h('p', {}, text);
   const signOutButton = () => h('button', { class: 'btn', type: 'button', onclick: () => { data.auth.signOut(); signedOut(); } }, 'Sign out');
 
   async function picker() {
     data.stop();
     const session = data.auth.session();
-    const view = screen(h('h1', {}, 'Pick a repository'), h('p', {}, 'Reading your repositories from GitHub…'), h('p', { class: 'small' }, signOutButton()));
+    const view = screen(h('h1', {}, 'Pick a repository'), reading('Reading your repositories from GitHub…'), h('p', { class: 'small' }, signOutButton()));
     let found;
     try {
       found = await data.repositories();
@@ -165,7 +176,7 @@
     const close = () => { list.hidden = true; button.setAttribute('aria-expanded', 'false'); };
     const fill = async () => {
       const session = data.auth.session();
-      list.replaceChildren(h('p', {}, 'Reading your repositories…'));
+      list.replaceChildren(reading('Reading your repositories…'));
       let found;
       try {
         found = await readRepositories();
@@ -365,7 +376,7 @@
     if (!demo && !liveFeed && mine.length && mine.every(feed => feed.state === 'unknown')) {
       built.body.replaceChildren(OW.ui.unknown(`${page.title} couldn't be read from GitHub. The app tries again on its own, or press Refresh now.`));
     } else if (!demo && !liveFeed && mine.length && mine.some(feed => feed.state === 'loading') && !mine.some(feed => feed.data)) {
-      built.body.replaceChildren(OW.ui.placeholder('Reading GitHub…'));
+      OW.ui.fill(built.body, OW.ui.placeholder('Reading GitHub…'));
     } else {
       page.render(built.body, feeds, route().arg, built.pager);
     }
@@ -428,7 +439,7 @@
     const state = params.get('state');
     if (location.search) history.replaceState(null, '', `${location.pathname}${location.hash}`);
     if (code && state) {
-      screen(h('h1', {}, 'Signing in…'), h('p', {}, 'Finishing your GitHub sign-in.'));
+      waitScreen('Signing in…');
       try {
         await data.finishSignIn(code, state);
       } catch {
