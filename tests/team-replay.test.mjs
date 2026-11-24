@@ -6,13 +6,14 @@ import { runInNewContext } from 'node:vm';
 const script = readFileSync(new URL('../site.js', import.meta.url), 'utf8');
 const html = readFileSync(new URL('../team/index.html', import.meta.url), 'utf8');
 const utc = stamp => '2026-11-' + stamp.replace(' ', 'T') + 'Z';
+const stamp = iso => `${Number(iso.slice(8, 10))} Nov ${iso.slice(11, 16)}`;
 const opened = utc('20 13:38:32');
 // Trimmed replay-packet.json, spec #1927. Each row records build, review, close and linked PRs.
 const tickets = [
   [1928, '20 15:45:24', '20 15:57:37', '20 19:03:28', ['OpenWiz #1945']],
   [1929, '20 17:45:43', '20 17:58:49', '21 01:27:35', ['WizSkills #212', 'WizSite #118']],
-  [1931, '21 01:32:44', '21 02:00:06', '21 04:36:55', ['WizSkills #229']],
   [1932, '20 17:46:29', '20 17:58:49', '21 01:28:10', ['WizSite #118']],
+  [1931, '21 01:32:44', '21 02:00:06', '21 04:36:55', ['WizSkills #229']],
 ];
 const landings = {
   'OpenWiz #1945': '20 19:03:26',
@@ -22,38 +23,32 @@ const landings = {
 };
 
 function playback(reduced = false) {
-  const tracks = [];
-  const events = [];
-  function event(markup, label, track) {
-    const [, dateTime] = markup.match(/datetime="([^"]+)"/);
-    const attrs = new Set(markup.includes('aria-current="step"') ? ['aria-current'] : []);
-    const node = {
-      label, attrs, dateTime,
-      closest: () => track,
-      querySelector: () => ({ dateTime }),
+  const stars = [];
+  for (const [, classes, attrs, label, stateText, dateTime, timeText] of html.matchAll(
+    /<li class="(team-star[^"]*)"([^>]*)><a [^>]*>([^<]+)<\/a> <span>([^<]+)<\/span> <time datetime="([^"]+)">([^<]+)<\/time><\/li>/g
+  )) {
+    const dataset = {};
+    for (const [, key, value] of attrs.matchAll(/data-([a-z]+)="([^"]+)"/g)) dataset[key] = value;
+    const span = { textContent: stateText };
+    const time = { dateTime, textContent: timeText };
+    stars.push({
+      classes,
+      label,
+      dataset,
+      span,
+      time,
+      querySelector: selector => (selector === 'span' ? span : selector === 'time' ? time : null),
+    });
+  }
+  const links = [];
+  for (const [, lit, star] of html.matchAll(/<path class="team-link"( data-lit)? data-star="([^"]+)"[^>]*\/>/g)) {
+    const attrs = new Set(lit ? ['data-lit'] : []);
+    links.push({
+      dataset: { star },
+      attrs,
       setAttribute: name => attrs.add(name),
       removeAttribute: name => attrs.delete(name),
-    };
-    events.push(node);
-    return node;
-  }
-  for (const [, number, steps] of html.matchAll(/<code>#(\d+)<\/code>[^\n]+\n\s*<div class="team-timeline" data-replay-stages>([\s\S]*?)\n\s*<\/div>\n\s*<\/li>/g)) {
-    const stages = [];
-    const track = {
-      number: Number(number), stages,
-      prepend(waiting) { this.waiting = waiting; },
-      querySelector(selector) {
-        if (selector === '.team-waiting') return this.waiting;
-        return stages.find(stage => stage.attrs.has('aria-current'));
-      },
-    };
-    for (const [markup, label] of steps.matchAll(/<div data-replay-event[^>]*><span>([^<]+)<\/span> <time[^>]*>[^<]+<\/time><\/div>/g)) {
-      stages.push(event(markup, label, track));
-    }
-    tracks.push(track);
-  }
-  for (const [markup, label] of html.matchAll(/<li data-replay-event><a [^>]*>([^<]+)<\/a> · Merged <time[^>]*>[^<]+<\/time><\/li>/g)) {
-    event(markup, label);
+    });
   }
   const control = {
     textContent: html.match(/<button class="team-replay-control"[^>]*>([^<]+)/)[1],
@@ -66,8 +61,8 @@ function playback(reduced = false) {
   };
   const replay = {
     dataset: { teamReplay: html.match(/data-team-replay="([^"]+)"/)[1] },
-    querySelector: () => control,
-    querySelectorAll: selector => selector === '[data-replay-event]' ? events : tracks,
+    querySelector: selector => (selector === '.team-replay-control' ? control : null),
+    querySelectorAll: selector => (selector === '.team-star' ? stars : selector === '.team-link' ? links : []),
   };
   const timers = new Map();
   let now = 0;
@@ -97,7 +92,7 @@ function playback(reduced = false) {
     fetch() { reads++; throw new Error('unexpected read'); },
   });
   return {
-    tracks, events, control, motion, timers, replay,
+    stars, links, control, motion, timers, replay,
     reads: () => reads,
     advanceTo(time) {
       for (const [token, timer] of timers) {
@@ -108,60 +103,94 @@ function playback(reduced = false) {
       }
       now = time;
     },
-    shown: () => events.filter(node => !node.attrs.has('data-replay-pending')),
   };
 }
 
-test('the still contains the packet’s ticket transitions and unique pull request landings', () => {
+test('the still sky contains the packet’s ticket transitions and unique pull request landings', () => {
   const run = playback(true);
   assert.equal(run.replay.dataset.teamReplay, opened);
-  assert.deepEqual(run.tracks.map(track => track.number), tickets.map(([number]) => number));
+  assert.equal(run.stars.length, tickets.length + Object.keys(landings).length);
+  assert.deepEqual(run.stars.slice(0, 4).map(star => Number(star.dataset.star)), tickets.map(([number]) => number));
   for (const [number, build, review, close, linked] of tickets) {
-    const { stages } = run.tracks.find(track => track.number === number);
+    const star = run.stars.find(item => item.dataset.star === String(number));
     const merged = [close, linked.map(pr => landings[pr]).sort().at(-1)].sort()[0];
-    assert.deepEqual(stages.map(stage => [stage.label, stage.dateTime]),
-      [['Building', utc(build)], ['In review', utc(review)], ['Merged', utc(merged)]]);
-    assert.ok(stages[2].attrs.has('aria-current'));
+    assert.deepEqual([star.dataset.building, star.dataset.review, star.dataset.merged],
+      [utc(build), utc(review), utc(merged)]);
+    assert.equal(star.dataset.state, 'merged');
+    assert.equal(star.span.textContent, 'Merged');
+    assert.equal(star.time.dateTime, utc(merged));
+    assert.equal(star.time.textContent, stamp(utc(merged)));
   }
-  assert.deepEqual(run.events.slice(-4).map(node => [node.label, node.dateTime]),
-    Object.entries(landings).map(([label, at]) => [label, utc(at)]));
-  assert.equal(run.shown().length, 16);
+  const prStars = run.stars.slice(4);
+  assert.deepEqual(prStars.map(star => [star.label, star.dataset.merged, star.time.dateTime, star.time.textContent]),
+    Object.entries(landings).map(([label, at]) => [label, utc(at), utc(at), stamp(utc(at))]));
+  assert.ok(prStars.at(-1).classes.includes('team-landing'));
+  assert.ok(run.links.every(link => link.attrs.has('data-lit')));
   assert.equal(run.timers.size, 0);
   assert.equal(run.control.hidden, true);
   assert.equal(run.reads(), 0);
 });
 
-test('replay reveals the recorded events in order on a 20-second clock', () => {
+test('replay lights up each star and link in recorded order on a 20-second clock', () => {
   const run = playback();
-  assert.ok(run.tracks.every(track => !track.waiting.hidden && track.waiting.textContent === 'Waiting'));
+  assert.equal(run.control.hidden, false);
   assert.equal(run.control.textContent, 'Finish replay');
-  assert.equal(run.shown().length, 0);
+  assert.ok(run.stars.every(star => star.dataset.state === 'waiting' && star.span.textContent === 'Waiting' && !star.time.dateTime && !star.time.textContent));
+  assert.ok(run.links.every(link => !link.attrs.has('data-lit')));
+
+  const states = [['building', 'Building'], ['review', 'In review'], ['merged', 'Merged']];
+  const expectedAt = (star, cutoff, inclusive) => {
+    let current = ['waiting', 'Waiting', ''];
+    for (const [state, label] of states) {
+      const iso = star.dataset[state];
+      if (iso && (inclusive ? iso <= cutoff : iso < cutoff)) current = [state, label, iso];
+    }
+    return current;
+  };
+  const checkAt = (cutoff, inclusive) => {
+    for (const star of run.stars) {
+      const [state, label, iso] = expectedAt(star, cutoff, inclusive);
+      assert.equal(star.dataset.state, state);
+      assert.equal(star.span.textContent, label);
+      assert.equal(star.time.dateTime, iso);
+      assert.equal(star.time.textContent, iso && stamp(iso));
+      const link = run.links.find(item => item.dataset.star === star.dataset.star);
+      assert.equal(link.attrs.has('data-lit'), state !== 'waiting');
+    }
+  };
+
+  const times = [...new Set(run.stars.flatMap(star => states.map(([s]) => star.dataset[s]).filter(Boolean)))].sort();
+  assert.equal(times.length, 12);
   const start = Date.parse(opened);
   const duration = Date.parse(utc(landings['WizSkills #229'])) - start;
-  for (const at of [...new Set(run.events.map(node => node.dateTime))].sort()) {
+  for (const at of times) {
     const ms = (Date.parse(at) - start) / duration * 20_000;
     run.advanceTo(ms - .01);
-    assert.deepEqual(run.shown(), run.events.filter(node => node.dateTime < at));
+    checkAt(at, false);
     run.advanceTo(ms + .01);
-    assert.deepEqual(run.shown(), run.events.filter(node => node.dateTime <= at));
+    checkAt(at, true);
   }
-  assert.ok(run.tracks.every(track => track.waiting.hidden && track.querySelector('[aria-current]').label === 'Merged'));
+  assert.ok(run.stars.every(star => star.dataset.state === 'merged' && star.span.textContent === 'Merged' && star.time.dateTime === star.dataset.merged));
+  assert.ok(run.links.every(link => link.attrs.has('data-lit')));
   assert.equal(run.timers.size, 0);
   assert.equal(run.control.textContent, 'Play again');
   assert.equal(run.reads(), 0);
 });
 
-test('the one control can finish and replay, and enabling reduced motion leaves the full still', () => {
+test('the one control can finish and replay, and enabling reduced motion leaves the full sky', () => {
   const run = playback();
   run.control.click();
-  assert.equal(run.shown().length, 16);
+  assert.ok(run.stars.every(star => star.dataset.state === 'merged' && star.time.dateTime === star.dataset.merged));
+  assert.ok(run.links.every(link => link.attrs.has('data-lit')));
   assert.equal(run.control.textContent, 'Play again');
   run.control.click();
-  assert.equal(run.shown().length, 0);
+  assert.ok(run.stars.every(star => star.dataset.state === 'waiting' && !star.time.dateTime));
+  assert.ok(run.links.every(link => !link.attrs.has('data-lit')));
   assert.equal(run.timers.size, 1);
   run.motion.matches = true;
   run.motion.change();
-  assert.equal(run.shown().length, 16);
+  assert.ok(run.stars.every(star => star.dataset.state === 'merged' && star.time.dateTime === star.dataset.merged));
+  assert.ok(run.links.every(link => link.attrs.has('data-lit')));
   assert.equal(run.control.hidden, true);
   assert.equal(run.timers.size, 0);
 });
