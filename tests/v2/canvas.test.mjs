@@ -299,7 +299,25 @@ test('Canvas: widening the window refits a board that is still at its fitted vie
   }
 });
 
-test('switch on: #/canvas still opens the Canvas page under the v2 shell, which keeps its own nav', async () => {
+test('switch on: a note the app cannot read stays unknown on the v2 board', async () => {
+  const run = await start();
+  try {
+    world(run, {
+      missing: 1,
+      tickets: list => { list.find(t => t.n === 46).notes.push(note(8461, { agent: 'builder', state: 'working', step: 'a later version', min: 3, version: 2 })); },
+    });
+    await run.page.go(`${SITE}/app/?v2=on`);
+    await run.page.until(`document.body.innerText.includes('Continue with GitHub')`, 'the v2 signed-out screen');
+    await openCanvas(run);
+    assert.equal(await run.page.run(`document.querySelector('.cv-stack[data-ticket$="#46"] .pill').textContent`), 'Unknown');
+    assert.match(await run.page.text(), /1 ticket of #41 couldn't be read, so it shows as unknown/);
+    assert.deepEqual(run.world.violations, []);
+  } finally {
+    await run.close();
+  }
+});
+
+test('switch on: Canvas is in the v2 nav and shows tickets and plain states, with updates only inside a ticket', async () => {
   const run = await start();
   try {
     world(run);
@@ -313,7 +331,31 @@ test('switch on: #/canvas still opens the Canvas page under the v2 shell, which 
     assert.equal(await run.page.run('location.hash'), '#/canvas');
     assert.equal(await run.page.run(`document.querySelector('main h1')?.textContent`), 'Canvas');
     assert.deepEqual(await sheets(run), ['#41 Spec: checkout', '#48 Spec: accounts', 'Quiet · 1']);
-    assert.deepEqual(await run.page.run(`[...document.querySelectorAll('nav.main a')].map(a => a.getAttribute('href'))`), ['#/chat', '#/feed', '#/settings']);
+    assert.deepEqual(await run.page.run(`[...document.querySelectorAll('nav.main a')].map(a => a.getAttribute('href'))`), ['#/chat', '#/feed', '#/canvas', '#/settings']);
+    assert.deepEqual(await run.page.run(`[...document.querySelectorAll('nav.v2-tabs a')].map(a => a.getAttribute('href'))`), ['#/chat', '#/feed', '#/canvas', '#/settings']);
+    assert.deepEqual(await run.page.run(`Object.fromEntries([...document.querySelectorAll('.cv-stack[data-ticket]')].map(s =>
+      [s.dataset.ticket.split('#').pop(), s.querySelector('.pill').textContent]))`), {
+      42: 'Done', 43: 'In review', 44: 'Needs you', 45: 'Needs you', 46: 'Waiting', 47: 'Paused',
+    });
+    assert.equal(await run.page.run(`document.querySelectorAll('.cv-line').length`), 6);
+    const machinery = /Claude|Codex|Opus|Sol 6|Builder|Reviewer|agent|fleet|plan limit/i;
+    assert.doesNotMatch(await run.page.text(), machinery, 'the board names agents, models or roles');
+    await run.page.run(`document.querySelector('.cv-stack[data-ticket$="#44"]').click()`);
+    await run.page.until(`document.querySelector('.cv-focus .cv-update')`, 'the ticket view');
+    assert.match(await run.page.text(), /reviewing at the exact head/);
+    assert.match(await run.page.text(), /#42 Cart contract · Done/);
+    assert.doesNotMatch(await run.page.text(), machinery, 'the ticket view names agents, models or roles');
+    await run.page.key('Escape');
+    await run.page.until(`document.activeElement?.dataset.ticket === 'acme/factory#44'`, 'focus back on the ticket');
+    if (SHOTS) await run.page.shot(join(SHOTS, 'canvas-v2.png'), 1440, 900, false);
+    await run.page.size(390, 844, true);
+    await run.page.until(`document.querySelectorAll('.cv-row').length >= 6 && !document.querySelector('.cv-board')`, 'ticket rows on a phone');
+    assert.deepEqual(await run.page.run(`[...document.querySelectorAll('.cv-rows[data-sheet="41"] > ul .cv-row')].map(r => r.querySelector('.num').textContent + ' ' + r.querySelector('.pill').textContent)`),
+      ['#44 Needs you', '#45 Needs you', '#47 Paused', '#43 In review', '#46 Waiting']);
+    assert.equal(await run.page.run(`document.querySelectorAll('.cv-rows[data-sheet="41"] > .cv-blocks i').length`), 6);
+    assert.equal(await run.page.run(`document.scrollingElement.scrollWidth <= innerWidth`), true);
+    if (SHOTS) await run.page.shot(join(SHOTS, 'canvas-v2-phone.png'), 390, 844, true);
+    await run.page.size(1440, 900, false);
     await run.page.go(`${SITE}/app/#/canvas/41`);
     await run.page.until(`document.querySelector('main h1')?.textContent === 'Canvas' && document.querySelectorAll('.cv-stack[data-ticket]').length >= 6`, 'the Canvas page at spec #41');
     assert.equal(await run.page.run('location.hash'), '#/canvas/41');

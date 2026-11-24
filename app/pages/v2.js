@@ -1,6 +1,6 @@
 'use strict';
 (() => {
-  const { h, icon } = OW.ui;
+  const { h, icon, STATES } = OW.ui;
   const isDemo = OW.data.demo;
   const mark = () => h('img', { src: '/app/mark.svg', alt: '', width: 28, height: 28 });
   const avatar = () => h('span', { class: 'v2-avatar' }, mark());
@@ -37,6 +37,7 @@
         {
           role: 'grill',
           specTitle: 'Usage-based seat billing',
+          plan: 'billing',
           answered: false,
           questions: [
             { prompt: 'When should we charge for new seats?', rec: 0, selected: 0, options: ['At month end', 'Right away'] },
@@ -47,12 +48,12 @@
       ],
       cards: [
         {
+          id: 'magic',
           type: 'spec',
           status: 'ready',
+          spec: 211,
           title: 'Magic-link sign-in',
           goal: 'A simpler way into Harbor.',
-          merged: 6,
-          total: 6,
           scenes: [
             '0:02 · Request a sign-in link.',
             '0:05 · Open the link to sign in.',
@@ -61,6 +62,7 @@
           sceneIdx: 0,
         },
         {
+          id: 'free',
           type: 'decision',
           status: 'pending',
           title: 'Keep the free plan?',
@@ -68,6 +70,7 @@
           rec: 'Keep it, cap at 3 seats',
         },
         {
+          id: 'retention',
           type: 'decision',
           status: 'pending',
           title: 'Retention window for deleted projects',
@@ -75,9 +78,31 @@
           rec: 'Allow recovery for 30 days',
         },
       ],
-      building: [
-        { title: 'Audit log export', merged: 5, total: 7 },
-        { title: 'Project activity digest', merged: 2, total: 4 },
+      nextSpec: 231,
+      specs: [
+        { number: 201, title: 'Audit log export', tickets: [
+          { n: 202, title: 'Event schema', state: 'merged', blockers: [], min: 310, notes: ['Merged with every check passing.'] },
+          { n: 203, title: 'Record events', state: 'merged', blockers: [202], min: 240, notes: ['Merged with every check passing.'] },
+          { n: 204, title: 'CSV export', state: 'merged', blockers: [202], min: 190, notes: ['Merged with every check passing.', 'Large exports now stream row by row.'] },
+          { n: 205, title: 'Member filter', state: 'merged', blockers: [202], min: 150, notes: ['Merged with every check passing.'] },
+          { n: 206, title: 'Download page', state: 'merged', blockers: [203, 204], min: 62, notes: ['Merged with every check passing.'] },
+          { n: 207, title: 'Email when ready', state: 'building', blockers: [204], min: 4, notes: ['Sending a test export to a sample inbox.', 'Drafted the email.'] },
+          { n: 208, title: 'Retention rules', card: 'retention', blockers: [205], min: 9, notes: ['How long should deleted projects stay recoverable?'] },
+        ] },
+        { number: 221, title: 'Project activity digest', tickets: [
+          { n: 222, title: 'Collect activity', state: 'merged', blockers: [], min: 280, notes: ['Merged with every check passing.'] },
+          { n: 223, title: 'Weekly summary', state: 'merged', blockers: [222], min: 120, notes: ['Merged with every check passing.'] },
+          { n: 224, title: 'Digest email', state: 'review', blockers: [223], min: 12, notes: ['Checking the layout on small screens.', 'Built the first version.'] },
+          { n: 225, title: 'Free plan limits', card: 'free', blockers: [222], min: 16, notes: ['Should the free plan stay, and with what limit?'] },
+        ] },
+        { number: 211, title: 'Magic-link sign-in', tickets: [
+          { n: 212, title: 'Sign-in email', state: 'merged', blockers: [], min: 420, notes: ['Merged with every check passing.'] },
+          { n: 213, title: 'One-time links', state: 'merged', blockers: [], min: 400, notes: ['Merged with every check passing.'] },
+          { n: 214, title: 'Request page', state: 'merged', blockers: [212], min: 330, notes: ['Merged with every check passing.'] },
+          { n: 215, title: 'Open the link', state: 'merged', blockers: [213], min: 300, notes: ['Merged with every check passing.'] },
+          { n: 216, title: 'Expired links', state: 'merged', blockers: [213], min: 210, notes: ['Merged with every check passing.'] },
+          { n: 217, title: 'Welcome back', state: 'merged', blockers: [214, 215], min: 95, notes: ['Merged with every check passing.'] },
+        ] },
       ],
       settings: {
         host: 'Local workstation',
@@ -90,6 +115,58 @@
       },
     };
   }
+
+  const PLAN_TITLES = {
+    billing: ['Count seats', 'Price per seat', 'Viewer rules', 'Upgrade flow', 'Failed renewals'],
+    general: ['First version', 'Settings toggle', 'Rollout', 'Help page', 'Walkthrough video'],
+  };
+  function planSpec(title, plan) {
+    const number = demo.nextSpec;
+    demo.nextSpec += 10;
+    const before = [[], [1], [1], [2, 3], [2]];
+    demo.specs.unshift({ number, title, tickets: PLAN_TITLES[plan].map((name, i) => ({
+      n: number + i + 1, title: name, state: i ? 'waiting' : 'building', blockers: before[i].map(b => number + b), min: 0,
+      notes: i ? [] : ['Getting started.'],
+    })) });
+  }
+
+  const KEY = n => `harbor#${n}`;
+  function sampleTicket(t, now) {
+    const card = t.card && demo.cards.find(c => c.id === t.card);
+    const state = !t.card ? t.state : card?.status === 'pending' ? 'you' : card?.status === 'deferred' ? 'waiting' : 'building';
+    const steps = !t.card || state === 'you' ? t.notes : [state === 'waiting' ? 'Set aside until you decide.' : 'Your decision is in. Building it now.'];
+    const at = now - t.min * 60000;
+    const doing = { merged: ['done', 'builder'], you: ['asking', 'builder'], review: ['working', 'reviewer'], building: ['working', 'builder'] };
+    const [status, agent] = doing[state] || ['lapsed', 'builder'];
+    const notes = steps.map((step, i) => ({ kind: 'note', status: i ? 'done' : status,
+      row: { at: at - i * 38 * 60000, note: { agent: i ? 'builder' : agent, step } } }));
+    return { key: KEY(t.n), number: t.n, title: t.title, url: null, href: state === 'you' ? cardHref(card) : null, state,
+      gap: false, outside: false, missing: 0, blockers: t.blockers.map(KEY), blocks: [], lead: null,
+      members: [...notes, { kind: 'ticket', labels: [] }], you: state === 'you', working: state === 'building', activity: notes.length ? at : 0 };
+  }
+  function sampleSheet(spec, now) {
+    const tickets = spec.tickets.map(t => sampleTicket(t, now));
+    for (const t of tickets) for (const key of t.blockers) tickets.find(x => x.key === key)?.blocks.push(t.key);
+    const card = demo.cards.find(c => c.spec === spec.number);
+    const ready = card?.status === 'ready';
+    const done = tickets.filter(t => t.state === 'merged').length;
+    const you = tickets.filter(t => t.you).length + (ready ? 1 : 0);
+    return { number: spec.number, title: spec.title, url: null, total: tickets.length, done, read: true, unknown: 0, tickets,
+      decisions: ready ? [{ kind: 'ship', number: spec.number, href: cardHref(card) }] : [],
+      counts: { you }, activity: now, quiet: !you && done === tickets.length };
+  }
+  function sampleCanvas(now = Date.now()) {
+    const sheets = demo.specs.map(spec => sampleSheet(spec, now));
+    const inbox = pendingDemoCards().map(card => {
+      const sheet = sheets.find(s => s.number === card.spec) || sheets.find(s => s.tickets.some(t => t.href === cardHref(card)));
+      const ticket = sheet?.tickets.find(t => t.href === cardHref(card)) || null;
+      return { kind: 'feed', sheet: sheet?.number ?? null, ticket: ticket?.key ?? null, number: ticket?.number ?? card.spec,
+        text: card.type === 'spec' ? `Ship ${card.title}` : card.title, href: cardHref(card), url: null, at: 0 };
+    });
+    return { sheets, inbox, gaps: [], partial: false };
+  }
+  const sampleSpec = number => sampleCanvas().sheets.find(sheet => sheet.number === number);
+  const sampleBuilding = () => sampleCanvas().sheets.filter(sheet => sheet.done < sheet.total);
 
   const demo = isDemo ? initialDemoState() : null;
   if (isDemo && location.hash === '#/feed/clear') demo.cards = [];
@@ -187,7 +264,7 @@
       text: `“${grill.specTitle}” is now in Feed.`,
       jumpFeed: true,
     });
-    demo.building.unshift({ title: grill.specTitle, merged: 0, total: 5 });
+    planSpec(grill.specTitle, grill.plan || 'general');
     showToast(`Answers saved · "${grill.specTitle}" added to Feed`);
     redraw();
   }
@@ -261,6 +338,7 @@
       });
       input.value = demo.draft;
       let ghost = null;
+      let composing = false;
       const send = () => {
         const text = input.value;
         if (!text.trim()) return;
@@ -270,6 +348,14 @@
         submitChatPrompt(text);
         input.focus({ preventScroll: true });
       };
+      input.addEventListener('compositionstart', () => { composing = true; });
+      input.addEventListener('compositionend', () => { composing = false; });
+      input.addEventListener('keydown', event => {
+        if (!composing && !event.isComposing && event.key === 'Enter' && !event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey) {
+          event.preventDefault();
+          send();
+        }
+      });
       const composer = h('form', { class: 'v2-composer', onsubmit: event => {
         event.preventDefault();
         send();
@@ -277,7 +363,7 @@
       el.replaceChildren(h('div', { class: 'v2-chat-wrap' }, scroll, h('div', { class: 'v2-composer-wrap' }, composer)));
       const wireGhost = mod => {
         if (!mod || !input.isConnected || ghost) return;
-        ghost = mod.attach(input, { onInput: value => { demo.draft = value; }, onSubmit: send });
+        ghost = mod.attach(input, { onInput: value => { demo.draft = value; } });
         if (input.value && document.activeElement === input) ghost.sync();
       };
       if (OW.ghost) wireGhost(OW.ghost);
@@ -349,24 +435,23 @@
     const line = (d, attrs = {}) => h('path', { d, ...attrs });
     const lighthouse = h('svg', { class: 'v2-lighthouse', viewBox: '0 0 176 112', 'aria-hidden': 'true',
       fill: 'none', stroke: 'currentColor', 'stroke-linecap': 'round', 'stroke-linejoin': 'round' },
-      line('M80 80 84 36h13l5 44M82 36h17v-5H82zm2-5V19h13v12M82 19l8.5-8 8.5 8M90.5 11V7', { fill: '#243a52' }),
+      line('M80 80 84 36h13l5 44M82 36h17v-5H82zm2-5V19h13v12M82 19l8.5-8 8.5 8M90.5 11V7', { fill: '#2b2723' }),
       line('M88 19v12m5-12v12m-9 20h15m-16 3h16m-17 13h18m-18 3h19M89 78v-7h5v8', { opacity: '.82' }),
       line('M76 26 49 23m27 6-39 2m67-5 23-3m-23 6 37 2', { opacity: '.4', 'stroke-dasharray': '1 3' }),
-      line('m44 88 12-4 8 1 14-6 11 1 12-3 12 6 12-1 10 6Z', { fill: '#263d56' }),
+      line('m44 88 12-4 8 1 14-6 11 1 12-3 12 6 12-1 10 6Z', { fill: '#322c25' }),
       line('m60 88 17-5 7 1m11 1 7-4 12 7m-7-2 9-1 9 3M22 92h132m-117 4h38m8 0h55m-77 4h54m-41 4h27', { opacity: '.66' }),
       line('M47 90h85m-85 5h78m-59 7h47', { opacity: '.55', 'stroke-dasharray': '1 2' }));
     return h('div', { class: 'v2-clear-card' }, lighthouse, h('h2', { tabindex: '-1' }, 'All clear.'), h('p', {}, message));
   }
 
-  function buildingSection(items) {
-    if (!items.length) return null;
+  function buildingSection(sheets) {
+    if (!sheets.length) return null;
+    const { blocks, sheetLine, plainRows } = OW.canvas;
     return h('section', { class: 'v2-building', 'aria-labelledby': 'v2-building-title' },
       h('h2', { id: 'v2-building-title' }, 'Building'),
-      h('ul', {}, items.map(({ title, merged, total, href }) => h('li', {},
-        h('div', { class: 'v2-building-row' },
-          href ? h('a', { href, target: '_blank', rel: 'noreferrer', 'data-focus': `building:${href}` }, title) : h('span', {}, title),
-          h('span', { class: 'v2-building-count' }, `${merged} of ${total}`)),
-        h('progress', { value: merged, max: total, 'aria-label': `Tickets complete for ${title}` })))));
+      h('div', { class: 'v2-build-cards' }, sheets.map(sheet => h('a', { class: 'v2-build-card', href: `#/canvas/${sheet.number}`, 'data-focus': `building:${sheet.number}` },
+        h('span', { class: 'v2-build-name' }, sheet.title), icon('right'), blocks(sheet), h('span', { class: 'cv-sheet-line' }, sheetLine(sheet))))),
+      h('div', { class: 'v2-build-rows' }, sheets.map(sheet => plainRows(sheet, 'h3'))));
   }
 
   function nextPreview(card, go) {
@@ -386,13 +471,13 @@
   function specPreview(card) {
     const envelope = h('svg', { class: 'v2-envelope', viewBox: '0 0 240 144', 'aria-hidden': 'true',
       fill: 'none', stroke: 'currentColor', 'stroke-linejoin': 'round' },
-      h('path', { d: 'M36 28h168v94H36Z', fill: '#162b41', 'stroke-width': '1.5' }),
+      h('path', { d: 'M36 28h168v94H36Z', fill: '#1f1b17', 'stroke-width': '1.5' }),
       h('path', { d: 'm37 121 66-52m100 52-66-52M36 29l68 52a26 26 0 0 0 32 0l68-52', 'stroke-width': '1.5' }),
       h('path', { d: 'M41 35v79m158-79v79M44 32h150M44 118h152m-154-6 56-43m100 43-56-43M46 41l60 45a23 23 0 0 0 28 0l60-45',
         opacity: '.68', 'stroke-dasharray': '1 2' }),
       h('path', { d: 'M45 106h19m-18-4h24m-24-4h29m-29-4h35m-34-4h39m-40-4h45m52 0h55m-49 4h49m-43 4h43m-38 4h38m-32 4h32m-27 4h27',
         opacity: '.48', 'stroke-dasharray': '.6 2' }),
-      h('circle', { cx: 120, cy: 76, r: 15, fill: '#223f5d', 'stroke-width': '1.5' }),
+      h('circle', { cx: 120, cy: 76, r: 15, fill: '#352d24', 'stroke-width': '1.5' }),
       h('circle', { cx: 120, cy: 76, r: 11, opacity: '.65', 'stroke-dasharray': '1 2' }),
       h('path', { d: 'M115 77q3-4 6 0t6 0m-12 4q3-4 6 0t6 0' }));
     return h('div', { class: 'v2-preview' },
@@ -412,7 +497,7 @@
       controls.replaceChildren();
       el.replaceChildren(h('div', { class: 'v2-feed-stage v2-feed-clear' },
         allClear('Wiz is building. You’ll hear when something needs you.'),
-        buildingSection(demo.building)));
+        buildingSection(sampleBuilding())));
       return;
     }
 
@@ -430,7 +515,10 @@
     const resolve = (status, label, { revision, undoChange } = {}) => {
       const previous = card.status;
       card.status = status;
-      if (revision) demo.building.unshift(revision);
+      if (revision) {
+        const { tickets } = demo.specs.find(spec => spec.number === card.spec);
+        tickets.push({ n: tickets.at(-1).n + 1, title: 'Requested change', state: 'building', blockers: [tickets.at(-1).n], min: 0, notes: [revision] });
+      }
       go(cardHref(next || list[index - 1]));
       focusCard();
       showToast(label, revision ? null : () => {
@@ -440,15 +528,15 @@
         focusCard();
       });
     };
-    const details = decision ? null : h('div', { class: 'v2-progress-box' },
-      h('p', {}, h('strong', {}, `${card.merged} of ${card.total}`), ' tickets merged'),
-      h('div', { class: 'v2-pips', 'aria-hidden': 'true' },
-        Array.from({ length: card.total }, (_, i) => h('span', { class: i < card.merged ? 'merged' : '' }))));
+    const spec = decision ? null : sampleSpec(card.spec);
+    const details = spec && h('div', { class: 'v2-progress-box' },
+      h('p', {}, h('strong', {}, `${spec.done} of ${spec.total}`), ' tickets merged'),
+      OW.canvas.blocks(spec));
     const primaryAction = h('button', { type: 'button', class: 'v2-btn primary', 'data-focus': 'ship',
       onclick: () => resolve(decision ? 'decided' : 'shipped', `${decision ? 'Approved' : 'Shipped'} “${card.title}”`) }, icon('check'), decision ? card.rec : 'Ship it');
     const hero = h('article', { class: 'v2-hero-card' },
       h('div', { class: 'v2-card-top' },
-        h('span', { class: 'v2-label' }, decision ? 'Needs you' : 'Ready to ship'),
+        h('span', { class: 'pill', '--c': STATES.you.colour }, decision ? 'Needs you' : 'Ready to ship'),
         h('h2', { class: 'v2-card-title', tabindex: '-1' }, card.title),
         h('p', { class: 'v2-card-goal' }, card.goal)),
       decision ? null : specPreview(card),
@@ -457,13 +545,13 @@
         decision ? h('div', { class: 'v2-primary-slot' }, h('span', { class: 'v2-label v2-rec-tag' }, 'Recommended'), primaryAction) : primaryAction,
         h('button', { type: 'button', class: 'v2-btn v2-change', 'data-focus': 'change',
           onclick: event => openSheet(card, event.currentTarget, undoChange => resolve('changing', 'Change sent', decision
-            ? { undoChange } : { revision: { title: card.title, merged: 0, total: 1 } })) }, 'Change something'),
+            ? { undoChange } : { revision: 'Working on your change.' })) }, 'Change something'),
         h('button', { type: 'button', class: 'v2-btn subtle v2-defer', 'data-focus': 'defer',
           onclick: () => resolve('deferred', `Saved “${card.title}” for later`) }, 'Not now')));
     const navigation = pager(index, list.length, i => go(cardHref(list[i])));
     controls.replaceChildren(...(navigation ? [navigation] : []));
     el.replaceChildren(h('div', { class: 'v2-feed-stage' },
-      hero, nextPreview(next, href => { go(href); focusCard(); }), buildingSection(demo.building)));
+      hero, nextPreview(next, href => { go(href); focusCard(); }), buildingSection(sampleBuilding())));
   }
 
   const settingIcons = {
@@ -618,6 +706,7 @@
     setRedraw: fn => { redraw = fn; },
     renderWelcome,
     allClear,
+    sampleCanvas,
     stateCard,
     dismissToast: () => dismissToast?.(),
     pager,
@@ -644,6 +733,7 @@
             else OW.queue.render(el, feeds, { arg, controls, onCount: ctx.updateBadges });
           },
         },
+        ctx.canvas && { ...ctx.canvas, feeds: isDemo ? [] : ctx.canvas.feeds },
         {
           id: 'settings',
           title: 'Settings',
@@ -655,7 +745,7 @@
             else renderLiveSettings(el, ctx);
           },
         },
-      ];
+      ].filter(Boolean);
     },
   };
 })();

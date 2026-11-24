@@ -149,7 +149,6 @@
     if (!textarea || textarea.dataset.ghostReady === '1') return null;
     let recall = options.recall || createRecall(DEMO_CONTEXT);
     const onEvent = options.onEvent || null;
-    const onSubmit = options.onSubmit || null;
     const onInput = options.onInput || null;
 
     const prefixEl = h('span', { class: 'v2-ghost-prefix' });
@@ -171,12 +170,18 @@
     let asyncController = null;
     let asyncTimer = null;
 
+    function syncWidth() {
+      const w = textarea.clientWidth;
+      if (w) mirror.style.width = `${w}px`;
+    }
+
     function autoGrow() {
       textarea.style.height = 'auto';
       const max = 144;
       const next = Math.min(max, Math.max(44, textarea.scrollHeight));
       textarea.style.height = `${next}px`;
       textarea.style.overflowY = textarea.scrollHeight > max ? 'auto' : 'hidden';
+      syncWidth();
       mirror.scrollTop = textarea.scrollTop;
     }
 
@@ -185,6 +190,7 @@
       const suffix = current?.suffix || '';
       suffixEl.textContent = suffix;
       hintEl.hidden = !(suffix && hintActive);
+      syncWidth();
       mirror.scrollTop = textarea.scrollTop;
     }
 
@@ -343,11 +349,6 @@
 
     function handleKeydown(event) {
       if (composing || event.isComposing) return;
-      if (event.key === 'Enter' && !event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey) {
-        event.preventDefault();
-        onSubmit?.();
-        return;
-      }
       if (!current || !current.suffix) return;
       if (event.key === 'Tab' && !event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey) {
         event.preventDefault();
@@ -431,6 +432,9 @@
     textarea.addEventListener('compositionstart', () => { composing = true; clearGhost(); });
     textarea.addEventListener('compositionend', () => { composing = false; lastValue = textarea.value; evaluate(); });
 
+    const resizeObserver = typeof ResizeObserver === 'function' ? new ResizeObserver(syncWidth) : null;
+    resizeObserver?.observe(textarea);
+
     autoGrow();
     render();
 
@@ -462,6 +466,7 @@
       destroy() {
         cancelAsync();
         cancelTouch();
+        resizeObserver?.disconnect();
       },
     };
   }

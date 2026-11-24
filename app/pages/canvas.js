@@ -7,6 +7,9 @@
   const NODE = { width: 260, height: 128 };
   const ZOOM = { min: 0.25, max: 1.6, far: 0.6 };
   const PHONE = matchMedia('(max-width: 760px)');
+  const V2 = () => Boolean(OW.v2);
+  const PLAIN_NODE = { width: 232, height: 120 };
+  const node = () => (V2() ? PLAIN_NODE : NODE);
 
   const css = (el, props) => { for (const [k, v] of Object.entries(props)) el.style.setProperty(k, v); return el; };
   const svg = (tag, attrs = {}) => {
@@ -105,18 +108,29 @@
   }
   const view = { sheet: null, cams: new Map(), mode: 'board', focus: null, spread: null, query: '', quietOpen: false, over: 0, aim: null, inboxAll: false };
   let last = null;
+  let listed = null;
   let shown = null;
   const home = () => OW.data.repo.get()?.full;
 
-  const colourOf = t => (t.lead ? OW.agents.WORDS[t.lead][1] : STATES[t.state]?.colour || STATES.unknown.colour);
-  const wordOf = t => (t.lead ? OW.agents.WORDS[t.lead][0] : STATES[t.state]?.word || 'Unknown');
+  const PLAIN = { merged: 'Done', review: 'In review', building: 'Building', ready: 'Ready', waiting: 'Waiting', you: 'Needs you', held: 'Paused', unknown: 'Unknown' };
+  const NOTE_STATE = { working: 'building', asking: 'you', done: 'merged', stopped: 'held', lapsed: 'waiting', second: 'waiting', unknown: 'unknown' };
+  function plainState(t) {
+    if (t.state === 'merged') return 'merged';
+    if (t.you) return 'you';
+    if (t.lead === 'unknown') return 'unknown';
+    if (t.lead === 'stopped' && ['waiting', 'ready', 'building'].includes(t.state)) return 'held';
+    return t.working && ['waiting', 'ready'].includes(t.state) ? 'building' : t.state;
+  }
+  const plainPill = state => h('span', { class: 'pill', '--c': STATES[state].colour }, PLAIN[state]);
+  const colourOf = t => (V2() ? STATES[plainState(t)].colour : t.lead ? OW.agents.WORDS[t.lead][1] : STATES[t.state]?.colour || STATES.unknown.colour);
+  const wordOf = t => (V2() ? PLAIN[plainState(t)] : t.lead ? OW.agents.WORDS[t.lead][0] : STATES[t.state]?.word || 'Unknown');
   const dot = (colour, ring) => h('span', { class: `cv-dot${ring ? ' ring' : ''}`, '--c': colour, 'aria-hidden': 'true' });
 
   function layout(sheet, phone) {
     const g = new dagre.graphlib.Graph();
-    g.setGraph({ rankdir: phone ? 'TB' : 'LR', nodesep: phone ? 24 : 36, ranksep: phone ? 56 : 84, marginx: 32, marginy: 40 });
+    g.setGraph({ rankdir: phone ? 'TB' : 'LR', nodesep: phone ? 24 : V2() ? 28 : 36, ranksep: phone ? 56 : V2() ? 72 : 84, marginx: 32, marginy: V2() ? 32 : 40 });
     g.setDefaultEdgeLabel(() => ({}));
-    for (const t of sheet.tickets) g.setNode(t.key, { ...NODE });
+    for (const t of sheet.tickets) g.setNode(t.key, { ...node() });
     for (const t of sheet.tickets) for (const b of t.blockers) if (g.hasNode(b)) g.setEdge(b, t.key);
     dagre.layout(g);
     return g;
@@ -152,13 +166,61 @@
       h('p', { class: 'cv-meta' }, OW.ui.pill(t.state), m.labels?.length ? ` · ${m.labels.join(', ')}` : ''));
   }
 
+  const names = keys => keys.map(k => `#${k.split('#').pop()}`).join(', ');
+  const stamp = (at, now) => (at ? ` · ${ago(at, now)}` : '');
+  function plainStack(t, now) {
+    const state = plainState(t);
+    const colour = STATES[state].colour;
+    const still = state === 'merged' ? [] : t.blockers;
+    const line = state === 'waiting' && still.length ? `Waits for ${names(still)}` : t.blocks.length ? `Unlocks ${names(t.blocks)}` : '';
+    const el = h('button', { type: 'button', class: `cv-stack${t.you ? ' you' : ''}`, 'data-ticket': t.key, 'data-state': state,
+      'data-focus': `stack:${t.key}`, 'aria-label': `#${t.number} ${t.title}: ${PLAIN[state]}`, '--c': colour, onclick: () => open(t.key) },
+    h('span', { class: 'cv-front' }, h('span', { class: 'cv-card', '--c': colour },
+      h('span', { class: 'num' }, `#${t.number}`),
+      h('span', { class: 'cv-name' }, t.title),
+      h('span', { class: 'cv-step' }, line),
+      h('span', { class: 'cv-meta' }, plainPill(state), stamp(t.activity, now)))),
+    h('span', { class: 'cv-tile', 'aria-hidden': 'true' }, dot(colour, state === 'waiting' || state === 'ready'), h('b', {}, `#${t.number}`), h('span', {}, t.title)),
+    t.members.length > 1 ? h('span', { class: 'cv-behind', 'aria-hidden': 'true' },
+      t.members.slice(1, 3).map(() => h('span', { class: 'cv-card', '--c': colour }))) : null);
+    return el;
+  }
+
+  function plainRows(sheet, level = 'h2') {
+    const own = sheet.tickets.filter(t => !t.outside && !t.gap);
+    const rank = t => ['you', 'unknown', 'held', 'building', 'review', 'ready', 'waiting'].indexOf(plainState(t));
+    const left = own.filter(t => plainState(t) !== 'merged').sort((a, b) => rank(a) - rank(b) || a.number - b.number);
+    const done = own.filter(t => plainState(t) === 'merged');
+    const list = tickets => h('ul', {}, tickets.map(t => h('li', {}, h('button', { type: 'button', class: 'cv-row', 'data-ticket': t.key,
+      'data-focus': `row:${t.key}`, onclick: () => openTicket(sheet.number, t.key) },
+    h('span', { class: 'num' }, `#${t.number}`), h('span', { class: 'cv-row-name' }, t.title), plainPill(plainState(t))))));
+    return h('section', { class: 'cv-rows', 'data-sheet': sheet.number, 'aria-label': sheet.title },
+      h('div', { class: 'cv-rows-head' }, h(level, {}, sheet.title),
+        h('span', { class: 'num' }, !sheet.read ? 'Tickets unknown' : sheet.total ? `${sheet.done} of ${sheet.total}` : 'No tickets yet')),
+      blocks(sheet),
+      ...sheet.decisions.map(decisionLink),
+      left.length ? list(left) : null,
+      done.length ? h('details', { class: 'cv-done' }, h('summary', { 'data-focus': `done:${sheet.number}` }, `${done.length} done`), list(done)) : null);
+  }
+  const DECISION_WORDS = { ship: 'Ready to ship', plan_approval: 'Plan to approve', spec_confirmation: 'Spec to confirm' };
+  function decisionLink(d) {
+    return h('a', { class: 'pill cv-decision', '--c': STATES.you.colour, href: d.href || d.url,
+      rel: d.href ? null : 'noreferrer', target: d.href ? null : '_blank', 'data-focus': `decision:${d.kind}` }, DECISION_WORDS[d.kind]);
+  }
+
+  function openTicket(number, key) {
+    Object.assign(view, { sheet: number, focus: key, spread: null, mode: 'board' });
+    go(number);
+  }
+
   function stackEl(t, now) {
     const colour = colourOf(t);
     if (t.gap || t.outside) {
       return h('div', { class: 'cv-stack outside', 'data-ticket': t.key, 'data-state': t.state, '--c': colour },
         h('div', { class: 'cv-card', '--c': colour }, h('div', { class: 'num' }, t.gap ? 'Blocked by' : `#${t.number} · outside this spec`),
-          h('h3', {}, t.title), h('p', { class: 'cv-meta' }, OW.ui.pill(t.state))));
+          h('h3', {}, t.title), h('p', { class: 'cv-meta' }, V2() ? plainPill(t.state) : OW.ui.pill(t.state))));
     }
+    if (V2()) return plainStack(t, now);
     const spread = view.spread === t.key;
     const [front, ...behind] = t.members;
     const label = `#${t.number} ${t.title}: ${wordOf(t)}. ${plural(t.members.length, 'card')}. Space spreads, Enter opens.`;
@@ -207,16 +269,18 @@
       const x1 = Math.min(width, (r.width - cam.x) / cam.z);
       const y1 = Math.min(height, (r.height - cam.y) / cam.z);
       board.mini.frame.hidden = x1 <= x0 || y1 <= y0;
+      if (V2()) board.mini.el.hidden = x0 === 0 && y0 === 0 && x1 === width && y1 === height;
       css(board.mini.frame, { left: `${x0 * s}px`, top: `${y0 * s}px`, width: `${(x1 - x0) * s}px`, height: `${(y1 - y0) * s}px` });
     }
   }
   function fit(board) {
     const r = board.viewport.getBoundingClientRect();
     const { width, height } = board.size;
-    const TOP = 56;
+    const TOP = V2() ? 72 : 56;
+    const BOTTOM = V2() ? 64 : 24;
     const across = (r.width - 24) / width;
-    const z = Math.max(ZOOM.min, Math.min(1, PHONE.matches ? across : Math.min(across, (r.height - TOP - 24) / height)));
-    const cam = { z, x: (r.width - width * z) / 2, y: PHONE.matches ? TOP : Math.max(TOP, (r.height - height * z) / 2 + TOP / 2) };
+    const z = Math.max(ZOOM.min, Math.min(1, PHONE.matches ? across : Math.min(across, (r.height - TOP - BOTTOM) / height)));
+    const cam = { z, x: (r.width - width * z) / 2, y: PHONE.matches ? TOP : Math.max(TOP, V2() ? TOP + (r.height - TOP - BOTTOM - height * z) / 2 : (r.height - height * z) / 2 + TOP / 2) };
     view.cams.set(board.sheet.number, cam);
     if (PHONE.matches) css(board.root, { height: `${Math.max(380, Math.ceil(height * z + TOP + 24))}px` });
     fitted.set(board.sheet.number, { ...cam });
@@ -277,7 +341,7 @@
     const world = css(h('div', { class: 'cv-world' }, lines), { width: `${width}px`, height: `${height}px` });
     for (const t of sheet.tickets) {
       const at = g.node(t.key);
-      world.append(css(stackEl(t, now), { left: `${at.x - NODE.width / 2}px`, top: `${at.y - NODE.height / 2}px`, width: `${NODE.width}px` }));
+      world.append(css(stackEl(t, now), { left: `${at.x - node().width / 2}px`, top: `${at.y - node().height / 2}px`, width: `${node().width}px` }));
     }
     const viewport = h('div', { class: 'cv-view', 'aria-label': `Board of spec #${sheet.number}`, role: 'group' }, world);
     const zoom = h('span', { class: 'cv-zoom', 'aria-live': 'polite' });
@@ -289,7 +353,7 @@
       zoom,
       button('+', 'Zoom in', () => { const r = viewport.getBoundingClientRect(); zoomAt(board, 1.25, r.width / 2, r.height / 2); }),
       button('Fit', 'Fit the board', () => fit(board)),
-      button('Sheets', 'Show every sheet (L)', () => { view.mode = 'over'; view.over = Math.max(0, visibleSheets().findIndex(s => s.number === sheet.number)); rerender(); }));
+      button(V2() ? 'All specs' : 'Sheets', V2() ? 'Show every spec (L)' : 'Show every sheet (L)', () => { view.mode = 'over'; view.over = Math.max(0, visibleSheets().findIndex(s => s.number === sheet.number)); rerender(); }));
     root.append(tools, viewport, minimap(board), legend());
     wirePan(board);
     refitOnResize(board);
@@ -303,8 +367,8 @@
     const el = css(h('div', { class: 'cv-mini', 'aria-hidden': 'true' }), { width: `${width * scale}px`, height: `${height * scale}px` });
     for (const t of board.sheet.tickets) {
       const n = board.g.node(t.key);
-      el.append(css(h('i', { '--c': colourOf(t) }), { left: `${(n.x - NODE.width / 2) * scale}px`, top: `${(n.y - NODE.height / 2) * scale}px`,
-        width: `${NODE.width * scale}px`, height: `${NODE.height * scale}px` }));
+      el.append(css(h('i', { '--c': colourOf(t) }), { left: `${(n.x - node().width / 2) * scale}px`, top: `${(n.y - node().height / 2) * scale}px`,
+        width: `${node().width * scale}px`, height: `${node().height * scale}px` }));
     }
     el.append(frame);
     el.addEventListener('pointerdown', event => {
@@ -316,12 +380,16 @@
       Object.assign(cam, { x: v.width / 2 - wx * cam.z, y: v.height / 2 - wy * cam.z });
       apply(board);
     });
-    board.mini = { scale, frame };
+    board.mini = { scale, frame, el };
     return el;
   }
 
   function legend() {
     const W = OW.agents.WORDS;
+    if (V2()) {
+      return h('p', { class: 'cv-legend', 'aria-hidden': 'true' },
+        ['building', 'you', 'review', 'merged', 'waiting'].map(state => h('span', {}, dot(STATES[state].colour, state === 'waiting'), PLAIN[state])));
+    }
     return h('p', { class: 'cv-legend', 'aria-hidden': 'true' },
       ...[['working', W.working], ['asking', [STATES.you.word, STATES.you.colour]], ['review', [STATES.review.word, STATES.review.colour]],
         ['merged', [STATES.merged.word, STATES.merged.colour]], ['stopped', W.stopped]]
@@ -382,17 +450,36 @@
   function blocks(sheet) {
     const own = sheet.tickets.filter(t => !t.outside && !t.gap);
     return h('span', { class: 'cv-blocks', 'aria-hidden': 'true' },
-      own.map(t => h('i', { '--c': colourOf(t), class: t.working ? 'on' : t.state === 'waiting' || t.state === 'ready' ? 'off' : '' })));
+      own.map(t => h('i', { '--c': colourOf(t), class: V2() ? { building: 'on', you: 'on', waiting: 'off', ready: 'off' }[plainState(t)] || '' : t.working ? 'on' : t.state === 'waiting' || t.state === 'ready' ? 'off' : '' })));
   }
   function sheetLine(sheet) {
     const c = sheet.counts;
     const parts = [];
-    if (c.you) parts.push(`${c.you} need${c.you === 1 ? 's' : ''} you`);
-    if (c.working) parts.push(`${c.working} working`);
+    if (V2() && sheet.decisions.some(d => d.kind === 'ship')) parts.push('Ready to ship');
+    else if (c.you) parts.push(`${c.you} need${c.you === 1 ? 's' : ''} you`);
+    if (V2()) {
+      const at = state => sheet.tickets.filter(t => !t.outside && plainState(t) === state).length;
+      if (at('building')) parts.push(`${at('building')} building`);
+      if (at('review')) parts.push(`${at('review')} in review`);
+    } else if (c.working) parts.push(`${c.working} working`);
     if (!sheet.read) parts.push('tickets unknown');
     else if (sheet.total === 0) parts.push(sheet.decisions.length ? 'no tickets yet' : 'no tickets');
     else if (sheet.total) parts.push(`${sheet.done} of ${sheet.total} done`);
-    return parts.join(' · ');
+    return (V2() ? parts.map(part => part.replaceAll(' ', '\u00a0')) : parts).join(' · ');
+  }
+
+  function railLine(sheet) {
+    if (!V2() || !sheet.read || !sheet.total) return sheetLine(sheet);
+    const lead = sheet.decisions.some(d => d.kind === 'ship') ? 'Ready to ship' : sheet.counts.you ? `${sheet.counts.you} need${sheet.counts.you === 1 ? 's' : ''} you` : '';
+    return [lead, `${sheet.done} of ${sheet.total}`].filter(Boolean).join(' · ');
+  }
+
+  function quietToggle(quiet) {
+    if (!quiet.length) return '';
+    return h('button', { class: 'cv-sheet cv-quiet', type: 'button', 'aria-expanded': String(view.quietOpen), 'data-focus': 'quiet',
+      onclick: () => { view.quietOpen = !view.quietOpen; rerender(); } },
+    h('span', { class: 'cv-sheet-name' }, `Quiet · ${quiet.length}`),
+    h('span', { class: 'cv-sheet-line' }, view.quietOpen ? 'Fold them away' : 'Finished, or no activity for 3 days'));
   }
 
   function rail(m) {
@@ -403,21 +490,17 @@
       items.push(h('a', { class: `cv-sheet${s.number === view.sheet ? ' on' : ''}${s.counts.you ? ' you' : ''}${s.quiet ? ' quiet' : ''}`,
         href: `#/canvas/${s.number}`, 'data-sheet': s.number, 'data-focus': `sheet:${s.number}`, 'aria-current': s.number === view.sheet ? 'page' : null },
       h('span', { class: 'cv-sheet-name' }, `#${s.number} ${s.title}`), blocks(s),
-      h('span', { class: 'cv-sheet-line' }, hits === null ? sheetLine(s) : `${plural(hits, 'match', 'matches')}`)));
+      h('span', { class: 'cv-sheet-line' }, hits === null ? railLine(s) : `${plural(hits, 'match', 'matches')}`)));
     }
-    if (quiet.length) {
-      items.push(h('button', { class: 'cv-sheet cv-quiet', type: 'button', 'aria-expanded': String(view.quietOpen), 'data-focus': 'quiet',
-        onclick: () => { view.quietOpen = !view.quietOpen; rerender(); } },
-      h('span', { class: 'cv-sheet-name' }, `Quiet · ${quiet.length}`),
-      h('span', { class: 'cv-sheet-line' }, view.quietOpen ? 'Fold them away' : 'Finished, or no activity for 3 days')));
-    }
-    return h('nav', { class: 'cv-rail', 'aria-label': 'Sheets' }, items);
+    if (quiet.length) items.push(quietToggle(quiet));
+    return h('nav', { class: 'cv-rail', 'aria-label': V2() ? 'Specs' : 'Sheets' }, items);
   }
 
   const INBOX_SHOWN = 6;
   const INBOX_WORDS = {
-    asking: item => `${item.agent ? `${OW.agents.KIND[item.agent]} asks` : 'Asking you'}: ${item.step}`,
-    ticket: () => 'Ticket marked for you',
+    feed: item => item.text,
+    asking: item => V2() ? `Question: ${item.step}` : `${item.agent ? `${OW.agents.KIND[item.agent]} asks` : 'Asking you'}: ${item.step}`,
+    ticket: item => (V2() ? item.title : 'Ticket marked for you'),
     spec_confirmation: () => 'Spec to confirm',
     plan_approval: () => 'Plan to approve',
     unreadable: () => 'A decision record that couldn\'t be read',
@@ -430,10 +513,12 @@
     return h('div', { class: 'cv-inbox', role: 'list', 'aria-label': 'Needs you' },
       h('span', { class: 'cv-inbox-label' }, dot(STATES.you.colour), `Needs you · ${m.inbox.length}`),
       (view.inboxAll ? m.inbox : m.inbox.slice(0, INBOX_SHOWN)).map((item, i) => h('span', { class: 'cv-chip', role: 'listitem' },
-        h('button', { type: 'button', class: 'cv-chip-go', 'data-focus': `inbox:${i}`, 'data-item': item.kind,
+        item.href ? h('a', { class: 'cv-chip-go', href: item.href, 'data-focus': `inbox:${i}`, 'data-item': item.kind },
+          h('span', { class: 'num' }, `#${item.number}`), h('span', { class: 'cv-chip-text' }, INBOX_WORDS[item.kind](item)))
+        : h('button', { type: 'button', class: 'cv-chip-go', 'data-focus': `inbox:${i}`, 'data-item': item.kind,
           disabled: item.sheet === null ? true : null, onclick: () => goTo(item) },
         h('span', { class: 'num' }, item.ticket ? `#${item.number}` : `spec #${item.number}`), h('span', { class: 'cv-chip-text' }, INBOX_WORDS[item.kind](item))),
-        h('a', { href: item.url, rel: 'noreferrer', target: '_blank', 'aria-label': `Open #${item.number} on GitHub`, 'data-focus': `inbox-link:${i}` }, 'GitHub ↗'))),
+        item.url ? h('a', { href: item.url, rel: 'noreferrer', target: '_blank', 'aria-label': `Open #${item.number} on GitHub`, 'data-focus': `inbox-link:${i}` }, 'GitHub ↗') : null)),
       m.inbox.length > INBOX_SHOWN ? h('button', { type: 'button', class: 'cv-more-items', 'data-focus': 'inbox-more', 'aria-expanded': String(Boolean(view.inboxAll)),
         onclick: () => { view.inboxAll = !view.inboxAll; rerender(); } }, view.inboxAll ? 'Show fewer' : `${m.inbox.length - INBOX_SHOWN} more`) : null);
   }
@@ -467,10 +552,11 @@
       if (event.key === 'Escape') { event.stopPropagation(); input.value = ''; view.query = ''; mark(); input.blur(); }
       if (event.key === 'Enter') {
         event.preventDefault();
-        const here = m.sheets.find(s => s.number === view.sheet);
+        const { sheets } = m || shown;
+        const here = sheets.find(s => s.number === view.sheet);
         const local = here && matches(here)[0];
         if (local) { view.aim = local.key; return rerender(); }
-        const other = m.sheets.find(s => matches(s).length);
+        const other = sheets.find(s => matches(s).length);
         if (other) { view.aim = matches(other)[0].key; go(other.number); }
       }
     });
@@ -487,11 +573,47 @@
     });
     root.querySelectorAll('.cv-sheet[data-sheet]').forEach(el => {
       const s = shown.sheets.find(x => String(x.number) === el.dataset.sheet);
-      el.querySelector('.cv-sheet-line').textContent = view.query.trim() ? plural(matches(s).length, 'match', 'matches') : sheetLine(s);
+      el.querySelector('.cv-sheet-line').textContent = view.query.trim() ? plural(matches(s).length, 'match', 'matches') : railLine(s);
     });
   }
 
+  function plainFocus(sheet, t, now) {
+    const state = plainState(t);
+    const back = () => { view.focus = null; view.aim = t.key; rerender(); };
+    const notes = t.members.filter(m => m.kind === 'note');
+    const pr = t.members.find(m => m.kind === 'pr')?.pr;
+    const list = keys => keys.map(k => {
+      const other = sheet.tickets.find(x => x.key === k);
+      return h('div', {}, `#${k.split('#').pop()}${other ? ` ${other.title}` : ''}`, other ? h('span', { class: 'cv-fact-state' }, ` · ${wordOf(other)}`) : null);
+    });
+    const fact = (term, ...value) => [h('dt', {}, term), h('dd', {}, value)];
+    const update = m => {
+      const mine = m.row.unknown ? 'unknown' : m.status === 'working' && m.row.note.agent === 'reviewer' ? 'review' : NOTE_STATE[m.status];
+      return h('li', { class: 'cv-update', '--c': STATES[mine].colour },
+        h('p', {}, m.row.unknown ? 'An update here couldn\'t be read.' : m.row.note.step),
+        h('p', { class: 'cv-meta' }, plainPill(mine), stamp(m.row.at, now)));
+    };
+    const decide = !t.you ? null
+      : t.href ? h('a', { class: 'v2-btn primary', href: t.href, 'data-focus': 'focus-decide' }, 'Decide in Feed')
+      : h('a', { class: 'v2-btn primary', href: t.url, rel: 'noreferrer', target: '_blank', 'data-focus': 'focus-decide' }, 'Answer on GitHub ↗');
+    return h('section', { class: 'cv-focus', 'aria-label': `Ticket #${t.number}`, '--c': colourOf(t) },
+      h('div', { class: 'cv-focus-head' },
+        h('div', { class: 'cv-focus-name' }, h('h3', { tabindex: '-1', 'data-focus': 'focus-title' }, h('span', { class: 'num' }, `#${t.number}`), ' ', t.title), plainPill(state)),
+        h('div', { class: 'cv-focus-tools' },
+          t.url && !decide ? h('a', { class: 'v2-btn', href: t.url, rel: 'noreferrer', target: '_blank', 'data-focus': 'focus-ticket' }, 'Open the ticket ↗') : null,
+          decide, h('button', { class: 'v2-btn subtle', type: 'button', onclick: back, 'aria-keyshortcuts': 'Escape', 'data-focus': 'focus-back' }, 'Back'))),
+      h('div', { class: 'cv-focus-body' },
+        h('div', { class: 'cv-focus-notes' },
+          notes.length ? h('ul', { class: 'cv-updates' }, notes.map(update)) : h('p', { class: 'cv-calm' }, 'No updates in the last day.')),
+        h('dl', { class: 'cv-facts' },
+          ...fact('Spec', sheet.title),
+          ...(t.blockers.length || t.missing ? fact('Waits for', ...list(t.blockers), t.missing ? h('div', {}, `${plural(t.missing, 'ticket')} GitHub couldn't read`) : null) : []),
+          ...(t.blocks.length ? fact('Unlocks', ...list(t.blocks)) : []),
+          ...(pr ? fact('Change', pr.url ? h('a', { href: pr.url, rel: 'noreferrer', target: '_blank', 'data-focus': 'focus-pr' }, `#${pr.number} ↗`) : null, pr.url ? ` ${pr.facts}` : pr.facts) : []))));
+  }
+
   function focusPane(sheet, t, now) {
+    if (V2()) return plainFocus(sheet, t, now);
     const back = () => { view.focus = null; view.aim = t.key; rerender(); };
     const notes = t.members.filter(m => m.kind === 'note');
     const pr = t.members.find(m => m.kind === 'pr')?.pr;
@@ -536,7 +658,7 @@
     const s = sheets[at];
     const above = sheets.slice(Math.max(0, at - 3), at).map((x, j, arr) => slat(x, at - arr.length + j, j - arr.length));
     const below = sheets.slice(at + 1, at + 4).map((x, j) => slat(x, at + 1 + j, j + 1));
-    const more = (n, where) => (n > 0 ? h('p', { class: 'cv-more' }, `${plural(n, 'more sheet')} ${where}`) : null);
+    const more = (n, where) => (n > 0 ? h('p', { class: 'cv-more' }, `${plural(n, V2() ? 'more spec' : 'more sheet')} ${where}`) : null);
     const tiles = s ? s.tickets.filter(t => !t.outside && !t.gap).map(t => h('span', { class: 'cv-otile' }, dot(colourOf(t)), h('b', {}, `#${t.number}`), h('span', {}, t.title))) : [];
     const open = s ? h('button', { type: 'button', class: `cv-open${s.counts.you ? ' you' : ''}`, 'data-sheet': s.number, 'data-focus': `open:${s.number}`,
       'aria-label': `Open #${s.number} ${s.title}`, onclick: () => openAt(at) },
@@ -546,7 +668,7 @@
       more(Math.max(0, at - 3), 'above'),
       h('div', { class: 'cv-acc' }, ...above, open, ...below),
       more(Math.max(0, sheets.length - at - 4), 'below'),
-      h('p', { class: 'cv-hint' }, '↑ ↓ choose a sheet · Enter opens it · Esc or L goes back'));
+      h('p', { class: 'cv-hint' }, V2() ? '↑ ↓ choose a spec · Enter opens it · Esc goes back' : '↑ ↓ choose a sheet · Enter opens it · Esc or L goes back'));
     el.addEventListener('keydown', event => {
       if (event.key === 'ArrowUp' && at > 0) { event.preventDefault(); pick(at - 1); }
       if (event.key === 'ArrowDown' && at < sheets.length - 1) { event.preventDefault(); pick(at + 1); }
@@ -558,35 +680,51 @@
 
   function notices(m, sheet) {
     const out = [];
-    if (m.gaps.length) out.push(OW.ui.unknown(`GitHub gave only part of ${m.gaps.join(', ')}, so a sheet or stack may be missing. The app tries again on its own.`));
+    if (m.gaps.length) out.push(OW.ui.unknown(`GitHub gave only part of ${m.gaps.join(', ')}, so ${V2() ? 'a spec or ticket' : 'a sheet or stack'} may be missing. The app tries again on its own.`));
     if (sheet && !sheet.read) out.push(OW.ui.unknown(`Spec #${sheet.number}'s tickets couldn't be read from GitHub, so its board is unknown.`));
     if (sheet?.unknown) out.push(OW.ui.unknown(`${plural(sheet.unknown, 'ticket')} of #${sheet.number} couldn't be read, so ${sheet.unknown === 1 ? 'it shows' : 'they show'} as unknown.`));
     return out.map(n => css(n, { margin: '0 0 12px' }));
   }
 
-  function draw(el, feeds, arg) {
+  function draw(el, feeds, arg, controls) {
     const now = Date.now();
-    const seen = OW.factory.model(feeds);
-    if (!seen) return el.replaceChildren(OW.ui.placeholder('Reading GitHub…'));
-    const m = model(seen, OW.agents.notes(now), now, home());
+    const sample = OW.data.demo && V2();
+    const seen = sample ? null : OW.factory.model(feeds);
+    if (!seen && !sample) return el.replaceChildren(OW.ui.placeholder('Reading GitHub…'));
+    const m = sample ? OW.v2.sampleCanvas(now) : model(seen, OW.agents.notes(now), now, home());
     shown = m;
     const asked = arg ? Number(arg) : view.sheet;
     const sheet = m.sheets.find(s => s.number === asked) || (arg ? null : m.sheets.find(s => !s.quiet) || m.sheets[0] || null);
     if (view.sheet !== (sheet?.number ?? null)) { view.focus = null; view.spread = null; }
     view.sheet = sheet?.number ?? null;
-    const head = h('div', { class: 'cv-head' }, inbox(m), search(m));
+    if (V2() && !controls.querySelector('.cv-search')) controls.replaceChildren(search());
+    const head = h('div', { class: 'cv-head' }, inbox(m), V2() ? null : search(m));
     if (!m.sheets.length) {
       return el.replaceChildren(h('div', { class: 'cv' }, ...notices(m, null), head,
-        OW.ui.placeholder('No open spec yet. When a spec has a plan graph, its fleet shows here as a sheet.')));
+        OW.ui.placeholder(V2() ? 'Nothing is being built yet. A spec shows here once its tickets are planned.' : 'No open spec yet. When a spec has a plan graph, its fleet shows here as a sheet.')));
     }
     if (!sheet) {
       return el.replaceChildren(h('div', { class: 'cv' }, ...notices(m, null), head, h('div', { class: 'cv-area' }, rail(m),
         OW.ui.unknown(`Spec #${arg} isn't among the open specs GitHub gave this read.`))));
     }
+    const rows = V2() && PHONE.matches;
+    const focused = view.focus && sheet.tickets.find(t => t.key === view.focus);
+    if (rows && !focused) {
+      const shownSheets = m.sheets.filter(s => !s.quiet || view.quietOpen || s.number === view.sheet);
+      el.replaceChildren(h('div', { class: 'cv cv-list' }, ...notices(m, sheet), inbox(m), ...shownSheets.map(s => plainRows(s)), quietToggle(m.sheets.filter(s => s.quiet))));
+      const target = view.aim ? el.querySelector(`.cv-row[data-ticket="${CSS.escape(view.aim)}"]`) : null;
+      if (target) {
+        target.closest('details')?.setAttribute('open', '');
+        target.focus();
+      } else if (arg && Number(arg) !== listed) el.querySelector(`.cv-rows[data-sheet="${sheet.number}"]`)?.scrollIntoView({ block: 'start' });
+      listed = arg ? Number(arg) : null;
+      view.aim = null;
+      return;
+    }
     const title = h('div', { class: 'cv-title' },
-      h('h2', {}, h('a', { href: sheet.url, rel: 'noreferrer', target: '_blank', 'data-focus': 'sheet-link' }, `#${sheet.number} ${sheet.title}`)),
+      h('h2', {}, V2() && !sheet.url ? `#${sheet.number} ${sheet.title}` : h('a', { href: sheet.url, rel: 'noreferrer', target: '_blank', 'data-focus': 'sheet-link' }, `#${sheet.number} ${sheet.title}`)),
       h('span', { class: 'cv-sheet-line' }, sheetLine(sheet)),
-      ...sheet.decisions.map(d => h('a', { class: 'pill', '--c': STATES.you.colour, href: d.url, rel: 'noreferrer', target: '_blank' },
+      ...sheet.decisions.map(d => V2() ? decisionLink(d) : h('a', { class: 'pill', '--c': STATES.you.colour, href: d.url, rel: 'noreferrer', target: '_blank' },
         d.kind === 'plan_approval' ? 'Plan to approve' : 'Spec to confirm')));
     let stage;
     let board = null;
@@ -599,7 +737,8 @@
       board = boardOf(sheet, now);
       stage = board.root;
     }
-    el.replaceChildren(h('div', { class: 'cv' }, ...notices(m, sheet), head, h('div', { class: 'cv-area' }, rail(m), h('div', { class: 'cv-stage' }, title, stage))));
+    if (rows) el.replaceChildren(h('div', { class: 'cv cv-list' }, stage));
+    else el.replaceChildren(h('div', { class: 'cv' }, ...notices(m, sheet), head, h('div', { class: 'cv-area' }, rail(m), h('div', { class: 'cv-stage' }, title, stage))));
     if (board) {
       if (!camOf(sheet.number)) fit(board);
       else apply(board);
@@ -616,15 +755,18 @@
     mark();
   }
 
-  function render(el, feeds, arg) {
-    last = [el, feeds, arg];
-    OW.factory.redraw(el, () => draw(el, feeds, arg));
+  function render(el, feeds, arg, controls) {
+    last = [el, feeds, arg, controls];
+    OW.factory.redraw(el, () => draw(el, feeds, arg, controls));
   }
   function rerender() {
-    if (!last || !last[0].isConnected) return;
+    if (!last || !last[0].isConnected || (V2() && !/^#\/canvas(\/\d+)?$/.test(location.hash))) return;
     const arg = location.hash.match(/^#\/canvas\/([1-9]\d*)$/)?.[1] || null;
-    render(last[0], last[1], arg);
+    render(last[0], last[1], arg, last[3]);
   }
+  window.addEventListener('hashchange', () => {
+    if (V2() && !/^#\/canvas(\/\d+)?$/.test(location.hash)) Object.assign(view, { focus: null, mode: 'board' });
+  });
   PHONE.addEventListener('change', () => { view.cams.clear(); rerender(); });
 
   document.addEventListener('keydown', event => {
@@ -632,7 +774,7 @@
     if (event.altKey || event.ctrlKey || event.metaKey || OW.palette?.shown?.() || /input|textarea|select/i.test(event.target.tagName)) return;
     if (event.key === '/') {
       event.preventDefault();
-      return last[0].querySelector('.cv-search')?.focus();
+      return (V2() ? last[3] : last[0]).querySelector('.cv-search')?.focus();
     }
     if (event.key === 'l' || event.key === 'L') {
       event.preventDefault();
@@ -653,7 +795,7 @@
     if (event.key === '0') { event.preventDefault(); tools[2]?.click(); }
   });
 
-  OW.canvas = { model };
+  OW.canvas = { model, blocks, sheetLine, plainRows };
   OW.page({
     id: 'canvas',
     title: 'Canvas',
