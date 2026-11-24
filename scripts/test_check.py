@@ -19,7 +19,7 @@ def edit_built(root, name, change):
     new = fingerprint(name, data)
     old.unlink()
     (root / new).write_bytes(data)
-    for page in ('index.html', 'changelog/index.html', 'drivers/index.html', 'team/index.html', 'faq/index.html', 'market/index.html', 'app/index.html'):
+    for page in ('index.html', 'changelog/index.html', 'drivers/index.html', 'team/index.html', 'faq/index.html', 'market/index.html', 'pro/index.html', 'supporters/index.html', 'app/index.html'):
         path = root / page
         path.write_text(path.read_text().replace(f'"/{was}"', f'"/{new}"'))
 
@@ -760,6 +760,43 @@ class Checks(unittest.TestCase):
         with temp:
             check_site(root)
 
+    def test_pro_page(self):
+        def planted(page, change):
+            temp = tempfile.TemporaryDirectory()
+            root = Path(temp.name) / 'dist'
+            shutil.copytree(ROOT / 'dist', root)
+            path = root / page
+            path.write_text(change(path.read_text()))
+            return temp, root
+        checkout = re.compile(r'data-checkout href="[^"]*"')
+        P = 'pro/index.html'
+        refused = {
+            'exactly one checkout link': (P, lambda t: t.replace('</main>', '<a data-checkout href="https://buy.polar.sh/polar_cl_2">Two</a></main>', 1)),
+            'outside the pro page': ('index.html', lambda t: t.replace('</main>', '<a data-checkout href="https://buy.polar.sh/polar_cl_1">Pro</a></main>', 1)),
+            'outside the pro page: the app': ('app/index.html', lambda t: t.replace('</body>', '<a data-checkout href="https://buy.polar.sh/polar_cl_1">Pro</a></body>', 1)),
+            'must be https://buy.polar.sh/': (P, lambda t: checkout.sub('data-checkout href="http://buy.polar.sh/polar_cl_1"', t)),
+            'must be https://buy.polar.sh/ ': (P, lambda t: checkout.sub('data-checkout href="https://polar.sh/openwiz"', t)),
+            'must be https://buy.polar.sh/  ': (P, lambda t: checkout.sub('data-checkout href="https://buy.polar.sh/"', t)),
+            'must be https://buy.polar.sh/   ': (P, lambda t: checkout.sub('data-checkout href="https://example.com/pay"', t)),
+            'checkout placeholder needs its id': (P, lambda t: t.replace('id="checkout" ', '', 1)),
+            'the pro page title': (P, lambda t: t.replace('<title>OpenWiz Pro · $20 a year</title>', '<title>Pro</title>', 1)),
+            'the pro page heading': (P, lambda t: t.replace('<h1 id="pro-title">OpenWiz Pro</h1>', '<h1 id="pro-title">Back OpenWiz.</h1>', 1)),
+            'the pro page copy': (P, lambda t: t.replace('Get Pro · $20 a year', 'Go Pro · $20 a year', 1)),
+            'the pro page perks': (P, lambda t: t.replace('Your issues read first, with a Pro badge.', 'Priority issues.', 1)),
+            'names only \\$20': (P, lambda t: t.replace('<h2 id="pro-price">$20 a year</h2>', '<h2 id="pro-price">$30 a year</h2>', 1)),
+            'yearly only': (P, lambda t: t.replace('Get Pro · $20 a year', 'Get Pro · $20 per month', 1)),
+            'never mention Ultra': (P, lambda t: t.replace('Pro badge.', 'Pro and Ultra badge.', 1)),
+            'never mention Ultra ': ('index.html', lambda t: t.replace('</main>', '<p>Ultra tier</p></main>', 1)),
+            'offers only the checkout button': (P, lambda t: t.replace('</section>', '<a href="/faq/">FAQ</a></section>', 1)),
+        }
+        for message, (page, change) in refused.items():
+            temp, root = planted(page, change)
+            with temp, self.subTest(message=message), self.assertRaisesRegex(AssertionError, message.strip()):
+                check_site(root)
+        temp, root = planted(P, lambda t: checkout.sub('data-checkout href="https://buy.polar.sh/polar_cl_example123"', t))
+        with temp:
+            check_site(root)
+
     def test_footer_source(self):
         import check
         for message, change in {
@@ -933,7 +970,7 @@ class Checks(unittest.TestCase):
         for message, (page, change) in {
             'the index.html page needs the one Questions': ('index.html', lambda t: t.replace(FAQ, '', 1)),
             'the faq/index.html page needs the one Questions': ('faq/index.html', lambda t: t.replace('What is a kernel?', 'What is a core?', 1)),
-            'the team/index.html page shows no Questions|never uses: CloudRoom': ('team/index.html', lambda t: t.replace('</main>', FAQ + '</main>', 1)),
+            'the team/index.html page shows no Questions|never uses: CloudRoom|the team page shows no price': ('team/index.html', lambda t: t.replace('</main>', FAQ + '</main>', 1)),
             'needs faq.js': ('faq/index.html', lambda t: re.sub(r'<script src="/faq\.[0-9a-f]+\.js" defer></script>', '', t)),
         }.items():
             temp, root = planted(page, change)
@@ -952,6 +989,8 @@ class Checks(unittest.TestCase):
             'answer to Where do my agents run ': lambda f: f.replace(' In OpenWiz 0.01, you start builders by hand on this computer or boat.dev, and the automatic fleet runs in CloudRoom.', '', 1),
             'answer to Where do my agents run  ': lambda f: f.replace(FAQ_WHERE, 'Anywhere.', 1).replace('OpenWiz is free and open source', FAQ_WHERE + ' OpenWiz is free and open source', 1),
             'team answer': lambda f: f.replace('Your first fleet ships on it.', 'Your first fleet runs in a day.', 1),
+            'cost answer': lambda f: f.replace('Pro</a> ($20 a year) is optional: early builds and a few perks for people who back OpenWiz, never features.', 'Pro</a> is $20 a year.', 1),
+            'cost answer ': lambda f: f.replace('<a href="/pro/">Pro</a>', 'Pro', 1),
             'the same visit and click notice': lambda f: f.replace(check.COUNT_NOTICE, 'Visits are counted.', 1),
             'heading and its line': lambda f: f.replace('The short ones are here.', 'More.', 1),
             'no form or input': lambda f: f.replace('<p>The open source', '<input><p>The open source', 1),
