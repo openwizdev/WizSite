@@ -68,7 +68,7 @@ OW.records = (() => {
         kept.delete(at(item));
         return { result, checked_at: result === 'unchecked' ? null : clock };
       }
-      const binding = { ref: 'synthetic', digest: 'd'.repeat(64) };
+      const binding = { ref: 'synthetic', digest: window.bindingDigest || 'd'.repeat(64) };
       kept.set(at(item), { binding, checked_at: clock });
       return { result, binding: { ...binding }, checked_at: clock };
     },
@@ -466,5 +466,134 @@ else:
     assert.match(run(dist), /^refused:.*order/, 'a You and Agents swap passed the app check');
   } finally {
     await rm(temp, { recursive: true, force: true });
+  }
+});
+
+test('R8: a transient Specs 502 disables answering, keeps the draft in memory, and restores it on recovery', async () => {
+  const run = await start();
+  try {
+    await queueWorld(run);
+    await openQueue(run, 'dry-run', { card: true });
+    await run.page.until(`document.querySelector('article.decision[data-key="${SPEC_DECISION}"] textarea')`, 'the reply box');
+    await run.page.run(`document.querySelector('article.decision[data-key="${SPEC_DECISION}"] textarea').focus()`);
+    await run.page.type('Keep it through a 502');
+    run.world.graphql.Specs = async () => ({ status: 502, json: { message: 'Bad Gateway' } });
+    await run.page.click('Refresh now');
+    await run.page.until(`document.body.innerText.includes("Couldn't read Specs")`, 'the failed refresh');
+    await run.page.until(`document.querySelector('article.decision[data-key="${SPEC_DECISION}"] .decision-blocked')`, 'the unchecked card');
+    const enabledWhileFailed = await run.page.run(`[...document.querySelectorAll('article.decision[data-key="${SPEC_DECISION}"] button')].filter(b => !b.disabled).length`);
+    assert.equal(enabledWhileFailed, 0, 'answer actions stayed enabled during a Specs 502');
+    run.world.graphql.Specs = async () => ({ status: 200, json: specsAnswer(SPECS) });
+    await refreshed(run);
+    await run.page.until(`document.querySelector('article.decision[data-key="${SPEC_DECISION}"] textarea')`, 'the restored reply box');
+    const draft = await run.page.run(`document.querySelector('article.decision[data-key="${SPEC_DECISION}"] textarea').value`);
+    assert.equal(draft, 'Keep it through a 502', 'a transient Specs 502 erased the draft');
+    await run.page.run(`(() => { const card = document.querySelector('article.decision[data-key="${SPEC_DECISION}"]');
+      [...card.querySelectorAll('button')].find(b => b.textContent === 'Preview reply').scrollIntoView({ block: 'center' }); })()`);
+    await run.page.tap('Preview reply');
+    await run.page.until(`window.composed.length === 1`, 'one compose');
+    assert.deepEqual((await run.page.run('window.composed'))[0],
+      { key: SPEC_DECISION, form: 'decision.own', words: 'Keep it through a 502', refused: null }, 'the restored draft failed to compose');
+    assert.deepEqual(run.world.writes(), []);
+    assert.deepEqual(run.world.violations, []);
+  } finally {
+    await run.close();
+  }
+});
+
+test('R8: a changed binding on recovery does not restore the old draft', async () => {
+  const run = await start();
+  try {
+    await queueWorld(run);
+    await openQueue(run, 'dry-run', { card: true });
+    await run.page.until(`document.querySelector('article.decision[data-key="${SPEC_DECISION}"] textarea')`, 'the reply box');
+    await run.page.run(`document.querySelector('article.decision[data-key="${SPEC_DECISION}"] textarea').focus()`);
+    await run.page.type('Draft for old binding');
+    run.world.graphql.Specs = async () => ({ status: 502, json: { message: 'Bad Gateway' } });
+    await run.page.click('Refresh now');
+    await run.page.until(`document.querySelector('article.decision[data-key="${SPEC_DECISION}"] .decision-blocked')`, 'the unchecked card');
+    await run.page.run(`window.bindingDigest = 'e'.repeat(64)`);
+    run.world.graphql.Specs = async () => ({ status: 200, json: specsAnswer(SPECS) });
+    await refreshed(run);
+    await run.page.until(`document.querySelector('article.decision[data-key="${SPEC_DECISION}"] textarea')`, 'the recovered reply box');
+    const draft = await run.page.run(`document.querySelector('article.decision[data-key="${SPEC_DECISION}"] textarea').value`);
+    assert.equal(draft, '', 'a changed binding restored a draft from the old binding');
+    assert.deepEqual(run.world.writes(), []);
+    assert.deepEqual(run.world.violations, []);
+  } finally {
+    await run.close();
+  }
+});
+
+test('R9: tapping Yes during a refresh with a slow later GitHub read composes without stale refusal', async () => {
+  const run = await start();
+  try {
+    await queueWorld(run);
+    await openQueue(run, 'dry-run', { card: true });
+    await run.page.until(`document.querySelectorAll('article.decision').length >= 2`, 'the decision cards');
+    const firstPulls = run.world.recorded[pageOne];
+    delete run.world.recorded[pageOne];
+    let pullsStarted;
+    let releasePulls;
+    const started = new Promise(resolve => { pullsStarted = resolve; });
+    const gate = new Promise(resolve => { releasePulls = resolve; });
+    run.world.github['GET /repos/acme/factory/pulls'] = async () => {
+      pullsStarted();
+      await gate;
+      return { status: 200, json: firstPulls.json };
+    };
+    await run.page.click('Refresh now');
+    await started;
+    await run.page.until(`window.checked.filter(k => k === ${JSON.stringify(SPEC_DECISION)}).length === 2`, 'the in-flight spec check');
+    await run.page.run(`(() => { const card = document.querySelector('article.decision[data-key="${SPEC_DECISION}"]');
+      [...card.querySelectorAll('button')].find(b => b.textContent === 'Yes').scrollIntoView({ block: 'center' }); })()`);
+    await run.page.tap('Yes');
+    await run.page.until(`window.composed.length === 1`, 'one compose');
+    const [composed] = await run.page.run('window.composed');
+    assert.deepEqual(composed, { key: SPEC_DECISION, form: 'decision.yes', words: null, refused: null },
+      'Yes during an in-flight refresh was refused as stale');
+    await run.page.until(`document.body.innerText.includes('Synthetic preview of decision.yes')`, 'the preview');
+    releasePulls();
+    await run.page.until(`window.checked.filter(k => k === ${JSON.stringify(ROUND)}).length === 2`, 'the slow pull read finishing');
+    assert.deepEqual(run.world.writes(), []);
+    assert.deepEqual(run.world.violations, []);
+  } finally {
+    await run.close();
+  }
+});
+
+test('R9: a card marked stale by a timestamp mismatch recovers on the next successful refresh and keeps its draft', async () => {
+  const run = await start();
+  try {
+    await queueWorld(run);
+    await openQueue(run, 'dry-run', { card: true });
+    await run.page.until(`document.querySelector('article.decision[data-key="${SPEC_DECISION}"] textarea')`, 'the reply box');
+    await run.page.run(`document.querySelector('article.decision[data-key="${SPEC_DECISION}"] textarea').focus()`);
+    await run.page.type('Draft survives stale recovery');
+    await run.page.run(`OW.records.check({ repository: 'acme/factory', subject: { kind: 'issue', number: 60 }, comment_id: 9100021, key: ${JSON.stringify(SPEC_DECISION)} })`);
+    await run.page.run(`(() => { const card = document.querySelector('article.decision[data-key="${SPEC_DECISION}"]');
+      [...card.querySelectorAll('button')].find(b => b.textContent === 'Yes').scrollIntoView({ block: 'center' }); })()`);
+    await run.page.tap('Yes');
+    await run.page.until(`document.querySelector('article.decision[data-key="${SPEC_DECISION}"] .decision-blocked')`, 'the stale card');
+    await refreshed(run);
+    await run.page.until(`!document.querySelector('article.decision[data-key="${SPEC_DECISION}"] .decision-blocked')`, 'the recovered card');
+    const state = await run.page.run(`(() => {
+      const card = document.querySelector('article.decision[data-key="${SPEC_DECISION}"]');
+      const yes = [...card.querySelectorAll('button')].find(b => b.textContent === 'Yes');
+      const box = card.querySelector('textarea');
+      return { blocked: Boolean(card.querySelector('.decision-blocked')), disabled: yes.disabled, draft: box.value };
+    })()`);
+    assert.deepEqual(state, { blocked: false, disabled: false, draft: 'Draft survives stale recovery' },
+      'the stale card stayed disabled or lost its draft after a successful refresh');
+    await run.page.run(`(() => { const card = document.querySelector('article.decision[data-key="${SPEC_DECISION}"]');
+      [...card.querySelectorAll('button')].find(b => b.textContent === 'Preview reply').scrollIntoView({ block: 'center' }); })()`);
+    await run.page.tap('Preview reply');
+    await run.page.until(`window.composed.length === 2`, 'the recovered compose');
+    assert.deepEqual((await run.page.run('window.composed'))[1],
+      { key: SPEC_DECISION, form: 'decision.own', words: 'Draft survives stale recovery', refused: null });
+    assert.deepEqual(run.world.writes(), []);
+    assert.deepEqual(run.world.violations, []);
+  } finally {
+    await run.close();
   }
 });
