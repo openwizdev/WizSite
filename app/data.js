@@ -666,5 +666,5 @@
     github: (method, path, body) => github(method, path, body),
     onChange: listener => listeners.add(listener),
   });
-  if (auth.signedIn()) resolveAccount();
+  if (!demo && auth.signedIn()) resolveAccount();
 })();

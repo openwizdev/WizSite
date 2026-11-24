@@ -25,20 +25,34 @@ test('switch on + demo=1: renders v2 shell, deep links, interactions, and makes 
   const run = await start();
   try {
     await run.page.go(`${SITE}/app/?v2=dry-run&demo=1#/welcome`);
-    await run.page.until(`document.body.innerText.includes('Run your software factory.')`, 'v2 welcome screen');
+    await run.page.until(`document.body.innerText.includes('Your software factory, in one quiet room.')`, 'v2 welcome screen');
     assert.equal(await run.page.run(`document.documentElement.dataset.v2`), '1');
-    assert.ok((await run.page.text()).includes('Sample data'));
+    assert.equal(await run.page.run(`document.querySelector('.v2-sample-tag').textContent`), 'Sample data');
 
     await run.page.click('Open Harbor workspace');
-    await run.page.until(`location.hash === '#/chat' && document.body.innerText.includes('Accept all 3 recs')`, 'v2 chat with grill round');
+    await run.page.until(`location.hash === '#/chat' && document.body.innerText.includes('Accept all 3')`, 'v2 chat with grill round');
     const nav = await run.page.run(`[...document.querySelectorAll('nav.main a')].map(a => a.getAttribute('href'))`);
     assert.deepEqual(nav, ['#/chat', '#/feed', '#/settings']);
 
-    await run.page.click('Accept all 3 recs');
-    await run.page.until(`document.body.innerText.includes('Answered · Spec queued in Feed')`, 'grill accepted');
+    await run.page.run(`document.querySelector('.v2-composer input').focus()`);
+    await run.page.type('An unfinished idea');
+    await run.page.click('Right away');
+    assert.equal(await run.page.run(`document.activeElement.value`), 'An unfinished idea');
+    await run.page.run(`document.querySelector('.v2-q-pill').click()`);
+    await run.page.click('Accept all 3');
+    await run.page.until(`document.body.innerText.includes('Answers saved · Open Feed')`, 'grill accepted');
 
     await run.page.go(`${SITE}/app/?v2=dry-run&demo=1#/feed`);
     await run.page.until(`document.body.innerText.includes('Magic-link sign-in')`, 'feed spec card');
+    await run.page.tap('Change something');
+    await run.page.until(`document.querySelector('.v2-sheet')?.matches(':modal')`, 'the change dialog');
+    await run.page.key('Escape');
+    await run.page.until(`document.activeElement.dataset.focus === 'change'`, 'focus returned to the change button');
+    await run.page.tap('Change something');
+    await run.page.type('Make the link last ten minutes');
+    await run.page.tap('Send change');
+    assert.match(await run.page.text(), /Make the link last ten minutes/);
+    assert.equal(await run.page.run(`document.activeElement.dataset.focus`), 'change');
     await run.page.click('Ship it');
     await run.page.until(`document.body.innerText.includes('Pricing copy on the checkout banner')`, 'advances after shipping');
 
@@ -47,7 +61,9 @@ test('switch on + demo=1: renders v2 shell, deep links, interactions, and makes 
     assert.ok((await run.page.text()).includes('Show "Save 20%"'));
 
     await run.page.go(`${SITE}/app/?v2=dry-run&demo=1#/settings`);
-    await run.page.until(`document.body.innerText.includes('Where it runs') && document.body.innerText.includes('Home Mac Mini')`, 'settings screen');
+    await run.page.until(`document.querySelector('select[aria-label="Where it runs"]')?.value === 'Local workstation'`, 'settings screen');
+    await run.page.tap('Not connected');
+    assert.equal(await run.page.run(`document.querySelector('[aria-label="Notifications"]').getAttribute('aria-checked')`), 'true');
 
     assert.deepEqual(apiRequests(run.world), [], 'demo mode sent an API or external network request');
     assert.deepEqual(run.world.writes(), [], 'demo mode wrote something');

@@ -59,7 +59,7 @@ async function openQueue(run, value, { card = false, cards = false } = {}) {
 const wasChecked = (world, id) => world.log.some(r => r.method === 'GET' && r.path === `/repos/acme/factory/issues/comments/${id}`);
 const latestOf = (run, key) => run.page.run(`window.drawn.filter(item => item.key === ${JSON.stringify(key)}).pop() ?? null`);
 async function triggerRefresh(run) {
-  await run.page.run(`OW.data.refreshAll()`);
+  await run.page.tap('Refresh now');
 }
 async function refreshed(run) {
   const was = await run.page.run('OW.data.feeds.specs.readAt');
@@ -102,7 +102,7 @@ test('switch on: decisions and specs show in one ordered queue, drawn through th
     assert.deepEqual(tags.subject, { kind: 'issue', number: 61 });
     assert.equal(notes.video, null);
     assert.deepEqual(notes.graph, { tickets: [], unknown: 0 });
-    const text = await run.page.text();
+    const text = await run.page.run(`document.querySelector('.queue').textContent`);
     assert.ok(text.indexOf('Decision card decision:acme/factory#60:9100021') < text.indexOf('Spec card spec:acme/factory#61'), text);
     assert.ok(!text.includes('#62'), 'a spec with every ticket done is not in the queue');
     assert.deepEqual(run.world.writes(), [], 'the queue wrote something');
@@ -122,11 +122,16 @@ test('switch on without card modules: plain cards link to GitHub, in the same or
     assert.deepEqual(links, [['https://github.com/acme/factory/issues/60#issuecomment-9100021', '_blank'],
       ['https://github.com/acme/factory/pull/7#issuecomment-9100003', '_blank'], ['https://github.com/acme/factory/pull/7#issuecomment-9100005', '_blank'],
       ['https://github.com/acme/factory/issues/61', '_blank'], ['https://github.com/acme/factory/issues/60', '_blank']]);
-    const text = await run.page.text();
-    assert.match(text, /Spec to confirm · #60/);
-    assert.match(text, /Grill round to answer · #7/);
-    assert.match(text, /couldn't be read/);
-    assert.match(text, /Spec to watch · #61/);
+    assert.match(await run.page.text(), /Spec to confirm · #60/i);
+    const visible = () => run.page.run(`[...document.querySelectorAll('.queue-item:not([hidden])')].map(e => e.dataset.key)`);
+    assert.deepEqual(await visible(), [SPEC_DECISION]);
+    await run.page.tap('Next card');
+    assert.deepEqual(await visible(), [ROUND]);
+    assert.match(await run.page.text(), /Questions to answer · #7/i);
+    await run.page.tap('Next card');
+    assert.match(await run.page.text(), /couldn't be read/i);
+    await run.page.tap('Next card');
+    assert.match(await run.page.text(), /Spec to watch · #61/i);
     assert.deepEqual(run.world.violations, []);
   } finally {
     await run.close();
@@ -190,7 +195,7 @@ test('switch on: the signed-out copy no longer says read-only, and the queue lea
     await run.page.until(`document.readyState === 'complete'`, 'the app page');
     await run.page.run(`localStorage.setItem('openwiz.app.v2', '"on"')`);
     await run.page.go(`${SITE}/app/`);
-    await run.page.until(`document.body.innerText.includes('Sign in with GitHub')`, 'the signed-out screen');
+    await run.page.until(`document.body.innerText.includes('Continue with GitHub')`, 'the signed-out screen');
     const text = await run.page.text();
     assert.ok(!/read-only/i.test(text), text);
     await signIn(run.page);

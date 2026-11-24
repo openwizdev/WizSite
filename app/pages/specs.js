@@ -262,7 +262,8 @@
     build();
     if (!had || el.contains(document.activeElement)) return;
     const same = was && [...el.querySelectorAll('[data-focus]')].find(e => e.getAttribute('data-focus') === was);
-    (same || el.querySelector('.spec-title') || document.querySelector('main h1'))?.focus();
+    const target = OW.v2 && same?.disabled ? el.querySelector('.v2-rail-btn:not(:disabled)') : same;
+    (target || el.querySelector('.spec-title') || document.querySelector('main h1'))?.focus();
   }
 
   const home = () => OW.data.repo.get()?.full;
