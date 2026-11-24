@@ -232,7 +232,7 @@ NOT_FOUND = '404.html'
 ABOUT_LINK = '<p class="wrap about-link"><a href="/what-is-openwiz/">What is OpenWiz?</a></p>\n'
 STATIC = {
     'index.html', 'changelog/index.html', 'drivers/index.html', 'team/index.html', 'faq/index.html', 'market/index.html', '_headers', APP_PAGE, 'app/manifest.webmanifest',
-    'fonts/Geist-var.woff2', 'fonts/GeistMono-var.woff2', 'fonts/OFL.txt',
+    'SKILL.md', 'fonts/Geist-var.woff2', 'fonts/GeistMono-var.woff2', 'fonts/OFL.txt',
     'c76a1a01e62d088edd3789d30d6a4d29.txt',
 } | ART | set(ICON_HASHES) | set(VECTORS) | (set(VENDOR_HASHES) - {GSAP}) | set(APP_VENDOR) | set(DRIVER_LOGOS) | {ASK_INDEX, ABOUT_PAGE, NOT_FOUND} | DISCOVERY_FILES
 RUNTIME = STATIC | set(FINGERPRINTS.values())
@@ -869,7 +869,11 @@ def check_discovery(root, pages):
         'robots.txt must allow public pages and exclude the API for every group'
     brief = (root / 'llms.txt').read_text()
     full = (root / 'llms-full.txt').read_text()
-    assert brief.startswith('# OpenWiz\n\n> ') and '\n## Docs\n' in brief and '\n## Links\n' in brief, 'invalid llms.txt'
+    skill = (root / 'SKILL.md').read_text()
+    assert brief.startswith('# OpenWiz\n\n> ') and all(
+        f'\n## {section}\n' in brief for section in ('Install', 'Docs', 'Drivers', 'Skills', 'Changelog', 'Feedback', 'Links')
+    ) and f'{SITE_URL}SKILL.md' in brief, 'invalid llms.txt'
+    assert skill.startswith('---\nname: install-openwiz\n'), 'invalid SKILL.md'
     assert full.startswith('# What is OpenWiz?\n') and all(
         f"### {item['name']}\n\n{item['acceptedAnswer']['text']}\n" in full for item in expected_faq), 'invalid llms-full.txt'
 

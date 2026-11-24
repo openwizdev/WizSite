@@ -84,7 +84,7 @@ class Checks(unittest.TestCase):
                             check_site(root)
                     finally:
                         path.write_text(original)
-            for name in ('robots.txt', 'sitemap.xml', 'llms.txt', 'llms-full.txt', '404.html'):
+            for name in ('robots.txt', 'sitemap.xml', 'llms.txt', 'llms-full.txt', 'SKILL.md', '404.html'):
                 with self.subTest(missing=name):
                     path = root / name
                     original = path.read_bytes()

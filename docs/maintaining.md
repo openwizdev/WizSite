@@ -23,7 +23,7 @@ python3 -m http.server 8800 --bind 127.0.0.1 --directory dist
 
 ## Search and crawler files
 
-The page table in `scripts/discovery.mjs` supplies page metadata and the sitemap. The build takes the FAQ markup from `faq.html` and the crawler summaries from the overview page and FAQ. It checks the metadata and crawler files before finishing. The sign-in page is marked `noindex`.
+The page table in `scripts/discovery.mjs` supplies page metadata, the sitemap, `llms.txt` and `llms-full.txt`. The build takes the FAQ markup from `faq.html` and the crawler summaries from the overview page and FAQ. It also copies `SKILL.md` (a short Agent Skill that hands off to WizSkills' install skill) into `dist/`. It checks the metadata and crawler files before finishing. The sign-in page is marked `noindex`.
 
 Cloudflare Pages serves the root `404.html` for unmatched paths. With the local Python preview, open `/404.html` directly to see that page.
 

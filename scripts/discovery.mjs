@@ -3,6 +3,8 @@ import { decode } from './ask-index.mjs';
 const site = 'https://openwiz.dev/';
 const github = 'https://github.com/openwizdev';
 const repo = github + '/OpenWiz';
+const skillsRepo = github + '/WizSkills';
+const skillsTag = 'v0.5.0';
 const sameAs = [github, repo, 'https://x.com/openwiz'];
 const organization = site + '#organization';
 const software = site + '#software';
@@ -124,13 +126,43 @@ export function crawlerFiles(about, faq) {
   const [, , summary] = body.find(([, tag]) => tag === 'p');
   const [, , whatItDoes] = body.filter(([, tag]) => tag === 'p')[1];
   const llms = [
-    '# OpenWiz', `> ${plain(summary)}`, plain(whatItDoes),
+    '# OpenWiz',
+    `> ${plain(summary)}`,
+    plain(whatItDoes),
+    'To install, paste this one line into your coding agent (Claude Code, Codex or another): "Install OpenWiz from github.com/openwizdev/OpenWiz". It shows every change first and waits for your yes.',
+    '## Install', [
+      `- [SKILL.md](${site}SKILL.md): a short Agent Skill that installs OpenWiz from the one line`,
+      `- [Install skill](${skillsRepo}/blob/${skillsTag}/skills/install/SKILL.md): the full install your agent follows (WizSkills ${skillsTag})`,
+      `- [Install guide](${repo}/blob/main/docs/install.md): every step and command, what it may change, and how to recover or remove it`,
+      `- [Release 0.1.0](${repo}/releases/tag/v0.1.0): the verified prebuilt packages`,
+    ].join('\n'),
     '## Docs', [
       `- [${plain(intro[2])}](${urlFor(aboutPage)}): What it does, where agents run, and how to install it.`,
       links.find(line => line.startsWith('- [FAQ]')),
       `- [Full OpenWiz text](${site}llms-full.txt): The overview and FAQ in one file.`,
+      `- [README](${repo}/blob/main/README.md): what OpenWiz is and how the kernel fits together`,
+      `- [Your first hour](${repo}/blob/main/docs/first-hour.md): from install to your first merged pull request`,
+      `- [Records v1](${repo}/blob/main/kernel/records.v1.md): the rules for specs, tickets and status notes on GitHub`,
+      `- [AGENTS.md](${repo}/blob/main/AGENTS.md): where agents start when contributing to OpenWiz`,
     ].join('\n'),
-    '## Links', links.filter(line => !line.startsWith('- [FAQ]')).join('\n'),
+    '## Drivers', [
+      `- [Drivers](${site}drivers/): where your agents run: your computer or a VPS, CloudRoom and boat.dev`,
+      `- [Driver v1](${repo}/blob/main/kernel/driver.v1.md): the four commands a driver answers: version, start, wake, stop`,
+      `- [Driver template](${repo}/blob/main/adapters/template/README.md): copy it to plug in your own host`,
+      `- [Driver kit](${repo}/blob/main/kernel/driver-kit/README.md): checks a driver on its real host`,
+    ].join('\n'),
+    '## Skills', [
+      `- [WizSkills](${skillsRepo}): the skills OpenWiz puts into your agents, such as install, grill, to-spec, to-tickets, build-ticket and review-ticket`,
+    ].join('\n'),
+    '## Changelog', [
+      links.find(line => line.startsWith('- [Changelog]')),
+      `- [CHANGELOG.md](${repo}/blob/main/CHANGELOG.md): what each version adds, in full`,
+    ].join('\n'),
+    '## Feedback', [
+      `- [Report a problem](${repo}/issues/new?template=feedback.yml): open a feedback issue on GitHub`,
+      `- [Issues](${repo}/issues): for anything beyond a small fix, open an issue first`,
+    ].join('\n'),
+    '## Links', links.filter(line => !line.startsWith('- [FAQ]') && !line.startsWith('- [Changelog]')).join('\n'),
   ].join('\n\n') + '\n';
   const full = [
     `# ${plain(intro[2])}`,
