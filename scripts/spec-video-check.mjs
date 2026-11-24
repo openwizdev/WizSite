@@ -148,8 +148,10 @@ const FACTS = `(() => {
   const sound = moment?.querySelector('.spec-play');
   const link = [...moment?.querySelectorAll('a[href]') || []].find(a => /\\.(webm|mp4)$/.test(a.getAttribute('href')));
   const track = video && [...video.textTracks].find(t => t.kind === 'captions');
+  const still = moment?.querySelector('img.spec-poster');
   return {
-    video: shown(video), poster: !!video?.getAttribute('poster'), playing: !!video && !video.paused && !video.ended,
+    video: shown(video), poster: !video?.getAttribute('poster') && still?.loading === 'lazy' && shown(still),
+    still: still?.complete && still.naturalWidth > 0 ? still.currentSrc : '', playing: !!video && !video.paused && !video.ended,
     muted: !!video?.muted, autoplay: !!video?.autoplay, preload: video?.getAttribute('preload'),
     sound: shown(sound) && /sound/i.test(sound.textContent + (sound.getAttribute('aria-label') || '')),
     link: shown(link), cues: track ? (track.cues?.length || 0) : -1, captions: track ? track.mode : 'none',
@@ -169,6 +171,8 @@ const until = async (page, test, ms = 5000) => {
   }
 };
 const loadedVideo = page => page.requests.some(url => VIDEO.test(url));
+const POSTER = /\/art\/todo-spec-engraved[^/]*\.webp(\?|$)/;
+const loadedPoster = page => page.requests.some(url => POSTER.test(url));
 
 const failures = [];
 let passed = 0;
@@ -180,7 +184,8 @@ function expect(ok, where, message) {
 async function moment(page, where, name, width) {
   const scripted = name !== 'no JavaScript';
   let facts = await page.evaluate(FACTS);
-  expect(facts.video && facts.poster, where, 'the moment shows no video with a poster');
+  expect(facts.video && facts.poster, where, 'the moment shows no video with a lazy poster image');
+  expect(!loadedPoster(page), where, 'the poster loads with the page, before the player nears the viewport');
   expect(facts.preload === 'none' && !facts.autoplay, where, 'the video is not lazy (preload must be none, no autoplay attribute)');
   expect(facts.muted, where, 'the video does not start muted');
   expect(facts.link, where, 'no plain link to the video');
@@ -191,6 +196,9 @@ async function moment(page, where, name, width) {
   await page.evaluate(`${MOMENT}.querySelector('video').scrollIntoView({ block: 'center' }), true`);
   facts = await until(page, f => f.playing, 2500);
   expect(!facts.playing, where, 'in view, the video plays before anyone presses play');
+  facts = await until(page, f => f.still, 3000);
+  expect(facts.still && (width > 480) === !/-640\.webp$/.test(facts.still), where,
+    `near the viewport the poster is missing or the wrong size for this screen (${facts.still || 'not loaded'})`);
   if (name === 'in-app browser') {
     const at = await page.evaluate(`(() => { const r = ${MOMENT}.querySelector('video').getBoundingClientRect();
       return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);

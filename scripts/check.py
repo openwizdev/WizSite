@@ -40,6 +40,7 @@ ART_HASHES = {
     'art/hero-steam-frames.webp': '20f057c963be16ebc3cabbf1d2ab849e2e8144d29a3e419344a867eef2c41f3c',
     'art/todo-spec.mp4': '52bb1fa94a154e17270f7512db19efcedae921e4769a28742bc8a36093d1c732',
     'art/todo-spec-engraved.webp': '177a5d4c8f4d2d9e1bdfb30fb8b87f4d76aa5e118ae22aa43f47bbd6ad27cc11',
+    'art/todo-spec-engraved-640.webp': '62c695d9f7cc82e6d00da669af45072130981896feb88a84e65bdcdc6f981d2a',
     'art/todo-spec.vtt': '47e9ffb41081dd72f541110c43312521a8dd92f1c8e58c11092ecd0daa74eee2',
     'art/todo-app.webp': 'ccc5be87687b1d4ac387cfb623033c0f567890cfe73570f8e4d4bb4b8a81de54',
     'art/spec-video.mp4': 'feb357b9a80453d676123a31285a36c34b5873e102ed58c95728bfd6315bfe16',
@@ -468,6 +469,9 @@ class Page(HTMLParser):
         for key in ('href', 'src', 'poster'):
             if attrs.get(key):
                 self.refs.append(attrs[key])
+        for item in (attrs.get('srcset') or '').split(','):
+            if item.strip():
+                self.refs.append(item.split()[0])
         if tag == 'button':
             self.buttons.append(attrs)
         if tag == 'img':
@@ -769,7 +773,12 @@ def check_site(root, registry=ROOT / 'market/registry.json'):
     clip = next((v for v in page.videos if 'spec-video' in (v.get('class') or '').split()), {})
     assert clip.get('preload') == 'none' and 'autoplay' not in clip and 'loop' not in clip, 'spec recording must be opt-in'
     assert 'muted' in clip and 'playsinline' in clip, 'spec video must start muted inline'
-    assert clip.get('poster', '').removeprefix('/') in ART, 'spec video needs a pinned poster'
+    assert 'poster' not in clip, 'the spec video poster must not load with the page: use the lazy .spec-poster image'
+    poster = next((i for i in page.images if i.get('class') == 'spec-poster'), {})
+    sources = [item.split() for item in (poster.get('srcset') or '').split(',') if item.strip()]
+    assert poster.get('loading') == 'lazy' and poster.get('src', '').removeprefix('/') in ART and poster.get('alt') == '' and poster.get('sizes') \
+        and sources and all(len(s) == 2 and s[0].removeprefix('/') in ART for s in sources) and ['640w'] == [s[1] for s in sources if s[1] == '640w'], \
+        'spec video needs a pinned poster: a lazy decorative .spec-poster image with a 640w phone variant in its srcset'
     assert any(t.get('kind') == 'captions' and 'default' in t and t.get('src', '').removeprefix('/') in ART for t in page.tracks_of(clip)), 'spec video needs default captions'
     assert any(a.get('href') == clip.get('src') and 'hidden' not in a for a in page.links), 'needs a plain link to the spec video'
     for attrs in page.buttons:

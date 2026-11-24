@@ -287,6 +287,7 @@ function specVideo() {
   if (!video || !sound) return;
   const frame = video.closest('.spec-frame');
   const track = video.textTracks[0];
+  const poster = frame?.querySelector('.spec-poster');
   frame?.classList.add('is-resting');
   video.controls = false;
   if (track) track.mode = 'hidden';
@@ -294,6 +295,7 @@ function specVideo() {
   const listen = event => {
     if (!event.isTrusted || video.controls) return;
     frame?.classList.remove('is-resting');
+    if (poster) poster.hidden = true;
     video.controls = true;
     if (track) track.mode = 'showing';
     video.muted = false;
