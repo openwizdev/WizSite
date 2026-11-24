@@ -38,7 +38,7 @@ async function launch() {
   const profile = await mkdtemp(join(tmpdir(), 'spec-video-check-'));
   const child = spawn(chromePath(), ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`,
     '--no-first-run', '--no-default-browser-check', '--disable-background-networking', '--disable-component-update',
-    '--disable-sync', '--no-sandbox', '--hide-scrollbars', '--mute-audio', 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'] });
+    '--disable-sync', '--no-sandbox', '--hide-scrollbars', '--mute-audio', '--autoplay-policy=no-user-gesture-required', 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'] });
   const url = await new Promise((resolve, reject) => {
     let text = '';
     child.stderr.on('data', chunk => {
@@ -82,7 +82,20 @@ const MODES = {
   reduced: { reduced: true },
   'no GSAP': { block: ['*gsap*'] },
   'no JavaScript': { noScript: true },
+  'in-app browser': { inApp: true },
 };
+const IN_APP = 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36 LinkedInApp';
+const PLAYERS = '.spec-play, .spec-video, .launch-play, .launch-video';
+const EARS = `(() => {
+  window.__pressed = false;
+  window.__heard = [];
+  addEventListener('click', e => { if (e.isTrusted && e.target.closest?.('${PLAYERS}')) window.__pressed = true; }, true);
+  const listen = ({ target }) => {
+    if (target instanceof HTMLMediaElement && !target.paused && !target.muted && target.volume > 0 && !window.__pressed)
+      window.__heard.push(target.className + ' at ' + target.currentTime.toFixed(1) + 's');
+  };
+  for (const type of ['play', 'playing', 'volumechange', 'timeupdate']) document.addEventListener(type, listen, true);
+})()`;
 const SIZES = [[390, 844], [1280, 800]];
 
 async function open(browser, origin, width, height, mode) {
@@ -93,6 +106,11 @@ async function open(browser, origin, width, height, mode) {
   browser.on(m => m.sessionId === sessionId && m.method === 'Network.requestWillBeSent' && requests.push(m.params.request.url));
   await send('Page.enable');
   await send('Network.enable');
+  await send('Page.addScriptToEvaluateOnNewDocument', { source: EARS });
+  if (mode.inApp) {
+    await send('Emulation.setUserAgentOverride', { userAgent: IN_APP });
+    await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
+  }
   await send('Network.setBlockedURLs', { urls: ['*api.github.com*', ...(mode.block || [])] });
   await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: width <= 480 });
   await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: mode.reduced ? 'reduce' : 'no-preference' }] });
@@ -117,7 +135,9 @@ async function open(browser, origin, width, height, mode) {
         return { x: 0, y: r.top + scrollY - 16, width: ${width}, height: r.height + 32, scale: 1 }; })()`) });
     await writeFile(path, Buffer.from(data, 'base64'));
   };
-  return { evaluate, click, shot, requests, close: () => browser.send('Target.closeTarget', { targetId }) };
+  const swipe = async (x, y) => send('Input.synthesizeScrollGesture',
+    { x, y, yDistance: -120, gestureSourceType: 'touch', repeatCount: 2, repeatDelayMs: 150 });
+  return { evaluate, click, swipe, shot, requests, close: () => browser.send('Target.closeTarget', { targetId }) };
 }
 
 const MOMENT = "[...document.querySelectorAll('.moments li')].find(li => li.querySelector('h3')?.textContent === 'Watch your spec')";
@@ -159,36 +179,48 @@ function expect(ok, where, message) {
 
 async function moment(page, where, name, width) {
   const scripted = name !== 'no JavaScript';
-  const ambient = name === 'motion' || name === 'no GSAP';
   let facts = await page.evaluate(FACTS);
   expect(facts.video && facts.poster, where, 'the moment shows no video with a poster');
   expect(facts.preload === 'none' && !facts.autoplay, where, 'the video is not lazy (preload must be none, no autoplay attribute)');
+  expect(facts.muted, where, 'the video does not start muted');
   expect(facts.link, where, 'no plain link to the video');
   expect(!facts.sideways, where, 'the page scrolls sideways');
   expect(!loadedVideo(page), where, 'the video loads with the page, before the moment is near the viewport');
   expect(!facts.playing, where, 'the video plays before it is in view');
 
   await page.evaluate(`${MOMENT}.querySelector('video').scrollIntoView({ block: 'center' }), true`);
-  facts = await until(page, ambient ? f => f.playing : () => false, ambient ? 5000 : 1500);
-  if (ambient) {
-    expect(facts.playing && facts.muted, where, 'in view, the video does not play muted inline');
-    expect(loadedVideo(page), where, 'in view, the video never loads');
-  } else {
-    expect(!facts.playing, where, `with ${name}, the video plays without being asked`);
+  facts = await until(page, f => f.playing, 2500);
+  expect(!facts.playing, where, 'in view, the video plays before anyone presses play');
+  if (name === 'in-app browser') {
+    const at = await page.evaluate(`(() => { const r = ${MOMENT}.querySelector('video').getBoundingClientRect();
+      return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+    await page.swipe(at.x, at.y);
+    await page.evaluate(`${MOMENT}.querySelector('video').scrollIntoView({ block: 'center' }), true`);
+    facts = await until(page, f => f.playing, 1500);
+    expect(!facts.playing, where, 'a finger scrolling over the video starts it');
   }
+  await page.evaluate('scrollTo(0, 0), true');
+  await page.evaluate(`${MOMENT}.querySelector('video').scrollIntoView({ block: 'center' }), true`);
+  facts = await until(page, f => f.playing, 1500);
+  expect(!facts.playing, where, 'scrolled away and back, the video starts by itself');
+  expect(!loadedVideo(page), where, 'the video loads before anyone presses play');
+  if (scripted) {
+    await page.evaluate(`document.querySelector('.moments h2').scrollIntoView({ block: 'center' }), true`);
+    const h2 = await page.evaluate(`(() => { const r = document.querySelector('.moments h2').getBoundingClientRect();
+      return { x: r.left + 10, y: r.top + r.height / 2 }; })()`);
+    await page.click(h2.x, h2.y);
+    await page.evaluate(`['.spec-play', '.spec-video', '.launch-play'].forEach(s => document.querySelector(s).click()), true`);
+    facts = await until(page, f => f.playing, 1500);
+    const launch = await page.evaluate(`!document.querySelector('.launch-video').paused`);
+    expect(!facts.playing && !launch, where, 'after an unrelated click, a scripted click on a player starts it');
+    await page.evaluate(`${MOMENT}.querySelector('video').scrollIntoView({ block: 'center' }), true`);
+  }
+  const heard = await page.evaluate('window.__heard');
+  expect(!heard?.length, where, `sound played before a press on a player: ${heard}`);
   expect(scripted ? facts.sound : true, where, 'no visible "Play with sound" control');
   if (scripted) expect(!facts.sideways, where, 'the page scrolls sideways with the moment in view');
   expect(facts.inside, where, 'the video, its control or its link sticks out of the moment\'s card');
   if (process.env.SHOTS && name === 'motion') await page.shot(join(process.env.SHOTS, `spec-moment-${width}.png`));
-
-  if (ambient) {
-    await page.evaluate('scrollTo(0, 0), true');
-    facts = await until(page, f => !f.playing, 3000);
-    expect(!facts.playing, where, 'out of view, the muted video keeps playing');
-    await page.evaluate(`${MOMENT}.querySelector('video').scrollIntoView({ block: 'center' }), true`);
-    facts = await until(page, f => f.playing, 5000);
-    expect(facts.playing && facts.muted, where, 'back in view, the video does not resume muted');
-  }
   if (!scripted) return;
   const at = await page.evaluate(`(() => { const r = ${MOMENT}.querySelector('.spec-play').getBoundingClientRect();
     return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
@@ -296,10 +328,10 @@ async function oneVoice(page, where, name, first) {
   await press(page, one);
   let now = await voices(page, v => audible(v[a]) && v[a].time > 0.5);
   expect(audible(now[a]), where, `the ${a} video does not play with sound`);
-  if (first === 'launch' && name === 'motion') {
+  if (first === 'launch') {
     await page.evaluate(`document.querySelector('.spec-video').scrollIntoView({ block: 'center' }), true`);
-    now = await voices(page, v => v.spec.playing);
-    expect(now.spec.playing && now.spec.muted && audible(now.launch), where, 'the spec\'s muted preview stopped, or stopped the launch video');
+    now = await voices(page, v => v.spec.playing, 1500);
+    expect(!now.spec.playing && audible(now.launch), where, 'scrolling to the spec started it, or stopped the launch video');
   }
   await press(page, other);
   now = await voices(page, v => audible(v[b]) && !v[a].playing);
@@ -315,6 +347,7 @@ async function main() {
   try {
     for (const [width, height] of SIZES) {
       for (const [name, mode] of Object.entries(MODES)) {
+        if (mode.inApp && width > 480) continue;
         const where = `${width}px, ${name}`;
         const page = await open(browser, origin, width, height, mode);
         try {
