@@ -468,7 +468,7 @@ class Page(HTMLParser):
                 'Report a problem link needs rel="noreferrer"'
             self.report_links += 1
             attrs = {key: value for key, value in attrs.items() if key != 'href'}
-        for key in ('href', 'src', 'poster', 'srcset'):
+        for key in ('href', 'src', 'poster'):
             if attrs.get(key):
                 self.refs.append(attrs[key])
         if tag == 'button':

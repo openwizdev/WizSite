@@ -11,6 +11,7 @@ const TYPES = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 
   '.png': 'image/png', '.ico': 'image/x-icon', '.webp': 'image/webp', '.webm': 'video/webm', '.mp4': 'video/mp4',
   '.vtt': 'text/vtt; charset=utf-8', '.woff2': 'font/woff2' };
 const VIDEO = /\/art\/[^/?]+\.(webm|mp4)(\?|$)/;
+const STILL = /\/art\/todo-spec-engraved(-640)?\.webp(\?|$)/;
 
 function serve() {
   const server = createServer(async (request, response) => {
@@ -143,13 +144,22 @@ async function open(browser, origin, width, height, mode) {
 const MOMENT = "document.querySelector('.moments .spec-moment')";
 const FACTS = `(() => {
   const moment = ${MOMENT};
+  const section = document.querySelector('.moments');
   const shown = el => !!el && el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden';
   const video = moment?.querySelector('video');
+  const still = moment?.querySelector('.spec-still img');
+  const over = moment?.querySelector('.spec-over');
   const sound = moment?.querySelector('.spec-play');
   const link = [...moment?.querySelectorAll('a[href]') || []].find(a => /\\.(webm|mp4)$/.test(a.getAttribute('href')));
   const track = video && [...video.textTracks].find(t => t.kind === 'captions');
   return {
-    video: shown(video), poster: !!video?.getAttribute('poster'), playing: !!video && !video.paused && !video.ended,
+    video: shown(video), poster: !!video?.getAttribute('poster'),
+    still: shown(still) && still.complete && still.naturalWidth > 0,
+    stillSrc: still?.currentSrc || '',
+    sectionHeight: section ? Math.round(section.getBoundingClientRect().height) : 0,
+    stacked: shown(still) && shown(over) && over.getBoundingClientRect().top >= still.getBoundingClientRect().bottom - 1,
+    tapTargets: [...(moment?.querySelectorAll('.moment-links summary, .moment-links a') || [])].filter(shown).every(el => el.getBoundingClientRect().height >= 44),
+    playing: !!video && !video.paused && !video.ended,
     muted: !!video?.muted, autoplay: !!video?.autoplay, preload: video?.getAttribute('preload'),
     sound: shown(sound) && /sound/i.test(sound.textContent + (sound.getAttribute('aria-label') || '')),
     link: shown(link), cues: track ? (track.cues?.length || 0) : -1, captions: track ? track.mode : 'none',
@@ -169,6 +179,7 @@ const until = async (page, test, ms = 5000) => {
   }
 };
 const loadedVideo = page => page.requests.some(url => VIDEO.test(url));
+const loadedStill = page => page.requests.some(url => STILL.test(url));
 
 const failures = [];
 let passed = 0;
@@ -180,15 +191,25 @@ function expect(ok, where, message) {
 async function moment(page, where, name, width) {
   const scripted = name !== 'no JavaScript';
   let facts = await page.evaluate(FACTS);
-  expect(facts.video && facts.poster, where, 'the moment shows no video with a poster');
+  expect(facts.video && !facts.poster, where, 'the moment shows no video, or still puts poster on the video tag');
   expect(facts.preload === 'none' && !facts.autoplay, where, 'the video is not lazy (preload must be none, no autoplay attribute)');
   expect(facts.muted, where, 'the video does not start muted');
   expect(facts.link, where, 'no plain link to the video');
   expect(!facts.sideways, where, 'the page scrolls sideways');
   expect(!loadedVideo(page), where, 'the video loads with the page, before the moment is near the viewport');
+  if (scripted) expect(!loadedStill(page), where, 'the spec still loads with the page, before the moment is near the viewport');
   expect(!facts.playing, where, 'the video plays before it is in view');
 
   await page.evaluate(`${MOMENT}.querySelector('video').scrollIntoView({ block: 'center' }), true`);
+  facts = await until(page, f => f.still, 2500);
+  expect(facts.still, where, 'in view, the spec still does not appear');
+  const expectedStill = width <= 599 ? '/art/todo-spec-engraved-640.webp' : '/art/todo-spec-engraved.webp';
+  expect(facts.stillSrc.endsWith(expectedStill), where, `wrong spec still for ${width}px (${facts.stillSrc})`);
+  if (scripted && width === 390) {
+    expect(facts.sectionHeight <= 844, where, `on a phone the moments section is ${facts.sectionHeight}px tall (must fit in 844px)`);
+    expect(facts.stacked, where, 'on a phone the wish and play control must stack under the art');
+    expect(facts.tapTargets, where, 'on a phone the moment links must have 44px+ tap targets');
+  }
   facts = await until(page, f => f.playing, 2500);
   expect(!facts.playing, where, 'in view, the video plays before anyone presses play');
   if (name === 'in-app browser') {
