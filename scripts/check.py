@@ -329,7 +329,7 @@ DRIVER_WALL = (
     ('pane', 'Pane', 'hosts', 'waiting', PR + '2029', 'pane.svg'),
     ('codespaces', 'GitHub Codespaces', 'hosts', 'waiting', PR + '2559', None),
     ('devin', 'Devin', 'hosts', 'waiting', PR + '2490', 'devin.svg'),
-    ('sprites', 'Fly Sprites', 'hosts', 'review', PR + '2720', None),
+    ('sprites', 'Fly Sprites', 'hosts', 'waiting', PR + '2720', None),
     ('openhands', 'OpenHands Cloud', 'hosts', 'review', PR + '2567', 'openhands.svg'),
     ('warp-oz', 'Warp Oz', 'hosts', 'review', PR + '2555', 'warp.svg'),
     ('tembo', 'Tembo', 'hosts', 'review', PR + '2662', 'tembo.svg'),
@@ -342,9 +342,9 @@ DRIVER_WALL = (
     ('warp-local', 'Warp local agent', 'harnesses', 'waiting', PR + '2766', 'warp.svg'),
     ('auggie', 'Augment Auggie', 'harnesses', 'waiting', PR + '2639', 'augment.svg'),
     ('junie', 'JetBrains Junie', 'harnesses', 'waiting', PR + '2638', None),
-    ('copilot', 'GitHub Copilot CLI', 'harnesses', 'review', PR + '2782', None),
+    ('copilot', 'GitHub Copilot CLI', 'harnesses', 'waiting', PR + '2782', None),
+    ('gemini', 'Gemini CLI', 'harnesses', 'waiting', PR + '2776', 'gemini-cli.svg'),
     ('cursor-cli', 'Cursor CLI', 'harnesses', 'review', PR + '2778', 'cursor.svg'),
-    ('gemini', 'Gemini CLI', 'harnesses', 'review', PR + '2776', 'gemini-cli.svg'),
     ('goose', 'Goose', 'harnesses', 'review', PR + '2779', 'goose.png'),
     ('kimi', 'Kimi Code', 'harnesses', 'review', PR + '2785', 'kimi-code.svg'),
     ('pi', 'Pi', 'harnesses', 'review', PR + '2774', 'pi.svg'),
@@ -375,6 +375,7 @@ DRIVER_WALL_LOGINS = {
     'openclaw': 'Login: stays on your machine', 'hermes': 'Login: stays on your machine', 'conductor': 'Login: held by Conductor',
     'cursor': 'Login: held by Cursor', 'factory': 'Login: held by Factory', 'pane': 'Login: stays on your machine',
     'codespaces': 'Login: held by GitHub', 'devin': 'Login: held by Devin',
+    'sprites': 'Login: held by Fly.io',
 }
 DRIVER_WALLS = (('hosts', 'Where your agents run', 'Hosts'), ('harnesses', 'Which agent you already use', 'Harnesses'))
 DRIVER_WALL_HIDDEN = re.compile(r'\s(?:style|hidden|aria-hidden|inert)\b|\bclass="[^"]*\b(?:hidden|sr-only|visually-hidden)\b', re.I)
