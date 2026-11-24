@@ -60,7 +60,7 @@ const wasChecked = (world, id) => world.log.some(r => r.method === 'GET' && r.pa
 const latestOf = (run, key) => run.page.run(`window.drawn.filter(item => item.key === ${JSON.stringify(key)}).pop() ?? null`);
 async function refreshed(run) {
   const was = await run.page.run('OW.data.feeds.specs.readAt');
-  await run.page.click('Refresh now');
+  await run.page.run('OW.data.refreshAll()');
   await run.page.until(`OW.data.feeds.specs.readAt !== ${was}`, 'the refreshed Specs read');
   await new Promise(resolve => setTimeout(resolve, 700));
 }
@@ -80,7 +80,7 @@ test('switch on: decisions and specs show in one ordered queue, drawn through th
   try {
     await queueWorld(run);
     await openQueue(run, 'on', { cards: true });
-    await run.page.until(`location.hash === '#/queue' && document.querySelector('main h1').textContent === 'Queue'`, 'the queue opening first');
+    await run.page.until(`location.hash === '#/feed' && document.querySelector('main h1').textContent === 'Feed'`, 'the feed opening first');
     await run.page.until(`window.drawn.length >= 5`, 'five cards');
     const drawn = await run.page.run('window.drawn');
     assert.deepEqual(drawn.map(item => item.key), ['decision:acme/factory#60:9100021', 'decision:acme/factory#7:9100003',
@@ -192,9 +192,9 @@ test('switch on: the signed-out copy no longer says read-only, and the queue lea
     assert.ok(!/read-only/i.test(text), text);
     await signIn(run.page);
     await run.page.click('acme/factory');
-    await run.page.until(`document.querySelector('main h1')?.textContent === 'Queue'`, 'the queue');
-    const nav = await run.page.run(`[...document.querySelectorAll('nav.main a')].map(a => a.getAttribute('href'))`);
-    assert.deepEqual(nav, ['#/queue', '#/you', '#/specs', '#/agents']);
+    await run.page.until(`document.querySelector('main h1')?.textContent === 'Feed'`, 'the feed');
+    const nav = await run.page.run(`[...document.querySelectorAll('.v2-side nav a')].map(a => a.getAttribute('href'))`);
+    assert.deepEqual(nav, ['#/chat', '#/feed', '#/settings']);
   } finally {
     await run.close();
   }
@@ -209,7 +209,7 @@ test('a failed refresh never keeps an earlier true: the item turns unchecked and
     await run.page.until(`window.drawn.some(item => item.key === 'decision:acme/factory#7:9100003' && item.current === true)`, 'the first, matched read');
     assert.ok(!(await run.page.text()).includes('may be missing'));
     run.world.record(failed.refreshes[1].github);
-    await run.page.click('Refresh now');
+    await run.page.run('OW.data.refreshAll()');
     await run.page.until(`window.drawn.some(item => item.key === 'decision:acme/factory#7:9100003' && item.current === null)`, 'the refreshed, unchecked item');
     const last = (await run.page.run('window.drawn')).filter(item => item.key === 'decision:acme/factory#7:9100003').pop();
     assert.deepEqual(last, failed.refreshes[1].items[0]);
@@ -273,7 +273,7 @@ test('R2: a failed Specs refresh clears every earlier true and shows the gap', a
     await run.page.until(`window.drawn.some(item => item.key === ${JSON.stringify(SPEC_DECISION)} && item.current === true)`
       + ` && window.drawn.some(item => item.key === ${JSON.stringify(ROUND)} && item.current === true)`, 'the first, matched read');
     run.world.graphql.Specs = async () => ({ status: 502, json: { message: 'Bad Gateway' } });
-    await run.page.click('Refresh now');
+    await run.page.run('OW.data.refreshAll()');
     await run.page.until(`document.body.innerText.includes("Couldn't read Specs")`, 'the failed refresh');
     await new Promise(resolve => setTimeout(resolve, 700));
     const shown = await run.page.run(`[...document.querySelectorAll('.queue-item')].map(el => el.dataset.key)`);
@@ -293,7 +293,7 @@ test('R2: a first Specs read with GraphQL errors and no nodes shows a gap, never
     await queueWorld(run, { specs: [], details: {}, grillAnswers: { [pageOne]: { status: 200, json: [] } } });
     run.world.graphql.Specs = async () => ({ status: 200, json: { ...specsAnswer([]), errors: [{ message: 'synthetic', path: ['repository', 'issues'] }] } });
     await openQueue(run, 'on');
-    await run.page.until(`document.querySelector('main h1')?.textContent === 'Queue' && document.body.innerText.includes('GitHub gave only part of')`
+    await run.page.until(`document.querySelector('main h1')?.textContent === 'Feed' && document.body.innerText.includes('GitHub gave only part of')`
       + ` || document.body.innerText.includes(${JSON.stringify(EMPTY)})`, 'the queue settling');
     const text = await run.page.text();
     assert.ok(!text.includes(EMPTY), 'a partial Specs read said the queue is empty');

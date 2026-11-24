@@ -9,20 +9,32 @@
   let built = null;
   const INSTALL = 'https://github.com/apps/openwiz-viewer/installations/new';
   const v2 = Boolean(OW.records?.enabled?.());
-  const queue = OW.pages.findIndex(page => page.v2);
-  if (queue >= 0) {
-    const [page] = OW.pages.splice(queue, 1);
-    if (v2) OW.pages.unshift(page);
+  const isDemo = Boolean(v2 && data.demo?.());
+  const allPages = OW.pages.slice();
+  if (v2) {
+    document.documentElement.dataset.v2 = '1';
+    const order = ['chat', 'feed', 'settings'];
+    const shellPages = order.map(id => allPages.find(page => page.id === id)).filter(Boolean);
+    OW.pages.splice(0, OW.pages.length, ...shellPages);
+  } else {
+    for (let i = OW.pages.length - 1; i >= 0; i -= 1) {
+      if (OW.pages[i].v2 || OW.pages[i].v2Shell) OW.pages.splice(i, 1);
+    }
   }
-  const home = () => `#/${OW.pages[0].id}`;
+  const home = () => (v2 ? (isDemo ? '#/chat' : '#/feed') : `#/${OW.pages[0].id}`);
 
   const route = () => {
     const [id, arg] = location.hash.replace(/^#\/?/, '').split('/');
-    return id === 'specs' && /^[1-9]\d*$/.test(arg || '') ? { id, arg } : { id: arg === undefined ? id : '', arg: null };
+    if (id === 'specs' && /^[1-9]\d*$/.test(arg || '')) return { id, arg };
+    if (v2 && id === 'feed' && /^[1-9]\d*$/.test(arg || '')) return { id, arg };
+    return { id: arg === undefined ? id : '', arg: null };
   };
   const current = () => {
     const { id } = route();
-    return OW.pages.find(page => page.id === id) || OW.pages[0];
+    const pool = v2 ? allPages : OW.pages;
+    const found = pool.find(page => page.id === id);
+    if (found) return found;
+    return v2 ? (pool.find(page => page.id === (isDemo ? 'chat' : 'feed')) || OW.pages[0]) : OW.pages[0];
   };
 
   function screen(...children) {
@@ -34,16 +46,54 @@
     return view;
   }
 
+  function welcomeScreen(note, demoPreview) {
+    built = null;
+    OW.palette.close();
+    const view = h('div', { class: 'v2-welcome-wrap' },
+      h('div', { class: 'v2-welcome-card' },
+        h('div', { class: 'v2-welcome-art' },
+          h('div', { class: 'v2-painted-layer art-boat', 'aria-hidden': 'true' }),
+          h('div', { class: 'v2-dither-layer', 'aria-hidden': 'true' }),
+          h('div', { class: 'v2-welcome-art-meta' },
+            h('span', { class: 'v2-mono' }, 'OPENWIZ · 0.02'),
+            demoPreview ? h('span', { class: 'v2-sample-pill v2-mono' }, 'Sample data') : null)),
+        h('div', { class: 'v2-welcome-body' },
+          h('div', { class: 'v2-welcome-brand' }, logo(), h('span', {}, 'OpenWiz')),
+          h('h1', { class: 'v2-welcome-title' }, 'Your software factory, in one quiet room.'),
+          h('p', { class: 'v2-welcome-lead' }, 'Answer three plain questions. Watch specs build. Tap Ship it.'),
+          h('ol', { class: 'v2-welcome-steps' },
+            h('li', {}, h('span', { class: 'v2-mono' }, '01'), h('span', {}, 'Grill — recommendations pre-picked')),
+            h('li', {}, h('span', { class: 'v2-mono' }, '02'), h('span', {}, 'Watch — narrated specs and progress')),
+            h('li', {}, h('span', { class: 'v2-mono' }, '03'), h('span', {}, 'Decide — Ship it, Change something, or Not now'))),
+          note ? h('div', { class: 'notices' }, h('div', { class: 'notice bad', role: 'alert' }, icon('warn'), h('span', {}, note))) : null,
+          h('div', { class: 'v2-welcome-actions' },
+            demoPreview
+              ? h('button', {
+                class: 'v2-btn v2-btn-primary',
+                type: 'button',
+                onclick: () => { location.hash = '#/chat'; },
+              }, 'Start Harbor', icon('arrowRight'))
+              : h('a', { class: 'v2-btn v2-btn-primary', href: '/api/sign-in/start' }, 'Sign in with GitHub'),
+            demoPreview
+              ? h('a', { class: 'v2-btn v2-btn-ghost', href: '/api/sign-in/start' }, 'Sign in with GitHub')
+              : null),
+          h('p', { class: 'v2-welcome-note' }, demoPreview
+            ? 'Interactive sample workspace. Makes no network requests and no writes.'
+            : 'On the repositories you choose, it posts only the comments you see and confirm. Your sign-in stays in this browser; the app talks only to GitHub.'))));
+    root.replaceChildren(view);
+    document.title = 'OpenWiz';
+    return view;
+  }
+
   function signedOut(note) {
     data.stop();
+    if (v2) return welcomeScreen(note, false);
     screen(
       h('h1', {}, 'Your factory, at a glance'),
       h('p', {}, 'See what needs you, every spec and the agents at work. Sign in to pick a repository.'),
       note ? h('div', { class: 'notices' }, h('div', { class: 'notice bad', role: 'alert' }, icon('warn'), h('span', {}, note))) : null,
       h('a', { class: 'btn primary', href: '/api/sign-in/start' }, 'Sign in with GitHub'),
-      h('p', { class: 'small' }, v2
-        ? 'On the repositories you choose, it posts only the comments you see and confirm. Your sign-in stays in this browser; the app talks only to GitHub.'
-        : 'Read-only, on the repositories you choose. Your sign-in stays in this browser; the app talks only to GitHub.'),
+      h('p', { class: 'small' }, 'Read-only, on the repositories you choose. Your sign-in stays in this browser; the app talks only to GitHub.'),
     );
   }
 
@@ -169,7 +219,45 @@
     return wrap;
   }
 
+  function buildV2Shell() {
+    const picked = isDemo ? { full: OW.demo.state.workspace } : data.repo.get();
+    const topPages = OW.pages.filter(page => !page.pinnedBottom);
+    const bottomPages = OW.pages.filter(page => page.pinnedBottom);
+    const makeLink = page => {
+      const badge = h('span', { class: 'v2-badge v2-mono', hidden: true });
+      const link = h('a', { href: `#/${page.id}` }, icon(page.icon), h('span', {}, page.title), badge);
+      return { page, link, badge };
+    };
+    const sideMain = topPages.map(makeLink);
+    const sideBottom = bottomPages.map(makeLink);
+    const tabs = OW.pages.map(makeLink);
+    const notices = h('div', { class: 'notices', role: 'status' });
+    const body = h('section', { class: 'page-body v2-page-body' });
+    const toastHost = h('div', { class: 'v2-toast-host', role: 'status', 'aria-live': 'polite' });
+    const sample = isDemo ? h('span', { class: 'v2-sample-pill v2-mono' }, 'Sample data') : null;
+    const sampleTop = isDemo ? h('span', { class: 'v2-sample-pill v2-mono' }, 'Sample data') : null;
+    root.replaceChildren(
+      h('a', { class: 'skip', href: '#content', onclick: event => { event.preventDefault(); root.querySelector('main h1')?.focus(); } }, 'Skip to the page'),
+      h('div', { class: 'shell v2-shell' },
+        h('aside', { class: 'side v2-side' },
+          h('div', { class: 'v2-side-brand' },
+            h('a', { class: 'brand', href: isDemo ? '#/welcome' : home() }, logo(), h('span', {}, 'OpenWiz')),
+            h('div', { class: 'v2-side-meta' },
+              h('span', { class: 'v2-workspace-name' }, picked?.full || ''),
+              sample)),
+          h('nav', { class: 'main v2-nav', 'aria-label': 'Pages' }, sideMain.map(item => item.link)),
+          h('nav', { class: 'v2-nav v2-nav-bottom', 'aria-label': 'Settings' }, sideBottom.map(item => item.link))),
+        h('header', { class: 'top v2-top' },
+          h('a', { class: 'brand', href: isDemo ? '#/welcome' : home() }, logo(), h('span', {}, 'OpenWiz')),
+          h('span', { class: 'v2-top-space' }, picked?.full || ''),
+          sampleTop),
+        h('main', { id: 'content', class: 'v2-main' }, notices, body, toastHost),
+        h('nav', { class: 'tabs v2-tabs', 'aria-label': 'Pages' }, tabs.map(item => item.link))));
+    built = { v2: true, side: [...sideMain, ...sideBottom], tabs, notices, body, toastHost, page: null };
+  }
+
   function buildShell() {
+    if (v2) return buildV2Shell();
     const picked = data.repo.get();
     const repoButton = () => repoSwitch(picked);
     const side = navLinks('main');
@@ -208,8 +296,76 @@
     return h('div', { class: `notice ${kind}` }, icon(iconName), h('span', {}, h('b', {}, strong), ' ', text));
   }
 
+  function updateV2() {
+    const page = current();
+    const feeds = data.feeds;
+    const limit = data.limit;
+    for (const { page: p, link, badge } of [...built.side, ...built.tabs]) {
+      if (p.id === page.id || (page.id === 'queue' && p.id === 'feed')) link.setAttribute('aria-current', 'page');
+      else link.removeAttribute('aria-current');
+      const count = p.badge?.(feeds);
+      badge.hidden = !count;
+      badge.textContent = count ? String(count) : '';
+    }
+    const notes = [];
+    if (!isDemo) {
+      const mine = (page.feeds || []).map(name => feeds[name]).filter(Boolean);
+      if (data.paused()) {
+        notes.push(notice('slow', 'pause', 'GitHub\'s limit is low', `(${limit.remaining ?? 0} left). Reads are paused until ${time(limit.pausedUntil)}, then resume on their own.`));
+      }
+      for (const feed of mine) {
+        if (feed.state === 'unknown') notes.push(notice('bad', 'warn', `Couldn't read ${feed.label} from GitHub`, `at ${time(feed.failedAt)}. It shows as unknown, not as empty, until a read works.`));
+        if (feed.state === 'stale') notes.push(notice('bad', 'warn', `Couldn't read ${feed.label} at ${time(feed.failedAt)}.`, `Showing the read from ${time(feed.readAt)}.`));
+        if (feed.state === 'partial') notes.push(notice('bad', 'warn', 'Part of this read failed', `(${feed.label}, ${time(feed.readAt)}). What's missing shows as unknown.`));
+      }
+    }
+    built.notices.replaceChildren(...notes);
+    if (!isDemo && page.id === 'queue') {
+      const mine = page.feeds.map(name => feeds[name]);
+      if (mine.every(feed => feed.state === 'unknown')) {
+        built.body.replaceChildren(h('h1', { class: 'v2-h1', tabindex: '-1' }, page.title), OW.ui.unknown(`${page.title} couldn't be read from GitHub. The app tries again on its own, or press Refresh now in Settings.`));
+      } else if (mine.some(feed => feed.state === 'loading') && !mine.some(feed => feed.data)) {
+        built.body.replaceChildren(h('h1', { class: 'v2-h1', tabindex: '-1' }, page.title), OW.ui.placeholder('Reading GitHub…'));
+      } else {
+        const slot = h('div', {});
+        built.body.replaceChildren(
+          h('div', { class: 'v2-queue-head' },
+            h('h1', { class: 'v2-h1', tabindex: '-1' }, page.title),
+            h('button', { class: 'v2-btn', type: 'button', disabled: data.paused(), onclick: () => data.refreshAll() }, icon('refresh'), 'Refresh now')),
+          slot);
+        page.render(slot, feeds, route().arg);
+      }
+    } else if (!isDemo && (page.feeds || []).length && page.id !== 'settings' && page.id !== 'chat') {
+      const mine = page.feeds.map(name => feeds[name]);
+      if (mine.every(feed => feed.state === 'unknown')) {
+        built.body.replaceChildren(OW.ui.unknown(`${page.title} couldn't be read from GitHub. The app tries again on its own, or press Refresh now in Settings.`));
+      } else if (mine.some(feed => feed.state === 'loading') && !mine.some(feed => feed.data)) {
+        built.body.replaceChildren(OW.ui.placeholder('Reading GitHub…'));
+      } else {
+        page.render(built.body, feeds, route().arg);
+      }
+    } else {
+      page.render(built.body, feeds, route().arg);
+    }
+    if (isDemo && OW.demo.state.toast) {
+      const t = OW.demo.state.toast;
+      built.toastHost.replaceChildren(
+        h('div', { class: 'v2-toast' },
+          h('span', {}, t.message),
+          t.undo ? h('button', { type: 'button', class: 'v2-toast-undo', onclick: () => { t.undo(); OW.demo.clearToast(); } }, 'Undo') : null));
+    } else {
+      built.toastHost.replaceChildren();
+    }
+    if (built.page !== page.id) {
+      document.title = `${page.title} · OpenWiz`;
+      if (built.page !== null) root.querySelector('main h1')?.focus();
+      built.page = page.id;
+    }
+  }
+
   function update() {
     if (!built) return;
+    if (built.v2) return updateV2();
     const page = current();
     const feeds = data.feeds;
     const limit = data.limit;
@@ -253,9 +409,17 @@
   }
 
   function draw() {
+    if (isDemo) {
+      if (route().id === 'welcome') return welcomeScreen(null, true);
+      if (!ROUTES().includes(route().id)) history.replaceState(null, '', '#/chat');
+      if (!built) buildShell();
+      update();
+      return;
+    }
     if (!data.auth.signedIn()) return signedOut();
     if (!data.repo.get()) return picker();
-    if (!ROUTES().includes(route().id)) history.replaceState(null, '', `#/${OW.pages[0].id}`);
+    const valid = v2 ? allPages.map(page => page.id) : ROUTES();
+    if (!valid.includes(route().id)) history.replaceState(null, '', home());
     if (!built) {
       buildShell();
       data.start();
@@ -264,15 +428,33 @@
   }
 
   data.onChange(update);
+  if (v2 && OW.queue?.onUpdate) OW.queue.onUpdate(update);
+  if (isDemo && OW.demo?.onChange) OW.demo.onChange(update);
   OW.onSignedOut = () => signedOut('Your sign-in ended. Sign in again.');
-  window.addEventListener('hashchange', () => (built ? update() : null));
+  OW.onRepoReset = () => picker();
+  window.addEventListener('hashchange', () => (isDemo ? draw() : built ? update() : null));
   document.addEventListener('keydown', event => {
     if (!built) return;
+    if (isDemo && route().id === 'feed' && OW.demo.state.changeTarget && event.key === 'Escape') {
+      event.preventDefault();
+      OW.demo.closeChange();
+      return;
+    }
     if ((event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'k') {
       event.preventDefault();
       return OW.palette.toggle();
     }
     if (OW.palette.shown() || event.altKey || event.ctrlKey || event.metaKey || /input|textarea|select/i.test(event.target.tagName)) return;
+    if (isDemo && route().id === 'feed' && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
+      event.preventDefault();
+      const cards = OW.demo.visibleCards();
+      if (!cards.length) return;
+      const next = Math.max(0, Math.min(OW.demo.state.feedIndex + (event.key === 'ArrowDown' ? 1 : -1), cards.length - 1));
+      OW.demo.state.feedIndex = next;
+      history.replaceState(null, '', next === 0 ? '#/feed' : `#/feed/${next + 1}`);
+      OW.demo.notify();
+      return;
+    }
     if (event.key === '?') {
       event.preventDefault();
       return OW.palette.shortcuts();
@@ -285,8 +467,8 @@
     const params = new URLSearchParams(location.search);
     const code = params.get('code');
     const state = params.get('state');
-    if (location.search) history.replaceState(null, '', `${location.pathname}${location.hash}`);
-    if (code && state) {
+    if (location.search && !isDemo) history.replaceState(null, '', `${location.pathname}${location.hash}`);
+    if (!isDemo && code && state) {
       screen(h('h1', {}, 'Signing in…'), h('p', {}, 'Finishing your GitHub sign-in.'));
       try {
         await data.finishSignIn(code, state);
