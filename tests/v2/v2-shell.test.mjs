@@ -73,7 +73,7 @@ test('switch on + demo=1: renders v2 shell, deep links, interactions, and makes 
     await run.page.click('Open Harbor workspace');
     await run.page.until(`location.hash === '#/chat' && document.body.innerText.includes('Accept all 3')`, 'v2 chat with grill round');
     const nav = await run.page.run(`[...document.querySelectorAll('nav.main a')].map(a => a.getAttribute('href'))`);
-    assert.deepEqual(nav, ['#/chat', '#/feed', '#/settings']);
+    assert.deepEqual(nav, ['#/chat', '#/feed', '#/canvas', '#/settings']);
 
     await run.page.run(`window.originalMessages = [...document.querySelector('.v2-chat-thread').children];
       window.originalChoices = [...document.querySelectorAll('.v2-q-pill')];
@@ -136,7 +136,8 @@ test('switch on + demo=1: renders v2 shell, deep links, interactions, and makes 
     await run.page.click('Not now');
     await run.page.until(`location.hash === '#/feed/clear' && document.querySelector('.v2-clear-card h2')?.textContent === 'All clear.'`, 'all clear after the last decision');
     assert.deepEqual(await badges(), [null, null]);
-    assert.equal(await run.page.run(`document.querySelector('.v2-building progress').value`), 5);
+    assert.deepEqual(await run.page.run(`[...document.querySelectorAll('.v2-build-card')].map(card => [card.getAttribute('href'), card.querySelectorAll('.cv-blocks i').length, card.querySelector('.cv-sheet-line').textContent])`),
+      [['#/canvas/201', 7, '1\u00a0building · 5\u00a0of\u00a07\u00a0done'], ['#/canvas/221', 4, '1\u00a0building · 1\u00a0in\u00a0review · 2\u00a0of\u00a04\u00a0done']]);
     await run.page.run(`document.querySelector('.v2-toast button').focus()`);
     await new Promise(resolve => setTimeout(resolve, 4700));
     assert.equal(await run.page.run(`document.querySelector('.v2-toast').hidden`), false, 'Undo expired while focused');
@@ -149,6 +150,13 @@ test('switch on + demo=1: renders v2 shell, deep links, interactions, and makes 
     await run.page.go(`${SITE}/app/?v2=dry-run&demo=1#/feed/clear`);
     await run.page.until(`document.querySelector('.v2-clear-card h2')?.textContent === 'All clear.'`, 'deep link to all clear');
     assert.deepEqual(await badges(), [null, null]);
+
+    await run.page.go(`${SITE}/app/?v2=dry-run&demo=1#/canvas`);
+    await run.page.until(`document.querySelectorAll('.cv-stack').length === 7`, 'the sample board');
+    assert.equal(await run.page.run(`document.querySelector('.cv-title h2').textContent`), '#201 Audit log export');
+    assert.deepEqual(await run.page.run(`[...document.querySelectorAll('.cv-rail .cv-sheet-name')].map(name => name.textContent)`),
+      ['#201 Audit log export', '#221 Project activity digest', '#211 Magic-link sign-in']);
+    assert.equal(await run.page.run(`[...document.querySelectorAll('.cv a')].some(link => /^https?:/.test(link.getAttribute('href')))`), false, 'the sample board links off the app');
 
     await run.page.go(`${SITE}/app/?v2=dry-run&demo=1#/settings`);
     const hostValue = `document.querySelector('.v2-setting-trigger .v2-setting-value')?.textContent`;
@@ -204,6 +212,22 @@ test('demo isolates a saved GitHub session from boot, visibility refresh, and th
 
     assert.equal(await run.page.run('OW.palette.shown()'), false);
     assert.doesNotMatch(await run.page.text(), /acme\/factory/);
+
+    await run.page.go('about:blank');
+    await run.page.go(`${SITE}/app/?v2=dry-run&demo=1#/canvas`);
+    await run.page.until(`document.querySelectorAll('.cv-stack').length === 7`, 'the sample board with a saved session');
+    assert.deepEqual(await run.page.run(`[...document.querySelectorAll('.cv-chip-go')].map(chip => chip.getAttribute('href'))`), ['#/feed', '#/feed/2', '#/feed/3']);
+    assert.doesNotMatch(await run.page.text(), /acme\/factory|Claude|Codex|Builder|Reviewer|agent/i);
+    await run.page.run(`document.querySelector('.cv-stack[data-ticket$="#208"]').click()`);
+    await run.page.until(`document.querySelector('.cv-focus h3')?.textContent === '#208 Retention rules'`, 'the ticket that needs you');
+    await run.page.click('Decide in Feed');
+    await run.page.until(`location.hash === '#/feed/3' && document.querySelector('.v2-card-title')?.textContent === 'Retention window for deleted projects'`, 'its decision in Feed');
+    await run.page.click('Allow recovery for 30 days');
+    await run.page.until(`document.querySelector('.v2-build-card')?.textContent.includes('Audit log export')`, 'Feed with the Building cards');
+    await run.page.run(`document.querySelector('.v2-build-card').click()`);
+    await run.page.until(`location.hash === '#/canvas/201' && document.querySelector('.cv-stack[data-ticket$="#208"] .pill')?.textContent === 'Building'`, 'Building opens the board, with the decided ticket building');
+    await run.page.run(`Object.defineProperty(document, 'hidden', { configurable: true, value: false });
+      document.dispatchEvent(new Event('visibilitychange'))`);
     assert.deepEqual(await run.page.run(stored), session);
     assert.deepEqual(apiRequests(run.world), [], 'demo used network access with a saved session');
     assert.deepEqual(run.world.violations, []);
