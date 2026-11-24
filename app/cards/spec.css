@@ -1,0 +1,23 @@
+.spec-card { background: var(--em-card); border: 1px solid var(--em-line); border-radius: var(--em-radius); padding: 18px 20px 20px; max-width: 760px; }
+.spec-card h3 { margin: 0 0 14px; font-size: 19px; line-height: 1.35; }
+.spec-card-kind { margin: 0 0 4px; color: var(--em-muted); font-size: 14px; }
+.spec-card-frame video { display: block; width: 100%; aspect-ratio: 16 / 9; background: var(--em-side); border-radius: var(--em-radius-sm); object-fit: contain; }
+.spec-card-actions, .spec-card-buttons { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 12px 0 0; }
+.spec-card-picture { display: block; overflow-x: auto; background: var(--em-side); border-radius: var(--em-radius-sm); padding: 10px; }
+.spec-card-plan { display: block; max-width: 100%; height: auto; max-height: 220px; margin: 0 auto; }
+.spec-card-plan rect { fill: var(--em-card); stroke: var(--c); stroke-width: 2; }
+.spec-card-plan .outside rect { stroke-dasharray: 4 3; }
+.spec-card-plan text { fill: var(--em-text); font: 600 13px var(--em-mono); }
+.spec-card-arrow { fill: none; stroke: var(--em-muted); stroke-width: 1.6; }
+.spec-card-head { fill: var(--em-muted); }
+.spec-card-note { margin: 10px 0 0; color: var(--em-text-2); }
+.spec-card button { min-height: var(--em-tap); padding: 0 18px; border-radius: var(--em-radius-sm); border: 1px solid var(--em-line); background: var(--em-card-hover); cursor: pointer; }
+.spec-card button.primary { background: var(--em-amber); color: var(--em-on-amber); border-color: var(--em-amber); font-weight: 600; }
+.spec-card-steer { margin: 16px 0 0; }
+.spec-card-typed { display: grid; gap: 6px; color: var(--em-text-2); }
+.spec-card textarea { width: 100%; font: inherit; color: var(--em-text); background: var(--em-side); border: 1px solid var(--em-line); border-radius: var(--em-radius-sm); padding: 10px 12px; resize: vertical; }
+.spec-card-preview p { margin: 0 0 8px; color: var(--em-text-2); }
+.spec-card-preview pre { margin: 0; padding: 12px 14px; background: var(--em-side); border: 1px solid var(--em-line); border-radius: var(--em-radius-sm); font: 15px/1.5 var(--em-mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+.spec-card-status p { margin: 12px 0 0; }
+.spec-card-status [data-outcome="unknown"], .spec-card-status [data-outcome="refused"] { color: var(--em-unknown); }
+.spec-card-status button { margin-left: 6px; }
