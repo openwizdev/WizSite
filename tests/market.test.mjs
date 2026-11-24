@@ -227,7 +227,7 @@ test('the page reads without JavaScript: plain anchors, every target on the page
   assert.ok(hrefs(publish[0]).includes('https://github.com/openwizdev/WizMarket'), 'it links WizMarket');
   assert.ok(hrefs(publish[0]).includes('https://github.com/openwizdev/WizMarket/blob/main/contracts/listing.v1.md'), 'it links the merged contract');
   assert.ok(!hrefs(body).some(href => href.includes('pull_request_template')), 'no link to a template main does not hold yet');
-  assert.match(html, /<footer class="landing-footer">[\s\S]*<a href="\/market\/">Market<\/a>/, 'the site footer, with its Market link');
+  assert.match(html, /<footer class="landing-footer">[\s\S]*<a href="\/market\/" data-count="market">Market<\/a>/, 'the site footer, with its Market link');
 });
 
 test('the site builds its market page from the real snapshot', () => {

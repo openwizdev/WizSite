@@ -1,3 +1,4 @@
+import { clickLinkAttribute } from './count-links.mjs';
 import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 
@@ -254,7 +255,7 @@ export async function readRegistry(file = REGISTRY) {
 }
 
 const esc = text => String(text).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
-const link = (href, text) => `<a href="${esc(href)}"${href.startsWith('#') ? '' : ' rel="noreferrer"'}>${esc(text)}</a>`;
+const link = (href, text) => `<a href="${esc(href)}"${clickLinkAttribute(href)}${href.startsWith('#') ? '' : ' rel="noreferrer"'}>${esc(text)}</a>`;
 export const tagsOf = index => [...new Set(index.listings.flatMap(listing => listing.tags))].sort();
 
 function status(listing) {

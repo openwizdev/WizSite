@@ -29,14 +29,14 @@ const entry = release => {
   return `<article class="release" aria-labelledby="${id}"><h2 id="${id}">${esc(release.name)} <small>· <time datetime="${esc(release.date)}">${day(release.date)}</time> (${esc(release.semver)})</small></h2>`
     + `<p class="headline">${esc(release.headline)}</p>`
     + `<ul>${release.bullets.map(b => `<li>${esc(b)}</li>`).join('')}</ul>`
-    + `<p class="notes"><a href="${esc(release.notes)}">Full notes on GitHub</a></p></article>`;
+    + `<p class="notes"><a href="${esc(release.notes)}" data-count="github">Full notes on GitHub</a></p></article>`;
 };
 
 export function render(list, live) {
   const shown = live ? list : [];
   const pre = shown.length
-    ? `<p class="pre">Earlier pre-releases are on <a href="${PRE_RELEASES}">GitHub</a>.</p>`
-    : `<p class="pre">No public release yet. The pre-releases are on <a href="${PRE_RELEASES}">GitHub</a>.</p>`;
+    ? `<p class="pre">Earlier pre-releases are on <a href="${PRE_RELEASES}" data-count="github">GitHub</a>.</p>`
+    : `<p class="pre">No public release yet. The pre-releases are on <a href="${PRE_RELEASES}" data-count="github">GitHub</a>.</p>`;
   return `<section class="releases" aria-label="Releases">${shown.map(entry).join('')}${pre}</section>`;
 }
 

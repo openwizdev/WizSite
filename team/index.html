@@ -37,9 +37,9 @@
  L328 222 Z" mask="url(#hatcut)"/><path d="M96 210 Q96 190 117 190 H395 Q416 190 416 210 V228 Q416 246 397 246 H115 Q96 246 96 228 Z"/>
     </g></svg>OpenWiz</a>
   <nav aria-label="Main navigation">
-    <a class="nav-drivers" href="/drivers/">Drivers</a>
+    <a class="nav-drivers" href="/drivers/" data-count="drivers">Drivers</a>
     <a class="nav-log" href="/changelog/">Changelog</a>
-    <a class="github-star" href="https://github.com/openwizdev/openwiz" aria-label="Star on GitHub"><svg aria-hidden="true" viewBox="0 0 16 16" width="17" height="17" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg><span data-stars hidden></span></a>
+    <a class="github-star" href="https://github.com/openwizdev/openwiz" aria-label="Star on GitHub" data-count="star"><svg aria-hidden="true" viewBox="0 0 16 16" width="17" height="17" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg><span data-stars hidden></span></a>
     <a class="sign-in" href="/app/" aria-label="Sign in with GitHub">Sign in</a>
   </nav>
 </header>
@@ -49,7 +49,7 @@
     <p class="team-kicker">For solo builders and small teams</p>
     <h1>Book 30 minutes. Leave with a shipped pull request.</h1>
     <p class="team-lead">A 30-minute call with Jake, who builds OpenWiz. We connect it to your repo and the coding agent you already use, you pick one small change, and your first fleet ships it on your workflow.</p>
-    <a class="team-book" id="book" data-book href="https://cal.com/openwiz-jake/setup">Book a call</a>
+    <a class="team-book" id="book" data-book href="https://cal.com/openwiz-jake/setup" data-count="book-call">Book a call</a>
     <p class="team-label" id="team-how">How the call works</p>
     <ul class="team-terms" aria-labelledby="team-how">
       <li>A small, real change of your choice.</li>
@@ -79,13 +79,13 @@
         <span class="team-logo"><img class="team-logo-lockup" src="/drivers/logos/boat-dev.svg" alt="boat.dev" width="390" height="109"><small>5 of 5</small></span>
       </div>
       <p class="team-soon">Grok Bot: on hold</p>
-      <a href="/drivers/">See how drivers work</a>
+      <a href="/drivers/" data-count="drivers">See how drivers work</a>
     </li>
     <li class="team-card">
       <p>Our Drivers page was built the same way: a fleet of agents drew six designs, a council of judges picked one, and it merged in one night.</p>
-      <a href="/drivers/">See the Drivers page</a>
+      <a href="/drivers/" data-count="drivers">See the Drivers page</a>
     </li>
-    <li class="team-card"><a href="https://x.com/openwiz" class="team-poster"><figure><img src="/art/team-boat-poster.webp" alt="Wizards on a boat: the fleet that built the Drivers page" width="1280" height="720" loading="lazy"><figcaption>Watch the fleet build it (49 s, on X)</figcaption></figure></a></li>
+    <li class="team-card"><a href="https://x.com/openwiz" class="team-poster" data-count="x"><figure><img src="/art/team-boat-poster.webp" alt="Wizards on a boat: the fleet that built the Drivers page" width="1280" height="720" loading="lazy"><figcaption>Watch the fleet build it (49 s, on X)</figcaption></figure></a></li>
   </ul>
 </section>
 <section class="team-part team-fit wrap" aria-label="Who it’s for and pricing">
@@ -95,7 +95,7 @@
 <template data-slot="faq"></template>
 <section class="team-part team-close wrap" aria-labelledby="team-call">
   <h2 id="team-call">Your first fleet ships on the call.</h2>
-  <a class="team-book" data-book href="https://cal.com/openwiz-jake/setup">Book a call</a>
+  <a class="team-book" data-book href="https://cal.com/openwiz-jake/setup" data-count="book-call">Book a call</a>
 </section>
 </main>
 <template data-slot="footer"></template>

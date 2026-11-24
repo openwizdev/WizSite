@@ -524,7 +524,7 @@ class Checks(unittest.TestCase):
     def test_install_line_and_its_switch(self):
         line = '<code class="install-line">Install OpenWiz from github.com/openwizdev/OpenWiz</code>'
         hint = '<p class="install-hint">Paste this into your agent</p>'
-        button = '<button class="btn install" type="button" disabled>Copy · coming soon</button>'
+        button = '<button class="btn install" type="button" disabled data-count="install-copy">Copy · coming soon</button>'
         text = (ROOT / 'dist/index.html').read_text()
         shipped = re.findall(r'data-install="([^"]*)"', text)
         self.assertEqual(len(shipped), 1, 'one install switch')
@@ -737,7 +737,7 @@ class Checks(unittest.TestCase):
             'Proof: the first card    ': ('team/index.html', lambda t: t.replace('version, start, wake, stop and token.', 'version and start.', 1)),
             'the team page sections  ': ('team/index.html', lambda t: t.replace('<section class="team-part team-close', '<section class="team-part wrap"><h2>Where your agents run</h2></section>\n<section class="team-part team-close', 1)),
             'Proof: the first card ': ('team/index.html', lambda t: t.replace('Grok Bot: on hold', 'Grok Bot', 1)),
-            'Proof: the first card  ': ('team/index.html', lambda t: t.replace('<a href="/drivers/">See how drivers work</a>', '<a href="/">See how drivers work</a>', 1)),
+            'Proof: the first card  ': ('team/index.html', lambda t: t.replace('<a href="/drivers/" data-count="drivers">See how drivers work</a>', '<a href="/">See how drivers work</a>', 1)),
             'Proof: the second card': ('team/index.html', lambda t: t.replace('>See the Drivers page</a>', '>Drivers</a>', 1)),
             'the boat poster: Proof': ('team/index.html', lambda t: re.sub(r'<li class="team-card"><a href="https://x\.com/openwiz"[\s\S]*?</li>\n', '<li class="team-card"><a href="https://x.com/openwiz" class="team-poster">Watch the fleet build it (49 s, on X)</a></li>\n', t, count=1)),
             'the one site footer|one X link per page': ('drivers/index.html', lambda t: t.replace(FOOTER, '', 1)),
@@ -759,6 +759,7 @@ class Checks(unittest.TestCase):
             'the footer links ': lambda f: f.replace('href="https://x.com/openwiz"', 'href="https://x.com/someone"', 1),
             'link groups': lambda f: f.replace('<h2>Company</h2>', '<h2>More</h2>', 1),
             'Owned by no one': lambda f: f.replace('Owned by no one.', '', 1),
+            'one visit and click notice': lambda f: f.replace(check.COUNT_NOTICE, '', 1),
             'wordmark': lambda f: f.replace('<p class="footer-wordmark">OpenWiz</p>', '', 1),
             'twelve Wizes': lambda f: f.replace('<span class="family-wiz">', '<span>', 1),
         }.items():
@@ -774,7 +775,7 @@ class Checks(unittest.TestCase):
             'unexpected external URL ': ('index.html', '</head>', '<link rel="preload" href="https://x.com/openwiz" as="image"></head>'),
             'one X link per page': ('changelog/index.html', '</main>', '<a href="https://x.com/openwiz">X</a></main>'),
             'one X link per page, the footer\'s: team': ('team/index.html', '</main>', '<a href="https://x.com/openwiz">X</a></main>'),
-            'one X link per page ': ('drivers/index.html', '<a href="https://x.com/openwiz">X @openwiz</a>', '<a href="/">X @openwiz</a>'),
+            'one X link per page ': ('drivers/index.html', '<a href="https://x.com/openwiz" data-count="x">X @openwiz</a>', '<a href="/">X @openwiz</a>'),
             'one X link per page, the footer\'s: the app': ('app/index.html', '</body>', '<a href="https://x.com/openwiz">X</a></body>'),
         }.items():
             with tempfile.TemporaryDirectory() as temp, self.subTest(message=message):
@@ -883,7 +884,7 @@ class Checks(unittest.TestCase):
                         check_site(root, registry)
 
     def test_report_a_problem_link(self):
-        form = '<a href="https://github.com/openwizdev/openwiz/issues/new?template=feedback.yml" rel="noreferrer">Report a problem</a>'
+        form = '<a href="https://github.com/openwizdev/openwiz/issues/new?template=feedback.yml" rel="noreferrer" data-count="github">Report a problem</a>'
         for page, count in {'index.html': 1, 'drivers/index.html': 1, 'team/index.html': 1, 'faq/index.html': 1, 'changelog/index.html': 1, 'app/index.html': 0}.items():
             with self.subTest(page=page):
                 self.assertEqual((ROOT / 'dist' / page).read_text().count(form), count)
@@ -893,9 +894,9 @@ class Checks(unittest.TestCase):
             'Report a problem link ': ('team/index.html', form, '<a href="/">Report a problem</a>'),
             'Report a problem link  ': ('drivers/index.html', '</main>', form + '</main>'),
             'Report a problem link, the footer\'s: the app': ('app/index.html', '</body>', form + '</body>'),
-            'Report a problem link needs rel="noreferrer"': ('index.html', ' rel="noreferrer">Report', '>Report'),
-            'Report a problem link needs rel="noreferrer" ': ('changelog/index.html', ' rel="noreferrer">Report', ' rel="noopener">Report'),
-            'Report a problem link needs rel="noreferrer"  ': ('team/index.html', ' rel="noreferrer">Report', ' rel="noreferrer" referrerpolicy="unsafe-url">Report'),
+            'Report a problem link needs rel="noreferrer"': ('index.html', ' rel="noreferrer" data-count="github">Report', '>Report'),
+            'Report a problem link needs rel="noreferrer" ': ('changelog/index.html', ' rel="noreferrer" data-count="github">Report', ' rel="noopener">Report'),
+            'Report a problem link needs rel="noreferrer"  ': ('team/index.html', ' rel="noreferrer" data-count="github">Report', ' rel="noreferrer" referrerpolicy="unsafe-url">Report'),
             'unexpected external URL parts': ('index.html', href, href + '&amp;body=x'),
             'unexpected external URL parts ': ('changelog/index.html', href, href.replace('feedback.yml', 'bug.yml')),
             'unexpected repository link|unexpected external URL parts': ('index.html', href, href.replace('/openwiz/', '/WizSkills/')),
@@ -943,7 +944,8 @@ class Checks(unittest.TestCase):
             'answer to Where do my agents run': lambda f: f.replace(FAQ_WHERE, 'Wherever you choose: your own computer or a VPS, Cloudroom, or boat.dev. Each has a driver that passed the same five-check test.', 1),
             'answer to Where do my agents run ': lambda f: f.replace(' In OpenWiz 0.01, you start builders by hand on this computer or boat.dev, and the automatic fleet runs in CloudRoom.', '', 1),
             'answer to Where do my agents run  ': lambda f: f.replace(FAQ_WHERE, 'Anywhere.', 1).replace('OpenWiz is free and open source', FAQ_WHERE + ' OpenWiz is free and open source', 1),
-            'last answer': lambda f: f.replace('Your first fleet ships on it.', 'Your first fleet runs in a day.', 1),
+            'team answer': lambda f: f.replace('Your first fleet ships on it.', 'Your first fleet runs in a day.', 1),
+            'the same visit and click notice': lambda f: f.replace(check.COUNT_NOTICE, 'Visits are counted.', 1),
             'heading and its line': lambda f: f.replace('The short ones are here.', 'More.', 1),
             'no form or input': lambda f: f.replace('<p>The open source', '<input><p>The open source', 1),
         }.items():
@@ -974,13 +976,13 @@ class Checks(unittest.TestCase):
                 ('drivers/index.html', '<article class="driver" id="cloudroom"', '<article class="driver hero" id="cloudroom"', 'boat.dev is the hero'),
                 ('drivers/index.html', 'href="https://github.com/openwizdev/OpenWiz/tree/main/adapters/template"', 'href="https://github.com/openwizdev/WizSkills"', 'only to the public OpenWiz'),
                 ('drivers/index.html', '>Changelog</a>', '>Changes</a>', 'identical to the landing'),
-                ('drivers/index.html', ' aria-current="page">Drivers', '>Drivers', 'aria-current'),
+                ('drivers/index.html', ' aria-current="page" data-count="drivers">Drivers', '>Drivers', 'aria-current'),
                 ('drivers/index.html', '</main>', '<p>Used by 300 teams.</p></main>', 'invented number'),
                 ('drivers/index.html', '</main>', '<p hidden>Later.</p></main>', 'without a script|waits for a script'),
                 ('drivers/index.html', '</head>', '<script>1</script></head>', 'never its own'),
                 ('drivers/index.html', '</head>', '<script src="/drivers/logos/monitor.svg"></script></head>', 'never its own'),
-                ('index.html', '<a class="nav-drivers" href="/drivers/">Drivers</a>', '', 'identical to the landing|landing top bar needs one Drivers'),
-                ('changelog/index.html', '<a class="nav-drivers" href="/drivers/">Drivers</a>', '', 'Changelog top bar needs one Drivers')):
+                ('index.html', '<a class="nav-drivers" href="/drivers/" data-count="drivers">Drivers</a>', '', 'identical to the landing|landing top bar needs one Drivers'),
+                ('changelog/index.html', '<a class="nav-drivers" href="/drivers/" data-count="drivers">Drivers</a>', '', 'Changelog top bar needs one Drivers')):
             self.broken(name, old, new, error)
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp) / 'dist'
@@ -1020,17 +1022,17 @@ class Checks(unittest.TestCase):
                 ('<p class="tile-state">Parked: the host has no programmatic wake or stop</p>', '<p class="tile-state">Coming soon</p>', 'reads exactly'),
                 ('<h4 class="tile-name">OpenHands Cloud</h4>\n          <p class="tile-state">In review</p>', '<h4 class="tile-name">OpenHands Cloud</h4>\n          <p class="tile-state">Being built</p>', 'reads exactly'),
                 ('<h4 class="tile-name">Amp</h4>\n          <p class="tile-state">Built, waiting on its live check</p>', '<h4 class="tile-name">Amp</h4>\n          <p class="tile-state">In review</p>', 'reads exactly'),
-                ('/pull/2767">Pull request</a>', '/pull/2767">Draft pull request</a>', 'one link'),
+                ('/pull/2767" data-count="github">Pull request</a>', '/pull/2767" data-count="github">Draft pull request</a>', 'one link'),
                 ('<h4 class="tile-name">Devin</h4>\n          <p class="tile-state">Built, waiting on its live check</p>', '<h4 class="tile-name">Devin</h4>\n          <p class="tile-state">In review</p>', 'reads exactly'),
                 ('<p class="driver-login">Login: held by GitHub</p>', '', 'its login line|a login line only on a driver card'),
-                ('<a class="tile-link" href="https://github.com/openwizdev/OpenWiz/pull/2490">Pull request</a>', '<a class="tile-link" href="https://github.com/openwizdev/OpenWiz/pull/2490">Pull request</a><p>Available now.</p>', 'nothing more'),
+                ('<a class="tile-link" href="https://github.com/openwizdev/OpenWiz/pull/2490" data-count="github">Pull request</a>', '<a class="tile-link" href="https://github.com/openwizdev/OpenWiz/pull/2490" data-count="github">Pull request</a><p>Available now.</p>', 'nothing more'),
                 ('<div class="wall-group" id="hosts-review"', '<p>Devin is supported.</p><div class="wall-group" id="hosts-review"', 'shows only its kicker'),
-                ('<a class="tile-link" href="https://github.com/openwizdev/OpenWiz/pull/2490">', '<a class="tile-link" style="display:none" href="https://github.com/openwizdev/OpenWiz/pull/2490">', 'hides nothing'),
+                ('<a class="tile-link" href="https://github.com/openwizdev/OpenWiz/pull/2490" data-count="github">', '<a class="tile-link" style="display:none" href="https://github.com/openwizdev/OpenWiz/pull/2490" data-count="github">', 'hides nothing'),
                 ('<li class="tile" id="devin" data-state="waiting">', '<li class="tile" id="devin" data-state="waiting" hidden>', 'hides nothing|waits for a script'),
                 ('</h2>\n    <p class="wall-lead">Each host', '</h2>\n    <a href="https://github.com/openwizdev/OpenWiz">Try it</a>\n    <p class="wall-lead">Each host', 'shows only its kicker|links only its tiles'),
-                ('/pull/2774">Pull request</a>', '/pull/2773">Pull request</a>', 'one link'),
-                ('/pull/2774">Pull request</a>', '/pull/2774">Pull request, released</a>', 'one link'),
-                ('<a class="tile-link" href="https://github.com/openwizdev/OpenWiz/issues/2540">Ticket</a>', '', 'one link'),
+                ('/pull/2774" data-count="github">Pull request</a>', '/pull/2773" data-count="github">Pull request</a>', 'one link'),
+                ('/pull/2774" data-count="github">Pull request</a>', '/pull/2774" data-count="github">Pull request, released</a>', 'one link'),
+                ('<a class="tile-link" href="https://github.com/openwizdev/OpenWiz/issues/2540" data-count="github">Ticket</a>', '', 'one link'),
                 ('<b>0</b> being built', '<b>10</b> being built', 'true numbers'),
                 ('<b>12</b> waiting on live checks', '<b>9</b> waiting on live checks', 'true numbers'),
                 ('<b>3</b> shipped', '<b>4</b> shipped', 'true numbers'),
@@ -1199,8 +1201,8 @@ class Checks(unittest.TestCase):
                 ('<p class="tile-state">Passed live, not in a release yet</p>', '<p class="tile-state">Passed live, ships next release</p>', 'reads exactly|invented number'),
                 ('<li data-host="boat-dev"', '<li data-host="openclaw" data-state="passed"><span class="host-name">OpenClaw</span> <span class="host-state">passed 5 of 5</span></li>\n        <li data-host="boat-dev"', 'host pills, in order|host pill only'),
                 ('Kit run, <time datetime="2026-11-20">2026-11-20</time>', 'Kit run, <time datetime="2026-11-21">2026-11-21</time>', 'dates its kit run 2026-11-20|invented number'),
-                ('<a href="https://github.com/openwizdev/OpenWiz/pull/1455#issuecomment-7034588211">', '<a href="https://github.com/openwizdev/OpenWiz/pull/1458#issuecomment-7034556153">', 'linked to its public evidence'),
-                ('<a href="https://github.com/openwizdev/OpenWiz/pull/1444">', '<a href="https://github.com/openwizdev/OpenWiz">', 'spotlight date links to its public evidence'),
+                ('<a href="https://github.com/openwizdev/OpenWiz/pull/1455#issuecomment-7034588211" data-count="github">', '<a href="https://github.com/openwizdev/OpenWiz/pull/1458#issuecomment-7034556153">', 'linked to its public evidence'),
+                ('<a href="https://github.com/openwizdev/OpenWiz/pull/1444" data-count="github">', '<a href="https://github.com/openwizdev/OpenWiz">', 'spotlight date links to its public evidence'),
                 ('</ol>\n        <p class="proof-also">', '</ol>\n        <p class="proof-other">', 'boat.dev is one of three'),
                 ('passed the same five checks on <time', 'may pass the same five checks on <time', 'boat.dev is one of three'),
                 ('<h2 id="more-title">Also shipped</h2>', '<h2 id="more-title">Also shipped</h2><p>Cloudroom is being fixed.</p>', 'stale driver state word'),

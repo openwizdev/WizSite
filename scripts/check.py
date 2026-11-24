@@ -180,6 +180,8 @@ FOOTER_LINKS = (('/drivers/', 'Drivers'), ('/market/', 'Market'), ('/changelog/'
                 ('/faq/', 'FAQ'), ('/app/', 'The app'), (REPORT_LINK, 'Report a problem'), ('/team/', 'For teams'),
                 ('https://github.com/openwizdev/openwiz', 'GitHub'), ('https://x.com/openwiz', 'X @openwiz'))
 FOOTER_LINE = 'Apache-2.0. Owned by no one.'
+COUNT_NOTICE = ('openwiz.dev counts visits with Cloudflare Web Analytics and selected clicks with Cloudflare Analytics Engine, '
+                'without cookies or personal data.')
 X_ACCOUNT = 'https://x.com/openwiz'
 CLOUDROOM_LINK = 'https://cloudroom.dev'
 INSTALL_NOTE = ("No CloudRoom needed to install. In OpenWiz 0.01, you start builders by hand on this computer, with the Claude Code "
@@ -195,8 +197,9 @@ FAQ_PAGE = 'faq/index.html'
 FAQ_ON = {'index.html': FAQ, TEAM_PAGE: FAQ, FAQ_PAGE: FAQ_TOP}
 FAQ_TITLE = ('Questions', 'The short ones are here.')
 FAQ_QUESTIONS = ('What is OpenWiz?', 'What is a kernel?', 'What do I need to run it?', 'Where do my agents run?',
-                 'Does OpenWiz see my code or my logins?', 'What does it cost?', 'Can you set it up for my team?')
-FAQ_LAST = 'Yes. Book a 30-minute call. Your first fleet ships on it.'
+                 'Does OpenWiz see my code or my logins?', 'What does it cost?', 'Can you set it up for my team?',
+                 'How does openwiz.dev count visits and clicks?')
+FAQ_TEAM = 'Yes. Book a 30-minute call. Your first fleet ships on it.'
 FAQ_WHERE = ("Builders run where you choose: this computer, with the Claude Code or Codex you're signed in to, boat.dev, "
              'or CloudRoom. Each is a driver that passed the same five-check test. In OpenWiz 0.01, you start builders by '
              'hand on this computer or boat.dev, and the automatic fleet runs in CloudRoom.')
@@ -496,7 +499,7 @@ def check_launch(landing, page):
         'the launch video needs its own English captions'
     play = re.search(r'<button class="launch-play" type="button" hidden>([\s\S]*?)</button>', landing)
     assert play and flat(play[1]) == LAUNCH_LABEL, f'the launch video needs one play button, hidden until the scripts run: {LAUNCH_LABEL}'
-    post = re.search(r'<a class="launch-post" href="([^"]*)">([^<]*)</a>', landing)
+    post = re.search(r'<a class="launch-post" href="([^"]*)" data-count="x">([^<]*)</a>', landing)
     assert post and post[1] == LAUNCH_POST and post[2] == LAUNCH_POST_TEXT, f'a "{LAUNCH_POST_TEXT}" link under the player'
     hero = re.search(r'<section class="product-hero[\s\S]*?</section>\n  <section class="agent-row', landing)
     hero = hero[0] if hero else ''
@@ -608,9 +611,11 @@ MARKET_ATTRS = {'class', 'id', 'aria-label', 'aria-labelledby', 'data-listing', 
 
 class MarketMarkup(HTMLParser):
     def handle_starttag(self, tag, attrs):
-        allowed = MARKET_ATTRS | ({'href', 'rel'} if tag == 'a' else set())
+        allowed = MARKET_ATTRS | ({'href', 'rel', 'data-count'} if tag == 'a' else set())
         assert tag in MARKET_TAGS and all(name in allowed for name, _ in attrs), 'unexpected markup in the generated Market section'
-        assert dict(attrs).get('rel', 'noreferrer') == 'noreferrer', 'unexpected markup in the generated Market section'
+        fields = dict(attrs)
+        assert fields.get('rel', 'noreferrer') == 'noreferrer', 'unexpected markup in the generated Market section'
+        assert 'data-count' not in fields or fields['data-count'] in ('github', 'x'), 'unexpected markup in the generated Market section'
 
 
 def check_market_markup(section):
@@ -1117,7 +1122,7 @@ def top_bar(html):
 def check_drivers(landing, changelog, drivers, page):
     bar = top_bar(drivers)
     current = re.findall(r'<a [^>]*aria-current="page"[^>]*>([^<]*)</a>', bar)
-    assert current == ['Drivers'] and re.search(r'<a class="nav-drivers" href="/drivers/" aria-current="page">Drivers</a>', bar), \
+    assert current == ['Drivers'] and re.search(r'<a class="nav-drivers" href="/drivers/" aria-current="page" data-count="drivers">Drivers</a>', bar), \
         'the drivers top bar must mark its Drivers link aria-current="page"'
     assert bar.replace(' aria-current="page"', '') == top_bar(landing), 'the drivers top bar must be identical to the landing\'s'
     for name, html in (('landing', landing), ('Changelog', changelog)):
@@ -1294,11 +1299,11 @@ def check_driver_results(drivers, main, outline):
         if key != DRIVER_HERO:
             assert cards[key]['kit_state'] == 'passed' and re.search(r'<p class="driver-kit passed"', card), \
                 f'{name} passed the kit: shown as anything but passed in its kit line: {cards[key]["kit_state"]!r}'
-            dated = re.findall(r'<p class="driver-date"><a href="([^"]+)">([\s\S]*?)</a></p>', card)
+            dated = re.findall(r'<p class="driver-date"><a href="([^"]+)" data-count="github">([\s\S]*?)</a></p>', card)
             assert [(href, plain(text)) for href, text in dated] == [(evidence, DRIVER_CARD_DATE.format(date))], \
                 f'{name}: its card dates its kit run {date}, linked to its public evidence: {dated}'
         else:
-            assert re.search(rf'<p class="driver-date"><a href="{re.escape(evidence)}">', card), \
+            assert re.search(rf'<p class="driver-date"><a href="{re.escape(evidence)}" data-count="github">', card), \
                 f'{name}: its spotlight date links to its public evidence {evidence}'
         assert f'datetime="{date}"' in card, f'{name}: its kit run is dated {date}'
         stale = DRIVER_STALE.search(plain(card) + ' ' + plain(pills.get(key, ('', ''))[1]))
@@ -1517,13 +1522,13 @@ def check_team(htmls, pages):
     cards = re.findall(r'<li class="team-card">([\s\S]*?)</li>\n', proof)
     assert len(cards) == 3 and proof.count('<li') == 3, f'Proof: three cards: {len(cards)}'
     passed = re.fullmatch(r'\s*<h3>([^<]*)</h3>\s*<p>([^<]*)</p>\s*<div class="team-logos">([\s\S]*?)</div>\s*'
-                          r'<p class="team-soon">Grok Bot: on hold</p>\s*<a href="/drivers/">See how drivers work</a>\s*', cards[0])
+                          r'<p class="team-soon">Grok Bot: on hold</p>\s*<a href="/drivers/" data-count="drivers">See how drivers work</a>\s*', cards[0])
     logos = re.findall(r'<img\b[^>]*src="([^"]*)"[^>]*>\s*(?:<span>[^<]*</span>\s*)?<small>([^<]*)</small>', passed[3]) if passed else []
     assert passed and (passed[1], passed[2]) == (TEAM_PASSED_HEADING, TEAM_PASSED_ABOUT) \
         and [src for src, _ in logos] == list(TEAM_PASSED) and all(line == TEAM_PASSED_LINE for _, line in logos), \
         f'Proof: the first card: {TEAM_PASSED_HEADING}, what the checks are, the three drivers\u2019 logos with ' \
         f'{TEAM_PASSED_LINE} under each, Grok Bot on hold and See how drivers work, to /drivers/'
-    built = re.fullmatch(r'\s*<p>([^<]*)</p>\s*<a href="/drivers/">See the Drivers page</a>\s*', cards[1])
+    built = re.fullmatch(r'\s*<p>([^<]*)</p>\s*<a href="/drivers/" data-count="drivers">See the Drivers page</a>\s*', cards[1])
     assert built and built[1].startswith('Our Drivers page was built the same way'), \
         'Proof: the second card says how the Drivers page was built, with its one link, See the Drivers page'
     poster = re.findall(r'<a [^>]*href="https://x\.com/openwiz"[^>]*>([\s\S]*?)</a>', cards[2])
@@ -1559,6 +1564,7 @@ def check_footer(htmls):
     groups = [plain(h) for h in re.findall(r'<h2>([\s\S]*?)</h2>', FOOTER)]
     assert groups == ['Product', 'Company'], f'the footer link groups: {groups}'
     assert FOOTER_LINE in plain(FOOTER), f'the footer says {FOOTER_LINE}'
+    assert plain(FOOTER).count(COUNT_NOTICE) == 1, 'the footer has one visit and click notice'
     assert '<p class="footer-wordmark">OpenWiz</p>' in FOOTER, 'the footer shows the wordmark'
     assert FOOTER.count('class="family-wiz"') == 12, 'the footer has the twelve Wizes'
 
@@ -1589,7 +1595,8 @@ def check_faq(htmls, pages, names):
             assert href.startswith('/'), f'an answer links off the site: {href}'
     where = [plain(a) for _, q, _, a in rows if plain(q) == 'Where do my agents run?']
     assert where == [FAQ_WHERE], f'the Questions\u2019 answer to Where do my agents run?: {FAQ_WHERE}'
-    assert rows and plain(rows[-1][3]) == FAQ_LAST, f'the Questions\u2019 last answer: {FAQ_LAST}'
+    assert plain(rows[-2][3]) == FAQ_TEAM, f'the Questions’ team answer: {FAQ_TEAM}'
+    assert plain(rows[-1][3]) == COUNT_NOTICE, 'the Questions use the same visit and click notice as the footer'
     assert not re.search(r'<(?:form|input|textarea)\b', FAQ), 'part 1 asks nothing: no form or input in the Questions'
 
 
@@ -1748,7 +1755,7 @@ class ReleaseOutline(HTMLParser):
 def check_releases(section, releases, live):
     outline = ReleaseOutline(section)
     allowed = {'section': {'class', 'aria-label'}, 'article': {'class', 'aria-labelledby'}, 'h2': {'id'}, 'small': set(),
-               'time': {'datetime'}, 'p': {'class'}, 'ul': set(), 'li': set(), 'a': {'href'}}
+               'time': {'datetime'}, 'p': {'class'}, 'ul': set(), 'li': set(), 'a': {'href', 'data-count'}}
     for tag, attrs in outline.tags:
         assert tag in allowed, f'unexpected element in the release entries: {tag}'
         assert set(attrs) <= allowed[tag], f'unexpected attribute in the release entries: {tag} {sorted(attrs)}'
