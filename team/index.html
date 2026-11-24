@@ -52,17 +52,25 @@
     <a class="team-book" id="book" data-book href="https://cal.com/openwiz-jake/setup" data-count="book-call">Book a call</a>
     <p class="team-needs">30 minutes. Bring a repository with working CI and a signed-in Claude Code or Codex.</p>
   </div>
-  <figure class="team-pr">
-    <figcaption class="team-pr-heading">
-      <p class="team-pr-meta"><code>your-org/your-repo</code> <span>Example</span></p>
-      <p class="team-pr-title"><span>#128</span> Add CSV export to the reports page</p>
-    </figcaption>
-    <dl class="team-pr-details">
-      <div><dt>Built by:</dt> <dd>your builder agent</dd></div>
-      <div><dt>Reviewed by:</dt> <dd>a second agent <span class="team-pr-approved">Approved</span></dd></div>
-      <div><dt>Checks:</dt> <dd>CI passed</dd></div>
-      <div><dt>Merge:</dt> <dd>your call</dd></div>
-    </dl>
+  <figure class="team-log" aria-labelledby="team-log-spec">
+    <figcaption class="team-log-heading" id="team-log-spec"><a href="https://github.com/openwizdev/OpenWiz/issues/2963">spec: openwiz.dev/book, our own booking page for the team call</a></figcaption>
+    <ul class="team-log-tickets" aria-label="Ticket states" role="list">
+      <li><a href="https://github.com/openwizdev/OpenWiz/issues/2964" aria-label="BK1: busy time from iCal and the open slots · Merged" title="Merged">BK1 <span data-state="merged">✓</span></a></li>
+      <li><a href="https://github.com/openwizdev/OpenWiz/issues/2966" aria-label="BK2: the booking API · Merged" title="Merged">BK2 <span data-state="merged">✓</span></a></li>
+      <li><a href="https://github.com/openwizdev/OpenWiz/issues/2965" aria-label="BK3: confirmation email and Google Calendar · Merged" title="Merged">BK3 <span data-state="merged">✓</span></a></li>
+      <li><a href="https://github.com/openwizdev/OpenWiz/issues/2967" aria-label="BK4: the booking page and its installable app · Merged" title="Merged">BK4 <span data-state="merged">✓</span></a></li>
+    </ul>
+    <ol class="team-log-events" aria-label="Events, newest first (UTC)" role="list">
+      <li><time datetime="2026-11-24T13:00:20Z">13:00</time> <span>BK2</span> <span>pull request <a href="https://github.com/openwizdev/WizSite/pull/183">#183</a> merged</span></li>
+      <li><time datetime="2026-11-24T12:55:24Z">12:55</time> <span>BK4</span> <span>pull request <a href="https://github.com/openwizdev/WizSite/pull/192">#192</a> merged</span></li>
+      <li><time datetime="2026-11-24T12:44:35Z">12:44</time> <span>BK4</span> <span>pull request <a href="https://github.com/openwizdev/WizSite/pull/192">#192</a> opened</span></li>
+      <li><time datetime="2026-11-24T12:32:28Z">12:32</time> <span>BK4</span> <span>pull request <a href="https://github.com/openwizdev/WizSite/pull/189">#189</a> merged</span></li>
+      <li><time datetime="2026-11-24T12:23:21Z">12:23</time> <span>BK4</span> <span>pull request <a href="https://github.com/openwizdev/WizSite/pull/189">#189</a> opened</span></li>
+      <li><time datetime="2026-11-24T12:15:27Z">12:15</time> <span>BK4</span> <span>pull request <a href="https://github.com/openwizdev/WizSite/pull/181">#181</a> merged</span></li>
+      <li><time datetime="2026-11-24T12:04:33Z">12:04</time> <span>BK1</span> <span>pull request <a href="https://github.com/openwizdev/WizSite/pull/180">#180</a> merged</span></li>
+      <li><time datetime="2026-11-24T11:49:33Z">11:49</time> <span>BK3</span> <span>pull request <a href="https://github.com/openwizdev/WizSite/pull/179">#179</a> merged</span></li>
+    </ol>
+    <div class="team-log-footer"><p class="team-log-status" role="status">Snapshot · 24 Nov 2026, 14:33 UTC</p></div>
   </figure>
 </div>
 <section class="team-part team-call wrap" aria-labelledby="team-how">
@@ -74,7 +82,7 @@
   </ol>
 </section>
 <section class="team-part wrap" aria-labelledby="team-launch">
-  <h2 id="team-launch">Launch film</h2>
+  <h2 id="team-launch">OpenWiz in two minutes</h2>
   <figure class="launch team-film">
     <div class="launch-frame">
       <video class="launch-video" src="/art/launch-video.mp4" poster="/art/launch-poster.webp" preload="none" playsinline controls width="1280" height="666" aria-label="OpenWiz in two minutes" aria-describedby="launch-about">
@@ -90,7 +98,7 @@
   <ul class="team-facts">
     <li>OpenWiz 0.01 is out: open source, Apache-2.0.</li>
     <li>It never touches a login and runs no server of ours.</li>
-    <li>Which drivers passed their live check: <a href="/drivers/" data-count="drivers">the Drivers page</a>.</li>
+    <li>Which drivers passed their check: <a href="/drivers/" data-count="drivers">the Drivers page</a>.</li>
     <li>One person built it, with fleets of agents.</li>
   </ul>
 </section>

@@ -153,22 +153,39 @@ TEAM_HEADLINE = 'Leave the call with a reviewed pull request.'
 TEAM_LEAD = ('Jake, who built OpenWiz, sets up an agent factory with your team on your own repository. '
              'Pick one small, real change: your agents build and review it. Merging stays your call.')
 TEAM_NEEDS = '30 minutes. Bring a repository with working CI and a signed-in Claude Code or Codex.'
-TEAM_EXAMPLE = ('your-org/your-repo', 'Example', '#128', 'Add CSV export to the reports page',
-                'Built by: your builder agent', 'Reviewed by: a second agent Approved',
-                'Checks: CI passed', 'Merge: your call')
+TEAM_SPEC = ('2963', 'spec: openwiz.dev/book, our own booking page for the team call')
+TEAM_TICKETS = (
+    ('2964', 'BK1', 'BK1: busy time from iCal and the open slots'),
+    ('2966', 'BK2', 'BK2: the booking API'),
+    ('2965', 'BK3', 'BK3: confirmation email and Google Calendar'),
+    ('2967', 'BK4', 'BK4: the booking page and its installable app'),
+)
+TEAM_EVENTS = (
+    ('13:00:20', 'BK2', '183', 'merged'),
+    ('12:55:24', 'BK4', '192', 'merged'),
+    ('12:44:35', 'BK4', '192', 'opened'),
+    ('12:32:28', 'BK4', '189', 'merged'),
+    ('12:23:21', 'BK4', '189', 'opened'),
+    ('12:15:27', 'BK4', '181', 'merged'),
+    ('12:04:33', 'BK1', '180', 'merged'),
+    ('11:49:33', 'BK3', '179', 'merged'),
+)
+TEAM_SNAPSHOT = 'Snapshot · 24 Nov 2026, 14:33 UTC'
+TEAM_ISSUES = 'https://github.com/openwizdev/OpenWiz/issues'
+TEAM_PULLS = 'https://github.com/openwizdev/WizSite/pull'
 TEAM_STEPS = (('Connect', 'We connect OpenWiz to your repository and the coding agents you already use.'),
               ('Decide', 'You pick one small, real change and answer a few questions about it.'),
               ('Ship', 'Your agents build it, a second agent reviews it, and the pull request opens on your repository. '
                        'Merging is your call.'))
-TEAM_PARTS = ('On the call', 'Launch film', 'What you’re setting up', 'One small change. One call.')
+TEAM_PARTS = ('On the call', 'OpenWiz in two minutes', 'What you’re setting up', 'One small change. One call.')
 TEAM_FACTS = ('OpenWiz 0.01 is out: open source, Apache-2.0.',
               'It never touches a login and runs no server of ours.',
-              'Which drivers passed their live check: the Drivers page.',
+              'Which drivers passed their check: the Drivers page.',
               'One person built it, with fleets of agents.')
 TEAM_DESCRIPTION = ('A 30-minute call with Jake, who built OpenWiz. Bring your repository; leave with a pull request '
                     'your agents built and reviewed.')
 TEAM_NEVER = re.compile(r'\binstall|\bguarantee|\bpric(?:e|es|ing)\b|\bcost|\bfree\b|\bcheckout|[$€£]\s*\d|\bper (?:month|seat|user)\b'
-                        r'|\bcustomers?\b|\btrusted\b|\btestimonial|\bresults?\b|\bcloudroom\b|\bships on\b|\bminute \d'
+                        r'|\bcustomers?\b|\btrusted\b|\btestimonial|\bresults?\b|\bcloudroom\b|\blive\b|\bright now\b|\bships on\b|\bminute \d'
                         r'|\b(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten) (?:drivers|hosts)\b|\b\d+ of \d+\b', re.I)
 REPORT_LINK = 'https://github.com/openwizdev/openwiz/issues/new?template=feedback.yml'
 FOOTER = (ROOT / 'footer.html').read_text()
@@ -635,6 +652,8 @@ def check_ref(root, source, ref, pages, favicons=(), market=None):
     if ref in favicons:
         assert ref in ('/favicon.ico', '/favicon.svg', '/app/icon.ico', '/app/icon.svg'), 'unexpected favicon'
     url = urlsplit(ref)
+    if source == root / TEAM_PAGE and any(ref == f'{TEAM_PULLS}/{pr}' for _, _, pr, _ in TEAM_EVENTS):
+        return  # Exact anchor placement and copy are pinned by check_team.
     if url.scheme or url.netloc:
         if market is not None and ref in market:
             assert url.scheme == 'https' and not url.username and not url.password, 'unexpected market URL parts'
@@ -1500,6 +1519,8 @@ def check_team(htmls, pages):
     assert description and unescape(description[1]) == TEAM_DESCRIPTION, f'the team page description: {TEAM_DESCRIPTION}'
     assert not re.search(r'<(?:iframe|embed|object|form|details)\b', team) and team.count('<script') == 2, \
         'the team page adds no embed, form or script beyond GSAP and site.js, and folds nothing away'
+    assert pages[TEAM_PAGE].scripts == [s for s in pages['index.html'].scripts if not s.startswith('/faq.')] \
+        and not pages[TEAM_PAGE].inline_scripts, 'the team page loads only the pinned GSAP and site.js'
     main = team.split('<main', 1)[1].split('</main>', 1)[0]
     shown = re.sub(r'\s+', ' ', unescape(re.sub(r'<[^>]*>', ' ', main)))
     assert not TEAM_NEVER.search(shown), f'a word the team page never uses: {TEAM_NEVER.search(shown)[0]}'
@@ -1517,16 +1538,26 @@ def check_team(htmls, pages):
                      r'<a class="team-book" id="book" data-book [^>]*>Book a call</a>\s*<p class="team-needs">([^<]*)</p>\s*</div>', hero)
     assert copy and tuple(map(unescape, copy.groups())) == (TEAM_KICKER, TEAM_LEAD, TEAM_NEEDS), \
         f'the hero, in order: who it is for, the headline, what happens on the call, Book a call, what to bring: {TEAM_KICKER} / {TEAM_LEAD} / {TEAM_NEEDS}'
-    example = re.fullmatch(r'\s*<figure class="team-pr">\s*<figcaption class="team-pr-heading">\s*'
-                           r'<p class="team-pr-meta"><code>([^<]+)</code> <span>([^<]+)</span></p>\s*'
-                           r'<p class="team-pr-title"><span>([^<]+)</span> ([^<]+)</p>\s*</figcaption>\s*'
-                           r'<dl class="team-pr-details">\s*'
-                           r'<div>(<dt>[^<]+</dt> <dd>[^<]+</dd>)</div>\s*'
-                           r'<div>(<dt>[^<]+</dt> <dd>[^<]+ <span class="team-pr-approved">[^<]+</span></dd>)</div>\s*'
-                           r'<div>(<dt>[^<]+</dt> <dd>[^<]+</dd>)</div>\s*'
-                           r'<div>(<dt>[^<]+</dt> <dd>[^<]+</dd>)</div>\s*</dl>\s*</figure>\s*', hero[copy.end():])
-    assert example and not hero[:copy.start()].strip() and tuple(unescape(plain(s)) for s in example.groups()) == TEAM_EXAMPLE, \
-        f'the hero ends with the labelled pull request example, in real text: {TEAM_EXAMPLE}'
+    spec, title = TEAM_SPEC
+    log = [
+        '<figure class="team-log" aria-labelledby="team-log-spec">',
+        f'<figcaption class="team-log-heading" id="team-log-spec"><a href="{TEAM_ISSUES}/{spec}">{title}</a></figcaption>',
+        '<ul class="team-log-tickets" aria-label="Ticket states" role="list">',
+        *(f'<li><a href="{TEAM_ISSUES}/{number}" aria-label="{title} · Merged" title="Merged">{name} <span data-state="merged">✓</span></a></li>'
+          for number, name, title in TEAM_TICKETS),
+        '</ul>',
+        '<ol class="team-log-events" aria-label="Events, newest first (UTC)" role="list">',
+        *(f'<li><time datetime="2026-11-24T{stamp}Z">{stamp[:5]}</time> <span>{name}</span> <span>pull request '
+          f'<a href="{TEAM_PULLS}/{pr}">#{pr}</a> {action}</span></li>' for stamp, name, pr, action in TEAM_EVENTS),
+        '</ol>',
+        f'<div class="team-log-footer"><p class="team-log-status" role="status">{TEAM_SNAPSHOT}</p></div>',
+        '</figure>',
+    ]
+    assert not hero[:copy.start()].strip() and [line.strip() for line in hero[copy.end():].strip().splitlines()] == log, \
+        'the hero ends with the pinned factory log snapshot'
+    for pr in {pr for _, _, pr, _ in TEAM_EVENTS}:
+        assert pages[TEAM_PAGE].refs.count(f'{TEAM_PULLS}/{pr}') == sum(row[2] == pr for row in TEAM_EVENTS), \
+            'the pinned pull request URLs appear only in the factory log'
     page = Page(main)
     assert len(page.videos) == 1, 'the team page has one video: the launch film'
     clip = page.videos[0]
@@ -1554,11 +1585,12 @@ def check_team(htmls, pages):
     facts = re.search(r'<section class="team-part wrap" aria-labelledby="team-what">\s*<h2 id="team-what">[^<]*</h2>\s*<ul class="team-facts">([\s\S]*?)</ul>\s*</section>', main)
     items = re.findall(r'<li>([\s\S]*?)</li>', facts[1]) if facts else []
     assert tuple(plain(i) for i in items) == TEAM_FACTS, f'What you\u2019re setting up: its four true lines, in order: {TEAM_FACTS}'
-    assert re.findall(r'href="([^"]*)" data-count="drivers"', facts[1]) == ['/drivers/'], 'the drivers line links to the live Drivers page, and restates no count'
+    assert re.findall(r'href="([^"]*)" data-count="drivers"', facts[1]) == ['/drivers/'], 'the drivers line links to the Drivers page, and restates no count'
     close = re.search(r'<section class="team-part team-close wrap" aria-labelledby="team-call">\s*<h2 id="team-call">[^<]*</h2>\s*'
                       r'<a class="team-book" data-book href="[^"]*" data-count="book-call">Book a call</a>\s*</section>\s*$', main)
     assert close, 'the page closes on its second Book a call'
-    assert main.count('<a ') == 3 and main.count('<button') == 1, 'the team page offers Book a call twice, the Drivers link and the play button; nothing else'
+    assert len(page.links) == 4 + len(TEAM_TICKETS) + len(TEAM_EVENTS) and len(page.buttons) == 1, \
+        'the team page offers Book a call twice, the Drivers link, the pinned log links and the play button, nothing else'
 
 
 

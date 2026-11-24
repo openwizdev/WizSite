@@ -644,9 +644,270 @@ async function askAWiz() {
   }
 }
 
+function teamFactoryLog() {
+  const log = document.querySelector('.team-log');
+  if (!log) return false;
+
+  const api = 'https://api.github.com';
+  const github = 'https://github.com/openwizdev';
+  const search = '/search/issues?q=repo:openwizdev/OpenWiz+is:issue+in:title+%22spec:%22&sort=updated&per_page=20';
+  const issues = '/repos/openwizdev/OpenWiz/issues';
+  const cacheKey = 'openwiz-team-factory-log-v1';
+  const maxAge = 10 * 60 * 1000;
+  const issueLink = /^https:\/\/github\.com\/openwizdev\/OpenWiz\/issues\/[1-9]\d*$/i;
+  const prLink = /^https:\/\/github\.com\/openwizdev\/[\w.-]+\/pull\/[1-9]\d*$/i;
+  const timePattern = /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/;
+  const isTime = value => typeof value === 'string' && timePattern.test(value)
+    && Number.isFinite(Date.parse(value)) && new Date(value).toISOString() === value.replace('Z', '.000Z');
+  const titleOK = title => typeof title === 'string' && title.trim() && title.length <= 256
+    && !/\b(?:cloudroom|customers?|testimonial\w*|pricing|prices?|costs?|guarantee\w*|checkout|free|trusted|live|right now)\b|[$€£]\s*\d|\bper (?:month|seat|user)\b/i.test(title);
+  const require = condition => {
+    if (!condition) throw new Error('Invalid factory log data');
+  };
+  const isIssue = issue => issue && Number.isSafeInteger(issue.number) && issue.number > 0
+    && titleOK(issue.title) && issueLink.test(issue.html_url) && issue.html_url.endsWith(`/${issue.number}`)
+    && ['open', 'closed'].includes(issue.state);
+
+  function readTicket(issue, timeline) {
+    require(Array.isArray(timeline));
+    const prs = new Map();
+    let built = null;
+    const closes = new Set();
+    for (const event of timeline) {
+      require(event && typeof event.event === 'string');
+      if (event.event === 'commented') {
+        require(typeof event.body === 'string');
+        if (event.body.startsWith('launch-fleet: start') ||
+            (event.body.includes('<!-- openwiz:status v1 -->') && /^\s*agent:\s*builder[ \t]*$/m.test(event.body))) {
+          require(isTime(event.created_at));
+          if (!built || event.created_at < built) built = event.created_at;
+        }
+      }
+      if (event.event === 'closed') {
+        require(isTime(event.created_at));
+        closes.add(event.created_at);
+      }
+      if (event.event !== 'cross-referenced') continue;
+      const source = event.source?.issue;
+      require(source && typeof source.html_url === 'string');
+      if (!source.pull_request || !source.html_url.toLowerCase().startsWith(`${github}/`)) continue;
+      const { html_url: url, merged_at: merged } = source.pull_request;
+      require(prLink.test(url) && url === source.html_url && new URL(url).href === url
+        && Number.isSafeInteger(source.number) && url.endsWith(`/${source.number}`)
+        && ['open', 'closed'].includes(source.state) && isTime(source.created_at)
+        && (merged === null || isTime(merged)));
+      prs.set(url, { url, opened: source.created_at, merged, state: source.state });
+    }
+    if (issue.state === 'closed') {
+      require(isTime(issue.closed_at));
+      closes.add(issue.closed_at);
+    }
+    return {
+      title: issue.title, url: issue.html_url, built, closes: [...closes],
+      state: issue.state, completed: issue.state === 'closed' && issue.state_reason === 'completed',
+      prs: [...prs.values()],
+    };
+  }
+
+  function validRun(run) {
+    return run && titleOK(run.title) && issueLink.test(run.url)
+      && Array.isArray(run.tickets) && run.tickets.length >= 2 && run.tickets.length <= 6
+      && run.tickets.every(ticket => ticket && titleOK(ticket.title) && issueLink.test(ticket.url)
+        && ['open', 'closed'].includes(ticket.state) && typeof ticket.completed === 'boolean'
+        && (ticket.built === null || isTime(ticket.built)) && Array.isArray(ticket.closes)
+        && ticket.closes.every(isTime) && Array.isArray(ticket.prs)
+        && ticket.prs.every(pr => pr && prLink.test(pr.url) && new URL(pr.url).href === pr.url
+          && isTime(pr.opened) && (pr.merged === null || isTime(pr.merged)) && ['open', 'closed'].includes(pr.state)));
+  }
+
+  const replayDate = time => `2026-11-${time}Z`;
+  // From the public replay packet for OpenWiz #1927.
+  const replay = {
+    title: 'Infra spec: write-driver, a skill that writes your own driver',
+    url: `${github}/OpenWiz/issues/1927`,
+    tickets: [
+      ['Infra WD1: the write-driver contract', 1928, '20T15:45:24', '20T19:03:28', [['OpenWiz', 1945, '20T15:57:37', '20T19:03:26']]],
+      ['Infra WD2: the write-driver skill takes a user from paste to a passing driver (WizSkills 0.2.1)', 1929, '20T17:45:43', '21T01:27:35', [['WizSite', 118, '20T17:58:49', '21T01:28:08'], ['WizSkills', 212, '20T18:27:18', '21T01:27:33']]],
+      ['Infra WD3: write-driver’s end-to-end eval against the template’s fake host (WizSkills 0.2.1)', 1931, '21T01:32:44', '21T04:36:55', [['WizSkills', 229, '21T02:00:06', '21T04:36:53']]],
+      ['Infra WD4: the Drivers page’s Write your own driver copy line', 1932, '20T17:46:29', '21T01:28:10', [['WizSite', 118, '20T17:58:49', '21T01:28:08']]],
+    ].map(([title, number, built, closed, prs]) => ({
+      title, url: `${github}/OpenWiz/issues/${number}`, built: replayDate(built), closes: [replayDate(closed)],
+      state: 'closed', completed: true,
+      prs: prs.map(([repo, pr, opened, merged]) => ({
+        url: `${github}/${repo}/pull/${pr}`, opened: replayDate(opened), merged: replayDate(merged), state: 'closed',
+      })),
+    })),
+  };
+
+  const nameOf = ticket => ticket.title.match(/^(?:\w+ )?([A-Z][A-Z0-9-]{0,3}\d{1,3})\b/)?.[1]
+    ?? `#${ticket.url.split('/').at(-1)}`;
+  const seen = (time, until) => time !== null && (until === null || time <= until);
+  function stateOf(ticket, until) {
+    const prs = ticket.prs.filter(pr => seen(pr.opened, until));
+    const closed = until ? ticket.closes.some(time => seen(time, until)) : ticket.state === 'closed';
+    if ((closed && ticket.completed) || (prs.length && prs.every(pr => seen(pr.merged, until)))) return ['merged', 'Merged', '✓'];
+    if (prs.some(pr => until ? !seen(pr.merged, until) : pr.state === 'open')) return ['review', 'In review', '↗'];
+    if (!closed && !prs.length && seen(ticket.built, until)) return ['building', 'Building', '…'];
+    return ['waiting', 'Waiting', '○'];
+  }
+
+  function eventsOf(run) {
+    const events = [];
+    for (const ticket of run.tickets) {
+      const add = (time, action, url, number) => {
+        if (time) events.push({ time, action, url, number, name: nameOf(ticket) });
+      };
+      add(ticket.built, 'builder started', ticket.url);
+      for (const time of ticket.closes) add(time, 'ticket closed', ticket.url);
+      for (const pr of ticket.prs) {
+        const number = pr.url.split('/').at(-1);
+        add(pr.opened, 'opened', pr.url, number);
+        add(pr.merged, 'merged', pr.url, number);
+      }
+    }
+    return events.sort((a, b) => b.time.localeCompare(a.time));
+  }
+
+  const heading = log.querySelector('.team-log-heading a');
+  const summary = log.querySelector('.team-log-tickets');
+  const eventsList = log.querySelector('.team-log-events');
+  const status = log.querySelector('.team-log-status');
+  const still = [heading.cloneNode(true), ...[summary, eventsList].map(list => [...list.childNodes].map(node => node.cloneNode(true))), status.textContent];
+  const make = (tag, text = '') => Object.assign(document.createElement(tag), { textContent: text });
+  const quote = text => text.replaceAll("'", '’');
+  const clock = time => time.slice(11, 16);
+
+  function render(run, label, until = null) {
+    heading.href = run.url;
+    heading.textContent = quote(run.title);
+    const names = new Intl.Collator('en', { numeric: true });
+    summary.replaceChildren(...[...run.tickets].sort((a, b) => names.compare(nameOf(a), nameOf(b))).map(ticket => {
+      const [state, label, marker] = stateOf(ticket, until);
+      const link = Object.assign(make('a'), { href: ticket.url });
+      link.setAttribute('aria-label', `${quote(ticket.title)} · ${label}`);
+      link.title = label;
+      const icon = make('span', marker);
+      icon.dataset.state = state;
+      link.append(`${nameOf(ticket)} `, icon);
+      const item = make('li');
+      item.append(link);
+      return item;
+    }));
+    const rows = eventsOf(run).filter(event => seen(event.time, until)).slice(0, 8).map(event => {
+      const { time, action, url, number, name } = event;
+      const stamp = Object.assign(make('time', until ? `${time.slice(8, 10)} ${clock(time)}` : clock(time)), { dateTime: time });
+      const message = make('span');
+      const link = Object.assign(make('a', number ? `#${number}` : action), { href: url });
+      if (number) message.append('pull request ', link, ` ${action}`);
+      else message.append(link);
+      const row = make('li');
+      row.append(stamp, ' ', make('span', name), ' ', message);
+      return row;
+    });
+    eventsList.replaceChildren(...(rows.length ? rows : [make('li', 'No recorded events yet')]));
+    status.textContent = label;
+  }
+
+  let cached, replayIndex = -1;
+  try {
+    const saved = JSON.parse(localStorage.getItem(cacheKey));
+    if (saved && Number.isSafeInteger(saved.readAt) && saved.readAt > 0 && saved.readAt <= Date.now() && validRun(saved.run)) cached = saved;
+  } catch { /* Storage may be unavailable. */ }
+  function current() {
+    if (cached) {
+      render(cached.run, `Live from GitHub · read ${clock(new Date(cached.readAt).toISOString())}`);
+    } else {
+      const [spec, tickets, events, label] = still;
+      heading.href = spec.href;
+      heading.textContent = spec.textContent;
+      summary.replaceChildren(...tickets);
+      eventsList.replaceChildren(...events);
+      status.textContent = label;
+    }
+  }
+
+  const steps = [...new Set(eventsOf(replay).map(event => event.time))].reverse();
+  const actions = make('div');
+  actions.className = 'team-log-actions';
+  const toggle = Object.assign(make('button', 'Replay a real run'), { type: 'button' });
+  const next = Object.assign(make('button', 'Next event'), { type: 'button' });
+  const showReplay = () => {
+    const done = replayIndex === steps.length - 1;
+    render(replay, `Replay of a real run · 20–21 Nov 2026 UTC${done ? ' · Complete' : ''}`, steps[replayIndex]);
+    next.setAttribute('aria-disabled', String(done));
+  };
+  toggle.addEventListener('click', () => {
+    if (replayIndex < 0) {
+      replayIndex = 0;
+      toggle.textContent = 'Back to current spec';
+      actions.append(next);
+      showReplay();
+    } else {
+      replayIndex = -1;
+      toggle.textContent = 'Replay a real run';
+      next.remove();
+      current();
+    }
+  });
+  next.addEventListener('click', () => {
+    if (replayIndex < steps.length - 1) {
+      replayIndex++;
+      showReplay();
+    }
+  });
+  actions.append(toggle);
+  status.after(actions);
+  if (cached) current();
+
+  const read = new AbortController();
+  let attempted = false;
+  async function get(path) {
+    require(document.visibilityState === 'visible' && !read.signal.aborted);
+    const response = await fetch(api + path, {
+      credentials: 'omit', cache: 'no-store',
+      signal: AbortSignal.any([read.signal, AbortSignal.timeout(5000)]),
+    });
+    require(response.status === 200);
+    return response.json();
+  }
+  async function onVisibility() {
+    if (document.visibilityState !== 'visible') {
+      if (attempted) read.abort();
+      return;
+    }
+    if (attempted || (cached && Date.now() - cached.readAt < maxAge)) return;
+    attempted = true;
+    try {
+      const { items } = await get(search);
+      require(Array.isArray(items) && items.every(item => item && ['open', 'closed'].includes(item.state)));
+      const spec = items.find(item => item.state === 'open' && Number.isInteger(item.sub_issues_summary?.total)
+        && item.sub_issues_summary.total >= 2 && item.sub_issues_summary.total <= 6);
+      // Five or six timelines would exceed the six-request budget.
+      require(isIssue(spec) && spec.sub_issues_summary.total <= 4);
+      const tickets = await get(`${issues}/${spec.number}/sub_issues?per_page=20`);
+      require(Array.isArray(tickets) && tickets.length === spec.sub_issues_summary.total && tickets.every(isIssue)
+        && new Set(tickets.map(ticket => ticket.number)).size === tickets.length);
+      const run = {
+        title: spec.title, url: spec.html_url,
+        tickets: await Promise.all(tickets.map(async ticket =>
+          readTicket(ticket, await get(`${issues}/${ticket.number}/timeline?per_page=100`)))),
+      };
+      require(document.visibilityState === 'visible' && !read.signal.aborted && validRun(run));
+      cached = { readAt: Date.now(), run };
+      try { localStorage.setItem(cacheKey, JSON.stringify(cached)); } catch { /* Keep this read on screen. */ }
+      if (replayIndex < 0) current();
+    } catch {
+      read.abort();
+    }
+  }
+  document.addEventListener('visibilitychange', onVisibility);
+  onVisibility();
+  return true;
+}
+
 enableCopy();
 askAWiz();
-showStars().catch(() => {});
+if (!teamFactoryLog()) showStars().catch(() => {});
 launchVideo();
 specVideo();
 oneVoiceAtATime();

@@ -688,6 +688,7 @@ class Checks(unittest.TestCase):
             return temp, root
         book = re.compile(r'data-book href="[^"]*"')
         T = 'team/index.html'
+        faq_script = re.search(r'/faq\.[a-f0-9]+\.js', (ROOT / 'dist/index.html').read_text())[0]
         refused = {
             'buy button': ('changelog/index.html', lambda t: t.replace(CTA, '', 1)),
             'buy button to /team/': ('team/index.html', lambda t: t.replace('<a class="nav-team" href="/team/">', '<a class="nav-team" href="/">', 1)),
@@ -716,13 +717,18 @@ class Checks(unittest.TestCase):
             'no embed, form or script ': (T, lambda t: t.replace('</main>', '<form></form></main>', 1)),
             'folds nothing away': (T, lambda t: t.replace('<ul class="team-facts">', '<details><summary>Facts</summary><ul class="team-facts">', 1).replace('</ul>', '</ul></details>', 1)),
             'one video': (T, lambda t: t.replace('</main>', '<video src="/art/spec-video.mp4" preload="none"></video></main>', 1)),
-            'the hero ends with the labelled pull request example': (T, lambda t: t.replace('<span>Example</span>', '<span>Live</span>', 1)),
-            'the hero ends with the labelled pull request example ': (T, lambda t: t.replace('Add CSV export to the reports page', '<img src="/art/launch-poster.webp" alt="Add CSV export to the reports page">', 1)),
-            'the hero ends with the labelled pull request example  ': (T, lambda t: t.replace('>your call</dd>', '>Automatic</dd>', 1)),
-            'the hero ends with the labelled pull request example   ': (T, lambda t: t.replace('>Approved</span>', '>Pending</span>', 1)),
-            'hides none of its copy ': (T, lambda t: t.replace('<span>Example</span>', '<span hidden>Example</span>', 1)),
-            'the launch film has its own section': (T, lambda t: re.sub(r'(<section class="team-part team-call[\s\S]*?<h2 id="team-launch">Launch film</h2>\n)(  <figure class="launch team-film">[\s\S]*?</figure>\n)', r'\2\1', t, count=1)),
-            'the team page sections   ': (T, lambda t: t.replace('>Launch film</h2>', '>Demo</h2>', 1)),
+            'never uses: Live': (T, lambda t: t.replace('Snapshot · 24 Nov 2026, 14:33 UTC', 'Live from GitHub · read 14:33', 1)),
+            'never uses: right now': (T, lambda t: t.replace('Snapshot · 24 Nov 2026, 14:33 UTC', 'What is happening right now', 1)),
+            'the pinned factory log snapshot ': (T, lambda t: t.replace('13:00:20Z', '13:00:21Z', 1)),
+            'the pinned factory log snapshot  ': (T, lambda t: t.replace('/issues/2963', '/issues/2966', 1)),
+            'the pinned factory log snapshot   ': (T, lambda t: t.replace('>✓</span>', '>○</span>', 1)),
+            'the pinned factory log snapshot    ': (T, lambda t: t.replace('14:33 UTC', '14:34 UTC', 1)),
+            'the pinned factory log snapshot     ': (T, lambda t: t.replace('pull request <a', '<img src="/art/launch-poster.webp" alt="">pull request <a', 1)),
+            'only in the factory log': (T, lambda t: t.replace('</main>', '<img src="https://github.com/openwizdev/WizSite/pull/183" alt=""></main>', 1)),
+            'hides none of its copy ': (T, lambda t: t.replace('<figure class="team-log"', '<figure hidden class="team-log"', 1)),
+            'the launch film has its own section': (T, lambda t: re.sub(r'(<section class="team-part team-call[\s\S]*?<h2 id="team-launch">OpenWiz in two minutes</h2>\n)(  <figure class="launch team-film">[\s\S]*?</figure>\n)', r'\2\1', t, count=1)),
+            'the team page sections   ': (T, lambda t: t.replace('>OpenWiz in two minutes</h2>', '>Launch film</h2>', 1)),
+            'only the pinned GSAP and site.js': (T, lambda t: re.sub(r'(<script src=")/site\.[^"]+\.js', r'\1' + faq_script, t, count=1)),
             'over its pinned poster': (T, lambda t: t.replace('poster="/art/launch-poster.webp"', 'poster="/art/spec-poster.webp"', 1)),
             'never autoplays': (T, lambda t: t.replace('preload="none" playsinline', 'preload="none" autoplay playsinline', 1)),
             'never autoplays ': (T, lambda t: t.replace('preload="none" playsinline', 'preload="auto" playsinline', 1)),
@@ -747,7 +753,7 @@ class Checks(unittest.TestCase):
             'never uses: customers': (T, lambda t: t.replace('<h2 id="team-call">One small change. One call.', '<h2 id="team-call">Our customers ship.', 1)),
             'never uses: Cloudroom': (T, lambda t: t.replace('runs no server of ours.', 'runs no server of ours, and Cloudroom is optional.', 1)),
             'never uses: Three drivers': (T, lambda t: t.replace('Which drivers passed', 'Three drivers passed', 1)),
-            'never uses: 5 of 5': (T, lambda t: t.replace('their live check:', 'their live check, 5 of 5:', 1)),
+            'never uses: 5 of 5': (T, lambda t: t.replace('their check:', 'their check, 5 of 5:', 1)),
             'the team page sections': (T, lambda t: t.replace('One small change. One call.</h2>', 'Questions</h2>', 1)),
             'the team page sections ': (T, lambda t: t.replace('<section class="team-part team-close', '<section class="team-part wrap"><h2>Proof</h2></section>\n<section class="team-part team-close', 1)),
             'hides none of its copy': (T, lambda t: t.replace('<ul class="team-facts">', '<ul class="team-facts" hidden>', 1)),
