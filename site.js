@@ -655,11 +655,13 @@ if (teamSpecPanel) {
   const cacheAge = 10 * 60 * 1000;
   const stateLabels = Object.fromEntries(ticketStates);
   const hourMinute = new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC', hour: '2-digit', minute: '2-digit' });
+  const dayMonth = new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC', day: 'numeric', month: 'short' });
   const date = new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC', day: 'numeric', month: 'short', year: 'numeric' });
   const heading = teamSpecPanel.querySelector('.team-spec-heading');
   const list = teamSpecPanel.querySelector('.team-spec-tickets');
   const merge = teamSpecPanel.querySelector('.team-spec-merge');
   const origin = teamSpecPanel.querySelector('.team-spec-origin');
+  const closeProof = document.querySelector('.team-close-proof');
 
   const issueNumber = number => Number.isSafeInteger(number) && number > 0;
   const titleFits = title => typeof title === 'string' && title.trim() &&
@@ -713,6 +715,20 @@ if (teamSpecPanel) {
     const time = element('time', hourMinute.format(readAt));
     time.dateTime = new Date(readAt).toISOString();
     origin.replaceChildren('Live from GitHub · read ', time);
+    if (closeProof) {
+      const closeLink = closeProof.querySelector('a') || element('a');
+      if (latest) {
+        const mergedAt = Date.parse(latest.mergedAt);
+        const closeTime = element('time', `${dayMonth.format(mergedAt)} ${hourMinute.format(mergedAt)} UTC`);
+        closeTime.dateTime = latest.mergedAt;
+        closeLink.href = latest.url;
+        closeLink.replaceChildren(`${latest.repo.replace(/^openwizdev\//i, '')} #${latest.number} merged · `, closeTime);
+      } else {
+        closeLink.href = spec.html_url;
+        closeLink.textContent = `OpenWiz #${spec.number} · no merged pull request yet`;
+      }
+      if (closeLink.parentNode !== closeProof) closeProof.replaceChildren('Latest: ', closeLink);
+    }
   }
 
   function ticketFromTimeline(issue, events) {

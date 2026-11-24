@@ -13,6 +13,7 @@ const sub = number => `${repo}/${number}/sub_issues?per_page=20`;
 const timeline = number => `${repo}/${number}/timeline?per_page=100`;
 const now = Date.parse('2026-11-24T14:34:56Z');
 const still = 'Snapshot from GitHub · 24 Nov 2026, 14:33 UTC';
+const stillClose = 'Latest: WizSite #183 merged · 24 Nov 13:00 UTC';
 const responses = () => structuredClone({
   [searchUrl]: fixtures.search,
   [sub(2963)]: fixtures.subIssues,
@@ -52,11 +53,14 @@ async function view({ data = responses(), cache = new Map(), at = now, hidden = 
   const heading = new Node('h2', '', [new Node('code'), new Node('a')]);
   const list = new Node('ul');
   const merge = new Node('div', '', [new Node('p', 'Latest merged pull request'), new Node('a'), new Node('p')]);
+  const closeLink = new Node('a', 'WizSite #183 merged · ', [new Node('time', '24 Nov 13:00 UTC')]);
+  closeLink.href = 'https://github.com/openwizdev/WizSite/pull/183';
+  const closeProof = new Node('p', '', ['Latest: ', closeLink]);
   const panel = { querySelector: name => ({ heading, tickets: list, merge, origin })[name.slice(11)] };
   const footer = { children: [], setAttribute() {}, removeAttribute() {}, addEventListener() {} };
   const document = Object.assign(new EventTarget(), {
     visibilityState: hidden ? 'hidden' : 'visible',
-    querySelector: selector => ({ '.team-spec': panel, '.family': footer, '.landing-footer': footer })[selector] || null,
+    querySelector: selector => ({ '.team-spec': panel, '.team-close-proof': closeProof, '.family': footer, '.landing-footer': footer })[selector] || null,
     querySelectorAll: () => [],
     createElement: tag => new Node(tag),
   });
@@ -86,7 +90,7 @@ async function view({ data = responses(), cache = new Map(), at = now, hidden = 
   });
   const settle = () => new Promise(resolve => setImmediate(resolve));
   await settle();
-  return { calls, origin, heading, list, merge, cache, changeVisibility, settle };
+  return { calls, origin, heading, list, merge, closeProof, cache, changeVisibility, settle };
 }
 
 test('reads the first eligible spec, derives the frozen states and renders the last merge', async () => {
@@ -112,6 +116,9 @@ test('reads the first eligible spec, derives the frozen states and renders the l
   assert.equal(result.merge.lastElementChild.querySelector('time').textContent, '24 Nov 2026, 13:00 UTC');
   assert.equal(result.origin.textContent, 'Live from GitHub · read 14:34');
   assert.equal(result.origin.querySelector('time').dateTime, '2026-11-24T14:34:56.000Z');
+  assert.equal(result.closeProof.textContent, stillClose);
+  assert.equal(result.closeProof.querySelector('a').href, latest.url);
+  assert.equal(result.closeProof.querySelector('a').querySelector('time').dateTime, latest.merged);
 });
 
 test('ticket rules distinguish waiting, builder note and fleet start, review and completed', async () => {
@@ -131,6 +138,8 @@ test('ticket rules distinguish waiting, builder note and fleet start, review and
   const result = await view({ data });
   assert.deepEqual(result.list.children.map(row => row.children[1].textContent), ['Waiting', 'Building', 'In review', 'Merged']);
   assert.equal(result.merge.textContent, 'No merged pull request yet');
+  assert.equal(result.closeProof.textContent, 'Latest: OpenWiz #2963 · no merged pull request yet');
+  assert.equal(result.closeProof.querySelector('a').href, fixtures.replay[2963].url);
 
   data[timeline(2965)] = [fixtures.timelines[2965][0]];
   data[timeline(2965)].push({ event: 'cross-referenced', source: { issue: {
@@ -141,6 +150,19 @@ test('ticket rules distinguish waiting, builder note and fleet start, review and
   const mixed = await view({ data });
   assert.deepEqual(mixed.list.children.map(row => row.children[1].textContent), ['Waiting', 'Building', 'In review', 'Merged']);
   assert.equal(mixed.merge.querySelector('a').href, 'https://github.com/openwizdev/WizSite/pull/183');
+  assert.equal(mixed.closeProof.textContent, stillClose);
+  assert.equal(mixed.closeProof.querySelector('a').href, 'https://github.com/openwizdev/WizSite/pull/183');
+
+  const otherRepo = responses();
+  otherRepo[timeline(2966)] = [{ event: 'cross-referenced', source: { issue: {
+    repository_url: `${api}/repos/${reviewed.repo}`,
+    html_url: reviewed.url, number: reviewed.number, title: reviewed.title,
+    state: 'closed', pull_request: { merged_at: '2026-11-24T14:12:00Z' },
+  } } }];
+  const updated = await view({ data: otherRepo });
+  assert.equal(updated.closeProof.textContent, 'Latest: WizSkills #229 merged · 24 Nov 14:12 UTC');
+  assert.equal(updated.closeProof.querySelector('a').href, reviewed.url);
+  assert.equal(updated.closeProof.querySelector('a').querySelector('time').dateTime, '2026-11-24T14:12:00Z');
 
   data[timeline(2966)][0].source.issue.state = 'closed';
   data[timeline(2966)].push({ event: 'commented', body: 'launch-fleet: started' });
@@ -152,6 +174,7 @@ test('keeps the still on failure, incomplete data, timeout or request budget', a
   for (const status of [201, 403, 429]) {
     const failed = await view({ data: { ...responses(), [timeline(2967)]: status } });
     assert.equal(failed.origin.textContent, still);
+    assert.equal(failed.closeProof.textContent, stillClose);
     assert.equal(failed.cache.size, 0);
     assert.equal(failed.calls.length, 6);
   }
@@ -180,6 +203,7 @@ test('uses the original cached time, never reads while hidden and never retries 
   const fresh = await view({ cache, at: now + 599_999 });
   assert.equal(fresh.calls.length, 0);
   assert.equal(fresh.origin.textContent, 'Live from GitHub · read 14:34');
+  assert.equal(fresh.closeProof.textContent, stillClose);
   const stale = await view({ cache, at: now + 600_000, data: { [searchUrl]: 429 } });
   assert.equal(stale.calls.length, 1);
   assert.equal(stale.origin.textContent, fresh.origin.textContent);

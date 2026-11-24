@@ -178,6 +178,8 @@ TEAM_SNAPSHOT = f'''
     <p class="team-spec-origin" role="status">Snapshot from GitHub · <time datetime="2026-11-24T14:33:00Z">24 Nov 2026, 14:33 UTC</time></p>
   </section>
 '''
+TEAM_CLOSE_PROOF = (f'<p class="team-close-proof">Latest: <a href="{TEAM_SPEC_PR}">WizSite #183 merged · '
+                    '<time datetime="2026-11-24T13:00:20Z">24 Nov 13:00 UTC</time></a></p>')
 TEAM_STEPS = (('Connect', 'We connect OpenWiz to your repository and the coding agents you already use.'),
               ('Decide', 'You pick one small, real change and answer a few questions about it.'),
               ('Ship', 'Your agents build it, a second agent reviews it, and the pull request opens on your repository. '
@@ -1577,11 +1579,14 @@ def check_team(htmls, pages):
     items = re.findall(r'<li>([\s\S]*?)</li>', facts[1]) if facts else []
     assert tuple(plain(i) for i in items) == TEAM_FACTS, f'What you\u2019re setting up: its four true lines, in order: {TEAM_FACTS}'
     assert re.findall(r'href="([^"]*)" data-count="drivers"', facts[1]) == ['/drivers/'], 'the drivers line links to the live Drivers page, and restates no count'
-    close = re.search(r'<section class="team-part team-close wrap" aria-labelledby="team-call">\s*<h2 id="team-call">[^<]*</h2>\s*'
+    close = re.search(r'<section class="team-part team-close wrap" aria-labelledby="team-call">\s*'
+                      r'<div class="team-close-copy">\s*<h2 id="team-call">[^<]*</h2>\s*'
+                      r'(<p class="team-close-proof">[\s\S]*?</p>)\s*</div>\s*'
                       r'<a class="team-book" data-book href="[^"]*" data-count="book-call">Book a call</a>\s*</section>\s*$', main)
-    assert close, 'the page closes on its second Book a call'
-    assert len(page.links) == 5 and main.count('<button') == 1, \
-        'the team page offers two booking links, the Drivers link, the snapshot’s spec and pull request links, and the play button; nothing else'
+    assert close and close[1].split() == TEAM_CLOSE_PROOF.split(), \
+        'the page closes on its proof line and second Book a call'
+    assert len(page.links) == 6 and main.count('<button') == 1, \
+        'the team page offers two booking links, the Drivers link, the snapshot’s spec and pull request links, the close proof link, and the play button; nothing else'
 
 
 
