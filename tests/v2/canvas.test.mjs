@@ -137,7 +137,8 @@ test('Canvas: a strip item opens its sheet and marks its stack; Space spreads a 
     const text = await run.page.text();
     assert.match(text, /Reviewer · Codex, Sol 6\.1 High/);
     assert.match(text, /Builder · Claude Code, Opus 5\.5 Medium/);
-    assert.match(text, /Waits for\s+#42 Cart contract \(merged\)/);
+    assert.match(text, /Waits for\s+nothing/);
+    assert.match(text, /Done\s+#42 Cart contract \(merged\)/);
     assert.match(text, /Blocks\s+#46 Order summary \(waiting\)/);
     assert.match(text, /#114: open, changes requested, checks pass/);
     await run.page.key('Escape');
@@ -498,7 +499,7 @@ test('Canvas: Waits for lists only open blockers, says Waits for nothing when al
     await run.page.key('Enter');
     await run.page.until(`document.querySelector('.cv-focus')`, 'focused #46');
     const focus46 = await run.page.text();
-    assert.match(focus46, /Waits for\s+#43 Price the basket \(review\)/);
+    assert.match(focus46, /Waits for\s+#43 Price the basket \(in review\)/);
     assert.doesNotMatch(focus46, /Waits for[^\n]*#44/);
     assert.match(focus46, /Done\s+#44 Shipping options \(merged\)/);
     await run.page.key('Escape');

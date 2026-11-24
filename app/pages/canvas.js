@@ -27,7 +27,7 @@
 
   function ticketOf(t, spec, notes, now, home) {
     if (t.gap) {
-      return { key: t.key, number: null, title: t.title, url: t.url, state: 'unknown', gap: true, outside: true, blockers: [], blocks: [],
+      return { key: t.key, number: null, title: t.title, url: t.url, state: 'unknown', gap: true, outside: true, blockers: [], openBlockers: [], doneBlockers: [], blocks: [],
         members: [], you: false, working: false, activity: 0, lead: null };
     }
     const sub = (spec.detail?.subIssues?.nodes || []).find(issue => issue && `${issue.repository?.nameWithOwner || home}#${issue.number}` === t.key);
@@ -43,7 +43,7 @@
     if (!t.outside) members.push({ kind: 'ticket', labels });
     return {
       key: t.key, number: t.number, title: t.title, url: t.url, state: t.state, gap: false, outside: t.outside,
-      blockers: t.blockers.filter(b => !b.startsWith('gap-')), missing: t.missing || 0, blocks: [],
+      blockers: t.blockers.filter(b => !b.startsWith('gap-')), openBlockers: [], doneBlockers: [], missing: t.missing || 0, blocks: [],
       members, lead: lead ? lead.status : null,
       person: person && t.state === 'you',
       you: (t.state === 'you' && !person) || members.some(m => m.kind === 'note' && m.status === 'asking'),
@@ -56,7 +56,11 @@
     const decisions = seen.you.filter(item => item.number === spec.number && (item.kind === 'spec_confirmation' || item.kind === 'plan_approval'));
     const tickets = spec.graph ? spec.graph.tickets.map(t => ticketOf(t, spec, notes, now, home)) : [];
     const byKey = new Map(tickets.map(t => [t.key, t]));
-    for (const t of tickets) for (const b of t.blockers) byKey.get(b)?.blocks.push(t.key);
+    for (const t of tickets) {
+      t.openBlockers = t.blockers.filter(b => byKey.get(b)?.state !== 'merged');
+      t.doneBlockers = t.blockers.filter(b => byKey.get(b)?.state === 'merged');
+      for (const b of t.blockers) byKey.get(b)?.blocks.push(t.key);
+    }
     const own = tickets.filter(t => !t.outside);
     const count = state => own.filter(t => t.state === state).length;
     const said = (spec.detail?.comments?.nodes || []).filter(Boolean).map(c => Date.parse(c.updatedAt) || 0);
@@ -146,7 +150,9 @@
         h('div', { class: 'num' }, m.pr.number ? `Pull request #${m.pr.number}` : 'Pull request'),
         front ? h('h3', {}, `#${t.number} ${t.title}`) : null, h('p', { class: 'cv-step' }, m.pr.facts));
     }
-    const waits = t.blockers.length ? `Waits for ${t.blockers.map(k => `#${k.split('#').pop()}`).join(', ')}` : 'Waits for nothing';
+    const waits = t.openBlockers.length
+      ? `Waits for ${t.openBlockers.map(k => `#${k.split('#').pop()}`).join(', ')}${t.missing ? `, and ${plural(t.missing, 'ticket')} GitHub couldn't read` : ''}`
+      : (t.missing ? `Waits for ${plural(t.missing, 'ticket')} GitHub couldn't read` : 'Waits for nothing');
     const blocks = t.blocks.length ? ` · blocks ${t.blocks.map(k => `#${k.split('#').pop()}`).join(', ')}` : '';
     return h('div', { class: 'cv-card', '--c': STATES[t.state]?.colour },
       h('div', { class: 'num' }, `Ticket #${t.number}`),
@@ -517,6 +523,9 @@
       const other = sheet.tickets.find(x => x.key === k);
       return `#${k.split('#').pop()}${other ? ` ${other.title} (${STATES[other.state]?.word.toLowerCase() || 'unknown'})` : ''}`;
     }).join(', ') : 'nothing');
+    const waitsText = t.openBlockers.length
+      ? list(t.openBlockers) + (t.missing ? `, and ${plural(t.missing, 'ticket')} GitHub couldn't read` : '')
+      : (t.missing ? `${plural(t.missing, 'ticket')} GitHub couldn't read` : 'nothing');
     return h('section', { class: 'cv-focus', 'aria-label': `Ticket #${t.number}`, '--c': colourOf(t) },
       h('div', { class: 'cv-focus-head' },
         dot(colourOf(t)), h('h3', { tabindex: '-1', 'data-focus': 'focus-title' }, `#${t.number} ${t.title}`), OW.ui.pill(t.state),
@@ -532,7 +541,8 @@
           h('dt', {}, 'Spec'), h('dd', {}, `#${sheet.number} ${sheet.title}`),
           h('dt', {}, 'State'), h('dd', {}, STATES[t.state]?.word || 'Unknown'),
           h('dt', {}, 'Labels'), h('dd', {}, ticket?.labels?.length ? ticket.labels.join(', ') : 'none read'),
-          h('dt', {}, 'Waits for'), h('dd', {}, list(t.blockers) + (t.missing ? `, and ${plural(t.missing, 'ticket')} GitHub couldn't read` : '')),
+          h('dt', {}, 'Waits for'), h('dd', {}, waitsText),
+          ...(t.doneBlockers.length ? [h('dt', {}, 'Done'), h('dd', {}, list(t.doneBlockers))] : []),
           h('dt', {}, 'Blocks'), h('dd', {}, list(t.blocks)),
           h('dt', {}, 'Pull request'), h('dd', {}, pr ? `${pr.number ? `#${pr.number}: ` : ''}${pr.facts}` : 'none yet'))));
   }
