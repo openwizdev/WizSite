@@ -58,6 +58,9 @@ ICON_HASHES = {
     'brand/og.png': '4e976988aed9f9d5a37e4254165f6267aeb376d8749e05c0a280520c10df0c5a',
     'app/icon.ico': '33a21c61aa051f91475b46678bc0c4f537ab507273c088c4ed016d5ddce2b9cd',
     'app/icon-180.png': 'deb93ec39812c224c1470e2f1730f7f4ead7be3d27428a20a2a83284b77fbc2f',
+    'book/icon-192.png': 'f9af296a7d21ff8ee2dc5d970be7a6fb58d94efea7037858a0d48a357605c591',
+    'book/icon-512.png': '770dc57433761f6b9bf7bdf21fc98a77b4d485e5ede2989133d10a0d78c5814c',
+    'book/icon-maskable-512.png': '81ca8bfd708fbe574af6ccfbcec55a56c953f07ccc89fba90562171aa10b3070',
 }
 DOC_HASHES = {
     'docs/map.png': '19fc57ff3f588b36e2ca412f5656483eaf873718d0d19a39aceb83e007333e6b',
@@ -117,6 +120,15 @@ DRIVER_LOGOS = {
 }
 
 HASHED = ('tokens.css', 'site.css', GSAP, 'site.js', 'faq.js')
+BOOK_PAGE = 'book/index.html'
+BOOK_STYLE = 'book/book.css'
+BOOK_SCRIPT = 'book/book.js'
+BOOK_MANIFEST = 'book/manifest.webmanifest'
+BOOK_SW = 'book/sw.js'
+BOOK_CSP = ("default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; media-src 'self'; font-src 'self'; "
+            "connect-src 'self'; worker-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
+BOOK_PRICE = re.compile(r'[$€£]\s*\d|\b(?:price|pricing|cost|payment|pay|paid|checkout|billing|per\s+(?:month|seat|user))\b', re.I)
+BOOK_COPY = ('Book 30 minutes with Jake', '30 minutes', 'Your repo and your agent', 'A pull request ships')
 APP_PAGE = 'app/index.html'
 APP_STYLE = 'app/ember.css'
 APP_FOUND = {(folder, ext): tuple(sorted(p.relative_to(ROOT).as_posix() for p in (ROOT / folder).glob(f'*.{ext}')))
@@ -128,7 +140,7 @@ APP_NEEDED = set(APP_FOUND['app/pages', 'js'] + APP_FOUND['app/pages', 'css'])
 APP_SCRIPTS = ('app/data.js', 'app/records.js', 'app/ui.js') + APP_PARTS + ('app/palette.js', 'app/shell.js')
 APP_VENDOR = {'app/vendor/dagre-3.1.3.min.js': ('node_modules/@dagrejs/dagre/dist/dagre.min.js', 'app/pages/spec.js'),
               'app/vendor/dagre-LICENSE.txt': ('node_modules/@dagrejs/dagre/LICENSE', None)}
-HASHED += (APP_STYLE,) + APP_PART_STYLES + APP_SCRIPTS
+HASHED += (BOOK_STYLE, BOOK_SCRIPT, APP_STYLE) + APP_PART_STYLES + APP_SCRIPTS
 APP_CSP = ("default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; media-src 'self'; font-src 'self'; "
            "connect-src 'self' https://api.github.com; manifest-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
 
@@ -221,7 +233,7 @@ def with_cta(html):
 FINGERPRINTS = {name: fingerprint(name, (ROOT / name).read_bytes()) for name in HASHED}
 ASK_INDEX = 'ask-index.json'
 STATIC = {
-    'index.html', 'changelog/index.html', 'drivers/index.html', 'team/index.html', 'faq/index.html', 'market/index.html', '_headers', APP_PAGE, 'app/manifest.webmanifest',
+    'index.html', 'changelog/index.html', 'drivers/index.html', 'team/index.html', 'faq/index.html', 'market/index.html', BOOK_PAGE, BOOK_MANIFEST, BOOK_SW, '_headers', APP_PAGE, 'app/manifest.webmanifest',
     'fonts/Geist-var.woff2', 'fonts/GeistMono-var.woff2', 'fonts/OFL.txt',
 } | ART | set(ICON_HASHES) | set(VECTORS) | (set(VENDOR_HASHES) - {GSAP}) | set(APP_VENDOR) | set(DRIVER_LOGOS) | {ASK_INDEX}
 RUNTIME = STATIC | set(FINGERPRINTS.values())
@@ -246,7 +258,7 @@ FONT_HASHES = {
     'fonts/GeistMono-var.woff2': '55419aa06f58adcd7f145c6c920e56936416f17e528f60efc6032ffa4269972b',
     'fonts/OFL.txt': 'c683bfbcc7e087f5d37a54ef628f10387c451a83ddc459b151403a164ac46c90',
 }
-PAGES = ('index.html', 'changelog/index.html', 'drivers/index.html', TEAM_PAGE, FAQ_PAGE, 'market/index.html')
+PAGES = ('index.html', 'changelog/index.html', 'drivers/index.html', TEAM_PAGE, FAQ_PAGE, 'market/index.html', BOOK_PAGE)
 ALL_PAGES = PAGES + (APP_PAGE,)
 STORY_COPY = ('Build a to-do app', 'Bring any agent', 'Sign in with GitHub', 'Put the app on your phone')
 OLD_EXAMPLE = ('dark mode', 'dark-mode')
@@ -739,9 +751,10 @@ def check_site(root, registry=ROOT / 'market/registry.json'):
     assert files == STATIC | set(names.values()), 'unexpected or missing build output'
     pages = {root / f: Page((root / f).read_text()) for f in PAGES}
     drivers_html = (root / DRIVERS_PAGE).read_text()
-    for page in pages.values():
+    for path, page in pages.items():
         assert not set(page.refs) & {f'/{name}' for name in HASHED}, 'a page uses an unfingerprinted style or script'
-        assert page.stylesheets == [f'/{names["tokens.css"]}', f'/{names["site.css"]}'], 'a page must apply exactly tokens.css then site.css'
+        expected_css = [f'/{names["tokens.css"]}', f'/{names["site.css"]}', f'/{names[BOOK_STYLE]}'] if path == root / BOOK_PAGE else [f'/{names["tokens.css"]}', f'/{names["site.css"]}']
+        assert page.stylesheets == expected_css, 'a page must apply exactly its expected fingerprinted stylesheets'
     page = pages[root / 'index.html']
     assert page.scripts == [f'/{names[GSAP]}', f'/{names["site.js"]}', f'/{names["faq.js"]}'], 'load the pinned GSAP before site.js, then faq.js'
     assert not page.inline_scripts, 'landing motion must wait for both external scripts'
@@ -802,10 +815,11 @@ def check_site(root, registry=ROOT / 'market/registry.json'):
             f'the launch post link, the landing launch video\'s only: {path.relative_to(root)} has {page.launch_posts}'
         for ref in css_refs(path.read_text()):
             check_ref(root, path, ref, pages)
-    for path in root.glob('*.css'):
+    for path in list(root.glob('*.css')) + [root / names[BOOK_STYLE]]:
         for ref in css_refs(path.read_text()):
             check_ref(root, path, ref, pages)
     check_app(root, names, pages)
+    check_book(root, names, pages)
     for name in FONT_HASHES:
         data = (root / name).read_bytes()
         assert sha256(data).hexdigest() == FONT_HASHES[name], 'font or licence changed; review before updating its hash'
@@ -1807,6 +1821,60 @@ def check_app(root, names, pages):
         assert '  Referrer-Policy: no-referrer' in rule[1].splitlines(), f'_headers must give {path} no-referrer'
 
 
+def check_book(root, names, pages):
+    html = (root / BOOK_PAGE).read_text()
+    page = pages[root / BOOK_PAGE]
+    assert not page.books, 'a booking link outside the team page: /book'
+    assert page.stylesheets == [f'/{names["tokens.css"]}', f'/{names["site.css"]}', f'/{names[BOOK_STYLE]}'], \
+        'the booking page must load tokens.css, site.css and book/book.css'
+    assert page.scripts == [f'/{names[BOOK_SCRIPT]}'], 'the booking page must load only fingerprinted book/book.js'
+    assert not page.inline_scripts, 'the booking page allows no inline script'
+    assert not re.search(r'<style\b|\sstyle=', html, re.I), 'the booking page allows no inline style'
+    assert f'/{BOOK_MANIFEST}' in page.refs, 'the booking page must link its manifest'
+    manifest = json.loads((root / BOOK_MANIFEST).read_text())
+    assert manifest.get('name') == 'Book OpenWiz', 'the booking manifest must name Book OpenWiz'
+    assert manifest.get('id') == manifest.get('start_url') == manifest.get('scope') == '/book/', \
+        'the booking manifest must scope id, start_url and scope to /book/'
+    assert manifest.get('display') == 'standalone', 'the booking manifest must open standalone'
+    assert manifest.get('background_color') == '#1b1916', 'the booking manifest must use the site ground colour'
+    icons = manifest.get('icons') or []
+    sizes = {icon.get('sizes') for icon in icons if icon.get('type') == 'image/png'}
+    assert '192x192' in sizes and '512x512' in sizes, 'the booking manifest needs 192 and 512 px PNG icons'
+    assert any('maskable' in (icon.get('purpose') or '').split() for icon in icons), 'the booking manifest needs a maskable icon'
+    for icon in icons:
+        assert icon['src'].lstrip('/') in STATIC, f'booking manifest icon is not a built file: {icon["src"]}'
+    sw = (root / BOOK_SW).read_text()
+    assert "addEventListener('fetch'" in sw or 'addEventListener("fetch"' in sw, 'the booking service worker must handle fetch'
+    assert '/api/' in sw, 'the booking service worker must explicitly skip /api/'
+    assert "addEventListener('activate'" in sw or 'addEventListener("activate"' in sw, 'the booking service worker must clean old caches on activate'
+    assert '__BOOK_CACHE__' not in sw and re.search(r"book-shell-[0-9a-f]{10}", sw), \
+        'the booking service worker must stamp a build-tied cache name'
+    for script_path in (root / names[BOOK_SCRIPT], root / BOOK_SW, ROOT / 'scripts/book-check.mjs'):
+        syntax = subprocess.run(['node', '--check', str(script_path)], capture_output=True, text=True)
+        assert syntax.returncode == 0, f'booking script syntax error in {script_path.name}: {syntax.stderr.strip()}'
+    check_motion((root / names[BOOK_STYLE]).read_text())
+    main = html.split('<footer', 1)[0]
+    flat = re.sub(r'\s+', ' ', unescape(re.sub(r'<[^>]*>', ' ', main)))
+    for text in BOOK_COPY:
+        assert text in flat, f'missing booking page copy: {text}'
+    assert not BOOK_PRICE.search(flat), f'the booking page shows no price or cost words: {BOOK_PRICE.search(flat)[0]}'
+    for form in re.findall(r'<form\b[^>]*>', html, re.I):
+        action = re.search(r'\baction\s*=\s*(?:"([^"]*)"|\'([^\']*)\'|([^\s>]+))', form, re.I)
+        if action:
+            target = action[1] or action[2] or action[3] or ''
+            assert target in ('/api/book', '/api/book/cancel'), f'booking form must not post elsewhere: {target}'
+    assert 'mailto:' not in html.lower(), 'the booking page uses no mailto: fallback'
+    for other_path, other_page in pages.items():
+        if other_path != root / BOOK_PAGE:
+            assert not any(ref.rstrip('/') == '/book' for ref in other_page.refs), \
+                f'nothing links to /book yet: {other_path.relative_to(root)}'
+    headers = (root / '_headers').read_text()
+    rule = re.search(r'^/book/\*\n((?:  .*\n?)*)', headers, re.M)
+    assert rule and f'  Content-Security-Policy: {BOOK_CSP}' in rule[1].splitlines(), '_headers must give /book/* the book CSP'
+    assert '  Referrer-Policy: no-referrer' in rule[1].splitlines(), '_headers must give /book/* no-referrer'
+    assert '  X-Content-Type-Options: nosniff' in rule[1].splitlines(), '_headers must give /book/* nosniff'
+
+
 def check_art(name, data):
     assert name in ART_HASHES and sha256(data).hexdigest() == ART_HASHES[name], 'unreviewed art or recording'
     if name.endswith('.webp'):
@@ -1848,9 +1916,11 @@ def check_privacy(path, data):
 def main():
     output = ROOT / 'dist'
     check_site(output)
-    for name in RUNTIME - set(FINGERPRINTS.values()) - set(ALL_PAGES) - {ASK_INDEX}:
+    for name in RUNTIME - set(FINGERPRINTS.values()) - set(ALL_PAGES) - {ASK_INDEX, BOOK_SW}:
         source = APP_VENDOR[name][0] if name in APP_VENDOR else name
         assert (ROOT / source).read_bytes() == (output / name).read_bytes(), f'export differs: {name}'
+    book_cache = sha256(f'{FINGERPRINTS[BOOK_STYLE]}:{FINGERPRINTS[BOOK_SCRIPT]}'.encode()).hexdigest()[:10]
+    assert (ROOT / BOOK_SW).read_text().replace('__BOOK_CACHE__', book_cache) == (output / BOOK_SW).read_text(), f'export differs: {BOOK_SW}'
     assert built_fingerprints(output) == FINGERPRINTS, 'build is stale: rebuild the site'
     for name, hashed in FINGERPRINTS.items():
         assert (ROOT / name).read_bytes() == (output / hashed).read_bytes(), f'export differs: {name}'

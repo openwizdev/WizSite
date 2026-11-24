@@ -1,0 +1,8 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VEVENT
+UID:evt-bad@example.test
+DTSTART:not-a-date
+SUMMARY:Secret Event Title Do Not Leak
+END:VEVENT
+END:VCALENDAR
