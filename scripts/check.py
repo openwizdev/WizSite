@@ -1,3 +1,4 @@
+from datetime import date, datetime, timedelta, timezone
 from hashlib import sha256
 from html import escape, unescape
 from html.parser import HTMLParser
@@ -6,6 +7,7 @@ import json
 import re
 import subprocess
 from urllib.parse import unquote, urlsplit
+import font_chars
 
 ROOT = Path(__file__).resolve().parents[1]
 TODO_RUN = (
@@ -37,11 +39,11 @@ ART_HASHES = {
     'art/hero-renaissance-frames.webp': '04192a312129777ab9b4ee43ea632d04c6b725938b6feb7d134db4fcfdfd4cec',
     'art/hero-samurai-frames.webp': '3a6eef42bfd2fc6f7b8e847d4355d75c283425a274b5fb9c95c3404f580725c5',
     'art/hero-steam-frames.webp': '20f057c963be16ebc3cabbf1d2ab849e2e8144d29a3e419344a867eef2c41f3c',
-    'art/todo-spec.mp4': '52bb1fa94a154e17270f7512db19efcedae921e4769a28742bc8a36093d1c732',
+    'art/todo-spec.mp4': '3326385f658f92ec4d0cea3d8da0f1f4590f9433b2df59f4539380faeaeecc66',
     'art/todo-spec-poster.webp': '94a69b2033a98e4ae6663b61bf9f0af0ba06d5a4d4d28aa4b46247570cac5b72',
     'art/todo-spec.vtt': '47e9ffb41081dd72f541110c43312521a8dd92f1c8e58c11092ecd0daa74eee2',
     'art/todo-app.webp': 'ccc5be87687b1d4ac387cfb623033c0f567890cfe73570f8e4d4bb4b8a81de54',
-    'art/spec-video.mp4': 'feb357b9a80453d676123a31285a36c34b5873e102ed58c95728bfd6315bfe16',
+    'art/spec-video.mp4': '3422378bc03f4c8fb358f4a4c895774e7405c4ff00468acd81b4cc51dc2ac13b',
     'art/spec-poster.webp': '4922f6d265ed8c0c57dead86a62288c94d97159dda34f95969db0ee42b72fdc4',
     'art/spec-video.vtt': '570f5621ff3d84152587612d1be5d78ba5e0fbf6a7da306088a5897c755dc09d',
     'art/drivers-d-sea.webp': 'f2699bd8fe4763993a492dfac2bdbfc3eae46ec33bae0ab74127ad6ebc6a6285',
@@ -64,6 +66,21 @@ ICON_HASHES = {
 DOC_HASHES = {
     'docs/map.png': '19fc57ff3f588b36e2ca412f5656483eaf873718d0d19a39aceb83e007333e6b',
     'docs/map-phone.png': 'cdd21a74a880d3adab68ce794de1b18060d916d6df5d00ceb54eb06736cf3fd2',
+    'docs/evidence/speed/fonts/app-1280x800.png': 'db6128e1d62daf1112ca41246fd04665bcc0b3060b99192bbc66927ef6fb66cf',
+    'docs/evidence/speed/fonts/app-390x844.png': 'c7f5f4c1ef45cb111f74bce6014f79aa07eb58c54c9a4a632a55847f5863d679',
+    'docs/evidence/speed/fonts/changelog-1280x800.png': 'd88654b912dbd9c1320d6503e8ad165bf23b5a3a4c5d0d13e60586ba944735c3',
+    'docs/evidence/speed/fonts/changelog-390x844.png': '20acd59b361c99356204b94b49b866357cb63e26cf6dc81907de520a638d066f',
+    'docs/evidence/speed/fonts/crops-2x-before-after.png': '10b95c4c3a5b33891e8c8438ccf24318607844233ad3bbaf39841f247054123b',
+    'docs/evidence/speed/fonts/drivers-1280x800.png': '3c2c1e5eb13268d12a73433908899c33e8014f5224b46a0571b32f1f6b2985c5',
+    'docs/evidence/speed/fonts/drivers-390x844.png': 'b4dec2d7d53f6289f6c6b43f2acf36584d479a72b1d324a3dd772ff54c46ee42',
+    'docs/evidence/speed/fonts/faq-1280x800.png': '14eb6772be2d15c72217ab61e0354409edfc00936d1de2b7adc677971dffb958',
+    'docs/evidence/speed/fonts/faq-390x844.png': '3ba5a236de645fadb75f110ff1f49708beafcaeb9e510e2207fb719df5847150',
+    'docs/evidence/speed/fonts/index-1280x800.png': '5090def78f9ecb1e3458fec0d6ec997117e22acaa4bbfdbccb2db1916b829331',
+    'docs/evidence/speed/fonts/index-390x844.png': '0083e1e5532da23e6fdab84748e31c26eb476ab5ac0e2c293071e41c19e0d98a',
+    'docs/evidence/speed/fonts/market-1280x800.png': '0a475febc2520ebb971230a6d07a95fe991562daef853c34a3051eba5c778cd4',
+    'docs/evidence/speed/fonts/market-390x844.png': 'a183102af047c3fff12ad64437419255f0e3699e7545ca140d4c1b94f427b12e',
+    'docs/evidence/speed/fonts/team-1280x800.png': '39341122e3a7f63eb6edc82f7be689f406fad216bf23d3e5fcff0eaa9e08cafd',
+    'docs/evidence/speed/fonts/team-390x844.png': 'c1ba52e547ef48d4134271b1648bc8e67b6adf1ea6820165b90bc56e51d1267b',
 }
 VECTORS = ('favicon.svg', 'brand/openwiz-lockup.svg', 'app/mark.svg', 'app/icon.svg', 'app/wiz-reviewer.svg')
 MARK, OLD_MARK = '#cfc6b8', '#2b2bff'
@@ -118,8 +135,9 @@ DRIVER_LOGOS = {
     'drivers/logos/warp.svg': ('66dca2f684bb2250d5294e7f60b190afb7690c79a03bd6e6d4507f0da6a0d7aa', 'Warp'),
 }
 
+FONT_FILES = ('fonts/Geist-var.woff2', 'fonts/GeistMono-var.woff2')
 PAGE_STYLES = {'changelog/index.html': 'changelog/changelog.css', 'market/index.html': 'market/market.css'}
-HASHED = ('tokens.css', 'site.css', *PAGE_STYLES.values(), GSAP, 'site.js', 'faq.js')
+HASHED = FONT_FILES + ('tokens.css', 'site.css', *PAGE_STYLES.values(), GSAP, 'site.js', 'faq.js')
 APP_PAGE = 'app/index.html'
 APP_STYLE = 'app/ember.css'
 APP_FOUND = {(folder, ext): tuple(sorted(p.relative_to(ROOT).as_posix() for p in (ROOT / folder).glob(f'*.{ext}')))
@@ -148,12 +166,89 @@ SITE_HEADERS = (
 )
 APP_CSP = ("default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; media-src 'self'; font-src 'self'; "
            "connect-src 'self' https://api.github.com; manifest-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
+CACHE_HTML = 'public, max-age=0, must-revalidate'
+CACHE_IMMUTABLE = 'public, max-age=31536000, immutable'
+CACHE_MEDIA = 'public, max-age=604800, stale-while-revalidate=2592000'
 SECURITY_TXT = '.well-known/security.txt'
+SECURITY_TXT_MIN_DAYS = 60
+RFC3339 = re.compile(r'^\d{4}-\d{2}-\d{2}[Tt]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:[Zz]|[+-]\d{2}:\d{2})$')
 ROBOTS_TXT = 'robots.txt'
 
 
+def parse_headers(text):
+    rules = []
+    current = None
+    for raw in text.splitlines():
+        if not raw.strip() or raw.lstrip().startswith('#'):
+            continue
+        if raw.startswith('/'):
+            pattern = raw.strip()
+            assert pattern.count('*') <= 1, f'_headers rule may contain at most one * splat: {pattern}'
+            parts = []
+            i = 0
+            while i < len(pattern):
+                if pattern[i] == '*':
+                    parts.append('.*')
+                    i += 1
+                elif pattern[i] == ':':
+                    m = re.match(r':[A-Za-z0-9_]+', pattern[i:])
+                    assert m, f'invalid :placeholder in _headers rule: {pattern}'
+                    parts.append('[^/]+')
+                    i += len(m[0])
+                else:
+                    parts.append(re.escape(pattern[i]))
+                    i += 1
+            current = (pattern, re.compile('^' + ''.join(parts) + '$'), [])
+            rules.append(current)
+        else:
+            assert current is not None, f'header line without a path rule: {raw}'
+            line = raw.strip()
+            if line.startswith('!'):
+                current[2].append(('!', line[1:].strip().lower(), None))
+            else:
+                name, sep, value = line.partition(':')
+                assert sep, f'malformed header line: {raw}'
+                current[2].append(('+', name.strip().lower(), value.strip()))
+    return rules
+
+
+def match_headers(rules, path):
+    values = {}
+    for _, regex, entries in rules:
+        if regex.match(path):
+            for op, name, value in entries:
+                if op == '!':
+                    values.pop(name, None)
+                else:
+                    values.setdefault(name, []).append(value)
+    return values
+
+
+def expected_cache_control(rel):
+    if rel.endswith(('.css', '.js')):
+        return CACHE_IMMUTABLE
+    if rel.startswith('fonts/') and rel.endswith('.woff2'):
+        return CACHE_IMMUTABLE
+    if (rel.startswith(('art/', 'brand/', 'drivers/logos/'))
+            or rel in ('favicon.ico', 'favicon.svg', 'apple-touch-icon.png')
+            or (rel.startswith('app/') and rel.endswith(('.svg', '.png', '.ico')))
+            or rel.endswith(('.mp4', '.vtt'))):
+        return CACHE_MEDIA
+    return CACHE_HTML
+
+
 def fingerprint(name, data):
-    return re.sub(r'\.(css|js)$', rf'.{sha256(data).hexdigest()[:10]}.\1', name)
+    return re.sub(r'\.(css|js|woff2)$', rf'.{sha256(data).hexdigest()[:10]}.\1', name)
+
+
+def built_asset_bytes(name, font_names=None):
+    data = (ROOT / name).read_bytes()
+    if name.endswith('.css') and font_names:
+        text = data.decode('utf-8')
+        for font, hashed in font_names.items():
+            text = text.replace(f"'/{font}'", f"'/{hashed}'").replace(f'"/{font}"', f'"/{hashed}"')
+        return text.encode('utf-8')
+    return data
 
 
 def fingerprinted_page(html, cta=False):
@@ -234,11 +329,12 @@ def with_cta(html):
     return html.replace(TOP_BAR_END, CTA + TOP_BAR_END)
 
 
-FINGERPRINTS = {name: fingerprint(name, (ROOT / name).read_bytes()) for name in HASHED}
+FONT_FINGERPRINTS = {name: fingerprint(name, (ROOT / name).read_bytes()) for name in FONT_FILES}
+FINGERPRINTS = {name: fingerprint(name, built_asset_bytes(name, FONT_FINGERPRINTS)) for name in HASHED}
 ASK_INDEX = 'ask-index.json'
 STATIC = {
     'index.html', 'changelog/index.html', 'drivers/index.html', 'team/index.html', 'faq/index.html', 'market/index.html', '_headers', SECURITY_TXT, ROBOTS_TXT, APP_PAGE, 'app/manifest.webmanifest',
-    'fonts/Geist-var.woff2', 'fonts/GeistMono-var.woff2', 'fonts/OFL.txt',
+    'fonts/OFL.txt',
 } | ART | set(ICON_HASHES) | set(VECTORS) | (set(VENDOR_HASHES) - {GSAP}) | set(APP_VENDOR) | set(DRIVER_LOGOS) | {ASK_INDEX}
 RUNTIME = STATIC | set(FINGERPRINTS.values())
 
@@ -258,8 +354,8 @@ BANNED_COPY = ('play' 'book',)
 DENYLIST = ('closedwiz', '/users/', '/home/', 'private/evidence/',
             'docs/grills/', 'thr_', 'cr_sub_')
 FONT_HASHES = {
-    'fonts/Geist-var.woff2': '206f01ed08e05c98a51daa7472331c3c71bbb8c1f9d55ea8c70074f3c528a706',
-    'fonts/GeistMono-var.woff2': '55419aa06f58adcd7f145c6c920e56936416f17e528f60efc6032ffa4269972b',
+    'fonts/Geist-var.woff2': '048e449054f7b224ba304b13c430f8e381f5eeda7777ba4d88a5e7dafa3f4b26',
+    'fonts/GeistMono-var.woff2': '9e8aaba5adee50826485cff3187dc86d45f7dd4799a80371af0f369bbd999989',
     'fonts/OFL.txt': 'c683bfbcc7e087f5d37a54ef628f10387c451a83ddc459b151403a164ac46c90',
 }
 PAGES = ('index.html', 'changelog/index.html', 'drivers/index.html', TEAM_PAGE, FAQ_PAGE, 'market/index.html')
@@ -751,7 +847,40 @@ def check_drivers_export(built):
     assert expected == built, f'export differs: {DRIVERS_PAGE}'
 
 
-def check_site(root, registry=ROOT / 'market/registry.json'):
+def check_security_txt(text, now=None):
+    lines = text.splitlines()
+    for line in (
+        'Contact: https://github.com/openwizdev/OpenWiz/security/advisories/new',
+        'Preferred-Languages: en',
+        'Canonical: https://openwiz.dev/.well-known/security.txt',
+        'Policy: https://github.com/openwizdev/OpenWiz/security/policy',
+    ):
+        assert line in lines, f'{SECURITY_TXT} missing required line: {line}'
+    expires_lines = [line for line in lines if re.match(r'^expires:', line, re.I)]
+    assert expires_lines, f'{SECURITY_TXT} missing Expires field'
+    assert len(expires_lines) == 1, f'{SECURITY_TXT} has duplicate Expires fields'
+    assert expires_lines[0].startswith('Expires:'), f'{SECURITY_TXT} Expires field must be capitalized'
+    raw = expires_lines[0].removeprefix('Expires:').strip()
+    assert RFC3339.fullmatch(raw), f'{SECURITY_TXT} has unparsable RFC 3339 Expires: {raw!r}'
+    try:
+        expires = datetime.fromisoformat(raw).astimezone(timezone.utc)
+    except ValueError:
+        raise AssertionError(f'{SECURITY_TXT} has unparsable RFC 3339 Expires: {raw!r}')
+    if now is None:
+        today = datetime.now(timezone.utc)
+    elif type(now) is date:
+        today = datetime(now.year, now.month, now.day, tzinfo=timezone.utc)
+    elif now.tzinfo is None:
+        today = now.replace(tzinfo=timezone.utc)
+    else:
+        today = now.astimezone(timezone.utc)
+    assert expires > today, f'security.txt Expires {raw} is in the past; move it about a year out'
+    assert expires - today >= timedelta(days=SECURITY_TXT_MIN_DAYS), (
+        f'security.txt Expires {raw} is within {SECURITY_TXT_MIN_DAYS} days; move it about a year out'
+    )
+
+
+def check_site(root, registry=ROOT / 'market/registry.json', now=None):
     files = {p.relative_to(root).as_posix() for p in root.rglob('*') if p.is_file()}
     names = built_fingerprints(root)
     assert files == STATIC | set(names.values()), 'unexpected or missing build output'
@@ -827,12 +956,22 @@ def check_site(root, registry=ROOT / 'market/registry.json'):
             check_ref(root, path, ref, pages)
     check_app(root, names, pages)
     for name in FONT_HASHES:
-        data = (root / name).read_bytes()
+        data = (root / names.get(name, name)).read_bytes()
         assert sha256(data).hexdigest() == FONT_HASHES[name], 'font or licence changed; review before updating its hash'
         if name.endswith('.woff2'):
             assert data[:4] == b'wOF2', 'invalid WOFF2 signature'
         else:
             assert b'SIL OPEN FONT LICENSE' in data, 'missing OFL licence'
+    tokens_css = (root / names['tokens.css']).read_text()
+    faces = re.findall(r'@font-face\s*\{([^}]*)\}', tokens_css)
+    assert len(faces) == 2, 'tokens.css must declare exactly Geist and GeistMono @font-face rules'
+    for face in faces:
+        assert re.search(r'font-display\s*:\s*optional\b', face), 'tokens.css @font-face must keep font-display: optional'
+        assert f'unicode-range: {font_chars.UNICODE_RANGE};' in face, 'tokens.css @font-face must declare the subset unicode-range'
+    for font in FONT_FILES:
+        assert f"'/{font}'" not in tokens_css and f'"/{font}"' not in tokens_css, 'tokens.css uses an unfingerprinted font URL'
+        assert f"'/{names[font]}'" in tokens_css, f'tokens.css must reference fingerprinted {font}'
+    font_chars.check_font_chars(root, ROOT)
     headers = (root / '_headers').read_text()
     site_rule = re.search(r'^/\*\n((?:  .*\n?)*)', headers, re.M)
     assert site_rule, '_headers must define site-wide /* rules'
@@ -842,8 +981,30 @@ def check_site(root, registry=ROOT / 'market/registry.json'):
     sec_rule = re.search(r'^/\.well-known/security\.txt\n((?:  .*\n?)*)', headers, re.M)
     assert sec_rule and '  Content-Type: text/plain; charset=utf-8' in sec_rule[1].splitlines(), \
         '_headers must serve /.well-known/security.txt as text/plain; charset=utf-8'
-    for kind in ('css', 'js'):
-        assert re.search(rf'^/\*\.{kind}\n  Cache-Control: public, max-age=0, must-revalidate$', headers, re.M), f'_headers must revalidate .{kind}'
+    rules = parse_headers(headers)
+    site_header_pairs = [(h.split(':', 1)[0].strip().lower(), h.split(':', 1)[1].strip()) for h in SITE_HEADERS]
+    for file_path in sorted(p for p in root.rglob('*') if p.is_file() and p.name != '_headers'):
+        rel = file_path.relative_to(root).as_posix()
+        url_path = '/' if rel == 'index.html' else ('/' + rel[:-len('index.html')] if rel.endswith('/index.html') else '/' + rel)
+        merged = match_headers(rules, url_path)
+        want_cc = expected_cache_control(rel)
+        assert merged.get('cache-control') == [want_cc], (
+            f'_headers Cache-Control mismatch for {url_path}: got {merged.get("cache-control")}, want {[want_cc]}')
+        for name, value in site_header_pairs:
+            if url_path.startswith('/app/') and name == 'content-security-policy':
+                assert merged.get(name) == [APP_CSP], f'_headers {name} mismatch for {url_path}: {merged.get(name)}'
+            elif url_path.startswith('/app/') and name == 'referrer-policy':
+                assert merged.get(name) == ['no-referrer'], f'_headers {name} mismatch for {url_path}: {merged.get(name)}'
+            else:
+                assert merged.get(name) == [value], f'_headers {name} mismatch for {url_path}: {merged.get(name)}'
+    for unhashed in ('/site.js', '/tokens.css', '/app/shell.js', '/app/ember.css'):
+        merged = match_headers(rules, unhashed)
+        assert merged.get('cache-control') == [CACHE_HTML], (
+            f'_headers must keep unhashed {unhashed} at {CACHE_HTML}, got {merged.get("cache-control")}')
+    for media in ('/clip.mp4', '/clip.vtt'):
+        merged = match_headers(rules, media)
+        assert merged.get('cache-control') == [CACHE_MEDIA], (
+            f'_headers must cache {media} as {CACHE_MEDIA}, got {merged.get("cache-control")}')
     sec_txt = (root / SECURITY_TXT).read_text()
     for line in (
         'Contact: https://github.com/openwizdev/OpenWiz/security/advisories/new',
@@ -853,6 +1014,7 @@ def check_site(root, registry=ROOT / 'market/registry.json'):
     ):
         assert line in sec_txt.splitlines(), f'{SECURITY_TXT} missing required line: {line}'
     assert re.search(r'^Expires: \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$', sec_txt, re.M), f'{SECURITY_TXT} missing RFC 3339 Expires'
+    check_security_txt(sec_txt, now=now)
     robots = (root / ROBOTS_TXT).read_text()
     for line in ('User-agent: *', 'Allow: /', 'Disallow: /api/'):
         assert line in robots.splitlines(), f'{ROBOTS_TXT} missing required line: {line}'
@@ -1866,6 +2028,8 @@ def check_privacy(path, data):
     # PRIVACY: font binaries contain author metadata, so the fonts and legal attributions need review.
     # Every other tracked file must be UTF-8. Scan paths too; do not follow symlinks.
     font = path.removeprefix('dist/')
+    if path.startswith('dist/') and font.endswith('.woff2'):
+        font = re.sub(r'\.[0-9a-f]{10}\.woff2$', '.woff2', font)
     if font in FONT_HASHES:
         assert sha256(data).hexdigest() == FONT_HASHES[font], 'unreviewed font or licence'
     if path.endswith('.woff2'):
@@ -1897,7 +2061,7 @@ def main():
         assert (ROOT / source).read_bytes() == (output / name).read_bytes(), f'export differs: {name}'
     assert built_fingerprints(output) == FINGERPRINTS, 'build is stale: rebuild the site'
     for name, hashed in FINGERPRINTS.items():
-        assert (ROOT / name).read_bytes() == (output / hashed).read_bytes(), f'export differs: {name}'
+        assert built_asset_bytes(name, FONT_FINGERPRINTS) == (output / hashed).read_bytes(), f'export differs: {name}'
     for name in ALL_PAGES:
         built = (output / name).read_text()
         if name == 'changelog/index.html':

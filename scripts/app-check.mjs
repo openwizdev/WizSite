@@ -557,7 +557,7 @@ async function main() {
       const page = await open(browser, world);
       await signIn(page, world);
       await page.click('acme/factory');
-      await page.until(`/GitHub.s limit is low/.test(document.body.innerText)`, 'the low-limit notice');
+      await page.until(`/GitHub.s hourly read limit for your account is nearly used up/.test(document.body.innerText)`, 'the low-limit notice');
       assert(/paused until/i.test(await page.text()), 'the notice does not say when reads resume');
       if (process.env.SHOTS) await page.shot(join(process.env.SHOTS, 'low-limit-phone.png'), 390, 844, true);
       await settle(page);
@@ -623,13 +623,13 @@ async function main() {
       const page = await ap6Open(world);
       await page.until(`document.querySelectorAll('main .cards a.card').length >= 6`, 'the You items');
       const tiles = await page.run(`[...document.querySelectorAll('main .tile')].map(t => t.querySelector('.k').textContent + '=' + t.querySelector('.v').textContent)`);
-      assert(JSON.stringify(tiles) === JSON.stringify(['Needs you=4', 'Building=1', 'In review=1', 'Merged=3']), `tiles: ${JSON.stringify(tiles)}`);
+      assert(JSON.stringify(tiles) === JSON.stringify(['Needs you=3', 'Building=1', 'In review=1', 'Merged=3']), `tiles: ${JSON.stringify(tiles)}`);
       const items = await youItems(page);
-      const want = ['Ticket marked for you 46', 'Spec to confirm 60#issuecomment-9001', 'Plan to approve 50#issuecomment-9003',
-        'A decision record that couldn\'t be read 50#issuecomment-9005', 'Ticket marked for you 48', 'A decision record that couldn\'t be read 50#issuecomment-9006'];
+      const want = ['Waiting on your answer 46', 'Spec to confirm 60#issuecomment-9001', 'Plan to approve 50#issuecomment-9003',
+        'A decision record that couldn\'t be read 50#issuecomment-9005', 'A decision record that couldn\'t be read 50#issuecomment-9006', 'A task for a person 48'];
       assert(JSON.stringify(items) === JSON.stringify(want), `You items: ${JSON.stringify(items)}`);
       const badge = await page.run(`document.querySelector('nav.main a[href="#/you"] .badge').textContent`);
-      assert(badge === '4', `the You badge is ${badge}`);
+      assert(badge === '3', `the You badge is ${badge}`);
       if (process.env.SHOTS) {
         await page.shot(join(process.env.SHOTS, 'you-laptop.png'), 1440, 900, false);
         await page.shot(join(process.env.SHOTS, 'you-phone.png'), 390, 844, true);
@@ -741,7 +741,7 @@ async function main() {
       await page.until(`[...document.querySelectorAll('main .tile .v')].some(v => /\\d/.test(v.textContent))`, 'the counts');
       await settle(page, 600);
       const tiles = await tileValues(page);
-      assert(JSON.stringify(tiles) === JSON.stringify(['Needs you=4', 'Building=1', 'In review=1', 'Merged=3']), `tiles: ${JSON.stringify(tiles)}`);
+      assert(JSON.stringify(tiles) === JSON.stringify(['Needs you=3', 'Building=1', 'In review=1', 'Merged=3']), `tiles: ${JSON.stringify(tiles)}`);
       assert(world.searched.length > 0, 'the specs were not searched for');
       await page.go(`${SITE}/app/#/specs`);
       await page.until(`document.querySelectorAll('main a.card').length >= 3`, 'the spec cards');
@@ -796,11 +796,11 @@ async function main() {
       await settle(page, 600);
       const items = await youItems(page);
       const unreadable = id => `A decision record that couldn't be read 50#issuecomment-${id}`;
-      const want = ['Ticket marked for you 46', 'Spec to confirm 60#issuecomment-9001', 'Plan to approve 50#issuecomment-9003',
-        unreadable(9005), 'Ticket marked for you 48', unreadable(9006), unreadable(9019), unreadable(9018), unreadable(9017), unreadable(9016)];
+      const want = ['Waiting on your answer 46', 'Spec to confirm 60#issuecomment-9001', 'Plan to approve 50#issuecomment-9003',
+        unreadable(9005), unreadable(9006), unreadable(9019), unreadable(9018), unreadable(9017), unreadable(9016), 'A task for a person 48'];
       assert(JSON.stringify(items) === JSON.stringify(want), `You items: ${JSON.stringify(items)}`);
       const badge = await page.run(`document.querySelector('nav.main a[href="#/you"] .badge')?.textContent`);
-      assert(badge === '4', `the You badge is ${badge}`);
+      assert(badge === '3', `the You badge is ${badge}`);
       await page.go(`${SITE}/app/#/specs`);
       await page.until(`document.querySelectorAll('main a.card').length === 3`, 'the spec cards');
       checkRequestLog(world);
@@ -1306,23 +1306,24 @@ async function main() {
       await page.close();
     });
 
-    await check('AP22 You: a ready-for-human ticket with an open blocker is later: not counted, listed under Later', async () => {
+    await check('AP22 You: ready-for-human tickets are tasks for a person: never counted as needing you, listed under their own heading', async () => {
       const ticket = (number, blockedBy) => ({ number, title: `Synthetic live check ${number}`, url: `https://github.com/acme/factory/issues/${number}`,
         updatedAt: '2030-01-06T00:00:00Z', labels: { nodes: [{ name: 'ready-for-human' }] }, issueDependenciesSummary: { blockedBy } });
       const world = ap6World({ specs: repository => {
-        repository.youIssues.nodes.push(ticket(90, 0), ticket(91, 2));
-        repository.youIssues.totalCount += 2;
+        repository.peopleIssues.nodes.push(ticket(90, 0), ticket(91, 2));
+        repository.peopleIssues.totalCount += 2;
       } });
       const page = await ap6Open(world);
       await page.until(`document.querySelectorAll('main .cards a.card').length >= 8`, 'the You items');
       const tiles = await page.run(`[...document.querySelectorAll('main .tile')].map(t => t.querySelector('.k').textContent + '=' + t.querySelector('.v').textContent)`);
-      assert(tiles[0] === 'Needs you=5', `Needs you counts a later ticket: ${JSON.stringify(tiles)}`);
+      assert(tiles[0] === 'Needs you=3', `Needs you counts a task for a person: ${JSON.stringify(tiles)}`);
       const badge = await page.run(`document.querySelector('nav.main a[href="#/you"] .badge').textContent`);
-      assert(badge === '5', `the You badge is ${badge}`);
+      assert(badge === '3', `the You badge is ${badge}`);
       const groups = await page.run(`[...document.querySelectorAll('main .cards')].map(g => [g.previousElementSibling?.tagName === 'H2' ? g.previousElementSibling.textContent : '',
         [...g.querySelectorAll('a.card')].map(a => a.getAttribute('href').split('/').pop())])`);
-      assert(groups.length === 2 && groups[1][0] === 'Later' && JSON.stringify(groups[1][1]) === '["91"]' && groups[0][1].includes('90') && !groups[0][1].includes('91'),
-        `due now and later: ${JSON.stringify(groups)}`);
+      const people = groups.find(g => g[0].startsWith('Tasks for a person'));
+      assert(people && people[0] === 'Tasks for a person · 3' && JSON.stringify(people[1]) === '["90","48","91"]' && !groups[0][1].some(n => ['48', '90', '91'].includes(n)),
+        `needs you and tasks for a person: ${JSON.stringify(groups)}`);
       checkRequestLog(world);
       await page.close();
     });
@@ -1432,7 +1433,7 @@ async function main() {
       const page = await open(browser, world);
       await signIn(page, world);
       await page.click('acme/factory');
-      await page.until(`/GitHub.s limit is low/.test(document.body.innerText)`, 'the low-limit notice');
+      await page.until(`/GitHub.s hourly read limit for your account is nearly used up/.test(document.body.innerText)`, 'the low-limit notice');
       const before = graphqlCount(world);
       await page.click('acme/factory');
       await page.until(`[...document.querySelectorAll('button')].some(b => b.textContent.trim() === 'acme/site')`, 'the picker');
@@ -1440,7 +1441,7 @@ async function main() {
       await page.until(`document.querySelector('h1') && document.querySelector('h1').textContent.trim() === 'You' && document.body.innerText.includes('acme/site')`, 'the shell on acme/site');
       await page.run(`new Promise(resolve => setTimeout(resolve, 400))`);
       assert(graphqlCount(world) === before, `changing repository read GitHub's GraphQL while paused (${graphqlCount(world) - before} more)`);
-      assert(/GitHub.s limit is low/.test(await page.text()), 'the back-off notice is gone after changing repository');
+      assert(/GitHub.s hourly read limit for your account is nearly used up/.test(await page.text()), 'the back-off notice is gone after changing repository');
       checkRequestLog(world);
       await page.close();
     });
