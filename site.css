@@ -105,9 +105,13 @@ code,.v{font-family:var(--ow-font-mono)}
 .install-version { margin-bottom: 6px; color: var(--ink); font: 650 15px var(--ow-font-sans); }
 .install-version small { margin-left: 6px; color: var(--grey); font: 400 12px var(--ow-font-mono); }
 .install-box[data-install="coming-soon"] .install-version { display: none; }
-.install-note, .install-prereqs { max-width: 46ch; margin-top: 8px; color: var(--grey2); font-size: 13px; }
-.install-note a, .install-prereqs a { color: var(--ink); text-decoration: underline; text-underline-offset: 2px; }
-.install-box[data-install="coming-soon"] .install-note, .install-box[data-install="coming-soon"] .install-prereqs { display: none; }
+.install-new, .install-help, .install-note { max-width: 46ch; margin-top: 8px; color: var(--grey2); font-size: 13px; }
+.install-new a, .install-help a, .install-note a { color: var(--ink); text-decoration: underline; text-underline-offset: 2px; }
+.install-note summary { width: fit-content; color: var(--grey2); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; list-style: none; }
+.install-note summary::-webkit-details-marker { display: none; }
+.install-note summary:hover { color: var(--ink); }
+.install-note p { margin-top: 6px; }
+.install-box[data-install="coming-soon"] :is(.install-new, .install-help, .install-note) { display: none; }
 .install-row { display: flex; align-items: center; gap: 12px; padding: 5px 6px 5px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); color: var(--grey); font: 13px var(--ow-font-mono); }
 .install-line { min-width: 0; overflow-wrap: anywhere; color: #e1d7cb; font: inherit; user-select: all; }
 .install-box[data-install="coming-soon"] .install-line { color: var(--grey); }
