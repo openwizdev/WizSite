@@ -3,8 +3,6 @@ import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import { SITE, signIn, start } from './browser.mjs';
 
-// A synthetic factory: three specs, one with a six-ticket plan graph and agents at every stage. Every name, number
-// and step is invented. Note times are set relative to now, so live notes stay live.
 const RATE = { limit: 5000, remaining: 4800, resetAt: '2099-01-01T00:00:00Z' };
 const FLEET = '# Fleet\n\n## GitHub identity\n\n| What | Who |\n| --- | --- |\n| Record authors | `factory-bot[bot]` |\n';
 const BOT = { login: 'factory-bot[bot]' };

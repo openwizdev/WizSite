@@ -261,8 +261,6 @@
         issues: Object.values(specs.data?.specs || {}).flatMap(spec => spec?.subIssues?.nodes || []) },
     ].sort((a, b) => a.at - b.at);
   }
-  // Every ticket's notes from both reads, the newer edit of each comment winning; the issue is the agents read's when
-  // it has one, since only that read carries each pull request's checks.
   function notes(now = Date.now()) {
     const home = OW.data.repo.get()?.full;
     const reads = readsNow();

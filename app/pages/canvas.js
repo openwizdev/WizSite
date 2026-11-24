@@ -19,11 +19,6 @@
     return min < 1 ? 'just now' : min < 60 ? `${min} min ago` : min < 48 * 60 ? `${Math.floor(min / 60)} h ago` : `${Math.floor(min / 1440)} days ago`;
   };
   const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
-
-  // ---------------------------------------------------------------------------------------------------------------
-  // The model: what the board draws, from the two reads the app already makes. It reads no network and no clock
-  // (`now` is given), so its cases are tested on synthetic answers. Unknown stays unknown: nothing becomes zero.
-  // ---------------------------------------------------------------------------------------------------------------
   const RANK = row => (row.unknown ? 3 : row.holds ? (row.note.state === 'asking' ? 0 : 1) : row.live ? 2 : 4);
   function rowsOf(entry, now) {
     return (entry?.notes || []).filter(r => r.unknown || r.holds || r.live || now - r.at < DAY)
@@ -108,10 +103,6 @@
     inbox.sort((a, b) => b.at - a.at);
     return { sheets, inbox, gaps: seen.gaps.slice(), partial: seen.partialSpecs };
   }
-
-  // ---------------------------------------------------------------------------------------------------------------
-  // The page.
-  // ---------------------------------------------------------------------------------------------------------------
   const view = { sheet: null, cams: new Map(), mode: 'board', focus: null, spread: null, query: '', quietOpen: false, over: 0, aim: null, inboxAll: false };
   let last = null;
   let shown = null;
@@ -200,7 +191,6 @@
     rerender();
   }
 
-  // The camera: one transform on the world; nothing moves unless you move it.
   function camOf(number) { return view.cams.get(number); }
   function apply(board) {
     const cam = camOf(board.sheet.number);

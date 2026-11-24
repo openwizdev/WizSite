@@ -1,4 +1,3 @@
-/* Canvas: every open spec as a sheet, every ticket as a stack. Ember allows no motion, so every change is instant. */
 .cv { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 .cv-head { display: flex; gap: 12px; align-items: stretch; min-width: 0; }
 .cv-inbox {
@@ -104,7 +103,6 @@
 .cv-stack.you.flash .cv-front .cv-card { box-shadow: 0 0 0 2.5px var(--em-amber), 0 0 0 7px color-mix(in srgb, var(--em-amber) 22%, transparent); }
 .cv-tile { display: none; }
 
-/* Zoomed out: each stack is one quiet line, coloured by what its agent is doing. */
 .cv-board.far .cv-front, .cv-board.far .cv-behind, .cv-board.far .cv-count { display: none; }
 .cv-board.far .cv-tile {
   display: flex; align-items: center; gap: 12px; height: 128px; padding: 0 22px; border-radius: 16px; font-size: 26px; line-height: 1.25; color: var(--em-text-2);
@@ -118,7 +116,6 @@
 .cv-empty { min-height: 200px; }
 .cv-calm { color: var(--em-muted); font-size: 15px; margin: 0; }
 
-/* Focus: one ticket fills the stage. */
 .cv-focus { border-radius: var(--em-radius); background: var(--em-card); border: 1px solid var(--em-line); overflow: hidden; }
 .cv-focus-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--em-line); }
 .cv-focus-head h3:focus:not(:focus-visible), .cv-focus-head h3[tabindex='-1']:focus { outline: none; }
@@ -133,7 +130,6 @@
 .cv-facts dt { font: 400 13px/1.6 var(--em-mono); color: var(--em-muted); }
 .cv-facts dd { margin: 0; color: var(--em-text); overflow-wrap: anywhere; }
 
-/* The sheets overview: the open sheet faces you, the rest fold away above and below it. */
 .cv-over { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 18px 12px 14px; border-radius: var(--em-radius); border: 1px solid var(--em-line); background: #1a1815; outline: none; }
 .cv-acc { width: min(720px, 100%); display: flex; flex-direction: column; perspective: 1200px; }
 .cv-slat, .cv-open {
