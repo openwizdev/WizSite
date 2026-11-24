@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-"""Scan WizSite pages, CSS content:, JS strings, changelog and market data for characters."""
 from html.parser import HTMLParser
 import json
 from pathlib import Path
@@ -8,9 +7,6 @@ import sys
 
 ROOT = Path(__file__).resolve().parent.parent
 
-# Unicode blocks kept in fonts/Geist-var.woff2 and fonts/GeistMono-var.woff2:
-# Basic Latin, Latin-1 Supplement, Latin Extended-A, General Punctuation, Currency Symbols, Arrows,
-# plus U+2212 (MINUS SIGN, used in app/pages/canvas.js).
 SUBSET_RANGES = (
     (0x0020, 0x007E),
     (0x00A0, 0x00FF),
@@ -24,9 +20,6 @@ SUBSET_CODEPOINTS = frozenset(cp for lo, hi in SUBSET_RANGES for cp in range(lo,
 UNICODE_RANGE = ', '.join(f'U+{lo:04X}' if lo == hi else f'U+{lo:04X}-{hi:04X}' for lo, hi in SUBSET_RANGES)
 PYFTSUBSET_UNICODES = ','.join(f'U+{lo:04X}' if lo == hi else f'U+{lo:04X}-{hi:04X}' for lo, hi in SUBSET_RANGES)
 
-# Symbols absent from upstream Geist/GeistMono that intentionally fall back to the system font
-# via unicode-range (disclosure triangles in site.css, macOS Command key in app/palette.js,
-# and the emoji arrow parsed in app/records.js).
 SYSTEM_FALLBACK_CHARS = frozenset({'\u2318', '\u25b4', '\u25be', '\u27a1', '\ufe0f'})
 
 HTML_PAGES = (
@@ -92,7 +85,6 @@ def _decode_js_escapes(s):
 
 
 def extract_js_strings(text):
-    # Match single-quoted, double-quoted, and template literals while skipping line/block comments.
     pattern = re.compile(
         r'//[^\n]*|/\*[\s\S]*?\*/'
         r'|\'((?:\\.|[^\'\\\n])*)\''
