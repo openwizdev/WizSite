@@ -130,8 +130,9 @@ APP_SCRIPTS = ('app/data.js', 'app/records.js', 'app/ui.js') + APP_PARTS + ('app
 APP_VENDOR = {'app/vendor/dagre-3.1.3.min.js': ('node_modules/@dagrejs/dagre/dist/dagre.min.js', 'app/pages/spec.js'),
               'app/vendor/dagre-LICENSE.txt': ('node_modules/@dagrejs/dagre/LICENSE', None)}
 HASHED += (APP_STYLE,) + APP_PART_STYLES + APP_SCRIPTS
-SITE_CSP = ("default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; media-src 'self'; "
-            "font-src 'self'; connect-src 'self' https://api.github.com; frame-src 'none'; object-src 'none'; "
+SITE_CSP = ("default-src 'self'; script-src 'self' https://static.cloudflareinsights.com; style-src 'self'; "
+            "img-src 'self' data:; media-src 'self'; font-src 'self'; "
+            "connect-src 'self' https://api.github.com https://cloudflareinsights.com; frame-src 'none'; object-src 'none'; "
             "base-uri 'none'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests")
 SITE_HEADERS = (
     'Strict-Transport-Security: max-age=31536000',
