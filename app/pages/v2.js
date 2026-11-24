@@ -234,6 +234,19 @@
       groups, h('div', { class: 'v2-grill-foot' }, message.answered ? saved : submit));
   }
 
+  const chatLayout = (scroll, composer, summary) => h('div', { class: 'v2-chat-layout' },
+    h('div', { class: 'v2-chat-wrap' }, scroll, h('div', { class: 'v2-composer-wrap' }, composer)),
+    summary);
+  const chatSummary = () => h('aside', { class: 'v2-chat-summary', 'aria-label': 'In progress' });
+
+  function renderChatSummary(summary, title, detail, showFeed) {
+    summary.replaceChildren(
+      h('h2', { class: 'v2-label' }, 'In progress'),
+      h('p', { class: 'v2-summary-title' }, title),
+      h('p', {}, detail),
+      showFeed ? h('a', { class: 'v2-queue-link', href: '#/feed' }, 'Open Feed', icon('right')) : null);
+  }
+
   function renderDemoChat(el) {
     if (!chatView || !el.contains(chatView.scroll)) {
       const scroll = h('div', { class: 'v2-chat-scroll', role: 'log', 'aria-live': 'polite', 'aria-relevant': 'additions' });
@@ -255,11 +268,15 @@
         submitChatPrompt(text);
         input.focus({ preventScroll: true });
       } }, input, h('button', { type: 'submit', class: 'v2-send-btn', 'aria-label': 'Send message' }, icon('up')));
-      el.replaceChildren(h('div', { class: 'v2-chat-wrap' }, scroll, h('div', { class: 'v2-composer-wrap' }, composer)));
-      chatView = { scroll, thread, length: 0 };
+      const summary = chatSummary();
+      el.replaceChildren(chatLayout(scroll, composer, summary));
+      chatView = { scroll, thread, summary, length: 0 };
     }
-    const { scroll, thread, length } = chatView;
+    const { scroll, thread, summary, length } = chatView;
     if (length === demo.messages.length) return;
+    const round = demo.messages.findLast(message => message.role === 'grill');
+    renderChatSummary(summary, round.specTitle,
+      round.answered ? 'Spec in progress' : 'Waiting for your answers', round.answered);
     const top = scroll.scrollTop;
     thread.append(...demo.messages.slice(length).map(message => {
       if (message.role === 'grill') return h('div', { class: 'v2-msg questions' }, renderQuestions(message));
@@ -279,17 +296,29 @@
     } else scroll.scrollTop = top;
   }
 
-  function renderLiveChat(el) {
-    if (el.querySelector('.v2-chat-empty')) return;
-    const input = h('input', { type: 'text', disabled: true, placeholder: 'Chat is coming soon', 'aria-label': 'Chat composer' });
-    const send = h('button', { type: 'button', class: 'v2-send-btn', disabled: true, 'aria-label': 'Send message' }, icon('up'));
-    el.replaceChildren(h('div', { class: 'v2-chat-wrap' },
-      h('div', { class: 'v2-chat-scroll' },
+  function renderLiveChat(el, feeds) {
+    let summary = el.querySelector('.v2-chat-summary');
+    if (!summary) {
+      summary = chatSummary();
+      const input = h('input', { type: 'text', disabled: true, placeholder: 'Chat is coming soon', 'aria-label': 'Chat composer' });
+      const send = h('button', { type: 'button', class: 'v2-send-btn', disabled: true, 'aria-label': 'Send message' }, icon('up'));
+      const scroll = h('div', { class: 'v2-chat-scroll' },
         h('div', { class: 'v2-chat-empty' },
           h('h2', {}, 'Chat is coming soon'),
           h('p', {}, 'Review specs and questions from your repository in Feed.'),
-          h('a', { class: 'v2-btn primary', href: '#/feed' }, 'Open Feed', icon('right')))),
-      h('div', { class: 'v2-composer-wrap' }, h('div', { class: 'v2-composer' }, input, send))));
+          h('a', { class: 'v2-btn primary', href: '#/feed' }, 'Open Feed', icon('right'))));
+      el.replaceChildren(chatLayout(scroll, h('div', { class: 'v2-composer' }, input, send), summary));
+    }
+    const spec = feeds.specs.data?.specIssues?.nodes?.find(issue => {
+      const progress = issue?.subIssuesSummary;
+      return Number.isInteger(progress?.completed) && progress.completed < progress.total;
+    });
+    if (spec) {
+      const { completed, total } = spec.subIssuesSummary;
+      renderChatSummary(summary, spec.title, `${completed} of ${total} tickets complete`, false);
+    } else {
+      summary.replaceChildren();
+    }
   }
 
   function pendingDemoCards() {
@@ -339,17 +368,14 @@
         h('progress', { value: merged, max: total, 'aria-label': `Tickets complete for ${title}` })))));
   }
 
-  function nextPreview(card, go) {
-    if (!card) return null;
-    const href = cardHref(card);
-    return h('a', { class: 'v2-next-preview', href, onclick: event => {
+  function nextPreview(card, href, go) {
+    return h('a', { class: 'v2-next-preview', href, 'data-focus': 'feed-next', onclick: event => {
       if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
       event.preventDefault();
-      go(href);
+      go();
     } },
-      h('span', { class: 'v2-label' }, 'Next'),
+      h('span', { class: 'v2-label' }, 'Next '),
       h('span', { class: 'v2-next-title' }, card.title),
-      h('span', { class: 'v2-next-task' }, card.type === 'decision' ? 'Decision' : 'Review'),
       icon('right'));
   }
 
@@ -410,13 +436,11 @@
         focusCard();
       });
     };
-    const details = decision
-      ? h('h3', { class: 'v2-recommendation' }, h('span', {}, 'Recommended:'), ' ', card.rec)
-      : h('div', { class: 'v2-progress-box' },
+    const details = decision ? null : h('div', { class: 'v2-progress-box' },
         h('p', {}, h('strong', {}, `${card.merged} of ${card.total}`), ' tickets merged'),
         h('div', { class: 'v2-pips', 'aria-hidden': 'true' },
           Array.from({ length: card.total }, (_, i) => h('span', { class: i < card.merged ? 'merged' : '' }))));
-    const hero = h('article', { class: 'v2-hero-card' },
+    const hero = h('article', { class: `v2-hero-card${decision ? ' v2-decision-card' : ''}` },
       h('div', { class: 'v2-card-top' },
         h('span', { class: 'v2-label' }, decision ? 'Needs you' : 'Ready to ship'),
         h('h2', { class: 'v2-card-title', tabindex: '-1' }, card.title),
@@ -424,7 +448,9 @@
       decision ? null : specPreview(card),
       details,
       h('div', { class: 'v2-card-actions' },
+        decision ? h('span', { class: 'v2-label v2-rec-tag', id: 'v2-rec-tag' }, 'Recommended') : null,
         h('button', { type: 'button', class: 'v2-btn primary', 'data-focus': 'ship',
+          'aria-describedby': decision ? 'v2-rec-tag' : null,
           onclick: () => resolve(decision ? 'decided' : 'shipped', `${decision ? 'Approved' : 'Shipped'} “${card.title}”`) }, icon('check'), decision ? card.rec : 'Ship it'),
         h('button', { type: 'button', class: 'v2-btn v2-change', 'data-focus': 'change',
           onclick: event => openSheet(card, event.currentTarget, undoChange => resolve('changing', 'Change sent', decision
@@ -433,8 +459,9 @@
           onclick: () => resolve('deferred', `Saved “${card.title}” for later`) }, 'Not now')));
     const navigation = pager(index, list.length, i => go(cardHref(list[i])));
     controls.replaceChildren(...(navigation ? [navigation] : []));
-    el.replaceChildren(h('div', { class: 'v2-feed-stage' },
-      hero, nextPreview(next, href => { go(href); focusCard(); }), buildingSection(demo.building)));
+    const preview = next && nextPreview(next, cardHref(next), () => { go(cardHref(next)); focusCard(); });
+    el.replaceChildren(h('div', { class: 'v2-feed-stage' }, hero,
+      h('aside', { class: 'v2-feed-context', 'aria-label': 'More from Feed' }, preview, buildingSection(demo.building))));
   }
 
   const settingRow = (label, value) => h('div', { class: 'v2-set-row' }, h('span', {}, label), value);
@@ -498,8 +525,8 @@
       note ? h('div', { class: 'notice bad', role: 'alert' }, icon('warn'), h('span', {}, note)) : null,
       h('a', { class: 'v2-btn primary', href: demoMode ? '#/chat' : '/api/sign-in/start' },
         demoMode ? 'Open Harbor workspace' : 'Continue with GitHub', icon('right')),
-      h('a', { class: 'v2-btn subtle v2-welcome-sample', href: demoMode ? '/app/' : '/app/?demo=1#/chat' },
-        demoMode ? 'Exit sample workspace' : 'See a sample factory'));
+      h('a', { class: 'v2-btn subtle v2-welcome-sample', href: demoMode ? '/api/sign-in/start' : '/app/?demo=1#/chat' },
+        demoMode ? 'Continue with GitHub' : 'See a sample factory'));
     card.prepend(h('header', { class: 'v2-welcome-head' },
       h('div', { class: 'v2-welcome-brand' }, mark(), h('span', {}, 'OpenWiz')),
       demoMode ? h('span', { class: 'v2-sample-tag' }, 'Sample data') : null));
@@ -511,6 +538,7 @@
     setRedraw: fn => { redraw = fn; },
     renderWelcome,
     allClear,
+    nextPreview,
     dismissToast: () => dismissToast?.(),
     pager,
     pages(ctx) {
@@ -520,9 +548,9 @@
           title: 'Chat',
           icon: 'chat',
           feeds: [],
-          render(el) {
+          render(el, feeds) {
             if (isDemo) OW.factory.redraw(el, () => renderDemoChat(el));
-            else renderLiveChat(el);
+            else renderLiveChat(el, feeds);
           },
         },
         {

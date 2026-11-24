@@ -319,7 +319,7 @@
 
   function draw(el) {
     const { deck } = state;
-    const { allClear, pager } = OW.v2 ?? {};
+    const { allClear, nextPreview, pager } = OW.v2 ?? {};
     const unknown = deck.specs.state === 'unknown';
     const stale = state.failedSince !== null;
     const result = unknown ? null : view();
@@ -367,6 +367,25 @@
     deck.activeKey = items[index]?.key;
     deck.keys = items.map(item => item.key);
     const position = `${index}/${items.length}`;
+    const next = deck.controls && items[index + 1];
+    if (deck.position !== position || deck.nextKey !== next?.key || deck.nextTitle !== next?.title) {
+      deck.nextKey = next?.key;
+      deck.nextTitle = next?.title;
+      const href = `#/feed/${index + 2}`;
+      const preview = next && nextPreview?.(next, href, () => {
+        history.replaceState(null, '', href);
+        deck.arg = String(index + 2);
+        deck.activeKey = next.key;
+        el.closest('.v2-view').scrollTop = 0;
+        updateDeck(el);
+        const heading = deck.cards.querySelector('.queue-item:not([hidden]) :is(h2, h3)');
+        if (heading) {
+          heading.tabIndex = -1;
+          heading.focus({ preventScroll: true });
+        }
+      });
+      deck.context.replaceChildren(...(preview ? [preview] : []));
+    }
     if (deck.position !== position) {
       const go = next => {
         deck.activeKey = deck.keys[next];
@@ -402,8 +421,9 @@
       if (!el.contains(state.deck?.cards)) {
         const status = h('div', { class: 'v2-queue-status' });
         const cards = h('div', { class: 'queue' });
-        el.replaceChildren(h('div', { class: 'v2-live-feed' }, status, cards));
-        state.deck = { status, controls, cards, arg, onCount };
+        const context = h('aside', { class: 'v2-feed-context', 'aria-label': 'More from Feed' });
+        el.replaceChildren(h('div', { class: 'v2-live-feed' }, status, cards, context));
+        state.deck = { status, controls, cards, context, arg, onCount };
       } else if (state.deck.arg !== arg) {
         state.deck.arg = arg;
         state.deck.activeKey = null;
