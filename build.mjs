@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import { installSwitch, readReleases, render, summary, withReleases } from './scripts/changelog.mjs';
 import { readRegistry, render as renderMarket, summary as marketSummary, withMarket } from './scripts/market.mjs';
 import { withDrivers } from './scripts/drivers.mjs';
-import { aboutPage, crawlerFiles, pages, withMetadata } from './scripts/discovery.mjs';
+import { aboutPage, crawlerFiles, guidePage, pages, withMetadata } from './scripts/discovery.mjs';
 
 const root = new URL('./', import.meta.url);
 const output = new URL('dist/', root);
@@ -54,12 +54,13 @@ for (const file of hashed) {
   names[file] = file.replace(/\.(css|js)$/, `.${hash}.$1`);
   await put(names[file], data);
 }
-let about;
+let about, guide;
 for (const page of Object.keys(pages)) {
   let html = await readFile(new URL(page, root), 'utf8');
-  if (page === aboutPage || page === '404.html') {
+  if (page === aboutPage || page === guidePage || page === '404.html') {
     html = html.replace('<template data-slot="top-bar"></template>', () => topBar);
   }
+  if (page === guidePage) guide = html;
   if (page === aboutPage) {
     html = html.replace('<template data-slot="install-instructions"></template>', `<p>${install}</p>`);
     about = html;
@@ -72,7 +73,7 @@ for (const page of Object.keys(pages)) {
   if (page === 'drivers/index.html') html = withDrivers(html, registry);
   await put(page, html);
 }
-const discovery = crawlerFiles(about, faq);
+const discovery = crawlerFiles(about, faq, guide);
 for (const [file, data] of Object.entries(discovery)) await put(file, data);
 await put('ask-index.json', await (await import('./scripts/ask-index.mjs')).snapshotIndex(output, new URL('ask-docs/', root)));
 for (const [file, source] of Object.entries(npmVendor)) await put(file, await readFile(new URL(source, root)));

@@ -658,5 +658,7 @@ body.landing > main { flex: 1 0 auto; }
 .plain-page h1{font-size:clamp(36px,5vw,64px);line-height:1.05}
 .plain-page h2{margin-top:1.5em}
 .plain-page p{margin-top:.75em}
+.plain-page ul,.plain-page ol{margin-top:.75em}
+.plain-page li+li{margin-top:.5em}
 .plain-page a,.about-link a{text-decoration:underline;text-underline-offset:.2em}
 .about-link{margin-block:1rem 2rem}

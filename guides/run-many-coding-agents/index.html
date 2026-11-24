@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><template data-slot="page-metadata"></template><link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48"><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><meta property="og:image" content="https://openwiz.dev/brand/og.png?v=2"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="OpenWiz"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="https://openwiz.dev/brand/og.png?v=2"><link rel="preload" href="/fonts/Geist-var.woff2" as="font" type="font/woff2" crossorigin><link rel="stylesheet" href="/tokens.css"><link rel="stylesheet" href="/site.css"><script src="/vendor/gsap-3.15.1.min.js" defer></script><script src="/site.js" defer></script></head>
+<body class="landing">
+<a class="skip" href="#main">Skip to content</a>
+<template data-slot="top-bar"></template>
+<main id="main" class="wrap plain-page">
+  <h1>How to run many coding agents at once</h1>
+  <p>An agent factory is a system that turns a plan you approve into merged code: each small ticket goes to its own AI coding agent, and another agent reviews the work before it merges. A fleet of coding agents is the group of builder and reviewer agents, such as Claude Code or Codex, that an agent factory runs at the same time, each on its own branch.</p>
+
+  <h2>Why one agent at a time stalls</h2>
+  <p>One coding agent in one terminal writes code quickly, but the work around it stays manual. You write each prompt, wait, read every change and decide what comes next. The pace is set by how fast one person can review and coordinate, not by how fast the agent types.</p>
+  <p>Opening more terminals does not fix this on its own. Several agents on one repository need separate, clear tasks, their own branches, a check on every result and a shared record of what is done. Without those, the time the agents save goes into sorting out overlaps and reading diffs.</p>
+
+  <h2>What an agent factory does</h2>
+  <p>An agent factory replaces that hand coordination with a fixed process. You make the decisions; the agents do the rest.</p>
+  <ul>
+    <li><strong>Spec:</strong> an agent asks you a few questions about your idea, then writes it up as a spec for you to confirm.</li>
+    <li><strong>Tickets:</strong> the spec becomes small tickets, a plan you approve as a whole.</li>
+    <li><strong>Builders:</strong> each ticket gets its own builder agent, which writes the code on its own branch and opens a pull request.</li>
+    <li><strong>Reviewers:</strong> a reviewer agent from a different model family checks each pull request on its own.</li>
+    <li><strong>Merge:</strong> approved work with passing checks merges by your project’s rules.</li>
+    <li><strong>Records on GitHub:</strong> specs, tickets and each agent’s status live in your repository’s issues, so you, your team and your agents read the same record.</li>
+  </ul>
+
+  <h2>Running a fleet with OpenWiz, step by step</h2>
+  <p>These steps are for OpenWiz 0.01 (version 0.1.0), the current release. You need an Apple-silicon Mac or x86_64 Linux, a GitHub repository and a coding agent you already use.</p>
+  <ol class="guide-steps">
+    <li><strong>Install OpenWiz.</strong> Paste <code>Install OpenWiz from github.com/openwizdev/OpenWiz</code> into Claude Code, Codex or another coding agent. It shows every change first and waits for your yes.</li>
+    <li><strong>Choose where your agents run.</strong> The install asks: this computer, with the Claude Code or Codex you’re signed in to; boat.dev; or CloudRoom. CloudRoom is optional, and the install never needs it.</li>
+    <li><strong>Plan the work.</strong> Pick a repository and say what you want. Your agent grills you with a few questions, writes the spec for you to confirm and splits it into tickets on GitHub. Nothing starts until you approve the plan.</li>
+    <li><strong>Start the builders.</strong> With CloudRoom, the automatic fleet runs there: builders and reviewers start and wake on their own. Without CloudRoom, in OpenWiz 0.01 you start each ticket’s builder by hand on this computer or on boat.dev.</li>
+    <li><strong>Review and merge.</strong> In the CloudRoom fleet, a reviewer from a different model family reviews each pull request, and approved, green work merges by your project’s rules. Without CloudRoom, you review and merge each pull request yourself.</li>
+    <li><strong>Watch it ship.</strong> Follow the specs, tickets and pull requests on GitHub, or sign in to <a href="/app/">the app</a>, which only reads your GitHub.</li>
+  </ol>
+
+  <h2>Where the agents run</h2>
+  <p>A driver connects OpenWiz to the machine that runs your agents. OpenWiz 0.01 ships drivers for your own computer or VPS, CloudRoom and boat.dev, and each answers the same four commands: <code>version</code>, <code>start</code>, <code>wake</code> and <code>stop</code>. Your agents keep using their own signed-in tools, and OpenWiz never touches a login. See the <a href="/drivers/">driver list</a> for which drivers passed the test kit.</p>
+
+  <h2>What it costs</h2>
+  <p>OpenWiz is free and released under the Apache License 2.0. You pay only for the models and machines you use: your Claude Code or Codex plan, and any host you pick. boat.dev bills per second while a sandbox runs, and CloudRoom’s charges are its own, on your plan with it.</p>
+
+  <h2>Learn more</h2>
+  <ul>
+    <li><a href="/what-is-openwiz/">What is OpenWiz?</a> — What the kernel is and how it works.</li>
+    <li><a href="/faq/">FAQ</a> — Short answers to common questions.</li>
+    <li><a href="https://github.com/openwizdev/OpenWiz">OpenWiz on GitHub</a> — Source code, releases and the install guide.</li>
+  </ul>
+</main>
+<template data-slot="footer"></template>
+</body></html>

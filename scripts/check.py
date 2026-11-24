@@ -194,7 +194,7 @@ TEAM_NEVER = re.compile(r'\binstall|\bguarantee|\bpric(?:e|es|ing)\b|\bcost|\bfr
 REPORT_LINK = 'https://github.com/openwizdev/openwiz/issues/new?template=feedback.yml'
 FOOTER = (ROOT / 'footer.html').read_text()
 FOOTER_SLOT = '<template data-slot="footer"></template>\n'
-FOOTER_LINKS = (('/what-is-openwiz/', 'What is OpenWiz?'), ('/drivers/', 'Drivers'), ('/market/', 'Market'), ('/changelog/', 'Changelog'), ('https://github.com/openwizdev/openwiz#readme', 'Docs'),
+FOOTER_LINKS = (('/what-is-openwiz/', 'What is OpenWiz?'), ('/guides/run-many-coding-agents/', 'Guide'), ('/drivers/', 'Drivers'), ('/market/', 'Market'), ('/changelog/', 'Changelog'), ('https://github.com/openwizdev/openwiz#readme', 'Docs'),
                 ('/faq/', 'FAQ'), ('/app/', 'The app'), (REPORT_LINK, 'Report a problem'), ('/team/', 'For teams'),
                 ('https://github.com/openwizdev/openwiz', 'GitHub'), ('https://x.com/openwiz', 'X @openwiz'))
 FOOTER_LINE = 'Apache-2.0. Owned by no one.'
@@ -244,13 +244,18 @@ FINGERPRINTS = {name: fingerprint(name, (ROOT / name).read_bytes()) for name in 
 ASK_INDEX = 'ask-index.json'
 DISCOVERY_FILES = {ROBOTS_TXT, 'sitemap.xml', 'llms.txt', 'llms-full.txt'}
 ABOUT_PAGE = 'what-is-openwiz/index.html'
+GUIDE_PAGE = 'guides/run-many-coding-agents/index.html'
+GUIDE_H1 = 'How to run many coding agents at once'
+GUIDE_STEPS = re.compile(r'<li><strong>([^<]+)\.</strong>([\s\S]*?)</li>')
+# The guide describes OpenWiz 0.01 only: it never names a later version as out.
+GUIDE_NEVER = re.compile(r'\b0\.1\.[1-9]|\b0\.0[2-9]\b')
 NOT_FOUND = '404.html'
 ABOUT_LINK = '<p class="wrap about-link"><a href="/what-is-openwiz/">What is OpenWiz?</a></p>\n'
 STATIC = {
     'index.html', 'changelog/index.html', 'drivers/index.html', 'team/index.html', 'faq/index.html', 'market/index.html', '_headers', SECURITY_TXT, APP_PAGE, 'app/manifest.webmanifest',
     'SKILL.md', 'fonts/Geist-var.woff2', 'fonts/GeistMono-var.woff2', 'fonts/OFL.txt',
     'c76a1a01e62d088edd3789d30d6a4d29.txt',
-} | ART | set(ICON_HASHES) | set(VECTORS) | (set(VENDOR_HASHES) - {GSAP}) | set(APP_VENDOR) | set(DRIVER_LOGOS) | {ASK_INDEX, ABOUT_PAGE, NOT_FOUND} | DISCOVERY_FILES
+} | ART | set(ICON_HASHES) | set(VECTORS) | (set(VENDOR_HASHES) - {GSAP}) | set(APP_VENDOR) | set(DRIVER_LOGOS) | {ASK_INDEX, ABOUT_PAGE, GUIDE_PAGE, NOT_FOUND} | DISCOVERY_FILES
 RUNTIME = STATIC | set(FINGERPRINTS.values())
 
 
@@ -273,7 +278,7 @@ FONT_HASHES = {
     'fonts/GeistMono-var.woff2': '55419aa06f58adcd7f145c6c920e56936416f17e528f60efc6032ffa4269972b',
     'fonts/OFL.txt': 'c683bfbcc7e087f5d37a54ef628f10387c451a83ddc459b151403a164ac46c90',
 }
-PAGES = ('index.html', 'changelog/index.html', 'drivers/index.html', TEAM_PAGE, FAQ_PAGE, 'market/index.html', ABOUT_PAGE)
+PAGES = ('index.html', 'changelog/index.html', 'drivers/index.html', TEAM_PAGE, FAQ_PAGE, 'market/index.html', ABOUT_PAGE, GUIDE_PAGE)
 SITE_PAGES = PAGES + (NOT_FOUND,)
 ALL_PAGES = SITE_PAGES + (APP_PAGE,)
 STORY_COPY = ('Build a to-do app', 'Bring any agent', 'Sign in with GitHub', 'Put the app on your phone')
@@ -801,7 +806,7 @@ def check_discovery(root, pages):
     titles = set()
     descriptions = set()
     structured = {}
-    expected_types = {'index.html': 'graph', ABOUT_PAGE: 'AboutPage', FAQ_PAGE: 'FAQPage'}
+    expected_types = {'index.html': 'graph', ABOUT_PAGE: 'AboutPage', FAQ_PAGE: 'FAQPage', GUIDE_PAGE: 'HowTo'}
     for name, page in pages.items():
         fields = page.head_fields
         indexable = name in PAGES
@@ -863,6 +868,21 @@ def check_discovery(root, pages):
         for _, question, _, answer in FAQ_ROWS.findall(FAQ)
     ]
     assert structured[FAQ_PAGE].get('mainEntity') == expected_faq, 'FAQ JSON-LD must match the visible questions and answers'
+    guide = (root / GUIDE_PAGE).read_text()
+    guide_main = re.search(r'<main\b[^>]*>([\s\S]*?)</main>', guide)[1]
+    steps = re.search(r'<ol class="guide-steps">([\s\S]*?)</ol>', guide_main)
+    visible = GUIDE_STEPS.findall(steps[1]) if steps else []
+    assert visible and len(visible) == steps[1].count('<li>'), 'the guide needs its numbered steps, each a name and its text'
+    expected_steps = [{'@type': 'HowToStep', 'position': i, 'name': plain(name), 'text': plain(text)}
+                      for i, (name, text) in enumerate(visible, 1)]
+    how_to = structured[GUIDE_PAGE]
+    assert how_to.get('step') == expected_steps, 'HowTo JSON-LD must match the visible steps'
+    assert how_to.get('name') == GUIDE_H1 and re.findall(r'<h1>([\s\S]*?)</h1>', guide_main) == [GUIDE_H1], 'the guide h1 and HowTo name'
+    assert how_to.get('description') == pages[GUIDE_PAGE].head_fields['description'][0] and how_to.get('about') == {'@id': software['@id']}, \
+        'the guide JSON-LD must match its description and link to the application'
+    assert not GUIDE_NEVER.search(plain(guide_main)), 'the guide names only OpenWiz 0.01'
+    assert 'href="/guides/run-many-coding-agents/">Guide: run many coding agents</a>' in (root / ABOUT_PAGE).read_text(), \
+        'the overview links the guide'
 
     ns = '{http://www.sitemaps.org/schemas/sitemap/0.9}'
     try:
@@ -888,10 +908,14 @@ def check_discovery(root, pages):
     skill = (root / 'SKILL.md').read_text()
     assert brief.startswith('# OpenWiz\n\n> ') and all(
         f'\n## {section}\n' in brief for section in ('Install', 'Docs', 'Drivers', 'Skills', 'Changelog', 'Feedback', 'Links')
-    ) and f'{SITE_URL}SKILL.md' in brief, 'invalid llms.txt'
+    ) and f'{SITE_URL}SKILL.md' in brief and f'[{GUIDE_H1}]({SITE_URL}guides/run-many-coding-agents/)' in brief.split('\n## Docs\n')[-1].split('\n## ')[0], \
+        'invalid llms.txt'
     assert skill.startswith('---\nname: install-openwiz\n'), 'invalid SKILL.md'
     assert full.startswith('# What is OpenWiz?\n') and all(
         f"### {item['name']}\n\n{item['acceptedAnswer']['text']}\n" in full for item in expected_faq), 'invalid llms-full.txt'
+    first = re.search(r'<p>([\s\S]*?)</p>', guide_main)[1]
+    assert f'\n## Guide: {GUIDE_H1}\n\n{plain(first)}\n' in full and all(
+        f"\n{item['position']}. {item['name']}. {item['text']}" in full for item in expected_steps), 'llms-full.txt needs the guide'
 
 
 def check_site(root, registry=ROOT / 'market/registry.json'):
