@@ -38,16 +38,22 @@ test('switch off: none of the v2 shell renders and demo=1 is ignored', async () 
 test('switch on + demo=1: renders v2 shell, deep links, interactions, and makes zero network requests', async () => {
   const run = await start();
   try {
+    await run.page.size(1440, 900, false);
     await run.page.go(`${SITE}/app/?v2=on&demo=1#/welcome`);
     await run.page.until(`document.body.innerText.includes('Run your software factory from here.')`, 'v2 welcome screen');
     assert.equal(await run.page.run(`document.documentElement.dataset.v2`), '1');
     assert.equal(await run.page.run(`document.querySelector('.v2-sample-tag').textContent`), 'Sample data');
-    assert.equal(await run.page.run(`document.querySelector('.v2-welcome-sample').getAttribute('href')`), '/api/sign-in/start');
+    assert.deepEqual(await run.page.run(`[...document.querySelectorAll('.v2-welcome-card a')].map(a => a.getAttribute('href'))`), ['#/chat']);
 
-    await run.page.click('Open Harbor workspace');
+    await run.page.tap('Open Harbor workspace');
     await run.page.until(`location.hash === '#/chat' && document.body.innerText.includes('Accept all 3')`, 'v2 chat with grill round');
     const nav = await run.page.run(`[...document.querySelectorAll('nav.main a')].map(a => a.getAttribute('href'))`);
     assert.deepEqual(nav, ['#/chat', '#/feed', '#/settings']);
+    assert.equal(await run.page.run(`(() => {
+      const summary = document.querySelector('.v2-chat-summary').getBoundingClientRect();
+      const thread = document.querySelector('.v2-chat-thread').getBoundingClientRect();
+      return summary.left > thread.right && summary.width > 0;
+    })()`), true, 'the desktop chat summary is beside the thread');
 
     await run.page.run(`window.originalMessages = [...document.querySelector('.v2-chat-thread').children];
       window.originalChoices = [...document.querySelectorAll('.v2-q-pill')];
@@ -59,7 +65,7 @@ test('switch on + demo=1: renders v2 shell, deep links, interactions, and makes 
       choice === document.querySelectorAll('.v2-q-pill')[i])`), true, 'answering replaced question controls');
     assert.equal(await run.page.run(`window.originalChoices[1].getAttribute('aria-pressed')`), 'true');
     await run.page.run(`document.querySelector('.v2-q-pill').click()`);
-    await run.page.click('Accept all 3');
+    await run.page.tap('Accept all 3');
     await run.page.until(`document.body.innerText.includes('Answers saved · Open Feed')`, 'grill accepted');
     assert.equal(await run.page.run(`window.originalMessages.every((message, i) =>
       message === document.querySelector('.v2-chat-thread').children[i])`), true, 'accepting replayed the thread');
@@ -67,31 +73,52 @@ test('switch on + demo=1: renders v2 shell, deep links, interactions, and makes 
 
     await run.page.go(`${SITE}/app/?v2=dry-run&demo=1#/feed`);
     await run.page.until(`document.body.innerText.includes('Magic-link sign-in')`, 'feed spec card');
+    assert.equal(await run.page.run(`(() => {
+      const bounds = selector => document.querySelector(selector).getBoundingClientRect();
+      const card = bounds('.v2-spec-card');
+      const context = bounds('.v2-feed-context');
+      return card.width >= 640 && card.width <= 720 && card.top === context.top
+        && card.right < context.left && bounds('.v2-building').bottom < bounds('.v2-view').bottom;
+    })()`), true, 'desktop Feed has room for the card and all Building rows');
+    await run.page.size(390, 844, false);
+    assert.equal(await run.page.run(`(() => {
+      const bounds = selector => document.querySelector(selector).getBoundingClientRect();
+      return document.documentElement.scrollWidth === 390
+        && bounds('.v2-building').bottom <= bounds('.v2-tabs').top
+        && bounds('.v2-pips').width === bounds('.v2-preview').width
+        && document.querySelector('.v2-view').scrollHeight > document.querySelector('.v2-view').clientHeight;
+    })()`), true, 'phone Feed fits above the tabs and can scroll inside the window');
     await run.page.tap('Change something');
     await run.page.until(`document.querySelector('.v2-sheet')?.matches(':modal')`, 'the change dialog');
     await run.page.key('Escape');
     await run.page.until(`document.activeElement.dataset.focus === 'change'`, 'focus returned to the change button');
     await run.page.tap('Change something');
-    await run.page.type('Make the link last ten minutes');
+    await run.page.tap('Simplify copy');
     await run.page.tap('Send change');
     await run.page.until(`location.hash === '#/feed/2' && document.activeElement.textContent === 'Keep the free plan?'`, 'a change advances to the next card and focuses its title');
     await run.page.go(`${SITE}/app/?demo=1#/chat`);
-    await run.page.until(`document.body.innerText.includes('Make the link last ten minutes')`, 'change request recorded in Chat');
+    await run.page.until(`document.body.innerText.includes('Simplify the copy to one line')`, 'change request recorded in Chat');
     await run.page.go(`${SITE}/app/?demo=1#/feed/clear`);
     await run.page.until(`document.querySelector('.v2-building')?.textContent.includes('Magic-link sign-in')`, 'revised spec moved to Building');
 
     await run.page.go(`${SITE}/app/?v2=dry-run&demo=1#/feed/2`);
     await run.page.until(`document.querySelector('.v2-card-title')?.textContent === 'Keep the free plan?'`, 'deep link to decision card');
-    assert.match(await run.page.text(), /Recommended: keep it, cap at 3 seats/);
+    assert.match(await run.page.text(), /Recommended: Keep it, cap at 3 seats/);
     assert.equal(await run.page.run(`document.querySelector('.v2-hero-card .v2-preview')`), null);
     await run.page.go(`${SITE}/app/?demo=1#/feed`);
     const badges = () => run.page.run(`[...document.querySelectorAll('a[href="#/feed"] .v2-badge')].map(badge => badge.hidden ? null : badge.textContent)`);
     await run.page.until(`document.querySelector('.v2-card-title')?.textContent === 'Magic-link sign-in'`, 'spec card to ship');
     assert.deepEqual(await badges(), ['3', '3']);
-    await run.page.click('Ship it');
+    await run.page.tap('Ship it');
     await run.page.until(`document.querySelector('.v2-card-title')?.textContent === 'Keep the free plan?'`, 'advances after shipping');
     assert.deepEqual(await badges(), ['2', '2']);
-    await run.page.click('Ship it');
+    await run.page.click('Change something');
+    await run.page.type('Review the seat cap again');
+    await run.page.tap('Send change');
+    await run.page.until(`location.hash === '#/feed/3' && !document.querySelector('.v2-toast').hidden`, 'the decision change can be undone');
+    await run.page.tap('Undo');
+    await run.page.until(`location.hash === '#/feed/2' && document.activeElement.textContent === 'Keep the free plan?'`, 'undo restores the decision');
+    await run.page.click('Keep it, cap at 3 seats');
     await run.page.until(`document.querySelector('.v2-card-title')?.textContent === 'Retention window for deleted projects'`, 'next decision');
     assert.deepEqual(await badges(), ['1', '1']);
     await run.page.click('Not now');
@@ -104,9 +131,11 @@ test('switch on + demo=1: renders v2 shell, deep links, interactions, and makes 
     await run.page.key('Enter');
     await run.page.until(`document.querySelector('.v2-card-title')?.textContent === 'Retention window for deleted projects'`, 'undo restores the last decision');
     assert.deepEqual(await badges(), ['1', '1']);
-    await run.page.click('Ship it');
+    await run.page.click('Allow recovery for 30 days');
     await run.page.until(`location.hash === '#/feed/clear' && document.querySelector('.v2-lighthouse')`, 'approving the final decision clears Feed');
     assert.deepEqual(await badges(), [null, null]);
+    await run.page.click('Settings');
+    await run.page.until(`location.hash === '#/settings' && document.querySelector('.v2-toast').hidden`, 'changing routes dismisses Undo');
     await run.page.go(`${SITE}/app/?v2=dry-run&demo=1#/feed/clear`);
     await run.page.until(`document.querySelector('.v2-clear-card h2')?.textContent === 'All clear.'`, 'deep link to all clear');
     assert.deepEqual(await badges(), [null, null]);
