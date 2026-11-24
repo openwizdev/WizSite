@@ -51,11 +51,12 @@ const CARD = await readFile(new URL('app/cards/decision.js', ROOT), 'utf8');
 const MOCK_CARDS = `window.drawn = [];
 OW.cards = { decision(item, el) { window.drawn.push(item); el.replaceChildren(Object.assign(document.createElement('p'), { textContent: 'Decision card ' + item.key })); },
   spec(item, el) { window.drawn.push(item); el.replaceChildren(Object.assign(document.createElement('p'), { textContent: 'Spec card ' + item.key })); } };`;
-async function openQueue(run, value, { card = false, cards = false } = {}) {
+async function openQueue(run, value, { card = false, cards = false, noCards = false } = {}) {
   await run.page.go(`${SITE}/app/`);
   await run.page.until(`document.readyState === 'complete'`, 'the app page');
   await run.page.run(`localStorage.setItem('openwiz.app.v2', ${JSON.stringify(JSON.stringify(value))})`);
   await signIn(run.page);
+  if (noCards) await run.page.run('delete OW.cards');
   if (cards) await run.page.run(MOCK_CARDS);
   if (card) await run.page.run(CARD);
   await run.page.click('acme/factory');
@@ -117,7 +118,7 @@ test('switch on without card modules: plain cards link to GitHub, in the same or
   const run = await start();
   try {
     await queueWorld(run);
-    await openQueue(run, 'dry-run');
+    await openQueue(run, 'dry-run', { noCards: true });
     await run.page.until(`document.querySelectorAll('.queue a.card').length === 5`, 'five plain cards');
     const links = await run.page.run(`[...document.querySelectorAll('.queue a.card')].map(a => [a.getAttribute('href'), a.target])`);
     assert.deepEqual(links, [['https://github.com/acme/factory/issues/60#issuecomment-9100021', '_blank'],
