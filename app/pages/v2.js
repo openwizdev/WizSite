@@ -365,6 +365,7 @@
   }
 
   function renderWelcome(root, { note, demoMode }) {
+    if (toast) toast.hidden = true;
     const cta = demoMode
       ? h('a', { class: 'v2-btn primary', href: '#/chat' }, 'Open Harbor workspace', icon('right'))
       : h('a', { class: 'v2-btn primary', href: '/api/sign-in/start' }, 'Continue with GitHub', icon('right'));

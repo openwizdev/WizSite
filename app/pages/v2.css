@@ -39,7 +39,7 @@ html[data-v2='1'] input, html[data-v2='1'] textarea { font: inherit; }
 .v2-backdrop::before, .v2-backdrop::after { content: ''; position: absolute; }
 .v2-backdrop::before {
   inset: 0;
-  background: linear-gradient(transparent 46%, #24645636 64%, #2c766bc7 73%), url('/art/moments-sea.webp') center / cover no-repeat;
+  background: linear-gradient(transparent 46%, #36584f36 64%, #345e56b5 73%), url('/art/moments-sea.webp') center / cover no-repeat;
   background-blend-mode: color, normal;
   filter: saturate(.76) brightness(1.52);
 }
@@ -511,7 +511,7 @@ nav.v2-nav a[aria-current='page'], .v2-tabs a[aria-current='page'] {
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr) 20px;
   align-items: center;
   gap: 12px;
-  min-height: 56px;
+  min-height: 64px;
   padding: 8px 4px;
   margin: 0;
   border-bottom: 1px solid var(--v2-line);
@@ -636,8 +636,8 @@ nav.v2-nav a[aria-current='page'], .v2-tabs a[aria-current='page'] {
     padding: clamp(8px, calc(100dvh - 750px), 104px) 8px max(8px, env(safe-area-inset-bottom));
   }
   .v2-backdrop:not(.welcome)::before {
-    background-image: linear-gradient(#28796a25, #2c766bc7 84%), url('/art/moments-sea.webp'), url('/art/moments-sea.webp');
-    background-size: auto, auto 152px, cover;
+    background-image: linear-gradient(#36584f25, #345e56b5 84%), url('/art/moments-sea.webp'), url('/art/moments-sea.webp');
+    background-size: auto, auto max(152px, 45vw), cover;
     background-position: center, 58% top, 56% center;
     background-repeat: no-repeat;
     background-blend-mode: color, normal, normal;
@@ -720,11 +720,11 @@ nav.v2-nav a[aria-current='page'], .v2-tabs a[aria-current='page'] {
   .v2-hero-card[data-kind='decision'] { margin-top: 0; }
   .v2-card-title { font-size: clamp(29px, 9vw, 40px); }
   .v2-hero-card:has(.v2-preview.envelope) .v2-card-title { max-width: 10ch; }
-  .v2-hero-card[data-kind='decision'] .v2-card-title { max-width: 16ch; }
+  .v2-hero-card[data-kind='decision'] .v2-card-title { max-width: 12ch; }
   .v2-card-goal { font-size: 15px; }
-  .v2-preview { min-height: 166px; padding: 8px; }
+  .v2-preview { min-height: 192px; padding: 8px; }
   .v2-envelope { width: 52%; }
-  .v2-progress { gap: 6px 12px; }
+  .v2-progress { flex-direction: column; align-items: flex-start; gap: 6px; }
   .v2-card-actions { display: grid; grid-template-columns: 1.55fr 1fr; }
   .v2-card-actions .primary, .v2-card-actions.single .v2-btn { grid-column: 1 / -1; min-width: 0; }
   .v2-card-actions .v2-btn { padding-inline: 4px; }

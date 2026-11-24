@@ -7,7 +7,7 @@ const ROOT = new URL('../../', import.meta.url);
 const grill = JSON.parse(await readFile(new URL('tests/v2/fixtures/queue/grill-round.json', ROOT), 'utf8'));
 const FLEET = grill.fleet;
 const RATE = { limit: 5000, remaining: 4800, resetAt: '2099-01-01T00:00:00Z' };
-const EMPTY = 'No open spec or grill pull request is waiting on you';
+const EMPTY = 'No open decision or spec is waiting on you';
 const VIDEO = 'https://example.com/synthetic/spec.mp4';
 
 const specIssue = (number, title, updatedAt, total, completed) => ({ number, title, url: `https://github.com/acme/factory/issues/${number}`,
@@ -121,8 +121,8 @@ test('switch on without card modules: plain cards link to GitHub, in the same or
   try {
     await queueWorld(run);
     await openQueue(run, 'dry-run');
-    await run.page.until(`document.querySelectorAll('.queue .queue-item a').length === 5`, 'five plain cards');
-    const links = await run.page.run(`[...document.querySelectorAll('.queue .queue-item a')].map(a => [a.getAttribute('href'), a.target])`);
+    await run.page.until(`document.querySelectorAll('.queue .queue-item a.primary').length === 5`, 'five plain cards');
+    const links = await run.page.run(`[...document.querySelectorAll('.queue .queue-item a.primary')].map(a => [a.getAttribute('href'), a.target])`);
     assert.deepEqual(links, [['https://github.com/acme/factory/issues/60#issuecomment-9100021', '_blank'],
       ['https://github.com/acme/factory/pull/7#issuecomment-9100003', '_blank'], ['https://github.com/acme/factory/pull/7#issuecomment-9100005', '_blank'],
       ['https://github.com/acme/factory/issues/61', '_blank'], ['https://github.com/acme/factory/issues/60', '_blank']]);
@@ -131,6 +131,7 @@ test('switch on without card modules: plain cards link to GitHub, in the same or
       'Spec to watch · #61', 'Spec to watch · #60']);
     assert.equal(await run.page.run(`document.querySelector('.queue-item[data-key="spec:acme/factory#61"] .v2-progress').textContent`),
       '0 of 2 tickets completed');
+    assert.equal(await run.page.run(`document.querySelector('.queue-item[data-key="spec:acme/factory#61"] a.text').href`), VIDEO);
     assert.deepEqual(run.world.violations, []);
   } finally {
     await run.close();

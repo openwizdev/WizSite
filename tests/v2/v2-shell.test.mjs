@@ -75,6 +75,15 @@ test('switch on + demo=1: renders v2 shell, deep links, interactions, and makes 
 
     await run.page.go(`${SITE}/app/?v2=dry-run&demo=1#/settings`);
     await run.page.until(`document.body.innerText.includes('Where it runs') && document.body.innerText.includes('Home computer')`, 'settings screen');
+    await run.page.size(1440, 560, false);
+    await run.page.run(`document.querySelectorAll('.v2-setting').forEach(details => details.open = true)`);
+    await run.page.run(`document.querySelector('.v2-sign-out').focus()`);
+    assert.ok(await run.page.run(`(() => {
+      const body = document.querySelector('.v2-body');
+      const signout = document.activeElement;
+      return body.scrollTop > 0 && signout.matches('.v2-sign-out')
+        && signout.getBoundingClientRect().bottom <= body.getBoundingClientRect().bottom;
+    })()`), 'expanded Settings scrolls within the desktop window');
 
     assert.deepEqual(apiRequests(run.world), [], 'demo mode sent an API or external network request');
     assert.deepEqual(run.world.writes(), [], 'demo mode wrote something');

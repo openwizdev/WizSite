@@ -238,7 +238,9 @@
         item.type === 'spec' && progress?.total && Number.isInteger(progress.done)
           ? OW.v2.progress(progress.done, progress.total, 'completed') : null,
         h('div', { class: 'v2-card-actions single' },
-          h('a', { class: 'v2-btn primary', href: item.url, target: '_blank', rel: 'noreferrer', 'data-focus': `queue:${item.key}` }, 'Open on GitHub')));
+          h('a', { class: 'v2-btn primary', href: item.url, target: '_blank', rel: 'noreferrer', 'data-focus': `queue:${item.key}` }, 'Open on GitHub'),
+          item.video ? h('a', { class: 'v2-btn text', href: item.video.url, target: '_blank', rel: 'noreferrer',
+            'data-focus': `video:${item.key}` }, 'Narrated spec') : null));
     }
     const head = (word, colour, tell) => h('a', { class: 'card you', href: item.url, target: '_blank', rel: 'noreferrer', '--c': colour, 'data-focus': `queue:${item.key}` },
       h('div', { class: 'num' }, `${word} · #${item.subject.number}${item.at ? ` · ${time(item.at)}` : ''}`), h('h3', {}, item.title), h('p', {}, tell));
@@ -283,7 +285,7 @@
     const missing = result.gaps.length
       ? OW.ui.unknown(`This list may be missing items: GitHub gave only part of ${result.gaps.join(', ')}. The app tries again on its own.`) : null;
     const cards = items.map(item => holder(item, result.bindings, item.type === 'spec' && result.progress?.get(item.subject.number)));
-    const empty = missing ? null : (OW.v2 ? OW.v2.allClear(`${EMPTY}.`) : OW.ui.placeholder(`${EMPTY}.`));
+    const empty = missing ? null : (OW.v2 ? OW.v2.allClear('No open decision or spec is waiting on you.') : OW.ui.placeholder(`${EMPTY}.`));
     if (present) return present(missing, cards, empty);
     el.replaceChildren(...[missing, cards.length ? h('div', { class: 'queue' }, cards) : empty].filter(Boolean));
   }
