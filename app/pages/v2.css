@@ -31,6 +31,7 @@ html[data-v2='1'] {
 html[data-v2='1'] body { font-size: var(--v2-body); line-height: 1.5; }
 html[data-v2='1'] :is(h1, h2, h3) { text-wrap: balance; }
 html[data-v2='1'] :focus-visible { outline: 2px solid var(--em-amber); outline-offset: 3px; }
+html[data-v2='1'] :is(h1, h2)[tabindex='-1']:focus { outline: none; }
 
 .v2-backdrop {
   position: fixed;
@@ -232,6 +233,8 @@ nav.v2-nav { flex: 1; gap: 4px; }
   margin: 0;
 }
 .v2-head-tools { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; max-width: 100%; }
+.v2-head .v2-refresh { padding-inline: 8px 0; }
+.v2-head .v2-refresh:hover { padding-inline: 8px; }
 .v2-pager-slot:empty { display: none; }
 .v2-view, .v2-chat-scroll {
   scrollbar-width: thin;
@@ -720,6 +723,8 @@ nav.v2-nav { flex: 1; gap: 4px; }
   .v2-chat-empty { margin: 16px auto; padding: 20px; }
 
   .v2-feed-stage, .v2-live-feed { padding: 12px 0 40px; }
+  .v2-hero-card { gap: 12px; }
+  .v2-preview { min-height: 136px; }
   .v2-hero-card, .v2-state-card, .v2-live-card.card,
   .v2-live-feed .card.decision, .v2-live-feed .spec-card { padding: 16px; }
   .v2-next-preview { min-height: 48px; margin-top: 8px; gap: 8px; }
