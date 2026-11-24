@@ -281,50 +281,18 @@ function launchVideo() {
 function specVideo() {
   const video = document.querySelector('.spec-video');
   const sound = document.querySelector('.spec-play');
-  const pause = document.querySelector('.demo-pause');
   if (!video || !sound) return;
-  const calm = matchMedia('(prefers-reduced-motion: reduce)');
-  let inView = false;
-  let visitorDrives = false;
-  let ownPlayEvents = 0;
   const frame = video.closest('.spec-frame');
   const track = video.textTracks[0];
-  const resting = on => {
-    frame?.classList.toggle('is-ambient', on);
-    video.controls = !on;
-    if (track) track.mode = on ? 'hidden' : 'showing';
-  };
-  const takeOver = () => { visitorDrives = true; resting(false); };
-  const update = () => {
-    if (visitorDrives) return;
-    const ambient = inView && !calm.matches && pause.getAttribute('aria-pressed') !== 'true' && !document.hidden;
-    if (ambient && video.paused) {
-      ownPlayEvents += 1;
-      video.muted = true;
-      video.play().catch(() => { ownPlayEvents = 0; });
-    } else if (!ambient && !video.paused) {
-      ownPlayEvents += 1;
-      video.pause();
-    }
-  };
-  const take = () => {
-    if (ownPlayEvents > 0) ownPlayEvents -= 1;
-    else takeOver();
-  };
-  video.addEventListener('play', take);
-  video.addEventListener('pause', take);
-  video.addEventListener('volumechange', () => { if (!video.muted) takeOver(); });
-  new IntersectionObserver(([entry]) => { inView = entry.isIntersecting; update(); }, { threshold: .5 }).observe(video);
-  calm.addEventListener('change', update);
-  document.addEventListener('visibilitychange', update);
-  pause.addEventListener('click', () => setTimeout(update));
-  resting(true);
+  frame?.classList.add('is-resting');
+  video.controls = false;
+  if (track) track.mode = 'hidden';
   sound.hidden = false;
   const listen = () => {
-    takeOver();
+    frame?.classList.remove('is-resting');
+    video.controls = true;
+    if (track) track.mode = 'showing';
     video.muted = false;
-    video.loop = false;
-    video.currentTime = 0;
     video.play().then(() => video.focus(), () => {});
   };
   sound.addEventListener('click', listen);
