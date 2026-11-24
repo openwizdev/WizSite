@@ -622,8 +622,6 @@ showStars().catch(() => {});
 launchVideo();
 specVideo();
 oneVoiceAtATime();
-// GSAP only drives motion, so it stays off the critical path: the page names it (data-gsap on this script)
-// and it loads after the load event. Until then, and if it never loads, the page shows its still.
 const GSAP = document.currentScript?.dataset.gsap;
 const startMotion = () => {
   enableFamily(window.gsap);
