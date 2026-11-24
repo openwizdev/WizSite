@@ -15,6 +15,7 @@ const ACCESS_TOKEN = 'ya29.fake-google-access-token-secret456';
 
 const START = Date.parse('2026-11-25T19:00:00Z');
 const END = Date.parse('2026-11-25T19:30:00Z');
+const NOW = Date.parse('2026-11-24T12:34:56Z');
 
 const BOOKING = {
   id: 'bk_test_id_0123456789',
@@ -129,7 +130,7 @@ function timeoutError() {
 
 test('icsFor: generates valid folded RFC 5545 VCALENDAR that parses back', () => {
   const trickyUrl = 'https://meet.example.com/room;team=a,b\\c?long=' + 'x'.repeat(80) + '&note=café';
-  const ics = icsFor(BOOKING, { BOOK_MEETING_URL: trickyUrl });
+  const ics = icsFor(BOOKING, { BOOK_MEETING_URL: trickyUrl }, NOW);
   const { rawLines, props, counts } = parseIcs(ics);
 
   assert.ok(rawLines.some(line => line.startsWith(' ')), 'Long LOCATION should fold across lines');
@@ -137,12 +138,17 @@ test('icsFor: generates valid folded RFC 5545 VCALENDAR that parses back', () =>
   assert.equal(counts.END, 2);
   assert.equal(props.VERSION, '2.0');
   assert.equal(props.UID, `${BOOKING.id}@openwiz.dev`);
+  assert.equal(props.DTSTAMP, '20261124T123456Z');
   assert.equal(props.DTSTART, '20261125T190000Z');
   assert.equal(props.DTEND, '20261125T193000Z');
   assert.equal(props.SUMMARY, 'OpenWiz call');
   assert.equal(unescapeIcs(props.LOCATION), trickyUrl);
   assert.equal(ics.includes(BOOKING.name), false);
   assert.equal(ics.includes(BOOKING.team), false);
+
+  const defaultIcs = icsFor(BOOKING, {});
+  const { props: defaultProps } = parseIcs(defaultIcs);
+  assert.notEqual(defaultProps.DTSTAMP, defaultProps.DTSTART);
 });
 
 test('icsFor: omits LOCATION when BOOK_MEETING_URL is not set', () => {
@@ -166,7 +172,7 @@ test('sendBookingMail: sends visitor confirmation with .ics and owner notice wit
     () => Response.json({ id: 'email_owner_1' }),
   ]);
 
-  const result = await sendBookingMail(MAIL_ENV, BOOKING, { fetch });
+  const result = await sendBookingMail(MAIL_ENV, BOOKING, { fetch, now: NOW });
   assert.equal(result, 'sent');
   assert.equal(calls.length, 2);
 
@@ -193,7 +199,7 @@ test('sendBookingMail: sends visitor confirmation with .ics and owner notice wit
   assert.ok(vBody.html.includes(BOOKING.cancelUrl));
   assert.equal(vBody.attachments.length, 1);
   assert.equal(vBody.attachments[0].filename, 'openwiz-call.ics');
-  assert.equal(decodeBase64Utf8(vBody.attachments[0].content), icsFor(BOOKING, MAIL_ENV));
+  assert.equal(decodeBase64Utf8(vBody.attachments[0].content), icsFor(BOOKING, MAIL_ENV, NOW));
 
   assert.equal(oCall.url, RESEND_URL);
   assert.equal(oCall.method, 'POST');
@@ -317,6 +323,41 @@ test('sendCancelMail: skips without key, sends both recipients, strips visitor t
   assert.equal(await sendCancelMail(envNoOwner, BOOKING, { fetch: async () => { throw timeoutError(); } }), 'failed');
   assert.equal(await sendCancelMail(envNoOwner, BOOKING, { fetch: async () => new Response('err', { status: 502 }) }), 'failed');
   assert.equal(await sendCancelMail(envNoOwner, BOOKING, { fetch: async () => new Response('{bad', { status: 200 }) }), 'failed');
+});
+
+test('sendBookingMail and sendCancelMail: return failed without throwing or calling fetch on bad booking or non-bare email', async () => {
+  const badBookings = [
+    null,
+    undefined,
+    { ...BOOKING, start: Number.NaN },
+    { ...BOOKING, start: Number.POSITIVE_INFINITY },
+    { ...BOOKING, start: 'not-a-number' },
+    { ...BOOKING, end: Number.NaN },
+    { ...BOOKING, end: undefined },
+  ];
+  const badEmails = [
+    '',
+    'not-an-email',
+    'Alex <visitor@example.com>',
+    '<visitor@example.com>',
+    'a@example.com,b@example.com',
+    'a@example.com;b@example.com',
+    'visitor @example.com',
+    'visitor@example.com\r\nBcc: other@example.com',
+    'visitor@example.com\n',
+    'visitor@example.com\u0000',
+  ];
+
+  const { calls, fetch } = makeRecorder([]);
+  for (const bad of badBookings) {
+    assert.equal(await sendBookingMail(MAIL_ENV, bad, { fetch }), 'failed');
+    assert.equal(await sendCancelMail(MAIL_ENV, bad, { fetch }), 'failed');
+  }
+  for (const email of badEmails) {
+    assert.equal(await sendBookingMail(MAIL_ENV, { ...BOOKING, email }, { fetch }), 'failed');
+    assert.equal(await sendCancelMail(MAIL_ENV, { ...BOOKING, email }, { fetch }), 'failed');
+  }
+  assert.equal(calls.length, 0);
 });
 
 test('googleReady: true only when all three Google credentials are non-empty', () => {
@@ -451,9 +492,10 @@ test('googleInsert: inserts event with deterministic id, sendUpdates=none, and h
   const event = JSON.parse(calls[1].body);
   assert.equal(event.id, id1);
   assert.equal(event.summary, `OpenWiz call: ${BOOKING.name}`);
+  assert.ok(event.description.includes(BOOKING.name));
   assert.ok(event.description.includes(BOOKING.team));
   assert.ok(event.description.includes(BOOKING.email));
-  assert.deepEqual(event.attendees, [{ email: BOOKING.email }]);
+  assert.equal('attendees' in event, false);
   assert.equal(event.start.dateTime, '2026-11-25T19:00:00.000Z');
   assert.equal(event.end.dateTime, '2026-11-25T19:30:00.000Z');
   assert.equal(event.location, MAIL_ENV.BOOK_MEETING_URL);
