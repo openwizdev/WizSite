@@ -27,6 +27,7 @@ const faqTop = faq.replace(/<(\/?)h2\b/g, '<$1h1').replace(/<(\/?)h3\b/g, '<$1h2
 const withFaq = html => html.replace('<template data-slot="faq"></template>\n', faq).replace('<template data-slot="faq-h1"></template>\n', faqTop);
 const appFolder = async folder => (await readdir(new URL(`${folder}/`, root)).catch(() => [])).filter(name => /\.(js|css)$/.test(name)).sort().map(name => `${folder}/${name}`);
 const app = ['app/ember.css', 'app/data.js', 'app/records.js', 'app/ui.js', ...await appFolder('app/pages'), ...await appFolder('app/cards'), 'app/palette.js', 'app/shell.js'];
+const npmHashed = { 'vendor/gsap-3.15.1.min.js': 'node_modules/gsap/dist/gsap.min.js' };
 const npmVendor = { 'app/vendor/dagre-3.1.3.min.js': 'node_modules/@dagrejs/dagre/dist/dagre.min.js', 'app/vendor/dagre-LICENSE.txt': 'node_modules/@dagrejs/dagre/LICENSE' };
 const hashed = ['tokens.css', 'site.css', 'site.js', 'faq.js', vendor[0], ...app];
 const brand = ['favicon.ico', 'favicon.svg', 'apple-touch-icon.png', 'brand/openwiz-lockup.svg', 'brand/og.png'];
@@ -45,7 +46,7 @@ const put = async (name, data) => {
 };
 const names = {};
 for (const file of hashed) {
-  const data = await readFile(new URL(file, root));
+  const data = await readFile(new URL(npmHashed[file] ?? file, root));
   const hash = createHash('sha256').update(data).digest('hex').slice(0, 10);
   names[file] = file.replace(/\.(css|js)$/, `.${hash}.$1`);
   await put(names[file], data);

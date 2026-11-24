@@ -4,7 +4,7 @@ How the site is built, checked and deployed. The [README](../README.md) is the s
 
 ## Build and check
 
-Use Node.js 24, Python 3.11+ and Git. Install the pinned dependencies with `npm ci` first. The static build uses the checked-in GSAP file. The npm lockfile pins its upstream version so maintainers can verify or refresh the bundle with `npm ci --ignore-scripts`.
+Use Node.js 24, Python 3.11+ and Git. Install the pinned dependencies with `npm ci` first. The build copies GSAP from the locked `gsap` package, so `npm run build` needs `npm ci` (dev dependencies included) first; the lockfile's integrity hash is its pin.
 
 ```sh
 npm ci
@@ -53,7 +53,7 @@ The repository map and the *What exists today* text that used to open the page a
 
 ## Site assets
 
-WizSite owns `tokens.css`. The landing page and the Changelog use it with `site.css`; the Changelog keeps its own styles inline in `changelog/index.html`, so the landing never loads them. The landing also loads the pinned GSAP 3.15.1 core and `site.js`. The build fingerprints these styles and scripts so new HTML gets the matching assets. The GreenSock Standard No Charge licence and the agent icon notices ship in `vendor/`.
+WizSite owns `tokens.css`. The landing page and the Changelog use it with `site.css`; the Changelog keeps its own styles inline in `changelog/index.html`, so the landing never loads them. The landing also loads the GSAP 3.15.1 core and `site.js`; the build copies GSAP from the locked `gsap` npm dependency (`node_modules/gsap/dist/gsap.min.js`), and the check pins its bytes by hash. The build fingerprints these styles and scripts so new HTML gets the matching assets. The GreenSock Standard No Charge licence and the agent icon notices ship in `vendor/`.
 
 The landing page opens on an Ember-style OpenWiz window that walks through one to-do build. Right under the hero (its headline, install box and demo window), above everything else, sits the two-minute launch video (`art/launch-video.mp4`, a 1280×666 web copy of the launch film with its 40 px black bars cropped: H.264 high profile at about 1.1 Mbps with 128 kbps AAC and `+faststart`) on a wide player: its poster (`art/launch-poster.webp`, the ship at sunset) and one **Watch OpenWiz in two minutes** button. It loads nothing until that button is pressed (`preload="none"`, never autoplay), then plays from the start with sound, native controls and captions on offer (`art/launch-video.vtt`, the narrator's lines, without the spell shouts). Without scripts it keeps the video's native controls. A two-sentence text alternative describes it to screen readers, and one small **See the launch post** link under it opens the launch post on X. Painted WebP costume and crew sprites sit alongside HTML ticket states and an SVG working pulse. Below it are the supported agent logos and three product moments. The spec card plays the real narrated spec video of the to-do app an OpenWiz fleet built (openwizdev/todo-demo, J267); the grill and ship cards link that run's grill questions and the live app, muted and inline while in view, with Play with sound, captions, a poster and a plain link; it loads only when it first plays. The footer's twelve waving Wizes look toward the pointer. The demo pauses off screen, offers a Pause motion control and keeps a readable still when reduced motion is on or either script is unavailable. The install box shows the one line, `Install OpenWiz from github.com/openwizdev/OpenWiz`, with **Paste this into your agent** and a **Copy** button, which stays disabled as **Copy · coming soon** until the box's `data-install` switch in `index.html` reads `live`. Sign in and the phone home-screen instructions lead to the existing app.
 
@@ -67,19 +67,18 @@ Every site page shares one **footer**, `footer.html`, which the build adds at ea
 
 The logo files are the favicons (`favicon.ico` with 16, 32 and 48 px images, `favicon.svg`, `apple-touch-icon.png`), the header lockup `brand/openwiz-lockup.svg` and the 1200×630 social card `brand/og.png` (the lockup on the site ground, rendered from the SVG). The lockup's wordmark is converted to outlines: the SVG has no text and no font reference, and the check refuses one that does, so the wordmark font never ships.
 
-The old README map (`docs/map.png`, and `docs/map-phone.png`) is for GitHub only, and the README no longer shows it: the build never copies it, and the check pins both by hash in `DOC_HASHES` like the icons. Its source is `maps/draw.mjs` in `openwizdev/.github`.
-
 The Geist and Geist Mono fonts ship unmodified with `fonts/OFL.txt`. Keep the licence in source and the static export. The build does not fetch fonts from an external service.
 
 ## Privacy and verification limits
 
-CI uses only Node.js, Python's standard library, Git and the checkout/setup Actions, plus `npm ci` for the pinned dependencies below; it builds the landing from the checked-in vendor files.
+CI uses only Node.js, Python's standard library, Git and the checkout/setup Actions, plus `npm ci` for the pinned dependencies below; it builds the landing from the checked-in licence files and the locked npm packages.
 
 **npm dependencies** (exact versions in `package.json`, locked in `package-lock.json`; small, maintained and licence-checked, under J187):
 
 | Package | Version | Licence | Size | Why |
 | --- | --- | --- | --- | --- |
 | `@dagrejs/dagre` (with `@dagrejs/graphlib` 4.0.6, bundled in its file) | 3.1.3 | MIT | 49 KB minified | Lays out a spec's ticket graph in the app: layered, with fewer crossings and routed arrows. The build copies `dist/dagre.min.js` and its `LICENSE` into `dist/app/vendor/`; it makes no network calls |
+| `gsap` (dev dependency: only the build reads it) | 3.15.1 | GreenSock Standard No Charge (`vendor/GSAP-LICENSE.txt`) | 72 KB minified | Runs the landing's and footer's motion. The build fingerprints `dist/gsap.min.js` as `dist/vendor/gsap-3.15.1.min.<hash>.js`, and `scripts/check.py` pins its SHA-256 in `VENDOR_HASHES` |
 
 `scripts/check.py` documents a small case-insensitive denylist of generic private-repository names, owner-home paths, private evidence/decision paths and thread identifiers. It scans tracked and non-ignored source paths and UTF-8 contents, plus the export. Only the denylist declaration itself is exempt from matching its own literals. Bundled font binaries and licences are pinned by hash; each `art/*.webp` must be plain WebP with no EXIF or XMP chunks, and the pinned artwork and spec video share a 2 MB budget; the launch video, its poster and captions have their own 24 MB budget, since Cloudflare Pages refuses any single file over 25 MiB; the PNG and ICO logo files are pinned by hash; other binary content and symlinks require review. Personal literal lists and private policy/history tooling are deliberately not copied into this public repository.
 

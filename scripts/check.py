@@ -59,10 +59,6 @@ ICON_HASHES = {
     'app/icon.ico': '33a21c61aa051f91475b46678bc0c4f537ab507273c088c4ed016d5ddce2b9cd',
     'app/icon-180.png': 'deb93ec39812c224c1470e2f1730f7f4ead7be3d27428a20a2a83284b77fbc2f',
 }
-DOC_HASHES = {
-    'docs/map.png': '19fc57ff3f588b36e2ca412f5656483eaf873718d0d19a39aceb83e007333e6b',
-    'docs/map-phone.png': 'cdd21a74a880d3adab68ce794de1b18060d916d6df5d00ceb54eb06736cf3fd2',
-}
 VECTORS = ('favicon.svg', 'brand/openwiz-lockup.svg', 'app/mark.svg', 'app/icon.svg', 'app/wiz-reviewer.svg')
 MARK, OLD_MARK = '#cfc6b8', '#2b2bff'
 SITE_URL = 'https://openwiz.dev/'
@@ -77,6 +73,7 @@ LAUNCH_LABEL = 'Watch OpenWiz in two minutes'
 LAUNCH_POST = 'https://x.com/openwiz/status/2124709517665657224'
 LAUNCH_POST_TEXT = 'See the launch post'
 GSAP = 'vendor/gsap-3.15.1.min.js'
+NPM_HASHED = {GSAP: 'node_modules/gsap/dist/gsap.min.js'}
 VENDOR_HASHES = {
     'vendor/GSAP-LICENSE.txt': '791e7d34e6718aad2bd3e20fa5240a4c0e47d73ee3ca31424652cca52fe9acf0',
     'vendor/LOBE-ICONS-LICENSE.txt': 'add9d7531d1b21646317a8958e38fc727506fa39d24bdecb44154d943c82753a',
@@ -215,7 +212,7 @@ def with_cta(html):
     return html.replace(TOP_BAR_END, CTA + TOP_BAR_END)
 
 
-FINGERPRINTS = {name: fingerprint(name, (ROOT / name).read_bytes()) for name in HASHED}
+FINGERPRINTS = {name: fingerprint(name, (ROOT / NPM_HASHED.get(name, name)).read_bytes()) for name in HASHED}
 ASK_INDEX = 'ask-index.json'
 STATIC = {
     'index.html', 'changelog/index.html', 'drivers/index.html', 'team/index.html', 'faq/index.html', 'market/index.html', '_headers', APP_PAGE, 'app/manifest.webmanifest',
@@ -1826,7 +1823,7 @@ def check_privacy(path, data):
     if path.endswith(('.webp', '.mp4', '.vtt')):
         check_art(font, data)
     if path.endswith(('.png', '.ico')):
-        pinned = DOC_HASHES.get(path) or ICON_HASHES.get(font) or DRIVER_LOGOS.get(font, (None,))[0]
+        pinned = ICON_HASHES.get(font) or DRIVER_LOGOS.get(font, (None,))[0]
         assert pinned and sha256(data).hexdigest() == pinned, 'unreviewed picture'
         assert not any(marker.encode() in data.lower() for marker in DENYLIST), f'private marker in {path}'
     if font in VECTORS:
@@ -1850,7 +1847,7 @@ def main():
         assert (ROOT / source).read_bytes() == (output / name).read_bytes(), f'export differs: {name}'
     assert built_fingerprints(output) == FINGERPRINTS, 'build is stale: rebuild the site'
     for name, hashed in FINGERPRINTS.items():
-        assert (ROOT / name).read_bytes() == (output / hashed).read_bytes(), f'export differs: {name}'
+        assert (ROOT / NPM_HASHED.get(name, name)).read_bytes() == (output / hashed).read_bytes(), f'export differs: {name}'
     for name in ALL_PAGES:
         built = (output / name).read_text()
         if name == 'changelog/index.html':
