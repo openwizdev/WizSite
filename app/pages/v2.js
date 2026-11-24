@@ -203,7 +203,6 @@
       ticket(first + 4, 'Messages', 'waiting', [first + 2]),
       ticket(first + 5, 'Walkthrough', 'waiting', [first + 3, first + 4]),
     ] });
-    showToast(`Answers saved · "${grill.specTitle}" added to Feed`);
     redraw();
   }
 

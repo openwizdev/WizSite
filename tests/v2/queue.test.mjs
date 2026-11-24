@@ -211,7 +211,7 @@ test('switch on: the signed-out copy no longer says read-only, and the queue lea
     await run.page.click('acme/factory');
     await run.page.until(`document.querySelector('main h1')?.textContent === 'Feed'`, 'the feed');
     const nav = await run.page.run(`[...document.querySelectorAll('nav.main a')].map(a => a.getAttribute('href'))`);
-    assert.deepEqual(nav, ['#/chat', '#/feed', '#/settings']);
+    assert.deepEqual(nav, ['#/chat', '#/feed', '#/canvas', '#/settings']);
   } finally {
     await run.close();
   }

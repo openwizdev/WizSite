@@ -776,5 +776,5 @@ body:has(.v2-view[data-page='chat']) .v2-toast { bottom: 104px; }
   .v2-toast { left: 50%; bottom: calc(84px + env(safe-area-inset-bottom)); }
   body:has(.v2-view[data-page='chat']) .v2-toast { bottom: calc(152px + env(safe-area-inset-bottom)); }
   html[data-v2='1'] .cv-focus-head .cv-gap { flex: 0 0 100%; }
-  html[data-v2='1'] .cv-focus-head .v2-btn { flex: 1; }
+  html[data-v2='1'] .cv-focus-head .v2-btn { flex: 1 1 auto; white-space: nowrap; }
 }
