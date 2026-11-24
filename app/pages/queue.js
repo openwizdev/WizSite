@@ -171,7 +171,7 @@
       const videos = (spec.detail?.comments?.nodes || []).filter(c => c && Number.isSafeInteger(c.databaseId) && authorOk(authors, c.author?.login)
         && VIDEO.test(String(c.body ?? ''))).sort((a, b) => b.databaseId - a.databaseId);
       const key = `spec:${repository}#${spec.number}`;
-      if (spec.done !== null) progress.set(key, `${spec.done} of ${spec.total} tickets complete`);
+      if (spec.done !== null) progress.set(key, { merged: spec.done, total: spec.total });
       return { type: 'spec', key, repository, subject: { kind: 'issue', number: spec.number },
         title: spec.title, url: spec.url, at: updated.get(spec.number) ?? 0,
         video: videos.length ? { url: videos[0].body.match(VIDEO)[1] } : null, graph: spec.graph };
@@ -233,7 +233,7 @@
     const request = item.request;
     const spec = item.type === 'spec';
     const label = spec ? 'Spec to watch' : request ? WORDS[request.kind] : 'Decision couldn\'t be read';
-    const detail = spec ? progress : request?.headline || request?.summary?.[0]
+    const detail = spec ? (progress && `${progress.merged} of ${progress.total} tickets complete`) : request?.headline || request?.summary?.[0]
       || request?.questions?.find(q => !request.answered.includes(q.id))?.decides;
     const status = spec ? null : !request ? 'Its details or author couldn\'t be checked.'
       : item.current ? null : 'Its source couldn\'t be checked yet.';
@@ -287,7 +287,7 @@
     if (deck.message !== message) {
       deck.message = message;
       const notice = message && (gaps.length ? OW.ui.unknown(message) : result
-        ? h('div', { class: 'v2-clear-card' }, h('h2', {}, 'All clear'), h('p', {}, message)) : OW.ui.placeholder(message));
+        ? OW.v2.allClear(message) : OW.ui.placeholder(message));
       deck.status.replaceChildren(...(notice ? [notice] : []));
     }
 
@@ -299,6 +299,16 @@
     const index = Math.max(0, selected);
     deck.activeKey = items[index]?.key;
     deck.keys = items.map(item => item.key);
+    if (deck.result !== result || deck.buildingKey !== deck.activeKey) {
+      deck.result = result;
+      deck.buildingKey = deck.activeKey;
+      const projects = items.flatMap(item => {
+        const progress = result?.progress?.get(item.key);
+        return progress && item.key !== deck.activeKey ? [{ title: item.title, href: item.url, ...progress }] : [];
+      }).slice(0, 3);
+      const building = OW.v2.buildingSection(projects);
+      deck.building.replaceChildren(...(building ? [building] : []));
+    }
     const position = `${index}/${items.length}`;
     if (deck.position !== position) {
       const go = next => {
@@ -330,13 +340,14 @@
     icon: 'clock',
     v2: true,
     feeds: ['specs'],
-    badge: () => state.result?.repository === OW.data.repo.get()?.full ? view()?.items.filter(shown).length || null : null,
+    badge: () => state.result?.repository === OW.data.repo.get()?.full ? view()?.items.filter(item => item.type === 'decision' && shown(item)).length || null : null,
     render(el, feeds, { arg, controls, onCount } = {}) {
       if (!el.contains(state.deck?.cards)) {
         const status = h('div', { class: 'v2-queue-status' });
         const cards = h('div', { class: 'queue' });
-        el.replaceChildren(h('div', { class: 'v2-live-feed' }, status, cards));
-        state.deck = { status, controls, cards, arg, onCount };
+        const building = h('div');
+        el.replaceChildren(h('div', { class: 'v2-live-feed' }, status, cards, building));
+        state.deck = { status, controls, cards, building, arg, onCount };
       } else if (state.deck.arg !== arg) {
         state.deck.arg = arg;
         state.deck.activeKey = null;

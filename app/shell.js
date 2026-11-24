@@ -39,7 +39,7 @@
     const [rawId, arg] = location.hash.replace(/^#\/?/, '').split('/');
     const id = v2 && OW.v2 && rawId === 'queue' ? 'feed' : rawId;
     if (id === 'specs' && /^[1-9]\d*$/.test(arg || '')) return { id, arg };
-    if (v2 && OW.v2 && id === 'feed' && /^[1-9]\d*$/.test(arg || '')) return { id, arg };
+    if (v2 && OW.v2 && id === 'feed' && (/^[1-9]\d*$/.test(arg || '') || (demo && arg === 'clear'))) return { id, arg };
     return { id: arg === undefined ? id : '', arg: null };
   };
   const current = () => {
@@ -227,7 +227,9 @@
     return OW.pages.map(page => {
       const badge = h('span', { class: 'v2-badge', hidden: true });
       const cls = kind === 'main' ? `v2-nav-item${page.bottom ? ' v2-bottom' : ''}` : '';
-      const link = h('a', { href: `#/${page.id}`, class: cls || null }, icon(page.icon), h('span', {}, page.title), badge);
+      const mobile = kind === 'tabs';
+      const glyph = mobile ? h('span', { class: 'v2-tab-icon' }, icon(page.icon), badge) : icon(page.icon);
+      const link = h('a', { href: `#/${page.id}`, class: cls || null }, glyph, h('span', {}, page.title), mobile ? null : badge);
       return { page, link, badge };
     });
   }

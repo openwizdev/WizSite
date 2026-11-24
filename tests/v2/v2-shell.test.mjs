@@ -51,14 +51,33 @@ test('switch on + demo=1: renders v2 shell, deep links, interactions, and makes 
     await run.page.tap('Change something');
     await run.page.type('Make the link last ten minutes');
     await run.page.tap('Send change');
-    assert.match(await run.page.text(), /Make the link last ten minutes/);
-    assert.equal(await run.page.run(`document.activeElement.dataset.focus`), 'change');
-    await run.page.click('Ship it');
-    await run.page.until(`document.body.innerText.includes('Pricing copy on the checkout banner')`, 'advances after shipping');
+    await run.page.until(`location.hash === '#/feed/2' && document.activeElement.textContent === 'Keep the free plan?'`, 'a change advances to the next card and focuses its title');
+    await run.page.go(`${SITE}/app/?demo=1#/chat`);
+    await run.page.until(`document.body.innerText.includes('Make the link last ten minutes')`, 'change request recorded in Chat');
+    await run.page.go(`${SITE}/app/?demo=1#/feed/clear`);
+    await run.page.until(`document.querySelector('.v2-building')?.textContent.includes('Magic-link sign-in')`, 'revised spec moved to Building');
 
     await run.page.go(`${SITE}/app/?v2=dry-run&demo=1#/feed/2`);
-    await run.page.until(`document.body.innerText.includes('Pricing copy on the checkout banner')`, 'deep link to decision card');
-    assert.ok((await run.page.text()).includes('Show "Save 20%"'));
+    await run.page.until(`document.querySelector('.v2-card-title')?.textContent === 'Keep the free plan?'`, 'deep link to decision card');
+    assert.match(await run.page.text(), /Recommended: keep it, cap at 3 seats/);
+    assert.equal(await run.page.run(`document.querySelector('.v2-hero-card .v2-preview')`), null);
+    await run.page.go(`${SITE}/app/?demo=1#/feed`);
+    const badges = () => run.page.run(`[...document.querySelectorAll('a[href="#/feed"] .v2-badge')].map(badge => badge.hidden ? null : badge.textContent)`);
+    await run.page.until(`document.querySelector('.v2-card-title')?.textContent === 'Magic-link sign-in'`, 'spec card to ship');
+    assert.deepEqual(await badges(), ['3', '3']);
+    await run.page.click('Ship it');
+    await run.page.until(`document.querySelector('.v2-card-title')?.textContent === 'Keep the free plan?'`, 'advances after shipping');
+    assert.deepEqual(await badges(), ['2', '2']);
+    await run.page.click('Ship it');
+    await run.page.until(`document.querySelector('.v2-card-title')?.textContent === 'Retention window for deleted projects'`, 'next decision');
+    assert.deepEqual(await badges(), ['1', '1']);
+    await run.page.click('Not now');
+    await run.page.until(`location.hash === '#/feed/clear' && document.querySelector('.v2-clear-card h2')?.textContent === 'All clear.'`, 'all clear after the last decision');
+    assert.deepEqual(await badges(), [null, null]);
+    assert.equal(await run.page.run(`document.querySelector('.v2-building progress').value`), 5);
+    await run.page.click('Undo');
+    await run.page.until(`document.querySelector('.v2-card-title')?.textContent === 'Retention window for deleted projects'`, 'undo restores the last decision');
+    assert.deepEqual(await badges(), ['1', '1']);
 
     await run.page.go(`${SITE}/app/?v2=dry-run&demo=1#/settings`);
     await run.page.until(`document.querySelector('select[aria-label="Where it runs"]')?.value === 'Local workstation'`, 'settings screen');
@@ -66,6 +85,8 @@ test('switch on + demo=1: renders v2 shell, deep links, interactions, and makes 
     assert.equal(await run.page.run(`document.querySelector('[aria-label="Notifications"]').getAttribute('aria-checked')`), 'true');
 
     assert.deepEqual(apiRequests(run.world), [], 'demo mode sent an API or external network request');
+    assert.deepEqual(await run.page.run(`performance.getEntriesByType('resource').filter(entry =>
+      ['fetch', 'xmlhttprequest', 'beacon'].includes(entry.initiatorType)).map(entry => entry.name)`), []);
     assert.deepEqual(run.world.writes(), [], 'demo mode wrote something');
     assert.deepEqual(run.world.violations, [], 'demo mode hit a CSP or console violation');
   } finally {
