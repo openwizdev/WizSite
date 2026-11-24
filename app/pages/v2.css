@@ -21,6 +21,7 @@ html[data-v2='1'] body { font-size: var(--v2-body); line-height: 1.5; }
 html[data-v2='1'] :is(h1, h2, h3) { text-wrap: balance; }
 html[data-v2='1'] :focus-visible { outline: 2px solid var(--em-amber); outline-offset: 3px; }
 html[data-v2='1'] :is(h1, h2)[tabindex='-1']:focus { outline: none; }
+html[data-v2='1'] body > .visually-hidden { position: fixed; top: 0; left: 0; }
 
 .v2-backdrop, .v2-welcome::before {
   content: '';
@@ -750,6 +751,13 @@ html[data-v2='1'] a.cv-decision:hover { text-decoration: none; }
 .cv-done summary { display: flex; align-items: center; min-height: 44px; color: var(--em-muted); font-size: var(--v2-small); cursor: pointer; }
 .cv-done summary::before { content: '+'; width: 20px; font: 400 16px var(--em-mono); }
 .cv-done[open] summary::before { content: '−'; }
+
+@media (761px <= width < 1120px) {
+  html[data-v2='1'] .cv-area { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+  html[data-v2='1'] .cv-rail { flex-direction: row; overflow: auto hidden; }
+  html[data-v2='1'] .cv-rail .cv-sheet { flex: 0 0 208px; }
+  html[data-v2='1'] .cv-legend { display: none; }
+}
 
 @media (max-width: 760px) {
   html[data-v2='1'] {
