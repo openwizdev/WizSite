@@ -8,4 +8,4 @@ Generate a full-page design target screenshot for openwiz.dev/team. Existing dar
 
 # Inspection
 
-I inspected both generated PNGs for the two-column desktop hero, full-width phone booking link, stacked proof sections, ticket-row density, and brass final pull request. The tool returned its native image dimensions. The site retains the existing page copy and film assets and uses the fixture titles, links, and UTC timestamps in place of the mockups’ generated examples.
+I inspected both generated PNGs for the two-column desktop hero, full-width phone booking link, stacked proof sections, ticket-row density, and brass final pull request. I resampled the complete native renders proportionally to 1440 × 2160 and 390 × 780. The site retains the existing page copy and film assets and uses the fixture titles, links, and UTC timestamps in place of the mockups’ generated examples.
