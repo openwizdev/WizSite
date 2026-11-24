@@ -667,7 +667,7 @@
       'aria-label': `Open #${s.number} ${s.title}`, onclick: () => openAt(at) },
     h('span', { class: 'cv-open-head' }, h('span', { class: 'cv-sheet-name' }, `${String(at + 1).padStart(2, '0')} · #${s.number} ${s.title}`), h('span', { class: 'cv-sheet-line' }, sheetLine(s))),
     tiles.length ? h('span', { class: 'cv-otiles' }, tiles) : h('span', { class: 'cv-calm' }, s.read ? 'No tickets yet.' : 'Its tickets couldn\'t be read.')) : null;
-    const el = h('section', { class: 'cv-over', 'aria-label': 'Every sheet', tabindex: '-1', 'data-focus': 'over' },
+    const el = h('section', { class: 'cv-over', 'aria-label': V2() ? 'Every spec' : 'Every sheet', tabindex: '-1', 'data-focus': 'over' },
       more(Math.max(0, at - 3), 'above'),
       h('div', { class: 'cv-acc' }, ...above, open, ...below),
       more(Math.max(0, sheets.length - at - 4), 'below'),
@@ -708,7 +708,7 @@
     }
     if (!sheet) {
       return el.replaceChildren(h('div', { class: 'cv' }, ...notices(m, null), head, h('div', { class: 'cv-area' }, rail(m),
-        OW.ui.unknown(`Spec #${arg} isn't among the open specs GitHub gave this read.`))));
+        OW.ui.unknown(sample ? `Spec #${arg} isn't in this sample workspace.` : `Spec #${arg} isn't among the open specs GitHub gave this read.`))));
     }
     const rows = V2() && PHONE.matches;
     const focused = view.focus && sheet.tickets.find(t => t.key === view.focus);
