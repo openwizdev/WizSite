@@ -64,8 +64,6 @@ ICON_HASHES = {
     'app/icon-180.png': 'deb93ec39812c224c1470e2f1730f7f4ead7be3d27428a20a2a83284b77fbc2f',
 }
 DOC_HASHES = {
-    'docs/map.png': '19fc57ff3f588b36e2ca412f5656483eaf873718d0d19a39aceb83e007333e6b',
-    'docs/map-phone.png': 'cdd21a74a880d3adab68ce794de1b18060d916d6df5d00ceb54eb06736cf3fd2',
     'docs/evidence/speed/fonts/app-1280x800.png': 'db6128e1d62daf1112ca41246fd04665bcc0b3060b99192bbc66927ef6fb66cf',
     'docs/evidence/speed/fonts/app-390x844.png': 'c7f5f4c1ef45cb111f74bce6014f79aa07eb58c54c9a4a632a55847f5863d679',
     'docs/evidence/speed/fonts/changelog-1280x800.png': 'd88654b912dbd9c1320d6503e8ad165bf23b5a3a4c5d0d13e60586ba944735c3',
@@ -127,6 +125,7 @@ LAUNCH_LABEL = 'Watch OpenWiz in two minutes'
 LAUNCH_POST = 'https://x.com/openwiz/status/2124709517665657224'
 LAUNCH_POST_TEXT = 'See the launch post'
 GSAP = 'vendor/gsap-3.15.1.min.js'
+NPM_HASHED = {GSAP: 'node_modules/gsap/dist/gsap.min.js'}
 VENDOR_HASHES = {
     'vendor/GSAP-LICENSE.txt': '791e7d34e6718aad2bd3e20fa5240a4c0e47d73ee3ca31424652cca52fe9acf0',
     'vendor/LOBE-ICONS-LICENSE.txt': 'add9d7531d1b21646317a8958e38fc727506fa39d24bdecb44154d943c82753a',
@@ -272,7 +271,7 @@ def fingerprint(name, data):
 
 
 def built_asset_bytes(name, font_names=None):
-    data = (ROOT / name).read_bytes()
+    data = (ROOT / NPM_HASHED.get(name, name)).read_bytes()
     if name.endswith('.css') and font_names:
         text = data.decode('utf-8')
         for font, hashed in font_names.items():
