@@ -14,7 +14,7 @@ const git = (dir, ...args) => execFileSync('git', ['-c', 'credential.helper=', '
   { encoding: 'utf8', env: { ...ISOLATED, GIT_NO_LAZY_FETCH: '1' }, stdio: ['ignore', 'pipe', 'pipe'] });
 const PATTERNS = 'import json, re, sys; sys.path.insert(0, "check"); import check; print(json.dumps([[label, pattern.pattern, bool(pattern.flags & re.I)] for label, pattern in check.PRIVATE]))';
 
-export async function sync(checkout, target = REGISTRY, canonical = WIZMARKET) {
+export async function sync(checkout, target = REGISTRY) {
   const dir = resolve(checkout);
   const refuse = why => { throw new Error(`market-sync: refused: ${why}`); };
   if (!existsSync(join(dir, '.git'))) refuse('not a git checkout');
@@ -24,8 +24,8 @@ export async function sync(checkout, target = REGISTRY, canonical = WIZMARKET) {
   const temp = mkdtempSync(join(tmpdir(), 'market-sync-'));
   try {
     const main = join(temp, 'WizMarket');
-    try { git(temp, 'clone', '--quiet', '--no-checkout', '--no-tags', '--single-branch', '--branch', 'main', '--', canonical, main); } catch { refuse(`could not fetch canonical WizMarket main from ${canonical}`); }
-    try { git(main, 'merge-base', '--is-ancestor', head, 'refs/remotes/origin/main'); } catch { refuse(`HEAD is not on canonical WizMarket main (${canonical})`); }
+    try { git(temp, 'clone', '--quiet', '--no-checkout', '--no-tags', '--single-branch', '--branch', 'main', '--', WIZMARKET, main); } catch { refuse(`could not fetch canonical WizMarket main from ${WIZMARKET}`); }
+    try { git(main, 'merge-base', '--is-ancestor', head, 'refs/remotes/origin/main'); } catch { refuse(`HEAD is not on canonical WizMarket main (${WIZMARKET})`); }
     git(main, 'checkout', '--quiet', '--detach', head);
     if (!existsSync(join(main, 'check/check.py'))) refuse('the commit has no check/check.py (WizMarket\'s index command)');
     const python = (...args) => execFileSync('python3', ['-I', '-B', ...args], { cwd: main, env: ISOLATED, stdio: ['ignore', 'pipe', 'pipe'] });
@@ -48,14 +48,14 @@ export async function sync(checkout, target = REGISTRY, canonical = WIZMARKET) {
   }
 }
 
-export async function cli(args, canonical = WIZMARKET) {
+export async function cli(args) {
   const [checkout, extra] = args;
   if (!checkout || extra) {
     console.error('usage: node scripts/market-sync.mjs <WizMarket checkout>');
     return 2;
   }
   try {
-    const index = await sync(checkout, REGISTRY, canonical);
+    const index = await sync(checkout, REGISTRY);
     console.log(`market/registry.json: ${index.listings.length} listings at WizMarket ${index.commit}`);
     return 0;
   } catch (error) {

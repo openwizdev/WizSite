@@ -10,6 +10,7 @@ const ROOT = new URL('..', import.meta.url).pathname;
 const FIXTURES = join(ROOT, 'tests/market-fixtures');
 const C = 'd'.repeat(40);
 const RECEIPT = id => `https://github.com/openwizdev/WizMarket/blob/${C}/receipts/${id}/2026-11-01-aaaaaaaaaaaa.txt`;
+const WIZMARKET = 'https://github.com/openwizdev/WizMarket';
 const SKILL = `https://github.com/example-owner/example-skills/tree/${'c'.repeat(40)}`;
 
 const CONTRACT_LISTINGS = {
@@ -255,10 +256,15 @@ function trusted() {
   return { dir, work, git, canonical, fork, ran: () => existsSync(ran) ? readFileSync(ran, 'utf8').trim().split('\n') : [] };
 }
 
+const REAL_GIT = execFileSync('sh', ['-c', 'command -v git'], { encoding: 'utf8' }).trim();
+
 function trustedSync(repo, env = {}) {
   const site = siteCopy();
-  const code = `const { cli } = await import(${JSON.stringify(pathToFileURL(join(site, 'scripts/market-sync.mjs')).href)}); process.exitCode = await cli([${JSON.stringify(repo.work)}], ${JSON.stringify(repo.canonical)});`;
-  const run = spawnSync(process.execPath, ['--input-type=module', '-e', code], { cwd: site, encoding: 'utf8', env: { ...process.env, ...env } });
+  const transport = join(repo.dir, 'transport');
+  mkdirSync(transport, { recursive: true });
+  writeFileSync(join(transport, 'git'), `#!/bin/sh\nfor a; do shift; [ "$a" = ${JSON.stringify(WIZMARKET)} ] && a=${JSON.stringify(repo.canonical)}; set -- "$@" "$a"; done\nexec ${JSON.stringify(REAL_GIT)} "$@"\n`, { mode: 0o755 });
+  const run = spawnSync(process.execPath, [join(site, 'scripts/market-sync.mjs'), repo.work], { cwd: site, encoding: 'utf8',
+    env: { ...process.env, ...env, PATH: `${transport}:${process.env.PATH}` } });
   const out = existsSync(join(site, 'market/registry.json')) ? readFileSync(join(site, 'market/registry.json'), 'utf8') : null;
   rmSync(site, { recursive: true, force: true });
   return { ...run, out };
