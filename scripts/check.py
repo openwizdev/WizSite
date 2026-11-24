@@ -118,7 +118,8 @@ DRIVER_LOGOS = {
     'drivers/logos/warp.svg': ('66dca2f684bb2250d5294e7f60b190afb7690c79a03bd6e6d4507f0da6a0d7aa', 'Warp'),
 }
 
-HASHED = ('tokens.css', 'site.css', GSAP, 'site.js', 'faq.js')
+PAGE_STYLES = {'changelog/index.html': 'changelog/changelog.css', 'market/index.html': 'market/market.css'}
+HASHED = ('tokens.css', 'site.css', *PAGE_STYLES.values(), GSAP, 'site.js', 'faq.js')
 APP_PAGE = 'app/index.html'
 APP_STYLE = 'app/ember.css'
 APP_FOUND = {(folder, ext): tuple(sorted(p.relative_to(ROOT).as_posix() for p in (ROOT / folder).glob(f'*.{ext}')))
@@ -132,8 +133,23 @@ APP_SCRIPTS = ('app/data.js', 'app/records.js', 'app/ui.js') + APP_PARTS + ('app
 APP_VENDOR = {'app/vendor/dagre-3.1.3.min.js': ('node_modules/@dagrejs/dagre/dist/dagre.min.js', 'app/pages/spec.js'),
               'app/vendor/dagre-LICENSE.txt': ('node_modules/@dagrejs/dagre/LICENSE', None)}
 HASHED += (APP_STYLE,) + APP_PART_STYLES + APP_SCRIPTS
+SITE_CSP = ("default-src 'self'; script-src 'self' https://static.cloudflareinsights.com; style-src 'self'; "
+            "img-src 'self' data:; media-src 'self'; font-src 'self'; "
+            "connect-src 'self' https://api.github.com https://cloudflareinsights.com; frame-src 'none'; object-src 'none'; "
+            "base-uri 'none'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests")
+SITE_HEADERS = (
+    'Strict-Transport-Security: max-age=31536000',
+    f'Content-Security-Policy: {SITE_CSP}',
+    'X-Frame-Options: DENY',
+    'Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()',
+    'Cross-Origin-Opener-Policy: same-origin',
+    'X-Content-Type-Options: nosniff',
+    'Referrer-Policy: strict-origin-when-cross-origin',
+)
 APP_CSP = ("default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; media-src 'self'; font-src 'self'; "
            "connect-src 'self' https://api.github.com; manifest-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
+SECURITY_TXT = '.well-known/security.txt'
+ROBOTS_TXT = 'robots.txt'
 
 
 def fingerprint(name, data):
@@ -221,7 +237,7 @@ def with_cta(html):
 FINGERPRINTS = {name: fingerprint(name, (ROOT / name).read_bytes()) for name in HASHED}
 ASK_INDEX = 'ask-index.json'
 STATIC = {
-    'index.html', 'changelog/index.html', 'drivers/index.html', 'team/index.html', 'faq/index.html', 'market/index.html', '_headers', APP_PAGE, 'app/manifest.webmanifest',
+    'index.html', 'changelog/index.html', 'drivers/index.html', 'team/index.html', 'faq/index.html', 'market/index.html', '_headers', SECURITY_TXT, ROBOTS_TXT, APP_PAGE, 'app/manifest.webmanifest',
     'fonts/Geist-var.woff2', 'fonts/GeistMono-var.woff2', 'fonts/OFL.txt',
 } | ART | set(ICON_HASHES) | set(VECTORS) | (set(VENDOR_HASHES) - {GSAP}) | set(APP_VENDOR) | set(DRIVER_LOGOS) | {ASK_INDEX}
 RUNTIME = STATIC | set(FINGERPRINTS.values())
@@ -741,16 +757,19 @@ def check_site(root, registry=ROOT / 'market/registry.json'):
     assert files == STATIC | set(names.values()), 'unexpected or missing build output'
     pages = {root / f: Page((root / f).read_text()) for f in PAGES}
     drivers_html = (root / DRIVERS_PAGE).read_text()
-    for page in pages.values():
+    for path, page in pages.items():
+        rel = path.relative_to(root).as_posix()
         assert not set(page.refs) & {f'/{name}' for name in HASHED}, 'a page uses an unfingerprinted style or script'
-        assert page.stylesheets == [f'/{names["tokens.css"]}', f'/{names["site.css"]}'], 'a page must apply exactly tokens.css then site.css'
+        expected = [f'/{names["tokens.css"]}', f'/{names["site.css"]}'] + ([f'/{names[PAGE_STYLES[rel]]}'] if rel in PAGE_STYLES else [])
+        assert page.stylesheets == expected, f'{rel} must apply exactly {expected}, got {page.stylesheets}'
+        assert not Outline(path.read_text()).styles, f'{rel} must not use inline <style> blocks'
     page = pages[root / 'index.html']
     assert page.scripts == [f'/{names[GSAP]}', f'/{names["site.js"]}', f'/{names["faq.js"]}'], 'load the pinned GSAP before site.js, then faq.js'
     assert not page.inline_scripts, 'landing motion must wait for both external scripts'
     assert len(page.videos) == 2, 'expected the launch video and one spec recording'
     check_launch((root / 'index.html').read_text(), page)
     clip = next((v for v in page.videos if 'spec-video' in (v.get('class') or '').split()), {})
-    assert clip.get('preload') == 'none' and 'autoplay' not in clip, 'spec recording must be opt-in'
+    assert clip.get('preload') == 'none' and 'autoplay' not in clip and 'loop' not in clip, 'spec recording must be opt-in'
     assert 'muted' in clip and 'playsinline' in clip, 'spec video must start muted inline'
     assert clip.get('poster', '').removeprefix('/') in ART, 'spec video needs a pinned poster'
     assert any(t.get('kind') == 'captions' and 'default' in t and t.get('src', '').removeprefix('/') in ART for t in page.tracks_of(clip)), 'spec video needs default captions'
@@ -803,7 +822,7 @@ def check_site(root, registry=ROOT / 'market/registry.json'):
             f'the launch post link, the landing launch video\'s only: {path.relative_to(root)} has {page.launch_posts}'
         for ref in css_refs(path.read_text()):
             check_ref(root, path, ref, pages)
-    for path in root.glob('*.css'):
+    for path in (root / names[name] for name in ('tokens.css', 'site.css', *PAGE_STYLES.values())):
         for ref in css_refs(path.read_text()):
             check_ref(root, path, ref, pages)
     check_app(root, names, pages)
@@ -815,8 +834,28 @@ def check_site(root, registry=ROOT / 'market/registry.json'):
         else:
             assert b'SIL OPEN FONT LICENSE' in data, 'missing OFL licence'
     headers = (root / '_headers').read_text()
+    site_rule = re.search(r'^/\*\n((?:  .*\n?)*)', headers, re.M)
+    assert site_rule, '_headers must define site-wide /* rules'
+    site_lines = site_rule[1].splitlines()
+    for header in SITE_HEADERS:
+        assert f'  {header}' in site_lines, f'_headers /* must include {header}'
+    sec_rule = re.search(r'^/\.well-known/security\.txt\n((?:  .*\n?)*)', headers, re.M)
+    assert sec_rule and '  Content-Type: text/plain; charset=utf-8' in sec_rule[1].splitlines(), \
+        '_headers must serve /.well-known/security.txt as text/plain; charset=utf-8'
     for kind in ('css', 'js'):
         assert re.search(rf'^/\*\.{kind}\n  Cache-Control: public, max-age=0, must-revalidate$', headers, re.M), f'_headers must revalidate .{kind}'
+    sec_txt = (root / SECURITY_TXT).read_text()
+    for line in (
+        'Contact: https://github.com/openwizdev/OpenWiz/security/advisories/new',
+        'Preferred-Languages: en',
+        'Canonical: https://openwiz.dev/.well-known/security.txt',
+        'Policy: https://github.com/openwizdev/OpenWiz/security/policy',
+    ):
+        assert line in sec_txt.splitlines(), f'{SECURITY_TXT} missing required line: {line}'
+    assert re.search(r'^Expires: \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$', sec_txt, re.M), f'{SECURITY_TXT} missing RFC 3339 Expires'
+    robots = (root / ROBOTS_TXT).read_text()
+    for line in ('User-agent: *', 'Allow: /', 'Disallow: /api/'):
+        assert line in robots.splitlines(), f'{ROBOTS_TXT} missing required line: {line}'
     landing = (root / 'index.html').read_text()
     words = re.sub(r'<[^>]*>', '', landing)
     headline = re.sub(r'<[^>]*>', '', re.search(r'<h1>([\s\S]*?)</h1>', landing)[1].replace('<br>', ' '))
@@ -876,7 +915,8 @@ def check_site(root, registry=ROOT / 'market/registry.json'):
     for attrs in pages[root / 'index.html'].images:
         if attrs.get('src') == '/art/era-2-grill.webp':
             assert (attrs.get('alt') or '').strip(), f'painting without a description: {attrs.get("src")}'
-    check_motion((root / names['site.css']).read_text())
+    for style_name in ('site.css', *PAGE_STYLES.values()):
+        check_motion((root / names[style_name]).read_text())
     check_driver_css((root / names['site.css']).read_text())
     unlabelled = check_install(landing, pages[root / 'index.html'])
     assert not re.search(r'\b\d{4}-\d{2}-\d{2}\b', words), 'dated landing promise'
@@ -1005,7 +1045,7 @@ def check_changelog(landing, changelog):
     home = Outline(landing)
     labels = [text for href, text in home.links if href in CHANGELOG_LINKS]
     assert labels == ['Changelog', 'Changelog'], f'the landing nav and footer must each link the Changelog: {labels}'
-    assert not home.styles, 'the landing page gets no inline styles; the changelog keeps its own'
+    assert not home.styles, 'the landing page gets no inline styles'
     for page in (landing, changelog):
         reader = Text(page)
         for reading in [reader.joined(), reader.spaced()] + reader.attrs:
@@ -1022,8 +1062,7 @@ def check_changelog(landing, changelog):
     reader = Text(main)
     for reading in [reader.joined(), reader.spaced()] + reader.attrs:
         assert not re.search(r'\d+\.\d+|\b(?:19|20)\d\d\b', reading), 'no version number or date outside the release entries'
-    for style in page.styles:
-        check_motion(style)
+    assert not page.styles, 'the changelog keeps its styles in an external stylesheet, never inline'
 
 
 def check_public_names(html):
@@ -1807,8 +1846,9 @@ def check_app(root, names, pages):
     headers = (root / '_headers').read_text()
     for path in ('/app/*',):
         rule = re.search(rf'^{re.escape(path)}\n((?:  .*\n?)*)', headers, re.M)
-        assert rule and f'  Content-Security-Policy: {APP_CSP}' in rule[1].splitlines(), f'_headers must give {path} the app CSP'
-        assert '  Referrer-Policy: no-referrer' in rule[1].splitlines(), f'_headers must give {path} no-referrer'
+        lines = rule[1].splitlines() if rule else []
+        assert '  ! Content-Security-Policy' in lines and f'  Content-Security-Policy: {APP_CSP}' in lines, f'_headers must detach and set the app CSP for {path}'
+        assert '  ! Referrer-Policy' in lines and '  Referrer-Policy: no-referrer' in lines, f'_headers must detach and set no-referrer for {path}'
 
 
 def check_art(name, data):
