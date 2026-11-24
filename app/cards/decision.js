@@ -24,6 +24,7 @@
   };
 
   const staleItems = new WeakSet();
+  const counts = new Map();
   const STALE = 'The request or its source changed since it was read.';
   const onSubject = (p, item) => !!p && p.repository === item.repository && !!p.subject
     && p.subject.kind === item.subject.kind && p.subject.number === item.subject.number;
@@ -49,26 +50,32 @@
     let raw = '';
     let was = '';
     let dropped = null;
+    let span = null;
     const at = n => { let i = 0; for (let k = 0; k < n; k++) i += raw.startsWith('\r\n', i) ? 2 : 1; return i; };
     const grab = event => {
       const data = event.clipboardData || event.dataTransfer;
       dropped = data ? data.getData('text/plain') : null;
+      span = event.type === 'paste' && typeof box.selectionStart === 'number' ? [box.selectionStart, box.selectionEnd] : null;
     };
     box.addEventListener('paste', grab);
     box.addEventListener('drop', grab);
     box.addEventListener('input', () => {
       const now = box.value;
       if (flat(raw) !== was) raw = was;
-      const caret = typeof box.selectionEnd === 'number' ? box.selectionEnd : now.length;
-      let tail = 0;
-      while (tail < was.length && tail < now.length - caret && was[was.length - 1 - tail] === now[now.length - 1 - tail]) tail++;
-      let head = 0;
-      while (head < Math.min(was.length, now.length) - tail && was[head] === now[head]) head++;
-      const added = now.slice(head, now.length - tail);
-      const text = dropped !== null && flat(dropped) === added ? dropped : added;
-      raw = raw.slice(0, at(head)) + text + raw.slice(at(was.length - tail));
+      if (span && dropped !== null && was.slice(0, span[0]) + flat(dropped) + was.slice(span[1]) === now) {
+        raw = raw.slice(0, at(span[0])) + dropped + raw.slice(at(span[1]));
+      } else {
+        const caret = typeof box.selectionEnd === 'number' ? box.selectionEnd : now.length;
+        let tail = 0;
+        while (tail < was.length && tail < now.length - caret && was[was.length - 1 - tail] === now[now.length - 1 - tail]) tail++;
+        let head = 0;
+        while (head < Math.min(was.length, now.length) - tail && was[head] === now[head]) head++;
+        const added = now.slice(head, now.length - tail);
+        const text = dropped !== null && flat(dropped) === added ? dropped : added;
+        raw = raw.slice(0, at(head)) + text + raw.slice(at(was.length - tail));
+      }
       was = now;
-      dropped = null;
+      dropped = span = null;
     });
     return () => flat(raw) === box.value ? raw : box.value;
   }
@@ -107,7 +114,7 @@
         h('strong', {}, `Outcome unknown (${reason}).`), ' ',
         'It may or may not be on GitHub. Check again before answering another way.',
         h('div', { class: 'decision-buttons' }, h('button', { class: 'btn', type: 'button',
-          onclick: () => show(slot.el, slot.preview, 0, () => { idle(slot, reason); lock(false); }, null, slot) }, 'Check again')));
+          onclick: () => show(slot.el, slot.preview, counts.get(slot.preview.op) || 0, () => { idle(slot, reason); lock(false); }, null, slot) }, 'Check again')));
       slot.el.replaceChildren(...(note ? [note] : []), h('pre', { 'data-preview-body': '' }, slot.preview.body), said);
     }
 
@@ -152,10 +159,13 @@
       const buttons = h('div', { class: 'decision-buttons' }, post, cancel);
       post.addEventListener('click', async event => {
         const counted = records.confirm(preview, event);
-        if (counted.confirmed < counted.of) {
-          if (counted.confirmed > confirmed) show(out, preview, counted.confirmed, back, note, slot);
+        const now = Math.min(counted.confirmed, counted.of - 1);
+        counts.set(preview.op, now);
+        if (counted.confirmed < counted.of || confirmed + 1 < counted.of) {
+          if (now !== confirmed) show(out, preview, now, back, note, slot);
           return;
         }
+        counts.delete(preview.op);
         buttons.replaceChildren(h('span', { class: 'decision-wait' }, 'Posting…'));
         let result;
         try { result = await records.post(preview); } catch { result = { outcome: 'unknown', op: preview.op, reason: 'error' }; }
