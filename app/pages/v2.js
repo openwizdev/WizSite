@@ -2,7 +2,7 @@
 (() => {
   const { h, icon } = OW.ui;
   const enabled = () => Boolean(OW.records?.enabled?.());
-  const isDemo = enabled() && new URLSearchParams(location.search).get('demo') === '1';
+  const isDemo = OW.data.demo;
 
   const EFFORT_NOTES = {
     fast: 'Fast: skips extra grill rounds on minor details and sends specs straight to Feed.',

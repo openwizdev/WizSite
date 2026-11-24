@@ -9,12 +9,20 @@
   let built = null;
   const INSTALL = 'https://github.com/apps/openwiz-viewer/installations/new';
   const v2 = Boolean(OW.records?.enabled?.());
-  const demo = Boolean(OW.v2?.demo);
-  if (v2) document.documentElement.dataset.v2 = '1';
+  const demo = data.demo;
+  const assets = document.currentScript.dataset;
+
+  function loadAsset(node) {
+    return new Promise((resolve, reject) => {
+      node.addEventListener('load', resolve, { once: true });
+      node.addEventListener('error', reject, { once: true });
+      document.head.append(node);
+    });
+  }
   const queue = OW.pages.findIndex(page => page.v2);
   if (queue >= 0) {
     const [page] = OW.pages.splice(queue, 1);
-    if (v2 && !OW.v2) OW.pages.unshift(page);
+    if (v2) OW.pages.unshift(page);
   }
   const home = () => (v2 && OW.v2 ? '#/feed' : `#/${OW.pages[0].id}`);
 
@@ -195,7 +203,7 @@
     ];
   }
 
-  if (v2 && OW.v2) {
+  function registerV2Pages() {
     const v2Pages = OW.v2.pages({
       get repoFull() { return data.repo.get()?.full || 'Harbor'; },
       repoSwitch: () => repoSwitch(data.repo.get()),
@@ -368,7 +376,7 @@
   OW.onSignedOut = () => signedOut('Your sign-in ended. Sign in again.');
   window.addEventListener('hashchange', () => (demo ? draw() : built ? update() : null));
   document.addEventListener('keydown', event => {
-    if (!built) return;
+    if (!built || demo || event.target.closest?.('dialog[open]')) return;
     if ((event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'k') {
       event.preventDefault();
       return OW.palette.toggle();
@@ -383,6 +391,14 @@
   });
 
   async function boot() {
+    if (v2) {
+      await Promise.all([
+        loadAsset(h('link', { rel: 'stylesheet', href: assets.v2Css })),
+        loadAsset(h('script', { src: assets.v2Js })),
+      ]);
+      document.documentElement.dataset.v2 = '1';
+      registerV2Pages();
+    }
     if (demo) return draw();
     const params = new URLSearchParams(location.search);
     const code = params.get('code');
@@ -398,5 +414,5 @@
     }
     draw();
   }
-  boot();
+  boot().catch(() => screen(h('h1', {}, 'Couldn’t open OpenWiz'), h('a', { class: 'btn', href: location.href }, 'Try again')));
 })();

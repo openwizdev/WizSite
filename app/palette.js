@@ -5,6 +5,7 @@
   const PALETTE_KEY = MAC ? '⌘ K' : 'Ctrl K';
   const RESULTS_SHOWN = 60;
   const KINDS = { page: 'Page', action: 'Action', spec: 'Spec', ticket: 'Ticket', agent: 'Agent' };
+  const v2 = () => OW.data.v2.get() !== 'off';
   const FILTERS = { page: 'pages', spec: 'specs', ticket: 'tickets', agent: 'agents' };
   const css = (el, props) => { for (const [k, v] of Object.entries(props)) el.style.setProperty(k, v); return el; };
   const GITHUB = url => typeof url === 'string' && url.startsWith('https://github.com/');
@@ -15,6 +16,7 @@
     const out = [];
     OW.pages.forEach((page, i) => out.push({ kind: 'page', id: `page:${page.id}`, title: page.title, detail: `Press ${i + 1}`, go: `#/${page.id}` }));
     out.push(...actions());
+    if (v2()) return out;
     const seen = OW.factory.model(feeds);
     const tickets = new Map();
     const ticket = (t, spec, where) => ({ kind: 'ticket', id: `ticket:${t.key}`, title: `#${t.number} ${t.title}`,
@@ -55,7 +57,7 @@
       { kind: 'action', id: 'copy', title: 'Copy a link to this page', detail: 'This page of the app', run: () => copy(location.href, 'this page') },
       { kind: 'action', id: 'github', title: 'Open this page on GitHub', detail: specUrl ? `Spec #${spec}` : home ? `${home}'s issues` : '',
         run: () => openOnGitHub(specUrl || (home ? `https://github.com/${home}/issues` : null)) },
-      ...Object.entries(FILTERS).map(([kind, words]) => ({ kind: 'action', id: `filter:${kind}`, title: `Show only ${words}`, detail: 'Filter the palette',
+      ...Object.entries(FILTERS).filter(([kind]) => !v2() || kind === 'page').map(([kind, words]) => ({ kind: 'action', id: `filter:${kind}`, title: `Show only ${words}`, detail: 'Filter the palette',
         run: () => { filter = kind; input.value = ''; draw(); } })),
       { kind: 'action', id: 'shortcuts', title: 'Show keyboard shortcuts', detail: 'Press ?', run: () => { close(true); shortcuts(); } },
     ];
@@ -199,9 +201,11 @@
     const was = keep ? shown[active]?.id : null;
     const found = match(results(), input.value);
     shown = found.slice(0, RESULTS_SHOWN);
-    input.placeholder = filter ? `Find ${FILTERS[filter]}… (Backspace shows everything)` : 'Find a page, spec, ticket or agent…';
+    input.placeholder = filter ? `Find ${FILTERS[filter]}… (Backspace shows everything)`
+      : v2() ? 'Find a page or action…' : 'Find a page, spec, ticket or agent…';
+    if (v2()) input.setAttribute('aria-label', 'Find a page or action');
     const more = found.length - shown.length;
-    const empty = filter ? `No ${FILTERS[filter].slice(0, -1)} matches. Backspace in the empty field shows everything.` : 'No match. Try a page, a spec or ticket number, or an agent\'s ticket.';
+    const empty = filter ? `No ${FILTERS[filter].slice(0, -1)} matches. Backspace in the empty field shows everything.` : v2() ? 'No matching pages or actions.' : 'No match. Try a page, a spec or ticket number, or an agent\'s ticket.';
     list.replaceChildren(...(shown.length ? shown.map(option) : [css(h('li', { class: 'small' }, empty), { padding: '9px 12px', color: 'var(--em-muted)' })]),
       ...(more > 0 ? [css(h('li', { class: 'small', 'aria-hidden': 'true' }, `${more} more: type to narrow`), { padding: '9px 12px', color: 'var(--em-muted)' })] : []));
     active = 0;
@@ -209,6 +213,7 @@
   }
 
   function open() {
+    if (OW.data.demo) return;
     if (!dialog) build();
     if (dialog.open) return;
     const was = help?.open ? focusReturn : document.activeElement;
@@ -234,11 +239,11 @@
 
   const SHORTCUTS = () => [
     ['Anywhere', [
-      [PALETTE_KEY, 'Open the command palette: go to any page, spec, ticket or agent, or run an action'],
+      [PALETTE_KEY, v2() ? 'Find a page or action' : 'Open the command palette: go to any page, spec, ticket or agent, or run an action'],
       ...OW.pages.map((page, i) => [String(i + 1), `Go to ${page.title}`]),
       ['?', 'Show these shortcuts'],
       ['Tab, Shift Tab', 'Move between links and buttons; Enter opens the focused one'],
-      ['Esc', 'Close the palette or this list; on a spec\'s page, back to all specs'],
+      ['Esc', v2() ? 'Close the palette or this list' : 'Close the palette or this list; on a spec\'s page, back to all specs'],
     ]],
     ['In the palette', [
       ['↑ ↓', 'Choose a result (Up and Down)'],
@@ -250,6 +255,7 @@
   ];
 
   function shortcuts() {
+    if (OW.data.demo) return;
     if (dialog?.open) close(false);
     if (help?.open) return;
     if (!focusReturn) focusReturn = document.activeElement;
