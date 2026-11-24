@@ -1,9 +1,8 @@
 'use strict';
 (() => {
-  const { h, icon } = OW.ui;
+  const { h, icon, time } = OW.ui;
   const isDemo = OW.data.demo;
   const mark = () => h('img', { src: '/app/mark.svg', alt: '', width: 28, height: 28 });
-  const avatar = () => h('img', { class: 'v2-avatar', src: '/art/family-01.webp', alt: '', width: 32, height: 32 });
 
   function initialDemoState() {
     return {
@@ -14,13 +13,13 @@
           id: 'm1',
           role: 'user',
           time: '9:12 AM',
-          text: 'Add usage-based seat billing. Keep upgrades simple for small teams.',
+          text: 'Add usage-based seat billing. Keep upgrades simple.',
         },
         {
           id: 'm2',
           role: 'wiz',
           time: '9:12 AM',
-          text: 'Three quick choices before I draft the spec.',
+          text: 'Three quick choices before I draft.',
         },
         {
           id: 'g1',
@@ -40,8 +39,9 @@
           id: 'c-spec-1',
           type: 'spec',
           status: 'ready',
-          kicker: 'Spec · Ready',
+          kicker: 'Ready to ship',
           title: 'Magic-link sign-in',
+          art: 'email',
           goal: 'Passwordless sign-in with 15-minute links and automatic session refresh.',
           merged: 6,
           total: 6,
@@ -57,7 +57,7 @@
           id: 'c-dec-1',
           type: 'decision',
           status: 'pending',
-          kicker: 'Decision · Needs you',
+          kicker: 'Needs you',
           title: 'Pricing copy on the checkout banner',
           goal: 'Show annual savings as a percentage or a dollar amount?',
           context: 'Annual plans save $240/yr per 10 seats. The rest of the pricing page uses percentages.',
@@ -85,7 +85,7 @@
           id: 'c-dec-2',
           type: 'decision',
           status: 'pending',
-          kicker: 'Decision · Needs you',
+          kicker: 'Needs you',
           title: 'Retention window for deleted projects',
           goal: 'Keep soft-deleted projects recoverable for 30 days or purge after 7 days?',
           context: 'Storage cost is under $2/mo; 30 days matches standard workspace recovery expectations.',
@@ -105,32 +105,45 @@
     };
   }
 
-  let demo = initialDemoState();
+  const demo = isDemo ? initialDemoState() : null;
   let redraw = () => {};
-  let toastTimer = null;
+  let toastTimer;
   let toastEl;
+  let dismissToast;
   let chatView;
+
+  function pauseToast() {
+    clearTimeout(toastTimer);
+  }
+
+  function scheduleToast() {
+    pauseToast();
+    if (!toastEl.hidden && !toastEl.matches(':hover, :focus-within')) toastTimer = setTimeout(dismissToast, 4500);
+  }
 
   function showToast(text, undo = null) {
     const returnTo = document.activeElement;
     if (!toastEl) {
-      toastEl = h('div', { class: 'v2-toast', role: 'status' });
+      toastEl = h('div', { class: 'v2-toast', role: 'status',
+        onpointerenter: pauseToast, onpointerleave: scheduleToast,
+        onfocusin: pauseToast, onfocusout: () => queueMicrotask(scheduleToast) });
       document.body.append(toastEl);
     }
-    const dismiss = () => {
+    dismissToast = () => {
+      const focused = toastEl.contains(document.activeElement);
       toastEl.hidden = true;
-      if (toastEl.contains(document.activeElement)) {
+      pauseToast();
+      if (focused) {
         (returnTo?.isConnected && returnTo !== document.body ? returnTo : document.querySelector('.v2-head h1'))?.focus();
       }
     };
     toastEl.replaceChildren(h('span', {}, text), undo ? h('button', {
       type: 'button',
       class: 'v2-btn subtle',
-      onclick: () => { dismiss(); undo(); },
+      onclick: () => { dismissToast(); undo(); },
     }, 'Undo') : null);
     toastEl.hidden = false;
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(dismiss, 4500);
+    scheduleToast();
   }
 
   function openSheet(card, opener) {
@@ -228,30 +241,53 @@
   }
 
   function renderQuestions(message) {
-    const allRecommended = message.questions.every(q => q.selected === q.rec);
-    return h('article', { class: 'v2-grill', 'aria-label': message.specTitle },
-      h('div', { class: 'v2-grill-head' }, h('h2', {}, message.specTitle),
-        h('p', {}, allRecommended ? 'Recommended answers selected' : 'Review your selected answers')),
-      message.questions.map(q => h('div', { class: 'v2-grill-q' },
-        h('p', {}, q.prompt),
-        h('div', { class: 'v2-q-opts', role: 'group', 'aria-label': q.prompt }, q.options.map((option, i) => h('button', {
-          type: 'button',
-          class: 'v2-q-pill',
-          'aria-pressed': i === q.selected ? 'true' : 'false',
-          'aria-label': i === q.rec ? `${option} (recommended)` : option,
-          'data-focus': `answer:${message.id}:${q.id}:${i}`,
-          disabled: message.answered,
-          onclick: () => { q.selected = i; redraw(); },
-        }, i === q.rec ? icon('check') : null, option))))),
-      h('div', { class: 'v2-grill-foot' }, message.answered
-        ? h('a', { class: 'v2-btn subtle', href: '#/feed', 'data-focus': `send:${message.id}` }, icon('check'), 'Answers saved · Open Feed')
-        : h('button', { type: 'button', class: 'v2-btn primary', 'data-focus': `send:${message.id}`,
-          onclick: () => completeGrill(message) }, allRecommended ? 'Accept all 3' : 'Send 3 answers')));
+    const allRecommended = () => message.questions.every(q => q.selected === q.rec);
+    const hint = h('p');
+    const savedLink = () => h('a', { class: 'v2-btn subtle', href: '#/feed', 'data-focus': `send:${message.id}` },
+      icon('check'), 'Answers saved · Open Feed');
+    const submit = h('button', { type: 'button', class: 'v2-btn primary', 'data-focus': `send:${message.id}`,
+      onclick: () => {
+        const focused = document.activeElement === submit;
+        const link = savedLink();
+        submit.replaceWith(link);
+        for (const option of card.querySelectorAll('.v2-q-pill')) option.disabled = true;
+        if (focused) link.focus({ preventScroll: true });
+        completeGrill(message);
+      },
+    });
+    const sync = () => {
+      const recommended = allRecommended();
+      const nextHint = recommended ? 'Recommended answers selected' : 'Review your selected answers';
+      const nextAction = recommended ? 'Accept all 3' : 'Send 3 answers';
+      if (hint.textContent !== nextHint) hint.textContent = nextHint;
+      if (submit.textContent !== nextAction) submit.textContent = nextAction;
+    };
+    const questions = message.questions.map(q => {
+      const choices = q.options.map((option, i) => h('button', {
+        type: 'button', class: 'v2-q-pill', 'aria-pressed': String(i === q.selected),
+        'aria-label': i === q.rec ? `${option} (recommended)` : option,
+        disabled: message.answered,
+        onclick: () => {
+          if (q.selected === i) return;
+          choices[q.selected].setAttribute('aria-pressed', 'false');
+          q.selected = i;
+          choices[i].setAttribute('aria-pressed', 'true');
+          sync();
+        },
+      }, i === q.rec ? icon('check') : null, option));
+      return h('div', { class: 'v2-grill-q' }, h('p', {}, q.prompt),
+        h('div', { class: 'v2-q-opts', role: 'group', 'aria-label': q.prompt }, choices));
+    });
+    sync();
+    const card = h('article', { class: 'v2-grill', 'aria-label': message.specTitle },
+      h('div', { class: 'v2-grill-head' }, h('h2', {}, message.specTitle), hint), questions,
+      h('div', { class: 'v2-grill-foot' }, message.answered ? savedLink() : submit));
+    return card;
   }
 
   function renderDemoChat(el) {
     if (!chatView || !el.contains(chatView.scroll)) {
-      const scroll = h('div', { class: 'v2-chat-scroll', role: 'log', 'aria-live': 'polite' });
+      const scroll = h('div', { class: 'v2-chat-scroll', role: 'log', 'aria-live': 'polite', 'aria-relevant': 'additions' });
       const thread = h('div', { class: 'v2-chat-thread' });
       scroll.append(thread);
       const input = h('input', {
@@ -260,37 +296,43 @@
         'aria-label': 'Tell Wiz what to build or change',
       });
       input.value = demo.draft;
-      input.addEventListener('input', () => { demo.draft = input.value; });
+      const send = h('button', { type: 'submit', class: 'v2-send-btn', 'aria-label': 'Send message',
+        disabled: !demo.draft.trim() }, icon('up'));
+      input.addEventListener('input', () => {
+        demo.draft = input.value;
+        send.disabled = !demo.draft.trim();
+      });
       const composer = h('form', { class: 'v2-composer', onsubmit: event => {
         event.preventDefault();
         const text = input.value;
         if (!text.trim()) return;
         input.value = '';
         demo.draft = '';
+        send.disabled = true;
         submitChatPrompt(text);
         input.focus({ preventScroll: true });
-      } }, input, h('button', { type: 'submit', class: 'v2-send-btn', 'aria-label': 'Send message' }, icon('up')));
+      } }, input, send);
       el.replaceChildren(h('div', { class: 'v2-chat-wrap' }, scroll, h('div', { class: 'v2-composer-wrap' }, composer)));
       chatView = { scroll, thread, length: 0 };
     }
     const { scroll, thread, length } = chatView;
-    const top = scroll.scrollTop;
-    thread.replaceChildren(...demo.messages.map(message => {
+    const added = demo.messages.slice(length);
+    if (!added.length) return;
+    thread.append(...added.map(message => {
       if (message.role === 'grill') return h('div', { class: 'v2-msg questions' }, renderQuestions(message));
       const fromWiz = message.role === 'wiz';
       return h('div', { class: `v2-msg ${fromWiz ? 'wiz' : 'user'}` },
-        fromWiz ? avatar() : null,
+        fromWiz ? h('span', { class: 'v2-avatar' }, mark()) : null,
         h('div', { class: 'v2-bubble' },
           h('div', { class: 'v2-meta' }, `${fromWiz ? 'Wiz' : 'You'} · ${message.time}`),
           h('p', {}, message.text),
           message.jumpFeed ? h('a', { class: 'v2-btn subtle', href: '#/feed', 'data-focus': 'chat-feed' }, 'Open in Feed', icon('right')) : null));
     }));
     chatView.length = demo.messages.length;
-    if (length && length < chatView.length) {
-      const last = thread.lastElementChild;
-      if (last.classList.contains('questions')) scroll.scrollTop += last.getBoundingClientRect().top - scroll.getBoundingClientRect().top - 8;
-      else scroll.scrollTop = top;
-    } else scroll.scrollTop = top;
+    const last = thread.lastElementChild;
+    if (length && last.classList.contains('questions')) {
+      scroll.scrollTop += last.getBoundingClientRect().top - scroll.getBoundingClientRect().top - 8;
+    }
   }
 
   function renderLiveChat(el) {
@@ -332,13 +374,13 @@
     const list = visibleDemoCards();
     if (!list.length) {
       controls.replaceChildren();
-      el.replaceChildren(h('div', { class: 'v2-feed-stage' },
+      el.replaceChildren(h('div', { class: 'v2-feed-stage v2-empty-stage' },
         h('div', { class: 'v2-clear-card' },
           h('h2', {}, 'All clear'),
           h('p', {}, 'Nothing needs your attention right now.'),
           h('div', { class: 'v2-clear-actions' },
-            h('a', { class: 'v2-btn primary', href: '#/chat' }, 'Open Chat'),
-            h('button', { type: 'button', class: 'v2-btn subtle', onclick: () => {
+            h('a', { class: 'v2-btn', href: '#/chat' }, 'Open Chat'),
+            h('button', { type: 'button', class: 'v2-btn v2-text-btn', onclick: () => {
               demo.cards = initialDemoState().cards;
               demo.feedIdx = 0;
               redraw();
@@ -349,6 +391,7 @@
     const index = feedIndex(list, arg);
     const card = list[index];
     const decision = card.type === 'decision';
+    const following = list[index + 1];
     const go = next => {
       demo.feedIdx = next;
       const number = demo.cards.indexOf(list[next]) + 1;
@@ -367,15 +410,17 @@
         redraw();
       });
     };
-    const poster = h('div', { class: `v2-preview${decision ? ' decision' : ''}` },
+    const email = card.art === 'email';
+    const poster = decision ? null : h('div', { class: `v2-preview${email ? ' v2-preview-email' : ''}` },
       h('div', { class: 'v2-preview-art', 'aria-hidden': 'true' }),
-      decision ? null : h('div', { class: 'v2-preview-top' },
+      email ? h('div', { class: 'v2-envelope', 'aria-hidden': 'true' }, h('span', {}, mark())) : null,
+      h('div', { class: 'v2-preview-top' },
         h('span', { class: 'v2-preview-label' }, 'Narrated spec'),
         h('button', { type: 'button', class: 'v2-preview-btn', 'data-focus': 'scene',
           'aria-label': `Next scene, scene ${card.sceneIdx + 1} of ${card.scenes.length}`,
           onclick: () => { card.sceneIdx = (card.sceneIdx + 1) % card.scenes.length; redraw(); },
         }, `Scene ${card.sceneIdx + 1}/${card.scenes.length}`, icon('right'))),
-      decision ? null : h('div', { class: 'v2-preview-caption', 'aria-live': 'polite' }, card.scenes[card.sceneIdx]));
+      h('div', { class: 'v2-preview-caption', 'aria-live': 'polite' }, card.scenes[card.sceneIdx]));
     const details = decision
       ? h('div', { class: 'v2-decision-box' },
         h('span', { class: 'v2-label' }, 'Recommendation'),
@@ -388,7 +433,7 @@
     const hero = h('article', { class: 'v2-hero-card' },
       h('div', { class: 'v2-card-top' },
         h('span', { class: 'v2-label' }, card.kicker),
-        h('h2', { class: 'v2-card-title' }, card.title),
+        h('h2', { class: 'v2-card-title', tabindex: '-1' }, card.title),
         h('p', { class: 'v2-card-goal' }, card.goal)),
       poster,
       details,
@@ -398,11 +443,19 @@
           onclick: () => resolve(decision ? 'decided' : 'shipped', decision ? 'Approved' : 'Shipped') }, icon('check'), 'Ship it'),
         h('button', { type: 'button', class: 'v2-btn', 'data-focus': 'change',
           onclick: event => openSheet(card, event.currentTarget) }, 'Change something'),
-        h('button', { type: 'button', class: 'v2-btn subtle', 'data-focus': 'defer',
+        h('button', { type: 'button', class: 'v2-btn v2-text-btn', 'data-focus': 'defer',
           onclick: () => resolve('deferred', 'Saved for later') }, 'Not now')));
     const navigation = pager(index, list.length, go);
     controls.replaceChildren(...(navigation ? [navigation] : []));
-    el.replaceChildren(h('div', { class: 'v2-feed-stage' }, hero));
+    const next = following ? h('button', { type: 'button', class: 'v2-next-card', 'data-focus': 'next-card',
+      onclick: () => {
+        go(index + 1);
+        el.querySelector('.v2-card-title')?.focus();
+      },
+    }, h('span', { class: 'v2-next-copy' },
+      h('span', { class: 'v2-label' }, `Next · ${following.type === 'decision' ? 'Needs a decision' : 'Spec to watch'}`),
+      h('span', {}, following.title)), icon('right')) : null;
+    el.replaceChildren(h('div', { class: `v2-feed-stage${decision ? ' v2-decision-stage' : ''}` }, hero, next));
   }
 
   const settingRow = (label, value) => h('div', { class: 'v2-set-row' }, h('span', {}, label), value);
@@ -439,10 +492,7 @@
       settingsGroup('Connections', [connection('GitHub', 'github'), connection('Notifications', 'notifications')]),
       settingsGroup('Account', [
         choose('Repository', 'repository', ['Harbor · main', 'Harbor · staging']),
-        h('a', { class: 'v2-btn subtle v2-sign-out', href: '#/welcome', onclick: () => {
-          demo = initialDemoState();
-          if (toastEl) toastEl.hidden = true;
-        } }, 'Sign out'),
+        h('a', { class: 'v2-btn v2-text-btn v2-sign-out', href: '/app/' }, 'Exit sample workspace'),
       ])));
   }
 
@@ -456,7 +506,7 @@
         settingsGroup('Connections', [settingRow('GitHub', h('span', { class: 'v2-connected' }, 'Connected'))]),
         settingsGroup('Account', [
           settingRow('Repository', ctx.repoSwitch()),
-          h('button', { class: 'v2-btn subtle v2-sign-out', type: 'button', onclick: ctx.signOut }, 'Sign out'),
+          h('button', { class: 'v2-btn v2-text-btn v2-sign-out', type: 'button', onclick: ctx.signOut }, 'Sign out'),
         ]),
         settingsGroup('Data freshness', [freshness])));
     }
@@ -464,23 +514,28 @@
   }
 
   function renderWelcome(root, { note, demoMode }) {
-    const card = h('div', { class: 'v2-welcome-card' },
-      h('h1', {}, 'Your software factory, in one quiet room.'),
+    const card = h('section', { class: 'v2-welcome-card', 'aria-labelledby': 'v2-welcome-title' },
+      h('header', { class: 'v2-welcome-head' },
+        h('div', { class: 'v2-welcome-brand' }, mark(), h('span', {}, 'OpenWiz')),
+        demoMode ? h('span', { class: 'v2-sample-tag' }, 'Sample data') : null),
+      h('h1', { id: 'v2-welcome-title' }, 'Your software factory, in one quiet room.'),
       h('p', { class: 'v2-welcome-copy' }, demoMode
         ? 'Answer a few questions. Watch specs build. Tap Ship it.'
         : 'Review decisions and follow the work in your GitHub repository.'),
       note ? h('div', { class: 'notice bad', role: 'alert' }, icon('warn'), h('span', {}, note)) : null,
       h('a', { class: 'v2-btn primary', href: demoMode ? '#/chat' : '/api/sign-in/start' },
-        demoMode ? 'Open Harbor workspace' : 'Continue with GitHub', icon('right')));
-    root.replaceChildren(h('main', { class: 'v2-welcome' },
-      h('header', { class: 'v2-welcome-head' },
-        h('div', { class: 'v2-welcome-brand' }, mark(), h('span', {}, 'OpenWiz')),
-        demoMode ? h('span', { class: 'v2-sample-tag' }, 'Sample data') : null),
-      card));
+        demoMode ? 'Open Harbor workspace' : 'Continue with GitHub', icon('right')),
+      demoMode ? h('a', { class: 'v2-btn v2-text-btn v2-welcome-sign-in', href: '/api/sign-in/start' }, 'Continue with GitHub') : null);
+    root.replaceChildren(h('main', { class: 'v2-welcome' }, card));
     document.title = 'OpenWiz';
   }
 
+  function readsPausedNote() {
+    return h('p', { class: 'v2-read-pause' }, `GitHub’s rate limit paused reads until ${time(OW.data.limit.pausedUntil)}.`);
+  }
+
   OW.v2 = {
+    readsPausedNote,
     setRedraw: fn => { redraw = fn; },
     renderWelcome,
     pager,

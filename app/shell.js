@@ -227,7 +227,10 @@
     return OW.pages.map(page => {
       const badge = h('span', { class: 'v2-badge', hidden: true });
       const cls = kind === 'main' ? `v2-nav-item${page.bottom ? ' v2-bottom' : ''}` : '';
-      const link = h('a', { href: `#/${page.id}`, class: cls || null }, icon(page.icon), h('span', {}, page.title), badge);
+      const glyph = icon(page.icon);
+      const link = h('a', { href: `#/${page.id}`, class: cls || null },
+        kind === 'tabs' ? h('span', { class: 'v2-tab-glyph' }, glyph, badge) : glyph,
+        h('span', {}, page.title), kind === 'main' ? badge : null);
       return { page, link, badge };
     });
   }
@@ -239,7 +242,7 @@
     const title = h('h1', { tabindex: '-1' });
     const refresh = demo ? null : h('button', {
       class: 'v2-btn subtle v2-refresh', type: 'button', onclick: () => data.refreshAll(), hidden: true,
-    }, icon('refresh'), 'Refresh now');
+    }, icon('refresh'), h('span', {}, 'Refresh now'));
     const pager = h('div', { class: 'v2-pager-slot' });
     const head = h('div', { class: 'v2-head' }, title, h('div', { class: 'v2-head-tools' }, pager, refresh));
     const phoneBar = h('header', { class: 'v2-phone-bar' },
@@ -310,6 +313,7 @@
 
   function updateBadges() {
     if (!built) return;
+    if (built.isV2 && built.refresh) built.refresh.disabled = data.paused();
     const page = current();
     for (const { page: p, link, badge } of [...built.side, ...built.tabs]) {
       if (p.id === page.id) link.setAttribute('aria-current', 'page');
@@ -341,13 +345,17 @@
       built.phoneReads.replaceChildren(...mine.flatMap((feed, i) => [i ? ' · ' : '', ...readLine(feed)]).filter(part => part !== null && part !== ''));
     } else if (built.refresh) {
       built.refresh.hidden = page.id !== 'feed';
-      built.refresh.disabled = data.paused();
     }
+    const liveFeed = built.isV2 && !demo && page.id === 'feed';
+    const unread = !demo && mine.length && mine.every(feed => feed.state === 'unknown');
+    const loading = !demo && mine.length && mine.some(feed => feed.state === 'loading') && !mine.some(feed => feed.data);
     const notes = [];
     if (!v2 && data.paused()) {
       notes.push(notice('slow', 'pause', 'GitHub\'s limit is low', `(${limit.remaining ?? 0} left). Reads are paused until ${time(limit.pausedUntil)}, then resume on their own.`));
     }
-    if (!demo) {
+    if (liveFeed) {
+      if ((unread || loading) && data.paused()) notes.push(OW.v2.readsPausedNote());
+    } else if (!demo) {
       for (const feed of mine) {
         if (feed.state === 'unknown') notes.push(notice('bad', 'warn', `Couldn't read ${feed.label} from GitHub`, `at ${time(feed.failedAt)}. It shows as unknown, not as empty, until a read works.`));
         if (feed.state === 'stale') notes.push(notice('bad', 'warn', `Couldn't read ${feed.label} at ${time(feed.failedAt)}.`, `Showing the read from ${time(feed.readAt)}.`));
@@ -355,10 +363,12 @@
       }
     }
     built.notices.replaceChildren(...notes);
-    if (!demo && mine.length && mine.every(feed => feed.state === 'unknown')) {
-      built.body.replaceChildren(OW.ui.unknown(`${page.title} couldn't be read from GitHub. The app tries again on its own, or press Refresh now.`));
-    } else if (!demo && mine.length && mine.some(feed => feed.state === 'loading') && !mine.some(feed => feed.data)) {
-      built.body.replaceChildren(OW.ui.placeholder('Reading GitHub…'));
+    if (unread) {
+      const retry = liveFeed && data.paused() ? 'The app will try again after reads resume.'
+        : 'The app tries again on its own, or press Refresh now.';
+      built.body.replaceChildren(OW.ui.unknown(`${page.title} couldn't be read from GitHub. ${retry}`));
+    } else if (loading) {
+      built.body.replaceChildren(OW.ui.placeholder(liveFeed && data.paused() ? 'Waiting to read Feed.' : 'Reading GitHub…'));
     } else {
       page.render(built.body, feeds, route().arg, built.pager);
     }
@@ -377,8 +387,11 @@
         return OW.v2.renderWelcome(root, { demoMode: true });
       }
       if (!ROUTES().includes(route().id)) history.replaceState(null, '', home());
+      const entered = !built && root.querySelector('.v2-welcome');
       if (!built) buildShell();
-      return update();
+      update();
+      if (entered) built.title.focus();
+      return;
     }
     if (!data.auth.signedIn()) return signedOut();
     if (!data.repo.get()) return picker();

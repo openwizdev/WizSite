@@ -221,7 +221,12 @@ test('v2 Settings stays available after a failed Specs read and the palette offe
     run.world.graphql.Specs = async () => ({ status: 502, json: { message: 'Bad Gateway' } });
     await openQueue(run, 'dry-run');
     await run.page.until(`document.body.innerText.includes("Feed couldn't be read from GitHub")`, 'the unknown Feed');
+    assert.doesNotMatch(await run.page.text(), /Couldn't read Specs from GitHub/);
+    run.world.graphql.Specs = async () => ({ status: 429, headers: { 'Retry-After': '60' }, json: { message: 'Rate limited' } });
     await run.page.tap('Refresh now');
+    await run.page.until(`document.querySelector('.v2-read-pause')?.textContent.includes('paused reads')`, 'the rate limit note');
+    assert.equal(await run.page.run(`document.querySelectorAll('.v2-read-pause').length`), 1);
+    assert.equal(await run.page.run(`document.querySelector('.v2-refresh').disabled`), true);
     await run.page.click('Settings');
     await run.page.until(`document.querySelector('.v2-settings .v2-sign-out')`, 'settings after the read failed');
     assert.match(await run.page.text(), /Where it runs\s+Coming soon/);
@@ -309,7 +314,7 @@ test('R1: a check OW.records answers unchecked, or that throws, leaves the item 
   }
 });
 
-test('R2: a failed Specs refresh clears every earlier true and shows the gap', async () => {
+test('R2: a failed Specs refresh clears every earlier true and shows one stale-read note', async () => {
   const run = await start();
   try {
     await queueWorld(run);
@@ -325,7 +330,8 @@ test('R2: a failed Specs refresh clears every earlier true and shows the gap', a
     for (const key of [SPEC_DECISION, ROUND]) current[key] = (await latestOf(run, key)).current;
     assert.deepEqual(current, { [SPEC_DECISION]: null, [ROUND]: null }, 'a failed refresh kept an earlier true');
     assert.ok(shown.includes(SPEC_DECISION) && shown.includes(ROUND), 'the cards from the last good read went away');
-    assert.match(await run.page.text(), /GitHub gave only part of the latest spec read/);
+    assert.match(await run.page.text(), /Showing the last available read/);
+    assert.equal(await run.page.run(`document.querySelectorAll('.v2-live-feed .unknown, .v2-notices .notice').length`), 1);
   } finally {
     await run.close();
   }

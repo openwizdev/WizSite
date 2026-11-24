@@ -119,10 +119,10 @@ export class World {
     this.opened = [];
   }
 
-  async answer(request) {
+  async answer(request, resourceType) {
     const url = new URL(request.url);
     const entry = { method: request.method, url: request.url, origin: url.origin, path: url.pathname,
-      headers: request.headers, body: request.postData || '' };
+      resourceType, headers: request.headers, body: request.postData || '' };
     this.log.push(entry);
     if (url.origin === SITE && url.pathname.startsWith('/api/sign-in/')) {
       if (url.pathname === '/api/sign-in/token' && request.method === 'POST') return { status: 200, json: await fixture('token.json') };
@@ -171,8 +171,8 @@ export async function open(browser, world) {
   browser.on(async message => {
     if (message.sessionId !== sessionId) return;
     if (message.method === 'Fetch.requestPaused') {
-      const { requestId, request } = message.params;
-      const reply = await world.answer(request);
+      const { requestId, request, resourceType } = message.params;
+      const reply = await world.answer(request, resourceType);
       if (!reply || reply.abort) {
         await send('Fetch.failRequest', { requestId, errorReason: reply ? 'ConnectionFailed' : 'BlockedByClient' }).catch(() => {});
         return;
