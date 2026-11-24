@@ -28,10 +28,11 @@
     for (const spec of seen?.specs || []) {
       for (const t of spec.graph?.tickets || []) if (t.outside && !t.gap && !tickets.has(t.key)) tickets.set(t.key, ticket(t, spec, 'outside'));
     }
-    for (const item of seen?.you || []) {
+    for (const item of [...(seen?.you || []), ...(seen?.people || [])]) {
       const key = `${home}#${item.number}`;
-      if (item.kind !== 'ticket' || tickets.has(key)) continue;
-      tickets.set(key, { kind: 'ticket', id: `ticket:${key}`, title: `#${item.number} ${item.title}`, detail: 'Marked for you', go: '#/you',
+      if ((item.kind !== 'ticket' && item.kind !== 'person') || tickets.has(key)) continue;
+      tickets.set(key, { kind: 'ticket', id: `ticket:${key}`, title: `#${item.number} ${item.title}`,
+        detail: item.kind === 'person' ? 'A task for a person' : 'Waiting on your answer', go: '#/you',
         focus: `main [data-focus="${CSS.escape(`item:${item.url}`)}"]`, url: item.url });
     }
     const agents = OW.agents.picture(feeds.agents, home);

@@ -144,7 +144,7 @@
     const authors = OW.factory.recordAuthors(data?.fleet?.text);
     const repository = picked.full;
     const R = repoPath(repository);
-    const gaps = seen.gaps.filter(gap => gap !== 'tickets marked for you');
+    const gaps = seen.gaps.filter(gap => gap !== 'tickets waiting on you' && gap !== 'tasks for a person');
     if (!authors) gaps.push('the record authors');
     if (!specsWhole) gaps.push('the spec read');
     const items = [];
