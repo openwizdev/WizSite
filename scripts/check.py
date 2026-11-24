@@ -153,11 +153,12 @@ TEAM_HEADLINE = 'Leave the call with a reviewed pull request.'
 TEAM_LEAD = ('Jake, who built OpenWiz, sets up an agent factory with your team on your own repository. '
              'Pick one small, real change: your agents build and review it. Merging stays your call.')
 TEAM_NEEDS = '30 minutes. Bring a repository with working CI and a signed-in Claude Code or Codex.'
-TEAM_REPLAY_LABEL = 'Replay of a real run · spec #1927 · 20–21 Nov 2026'
+TEAM_REPLAY_LABEL = 'Replay of a real run · spec #1927 · 20–21 Nov 2026 · times in UTC'
 TEAM_REPLAY_TITLE = 'Infra spec: write-driver, a skill that writes your own driver'
 TEAM_REPLAY_SPEC = 'https://github.com/openwizdev/OpenWiz/issues/1927'
 TEAM_REPLAY_OPENED = '2026-11-20T13:38:32Z'
 TEAM_REPLAY_CONTROL = '<button class="team-replay-control" type="button" hidden>Play again</button>'
+TEAM_REPLAY_SKY = '<svg class="team-sky-lines" viewBox="0 0 100 60" preserveAspectRatio="none" aria-hidden="true">'
 TEAM_REPLAY_WIZSITE = 'https://github.com/openwizdev/WizSite/pull/118'
 TEAM_REPLAY_TICKETS = (
     (1928, "Infra WD1: the write-driver contract: copy line, ticket format, live lessons and the timed report, first",
@@ -1528,7 +1529,7 @@ def check_team(htmls, pages):
     assert not forbidden, f'a word the team page never uses: {forbidden[0]}'
     assert "'" not in shown and "'" not in ' '.join(re.findall(r'aria-label="([^"]*)"', main)), \
         'the team page uses curly apostrophes'
-    controls = main.replace(TEAM_REPLAY_CONTROL, '').replace('<button class="launch-play" type="button" hidden><span aria-hidden="true">', '')
+    controls = main.replace(TEAM_REPLAY_CONTROL, '').replace(TEAM_REPLAY_SKY, '', 1).replace('<button class="launch-play" type="button" hidden><span aria-hidden="true">', '')
     assert not re.search(r'\bhidden\b|aria-hidden', controls), 'the team page hides none of its copy'
     parts = [plain(h) for h in re.findall(r'<h2\b[^>]*>([\s\S]*?)</h2>', main)]
     assert parts == list(TEAM_PARTS), f'the team page sections, in order: {parts}'
@@ -1542,30 +1543,47 @@ def check_team(htmls, pages):
     assert copy and tuple(map(unescape, copy.groups())) == (TEAM_KICKER, TEAM_LEAD, TEAM_NEEDS), \
         f'the hero, in order: who it is for, the headline, what happens on the call, Book a call, what to bring: {TEAM_KICKER} / {TEAM_LEAD} / {TEAM_NEEDS}'
 
-    def replay_time(at):
-        return f'<time datetime="{at}">{at[8:10]} Nov {at[11:19]} UTC</time>'
+    def stamp(at):  # 2026-11-20T19:03:26Z -> 20 Nov 19:03, as site.js prints it
+        return f'{int(at[8:10])} Nov {at[11:16]}'
 
+    def star(key, name, href, state, at, extra='', data=''):
+        return (f'<li class="team-star{extra}" data-star="{key}"{data} data-state="{state}"><a href="{href}">{name}</a> '
+                f'<span>Merged</span> <time datetime="{at}">{stamp(at)}</time></li>')
+
+    # The sky shows the tickets in the order their building started, then the pull requests as they merged.
+    tickets = sorted(TEAM_REPLAY_TICKETS, key=lambda ticket: ticket[2])
+    keys = [str(number) for number, *_ in tickets] + [f'pr{href.rsplit("/", 1)[1]}' for _, href, _ in TEAM_REPLAY_LANDINGS]
+    stars, record = [], []
+    for number, title, *times in tickets:
+        data = ''.join(f' data-{state}="{at}"' for state, at in zip(('building', 'review', 'merged'), times))
+        stars.append(star(number, re.search(r'\b(WD\d+):', title)[1], f'https://github.com/openwizdev/OpenWiz/issues/{number}',
+                          'merged', times[2], data=data))
+        record.append(f'<li>#{number} {title} · ' + ' · '.join(f'{state} {stamp(at)} UTC' for state, at in
+                                                             zip(('Building', 'In review', 'Merged'), times)) + '</li>')
+    for i, (label, href, at) in enumerate(TEAM_REPLAY_LANDINGS):
+        last = i == len(TEAM_REPLAY_LANDINGS) - 1
+        stars.append(star(keys[len(tickets) + i], label, href, 'merged', at,
+                          extra=' team-pr team-landing' if last else ' team-pr', data=f' data-merged="{at}"'))
+        record.append(f'<li>Pull request {label} · Merged {stamp(at)} UTC</li>')
+    lines = re.search(re.escape(TEAM_REPLAY_SKY) + r'([\s\S]*?)</svg>', hero)
+    drawn = re.findall(r'\s*<path class="team-(orbit|link)"((?: data-lit data-star="[^"]+")?) d="[MLA0-9. -]+"/>', lines[1]) if lines else []
+    assert lines and re.sub(r'\s*<path class="team-(?:orbit|link)"(?: data-lit data-star="[^"]+")? d="[MLA0-9. -]+"/>', '', lines[1]).strip() == '' \
+        and [kind for kind, _ in drawn] == ['orbit'] * len(tickets) + ['link'] * len(keys) \
+        and [re.sub(r' data-lit data-star="([^"]+)"', r'\1', star_of) for kind, star_of in drawn if kind == 'link'] == keys, \
+        'the sky drawing holds no words: one orbit per ticket and one lit line per star, in star order'
     replay = [
         f'<figure class="team-replay" data-team-replay="{TEAM_REPLAY_OPENED}">',
         '<figcaption class="team-replay-heading">',
         f'<p class="team-replay-meta">{TEAM_REPLAY_LABEL}</p>',
         f'<p class="team-replay-title"><a href="{TEAM_REPLAY_SPEC}">{TEAM_REPLAY_TITLE}</a></p>',
-        '</figcaption>', '<ul class="team-tickets">',
+        '</figcaption>', '<div class="team-sky">', 'SKY', '<span class="team-spec-star"></span>', '<ul class="team-stars">',
+        *stars, '</ul>', '</div>', '<ol class="sr-only team-record">', *record, '</ol>', TEAM_REPLAY_CONTROL, '</figure>',
     ]
-    for number, title, *times in TEAM_REPLAY_TICKETS:
-        replay += ['<li>',
-                   f'<a class="team-ticket" href="https://github.com/openwizdev/OpenWiz/issues/{number}"><code>#{number}</code> {title}</a>',
-                   '<div class="team-timeline" data-replay-stages>']
-        for state, at in zip(('Building', 'In review', 'Merged'), times):
-            current = ' aria-current="step"' if state == 'Merged' else ''
-            replay.append(f'<div data-replay-event{current}><span>{state}</span> {replay_time(at)}</div>')
-        replay += ['</div>', '</li>']
-    replay += ['</ul>', '<ul class="team-landings">']
-    replay += [f'<li data-replay-event><a href="{href}">{label}</a> · Merged {replay_time(at)}</li>'
-               for label, href, at in TEAM_REPLAY_LANDINGS]
-    replay += ['</ul>', TEAM_REPLAY_CONTROL, '</figure>']
-    assert not hero[:copy.start()].strip() and re.sub(r'\s+', ' ', hero[copy.end():]).strip() == ' '.join(replay), \
-        'the hero ends with the labelled real run, its ordered ticket history and its pull request landings'
+    rest = re.sub(r'\s+', ' ', hero[copy.end():].replace(lines[0], 'SKY', 1)).strip()
+    assert not hero[:copy.start()].strip() and rest == ' '.join(replay), \
+        'the hero ends with the labelled real run: its sky of ticket and pull request stars, and the plain record of the same times'
+    assert re.findall(r'class="[^"]*\bsr-only\b[^"]*"', main) == ['class="sr-only team-record"', 'class="sr-only"'], \
+        'the team page visually hides only the replay record and the film description'
     page = Page(main)
     assert len(page.videos) == 1, 'the team page has one video: the launch film'
     clip = page.videos[0]

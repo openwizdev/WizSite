@@ -278,59 +278,63 @@ function launchVideo() {
   }, { once: true });
 }
 
+// "2026-11-20T19:03:26Z" -> "20 Nov 19:03", as the team sky prints it.
+function teamStamp(iso) {
+  const at = new Date(iso);
+  const month = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][at.getUTCMonth()];
+  const two = n => String(n).padStart(2, '0');
+  return `${at.getUTCDate()} ${month} ${two(at.getUTCHours())}:${two(at.getUTCMinutes())}`;
+}
+
 function teamReplay(replay) {
   const calm = matchMedia('(prefers-reduced-motion: reduce)');
   const control = replay.querySelector('.team-replay-control');
   const playAgain = control.textContent;
   const opened = Date.parse(replay.dataset.teamReplay);
-  const events = [...replay.querySelectorAll('[data-replay-event]')]
-    .map(node => ({ node, at: Date.parse(node.querySelector('time').dateTime) }))
+  const stars = [...replay.querySelectorAll('.team-star')];
+  const links = [...replay.querySelectorAll('.team-link')];
+  const states = [['building', 'Building'], ['review', 'In review'], ['merged', 'Merged']];
+  const events = stars
+    .flatMap(star => states.filter(([state]) => star.dataset[state])
+      .map(([state, label]) => ({ star, state, label, iso: star.dataset[state], at: Date.parse(star.dataset[state]) })))
     .sort((a, b) => a.at - b.at);
   // Use one scale for the entire run, including simultaneous events.
   const duration = events.at(-1).at - opened;
   const delay = event => (event.at - opened) / duration * 20_000;
-  const tracks = [...replay.querySelectorAll('[data-replay-stages]')].map(track => {
-    const waiting = document.createElement('span');
-    waiting.className = 'team-waiting';
-    waiting.textContent = 'Waiting';
-    waiting.hidden = true;
-    track.prepend(waiting);
-    return track;
-  });
   let next = events.length;
   let timer;
   let start;
 
-  function reveal({ node }) {
-    node.removeAttribute('data-replay-pending');
-    const track = node.closest('[data-replay-stages]');
-    if (!track) return;
-    track.querySelector('.team-waiting').hidden = true;
-    track.querySelector('[aria-current]')?.removeAttribute('aria-current');
-    node.setAttribute('aria-current', 'step');
+  function show({ star, state, label, iso }) {
+    star.dataset.state = state;
+    star.querySelector('span').textContent = label;
+    const time = star.querySelector('time');
+    time.dateTime = iso;
+    time.textContent = iso && teamStamp(iso);
+    for (const link of links) {
+      if (link.dataset.star !== star.dataset.star) continue;
+      if (state === 'waiting') link.removeAttribute('data-lit');
+      else link.setAttribute('data-lit', '');
+    }
   }
 
   function finish() {
     clearTimeout(timer);
-    while (next < events.length) reveal(events[next++]);
+    while (next < events.length) show(events[next++]);
     control.textContent = playAgain;
   }
 
   function advance() {
     const elapsed = performance.now() - start;
     while (next < events.length && delay(events[next]) <= elapsed) {
-      reveal(events[next++]);
+      show(events[next++]);
     }
     if (next === events.length) finish();
     else timer = setTimeout(advance, delay(events[next]) - elapsed);
   }
 
   function play() {
-    for (const { node } of events) node.setAttribute('data-replay-pending', '');
-    for (const track of tracks) {
-      track.querySelector('[aria-current]')?.removeAttribute('aria-current');
-      track.querySelector('.team-waiting').hidden = false;
-    }
+    for (const star of stars) show({ star, state: 'waiting', label: 'Waiting', iso: '' });
     control.textContent = 'Finish replay';
     next = 0;
     start = performance.now();
