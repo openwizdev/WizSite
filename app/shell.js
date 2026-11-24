@@ -9,33 +9,50 @@
   let built = null;
   const INSTALL = 'https://github.com/apps/openwiz-viewer/installations/new';
   const v2 = Boolean(OW.records?.enabled?.());
+  const demo = Boolean(OW.v2?.demo);
+  if (v2) document.documentElement.dataset.v2 = '1';
   const queue = OW.pages.findIndex(page => page.v2);
   if (queue >= 0) {
     const [page] = OW.pages.splice(queue, 1);
-    if (v2) OW.pages.unshift(page);
+    if (v2 && !OW.v2) OW.pages.unshift(page);
   }
-  const home = () => `#/${OW.pages[0].id}`;
+  const home = () => (v2 && OW.v2 ? '#/feed' : `#/${OW.pages[0].id}`);
 
   const route = () => {
-    const [id, arg] = location.hash.replace(/^#\/?/, '').split('/');
-    return id === 'specs' && /^[1-9]\d*$/.test(arg || '') ? { id, arg } : { id: arg === undefined ? id : '', arg: null };
+    const [rawId, arg] = location.hash.replace(/^#\/?/, '').split('/');
+    const id = v2 && OW.v2 && rawId === 'queue' ? 'feed' : rawId;
+    if (id === 'specs' && /^[1-9]\d*$/.test(arg || '')) return { id, arg };
+    if (v2 && OW.v2 && id === 'feed' && /^[1-9]\d*$/.test(arg || '')) return { id, arg };
+    return { id: arg === undefined ? id : '', arg: null };
   };
   const current = () => {
     const { id } = route();
-    return OW.pages.find(page => page.id === id) || OW.pages[0];
+    return OW.pages.find(page => page.id === id) || OW.pages.find(page => page.id === 'feed') || OW.pages[0];
   };
 
   function screen(...children) {
     built = null;
     OW.palette.close();
     const view = h('div', { class: 'center' }, h('div', { class: 'panel' }, h('div', { class: 'brand' }, logo(), h('span', {}, 'OpenWiz')), ...children));
-    root.replaceChildren(view);
+    if (v2 && OW.v2) {
+      root.replaceChildren(
+        h('div', { class: 'v2-backdrop', 'aria-hidden': 'true' }),
+        h('div', { class: 'v2-veil', 'aria-hidden': 'true' }),
+        h('div', { class: 'v2-welcome-stage' }, view));
+    } else {
+      root.replaceChildren(view);
+    }
     document.title = 'OpenWiz';
     return view;
   }
 
   function signedOut(note) {
     data.stop();
+    if (v2 && OW.v2) {
+      built = null;
+      OW.palette.close();
+      return OW.v2.renderWelcome(root, { note, demoMode: false });
+    }
     screen(
       h('h1', {}, 'Your factory, at a glance'),
       h('p', {}, 'See what needs you, every spec and the agents at work. Sign in to pick a repository.'),
@@ -169,7 +186,75 @@
     return wrap;
   }
 
+  function freshnessNodes() {
+    const feeds = data.feeds;
+    const limit = data.limit;
+    return [
+      ...Object.values(feeds).flatMap(feed => [h('div', {}, ...readLine(feed))]),
+      h('div', {}, limit.remaining === null ? 'GitHub limit: not read yet' : `GitHub limit: ${limit.remaining.toLocaleString()} left`),
+    ];
+  }
+
+  if (v2 && OW.v2) {
+    const v2Pages = OW.v2.pages({
+      get repoFull() { return data.repo.get()?.full || 'Harbor'; },
+      repoSwitch: () => repoSwitch(data.repo.get()),
+      freshnessNodes,
+      signOut: () => { data.auth.signOut(); signedOut(); },
+    });
+    OW.pages.splice(0, OW.pages.length, ...v2Pages);
+    OW.v2.setRedraw(() => update());
+  }
+
+  function v2NavLinks(kind) {
+    return OW.pages.map(page => {
+      const badge = h('span', { class: `v2-badge${page.hotBadge ? ' hot' : ''}`, hidden: true });
+      const cls = kind === 'main' ? `v2-nav-item${page.bottom ? ' v2-bottom' : ''}` : '';
+      const link = h('a', { href: `#/${page.id}`, class: cls || null }, icon(page.icon), h('span', {}, page.title), badge);
+      return { page, link, badge };
+    });
+  }
+
+  function buildV2Shell() {
+    const workspace = demo ? 'Harbor' : (data.repo.get()?.full || 'OpenWiz');
+    const side = v2NavLinks('main');
+    const tabs = v2NavLinks('tabs');
+    const title = h('h1', { tabindex: '-1' });
+    const headSub = h('p', { class: 'v2-head-sub' });
+    const head = h('div', { class: 'v2-head' },
+      h('div', {}, title, headSub),
+      h('span', { class: 'v2-engraved-tag' }, demo ? 'Harbor · main' : workspace));
+    const phoneTitle = h('span', { class: 'v2-engraved-tag' });
+    const phoneBar = h('header', { class: 'v2-phone-bar' },
+      h('a', { class: 'v2-phone-brand', href: home() }, logo(), h('span', {}, 'OpenWiz'), phoneTitle),
+      demo ? h('span', { class: 'v2-sample-tag' }, 'Sample data') : null);
+    const notices = h('div', { class: 'notices v2-notices', role: 'status' });
+    const body = h('section', { class: 'v2-body' });
+    root.replaceChildren(
+      h('a', { class: 'skip', href: '#content', onclick: event => { event.preventDefault(); title.focus(); } }, 'Skip to the page'),
+      h('div', { class: 'v2-backdrop', 'aria-hidden': 'true' }),
+      h('div', { class: 'v2-veil', 'aria-hidden': 'true' }),
+      h('div', { class: 'v2-frame' },
+        h('div', { class: 'v2-shell' },
+          h('aside', { class: 'v2-side' },
+            h('a', { class: 'v2-brand', href: home() },
+              logo(),
+              h('span', { class: 'v2-brand-text' },
+                h('span', { class: 'v2-brand-name' }, 'OpenWiz'),
+                h('span', { class: 'v2-brand-sub' }, workspace))),
+            demo ? h('span', { class: 'v2-sample-tag' }, 'Sample data') : null,
+            h('nav', { class: 'main v2-nav', 'aria-label': 'Pages' }, side.map(item => item.link))),
+          h('main', { id: 'content', class: 'v2-main' },
+            phoneBar,
+            head,
+            notices,
+            body,
+            h('nav', { class: 'v2-tabs', 'aria-label': 'Pages' }, tabs.map(item => item.link))))));
+    built = { side, tabs, title, headSub, head, phoneTitle, notices, body, page: null, isV2: true };
+  }
+
   function buildShell() {
+    if (v2 && OW.v2) return buildV2Shell();
     const picked = data.repo.get();
     const repoButton = () => repoSwitch(picked);
     const side = navLinks('main');
@@ -213,33 +298,40 @@
     const page = current();
     const feeds = data.feeds;
     const limit = data.limit;
-    for (const { page: p, link, badge } of [...built.side, ...built.tabs]) {
+    for (const { page: p, link, badge, kind } of [...built.side.map(x => ({ ...x, kind: 'side' })), ...built.tabs.map(x => ({ ...x, kind: 'tabs' }))]) {
       if (p.id === page.id) link.setAttribute('aria-current', 'page');
       else link.removeAttribute('aria-current');
-      const count = p.badge?.(feeds);
+      const count = kind === 'tabs' && p.tabBadge ? p.tabBadge(feeds) : p.badge?.(feeds);
       badge.hidden = !count;
       badge.textContent = count ? String(count) : '';
     }
-    built.reads.replaceChildren(...Object.values(feeds).flatMap(feed => [h('div', {}, ...readLine(feed))]),
-      h('div', {}, limit.remaining === null ? 'GitHub limit: not read yet' : `GitHub limit: ${limit.remaining.toLocaleString()} left`));
-    for (const button of built.refresh) button.disabled = data.paused();
     const mine = page.feeds.map(name => feeds[name]);
-    const latest = mine.filter(feed => feed.readAt).map(feed => feed.readAt);
-    built.read.textContent = latest.length ? `Read ${time(Math.min(...latest))}` : '';
-    built.phoneReads.replaceChildren(...mine.flatMap((feed, i) => [i ? ' · ' : '', ...readLine(feed)]).filter(part => part !== null && part !== ''));
+    if (!built.isV2) {
+      built.reads.replaceChildren(...freshnessNodes());
+      for (const button of built.refresh) button.disabled = data.paused();
+      const latest = mine.filter(feed => feed.readAt).map(feed => feed.readAt);
+      built.read.textContent = latest.length ? `Read ${time(Math.min(...latest))}` : '';
+      built.phoneReads.replaceChildren(...mine.flatMap((feed, i) => [i ? ' · ' : '', ...readLine(feed)]).filter(part => part !== null && part !== ''));
+    } else {
+      built.headSub.textContent = page.sub || '';
+      built.phoneTitle.textContent = page.title;
+      built.head.classList.toggle('show-phone', Boolean(page.showPhoneHead));
+    }
     const notes = [];
-    if (data.paused()) {
+    if (!demo && data.paused()) {
       notes.push(notice('slow', 'pause', 'GitHub\'s limit is low', `(${limit.remaining ?? 0} left). Reads are paused until ${time(limit.pausedUntil)}, then resume on their own.`));
     }
-    for (const feed of mine) {
-      if (feed.state === 'unknown') notes.push(notice('bad', 'warn', `Couldn't read ${feed.label} from GitHub`, `at ${time(feed.failedAt)}. It shows as unknown, not as empty, until a read works.`));
-      if (feed.state === 'stale') notes.push(notice('bad', 'warn', `Couldn't read ${feed.label} at ${time(feed.failedAt)}.`, `Showing the read from ${time(feed.readAt)}.`));
-      if (feed.state === 'partial') notes.push(notice('bad', 'warn', 'Part of this read failed', `(${feed.label}, ${time(feed.readAt)}). What's missing shows as unknown.`));
+    if (!demo) {
+      for (const feed of mine) {
+        if (feed.state === 'unknown') notes.push(notice('bad', 'warn', `Couldn't read ${feed.label} from GitHub`, `at ${time(feed.failedAt)}. It shows as unknown, not as empty, until a read works.`));
+        if (feed.state === 'stale') notes.push(notice('bad', 'warn', `Couldn't read ${feed.label} at ${time(feed.failedAt)}.`, `Showing the read from ${time(feed.readAt)}.`));
+        if (feed.state === 'partial') notes.push(notice('bad', 'warn', 'Part of this read failed', `(${feed.label}, ${time(feed.readAt)}). What's missing shows as unknown.`));
+      }
     }
     built.notices.replaceChildren(...notes);
-    if (mine.every(feed => feed.state === 'unknown')) {
+    if (!demo && mine.length && mine.every(feed => feed.state === 'unknown')) {
       built.body.replaceChildren(OW.ui.unknown(`${page.title} couldn't be read from GitHub. The app tries again on its own, or press Refresh now.`));
-    } else if (mine.some(feed => feed.state === 'loading') && !mine.some(feed => feed.data)) {
+    } else if (!demo && mine.length && mine.some(feed => feed.state === 'loading') && !mine.some(feed => feed.data)) {
       built.body.replaceChildren(OW.ui.placeholder('Reading GitHub…'));
     } else {
       page.render(built.body, feeds, route().arg);
@@ -253,9 +345,18 @@
   }
 
   function draw() {
+    if (demo) {
+      if (route().id === 'welcome') {
+        built = null;
+        return OW.v2.renderWelcome(root, { demoMode: true });
+      }
+      if (!ROUTES().includes(route().id)) history.replaceState(null, '', home());
+      if (!built) buildShell();
+      return update();
+    }
     if (!data.auth.signedIn()) return signedOut();
     if (!data.repo.get()) return picker();
-    if (!ROUTES().includes(route().id)) history.replaceState(null, '', `#/${OW.pages[0].id}`);
+    if (!ROUTES().includes(route().id)) history.replaceState(null, '', home());
     if (!built) {
       buildShell();
       data.start();
@@ -265,7 +366,7 @@
 
   data.onChange(update);
   OW.onSignedOut = () => signedOut('Your sign-in ended. Sign in again.');
-  window.addEventListener('hashchange', () => (built ? update() : null));
+  window.addEventListener('hashchange', () => (demo ? draw() : built ? update() : null));
   document.addEventListener('keydown', event => {
     if (!built) return;
     if ((event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'k') {
@@ -282,6 +383,7 @@
   });
 
   async function boot() {
+    if (demo) return draw();
     const params = new URLSearchParams(location.search);
     const code = params.get('code');
     const state = params.get('state');

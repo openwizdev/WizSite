@@ -268,7 +268,7 @@
       : missing ? null : OW.ui.placeholder(`${EMPTY}.`)].filter(Boolean));
   }
 
-  OW.page({
+  const queuePage = {
     id: 'queue',
     title: 'Queue',
     icon: 'clock',
@@ -280,5 +280,7 @@
       refresh(feeds);
       OW.factory.redraw(el, () => draw(el));
     },
-  });
+  };
+  OW.queue = queuePage;
+  OW.page(queuePage);
 })();
