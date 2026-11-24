@@ -227,7 +227,11 @@
     return OW.pages.map(page => {
       const badge = h('span', { class: 'v2-badge', hidden: true });
       const cls = kind === 'main' ? `v2-nav-item${page.bottom ? ' v2-bottom' : ''}` : '';
-      const link = h('a', { href: `#/${page.id}`, class: cls || null }, icon(page.icon), h('span', {}, page.title), badge);
+      const glyph = icon(page.icon);
+      const link = h('a', { href: `#/${page.id}`, class: cls || null },
+        kind === 'tabs' ? h('span', { class: 'v2-tab-icon' }, glyph, badge) : glyph,
+        h('span', {}, page.title),
+        kind === 'main' ? badge : null);
       return { page, link, badge };
     });
   }
@@ -347,7 +351,11 @@
     if (!v2 && data.paused()) {
       notes.push(notice('slow', 'pause', 'GitHub\'s limit is low', `(${limit.remaining ?? 0} left). Reads are paused until ${time(limit.pausedUntil)}, then resume on their own.`));
     }
-    if (!demo) {
+    const liveV2Feed = built.isV2 && !demo && page.id === 'feed';
+    if (liveV2Feed && data.paused()) {
+      notes.push(h('p', { class: 'v2-rate-note' }, `GitHub paused reads until ${time(limit.pausedUntil)}.`));
+    }
+    if (!demo && !liveV2Feed) {
       for (const feed of mine) {
         if (feed.state === 'unknown') notes.push(notice('bad', 'warn', `Couldn't read ${feed.label} from GitHub`, `at ${time(feed.failedAt)}. It shows as unknown, not as empty, until a read works.`));
         if (feed.state === 'stale') notes.push(notice('bad', 'warn', `Couldn't read ${feed.label} at ${time(feed.failedAt)}.`, `Showing the read from ${time(feed.readAt)}.`));
