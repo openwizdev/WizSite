@@ -39,7 +39,9 @@ the contract is wrong and must be fixed.
     "max_prompt_price": "ASK_A_WIZ_MAX_PROMPT_PRICE",
     "max_completion_price": "ASK_A_WIZ_MAX_COMPLETION_PRICE",
     "max_request_price": "ASK_A_WIZ_MAX_REQUEST_PRICE",
-    "index_path": "/ask-index.json"
+    "index_path": "/ask-index.json",
+    "turnstile_secret": "TURNSTILE_SECRET_KEY",
+    "turnstile_site_key": "TURNSTILE_SITE_KEY"
   },
   "request": {
     "content_type": "application/json",
@@ -47,7 +49,15 @@ the contract is wrong and must be fixed.
     "max_body_bytes": 4096,
     "max_question_chars": 300,
     "min_question_chars": 1,
-    "same_origin": true
+    "same_origin": true,
+    "turnstile_header": "CF-Turnstile-Response"
+  },
+  "turnstile": {
+    "siteverify": "https://challenges.cloudflare.com/turnstile/v0/siteverify",
+    "action": "ask",
+    "hostname": "the request's own",
+    "probe_key": "turnstile_site_key",
+    "on_when": "TURNSTILE_SECRET_KEY is set"
   },
   "response": {
     "content_type": "application/x-ndjson; charset=utf-8",
@@ -73,6 +83,7 @@ the contract is wrong and must be fixed.
   },
   "refusals": {
     "bad_request": {"status": 400, "message": "That question couldn't be read. Try again."},
+    "not_human": {"status": 403, "message": "Please confirm you're human and try again."},
     "too_long": {"status": 413, "message": "That question is too long. Keep it to 300 characters or fewer."},
     "rate_limited": {"status": 429, "message": "That's a lot of questions at once. Try again in a few minutes."},
     "daily_cap": {"status": 429, "message": "Ask a Wiz has answered all it can for today. Try again tomorrow."},
@@ -150,6 +161,8 @@ Jake turns the switch on after FA6's go.
 | `ASK_A_WIZ_MAX_COMPLETION_PRICE` | Pages variable | The same for output, reasoning included |
 | `ASK_A_WIZ_MAX_REQUEST_PRICE` | Pages variable | The most any route may charge as a flat fee per request, in US dollars: a decimal such as `0.001`, above 0 and at most 1000 |
 | `ASK_A_WIZ` | Pages variable | The off switch: exactly `on` turns Ask a Wiz on; anything else, or unset, is off |
+| `TURNSTILE_SECRET_KEY` | Pages secret (encrypted) | The Cloudflare Turnstile widget's secret key. Unset: no human check, exactly as before |
+| `TURNSTILE_SITE_KEY` | Pages variable | The same widget's public site key. Required once the secret is set, or every question is `unavailable` |
 
 The key is read only as `env.OPENROUTER_API_KEY` inside the function, and is
 sent only in the `Authorization` header of the upstream call. It never
@@ -171,9 +184,13 @@ The row asks once, on page load, whether Ask a Wiz is on.
 - **Off:** `404`, no body. The row stays hidden; the FAQ shows only its
   hand-written rows.
 
-The probe reads no secret, no store and no counter. It says only that the
-switch is on; a missing secret, model or store shows as `unavailable` on the
-first question.
+When `TURNSTILE_SECRET_KEY` is set and `TURNSTILE_SITE_KEY` is valid, the
+probe adds one key, `"turnstile_site_key"`, the public site key, after
+`max_question_chars`. Otherwise its body is exactly the one above.
+
+The probe reads no store and no counter, and sends no secret. It says only
+that the switch is on, and whether the row must carry a Turnstile token; a
+missing secret, model or store shows as `unavailable` on the first question.
 
 ## The request: `POST /api/ask`
 
@@ -183,6 +200,9 @@ first question.
   code points. It must be 1 to 300 of them.
 - The request's `Origin` header must equal the origin of the request's own
   URL (so production and a preview deploy both work, and no other site does).
+- With Turnstile on, the request carries a fresh Turnstile token in the
+  `CF-Turnstile-Response` header (rendered with action `ask`; tokens are
+  single-use, so one per question). The body is unchanged.
 - Anything else (another method, content type or key, bad JSON, a body over
   4096 bytes, a missing or foreign `Origin`, an empty question) is
   `bad_request`. A question of 301 or more code points is `too_long`.
@@ -252,6 +272,7 @@ It is given in two cases:
 | Reason | Status | Message | When |
 | --- | --- | --- | --- |
 | `bad_request` | 400 | That question couldn't be read. Try again. | The request breaks "The request" |
+| `not_human` | 403 | Please confirm you're human and try again. | Turnstile is on and the request's token is missing or does not pass (see "The order of checks") |
 | `too_long` | 413 | That question is too long. Keep it to 300 characters or fewer. | 301 or more code points |
 | `rate_limited` | 429 | That's a lot of questions at once. Try again in a few minutes. | The visitor's hour is used up |
 | `daily_cap` | 429 | Ask a Wiz has answered all it can for today. Try again tomorrow. | The day's spend has reached the dollar cap, or its calls the call-count cap, or a cap is unset or invalid |
@@ -271,8 +292,16 @@ The function checks in this order, and stops at the first that fails:
 
 1. The switch (off: `404`, no body).
 2. The configuration (`unavailable`): the secret, the model, the store
-   binding, and the three maximum prices, each valid.
+   binding, the three maximum prices, each valid, and (when the Turnstile
+   secret is set) the Turnstile site key.
 3. The request (`bad_request`), then its length (`too_long`).
+3a. With Turnstile on, the human check (`not_human`): one siteverify call
+   with the secret, the token, `remoteip` (`CF-Connecting-IP`) and an
+   idempotency key, under a short timeout. Only `success: true` with action
+   `ask` and the request's own hostname passes (a result Cloudflare marks
+   `result_with_testing_key` passes as is: only a test secret yields it). A
+   missing or overlong token, a failed check, a non-200 or a network error
+   all refuse, before any store write or model call.
 4. The visitor's rate limit (`rate_limited`). A question that passes counts,
    whatever its outcome. This is the first store write.
 5. The passages (none: `not_covered`, no model call).

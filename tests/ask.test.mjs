@@ -274,12 +274,172 @@ test('the switch is on only for exactly "on": anything else answers 404 with no 
   assert.equal(calls.length, 0);
 });
 
-test('the probe reads only the switch: no secret, store or index, even when they are missing', async () => {
+test('the probe reads only the switch and the Turnstile names: no OpenRouter secret, store or index, even when they are missing', async () => {
   const c = withCase({ request: { method: 'GET', headers: {}, body: null }, settings: { ASK_A_WIZ: 'on' } });
   const out = await run(c, { index: null });
   assert.equal(out.response.status, 200);
   assert.equal(out.body, '{"schema":"openwiz.ask-a-wiz.v1","enabled":true,"max_question_chars":300}');
-  assert.deepEqual([...out.read], ['ASK_A_WIZ']);
+  assert.deepEqual([...out.read], ['ASK_A_WIZ', 'TURNSTILE_SECRET_KEY']);
+});
+
+const PASS_SITE = '1x00000000000000000000AA';
+const PASS_SECRET = '1x0000000000000000000000000000000AA';
+const FAIL_SECRET = '2x0000000000000000000000000000000AA';
+const SITEVERIFY = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
+const TOKEN = 'synthetic-turnstile-token';
+const NOT_HUMAN = '{"type":"refused","reason":"not_human","message":"Please confirm you\'re human and try again."}\n';
+const gated = (secret = PASS_SECRET, extra = {}) => withCase({ settings: settingsWith({ TURNSTILE_SECRET_KEY: secret, TURNSTILE_SITE_KEY: PASS_SITE }),
+  request: ask('Synthetic question: what does OpenWiz do?', { headers: { 'CF-Turnstile-Response': TOKEN, ...extra } }) });
+// A fake siteverify that answers like Cloudflare: the test secrets pass or fail any token, a real-looking secret gets `verdict`.
+const verifier = (verdict = null) => async call => {
+  if (call.url !== SITEVERIFY) return upstreamAnswer({ chunks: ['Synthetic answer about OpenWiz agents.'], cost: 0.0001 })();
+  const form = new URLSearchParams(call.body);
+  if (typeof verdict === 'function') return verdict(form, call);
+  if (form.get('secret') === PASS_SECRET) return Response.json({ success: true, 'error-codes': [], hostname: 'example.com', metadata: { result_with_testing_key: true } });
+  if (form.get('secret') === FAIL_SECRET) return Response.json({ success: false, 'error-codes': ['invalid-input-response'], metadata: { result_with_testing_key: true } });
+  return Response.json(verdict);
+};
+const sent = () => calls.filter(call => call.url === UPSTREAM).length;
+
+test('Turnstile: the probe gives the site key once the secret is set, and only a valid one', async () => {
+  const probe = settings => run(withCase({ request: { method: 'GET', headers: {}, body: null }, settings: { ASK_A_WIZ: 'on', ...settings } }));
+  const on = await probe({ TURNSTILE_SECRET_KEY: PASS_SECRET, TURNSTILE_SITE_KEY: PASS_SITE });
+  assert.equal(on.body, `{"schema":"openwiz.ask-a-wiz.v1","enabled":true,"max_question_chars":300,"turnstile_site_key":"${PASS_SITE}"}`);
+  assert.ok(!on.body.includes(PASS_SECRET));
+  for (const site of [undefined, '', 'has space', '<x>', 'x'.repeat(101)]) {
+    const out = await probe({ TURNSTILE_SECRET_KEY: PASS_SECRET, TURNSTILE_SITE_KEY: site });
+    assert.equal(out.body, '{"schema":"openwiz.ask-a-wiz.v1","enabled":true,"max_question_chars":300}', `site key ${site}`);
+  }
+  assert.equal((await probe({ TURNSTILE_SITE_KEY: PASS_SITE })).body, '{"schema":"openwiz.ask-a-wiz.v1","enabled":true,"max_question_chars":300}', 'no secret: off');
+  assert.equal(calls.length, 0);
+});
+
+test('Turnstile: an unset or empty secret is exactly today\'s behaviour, a token or not, with no siteverify call', async () => {
+  for (const secret of [undefined, '']) {
+    for (const headers of [{}, { 'CF-Turnstile-Response': TOKEN }]) {
+      calls.length = 0;
+      answer = verifier();
+      const c = withCase({ settings: settingsWith({ TURNSTILE_SECRET_KEY: secret, TURNSTILE_SITE_KEY: PASS_SITE }), request: ask('Synthetic question: what does OpenWiz do?', { headers }) });
+      if (secret === undefined) delete c.settings.TURNSTILE_SECRET_KEY;
+      const out = await run(c);
+      assert.equal(out.response.status, 200);
+      assert.equal(events(out.body).at(-1).type, 'done');
+      assert.deepEqual(calls.map(call => call.url), [UPSTREAM]);
+    }
+  }
+});
+
+test('Turnstile: a secret without a valid site key is unavailable, with nothing verified, counted or called', async () => {
+  answer = verifier();
+  const c = gated();
+  c.settings.TURNSTILE_SITE_KEY = 'not a key';
+  const store = fakeD1(c.store);
+  const out = await run(c, { store });
+  assert.equal(out.response.status, 503);
+  assert.match(out.body, /"reason":"unavailable"/);
+  assert.deepEqual(store.log, []);
+  assert.equal(calls.length, 0);
+});
+
+test('Turnstile: a missing, empty or overlong token is not_human before any siteverify call, store write or model call', async () => {
+  answer = verifier();
+  for (const token of [undefined, '', 'x'.repeat(2049)]) {
+    const c = gated();
+    if (token === undefined) delete c.request.headers['CF-Turnstile-Response']; else c.request.headers['CF-Turnstile-Response'] = token;
+    const store = fakeD1(c.store);
+    const out = await run(c, { store });
+    assert.equal(out.response.status, 403);
+    assert.equal(out.body, NOT_HUMAN);
+    assert.deepEqual(headersOf(out.response), { 'content-type': 'application/x-ndjson; charset=utf-8', 'cache-control': 'no-store' });
+    assert.deepEqual(store.log, [], 'no store operation');
+  }
+  assert.equal(calls.length, 0);
+});
+
+test('Turnstile: a malformed request is still bad_request, never spending a siteverify call', async () => {
+  answer = verifier();
+  const c = gated();
+  c.request.body = 'not even JSON';
+  const out = await run(c);
+  assert.equal(out.response.status, 400);
+  assert.equal(calls.length, 0);
+});
+
+test('Turnstile: the always-fail test secret, or any unsuccessful verdict, is not_human with no store write or model call', async () => {
+  const verdicts = [FAIL_SECRET, { success: false, 'error-codes': ['timeout-or-duplicate'] }, { success: 'true', action: 'ask', hostname: 'openwiz.dev' },
+    { action: 'ask', hostname: 'openwiz.dev' }, null, []];
+  for (const verdict of verdicts) {
+    calls.length = 0;
+    answer = verifier(typeof verdict === 'string' ? null : verdict);
+    const c = gated(typeof verdict === 'string' ? verdict : 'synthetic-real-secret');
+    const store = fakeD1(c.store);
+    const out = await run(c, { store });
+    assert.equal(out.response.status, 403, JSON.stringify(verdict));
+    assert.equal(out.body, NOT_HUMAN);
+    assert.deepEqual(store.log, []);
+    assert.deepEqual(calls.map(call => call.url), [SITEVERIFY]);
+  }
+});
+
+test('Turnstile: a real verdict must name the action ask and the request\'s own host', async () => {
+  const cases = [
+    [{ action: 'ask', hostname: 'openwiz.dev' }, 200],
+    [{ action: 'other', hostname: 'openwiz.dev' }, 403],
+    [{ hostname: 'openwiz.dev' }, 403],
+    [{ action: 'ask', hostname: 'example.invalid' }, 403],
+    [{ action: 'ask', hostname: 'openwiz.dev.example.invalid' }, 403],
+    [{ action: 'ask' }, 403],
+  ];
+  for (const [verdict, status] of cases) {
+    calls.length = 0;
+    answer = verifier({ success: true, 'error-codes': [], challenge_ts: '2026-01-15T14:20:00Z', ...verdict });
+    const out = await run(gated('synthetic-real-secret'));
+    assert.equal(out.response.status, status, JSON.stringify(verdict));
+    assert.equal(sent(), status === 200 ? 1 : 0);
+  }
+  calls.length = 0;
+  answer = verifier({ success: true, action: 'ask', hostname: 'preview.wizsite.pages.dev' });
+  const c = gated('synthetic-real-secret', { Origin: 'https://preview.wizsite.pages.dev' });
+  const preview = await run(c, { request: new Request('https://preview.wizsite.pages.dev/api/ask', c.request) });
+  assert.equal(preview.response.status, 200, 'a preview deploy passes on its own host');
+});
+
+test('Turnstile: a siteverify network error, timeout, redirect or non-200 fails closed', async () => {
+  const replies = [
+    () => { throw new TypeError('synthetic network error'); },
+    (form, call) => new Promise((_, reject) => call.signal.addEventListener('abort', () => reject(call.signal.reason))),
+    () => new Response(null, { status: 302, headers: { Location: 'https://example.invalid/' } }),
+    () => Response.json({ success: true, action: 'ask', hostname: 'openwiz.dev' }, { status: 500 }),
+    () => new Response('not json'),
+  ];
+  for (const reply of replies) {
+    calls.length = 0;
+    answer = verifier(reply);
+    const c = gated('synthetic-real-secret');
+    const store = fakeD1(c.store);
+    const out = await run(c, { store, deps: { verifyTimeout: 30 } });
+    assert.equal(out.response.status, 403);
+    assert.equal(out.body, NOT_HUMAN);
+    assert.deepEqual(store.log, []);
+    assert.deepEqual(calls.map(call => call.url), [SITEVERIFY], 'one attempt, no redirect followed');
+  }
+});
+
+test('Turnstile: the always-pass test secret answers, sending siteverify the secret, token, visitor IP and an idempotency key', async () => {
+  answer = verifier();
+  const out = await run(gated());
+  assert.equal(out.response.status, 200);
+  assert.equal(events(out.body).at(-1).type, 'done');
+  assert.deepEqual(calls.map(call => call.url), [SITEVERIFY, UPSTREAM]);
+  const form = new URLSearchParams(calls[0].body);
+  assert.deepEqual([...form.keys()].sort(), ['idempotency_key', 'remoteip', 'response', 'secret']);
+  assert.equal(form.get('secret'), PASS_SECRET);
+  assert.equal(form.get('response'), TOKEN);
+  assert.equal(form.get('remoteip'), BASE.request.headers['CF-Connecting-IP']);
+  assert.match(form.get('idempotency_key'), /^[0-9a-f-]{36}$/);
+  assert.equal(calls[0].method, 'POST');
+  assert.ok(!out.body.includes(PASS_SECRET) && !out.body.includes(TOKEN));
+  assert.equal(out.store.counters.find(r => r.key.startsWith('visitor:')).count, 3, 'counted once it passes');
 });
 
 test('a missing or invalid secret, model, store or maximum price is unavailable before the request is read', async () => {

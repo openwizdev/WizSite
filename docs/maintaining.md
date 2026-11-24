@@ -71,6 +71,19 @@ The old README map (`docs/map.png`, and `docs/map-phone.png`) is for GitHub only
 
 The Geist and Geist Mono fonts ship unmodified with `fonts/OFL.txt`. Keep the licence in source and the static export. The build does not fetch fonts from an external service.
 
+## Ask a Wiz: Turnstile
+
+`/api/ask` spends money on a model call, so besides its origin check and its per-visitor and daily caps it can require a free Cloudflare Turnstile check. Two Cloudflare Pages environment variables (Settings > Variables and Secrets, Production and Preview) turn it on:
+
+| Name | Kind | Holds |
+| --- | --- | --- |
+| `TURNSTILE_SITE_KEY` | Variable (public) | The widget's site key. `GET /api/ask` hands it to the page as `turnstile_site_key` |
+| `TURNSTILE_SECRET_KEY` | Secret (encrypted) | The widget's secret key. Only the function reads it, to call siteverify |
+
+To create the widget: Cloudflare dashboard > **Turnstile** > **Add widget**, name it, add the hostname `openwiz.dev` (and any preview hostname you want to test on, such as the Pages project's `*.pages.dev` host), choose **Managed** mode, then copy the site key and secret key into the two variables. Variables apply on the next deploy: redeploy (or push to main) after setting them.
+
+With `TURNSTILE_SECRET_KEY` unset, Ask a Wiz works exactly as before: no widget, no check. Once it is set, `TURNSTILE_SITE_KEY` must be valid too, or every question is `unavailable`. Each question then carries a fresh single-use token in the `CF-Turnstile-Response` header; the function checks it with siteverify (5 s timeout) before any counter write or model call and refuses anything but a pass for action `ask` on the request's own hostname with `403 not_human`, a network error included. The page loads `https://challenges.cloudflare.com/turnstile/v0/api.js` only after the probe names a site key and the visitor first focuses or uses the Ask box, and renders it invisible (`interaction-only`) unless Cloudflare needs a click. To test locally, put Cloudflare's test keys in an untracked `.dev.vars` for `wrangler pages dev`: site `1x00000000000000000000AA` with secret `1x0000000000000000000000000000000AA` always passes, secret `2x0000000000000000000000000000000AA` always fails.
+
 ## Privacy and verification limits
 
 CI uses only Node.js, Python's standard library, Git and the checkout/setup Actions, plus `npm ci` for the pinned dependencies below; it builds the landing from the checked-in vendor files.

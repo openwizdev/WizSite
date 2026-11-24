@@ -19,6 +19,12 @@ const SENTINEL = 'NOT_COVERED';
 const PRICE = /^[0-9]{1,4}(\.[0-9]{1,6})?$/;
 const UPSTREAM_TIMEOUT = 60_000;
 const STORE_TIMEOUT = 5_000;
+const SITEVERIFY = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
+const SITEVERIFY_TIMEOUT = 5_000;
+const TURNSTILE_ACTION = 'ask';
+const TURNSTILE_HEADER = 'CF-Turnstile-Response';
+const TURNSTILE_KEY = /^[0-9A-Za-z_-]{1,100}$/;
+const MAX_TOKEN = 2048;
 
 const SYSTEM = "You answer questions about OpenWiz for visitors to openwiz.dev. Answer only from the passages in the user's message, in plain text, in at most three short paragraphs. If the passages do not answer the question, reply with exactly NOT_COVERED and nothing else.";
 const NOT_COVERED = {
@@ -31,6 +37,7 @@ const NOT_COVERED = {
 };
 const REFUSALS = {
   bad_request: [400, "That question couldn't be read. Try again."],
+  not_human: [403, "Please confirm you're human and try again."],
   too_long: [413, 'That question is too long. Keep it to 300 characters or fewer.'],
   rate_limited: [429, "That's a lot of questions at once. Try again in a few minutes."],
   daily_cap: [429, 'Ask a Wiz has answered all it can for today. Try again tomorrow.'],
@@ -81,6 +88,35 @@ function caps(env) {
   const count = typeof calls === 'string' && /^[0-9]{1,6}$/.test(calls) && Number(calls) >= 1 && Number(calls) <= 100000 ? Number(calls) : 0;
   const dollars = price(usd);
   return { calls: count, spend: dollars === null ? 0 : micro(dollars * 1_000_000) };
+}
+
+// Turnstile is on only when its secret is set; then the public site key must be valid too, or the function is unavailable.
+function turnstile(env) {
+  const secret = env.TURNSTILE_SECRET_KEY;
+  if (secret === undefined || secret === '') return { on: false };
+  const site = env.TURNSTILE_SITE_KEY;
+  if (typeof secret !== 'string' || typeof site !== 'string' || !TURNSTILE_KEY.test(site)) return null;
+  return { on: true, secret, site };
+}
+
+// One siteverify call per question. Anything but a clear pass for this action on this host is a refusal, a network error too.
+async function human(gate, request, timeout) {
+  const token = request.headers.get(TURNSTILE_HEADER) ?? '';
+  if (!token || token.length > MAX_TOKEN) return false;
+  const form = new URLSearchParams({ secret: gate.secret, response: token, idempotency_key: crypto.randomUUID() });
+  const ip = request.headers.get('CF-Connecting-IP');
+  if (ip) form.set('remoteip', ip);
+  try {
+    const response = await fetch(SITEVERIFY, { method: 'POST', body: form, signal: AbortSignal.timeout(timeout), redirect: 'manual' });
+    if (response.status !== 200) { response.body?.cancel().catch(() => {}); return false; }
+    const result = await response.json();
+    if (result?.success !== true) return false;
+    // Cloudflare's test secrets pass any token and name no action and the host example.com; only the secret set here can produce one.
+    if (result.metadata?.result_with_testing_key === true) return true;
+    return result.action === TURNSTILE_ACTION && result.hostname === new URL(request.url).hostname;
+  } catch {
+    return false;
+  }
 }
 
 const JSON_STRING = String.raw`"(?:[^"\\\u0000-\u001f]|\\(?:["\\/bfnrt]|u[0-9a-fA-F]{4}))*"`;
@@ -301,22 +337,25 @@ export async function handle(context, options = {}) {
   const { request, env } = context;
   const {
     clock = () => new Date(), salt: makeSalt = randomSalt, rank = rankPassages,
-    upstreamTimeout = UPSTREAM_TIMEOUT, storeTimeout = STORE_TIMEOUT,
+    upstreamTimeout = UPSTREAM_TIMEOUT, storeTimeout = STORE_TIMEOUT, verifyTimeout = SITEVERIFY_TIMEOUT,
   } = options;
   const keep = promise => { try { context.waitUntil?.(promise); } catch { } };
 
   if (env.ASK_A_WIZ !== 'on') return new Response(null, { status: 404 });
+  const gate = turnstile(env);
   if (request.method === 'GET') {
-    return new Response(JSON.stringify({ schema: SCHEMA, enabled: true, max_question_chars: MAX_QUESTION }),
-      { headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
+    const probe = { schema: SCHEMA, enabled: true, max_question_chars: MAX_QUESTION };
+    if (gate?.on) probe.turnstile_site_key = gate.site;
+    return new Response(JSON.stringify(probe), { headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
   }
 
   const config = configure(env);
-  if (!config) return refuse('unavailable');
+  if (!config || !gate) return refuse('unavailable');
 
   const asked = await readQuestion(request);
   if (asked.refusal) return refuse(asked.refusal);
   const { question } = asked;
+  if (gate.on && !await human(gate, request, verifyTimeout)) return refuse('not_human');
 
   const now = clock();
   const day = utcDay(now);
