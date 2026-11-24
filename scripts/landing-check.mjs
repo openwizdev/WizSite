@@ -451,18 +451,37 @@ async function phoneMenu(page, where) {
     const toggle = document.querySelector('.nav-toggle');
     const panel = document.getElementById(toggle.getAttribute('aria-controls'));
     const links = [...panel.querySelectorAll('a')];
+    const firstStyle = links[0] && getComputedStyle(links[0]);
+    const panelStyle = getComputedStyle(panel);
+    const current = panel.querySelector('[aria-current="page"]');
+    const marker = current && getComputedStyle(current, '::after');
     return {
       expanded: toggle.getAttribute('aria-expanded'), shown: shown(panel),
       destinations: links.filter(shown).map(link => link.getAttribute('href')),
-      targets: links.every(link => link.getBoundingClientRect().height >= 40),
+      targets: links.every(link => link.getBoundingClientRect().height >= 44),
+      rowGap: links.length > 1 ? Math.round(links[1].getBoundingClientRect().top - links[0].getBoundingClientRect().bottom) : 0,
       scrollLocked: getComputedStyle(document.documentElement).overflowY === 'hidden' && document.querySelector('main').inert,
-      firstFocused: document.activeElement === links[0], toggleFocused: document.activeElement === toggle,
+      panelFocused: document.activeElement === panel,
+      firstFocused: document.activeElement === links[0],
+      firstRing: document.activeElement === links[0] && links[0].matches(':focus-visible') &&
+        firstStyle.outlineStyle === 'solid' && parseFloat(firstStyle.outlineWidth) >= 2,
+      noPointerRing: panelStyle.outlineStyle === 'none' && firstStyle.outlineStyle === 'none',
+      hasCurrent: !!current,
+      currentMarker: !current || (marker.content !== 'none' && parseFloat(marker.width) > 0 && parseFloat(marker.height) > 0),
+      toggleFocused: document.activeElement === toggle,
     };
   })()`);
   await page.click(toggle.x, toggle.y);
   const opened = await state();
-  expect(opened.expanded === 'true' && opened.shown && opened.firstFocused && opened.scrollLocked && opened.targets &&
-    opened.destinations.join() === '/drivers/,/market/,/changelog/,/faq/,/app/', where, 'the phone menu fails to open, focus, lock scrolling or show all links');
+  expect(opened.expanded === 'true' && opened.shown && opened.panelFocused && opened.noPointerRing && opened.scrollLocked &&
+    opened.targets && opened.rowGap >= 4 && opened.currentMarker &&
+    opened.destinations.join() === '/drivers/,/market/,/changelog/,/faq/,/app/', where,
+    'the phone menu fails to open calmly on tap, focus the panel, lock scrolling, or show 44 px rows with gap and current marker');
+  const tab = { key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 };
+  await page.send('Input.dispatchKeyEvent', { type: 'keyDown', ...tab });
+  await page.send('Input.dispatchKeyEvent', { type: 'keyUp', ...tab });
+  const tabbed = await state();
+  expect(tabbed.firstFocused && tabbed.firstRing, where, 'Tab in the open phone menu needs to show the focus ring on the first row');
   await page.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
   const escaped = await state();
   expect(escaped.expanded === 'false' && !escaped.shown && escaped.toggleFocused && !escaped.scrollLocked,

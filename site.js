@@ -23,6 +23,7 @@ function enablePhoneMenu() {
   const stars = document.querySelector('.landing-nav .github-star');
   const phone = matchMedia('(max-width: 850px)');
   const background = [...document.querySelectorAll('body > :is(main, footer, .skip):not([inert])')];
+  panel.tabIndex = -1;
 
   function setOpen(open) {
     toggle.setAttribute('aria-expanded', String(open));
@@ -44,15 +45,17 @@ function enablePhoneMenu() {
         stars.before(panel);
       }
       panel.hidden = false;
-      if (panel.contains(focused) || focused === signIn) focused.focus();
+      if (focused !== panel && (panel.contains(focused) || focused === signIn)) focused.focus();
       if (focused === toggle) panel.querySelector('a').focus();
     }
   }
 
-  toggle.addEventListener('click', () => {
+  toggle.addEventListener('click', event => {
     const open = toggle.getAttribute('aria-expanded') === 'false';
     setOpen(open);
-    (open ? panel.querySelector('a') : toggle).focus();
+    if (!open) toggle.focus();
+    else if (event.detail === 0) panel.querySelector('a').focus();
+    else panel.focus({ preventScroll: true });
   });
   document.addEventListener('keydown', event => {
     if (event.key !== 'Escape' || toggle.getAttribute('aria-expanded') !== 'true') return;
