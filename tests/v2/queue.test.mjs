@@ -431,3 +431,131 @@ else:
     await rm(temp, { recursive: true, force: true });
   }
 });
+
+test('R8: a transient Specs 502 disables answering, keeps the draft in memory, and restores it on recovery', async () => {
+  const run = await start();
+  try {
+    await queueWorld(run);
+    await openQueue(run, 'dry-run', { card: true });
+    await run.page.until(`document.querySelector('article.decision[data-key="${SPEC_DECISION}"] textarea')`, 'the reply box');
+    await run.page.run(`document.querySelector('article.decision[data-key="${SPEC_DECISION}"] textarea').focus()`);
+    await run.page.type('Keep it through a 502');
+    run.world.graphql.Specs = async () => ({ status: 502, json: { message: 'Bad Gateway' } });
+    await run.page.click('Refresh now');
+    await run.page.until(`document.body.innerText.includes("Couldn't read Specs")`, 'the failed refresh');
+    await run.page.until(`document.querySelector('article.decision[data-key="${SPEC_DECISION}"] .decision-blocked')`, 'the unchecked card');
+    const enabledWhileFailed = await run.page.run(`[...document.querySelectorAll('article.decision[data-key="${SPEC_DECISION}"] button')].filter(b => !b.disabled).length`);
+    assert.equal(enabledWhileFailed, 0, 'answer actions stayed enabled during a Specs 502');
+    run.world.graphql.Specs = async () => ({ status: 200, json: specsAnswer(SPECS) });
+    await refreshed(run);
+    await run.page.until(`document.querySelector('article.decision[data-key="${SPEC_DECISION}"] textarea')`, 'the restored reply box');
+    const draft = await run.page.run(`document.querySelector('article.decision[data-key="${SPEC_DECISION}"] textarea').value`);
+    assert.equal(draft, 'Keep it through a 502', 'a transient Specs 502 erased the draft');
+    await run.page.run(`(() => { const card = document.querySelector('article.decision[data-key="${SPEC_DECISION}"]');
+      [...card.querySelectorAll('button')].find(b => b.textContent === 'Preview reply').scrollIntoView({ block: 'center' }); })()`);
+    await run.page.tap('Preview reply');
+    await run.page.until(`document.body.innerText.includes('openwiz decision answer v1') && document.body.innerText.includes('Keep it through a 502')`, 'the composed preview');
+    assert.deepEqual(run.world.writes(), []);
+    assert.deepEqual(run.world.violations, []);
+  } finally {
+    await run.close();
+  }
+});
+
+test('R8: a changed binding on recovery does not restore the old draft', async () => {
+  const run = await start();
+  try {
+    await queueWorld(run);
+    await openQueue(run, 'dry-run', { card: true });
+    await run.page.until(`document.querySelector('article.decision[data-key="${SPEC_DECISION}"] textarea')`, 'the reply box');
+    await run.page.run(`document.querySelector('article.decision[data-key="${SPEC_DECISION}"] textarea').focus()`);
+    await run.page.type('Draft for old binding');
+    run.world.graphql.Specs = async () => ({ status: 502, json: { message: 'Bad Gateway' } });
+    await run.page.click('Refresh now');
+    await run.page.until(`document.querySelector('article.decision[data-key="${SPEC_DECISION}"] .decision-blocked')`, 'the unchecked card');
+    const updatedBody = SPEC_BODY.replace('Synthetic.', 'Synthetic body edited.');
+    run.world.github['GET /repos/acme/factory/issues/60'] = () => ({ status: 200, json: { number: 60, state: 'open', body: updatedBody } });
+    run.world.graphql.Specs = async () => ({ status: 200, json: specsAnswer(SPECS) });
+    await refreshed(run);
+    await run.page.until(`document.querySelector('article.decision[data-key="${SPEC_DECISION}"] textarea')`, 'the recovered reply box');
+    const draft = await run.page.run(`document.querySelector('article.decision[data-key="${SPEC_DECISION}"] textarea').value`);
+    assert.equal(draft, '', 'a changed binding restored a draft from the old binding');
+    assert.deepEqual(run.world.writes(), []);
+    assert.deepEqual(run.world.violations, []);
+  } finally {
+    await run.close();
+  }
+});
+
+test('R9: tapping Yes during a refresh with a slow later GitHub read composes without stale refusal', async () => {
+  const run = await start();
+  try {
+    await queueWorld(run);
+    await openQueue(run, 'dry-run', { card: true });
+    await run.page.until(`document.querySelectorAll('article.decision').length >= 2`, 'the decision cards');
+    const firstPulls = run.world.recorded[pageOne];
+    delete run.world.recorded[pageOne];
+    let pullsStarted;
+    let releasePulls;
+    const started = new Promise(resolve => { pullsStarted = resolve; });
+    const gate = new Promise(resolve => { releasePulls = resolve; });
+    run.world.github['GET /repos/acme/factory/pulls'] = async () => {
+      pullsStarted();
+      await gate;
+      return { status: 200, json: firstPulls.json };
+    };
+    await run.page.click('Refresh now');
+    await started;
+    await run.page.run(`(() => { const card = document.querySelector('article.decision[data-key="${SPEC_DECISION}"]');
+      [...card.querySelectorAll('button')].find(b => b.textContent === 'Yes').scrollIntoView({ block: 'center' }); })()`);
+    await run.page.tap('Yes');
+    await run.page.until(`document.body.innerText.includes('openwiz decision answer v1') && document.body.innerText.includes('confirm spec #60')`
+      + ` || document.body.innerText.includes('Not posted (source_changed)')`, 'the preview or refusal');
+    const text = await run.page.text();
+    assert.ok(!text.includes('Not posted (source_changed)'), 'Yes during an in-flight refresh was refused as stale');
+    assert.match(text, /openwiz decision answer v1/);
+    assert.match(text, /confirm spec #60/);
+    releasePulls();
+    await new Promise(resolve => setTimeout(resolve, 400));
+    assert.deepEqual(run.world.writes(), []);
+    assert.deepEqual(run.world.violations, []);
+  } finally {
+    await run.close();
+  }
+});
+
+test('R9: a card marked stale by a timestamp mismatch recovers on the next successful refresh and keeps its draft', async () => {
+  const run = await start();
+  try {
+    await queueWorld(run);
+    await openQueue(run, 'dry-run', { card: true });
+    await run.page.until(`document.querySelector('article.decision[data-key="${SPEC_DECISION}"] textarea')`, 'the reply box');
+    await run.page.run(`document.querySelector('article.decision[data-key="${SPEC_DECISION}"] textarea').focus()`);
+    await run.page.type('Draft survives stale recovery');
+    const changedBody = SPEC_BODY.replace('Keep your notes in one list.', 'Changed headline temporarily.');
+    run.world.github['GET /repos/acme/factory/issues/60'] = () => ({ status: 200, json: { number: 60, state: 'open', body: changedBody } });
+    await run.page.run(`(() => { const card = document.querySelector('article.decision[data-key="${SPEC_DECISION}"]');
+      [...card.querySelectorAll('button')].find(b => b.textContent === 'Yes').scrollIntoView({ block: 'center' }); })()`);
+    await run.page.tap('Yes');
+    await run.page.until(`document.querySelector('article.decision[data-key="${SPEC_DECISION}"] .decision-blocked')`, 'the stale card');
+    run.world.github['GET /repos/acme/factory/issues/60'] = () => ({ status: 200, json: { number: 60, state: 'open', body: SPEC_BODY } });
+    await refreshed(run);
+    await run.page.until(`!document.querySelector('article.decision[data-key="${SPEC_DECISION}"] .decision-blocked')`, 'the recovered card');
+    const state = await run.page.run(`(() => {
+      const card = document.querySelector('article.decision[data-key="${SPEC_DECISION}"]');
+      const yes = [...card.querySelectorAll('button')].find(b => b.textContent === 'Yes');
+      const box = card.querySelector('textarea');
+      return { blocked: Boolean(card.querySelector('.decision-blocked')), disabled: yes.disabled, draft: box.value };
+    })()`);
+    assert.deepEqual(state, { blocked: false, disabled: false, draft: 'Draft survives stale recovery' },
+      'the stale card stayed disabled or lost its draft after a successful refresh');
+    await run.page.run(`(() => { const card = document.querySelector('article.decision[data-key="${SPEC_DECISION}"]');
+      [...card.querySelectorAll('button')].find(b => b.textContent === 'Preview reply').scrollIntoView({ block: 'center' }); })()`);
+    await run.page.tap('Preview reply');
+    await run.page.until(`document.body.innerText.includes('openwiz decision answer v1') && document.body.innerText.includes('Draft survives stale recovery')`, 'the recovered compose');
+    assert.deepEqual(run.world.writes(), []);
+    assert.deepEqual(run.world.violations, []);
+  } finally {
+    await run.close();
+  }
+});

@@ -103,7 +103,7 @@
     return { result: got.result, checked_at: at, binding: got.result === 'matched' ? JSON.stringify(got.binding ?? null) : null };
   }
 
-  async function decisions(repository, subject, title, records, complete, authors, gaps, bindings) {
+  async function decisions(repository, subject, title, records, complete, authors, gaps, bindings, onCheck) {
     const out = [];
     const sameThread = (a, b) => a.kind === b.kind && (GRILL.includes(a.kind) ? a.grill_file === b.grill_file : a.spec === b.spec);
     const later = (a, b) => a.at > b.at || (a.at === b.at && a.id > b.id);
@@ -117,6 +117,7 @@
         else {
           Object.assign(item, { current: got.result === 'matched', checked_at: got.checked_at });
           if (got.binding) bindings.set(item.key, got.binding);
+          if (got.result === 'matched') onCheck?.(item, got.binding ?? null);
         }
       }
       out.push(item);
@@ -135,7 +136,7 @@
     return out;
   }
 
-  async function build(feeds, picked) {
+  async function build(feeds, picked, onCheck) {
     const seen = OW.factory.model(feeds);
     const data = feeds.specs.data;
     const specsWhole = !(feeds.specs.errors?.length);
@@ -153,7 +154,7 @@
       const complete = specsWhole && Boolean(list) && !nodes.some(c => !c) && (list.totalCount ?? 0) <= nodes.length;
       const comments = nodes.filter(Boolean).map(c => ({ id: c.databaseId, url: c.url, createdAt: c.createdAt, body: c.body, login: c.author?.login }));
       const records = candidates(comments, 'issue', spec.number, authors);
-      items.push(...(await decisions(repository, { kind: 'issue', number: spec.number }, spec.title, records, complete, authors, gaps, bindings)));
+      items.push(...(await decisions(repository, { kind: 'issue', number: spec.number }, spec.title, records, complete, authors, gaps, bindings, onCheck)));
     }
     const pulls = await every(`${R}/pulls?state=open`);
     if (!pulls.complete) gaps.push('the open pull requests');
@@ -163,7 +164,7 @@
       if (!got.complete) gaps.push(`#${pull.number}'s comments`);
       const comments = got.items.filter(Boolean).map(c => ({ id: c.id, url: c.html_url, createdAt: c.created_at, body: c.body, login: c.user?.login }));
       const records = candidates(comments, 'pull_request', pull.number, authors);
-      items.push(...(await decisions(repository, { kind: 'pull_request', number: pull.number }, pull.title, records, pulls.complete && got.complete, authors, gaps, bindings)));
+      items.push(...(await decisions(repository, { kind: 'pull_request', number: pull.number }, pull.title, records, pulls.complete && got.complete, authors, gaps, bindings, onCheck)));
     }
     const updated = new Map((data?.specIssues?.nodes || []).filter(Boolean).map(issue => [issue.number, Date.parse(issue.updatedAt) || 0]));
     const specs = seen.specs.filter(spec => spec.total > 0 && spec.done < spec.total).map(spec => {
@@ -179,16 +180,20 @@
     return { repository, items: [...items, ...specs], gaps: [...new Set(gaps)], bindings };
   }
 
-  const state = { key: null, run: null, result: null, failedSince: null, el: null, cards: new Map() };
+  const state = { key: null, run: null, result: null, failedSince: null, el: null, session: null, cards: new Map(), drafts: new Map() };
   const shown = item => item.type === 'spec' || item.request === null || (item.request.status === 'open' && item.current !== false);
+  const shapeOf = item => JSON.stringify({ ...item, current: null, checked_at: null });
 
   function refresh(feeds) {
     const picked = OW.data.repo.get();
     const specs = feeds.specs;
-    if (!picked || state.result?.repository !== picked.full) {
+    const session = OW.data.auth.session();
+    if (!picked || state.result?.repository !== picked.full || state.session !== session) {
       state.result = null;
       state.failedSince = null;
+      state.session = session;
       state.cards.clear();
+      state.drafts.clear();
     }
     if (!picked || !specs.data || !specs.readAt || !OW.factory.model(feeds)) return;
     if (specs.failedAt != null) state.failedSince = Math.max(state.failedSince ?? 0, specs.failedAt);
@@ -196,10 +201,22 @@
     const key = `${picked.full}|${OW.data.auth.session() ?? ''}|${OW.data.auth.account() ?? ''}|${readAt}`;
     if (state.key === key) return;
     state.key = key;
-    const session = OW.data.auth.session();
-    const mine = build(feeds, picked);
-    state.run = mine;
+    let mine;
     const still = () => state.run === mine && OW.data.auth.session() === session && OW.data.repo.get()?.full === picked.full;
+    const sync = (item, binding) => {
+      if (!still()) return;
+      const kept = state.cards.get(item.key);
+      if (!kept || kept.item.type !== 'decision' || kept.item.current !== true) return;
+      if (kept.shape !== shapeOf(item) || kept.binding !== binding) return;
+      kept.item.checked_at = item.checked_at;
+      if (state.result) {
+        const shownItem = state.result.items.find(x => x.key === item.key);
+        if (shownItem && shownItem.current === true) shownItem.checked_at = item.checked_at;
+        if (binding != null) state.result.bindings.set(item.key, binding);
+      }
+    };
+    mine = build(feeds, picked, sync);
+    state.run = mine;
     mine.then(result => {
       if (!still()) return;
       state.run = null;
@@ -241,18 +258,44 @@
     return { ...result, gaps: [...new Set([...result.gaps, 'the latest spec read'])],
       items: result.items.map(item => (item.type === 'decision' && item.current === true ? { ...item, current: null, checked_at: null } : item)) };
   }
+  function saveDraft(kept) {
+    if (!kept || kept.item.type !== 'decision' || kept.item.current !== true) return;
+    const boxes = [...kept.el.querySelectorAll('textarea')];
+    if (!boxes.length) return;
+    const values = boxes.map(box => box.value);
+    if (values.some(v => v.length > 0)) state.drafts.set(kept.item.key, { shape: kept.shape, binding: kept.binding, values });
+    else state.drafts.delete(kept.item.key);
+  }
+  function restoreDraft(el, key, shape, binding) {
+    const draft = state.drafts.get(key);
+    if (!draft) return;
+    if (draft.shape !== shape || draft.binding !== binding) return void state.drafts.delete(key);
+    const boxes = [...el.querySelectorAll('textarea')];
+    if (boxes.length !== draft.values.length) return;
+    state.drafts.delete(key);
+    boxes.forEach((box, i) => {
+      if (!draft.values[i]) return;
+      box.value = draft.values[i];
+      box.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+  }
   function holder(item, bindings) {
-    const identity = JSON.stringify([{ ...item, checked_at: null }, bindings.get(item.key) ?? null]);
+    const binding = bindings.get(item.key) ?? null;
+    const shape = shapeOf(item);
+    const identity = JSON.stringify([{ ...item, checked_at: null }, binding]);
     const kept = state.cards.get(item.key);
-    if (kept && kept.identity === identity) {
+    const stale = item.type === 'decision' && item.current === true && item !== kept?.item && Boolean(kept?.el?.querySelector('.decision-blocked'));
+    if (kept && kept.identity === identity && !stale) {
       kept.item.checked_at = item.checked_at;
       return kept.el;
     }
+    saveDraft(kept);
     const el = h('div', { class: 'queue-item', 'data-key': item.key });
     const card = OW.cards?.[item.type];
     if (typeof card === 'function') card(item, el);
     else el.replaceChildren(plain(item));
-    state.cards.set(item.key, { identity, item, el });
+    if (item.type === 'decision' && item.current === true) restoreDraft(el, item.key, shape, binding);
+    state.cards.set(item.key, { identity, shape, binding, item, el });
     return el;
   }
 
@@ -261,7 +304,18 @@
     if (!result) return el.replaceChildren(OW.ui.placeholder('Reading GitHub…'));
     const items = result.items.filter(shown);
     const keys = new Set(items.map(item => item.key));
-    for (const key of [...state.cards.keys()]) if (!keys.has(key)) state.cards.delete(key);
+    for (const [key, kept] of [...state.cards.entries()]) {
+      if (keys.has(key)) continue;
+      const gone = result.items.find(i => i.key === key);
+      if (result.gaps.length && (!gone || gone.current !== false)) saveDraft(kept);
+      else state.drafts.delete(key);
+      state.cards.delete(key);
+    }
+    if (!result.gaps.length) {
+      for (const key of [...state.drafts.keys()]) if (!keys.has(key)) state.drafts.delete(key);
+    } else {
+      for (const item of result.items) if (item.current === false) state.drafts.delete(item.key);
+    }
     const missing = result.gaps.length
       ? OW.ui.unknown(`This list may be missing items: GitHub gave only part of ${result.gaps.join(', ')}. The app tries again on its own.`) : null;
     el.replaceChildren(...[missing, items.length ? h('div', { class: 'queue' }, items.map(item => holder(item, result.bindings)))
