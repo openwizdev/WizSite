@@ -8,10 +8,10 @@ const mainStyles = ['/app/ember.css', '/app/pages/queue.css', '/app/cards/decisi
 const mainScripts = [
   '/app/data.js', '/app/records.js', '/app/ui.js', '/app/pages/you.js', '/app/pages/queue.js',
   '/app/pages/specs.js', '/app/vendor/dagre-3.1.3.min.js', '/app/pages/spec.js', '/app/pages/agents.js',
-  '/app/cards/decision.js', '/app/palette.js', '/app/shell.js',
+  '/app/pages/models.js', '/app/cards/decision.js', '/app/palette.js', '/app/shell.js',
 ];
 
-test('switch off: none of the v2 shell renders and demo=1 is ignored', async () => {
+test('switch off: main’s assets, navigation and startup requests are kept, and demo=1 is ignored', async () => {
   const run = await start();
   try {
     await run.page.go(`${SITE}/app/?demo=1#/feed`);
@@ -27,6 +27,29 @@ test('switch off: none of the v2 shell renders and demo=1 is ignored', async () 
     const requested = run.world.log.map(r => r.path).filter(path => /\.(?:css|js)$/.test(path));
     assert.deepEqual(requested.map(withoutFingerprint).sort(), [...mainStyles, ...mainScripts].sort());
     assert.deepEqual(apiRequests(run.world), []);
+
+    await signIn(run.page);
+    await run.page.click('acme/factory');
+    await run.page.until(`document.querySelector('main h1')?.textContent === 'You' &&
+      Object.values(OW.data.feeds).every(feed => !feed.busy && feed.state !== 'loading')`, 'the legacy startup reads');
+    const nav = await run.page.run(`['nav.main', 'nav.tabs'].map(selector =>
+      [...document.querySelectorAll(selector + ' a')].map(link => link.getAttribute('href')))`);
+    const mainNav = ['#/you', '#/specs', '#/agents', '#/models'];
+    assert.deepEqual(nav, [mainNav, mainNav]);
+    await run.page.click('Models');
+    await run.page.until(`location.hash === '#/models' && document.querySelector('main h1')?.textContent === 'Models'`, 'the Models page');
+    const startup = apiRequests(run.world).filter(r => r.method !== 'OPTIONS').map(r => {
+      const operation = r.path === '/graphql' ? JSON.parse(r.body).query.match(/\bquery\s+(\w+)/)[1] : '';
+      return [r.method, r.url, operation];
+    });
+    assert.deepEqual(startup.sort(), [
+      ['GET', 'https://api.github.com/user/installations/1001/repositories?per_page=100', ''],
+      ['GET', 'https://api.github.com/user/installations?per_page=100', ''],
+      ['POST', 'https://api.github.com/graphql', 'Agents'],
+      ['POST', 'https://api.github.com/graphql', 'Models'],
+      ['POST', 'https://api.github.com/graphql', 'Specs'],
+      ['POST', `${SITE}/api/sign-in/token`, ''],
+    ]);
     assert.deepEqual(run.world.violations, []);
   } finally {
     await run.close();
