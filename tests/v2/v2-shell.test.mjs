@@ -40,7 +40,7 @@ test('switch on + demo=1: renders v2 shell, deep links, interactions, and makes 
     await run.page.until(`document.body.innerText.includes('Run your software factory from here.')`, 'v2 welcome screen');
     assert.equal(await run.page.run(`document.documentElement.dataset.v2`), '1');
     assert.equal(await run.page.run(`document.querySelector('.v2-sample-tag').textContent`), 'Sample data');
-    assert.equal(await run.page.run(`document.querySelector('.v2-welcome-sample').getAttribute('href')`), '/app/');
+    assert.equal(await run.page.run(`document.querySelector('.v2-welcome-sample').getAttribute('href')`), '/api/sign-in/start');
 
     await run.page.click('Open Harbor workspace');
     await run.page.until(`location.hash === '#/chat' && document.body.innerText.includes('Accept all 3')`, 'v2 chat with grill round');
@@ -82,7 +82,8 @@ test('switch on + demo=1: renders v2 shell, deep links, interactions, and makes 
 
     await run.page.go(`${SITE}/app/?v2=dry-run&demo=1#/feed/2`);
     await run.page.until(`document.querySelector('.v2-card-title')?.textContent === 'Keep the free plan?'`, 'deep link to decision card');
-    assert.match(await run.page.text(), /Recommended:\s+Keep it, cap at 3 seats/);
+    assert.equal(await run.page.run(`document.querySelector('#v2-recommended').textContent`), 'Recommended');
+    assert.equal((await run.page.text()).match(/Keep it, cap at 3 seats/g)?.length, 1);
     assert.equal(await run.page.run(`document.querySelector('.v2-hero-card .v2-preview')`), null);
     assert.equal(await run.page.run(`document.querySelector('.v2-hero-card button.primary').textContent`), 'Keep it, cap at 3 seats');
     await run.page.tap('Change something');

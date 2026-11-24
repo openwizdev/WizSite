@@ -410,12 +410,14 @@
         focusCard();
       });
     };
-    const details = decision
-      ? h('h3', { class: 'v2-recommendation' }, h('span', {}, 'Recommended:'), ' ', card.rec)
-      : h('div', { class: 'v2-progress-box' },
+    const details = decision ? null : h('div', { class: 'v2-progress-box' },
         h('p', {}, h('strong', {}, `${card.merged} of ${card.total}`), ' tickets merged'),
         h('div', { class: 'v2-pips', 'aria-hidden': 'true' },
           Array.from({ length: card.total }, (_, i) => h('span', { class: i < card.merged ? 'merged' : '' }))));
+    const primary = h('button', { type: 'button', class: 'v2-btn primary', 'data-focus': 'ship',
+      'aria-describedby': decision ? 'v2-recommended' : null,
+      onclick: () => resolve(decision ? 'decided' : 'shipped', `${decision ? 'Approved' : 'Shipped'} “${card.title}”`) },
+      icon('check'), decision ? card.rec : 'Ship it');
     const hero = h('article', { class: 'v2-hero-card' },
       h('div', { class: 'v2-card-top' },
         h('span', { class: 'v2-label' }, decision ? 'Needs you' : 'Ready to ship'),
@@ -424,8 +426,8 @@
       decision ? null : specPreview(card),
       details,
       h('div', { class: 'v2-card-actions' },
-        h('button', { type: 'button', class: 'v2-btn primary', 'data-focus': 'ship',
-          onclick: () => resolve(decision ? 'decided' : 'shipped', `${decision ? 'Approved' : 'Shipped'} “${card.title}”`) }, icon('check'), decision ? card.rec : 'Ship it'),
+        decision ? h('div', { class: 'v2-recommended' },
+          h('span', { class: 'v2-label', id: 'v2-recommended' }, 'Recommended'), primary) : primary,
         h('button', { type: 'button', class: 'v2-btn v2-change', 'data-focus': 'change',
           onclick: event => openSheet(card, event.currentTarget, undoChange => resolve('changing', 'Change sent', decision
             ? { undoChange } : { revision: { title: card.title, merged: 0, total: 1 } })) }, 'Change something'),
@@ -498,8 +500,8 @@
       note ? h('div', { class: 'notice bad', role: 'alert' }, icon('warn'), h('span', {}, note)) : null,
       h('a', { class: 'v2-btn primary', href: demoMode ? '#/chat' : '/api/sign-in/start' },
         demoMode ? 'Open Harbor workspace' : 'Continue with GitHub', icon('right')),
-      h('a', { class: 'v2-btn subtle v2-welcome-sample', href: demoMode ? '/app/' : '/app/?demo=1#/chat' },
-        demoMode ? 'Exit sample workspace' : 'See a sample factory'));
+      h('a', { class: 'v2-btn subtle v2-welcome-sample', href: demoMode ? '/api/sign-in/start' : '/app/?demo=1#/chat' },
+        demoMode ? 'Continue with GitHub' : 'See a sample factory'));
     card.prepend(h('header', { class: 'v2-welcome-head' },
       h('div', { class: 'v2-welcome-brand' }, mark(), h('span', {}, 'OpenWiz')),
       demoMode ? h('span', { class: 'v2-sample-tag' }, 'Sample data') : null));
