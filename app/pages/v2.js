@@ -285,11 +285,12 @@
     const send = h('button', { type: 'button', class: 'v2-send-btn', disabled: true, 'aria-label': 'Send message' }, icon('up'));
     el.replaceChildren(h('div', { class: 'v2-chat-wrap' },
       h('div', { class: 'v2-chat-scroll' },
-        h('div', { class: 'v2-chat-empty' },
-          h('h2', {}, 'Chat is coming soon'),
-          h('p', {}, 'Review specs and questions from your repository in Feed.'),
+        h('article', { class: 'v2-chat-empty' },
+          h('span', { class: 'v2-label' }, 'Coming soon'),
+          h('h2', {}, 'Start work from here'),
+          h('p', {}, 'Describe what to build and answer quick questions before a spec starts.'),
           h('a', { class: 'v2-btn primary', href: '#/feed' }, 'Open Feed', icon('right')))),
-      h('div', { class: 'v2-composer-wrap' }, h('div', { class: 'v2-composer' }, input, send))));
+      h('div', { class: 'v2-composer-wrap' }, h('div', { class: 'v2-composer is-disabled' }, input, send))));
   }
 
   function pendingDemoCards() {
@@ -410,12 +411,12 @@
         focusCard();
       });
     };
-    const details = decision
-      ? h('h3', { class: 'v2-recommendation' }, h('span', {}, 'Recommended:'), ' ', card.rec)
-      : h('div', { class: 'v2-progress-box' },
-        h('p', {}, h('strong', {}, `${card.merged} of ${card.total}`), ' tickets merged'),
-        h('div', { class: 'v2-pips', 'aria-hidden': 'true' },
-          Array.from({ length: card.total }, (_, i) => h('span', { class: i < card.merged ? 'merged' : '' }))));
+    const details = decision ? null : h('div', { class: 'v2-progress-box' },
+      h('p', {}, h('strong', {}, `${card.merged} of ${card.total}`), ' tickets merged'),
+      h('div', { class: 'v2-pips', 'aria-hidden': 'true' },
+        Array.from({ length: card.total }, (_, i) => h('span', { class: i < card.merged ? 'merged' : '' }))));
+    const primaryAction = h('button', { type: 'button', class: 'v2-btn primary', 'data-focus': 'ship',
+      onclick: () => resolve(decision ? 'decided' : 'shipped', `${decision ? 'Approved' : 'Shipped'} “${card.title}”`) }, icon('check'), decision ? card.rec : 'Ship it');
     const hero = h('article', { class: 'v2-hero-card' },
       h('div', { class: 'v2-card-top' },
         h('span', { class: 'v2-label' }, decision ? 'Needs you' : 'Ready to ship'),
@@ -424,8 +425,7 @@
       decision ? null : specPreview(card),
       details,
       h('div', { class: 'v2-card-actions' },
-        h('button', { type: 'button', class: 'v2-btn primary', 'data-focus': 'ship',
-          onclick: () => resolve(decision ? 'decided' : 'shipped', `${decision ? 'Approved' : 'Shipped'} “${card.title}”`) }, icon('check'), decision ? card.rec : 'Ship it'),
+        decision ? h('div', { class: 'v2-primary-slot' }, h('span', { class: 'v2-label v2-rec-tag' }, 'Recommended'), primaryAction) : primaryAction,
         h('button', { type: 'button', class: 'v2-btn v2-change', 'data-focus': 'change',
           onclick: event => openSheet(card, event.currentTarget, undoChange => resolve('changing', 'Change sent', decision
             ? { undoChange } : { revision: { title: card.title, merged: 0, total: 1 } })) }, 'Change something'),
@@ -492,14 +492,28 @@
     freshness.replaceChildren(...ctx.freshnessNodes());
   }
 
+  function stateCard(kind, text) {
+    if (kind === 'pause') return h('div', { class: 'v2-pause-note', role: 'status' }, icon('pause'), h('span', {}, text));
+    if (kind === 'reading') {
+      return h('div', { class: 'placeholder v2-state-card', role: 'status' },
+        h('span', { class: 'v2-label' }, 'Syncing'),
+        h('h2', {}, text),
+        h('p', {}, 'Checking your repository for open specs and decisions.'));
+    }
+    const labels = { failed: 'Read failed', stale: 'Showing earlier read', partial: 'Partial read' };
+    return h('div', { class: 'unknown v2-state-card v2-state-warn', role: 'status' },
+      h('div', { class: 'v2-state-head' }, icon('warn'), h('span', { class: 'v2-label' }, labels[kind] || 'Unknown')),
+      h('p', {}, text));
+  }
+
   function renderWelcome(root, { note, demoMode }) {
     const card = h('div', { class: 'v2-welcome-card' },
       h('h1', {}, 'Run your software factory from here.'),
       note ? h('div', { class: 'notice bad', role: 'alert' }, icon('warn'), h('span', {}, note)) : null,
       h('a', { class: 'v2-btn primary', href: demoMode ? '#/chat' : '/api/sign-in/start' },
         demoMode ? 'Open Harbor workspace' : 'Continue with GitHub', icon('right')),
-      h('a', { class: 'v2-btn subtle v2-welcome-sample', href: demoMode ? '/app/' : '/app/?demo=1#/chat' },
-        demoMode ? 'Exit sample workspace' : 'See a sample factory'));
+      h('a', { class: 'v2-btn subtle v2-welcome-sample', href: demoMode ? '/api/sign-in/start' : '/app/?demo=1#/chat' },
+        demoMode ? 'Continue with GitHub' : 'See a sample factory'));
     card.prepend(h('header', { class: 'v2-welcome-head' },
       h('div', { class: 'v2-welcome-brand' }, mark(), h('span', {}, 'OpenWiz')),
       demoMode ? h('span', { class: 'v2-sample-tag' }, 'Sample data') : null));
@@ -511,6 +525,7 @@
     setRedraw: fn => { redraw = fn; },
     renderWelcome,
     allClear,
+    stateCard,
     dismissToast: () => dismissToast?.(),
     pager,
     pages(ctx) {
