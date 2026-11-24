@@ -18,7 +18,7 @@
   const PENDING = ['sending', 'unknown'];
   const TERMINAL = ['refused', 'retired'];
   const STATES = [...PENDING, 'posted', ...TERMINAL];
-  const REASONS = ['dry_run', 'disabled', 'not_composed', 'not_confirmed', 'signed_out', 'pending', 'source_changed', 'source_unchecked', 'github'];
+  const REASONS = ['dry_run', 'disabled', 'not_composed', 'not_confirmed', 'signed_out', 'pending', 'source_changed', 'source_unchecked', 'audience_changed', 'audience_unchecked', 'github'];
   const OP = /^op-[0-9a-f]{32}$/;
 
   const FIELDS = {
@@ -52,6 +52,7 @@
   const MARKERS = { line: ['launch-fleet:', '**Machine plan approval', '**Plan graph approved by', '**Late look by'], decisions: 'openwiz.decisions.' };
   const IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
   const QUESTION = /^[A-Z]{1,2}[1-9][0-9]*$/;
+  const FLEET_FILE = 'docs/agents/fleet.md';
   const GRILL_FILE = /^docs\/grills\/[A-Za-z0-9][A-Za-z0-9_.-]*\.md$/;
 
   const own = (o, key) => Object.prototype.hasOwnProperty.call(o, key);
@@ -197,15 +198,42 @@
     if (!response.ok) return null;
     return { json: await response.json().catch(() => undefined), response };
   }
-  function following(response, pin, path, page) {
-    const next = (response.headers.get('Link') || '').split(',').filter(part => /;\s*rel="next"\s*$/.test(part));
-    if (!next.length) return 'done';
-    const link = next.length === 1 && next[0].match(/^\s*<([^>]*)>\s*;\s*rel="next"\s*$/);
+  function sameListUrl(rawUrl, pin, path) {
     let url;
-    try { url = link && new URL(link[1]); } catch { return 'unreadable'; }
-    const where = url && (url.pathname === `/repos/${pin.owner}/${pin.name}${path}` || new RegExp(`^/repositories/[1-9][0-9]*${path}$`).test(url.pathname));
-    return where && url.origin === API && !url.hash && url.searchParams.get('page') === String(page + 1)
-      && [...url.searchParams.keys()].every(k => k === 'per_page' || k === 'page') ? 'next' : 'unreadable';
+    try { url = new URL(rawUrl); } catch { return null; }
+    const repoPath = `/repos/${pin.owner}/${pin.name}${path}`;
+    const idPath = url.pathname.startsWith('/repositories/') && url.pathname.endsWith(path)
+      && /^[1-9][0-9]*$/.test(url.pathname.slice('/repositories/'.length, url.pathname.length - path.length));
+    if (url.origin !== API || url.hash || !(url.pathname === repoPath || idPath)) return null;
+    if (![...url.searchParams.keys()].every(k => k === 'per_page' || k === 'page')) return null;
+    if (url.searchParams.getAll('page').length !== 1 || url.searchParams.getAll('per_page').length > 1) return null;
+    if (url.searchParams.has('per_page') && !matches(url.searchParams.get('per_page'), /^[1-9][0-9]*$/)) return null;
+    const rawPage = url.searchParams.get('page');
+    if (!matches(rawPage, /^[1-9][0-9]*$/)) return null;
+    const num = Number(rawPage);
+    return Number.isSafeInteger(num) ? num : null;
+  }
+  function following(response, pin, path, page) {
+    const header = response.headers.get('Link');
+    if (header === null) return 'done';
+    if (!header.trim()) return 'unreadable';
+    const rels = new Map();
+    for (const part of header.split(',')) {
+      const m = part.match(/^\s*<([^<>]+)>\s*;\s*rel="(prev|next|last|first)"\s*$/);
+      if (!m || rels.has(m[2])) return 'unreadable';
+      const target = sameListUrl(m[1], pin, path);
+      if (target === null) return 'unreadable';
+      rels.set(m[2], target);
+    }
+    if (rels.has('prev') && rels.get('prev') !== page - 1) return 'unreadable';
+    if (rels.has('first') && rels.get('first') !== 1) return 'unreadable';
+    if (rels.has('next')) {
+      if (rels.get('next') !== page + 1) return 'unreadable';
+      if (rels.has('last') && rels.get('last') < page + 1) return 'unreadable';
+      return 'next';
+    }
+    if (rels.has('last') && rels.get('last') > page) return 'unreadable';
+    return 'done';
   }
   async function pages(pin, path, readable) {
     const items = [];
@@ -291,25 +319,34 @@
     const section = String(body ?? '').split(/^## /m).find(part => part.startsWith('Changelog headline\n'));
     return section?.split('\n').slice(1).find(line => line.trim()) ?? null;
   }
-  const SPEC_EDIT = 'query SpecEdit($owner: String!, $name: String!, $number: Int!) { repository(owner: $owner, name: $name) { issue(number: $number) { lastEditedAt } } }';
-  async function lastEdited(pin, number) {
-    const response = await writer.query(pin, SPEC_EDIT, { owner: pin.owner, name: pin.name, number });
-    OW.data.noteLimit(null, response);
-    const answer = response.ok ? await response.json().catch(() => null) : null;
-    const issue = answer?.data?.repository?.issue;
-    if (!object(issue) || answer.errors !== undefined || !own(issue, 'lastEditedAt')) return undefined;
-    if (issue.lastEditedAt === null) return null;
-    const at = typeof issue.lastEditedAt === 'string' ? Date.parse(issue.lastEditedAt) : NaN;
-    return Number.isFinite(at) ? at : undefined;
+  async function authors(pin) {
+    const fleet = (await read(pin, `/contents/${FLEET_FILE}`))?.json;
+    if (!object(fleet) || fleet.path !== FLEET_FILE || fleet.encoding !== 'base64' || typeof fleet.content !== 'string') return null;
+    try {
+      const bytes = strictBase64(fleet.content);
+      if (!bytes) return null;
+      const text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+      return OW.factory?.recordAuthors(text) ?? null;
+    } catch {
+      return null;
+    }
   }
 
-  const authors = () => OW.factory?.recordAuthors(OW.data.feeds.specs.data?.fleet?.text) ?? null;
+  async function audience(pin) {
+    const repo = (await read(pin, ''))?.json;
+    if (repo?.full_name !== pin.full) return null;
+    if (repo.visibility === 'public' && repo.private === false) return 'public';
+    if (repo.visibility === 'private' && repo.private === true) return 'repository';
+    return null;
+  }
+
   async function sourceCheck(pin, item) {
     const unchecked = { result: 'unchecked' };
     try {
-      const writers = authors();
       const r = item.request;
-      if (!writer || !writers || pin.full !== item.repository || !requestShape(r)) return unchecked;
+      if (!writer || pin.full !== item.repository || !requestShape(r) || r.kind === 'spec_confirmation') return unchecked;
+      const writers = await authors(pin);
+      if (!writers) return unchecked;
       const comment = await read(pin, `/issues/comments/${item.comment_id}`);
       const c = comment?.json;
       if (!object(c) || c.id !== item.comment_id || typeof c.body !== 'string') return unchecked;
@@ -340,41 +377,32 @@
         const spec = await read(pin, `/issues/${r.spec}`);
         if (!object(spec?.json) || typeof spec.json.body !== 'string') return unchecked;
         fine = fine && spec.json.state === 'open' && headline(spec.json.body) === r.headline;
-        binding = { ref: 'issue', digest: await sha256(spec.json.body) };
-        if (r.kind === 'spec_confirmation') {
-          const edited = await lastEdited(pin, r.spec);
-          const posted = Date.parse(c.created_at);
-          if (edited === undefined || !Number.isFinite(posted) || edited === posted) return unchecked;
-          fine = fine && (edited === null || edited < posted);
+        const subs = await pages(pin, `/issues/${r.spec}/sub_issues`, t => object(t) && positive(t.number) && typeof t.title === 'string');
+        if (!subs.complete) return unchecked;
+        const tickets = [];
+        for (const t of [...subs.items].sort((a, b) => a.number - b.number)) {
+          const by = await pages(pin, `/issues/${t.number}/dependencies/blocked_by`, b => object(b) && positive(b.number));
+          if (!by.complete) return unchecked;
+          tickets.push({ number: t.number, title: t.title, body: t.body ?? '', blockers: by.items.map(b => b.number).sort((a, b) => a - b) });
         }
-        if (r.kind === 'plan_approval') {
-          const subs = await pages(pin, `/issues/${r.spec}/sub_issues`, t => object(t) && positive(t.number) && typeof t.title === 'string');
-          if (!subs.complete) return unchecked;
-          const tickets = [];
-          for (const t of [...subs.items].sort((a, b) => a.number - b.number)) {
-            const by = await pages(pin, `/issues/${t.number}/dependencies/blocked_by`, b => object(b) && positive(b.number));
-            if (!by.complete) return unchecked;
-            tickets.push({ number: t.number, title: t.title, body: t.body ?? '', blockers: by.items.map(b => b.number).sort((a, b) => a - b) });
-          }
-          const revision = ['plan-graph revision v2', `spec #${r.spec} body sha256 ${await sha256(untick(spec.json.body))}`];
-          for (const t of tickets) {
-            revision.push(`ticket #${t.number} blocked-by ${t.blockers.map(b => `#${b}`).join(' ') || 'none'} body sha256 ${await sha256(untick(t.body))} title ${t.title}`);
-          }
-          const digest = await sha256(`${revision.join('\n')}\n`);
-          fine = fine && same(tickets.map(({ number, title, blockers }) => ({ number, title, blockers })), r.tickets) && digest === r.fingerprint;
-          binding = { ref: 'revision-v2', digest };
+        const revision = ['plan-graph revision v2', `spec #${r.spec} body sha256 ${await sha256(untick(spec.json.body))}`];
+        for (const t of tickets) {
+          revision.push(`ticket #${t.number} blocked-by ${t.blockers.map(b => `#${b}`).join(' ') || 'none'} body sha256 ${await sha256(untick(t.body))} title ${t.title}`);
         }
+        const digest = await sha256(`${revision.join('\n')}\n`);
+        fine = fine && same(tickets.map(({ number, title, blockers }) => ({ number, title, blockers })), r.tickets) && digest === r.fingerprint;
+        binding = { ref: 'revision-v2', digest };
       }
       return fine ? { result: 'matched', binding } : { result: 'changed' };
     } catch {
       return unchecked;
     }
   }
-  function conversationCheck(list, item) {
-    const writers = authors();
+  function conversationCheck(list, item, writers) {
     const r = item.request;
     const at = list.items.findIndex(c => c.id === item.comment_id);
     if (!writers || at < 0) return 'source_unchecked';
+    if (!writers.has(list.items[at].user.login.toLowerCase())) return 'source_changed';
     for (const [i, c] of list.items.entries()) {
       if (!writers.has(c.user.login.toLowerCase())) continue;
       let got;
@@ -401,15 +429,20 @@
   async function check(item) {
     const snap = snapshot(item);
     const pin = context();
-    if (!snap || !itemShape(snap, 'decision') || !pin) return { result: 'unchecked', binding: null, checked_at: null };
-    const seq = ++checks;
-    const got = await sourceCheck(pin, snap);
-    const checkedAt = got.result === 'unchecked' ? null : (stamped = Math.max(Date.now(), stamped + 1));
+    if (!snap || !itemShape(snap, 'decision')) return { result: 'unchecked', binding: null, checked_at: null };
     const key = verifiedKey(snap);
-    if (!(verified.get(key)?.seq > seq)) {
-      if (got.result === 'matched') {
-        verified.set(key, frozen({ seq, binding: { ...got.binding }, checked_at: checkedAt, session: pin.session, account: pin.account, item: itemCanon(snap) }));
-      } else verified.delete(key);
+    const seq = ++checks;
+    if (!pin) {
+      if (!(verified.get(key)?.seq > seq)) verified.set(key, frozen({ seq, binding: null }));
+      return { result: 'unchecked', binding: null, checked_at: null };
+    }
+    const got = await sourceCheck(pin, snap);
+    if (verified.get(key)?.seq > seq) return { result: 'unchecked', binding: null, checked_at: null };
+    const checkedAt = got.result === 'unchecked' ? null : (stamped = Math.max(Date.now(), stamped + 1));
+    if (got.result === 'matched') {
+      verified.set(key, frozen({ seq, binding: { ...got.binding }, checked_at: checkedAt, session: pin.session, account: pin.account, item: itemCanon(snap) }));
+    } else {
+      verified.set(key, frozen({ seq, binding: null }));
     }
     return { result: got.result, binding: got.result === 'matched' ? { ...got.binding } : null, checked_at: checkedAt };
   }
@@ -417,9 +450,9 @@
   const issued = new WeakMap();
   const usedTaps = new WeakSet();
   const inflight = new Map();
-  function issue(preview, action) {
+  function issue(preview, action, session = OW.data.auth.session()) {
     frozen(preview);
-    issued.set(preview, { snapshot: JSON.stringify(preview), action, session: OW.data.auth.session(), confirmed: 0 });
+    issued.set(preview, { snapshot: JSON.stringify(preview), action, session, confirmed: 0 });
     return preview;
   }
   function newOp() {
@@ -433,11 +466,10 @@
     const reason = precheck(snap, picked);
     if (reason) return { refused: reason };
     const { item } = snap;
-    const visibility = picked.private === true ? 'repository' : 'public';
+    const pin = context();
     let source = null;
     if (item.type === 'decision') {
       const kept = verified.get(verifiedKey(item));
-      const pin = context();
       if (!pin) return { refused: 'source_unchecked' };
       const ours = kept && kept.session === pin.session && kept.account === pin.account && kept.item === itemCanon(item);
       const got = await sourceCheck(pin, item);
@@ -447,7 +479,9 @@
       if (!same(kept.binding, got.binding)) return { refused: 'source_changed' };
       source = { ...kept.binding };
     }
-    return issue(build(snap, newOp(), visibility, source), snap);
+    const fresh = pin && mode() === 'on' ? await audience(pin) : null;
+    const visibility = fresh ?? (picked.private === true ? 'repository' : 'public');
+    return issue(build(snap, newOp(), visibility, source), snap, pin?.session ?? OW.data.auth.session());
   }
 
   function trustedClick(event) {
@@ -462,7 +496,7 @@
     if (!state) return { confirmed: 0, of: 0 };
     const account = OW.data.auth.account();
     const book = account ? ledger(account) : null;
-    if (book && (!book.ok || TERMINAL.includes(book.receipts[preview.op]?.state))) {
+    if (state.audienceRefusal || (book && (!book.ok || TERMINAL.includes(book.receipts[preview.op]?.state)))) {
       state.confirmed = 0;
       return { confirmed: 0, of: preview.confirms };
     }
@@ -569,8 +603,9 @@
       && r.preview.repository === preview.repository && same(r.preview.subject, preview.subject));
     if (other) return refused(op, 'pending');
     const prior = saved && PENDING.includes(saved.state) ? saved : null;
-    const list = await pages(pin, `/issues/${pin.number}/comments`, readableComment);
+    let baseline = null;
     if (prior) {
+      const list = await pages(pin, `/issues/${pin.number}/comments`, readableComment);
       const found = reconcile(list, prior, book, pin.account);
       if (found.found) {
         const comment = { id: found.found.id, url: found.found.html_url };
@@ -581,18 +616,53 @@
         await commit(pin.account, op, { ...prior, state: 'unknown' });
         return unknown(op, found.unknown);
       }
-    } else if (!list.complete) return refused(op, 'source_unchecked');
+      baseline = list;
+    }
     if (state.action.item.type === 'decision') {
       const got = await sourceCheck(pin, state.action.item);
-      const reason = got.result === 'unchecked' ? 'source_unchecked'
-        : got.result !== 'matched' || !same(got.binding, preview.source) ? 'source_changed' : conversationCheck(list, state.action.item);
+      let reason = got.result === 'unchecked' ? 'source_unchecked'
+        : got.result !== 'matched' || !same(got.binding, preview.source) ? 'source_changed' : null;
+      if (!reason) {
+        const fresh = await pages(pin, `/issues/${pin.number}/comments`, readableComment);
+        if (!fresh.complete) reason = 'source_unchecked';
+        else {
+          if (prior) {
+            const found = reconcile(fresh, prior, book, pin.account);
+            if (found.found) {
+              const comment = { id: found.found.id, url: found.found.html_url };
+              await commit(pin.account, op, { ...prior, state: 'posted', comment });
+              return { outcome: 'posted', op, comment };
+            }
+            if (found.unknown) {
+              await commit(pin.account, op, { ...prior, state: 'unknown' });
+              return unknown(op, found.unknown);
+            }
+          }
+          reason = conversationCheck(fresh, state.action.item, await authors(pin));
+          baseline = fresh;
+        }
+      }
       if (reason) {
-        if (prior) await commit(pin.account, op, { ...prior, ...(reason === 'source_changed' ? { state: 'retired', reason } : { state: 'unknown' }) });
+        if (prior) {
+          const retire = reason === 'source_changed' || state.action.item.request.kind === 'spec_confirmation';
+          await commit(pin.account, op, { ...prior, ...(retire ? { state: 'retired', reason } : { state: 'unknown' }) });
+        }
         return refused(op, reason);
       }
+    } else if (!baseline) {
+      baseline = await pages(pin, `/issues/${pin.number}/comments`, readableComment);
+      if (!baseline.complete) return refused(op, 'source_unchecked');
+    }
+    const freshAudience = await audience(pin);
+    const audienceRefusal = !freshAudience ? 'audience_unchecked'
+      : preview.visibility === 'repository' && freshAudience === 'public' ? 'audience_changed' : null;
+    if (audienceRefusal) {
+      state.audienceRefusal = audienceRefusal;
+      if (prior) await commit(pin.account, op, { ...prior, state: 'retired', reason: audienceRefusal });
+      return refused(op, audienceRefusal);
     }
     const base = { v: 1, op, account: pin.account, preview: JSON.parse(JSON.stringify(preview)), action: state.action,
-      sent_at: Date.now(), before: list.items.filter(c => c.user.id === pin.account && c.body === preview.body).map(c => c.id) };
+      sent_at: Date.now(), before: baseline.items.filter(c => c.user.id === pin.account && c.body === preview.body).map(c => c.id) };
     if (!(await commit(pin.account, op, { ...base, state: 'sending' }))) return refused(op, 'pending');
     return send(preview, state, pin, base);
   }
@@ -605,6 +675,7 @@
     if (saved?.state === 'posted') return { outcome: 'posted', op, comment: { ...saved.comment } };
     if (saved && TERMINAL.includes(saved.state)) return refused(op, saved.reason);
     if (state.outcome?.outcome === 'posted') return state.outcome;
+    if (state.audienceRefusal) return refused(op, state.audienceRefusal);
     if (state.confirmed < preview.confirms) return refused(op, 'not_confirmed');
     state.confirmed = 0;
     let entered = false;
