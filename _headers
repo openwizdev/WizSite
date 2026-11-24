@@ -2,9 +2,11 @@
 # from meeting an old cached file. HTML stays at max-age=0, must-revalidate; fingerprinted scripts/styles are
 # immutable for 1 year; fonts and unhashed media use bounded lifetimes with stale-while-revalidate. These rules
 # take effect only if the zone's Browser Cache TTL is set to respect existing headers.
+# The site CSP allows Cloudflare Web Analytics: Cloudflare injects its beacon script from
+# static.cloudflareinsights.com into every HTML page, and the beacon reports to cloudflareinsights.com.
 /*
   Strict-Transport-Security: max-age=31536000
-  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; media-src 'self'; font-src 'self'; connect-src 'self' https://api.github.com; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests
+  Content-Security-Policy: default-src 'self'; script-src 'self' https://static.cloudflareinsights.com; style-src 'self'; img-src 'self' data:; media-src 'self'; font-src 'self'; connect-src 'self' https://api.github.com https://cloudflareinsights.com; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests
   X-Frame-Options: DENY
   Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()
   Cross-Origin-Opener-Policy: same-origin

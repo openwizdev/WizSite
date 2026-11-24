@@ -130,8 +130,9 @@ APP_SCRIPTS = ('app/data.js', 'app/records.js', 'app/ui.js') + APP_PARTS + ('app
 APP_VENDOR = {'app/vendor/dagre-3.1.3.min.js': ('node_modules/@dagrejs/dagre/dist/dagre.min.js', 'app/pages/spec.js'),
               'app/vendor/dagre-LICENSE.txt': ('node_modules/@dagrejs/dagre/LICENSE', None)}
 HASHED += (APP_STYLE,) + APP_PART_STYLES + APP_SCRIPTS
-SITE_CSP = ("default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; media-src 'self'; "
-            "font-src 'self'; connect-src 'self' https://api.github.com; frame-src 'none'; object-src 'none'; "
+SITE_CSP = ("default-src 'self'; script-src 'self' https://static.cloudflareinsights.com; style-src 'self'; "
+            "img-src 'self' data:; media-src 'self'; font-src 'self'; "
+            "connect-src 'self' https://api.github.com https://cloudflareinsights.com; frame-src 'none'; object-src 'none'; "
             "base-uri 'none'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests")
 SITE_HEADERS = (
     'Strict-Transport-Security: max-age=31536000',
@@ -831,7 +832,7 @@ def check_site(root, registry=ROOT / 'market/registry.json'):
     assert len(page.videos) == 2, 'expected the launch video and one spec recording'
     check_launch((root / 'index.html').read_text(), page)
     clip = next((v for v in page.videos if 'spec-video' in (v.get('class') or '').split()), {})
-    assert clip.get('preload') == 'none' and 'autoplay' not in clip, 'spec recording must be opt-in'
+    assert clip.get('preload') == 'none' and 'autoplay' not in clip and 'loop' not in clip, 'spec recording must be opt-in'
     assert 'muted' in clip and 'playsinline' in clip, 'spec video must start muted inline'
     assert clip.get('poster', '').removeprefix('/') in ART, 'spec video needs a pinned poster'
     assert any(t.get('kind') == 'captions' and 'default' in t and t.get('src', '').removeprefix('/') in ART for t in page.tracks_of(clip)), 'spec video needs default captions'
