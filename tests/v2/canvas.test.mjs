@@ -315,19 +315,19 @@ test('switch on: Canvas is a v2 page with plain states, hides agent roles, and F
     assert.deepEqual(await sheets(run), ['#41 Spec: checkout', '#48 Spec: accounts', 'Quiet · 1']);
     assert.deepEqual(await run.page.run(`[...document.querySelectorAll('nav.main a')].map(a => a.getAttribute('href'))`), ['#/chat', '#/feed', '#/canvas', '#/settings']);
     assert.deepEqual(await run.page.run(`[...document.querySelectorAll('.cv-stack .pill')].map(p => p.textContent)`),
-      ['Done', 'In review', 'Needs you', 'Needs you', 'Waiting', 'On hold']);
-    const machinery = /Builder|Reviewer|Claude Code|Codex|Opus|Sol 6|Lapsed|Working/;
+      ['Done', 'In review', 'Needs you', 'Needs you', 'Waiting', 'Waiting']);
+    const machinery = /Builder|Reviewer|Claude Code|Codex|Opus|Sol 6|Lapsed|Building/;
     assert.doesNotMatch(await run.page.text(), machinery);
-    assert.match(await run.page.run(`document.querySelector('.cv-chip-go[data-item="asking"]').textContent`), /Question: which tax rule applies/);
+    assert.match(await run.page.run(`document.querySelector('.cv-chip-go[data-item="asking"]').textContent`), /Question: Tax at checkout/);
     await run.page.run(`document.querySelector('.cv-stack[data-ticket$="#44"]').click()`);
     await run.page.until(`document.querySelector('.cv-focus h3')?.textContent.includes('Shipping options')`, 'the plain ticket view');
     assert.match(await run.page.text(), /reviewing at the exact head/);
-    assert.doesNotMatch(await run.page.text(), machinery);
+    assert.match(await run.page.text(), /Reviewer, Codex, Sol 6\.1 High/, 'role, harness and model show only inside the ticket view');
     await run.page.key('Escape');
     await run.page.until(`document.activeElement.dataset.ticket === 'acme/factory#44'`, 'back on the board at #44');
     assert.equal(await run.page.run(`document.querySelectorAll('.cv-line').length`), 6);
     await run.page.size(1440, 900, false);
-    await run.page.click('Feed');
+    await run.page.run(`document.querySelector('nav.main a[href="#/feed"]').click()`);
     await run.page.until(`location.hash === '#/feed' && document.querySelectorAll('.v2-watch .cv-stack[data-ticket]').length === 6`, 'the board beside the Feed cards');
     assert.equal(await run.page.run(`document.querySelector('.v2-watch-tab[aria-pressed="true"] .v2-watch-name').textContent`), 'Spec: checkout');
     assert.doesNotMatch(await run.page.text(), machinery);

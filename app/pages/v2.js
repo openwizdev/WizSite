@@ -116,7 +116,7 @@
   let toastStatus;
   let dismissToast;
   let chatView;
-  const watch = { number: null };
+  const watch = { number: null, ticket: null };
 
   function scheduleToast() {
     clearTimeout(toastTimer);
@@ -216,10 +216,11 @@
     const tickets = spec.tickets.map(t => {
       const card = demo.cards.find(x => x.ticket === t.n);
       const state = t.state !== 'decision' ? t.state : card?.status === 'pending' ? 'you' : card?.status === 'deferred' ? 'held' : 'building';
-      const status = { you: 'asking', building: 'working', merged: 'done' }[state] ?? 'lapsed';
+      const status = { you: 'asking', building: 'working', review: 'working', merged: 'done' }[state] ?? 'lapsed';
       const members = t.notes.map(([step, min], i) => {
         const at = opened - min * MINUTE;
-        return { kind: 'note', id: `${t.n}-${i}`, status: i ? 'done' : status, row: { at, note: { step, time: new Date(at).toISOString() } } };
+        return { kind: 'note', id: `${t.n}-${i}`, status: i ? 'done' : status, row: { at, note: { step, time: new Date(at).toISOString(),
+          agent: state === 'review' && !i ? 'reviewer' : 'builder', harness: 'Claude Code', model: 'Opus 5.5' } } };
       });
       return { key: keyOf(t.n), number: t.n, title: t.title, url: null, href: state === 'you' ? cardHref(card) : null, state, gap: false, outside: false,
         blockers: t.after.map(keyOf), blocks: spec.tickets.filter(x => x.after.includes(t.n)).map(x => keyOf(x.n)), missing: 0, members,
@@ -410,7 +411,7 @@
     .filter(sheet => !sheet.quiet && sheet.read && sheet.tickets.length && sheet.total && sheet.done < sheet.total);
 
   function ticketRows(sheet) {
-    const order = ['you', 'building', 'review', 'held', 'unknown', 'ready', 'waiting', 'merged'];
+    const order = ['you', 'working', 'review', 'unknown', 'waiting', 'merged'];
     const own = sheet.tickets.filter(t => !t.outside && !t.gap)
       .map((t, i) => ({ t, i, rank: order.indexOf(OW.canvas.plainOf(t)) })).sort((a, b) => a.rank - b.rank || a.i - b.i);
     return h('ul', { class: 'v2-rows' }, own.map(({ t }) => h('li', {}, h('button', {
@@ -430,7 +431,7 @@
       el.replaceChildren();
       return;
     }
-    const heading = h('h2', { id: 'v2-watch-title' }, 'Building');
+    const heading = h('h2', { id: 'v2-watch-title' }, 'In progress');
     if (PHONE.matches) {
       side.replaceChildren();
       OW.factory.redraw(el, () => el.replaceChildren(h('div', { class: 'v2-watch-head' }, heading, open()), ...sheets.map(sheet =>
@@ -451,7 +452,7 @@
       top.replaceChildren(...(WIDE.matches ? [tabs] : [head, tabs]));
       if (!board.isConnected) el.replaceChildren(top, board);
     });
-    OW.canvas.embed(board, feeds, sheet.number);
+    OW.canvas.embed(board, feeds, sheet.number, watch.ticket);
   }
 
   function feedParts(el) {
@@ -505,8 +506,9 @@
     stage.classList.toggle('is-clear', arg === 'clear' || !pendingDemoCards().length);
     const list = pendingDemoCards();
     if (arg === 'clear' || !list.length) {
+      watch.ticket = null;
       controls.replaceChildren();
-      el.replaceChildren(allClear('Wiz is building. You’ll hear when something needs you.'));
+      el.replaceChildren(allClear('Wiz is working. You’ll hear when something needs you.'));
       return;
     }
 
@@ -514,6 +516,9 @@
     const card = list[index];
     const next = list[index + 1];
     const decision = card.type === 'decision';
+    const about = card.ticket ? demo.specs.find(spec => spec.tickets.some(t => t.n === card.ticket)) : null;
+    if (about && watch.ticket !== `harbor#${card.ticket}`) watch.number = about.number;
+    watch.ticket = about ? `harbor#${card.ticket}` : null;
     const go = href => {
       if (href !== location.hash) dismissToast?.();
       history.replaceState(null, '', href);
@@ -543,7 +548,7 @@
     const hero = h('article', { class: 'v2-hero-card' },
       h('div', { class: 'v2-card-top' },
         h('div', { class: 'v2-card-state' }, h('span', { class: 'pill', '--c': 'var(--em-you)' }, decision ? 'Needs you' : 'Ready to ship'),
-          card.ticket ? h('span', { class: 'v2-count' }, `#${card.ticket} ${demo.specs.find(spec => spec.tickets.some(t => t.n === card.ticket)).title}`) : null),
+          card.ticket ? h('span', { class: 'v2-count' }, `#${card.ticket} ${about.title}`) : null),
         h('h2', { class: 'v2-card-title', tabindex: '-1' }, card.title),
         h('p', { class: 'v2-card-goal' }, card.goal)),
       decision ? null : specPreview(card),
@@ -728,6 +733,7 @@
     setRedraw: fn => { redraw = fn; },
     renderWelcome,
     allClear,
+    ticketRows,
     stateCard,
     dismissToast: () => dismissToast?.(),
     pager,

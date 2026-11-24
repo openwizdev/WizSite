@@ -116,21 +116,20 @@
 
   const PLAIN = {
     you: ['Needs you', STATES.you.colour],
-    building: ['Building', STATES.building.colour],
+    working: ['Working', STATES.building.colour],
     review: ['In review', STATES.review.colour],
     merged: ['Done', STATES.merged.colour],
-    ready: ['Up next', STATES.ready.colour],
     waiting: ['Waiting', STATES.waiting.colour],
-    held: ['On hold', STATES.held.colour],
     unknown: ['Unknown', STATES.unknown.colour],
   };
   function plainOf(t) {
     if (t.you) return 'you';
-    if (t.state === 'merged' || t.state === 'review' || t.state === 'held') return t.state;
-    if (t.lead === 'stopped') return 'held';
-    if (t.working) return 'building';
-    return PLAIN[t.state] ? t.state : 'unknown';
+    if (t.state === 'merged' || t.state === 'review') return t.state;
+    if (t.state === 'held' || t.lead === 'stopped') return 'waiting';
+    if (t.working || t.state === 'building') return 'working';
+    return t.state === 'ready' || t.state === 'waiting' ? 'waiting' : 'unknown';
   }
+  const ringed = t => (OW.v2 ? plainOf(t) === 'waiting' : t.state === 'waiting' || t.state === 'ready');
   const pillOf = t => (OW.v2 ? h('span', { class: 'pill', '--c': PLAIN[plainOf(t)][1] }, PLAIN[plainOf(t)][0]) : OW.ui.pill(t.state));
   const colourOf = t => (OW.v2 ? PLAIN[plainOf(t)][1] : t.lead ? OW.agents.WORDS[t.lead][1] : STATES[t.state]?.colour || STATES.unknown.colour);
   const wordOf = t => (OW.v2 ? PLAIN[plainOf(t)][0] : t.lead ? OW.agents.WORDS[t.lead][0] : STATES[t.state]?.word || 'Unknown');
@@ -153,9 +152,10 @@
   }
   function plainNote(m, now) {
     const row = m.row;
-    return h('div', { class: 'cv-card', '--c': PLAIN[m.status === 'asking' ? 'you' : m.status === 'working' ? 'building' : m.status === 'done' ? 'merged' : 'waiting'][1] },
+    return h('div', { class: 'cv-card', '--c': PLAIN[m.status === 'asking' ? 'you' : m.status === 'working' ? 'working' : m.status === 'done' ? 'merged' : 'waiting'][1] },
       h('p', { class: 'cv-step' }, row.unknown ? 'An update that couldn\'t be read.' : row.note.step),
-      h('p', { class: 'cv-meta' }, ago(row.unknown ? row.at : Date.parse(row.note.time) || row.at, now)));
+      h('p', { class: 'cv-meta' }, [ago(row.unknown ? row.at : Date.parse(row.note.time) || row.at, now),
+        row.note?.agent ? `${OW.agents.KIND[row.note.agent]}, ${OW.ui.agentName(row.note.harness, row.note.model)}` : null].filter(Boolean).join(' · ')));
   }
 
   function memberCard(m, t, now, front) {
@@ -204,7 +204,7 @@
       'aria-label': label, '--c': colour },
     behind.length ? h('span', { class: 'cv-count', 'aria-hidden': 'true' }, String(t.members.length)) : null,
     h('div', { class: 'cv-front' }, memberCard(front, t, now, true)),
-    h('div', { class: 'cv-tile', 'aria-hidden': 'true' }, dot(colour, t.state === 'waiting' || t.state === 'ready'), h('b', {}, `#${t.number}`), h('span', {}, t.title)),
+    h('div', { class: 'cv-tile', 'aria-hidden': 'true' }, dot(colour, ringed(t)), h('b', {}, `#${t.number}`), h('span', {}, t.title)),
     behind.length ? h('div', { class: 'cv-behind' }, behind.map(m => memberCard(m, t, now, false))) : null);
     el.addEventListener('click', event => {
       if (event.target.closest('a')) return;
@@ -226,7 +226,7 @@
     const el = h('div', { class: `cv-stack${t.you ? ' you' : ''}`, 'data-ticket': t.key, 'data-state': t.state, 'data-lead': t.lead || '',
       'data-focus': `stack:${t.key}`, tabindex: '0', role: 'button', 'aria-label': `#${t.number} ${t.title}: ${wordOf(t)}`, '--c': colour },
     h('div', { class: 'cv-front' }, plainCard(t)),
-    h('div', { class: 'cv-tile', 'aria-hidden': 'true' }, dot(colour, t.state === 'waiting' || t.state === 'ready'), h('b', {}, `#${t.number}`), h('span', {}, t.title)),
+    h('div', { class: 'cv-tile', 'aria-hidden': 'true' }, dot(colour, ringed(t)), h('b', {}, `#${t.number}`), h('span', {}, t.title)),
     layers ? h('div', { class: 'cv-behind', 'aria-hidden': 'true' }, Array.from({ length: layers }, () => h('div', { class: 'cv-card' }))) : null);
     const choose = () => {
       if (view.place === 'embed' && t.href) location.hash = t.href;
@@ -315,6 +315,17 @@
     apply(board);
   }
 
+  function elbow(from, to, via, down) {
+    const at = (along, across) => (down ? `${across.toFixed(1)} ${along.toFixed(1)}` : `${along.toFixed(1)} ${across.toFixed(1)}`);
+    const [a, b, mid] = down ? [from, to, via.y] : [{ x: from.y, y: from.x }, { x: to.y, y: to.x }, via.x];
+    const half = (down ? PLAIN_NODE.height : PLAIN_NODE.width) / 2;
+    const [start, end] = [a.y + half, b.y - half];
+    const r = Math.min(10, Math.abs(b.x - a.x) / 2);
+    if (r < 1) return `M${at(start, a.x)} L${at(end, b.x)}`;
+    const way = Math.sign(b.x - a.x) * r;
+    return `M${at(start, a.x)} L${at(mid - r, a.x)} Q${at(mid, a.x)} ${at(mid, a.x + way)} L${at(mid, b.x - way)} Q${at(mid, b.x)} ${at(mid + r, b.x)} L${at(end, b.x)}`;
+  }
+
   function boardOf(sheet, now) {
     const embedded = view.place === 'embed';
     const size = nodeSize();
@@ -328,7 +339,8 @@
     const byKey = new Map(sheet.tickets.map(t => [t.key, t]));
     for (const e of g.edges()) {
       const p = g.edge(e).points;
-      const d = p.map((q, i) => `${i ? 'L' : 'M'}${q.x.toFixed(1)} ${q.y.toFixed(1)}`).join(' ');
+      const d = OW.v2 && p.length === 3 ? elbow(g.node(e.v), g.node(e.w), p[1], PHONE.matches || embedded)
+        : p.map((q, i) => `${i ? 'L' : 'M'}${q.x.toFixed(1)} ${q.y.toFixed(1)}`).join(' ');
       const from = byKey.get(e.v);
       lines.append(css(svg('path', { d, 'marker-end': 'url(#cv-arrow)', 'data-from': e.v, 'data-to': e.w, class: 'cv-line' }),
         { stroke: from?.state === 'merged' ? STATES.merged.colour : 'var(--em-muted)' }));
@@ -389,7 +401,7 @@
     const W = OW.agents.WORDS;
     if (OW.v2) {
       return h('p', { class: 'cv-legend', 'aria-hidden': 'true' },
-        ['you', 'building', 'review', 'merged', 'waiting'].map(state => h('span', {}, dot(PLAIN[state][1], state === 'waiting'), PLAIN[state][0])));
+        ['you', 'working', 'review', 'merged', 'waiting'].map(state => h('span', {}, dot(PLAIN[state][1], state === 'waiting'), PLAIN[state][0])));
     }
     return h('p', { class: 'cv-legend', 'aria-hidden': 'true' },
       ...[['working', W.working], ['asking', [STATES.you.word, STATES.you.colour]], ['review', [STATES.review.word, STATES.review.colour]],
@@ -451,14 +463,14 @@
   function blocks(sheet) {
     const own = sheet.tickets.filter(t => !t.outside && !t.gap);
     return h('span', { class: 'cv-blocks', 'aria-hidden': 'true' },
-      own.map(t => h('i', { '--c': colourOf(t), class: t.working ? 'on' : t.state === 'waiting' || t.state === 'ready' ? 'off' : '' })));
+      own.map(t => h('i', { '--c': colourOf(t), class: ringed(t) ? 'off' : t.working ? 'on' : '' })));
   }
   function sheetLine(sheet) {
     const c = sheet.counts;
     const parts = [];
     if (c.you) parts.push(`${c.you} need${c.you === 1 ? 's' : ''} you`);
-    const building = OW.v2 ? sheet.tickets.filter(t => !t.outside && plainOf(t) === 'building').length : c.working;
-    if (building) parts.push(`${building} ${OW.v2 ? 'building' : 'working'}`);
+    const working = OW.v2 ? sheet.tickets.filter(t => !t.outside && plainOf(t) === 'working').length : c.working;
+    if (working) parts.push(`${working} working`);
     if (!sheet.read) parts.push('tickets unknown');
     else if (sheet.total === 0) parts.push(sheet.decisions.length ? 'no tickets yet' : 'no tickets');
     else if (sheet.total) parts.push(`${sheet.done} of ${sheet.total} done`);
@@ -486,9 +498,9 @@
 
   const INBOX_SHOWN = 6;
   const INBOX_WORDS = {
-    asking: item => `${OW.v2 ? 'Question' : item.agent ? `${OW.agents.KIND[item.agent]} asks` : 'Asking you'}: ${item.step}`,
+    asking: item => (OW.v2 ? `Question: ${item.title}` : `${item.agent ? `${OW.agents.KIND[item.agent]} asks` : 'Asking you'}: ${item.step}`),
     feed: item => item.title,
-    ticket: () => (OW.v2 ? 'Ticket waiting on you' : 'Ticket marked for you'),
+    ticket: item => (OW.v2 ? item.title : 'Ticket marked for you'),
     spec_confirmation: () => 'Spec to confirm',
     plan_approval: () => 'Plan to approve',
     unreadable: () => 'A decision record that couldn\'t be read',
@@ -684,7 +696,7 @@
     const head = h('div', { class: 'cv-head' }, inbox(m), search(m));
     if (!m.sheets.length) {
       return el.replaceChildren(h('div', { class: 'cv' }, ...notices(m, null), head,
-        OW.ui.placeholder(OW.v2 ? 'Nothing is building yet. A spec shows here once it has tickets.'
+        OW.ui.placeholder(OW.v2 ? 'Nothing is in progress yet. A spec shows here once it has tickets.'
           : 'No open spec yet. When a spec has a plan graph, its fleet shows here as a sheet.')));
     }
     if (!sheet) {
@@ -708,7 +720,7 @@
       board = boardOf(sheet, now);
       stage = board.root;
     }
-    el.replaceChildren(h('div', { class: 'cv' }, ...notices(m, sheet), head, h('div', { class: 'cv-area' }, rail(m), h('div', { class: 'cv-stage' }, title, stage))));
+    el.replaceChildren(h('div', { class: 'cv' }, ...notices(m, sheet), head, h('div', { class: 'cv-area' }, rail(m), h('div', { class: 'cv-stage' }, title, stage, board && OW.v2 && PHONE.matches ? OW.v2.ticketRows(sheet) : null))));
     settle(el, board, sheet);
     if (view.mode === 'over') (el.querySelector('.cv-open') || el.querySelector('.cv-over'))?.focus({ preventScroll: true });
     mark();
@@ -735,9 +747,9 @@
     view.cams.clear();
     fitted.clear();
   }
-  function embed(el, feeds, number) {
+  function embed(el, feeds, number, here = null) {
     enter('embed');
-    last = [el, feeds, null, number];
+    last = [el, feeds, null, number, here];
     const now = Date.now();
     const m = read(feeds, now);
     const sheet = m?.sheets.find(s => s.number === number);
@@ -747,6 +759,7 @@
     OW.factory.redraw(el, () => {
       const board = t ? null : boardOf(sheet, now);
       el.replaceChildren(t ? focusPane(sheet, t, now) : board.root);
+      board?.world.querySelectorAll('.cv-stack').forEach(stack => { if (stack.dataset.ticket === here) stack.setAttribute('aria-current', 'true'); });
       settle(el, board, sheet);
     });
   }
@@ -763,7 +776,7 @@
   }
   function rerender() {
     if (!last || !last[0].isConnected) return;
-    if (view.place === 'embed') return embed(last[0], last[1], last[3]);
+    if (view.place === 'embed') return embed(last[0], last[1], last[3], last[4]);
     const arg = location.hash.match(/^#\/canvas\/([1-9]\d*)$/)?.[1] || null;
     render(last[0], last[1], arg);
   }

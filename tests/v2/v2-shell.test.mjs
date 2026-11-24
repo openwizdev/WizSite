@@ -107,7 +107,7 @@ test('switch on + demo=1: renders v2 shell, deep links, interactions, and makes 
     await run.page.until(`document.querySelector('.v2-toast').hidden`, 'route change dismisses the toast');
     await run.page.until(`document.body.innerText.includes('Make the link last ten minutes')`, 'change request recorded in Chat');
     await run.page.go(`${SITE}/app/?demo=1#/feed/clear`);
-    await run.page.until(`document.querySelector('.v2-watch-tab[aria-pressed="true"]')?.textContent.includes('Magic-link sign-in')`, 'revised spec leads Building');
+    await run.page.until(`document.querySelector('.v2-watch-tab[aria-pressed="true"]')?.textContent.includes('Magic-link sign-in')`, 'revised spec leads In progress');
     assert.equal(await run.page.run(`document.querySelector('.v2-watch-tab[aria-pressed="true"] .v2-count').textContent`), '6 of 7');
     assert.ok(await run.page.run(`[...document.querySelectorAll('.v2-watch .cv-plain h3')].some(el => el.textContent === 'Your change')`));
 
@@ -140,7 +140,7 @@ test('switch on + demo=1: renders v2 shell, deep links, interactions, and makes 
     await run.page.until(`location.hash === '#/feed/clear' && document.querySelector('.v2-clear-card h2')?.textContent === 'All clear.'`, 'all clear after the last decision');
     assert.deepEqual(await badges(), [null, null]);
     assert.equal(await run.page.run(`document.querySelectorAll('.v2-watch-tab .cv-blocks i').length`), 11, 'one block per ticket');
-    assert.equal(await run.page.run(`document.querySelector('.v2-watch [data-ticket="harbor#44"] .pill').textContent`), 'On hold');
+    assert.equal(await run.page.run(`document.querySelector('.v2-watch [data-ticket="harbor#44"] .pill').textContent`), 'Waiting');
     await run.page.run(`document.querySelector('.v2-toast button').focus()`);
     await new Promise(resolve => setTimeout(resolve, 4700));
     assert.equal(await run.page.run(`document.querySelector('.v2-toast').hidden`), false, 'Undo expired while focused');
@@ -153,7 +153,7 @@ test('switch on + demo=1: renders v2 shell, deep links, interactions, and makes 
     await run.page.go(`${SITE}/app/?v2=dry-run&demo=1#/feed/clear`);
     await run.page.until(`document.querySelector('.v2-clear-card h2')?.textContent === 'All clear.'`, 'deep link to all clear');
     assert.deepEqual(await badges(), [null, null]);
-    assert.equal(await run.page.run(`document.querySelector('.v2-watch [data-ticket="harbor#44"] .pill').textContent`), 'Building',
+    assert.equal(await run.page.run(`document.querySelector('.v2-watch [data-ticket="harbor#44"] .pill').textContent`), 'Working',
       'an answered decision moves its ticket on');
 
     await run.page.go(`${SITE}/app/?demo=1#/feed/2`);
@@ -225,8 +225,8 @@ test('demo isolates a saved GitHub session from boot, visibility refresh, and th
     assert.deepEqual(await run.page.run(`[...document.querySelectorAll('.cv-rail .cv-sheet-name')].map(el => el.textContent)`),
       ['#41 Audit log export', '#51 Project activity digest', '#30 Magic-link sign-in']);
     assert.deepEqual(await run.page.run(`[...new Set([...document.querySelectorAll('.cv-stack .pill')].map(p => p.textContent))].sort()`),
-      ['Building', 'Done', 'In review', 'Needs you', 'Waiting']);
-    assert.doesNotMatch(await run.page.text(), /Builder|Reviewer|Claude|Codex|Opus/);
+      ['Done', 'In review', 'Needs you', 'Waiting', 'Working']);
+    assert.doesNotMatch(await run.page.text(), /Builder|Reviewer|Claude|Codex|Opus|\bBuilding\b/);
     assert.equal(await run.page.run(`document.querySelectorAll('main a[href^="http"]').length`), 0, 'the sample board links outside');
     await run.page.go(`${SITE}/app/?demo=1#/canvas/51`);
     await run.page.until(`document.querySelectorAll('.cv-stack').length === 4`, 'a sample sheet by address');
