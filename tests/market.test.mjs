@@ -4,11 +4,13 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 const ROOT = new URL('..', import.meta.url).pathname;
 const FIXTURES = join(ROOT, 'tests/market-fixtures');
 const C = 'd'.repeat(40);
 const RECEIPT = id => `https://github.com/openwizdev/WizMarket/blob/${C}/receipts/${id}/2026-11-01-aaaaaaaaaaaa.txt`;
+const WIZMARKET = 'https://github.com/openwizdev/WizMarket';
 const SKILL = `https://github.com/example-owner/example-skills/tree/${'c'.repeat(40)}`;
 
 const CONTRACT_LISTINGS = {
@@ -109,7 +111,7 @@ test('a non-verified listing never shows verified', () => {
 
 test('a malformed snapshot fails the build', () => {
   const broken = Object.fromEntries(readdirSync(join(FIXTURES, 'broken')).filter(name => name.endsWith('.json')).sort().map(name => [name, bytes(`broken/${name}`)]));
-  assert.equal(Object.keys(broken).length, 27, 'the broken fixtures are there');
+  assert.equal(Object.keys(broken).length, 30, 'the broken fixtures are there');
   const valid = bytes('contract-index.json');
   const at = valid.indexOf('Example driver');
   broken['invalid UTF-8'] = Buffer.concat([valid.subarray(0, at), Buffer.from([0xc3, 0x28]), valid.subarray(at)]);
@@ -128,13 +130,59 @@ test('the build refuses what WizMarket refuses: repeated keys, bad text, impossi
     ['repeated-key-escaped.json', /key status twice/],
     ['unpaired-surrogate.json', /unpaired surrogate/],
     ['receipt-date-impossible.json', /date is not a calendar date/],
+    ['receipt-date-year-zero.json', /date is not a calendar date/],
+    ['repeated-key-private.json', /key \(not shown\) twice/],
     ['summary-password.json', /looks like a token/],
+    ['summary-password-long-s.json', /looks like a token/],
   ]) {
     const { code, stderr } = build(bytes(`broken/${name}`));
     assert.notEqual(code, 0, `${name}: the build passed`);
     assert.match(stderr, why, `${name}: says why (${stderr.trim().split('\n').at(-1)})`);
-    assert.doesNotMatch(stderr, /example-not-a-real-one/, `${name}: the refusal never prints the value`);
+    assert.doesNotMatch(stderr, /example[-_]not[-_]a[-_]real[-_]one/, `${name}: the refusal never prints the value`);
   }
+});
+
+test('the privacy scan refuses exactly what WizMarket\'s own scan refuses, every BMP code point at every probe position', async () => {
+  const { PRIVATE_SOURCE, parse, privateKind, validate } = await import('../scripts/market.mjs');
+  const run = spawnSync('python3', ['-I', join(FIXTURES, 'private-parity.py')], { encoding: 'utf8', maxBuffer: 1 << 28 });
+  assert.equal(run.status, 0, run.stderr);
+  const { unicode, word, patterns, cases } = JSON.parse(run.stdout);
+  assert.deepEqual(PRIVATE_SOURCE.map(([label, source]) => [label, source]), patterns.map(([label, source, ignorecase]) => [label, ignorecase === source.startsWith('(?i)') ? source : `${source} (ignorecase set by flag)`]),
+    'the site scans with WizMarket\'s patterns, character for character');
+  assert.throws(() => validate(['A synthetic driver. PAſSWORD: example']), /holds what looks like a token/, 'validate uses the same scan');
+  const path = ['home', 'examples', ''].join('/');
+  const cafe = fixture('contract-index.json').replace('A synthetic driver that ships its own skill.', `See https://example.com/café/${path} for more.`);
+  assert.doesNotThrow(() => parse(cafe), 'a non-ASCII letter keeps the URL path inside a word');
+  assert.throws(() => parse(cafe.replace(`café/${path}`, `café /${path}`)), /holds what looks like a machine path/, 'a real machine path is still refused');
+  assert.ok(cases.length > 400, 'the probes ran');
+  const hex = point => `U+${point.toString(16).toUpperCase().padStart(4, '0')}`;
+  const pythonWord = new Set(word);
+  const words = [];
+  const addedWord = new Set();
+  const newerUnicode = unicode !== '14.0.0' && Number(unicode.split('.')[0]) >= 14;
+  for (let point = 0; point < 0x110000; point++) {
+    if (point >= 0xd800 && point < 0xe000) continue;
+    const site = privateKind(String.fromCodePoint(point) + 'password: x') === null;
+    if (site === pythonWord.has(point)) continue;
+    if (newerUnicode && !site && /^[\p{L}\p{N}]$/u.test(String.fromCodePoint(point))) {
+      addedWord.add(point);
+      continue;
+    }
+    if (words.length < 20) words.push(`${hex(point)} before password: ${site ? 'a word character on the site only' : 'a word character in Python only'}`);
+  }
+  assert.deepEqual(words, [], `Python's Unicode word characters and boundaries, every code point (Python's Unicode ${unicode}; WizMarket's Python 3.11 is 14.0.0)`);
+  const mismatches = [];
+  for (const [probe, at, ranges] of cases) {
+    const python = new Set(ranges.flatMap(([first, last]) => Array.from({ length: last - first + 1 }, (_, i) => first + i)));
+    for (let point = 0; point < 0x10000 && mismatches.length < 20; point++) {
+      if (point >= 0xd800 && point < 0xe000) continue;
+      const site = privateKind(probe.slice(0, at) + String.fromCharCode(point) + probe.slice(at + 1)) !== null;
+      if (site === python.has(point)) continue;
+      if (site && addedWord.has(point)) continue;
+      mismatches.push(`${JSON.stringify(probe)} at ${at}: ${hex(point)} ${site ? 'refused by the site only' : 'refused by WizMarket only'}`);
+    }
+  }
+  assert.deepEqual(mismatches, [], 'strings one scan refuses and the other accepts');
 });
 
 test('any tag set builds and passes the site checker: distinct ids, registry links in generated markup only', () => {
@@ -192,74 +240,136 @@ test('the site builds its market page from the real snapshot', () => {
   assert.notEqual(index.commit, C, 'the deployed snapshot is not at the synthetic commit');
 });
 
-function wizmarket(index) {
-  const dir = mkdtempSync(join(tmpdir(), 'market-sync-'));
-  const canonical = join(dir, 'canonical.git');
-  const origin = join(dir, 'fork.git');
+const atHead = JSON.stringify({ commit: 'HEAD', contract: 'listing.v1', listings: JSON.parse(fixture('contract-index.json')).listings
+  .map(l => l.proof?.receipt ? { ...l, proof: { ...l.proof, receipt: { ...l.proof.receipt, url: l.proof.receipt.url.replace(C, 'HEAD') } } } : l) }, null, 2) + '\n';
+
+function trusted() {
+  const dir = mkdtempSync(join(tmpdir(), 'market-trust-'));
+  const canonical = join(dir, 'WizMarket');
+  const fork = join(dir, 'fork.git');
   const work = join(dir, 'work');
+  const ran = join(dir, 'ran');
   const git = (...args) => execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@example.com', ...args], { cwd: work, stdio: 'pipe', encoding: 'utf8' });
   execFileSync('git', ['init', '-q', '--bare', '-b', 'main', canonical]);
-  execFileSync('git', ['init', '-q', '--bare', '-b', 'main', origin]);
+  execFileSync('git', ['init', '-q', '--bare', '-b', 'main', fork]);
   mkdirSync(join(work, 'check'), { recursive: true });
   git('init', '-q', '-b', 'main');
-  writeFileSync(join(work, 'check/check.py'), 'import sys\nopen(".ran", "w").close()\nsys.stdout.write(open("index.out").read().replace("HEAD", open(".head").read().strip()))\n');
-  writeFileSync(join(work, 'index.out'), index);
-  writeFileSync(join(work, '.gitignore'), '.head\n.ran\n');
+  writeFileSync(join(work, 'check/check.py'), `${fixture('wizmarket-private.py')}\nimport os\nimport subprocess\nimport sys\n\nif __name__ == "__main__":\n    open(${JSON.stringify(ran)}, "a").write(os.getcwd() + "\\n")\n`
+    + '    head = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()\n    sys.stdout.write(open("index.out").read().replace("HEAD", head))\n');
+  writeFileSync(join(work, 'index.out'), atHead);
   git('add', '.');
   git('commit', '-q', '-m', 'registry');
-  git('remote', 'add', 'origin', origin);
-  git('push', '-q', 'origin', 'main');
   git('push', '-q', canonical, 'main');
-  writeFileSync(join(work, '.head'), git('rev-parse', 'HEAD'));
-  return { dir, work, git, canonical, ran: () => existsSync(join(work, '.ran')) };
+  git('push', '-q', fork, 'main');
+  return { dir, work, git, canonical, fork, ran: () => existsSync(ran) ? readFileSync(ran, 'utf8').trim().split('\n') : [] };
 }
 
-function sync(work, canonical) {
+const REAL_GIT = execFileSync('sh', ['-c', 'command -v git'], { encoding: 'utf8' }).trim();
+
+function trustedSync(repo, env = {}) {
   const site = siteCopy();
-  const env = { ...process.env, GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: `url.${canonical}.insteadOf`, GIT_CONFIG_VALUE_0: 'https://github.com/openwizdev/WizMarket' };
-  const run = spawnSync(process.execPath, ['scripts/market-sync.mjs', work], { cwd: site, encoding: 'utf8', env });
+  const transport = join(repo.dir, 'transport');
+  mkdirSync(transport, { recursive: true });
+  writeFileSync(join(transport, 'git'), `#!/bin/sh\nfor a; do shift; [ "$a" = ${JSON.stringify(WIZMARKET)} ] && a=${JSON.stringify(repo.canonical)}; set -- "$@" "$a"; done\nexec ${JSON.stringify(REAL_GIT)} "$@"\n`, { mode: 0o755 });
+  const run = spawnSync(process.execPath, [join(site, 'scripts/market-sync.mjs'), repo.work], { cwd: site, encoding: 'utf8',
+    env: { ...process.env, ...env, PATH: `${transport}:${process.env.PATH}` } });
   const out = existsSync(join(site, 'market/registry.json')) ? readFileSync(join(site, 'market/registry.json'), 'utf8') : null;
   rmSync(site, { recursive: true, force: true });
   return { ...run, out };
 }
 
-const atHead = JSON.stringify({ commit: 'HEAD', contract: 'listing.v1', listings: JSON.parse(fixture('contract-index.json')).listings
-  .map(l => l.proof?.receipt ? { ...l, proof: { ...l.proof, receipt: { ...l.proof.receipt, url: l.proof.receipt.url.replace(C, 'HEAD') } } } : l) }, null, 2) + '\n';
-
-test('market-sync writes the index of a clean checkout on canonical WizMarket main, byte for byte', () => {
-  const repo = wizmarket(atHead);
+test('market-sync writes the index of a commit on canonical WizMarket main, byte for byte', () => {
+  const repo = trusted();
   const head = repo.git('rev-parse', 'HEAD').trim();
-  const { status, stderr, stdout, out } = sync(repo.work, repo.canonical);
+  writeFileSync(join(repo.work, 'untracked.json'), '{}');
+  const { status, stderr, stdout, out } = trustedSync(repo);
   rmSync(repo.dir, { recursive: true, force: true });
   assert.equal(status, 0, stderr);
   assert.equal(out, atHead.replaceAll('HEAD', head), 'market/registry.json is the index output exactly');
   assert.match(stdout, new RegExp(`6 listings at WizMarket ${head}`));
 });
 
-test('market-sync refuses a checkout the index would not read, and a malformed index', () => {
-  const publish = repo => { repo.git('push', '-q', 'origin', 'main'); repo.git('push', '-q', repo.canonical, 'main'); writeFileSync(join(repo.work, '.head'), repo.git('rev-parse', 'HEAD')); };
+test('market-sync refuses a commit the index would not read, and a malformed index', () => {
+  const publish = repo => repo.git('push', '-q', repo.canonical, 'main');
+  const commit = (repo, file, text) => { writeFileSync(join(repo.work, file), text); repo.git('commit', '-q', '-am', file); publish(repo); };
   const cases = {
-    'uncommitted or untracked changes': [repo => writeFileSync(join(repo.work, 'listings.json'), '{}'), false],
     'HEAD is not on canonical WizMarket main': [repo => repo.git('commit', '-q', '--allow-empty', '-m', 'local only'), false],
-    'HEAD is not on canonical WizMarket main ': [repo => { repo.git('commit', '-q', '--allow-empty', '-m', 'a fork only'); repo.git('push', '-q', 'origin', 'main'); }, false],
+    'HEAD is not on canonical WizMarket main ': [repo => { repo.git('commit', '-q', '--allow-empty', '-m', 'a fork only'); repo.git('push', '-q', repo.fork, 'main'); }, false],
     'could not fetch canonical WizMarket main': [repo => rmSync(repo.canonical, { recursive: true, force: true }), false],
     'no check/check.py': [repo => { repo.git('rm', '-q', 'check/check.py'); repo.git('commit', '-q', '-m', 'drop'); publish(repo); }, false],
-    'market/registry.json: the index: contract is not listing.v1': [repo => {
-      writeFileSync(join(repo.work, 'index.out'), atHead.replace('"listing.v1"', '"listing.v2"'));
-      repo.git('commit', '-q', '-am', 'v2'); publish(repo);
-    }, true],
-    'index names another commit': [repo => writeFileSync(join(repo.work, '.head'), 'e'.repeat(40)), true],
+    'WizMarket\'s privacy patterns differ from the site\'s port': [repo => commit(repo, 'check/check.py', readFileSync(join(repo.work, 'check/check.py'), 'utf8').replace('passwd|', '')), false],
+    'market/registry.json: the index: contract is not listing.v1': [repo => commit(repo, 'index.out', atHead.replace('"listing.v1"', '"listing.v2"')), true],
+    'index names another commit': [repo => commit(repo, 'index.out', JSON.stringify({ commit: 'e'.repeat(40), contract: 'listing.v1', listings: [] })), true],
   };
   for (const [name, [spoil, runs]] of Object.entries(cases)) {
     const why = name.trim();
-    const repo = wizmarket(atHead);
+    const repo = trusted();
     spoil(repo);
-    const { status, stderr, out } = sync(repo.work, repo.canonical);
-    const ran = repo.ran();
+    const { status, stderr, out } = trustedSync(repo);
+    const ran = repo.ran().length > 0;
     rmSync(repo.dir, { recursive: true, force: true });
-    assert.equal(status, 1, `${name}: exit 1`);
+    assert.equal(status, 1, `${name}: exit 1 (${stderr.trim()})`);
     assert.ok(stderr.includes(why), `${name}: says why (${stderr.trim()})`);
-    assert.equal(ran, runs, `${name}: the checkout's index command ${runs ? 'ran' : 'never ran'}`);
+    assert.equal(ran, runs, `${name}: the index command ${runs ? 'ran' : 'never ran'}`);
     assert.equal(out, readFileSync(join(ROOT, 'market/registry.json'), 'utf8'), `${name}: the snapshot is untouched`);
   }
+});
+
+test('market-sync takes canonical main from git config it controls, never from the checkout\'s', () => {
+  const snapshot = readFileSync(join(ROOT, 'market/registry.json'), 'utf8');
+  const repo = trusted();
+  repo.git('commit', '-q', '--allow-empty', '-m', 'a fork only');
+  repo.git('push', '-q', repo.fork, 'main');
+  const home = join(repo.dir, 'home');
+  mkdirSync(home);
+  writeFileSync(join(home, '.gitconfig'), `[url "${repo.fork}"]\n\tinsteadOf = ${repo.canonical}\n`);
+  for (const [where, env] of [
+    ['the checkout\'s own config', {}],
+    ['global config', { HOME: home, XDG_CONFIG_HOME: join(home, '.config') }],
+    ['the environment', { GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: `url.${repo.fork}.insteadOf`, GIT_CONFIG_VALUE_0: repo.canonical }],
+  ]) {
+    if (!Object.keys(env).length) repo.git('config', `url.${repo.fork}.insteadOf`, repo.canonical);
+    else spawnSync('git', ['config', '--unset-all', `url.${repo.fork}.insteadOf`], { cwd: repo.work });
+    const { status, stderr, out } = trustedSync(repo, env);
+    assert.equal(status, 1, `an insteadOf rule in ${where} chose the fork as canonical main: ${stderr.trim()}`);
+    assert.match(stderr, /HEAD is not on canonical WizMarket main/, where);
+    assert.deepEqual(repo.ran(), [], `${where}: the fork's index command never ran`);
+    assert.equal(out, snapshot, `${where}: the snapshot is untouched`);
+  }
+  rmSync(repo.dir, { recursive: true, force: true });
+});
+
+test('market-sync reads only the checkout\'s HEAD ref, so a missing object never fetches from the checkout\'s promisor remote', () => {
+  const repo = trusted();
+  const head = repo.git('rev-parse', 'HEAD').trim();
+  const fetched = join(repo.dir, 'fetched');
+  writeFileSync(join(repo.dir, 'upload-pack.sh'), `#!/bin/sh\ntouch ${JSON.stringify(fetched)}\nexit 1\n`, { mode: 0o755 });
+  for (const [key, value] of [['core.repositoryformatversion', '1'], ['extensions.partialClone', 'origin'], ['remote.origin.url', repo.fork],
+    ['remote.origin.promisor', 'true'], ['remote.origin.uploadpack', join(repo.dir, 'upload-pack.sh')]]) repo.git('config', key, value);
+  rmSync(join(repo.work, '.git/objects', head.slice(0, 2), head.slice(2)));
+  const { status, stderr, out } = trustedSync(repo);
+  const lazy = existsSync(fetched);
+  rmSync(repo.dir, { recursive: true, force: true });
+  assert.equal(lazy, false, 'git fetched from the checkout\'s promisor remote before the commit was trusted');
+  assert.equal(status, 0, stderr);
+  assert.equal(out, atHead.replaceAll('HEAD', head), 'the commit and its index come from canonical main');
+});
+
+test('market-sync runs no code from the checkout and reads its commit, not its working tree', () => {
+  const repo = trusted();
+  const head = repo.git('rev-parse', 'HEAD').trim();
+  const hook = join(repo.dir, 'hook-ran');
+  writeFileSync(join(repo.dir, 'fsmonitor.sh'), `#!/bin/sh\ntouch ${JSON.stringify(hook)}\nexit 1\n`, { mode: 0o755 });
+  writeFileSync(join(repo.work, 'index.out'), atHead.replace('Example driver', 'Example changed driver'));
+  repo.git('update-index', '--assume-unchanged', 'index.out');
+  repo.git('config', 'core.fsmonitor', join(repo.dir, 'fsmonitor.sh'));
+  const { status, stderr, out } = trustedSync(repo);
+  const ran = repo.ran();
+  const hooked = existsSync(hook);
+  rmSync(repo.dir, { recursive: true, force: true });
+  assert.equal(status, 0, stderr);
+  assert.equal(hooked, false, 'git ran the checkout\'s core.fsmonitor command');
+  assert.equal(out, atHead.replaceAll('HEAD', head), 'the snapshot is the commit\'s index, not the working tree\'s');
+  assert.equal(ran.length, 1, 'the index command ran once');
+  assert.ok(!ran[0].startsWith(repo.work), `the index command ran outside the checkout, not in ${ran[0]}`);
 });
