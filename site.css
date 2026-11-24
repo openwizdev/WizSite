@@ -85,17 +85,90 @@ code,.v{font-family:var(--ow-font-mono)}
 
 
 .landing { --m: clamp(18px, 4vw, 68px); --round: 18px; }
-.landing-nav { display: flex; min-height: 76px; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--line); }
-.landing-brand, .landing-nav nav, .github-star { display: flex; align-items: center; }
-.landing-brand { gap: 8px; color: #cfc6b8; font-size: 21px; font-weight: 720; letter-spacing: -.04em; }
-.landing-nav nav { gap: clamp(10px, 2vw, 22px); font-size: 14px; color: var(--grey2); }
-.github-star { gap: 8px; min-height: 40px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; }
-.github-star span { border-left: 1px solid var(--line); padding-left: 8px; font-variant-numeric: tabular-nums; }
-.sign-in { padding: 8px 14px; border-radius: 8px; background: #cfc6b8; color: var(--ground); font-weight: 650; white-space: nowrap; }
-.nav-team { padding: 8px 14px; border-radius: 8px; background: var(--brass); color: var(--on-brass); font-weight: 650; white-space: nowrap; }
-.landing-nav .nav-team:hover { background: var(--brass-hi); text-decoration: none; }
-.nav-team-short { display: none; }
-.landing-nav a:hover, .footer-groups a:hover { text-decoration: underline; text-underline-offset: 4px; }
+.landing-nav { border-bottom: 1px solid var(--line); }
+.nav-inner {
+  width: min(100% - 2 * clamp(16px, 4vw, 64px), 1328px);
+  min-height: 63px;
+  margin-inline: auto;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 12px;
+}
+.landing-brand, .nav-pages, .nav-actions, .github-star { display: flex; align-items: center; }
+.landing-brand { justify-self: start; gap: 8px; min-height: 40px; color: var(--ink); font-size: 18px; font-weight: 650; letter-spacing: -.02em; }
+.landing-brand img { display: block; flex: none; }
+.nav-pages { gap: clamp(18px, 2.5vw, 38px); color: var(--grey2); font-size: 14px; font-weight: 450; }
+.nav-pages > a { display: flex; align-items: center; min-height: 36px; }
+.nav-pages > a:is(:hover, [aria-current="page"]), .github-star:hover { color: var(--ink); }
+.nav-pages > a[aria-current="page"] { text-decoration: underline; text-underline-offset: 5px; }
+.nav-actions { justify-self: end; gap: clamp(10px, 1.4vw, 20px); white-space: nowrap; }
+.github-star { gap: 7px; min-height: 40px; color: var(--grey2); font-size: 13px; font-variant-numeric: tabular-nums; }
+.github-star svg { flex: none; }
+.landing-nav :is(.sign-in, .nav-team) { display: flex; align-items: center; min-height: 36px; padding-inline: 14px; border-radius: 8px; font-size: 14px; font-weight: 650; }
+.nav-actions .sign-in { border: 1px solid #756a60; color: var(--ink); }
+.nav-actions .sign-in:hover { border-color: var(--grey2); }
+.nav-team { background: var(--brass); color: var(--on-brass); }
+.nav-team:hover { background: var(--brass-hi); }
+.nav-toggle, .nav-close-icon, .nav-sheet-actions, .nav-team-short, .nav-pages[hidden] { display: none; }
+.footer-groups a:hover { text-decoration: underline; text-underline-offset: 4px; }
+
+@media (max-width: 840px) {
+  .nav-inner { width: calc(100% - 24px); min-height: 55px; grid-template-columns: 1fr auto; gap: 8px; }
+  .landing-brand { font-size: 17px; }
+  .nav-actions { grid-column: 2; grid-row: 1; gap: 8px; }
+  .nav-actions .sign-in, .nav-bar-stars .github-mark, .nav-team-long { display: none; }
+  .nav-team-short { display: inline; }
+  .landing-nav .nav-team { min-height: 40px; padding-inline: 10px; }
+  .nav-bar-stars { min-width: 40px; justify-content: center; }
+  .nav-toggle:not([hidden]) {
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--ink);
+    cursor: pointer;
+  }
+  .nav-toggle:hover { background: var(--panel); }
+  .nav-toggle[aria-expanded="true"] .nav-open-icon { display: none; }
+  .nav-toggle[aria-expanded="true"] .nav-close-icon { display: inline; }
+  html:has(.nav-toggle[aria-expanded="true"]) { overflow: hidden; }
+  .landing-nav:has(.nav-toggle[aria-expanded="true"]) { position: sticky; z-index: 31; top: 0; background: var(--ground); }
+  .nav-pages { grid-column: 1 / -1; flex-direction: column; align-items: stretch; gap: 0; padding-bottom: 12px; color: var(--ink); }
+  .nav-inner:has(.nav-toggle[aria-expanded="true"]) .nav-pages {
+    position: fixed;
+    inset: 56px 0 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 12px 12px 24px;
+    background: var(--ground);
+  }
+  .nav-sheet-actions { display: block; }
+  .nav-pages > a, .landing-nav .nav-sheet-actions a {
+    align-items: center;
+    min-height: 68px;
+    padding: 0 8px;
+    border-bottom: 1px solid var(--line);
+    border-radius: 0;
+    font-size: 28px;
+    font-weight: 650;
+    letter-spacing: -.025em;
+  }
+  .nav-pages a:focus-visible { outline-offset: -3px; }
+  .landing-nav .nav-sheet-stars { display: none; }
+  .nav-inner:has(.nav-toggle[aria-expanded="true"]) .nav-sheet-stars { display: flex; gap: 10px; color: var(--ink); font-size: 23px; }
+  .nav-sheet-stars svg { width: 24px; height: 24px; }
+}
+@media (max-width: 340px) {
+  .nav-inner { width: calc(100% - 16px); gap: 4px; }
+  .landing-brand { gap: 4px; font-size: 15px; }
+  .nav-actions, .nav-bar-stars { gap: 4px; }
+  .landing-nav .nav-team { padding-inline: 8px; font-size: 13px; }
+}
 .product-hero { display: grid; grid-template-columns: minmax(0, .86fr) minmax(0, 1.25fr); gap: clamp(22px, 4vw, 60px); align-items: center; padding-block: clamp(40px, 6vw, 84px) 32px; }
 .hero-copy h1 { max-width: 8ch; font-size: clamp(52px, 6vw, 96px); font-weight: 760; line-height: .98; letter-spacing: -.06em; }
 .landing .sub { margin-top: 22px; color: #e1d7cb; font-size: clamp(18px, 1.8vw, 24px); line-height: 1.4; letter-spacing: -.025em; }
@@ -287,8 +360,6 @@ body.landing > main { flex: 1 0 auto; }
   .product-stage { padding: clamp(12px, 4vw, 32px); }
 }
 @media (max-width: 480px) {
-  .landing-nav { min-height: 65px; }
-  .nav-log { display: none; }
   .window-body { grid-template-columns: 55px minmax(0,1fr); min-height: 263px; }
   .window-sidebar { padding-inline: 3px; font-size: 9px; }
   .window-main { padding-inline: 8px; }
@@ -362,26 +433,9 @@ body.landing > main { flex: 1 0 auto; }
 
 @media (min-width: 961px) and (max-width: 1279px) { :root { --m: 48px; } }
 @media (max-width: 480px) {
-  .landing-brand { gap: 4px; font-size: 19px; }
-  .landing-brand svg { width: 28px; height: 28px; }
-  .landing-nav nav { gap: 8px; }
-  .landing-nav .sign-in { padding-inline: 10px; }
-  .landing-nav .nav-team { padding-inline: 10px; }
   .hero-copy h1 { font-size: clamp(44px, 13vw, 52px); }
   .ember-ticket { overflow-wrap: anywhere; }
 }
-@media (max-width: 760px) {
-  .landing-nav .landing-brand { gap: 0; font-size: 0; }
-  .landing-nav .github-star span { display: none; }
-  .nav-team-long { display: none; }
-  .nav-team-short { display: inline; }
-}
-@media (max-width: 360px) {
-  .landing-nav nav { gap: 6px; }
-  .landing-nav .sign-in, .landing-nav .nav-team { padding-inline: 8px; }
-  .landing-nav .github-star { padding-inline: 8px; }
-}
-
 .drivers-page { --gold: #f2c27b; --night: #0f0d0b; }
 .drivers-page .voyage { position: relative; isolation: isolate; display: flex; flex-direction: column; min-height: min(84svh, 820px); overflow: hidden; background: var(--night); }
 .drivers-page .voyage-art { position: absolute; z-index: -1; inset: 0; }
@@ -549,8 +603,6 @@ body.landing > main { flex: 1 0 auto; }
 @keyframes drivers-d-far { to { transform: translateY(6%); } }
 @keyframes drivers-d-near { to { transform: translateY(-10%); } }
 
-.team-page .nav-team { padding: 8px 0; border-radius: 0; background: none; color: var(--grey2); font-weight: 450; }
-.team-page .nav-team:hover { background: none; color: var(--ink); text-decoration: underline; text-underline-offset: 4px; }
 .team { display: grid; grid-template-columns: minmax(0, 1.08fr) minmax(0, .92fr); gap: clamp(28px, 4.5vw, 72px); align-items: center; padding-block: clamp(28px, 4.5vw, 64px); }
 .team-kicker { color: var(--grey2); font: 600 13px/1 var(--ow-font-sans); letter-spacing: .06em; text-transform: uppercase; }
 .team h1 { margin-top: 14px; max-width: 15ch; font-size: clamp(34px, 4.4vw, 60px); font-weight: 760; line-height: 1.02; letter-spacing: -.045em; text-wrap: balance; }
