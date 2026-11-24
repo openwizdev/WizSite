@@ -632,10 +632,11 @@
   }
   async function pinned(pin, method, path, body, write) {
     if (!pinOk(pin, write)) throw new Refused('an unreadable operation context');
-    const url = path === '/graphql' ? `${API}/graphql` : `${API}/repos/${pin.owner}/${pin.name}${path}`;
+    const repoPath = `/repos/${pin.owner}/${pin.name}`;
+    const url = `${API}${repoPath}${path}`;
     let parsed;
     try { parsed = new URL(url); } catch { throw new Refused(`the app never sends ${method} ${url}`); }
-    if (parsed.href !== url || parsed.origin !== API || (path !== '/graphql' && !parsed.pathname.startsWith(`/repos/${pin.owner}/${pin.name}/`))) {
+    if (parsed.href !== url || parsed.origin !== API || (path !== '' && !parsed.pathname.startsWith(`${repoPath}/`))) {
       throw new Refused(`the app never sends ${method} ${url}`);
     }
     if (!held(pin, write)) throw new Ended();
@@ -657,7 +658,6 @@
     claimed = true;
     return Object.freeze({
       read: (pin, path) => pinned(pin, 'GET', path),
-      query: (pin, query, variables) => pinned(pin, 'POST', '/graphql', { query, variables }),
       comment: (pin, body) => pinned(pin, 'POST', `/issues/${pin.number}/comments`, { body }, true),
     });
   }
