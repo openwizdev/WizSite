@@ -92,3 +92,41 @@ This denylist is a tripwire, not comprehensive detection of private names or sec
 ## Sign-in
 
 openwiz.dev/app signs in through the read-only [OpenWiz Viewer](https://github.com/apps/openwiz-viewer) GitHub App (issues, pull requests and metadata, read only). Its client ID and secret live only in the Cloudflare Pages project settings.
+
+## Booking
+
+The booking API (`openwiz.book.v1`) runs on Cloudflare Pages Functions under `functions/api/book/` backed by D1 (`BOOK_DB`, falling back to `ASK_A_WIZ_COUNTERS`):
+
+- `GET /api/book/slots`: lists open 30-minute UTC slots (`Cache-Control: no-store`).
+- `POST /api/book`: validates a same-origin JSON booking, checks availability and atomically enforces the booking caps and buffer when inserting into `book_bookings`, writes a Google Calendar event when configured, and sends confirmation email via Resend.
+- `POST /api/book/cancel`: cancels an upcoming booking by `id` and `token` (idempotent), deletes any Google Calendar event and sends cancellation email when the booking changes to cancelled.
+- `GET /api/book/feed`: lists bookings from 7 days back to the horizon with UTC timestamps to the second. It returns `404` when `BOOK_FEED_TOKEN` is unset, `401` when the bearer token does not match, and `503` when the token matches and booking is off.
+
+**Switch:** `BOOK_MODE` defaults to `off`. Set it to `fake` for local previews or `live` in production.
+
+For local previews, run `node scripts/book-dev.mjs` and open `http://127.0.0.1:8801/book/`. The server defaults to fake mode and uses an in-memory SQLite D1 wrapper with synthetic busy times. In fake mode without a Resend key, the server simulates email delivery and prints the cancel link to its terminal.
+
+**Settings and secrets:**
+
+| Name | Secret | Default | Purpose |
+| --- | --- | --- | --- |
+| `BOOK_MODE` | No | `off` | Switch: `off`, `fake`, or `live` |
+| `BOOK_DB` | Binding | `ASK_A_WIZ_COUNTERS` | Cloudflare D1 database binding for `book_*` tables |
+| `BOOK_TIMEZONE` | No | `America/Los_Angeles` | IANA timezone for working hours and daily caps |
+| `BOOK_DAYS` | No | `1,2,3,4,5` | Comma-separated weekdays (`0` Sunday through `6` Saturday) |
+| `BOOK_START` | No | `11:00` | Daily opening time (`HH:MM`) |
+| `BOOK_END` | No | `18:00` | Daily closing time (`HH:MM`) |
+| `BOOK_BUFFER_MIN` | No | `15` | Minutes clear on each side of busy events and bookings |
+| `BOOK_NOTICE_HOURS` | No | `4` | Minimum advance notice in hours |
+| `BOOK_HORIZON_DAYS` | No | `14` | Days ahead offered for booking and included in the feed |
+| `BOOK_MAX_PER_DAY` | No | `4` | Maximum bookings per local day |
+| `BOOK_ICAL_URL` | Yes | *(none)* | HTTPS iCal feed URL used in `live` mode when Google credentials are unset |
+| `GOOGLE_CLIENT_ID` | Yes | *(none)* | Google OAuth client ID for free/busy reads and event writes |
+| `GOOGLE_CLIENT_SECRET` | Yes | *(none)* | Google OAuth client secret |
+| `GOOGLE_REFRESH_TOKEN` | Yes | *(none)* | Google OAuth refresh token |
+| `BOOK_GOOGLE_CALENDAR` | No | `primary` | Google Calendar ID |
+| `RESEND_API_KEY` | Yes | *(none)* | Resend API key; when unset, confirmation and cancel emails are skipped |
+| `BOOK_FROM` | No | `OpenWiz <book@openwiz.dev>` | Email `From` header |
+| `BOOK_OWNER_EMAIL` | No | *(none)* | Maintainer address notified on booking and cancellation |
+| `BOOK_MEETING_URL` | No | *(none)* | Meeting link included in emails, `.ics`, and Google Calendar events |
+| `BOOK_FEED_TOKEN` | Yes | *(none)* | Bearer token guarding `GET /api/book/feed` |
