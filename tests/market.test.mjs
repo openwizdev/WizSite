@@ -312,6 +312,22 @@ test('market-sync takes canonical main from git config it controls, never from t
   rmSync(repo.dir, { recursive: true, force: true });
 });
 
+test('market-sync reads only the checkout\'s HEAD ref, so a missing object never fetches from the checkout\'s promisor remote', () => {
+  const repo = trusted();
+  const head = repo.git('rev-parse', 'HEAD').trim();
+  const fetched = join(repo.dir, 'fetched');
+  writeFileSync(join(repo.dir, 'upload-pack.sh'), `#!/bin/sh\ntouch ${JSON.stringify(fetched)}\nexit 1\n`, { mode: 0o755 });
+  for (const [key, value] of [['core.repositoryformatversion', '1'], ['extensions.partialClone', 'origin'], ['remote.origin.url', repo.fork],
+    ['remote.origin.promisor', 'true'], ['remote.origin.uploadpack', join(repo.dir, 'upload-pack.sh')]]) repo.git('config', key, value);
+  rmSync(join(repo.work, '.git/objects', head.slice(0, 2), head.slice(2)));
+  const { status, stderr, out } = trustedSync(repo);
+  const lazy = existsSync(fetched);
+  rmSync(repo.dir, { recursive: true, force: true });
+  assert.equal(lazy, false, 'git fetched from the checkout\'s promisor remote before the commit was trusted');
+  assert.equal(status, 0, stderr);
+  assert.equal(out, atHead.replaceAll('HEAD', head), 'the commit and its index come from canonical main');
+});
+
 test('market-sync runs no code from the checkout and reads its commit, not its working tree', () => {
   const repo = trusted();
   const head = repo.git('rev-parse', 'HEAD').trim();
