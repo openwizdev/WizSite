@@ -1,0 +1,207 @@
+{
+ "1927": {
+  "number": 1927,
+  "title": "Infra spec: write-driver, a skill that writes your own driver",
+  "url": "https://github.com/openwizdev/OpenWiz/issues/1927",
+  "opened": "2026-11-20T13:38:32Z",
+  "closed": "2026-11-21T04:41:33Z",
+  "tickets": [
+   {
+    "number": 1928,
+    "title": "Infra WD1: the write-driver contract: copy line, ticket format, live lessons and the timed report, first",
+    "url": "https://github.com/openwizdev/OpenWiz/issues/1928",
+    "state": "CLOSED",
+    "building_at": "2026-11-20T15:45:24Z",
+    "review_at": "2026-11-20T15:57:37Z",
+    "merged_at": "2026-11-20T19:03:28Z",
+    "pull_requests": [
+     {
+      "repo": "openwizdev/OpenWiz",
+      "number": 1945,
+      "url": "https://github.com/openwizdev/OpenWiz/pull/1945",
+      "title": "#1928: Infra WD1: the write-driver contract: copy line, ticket format, live lessons and the timed report, first",
+      "state": "MERGED",
+      "opened": "2026-11-20T15:57:37Z",
+      "merged": "2026-11-20T19:03:26Z"
+     }
+    ]
+   },
+   {
+    "number": 1929,
+    "title": "Infra WD2: the write-driver skill takes a user from paste to a passing driver (WizSkills 0.2.1)",
+    "url": "https://github.com/openwizdev/OpenWiz/issues/1929",
+    "state": "CLOSED",
+    "building_at": "2026-11-20T17:45:43Z",
+    "review_at": "2026-11-20T17:58:49Z",
+    "merged_at": "2026-11-21T01:27:35Z",
+    "pull_requests": [
+     {
+      "repo": "openwizdev/WizSkills",
+      "number": 212,
+      "url": "https://github.com/openwizdev/WizSkills/pull/212",
+      "title": "#1929: Infra WD2: the write-driver skill takes a user from paste to a passing driver (WizSkills 0.2.1)",
+      "state": "MERGED",
+      "opened": "2026-11-20T18:27:18Z",
+      "merged": "2026-11-21T01:27:33Z"
+     },
+     {
+      "repo": "openwizdev/WizSite",
+      "number": 118,
+      "url": "https://github.com/openwizdev/WizSite/pull/118",
+      "title": "#1932: Infra WD4: the Drivers page's Write your own driver copy line",
+      "state": "MERGED",
+      "opened": "2026-11-20T17:58:49Z",
+      "merged": "2026-11-21T01:28:08Z"
+     }
+    ]
+   },
+   {
+    "number": 1931,
+    "title": "Infra WD3: write-driver's end-to-end eval against the template's fake host (WizSkills 0.2.1)",
+    "url": "https://github.com/openwizdev/OpenWiz/issues/1931",
+    "state": "CLOSED",
+    "building_at": "2026-11-21T01:32:44Z",
+    "review_at": "2026-11-21T02:00:06Z",
+    "merged_at": "2026-11-21T04:36:55Z",
+    "pull_requests": [
+     {
+      "repo": "openwizdev/WizSkills",
+      "number": 229,
+      "url": "https://github.com/openwizdev/WizSkills/pull/229",
+      "title": "#1931: Infra WD3: write-driver's end-to-end eval against the template's fake host (WizSkills 0.2.1)",
+      "state": "MERGED",
+      "opened": "2026-11-21T02:00:06Z",
+      "merged": "2026-11-21T04:36:53Z"
+     }
+    ]
+   },
+   {
+    "number": 1932,
+    "title": "Infra WD4: the Drivers page's Write your own driver copy line",
+    "url": "https://github.com/openwizdev/OpenWiz/issues/1932",
+    "state": "CLOSED",
+    "building_at": "2026-11-20T17:46:29Z",
+    "review_at": "2026-11-20T17:58:49Z",
+    "merged_at": "2026-11-21T01:28:10Z",
+    "pull_requests": [
+     {
+      "repo": "openwizdev/WizSite",
+      "number": 118,
+      "url": "https://github.com/openwizdev/WizSite/pull/118",
+      "title": "#1932: Infra WD4: the Drivers page's Write your own driver copy line",
+      "state": "MERGED",
+      "opened": "2026-11-20T17:58:49Z",
+      "merged": "2026-11-21T01:28:08Z"
+     }
+    ]
+   }
+  ]
+ },
+ "2963": {
+  "number": 2963,
+  "title": "spec: openwiz.dev/book, our own booking page for the team call",
+  "url": "https://github.com/openwizdev/OpenWiz/issues/2963",
+  "opened": "2026-11-24T11:21:29Z",
+  "closed": null,
+  "tickets": [
+   {
+    "number": 2964,
+    "title": "BK1: busy time from iCal and the open slots",
+    "url": "https://github.com/openwizdev/OpenWiz/issues/2964",
+    "state": "OPEN",
+    "building_at": "2026-11-24T11:25:30Z",
+    "review_at": "2026-11-24T11:30:34Z",
+    "merged_at": null,
+    "pull_requests": [
+     {
+      "repo": "openwizdev/WizSite",
+      "number": 180,
+      "url": "https://github.com/openwizdev/WizSite/pull/180",
+      "title": "BK1: busy time from iCal and the open slots",
+      "state": "MERGED",
+      "opened": "2026-11-24T11:30:34Z",
+      "merged": "2026-11-24T12:04:33Z"
+     }
+    ]
+   },
+   {
+    "number": 2965,
+    "title": "BK3: confirmation email and Google Calendar",
+    "url": "https://github.com/openwizdev/OpenWiz/issues/2965",
+    "state": "OPEN",
+    "building_at": "2026-11-24T11:25:31Z",
+    "review_at": "2026-11-24T11:28:44Z",
+    "merged_at": null,
+    "pull_requests": [
+     {
+      "repo": "openwizdev/WizSite",
+      "number": 179,
+      "url": "https://github.com/openwizdev/WizSite/pull/179",
+      "title": "BK3: confirmation email and Google Calendar",
+      "state": "MERGED",
+      "opened": "2026-11-24T11:28:44Z",
+      "merged": "2026-11-24T11:49:33Z"
+     }
+    ]
+   },
+   {
+    "number": 2966,
+    "title": "BK2: the booking API",
+    "url": "https://github.com/openwizdev/OpenWiz/issues/2966",
+    "state": "OPEN",
+    "building_at": "2026-11-24T11:40:15Z",
+    "review_at": "2026-11-24T11:45:41Z",
+    "merged_at": null,
+    "pull_requests": [
+     {
+      "repo": "openwizdev/WizSite",
+      "number": 183,
+      "url": "https://github.com/openwizdev/WizSite/pull/183",
+      "title": "BK2: the booking API (#2966)",
+      "state": "MERGED",
+      "opened": "2026-11-24T11:45:41Z",
+      "merged": "2026-11-24T13:00:20Z"
+     }
+    ]
+   },
+   {
+    "number": 2967,
+    "title": "BK4: the booking page and its installable app",
+    "url": "https://github.com/openwizdev/OpenWiz/issues/2967",
+    "state": "OPEN",
+    "building_at": "2026-11-24T11:25:33Z",
+    "review_at": "2026-11-24T11:31:47Z",
+    "merged_at": null,
+    "pull_requests": [
+     {
+      "repo": "openwizdev/WizSite",
+      "number": 181,
+      "url": "https://github.com/openwizdev/WizSite/pull/181",
+      "title": "BK4: the booking page and its installable app",
+      "state": "MERGED",
+      "opened": "2026-11-24T11:31:47Z",
+      "merged": "2026-11-24T12:15:27Z"
+     },
+     {
+      "repo": "openwizdev/WizSite",
+      "number": 189,
+      "url": "https://github.com/openwizdev/WizSite/pull/189",
+      "title": "BK4 follow-up: DST calendar stepping, month label, closed and no-email copy",
+      "state": "MERGED",
+      "opened": "2026-11-24T12:23:21Z",
+      "merged": "2026-11-24T12:32:28Z"
+     },
+     {
+      "repo": "openwizdev/WizSite",
+      "number": 192,
+      "url": "https://github.com/openwizdev/WizSite/pull/192",
+      "title": "Fix BK4 slot reload check and month label size",
+      "state": "MERGED",
+      "opened": "2026-11-24T12:44:35Z",
+      "merged": "2026-11-24T12:55:24Z"
+     }
+    ]
+   }
+  ]
+ }
+}
