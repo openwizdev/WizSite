@@ -1,5 +1,5 @@
 'use strict';
-(() => {
+(async () => {
   const { h, icon, time } = OW.ui;
   const logo = () => h('img', { src: '/app/mark.svg', alt: '', width: 28, height: 28 });
   const wiz = () => h('p', {}, h('img', { src: '/app/wiz-reviewer.svg', alt: '', width: 96, height: 105 }));
@@ -8,9 +8,26 @@
   const ROUTES = () => OW.pages.map(page => page.id);
   let built = null;
   const INSTALL = 'https://github.com/apps/openwiz-viewer/installations/new';
-  const v2 = Boolean(OW.records?.enabled?.());
-  const demo = Boolean(OW.v2?.demo);
-  if (v2) document.documentElement.dataset.v2 = '1';
+  const v2 = data.v2.get() !== 'off';
+  const demo = data.demo;
+  if (v2) {
+    const { v2Style, v2Script } = document.currentScript.dataset;
+    const load = el => new Promise((resolve, reject) => {
+      el.addEventListener('load', resolve, { once: true });
+      el.addEventListener('error', reject, { once: true });
+      document.head.append(el);
+    });
+    try {
+      await Promise.all([
+        load(h('link', { rel: 'stylesheet', href: v2Style })),
+        load(h('script', { src: v2Script })),
+      ]);
+    } catch {
+      root.replaceChildren(h('div', { class: 'center', role: 'alert' }, 'OpenWiz could not load. Reload to try again.'));
+      return;
+    }
+    document.documentElement.dataset.v2 = '1';
+  }
   const queue = OW.pages.findIndex(page => page.v2);
   if (queue >= 0) {
     const [page] = OW.pages.splice(queue, 1);
@@ -368,7 +385,7 @@
   OW.onSignedOut = () => signedOut('Your sign-in ended. Sign in again.');
   window.addEventListener('hashchange', () => (demo ? draw() : built ? update() : null));
   document.addEventListener('keydown', event => {
-    if (!built) return;
+    if (!built || (v2 && (event.defaultPrevented || document.querySelector('.v2-sheet[open]')))) return;
     if ((event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'k') {
       event.preventDefault();
       return OW.palette.toggle();
