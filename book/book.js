@@ -107,8 +107,8 @@ function localDayKey(date) {
 
 function buildDayList(rawSlots) {
   const days = [];
-  const seen = new Set();
-  const now = new Date();
+  const todayKey = localDayKey(new Date());
+  const [year, monthNum, dayNum] = todayKey.split('-').map(Number);
   let lastSlotKey = '';
   for (const iso of rawSlots) {
     const key = localDayKey(new Date(iso));
@@ -116,25 +116,23 @@ function buildDayList(rawSlots) {
   }
   let prevMonth = null;
   for (let i = 0; i < 22; i++) {
-    const d = new Date(now.getTime() + i * 86400000);
-    const key = localDayKey(d);
-    if (seen.has(key)) continue;
-    seen.add(key);
-    const month = new Intl.DateTimeFormat(undefined, { month: 'short', timeZone: visitorTz }).format(d);
+    const cal = new Date(Date.UTC(year, monthNum - 1, dayNum + i, 12, 0, 0));
+    const key = cal.toISOString().slice(0, 10);
+    const month = new Intl.DateTimeFormat(undefined, { month: 'short', timeZone: 'UTC' }).format(cal);
     const monthChanged = prevMonth !== null && month !== prevMonth;
     prevMonth = month;
     days.push({
       key,
       month,
       monthChanged,
-      weekday: new Intl.DateTimeFormat(undefined, { weekday: 'short', timeZone: visitorTz }).format(d),
-      dayNum: new Intl.DateTimeFormat(undefined, { day: 'numeric', timeZone: visitorTz }).format(d),
+      weekday: new Intl.DateTimeFormat(undefined, { weekday: 'short', timeZone: 'UTC' }).format(cal),
+      dayNum: new Intl.DateTimeFormat(undefined, { day: 'numeric', timeZone: 'UTC' }).format(cal),
       fullLabel: new Intl.DateTimeFormat(undefined, {
         weekday: 'long',
         month: 'long',
         day: 'numeric',
-        timeZone: visitorTz,
-      }).format(d),
+        timeZone: 'UTC',
+      }).format(cal),
     });
     if (days.length >= 14 && (!lastSlotKey || key >= lastSlotKey)) break;
   }
@@ -194,9 +192,15 @@ function renderDays() {
     btn.setAttribute('aria-pressed', day.key === state.selectedDay ? 'true' : 'false');
     if (slots.length === 0) btn.disabled = true;
 
+    if (day.monthChanged) {
+      const mo = document.createElement('span');
+      mo.className = 'book-day-month';
+      mo.textContent = day.month;
+      btn.appendChild(mo);
+    }
     const wd = document.createElement('span');
-    wd.className = day.monthChanged ? 'book-day-wd book-day-month' : 'book-day-wd';
-    wd.textContent = day.monthChanged ? day.month : day.weekday;
+    wd.className = 'book-day-wd';
+    wd.textContent = day.weekday;
     const num = document.createElement('span');
     num.className = 'book-day-num';
     num.textContent = day.dayNum;
@@ -408,7 +412,7 @@ async function submitBooking(event) {
       if (data.email === 'sent') {
         els.confirmNote.textContent = `A confirmation is on its way to ${fields.email}.`;
       } else {
-        els.confirmNote.textContent = 'You’re booked. Save the time below.';
+        els.confirmNote.textContent = 'No email is coming, so add it to your calendar now.';
       }
       showView(els.confirm);
       announce('Your call is booked.');
@@ -428,7 +432,7 @@ async function submitBooking(event) {
     }
 
     if (res.status === 503 || data.error === 'unavailable') {
-      els.unavailableText.textContent = data.message || 'Booking isn’t open right now.';
+      els.unavailableText.textContent = 'Check back soon, or see the team page for how the call works.';
       showView(els.unavailable);
       return;
     }
@@ -465,7 +469,7 @@ async function loadSlots({ keepAlert = false } = {}) {
     }
 
     if (!res.ok) {
-      els.unavailableText.textContent = data.message || 'Booking isn’t open right now.';
+      els.unavailableText.textContent = 'Check back soon, or see the team page for how the call works.';
       showView(els.unavailable);
       announce('Booking is closed right now.');
       return;
@@ -503,7 +507,7 @@ async function loadSlots({ keepAlert = false } = {}) {
       showView(els.offline);
       announce('Booking needs an internet connection.');
     } else {
-      els.unavailableText.textContent = 'Booking isn’t open right now.';
+      els.unavailableText.textContent = 'Check back soon, or see the team page for how the call works.';
       showView(els.unavailable);
       announce('Booking is closed right now.');
     }
