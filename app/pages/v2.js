@@ -5,30 +5,38 @@
   const mark = () => h('img', { src: '/app/mark.svg', alt: '', width: 28, height: 28 });
   const avatar = () => h('span', { class: 'v2-avatar' }, mark());
 
+  const starters = [
+    {
+      label: 'Add usage-based billing',
+      title: 'Usage-based billing',
+      questions: [
+        ['When should we charge for new seats?', 'At month end', 'Right away'],
+        ['Should read-only viewers pay?', 'Keep viewers free', 'Count all members'],
+        ['How long before a failed renewal locks edits?', '7 days', '48 hours'],
+      ],
+    },
+    {
+      label: 'Add magic-link sign-in',
+      title: 'Magic-link sign-in',
+      questions: [
+        ['When should a sign-in link expire?', 'After 15 minutes', 'After an hour'],
+        ['What happens after opening the link?', 'Go to the workspace', 'Choose a workspace'],
+        ['Can the same link be used twice?', 'Single use', 'Reuse until it expires'],
+      ],
+    },
+    { label: 'Something else…', title: 'A new idea' },
+  ];
+  const scopeQuestions = [
+    ['Who should get the first version?', 'A small pilot group', 'Everyone'],
+    ['How much should the first release cover?', 'One core task', 'The whole workflow'],
+    ['What should I bring back for review?', 'A short walkthrough', 'A written summary'],
+  ];
+
   function initialDemoState() {
     return {
       draft: '',
       messages: [
-        {
-          role: 'user',
-          time: '9:12 AM',
-          text: 'Add usage-based seat billing. Keep upgrades simple for small teams.',
-        },
-        {
-          role: 'wiz',
-          time: '9:12 AM',
-          text: 'Three quick choices before I draft the spec.',
-        },
-        {
-          role: 'grill',
-          specTitle: 'Usage-based seat billing',
-          answered: false,
-          questions: [
-            { prompt: 'When should we charge for new seats?', rec: 0, selected: 0, options: ['At month end', 'Right away'] },
-            { prompt: 'Should read-only viewers pay?', rec: 0, selected: 0, options: ['Keep viewers free', 'Count all members'] },
-            { prompt: 'How long before a failed renewal locks edits?', rec: 0, selected: 0, options: ['7 days', '48 hours'] },
-          ],
-        },
+        { kind: 'text', role: 'wiz', text: 'What would you like to build in Harbor?', starters: starters.map(item => item.label) },
       ],
       cards: [
         {
@@ -39,9 +47,9 @@
           merged: 6,
           total: 6,
           scenes: [
-            '0:02 · Enter your email to get a sign-in link.',
-            '0:05 · Open the link to start a session.',
-            '0:08 · All six tickets merged.',
+            '0:02 · Enter your email',
+            '0:05 · Open the sign-in link',
+            '0:08 · Six tickets merged',
           ],
           sceneIdx: 0,
         },
@@ -50,14 +58,14 @@
           status: 'pending',
           title: 'Keep the free plan?',
           goal: 'Harbor’s free plan costs about $40 a month to run.',
-          rec: 'keep it, cap at 3 seats',
+          rec: 'Keep it, cap at 3 seats',
         },
         {
           type: 'decision',
           status: 'pending',
           title: 'Retention window for deleted projects',
           goal: 'Deleted projects can stay recoverable for 7 or 30 days.',
-          rec: 'allow recovery for 30 days',
+          rec: 'Allow recovery for 30 days',
         },
       ],
       building: [
@@ -82,6 +90,7 @@
   let toastTimer;
   let toastEl;
   let toastStatus;
+  let toastRoute;
   let dismissToast;
   let chatView;
 
@@ -104,11 +113,12 @@
       toastStatus = h('span', { class: 'visually-hidden', role: 'status' });
       document.body.append(toastEl, toastStatus);
     }
-    dismissToast = () => {
+    toastRoute = location.hash;
+    dismissToast = (restoreFocus = true) => {
       clearTimeout(toastTimer);
       const hadFocus = toastEl.contains(document.activeElement);
       toastEl.hidden = true;
-      if (hadFocus) {
+      if (hadFocus && restoreFocus) {
         (returnTo?.isConnected && returnTo !== document.body ? returnTo : document.querySelector('.v2-head h1'))?.focus();
       }
     };
@@ -138,12 +148,16 @@
       event.preventDefault();
       const text = input.value.trim();
       if (!text) return input.focus();
-      demo.messages.push(
-        { role: 'user', time: 'Just now', text: `On “${card.title}”: ${text}` },
-        { role: 'wiz', time: 'Just now', text: `I’ll update “${card.title}” and check it again.` });
+      const messages = [
+        { kind: 'text', role: 'user', text: `On “${card.title}”: ${text}` },
+        card.type === 'decision'
+          ? { kind: 'decision-card', title: card.title, answer: 'Change queued' }
+          : { kind: 'status', text: `Change queued for “${card.title}”.` },
+      ];
+      demo.messages.push(...messages);
       sheet.close();
       opener.focus();
-      onSend();
+      onSend(messages);
     } }, title, h('p', {}, card.title), input,
     h('div', { class: 'v2-quick-chips' }, chips),
     h('div', { class: 'v2-sheet-actions' },
@@ -162,46 +176,45 @@
   function completeGrill(grill) {
     if (grill.answered) return;
     grill.answered = true;
-    const summary = grill.questions.map(q => q.options[q.selected]).join(' · ');
-    demo.messages.push({ role: 'user', time: 'Just now', text: summary });
-    demo.messages.push({
-      role: 'wiz',
-      time: 'Just now',
-      text: `“${grill.specTitle}” is now in Feed.`,
-      jumpFeed: true,
-    });
+    const summary = grill.questions.map(question => question.options[question.selected]).join(' · ');
+    demo.messages.push(
+      { kind: 'text', role: 'user', text: summary },
+      { kind: 'spec-card', title: grill.specTitle },
+    );
     demo.building.unshift({ title: grill.specTitle, merged: 0, total: 5 });
-    showToast(`Answers saved · "${grill.specTitle}" added to Feed`);
     redraw();
   }
 
   function submitChatPrompt(text) {
     const clean = text.trim();
     if (!clean) return;
-    const shortTitle = clean.length > 42 ? `${clean.slice(0, 42).replace(/\s+\S*$/, '')}…` : clean;
-    demo.messages.push({ role: 'user', time: 'Just now', text: clean });
-    demo.messages.push({
-      role: 'grill',
-      specTitle: shortTitle,
-      answered: false,
-      questions: [
-        { prompt: 'Ship to everyone at once, or roll out to active workspaces first?', rec: 0, selected: 0, options: ['Active workspaces first', 'Everyone at once'] },
-        { prompt: 'Include an opt-out toggle in workspace settings?', rec: 0, selected: 0, options: ['Yes, one-click toggle', 'Always on'] },
-        { prompt: 'Should Wiz record a short walkthrough video for the Feed?', rec: 0, selected: 0, options: ['Yes, 10s walkthrough', 'Skip video'] },
-      ],
-    });
+    const starter = starters.find(item => item.label === clean);
+    const title = Array.from(clean).slice(0, 48).join('');
+    const specTitle = starter?.title ?? (title === clean ? clean : `${title.trimEnd()}…`);
+    demo.messages.push(
+      { kind: 'text', role: 'user', text: clean },
+      {
+        kind: 'grill-round',
+        specTitle,
+        answered: false,
+        questions: (starter?.questions ?? scopeQuestions).map(([prompt, ...options]) => ({
+          prompt, options, rec: 0, selected: 0,
+        })),
+      },
+    );
     redraw();
   }
 
   function renderQuestions(message) {
     const description = h('p');
-    const saved = h('a', { class: 'v2-btn subtle', href: '#/feed' }, icon('check'), 'Answers saved · Open Feed');
+    const title = h('h2', { tabindex: '-1' }, message.specTitle);
+    const saved = h('p', { class: 'v2-grill-saved' }, icon('check'), 'Answers saved');
     const submit = h('button', { type: 'button', class: 'v2-btn primary', onclick: () => {
       const hadFocus = document.activeElement === submit;
       submit.replaceWith(saved);
       groups.forEach(group => group.querySelectorAll('button').forEach(button => { button.disabled = true; }));
       completeGrill(message);
-      if (hadFocus) saved.focus({ preventScroll: true });
+      if (hadFocus) chatView?.thread.lastElementChild.querySelector('h2')?.focus({ preventScroll: true });
     } });
     const updateSummary = () => {
       const allRecommended = message.questions.every(q => q.selected === q.rec);
@@ -228,8 +241,44 @@
     });
     updateSummary();
     return h('article', { class: 'v2-grill', 'aria-label': message.specTitle },
-      h('div', { class: 'v2-grill-head' }, h('h2', {}, message.specTitle), description),
+      h('div', { class: 'v2-grill-head' }, title, description),
       groups, h('div', { class: 'v2-grill-foot' }, message.answered ? saved : submit));
+  }
+
+  function renderChatMessage(message) {
+    const feedLink = () => h('a', { class: 'v2-btn subtle', href: '#/feed' }, 'Watch in Feed', icon('right'));
+    switch (message.kind) {
+      case 'grill-round':
+        return h('div', { class: 'v2-msg' }, renderQuestions(message));
+      case 'spec-card':
+        return h('article', { class: 'v2-msg v2-chat-card' },
+          h('div', { class: 'v2-chat-card-title' },
+            icon('specs'),
+            h('h2', { tabindex: '-1' }, h('span', {}, 'Drafting the spec'), ' · ', message.title)),
+          h('progress', { 'aria-label': 'Drafting the spec' }), feedLink());
+      case 'decision-card':
+        return h('article', { class: 'v2-msg v2-chat-card' },
+          h('div', { class: 'v2-chat-card-title' }, icon('check'), h('h2', {}, message.title)),
+          h('p', {}, message.answer));
+      case 'status':
+        return h('p', { class: 'v2-msg v2-chat-status' }, icon('clock'), message.text);
+      case 'text': {
+        const fromWiz = message.role === 'wiz';
+        const suggestions = message.starters?.map(label => h('button', {
+          type: 'button', class: 'v2-btn v2-starter',
+          onclick: () => {
+            submitChatPrompt(label);
+            chatView?.thread.lastElementChild.querySelector('h2')?.focus({ preventScroll: true });
+          },
+        }, label, icon('right')));
+        return h('div', { class: `v2-msg ${fromWiz ? 'wiz' : 'user'}` },
+          fromWiz ? avatar() : null,
+          h('div', { class: 'v2-bubble' },
+            h('div', { class: 'v2-meta' }, fromWiz ? 'Wiz' : 'You'),
+            h('p', {}, message.text),
+            suggestions ? h('div', { class: 'v2-starters', hidden: demo.messages.length > 1 }, suggestions) : null));
+      }
+    }
   }
 
   function renderDemoChat(el) {
@@ -258,23 +307,16 @@
     }
     const { scroll, thread, length } = chatView;
     if (length === demo.messages.length) return;
-    const top = scroll.scrollTop;
-    thread.append(...demo.messages.slice(length).map(message => {
-      if (message.role === 'grill') return h('div', { class: 'v2-msg questions' }, renderQuestions(message));
-      const fromWiz = message.role === 'wiz';
-      return h('div', { class: `v2-msg ${fromWiz ? 'wiz' : 'user'}` },
-        fromWiz ? avatar() : null,
-        h('div', { class: 'v2-bubble' },
-          h('div', { class: 'v2-meta' }, `${fromWiz ? 'Wiz' : 'You'} · ${message.time}`),
-          h('p', {}, message.text),
-          message.jumpFeed ? h('a', { class: 'v2-btn subtle', href: '#/feed', 'data-focus': 'chat-feed' }, 'Open in Feed', icon('right')) : null));
-    }));
+    thread.append(...demo.messages.slice(length).map(renderChatMessage));
+    const suggestions = thread.querySelector('.v2-starters');
+    if (suggestions) suggestions.hidden = demo.messages.length > 1;
     chatView.length = demo.messages.length;
-    if (length && length < chatView.length) {
-      const last = thread.lastElementChild;
-      if (last.classList.contains('questions')) scroll.scrollTop += last.getBoundingClientRect().top - scroll.getBoundingClientRect().top - 8;
-      else scroll.scrollTop = top;
-    } else scroll.scrollTop = top;
+    if (chatView.length > 1) {
+      const bounds = scroll.getBoundingClientRect();
+      const message = thread.lastElementChild.getBoundingClientRect();
+      scroll.scrollTop += Math.max(message.top - bounds.top - 12,
+        message.bottom - bounds.bottom + 12, 0);
+    }
   }
 
   function renderLiveChat(el) {
@@ -394,20 +436,22 @@
       redraw();
     };
     const focusCard = () => el.querySelector('.v2-hero-card h2, .v2-clear-card h2')?.focus({ preventScroll: true });
-    const resolve = (status, label, revision) => {
+    const resolve = (status, label, { revision, messages } = {}) => {
       const previous = card.status;
       card.status = status;
       if (revision) demo.building.unshift(revision);
       go(cardHref(next || list[index - 1]));
       focusCard();
-      showToast(label, status === 'changing' ? null : () => {
+      showToast(label, () => {
         card.status = previous;
+        if (revision) demo.building = demo.building.filter(item => item !== revision);
+        if (messages) demo.messages = demo.messages.filter(message => !messages.includes(message));
         go(cardHref(card));
         focusCard();
       });
     };
     const details = decision
-      ? h('p', { class: 'v2-recommendation' }, 'Recommended: ', card.rec)
+      ? h('h3', { class: 'v2-recommendation' }, h('span', {}, 'Recommended: '), card.rec)
       : h('div', { class: 'v2-progress-box' },
         h('p', {}, h('strong', {}, `${card.merged} of ${card.total}`), ' tickets merged'),
         h('div', { class: 'v2-pips', 'aria-hidden': 'true' },
@@ -421,15 +465,17 @@
       details,
       h('div', { class: 'v2-card-actions' },
         h('button', { type: 'button', class: 'v2-btn primary', 'data-focus': 'ship',
-          onclick: () => resolve(decision ? 'decided' : 'shipped', `${decision ? 'Approved' : 'Shipped'} “${card.title}”`) }, 'Ship it'),
+          onclick: () => resolve(decision ? 'decided' : 'shipped', `${decision ? 'Approved' : 'Shipped'} “${card.title}”`) },
+        icon('check'), decision ? card.rec : 'Ship it'),
         h('button', { type: 'button', class: 'v2-btn v2-change', 'data-focus': 'change',
-          onclick: event => openSheet(card, event.currentTarget, () => resolve('changing', 'Change sent', decision
-            ? null : { title: card.title, merged: 0, total: 1 })) }, 'Change something'),
+          onclick: event => openSheet(card, event.currentTarget, messages => resolve('changing', 'Change sent', {
+            messages, revision: decision ? null : { title: card.title, merged: 0, total: 1 },
+          })) }, 'Change something'),
         h('button', { type: 'button', class: 'v2-btn subtle v2-defer', 'data-focus': 'defer',
           onclick: () => resolve('deferred', `Saved “${card.title}” for later`) }, 'Not now')));
     const navigation = pager(index, list.length, i => go(cardHref(list[i])));
     controls.replaceChildren(...(navigation ? [navigation] : []));
-    el.replaceChildren(h('div', { class: `v2-feed-stage${decision ? ' v2-feed-decision' : ''}` },
+    el.replaceChildren(h('div', { class: 'v2-feed-stage' },
       hero, nextPreview(next, href => { go(href); focusCard(); }), buildingSection(demo.building)));
   }
 
@@ -494,8 +540,8 @@
       note ? h('div', { class: 'notice bad', role: 'alert' }, icon('warn'), h('span', {}, note)) : null,
       h('a', { class: 'v2-btn primary', href: demoMode ? '#/chat' : '/api/sign-in/start' },
         demoMode ? 'Open Harbor workspace' : 'Continue with GitHub', icon('right')),
-      h('a', { class: 'v2-btn subtle v2-welcome-sample', href: demoMode ? '/api/sign-in/start' : '/app/?demo=1#/chat' },
-        demoMode ? 'Continue with GitHub' : 'See a sample factory'));
+      demoMode ? null : h('a', { class: 'v2-btn subtle v2-welcome-sample', href: '/app/?demo=1#/welcome' },
+        'See a sample factory'));
     card.prepend(h('header', { class: 'v2-welcome-head' },
       h('div', { class: 'v2-welcome-brand' }, mark(), h('span', {}, 'OpenWiz')),
       demoMode ? h('span', { class: 'v2-sample-tag' }, 'Sample data') : null));
@@ -505,6 +551,9 @@
 
   OW.v2 = {
     setRedraw: fn => { redraw = fn; },
+    dismissToastOnRouteChange() {
+      if (toastEl && !toastEl.hidden && toastRoute !== location.hash) dismissToast(false);
+    },
     renderWelcome,
     allClear,
     buildingSection,
