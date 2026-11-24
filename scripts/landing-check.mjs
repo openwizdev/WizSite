@@ -407,7 +407,7 @@ async function footer(page, where, mode) {
     return {
       count: document.querySelectorAll('footer').length,
       buttons: footer.querySelectorAll('.family-wiz[role="button"]').length,
-      links: links.length, inside: links.every(a => shown(a) && a.getBoundingClientRect().left >= 0 && a.getBoundingClientRect().right <= innerWidth),
+      links: links.length, overview: links.some(a => a.getAttribute('href') === '/what-is-openwiz/'), inside: links.every(a => shown(a) && a.getBoundingClientRect().left >= 0 && a.getBoundingClientRect().right <= innerWidth),
       lines: [...footer.querySelectorAll('.footer-line')].filter(shown).length,
       dbg: [glyphs.left, f.left, glyphs.right, f.right, glyphs.bottom, m.bottom, f.bottom].map(Math.round),
       whole: glyphs.left >= f.left && glyphs.right <= f.right && glyphs.bottom <= m.bottom + 1 && m.bottom <= f.bottom,
@@ -417,7 +417,7 @@ async function footer(page, where, mode) {
   })()`);
   expect(facts.count === 1, where, `one footer (${facts.count})`);
   expect(facts.buttons === (mode === 'no JavaScript' ? 0 : 12), where, `the footer Wizes are not the landing's (${facts.buttons} of 12 respond)`);
-  expect(facts.links === 10 && facts.inside, where, 'the footer link groups are not all shown inside the window');
+  expect(facts.links === 11 && facts.overview && facts.inside, where, 'the footer link groups are not all shown inside the window');
   expect(facts.lines === 2, where, 'the footer must show the license and counting notice');
   expect(facts.whole, where, `the footer wordmark is clipped (ink and box: ${facts.dbg})`);
   expect(facts.gap >= 0 && facts.gap <= 16, where, `a ${facts.gap}px painted gap between the wordmark's ink and the Wizes (0 to 16)`);
