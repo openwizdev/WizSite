@@ -37,7 +37,7 @@ function playback(reduced = false) {
     events.push(node);
     return node;
   }
-  for (const [, number, steps] of html.matchAll(/<code>#(\d+)<\/code>[^\n]+\n\s*<div class="team-timeline" data-replay-stages>([\s\S]*?)\n\s*<\/div>\n\s*<\/li>/g)) {
+  for (const [, number, steps] of html.matchAll(/issues\/(\d+)"[^>]*><code>WD\d+<\/code> [^<]+<\/a>\n\s*<div class="team-timeline" data-replay-stages>([\s\S]*?)\n\s*<\/div>\n\s*<\/li>/g)) {
     const stages = [];
     const track = {
       number: Number(number), stages,
@@ -52,7 +52,7 @@ function playback(reduced = false) {
     }
     tracks.push(track);
   }
-  for (const [markup, label] of html.matchAll(/<li data-replay-event><a [^>]*>([^<]+)<\/a> · Merged <time[^>]*>[^<]+<\/time><\/li>/g)) {
+  for (const [markup, label] of html.matchAll(/<li data-replay-event><a [^>]*>([^<]+)<\/a> <time[^>]*>[^<]+<\/time><\/li>/g)) {
     event(markup, label);
   }
   const control = {
@@ -126,6 +126,7 @@ test('the still contains the packet’s ticket transitions and unique pull reque
   assert.deepEqual(run.events.slice(-4).map(node => [node.label, node.dateTime]),
     Object.entries(landings).map(([label, at]) => [label, utc(at)]));
   assert.equal(run.shown().length, 16);
+  assert.equal('running' in run.replay.dataset, false);
   assert.equal(run.timers.size, 0);
   assert.equal(run.control.hidden, true);
   assert.equal(run.reads(), 0);
@@ -135,6 +136,7 @@ test('replay reveals the recorded events in order on a 20-second clock', () => {
   const run = playback();
   assert.ok(run.tracks.every(track => !track.waiting.hidden && track.waiting.textContent === 'Waiting'));
   assert.equal(run.control.textContent, 'Finish replay');
+  assert.equal('running' in run.replay.dataset, true);
   assert.equal(run.shown().length, 0);
   const start = Date.parse(opened);
   const duration = Date.parse(utc(landings['WizSkills #229'])) - start;
@@ -146,6 +148,7 @@ test('replay reveals the recorded events in order on a 20-second clock', () => {
     assert.deepEqual(run.shown(), run.events.filter(node => node.dateTime <= at));
   }
   assert.ok(run.tracks.every(track => track.waiting.hidden && track.querySelector('[aria-current]').label === 'Merged'));
+  assert.equal('running' in run.replay.dataset, false);
   assert.equal(run.timers.size, 0);
   assert.equal(run.control.textContent, 'Play again');
   assert.equal(run.reads(), 0);
@@ -153,15 +156,19 @@ test('replay reveals the recorded events in order on a 20-second clock', () => {
 
 test('the one control can finish and replay, and enabling reduced motion leaves the full still', () => {
   const run = playback();
+  assert.equal('running' in run.replay.dataset, true);
   run.control.click();
   assert.equal(run.shown().length, 16);
+  assert.equal('running' in run.replay.dataset, false);
   assert.equal(run.control.textContent, 'Play again');
   run.control.click();
   assert.equal(run.shown().length, 0);
+  assert.equal('running' in run.replay.dataset, true);
   assert.equal(run.timers.size, 1);
   run.motion.matches = true;
   run.motion.change();
   assert.equal(run.shown().length, 16);
+  assert.equal('running' in run.replay.dataset, false);
   assert.equal(run.control.hidden, true);
   assert.equal(run.timers.size, 0);
 });

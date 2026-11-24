@@ -719,8 +719,10 @@ class Checks(unittest.TestCase):
             'the hero ends with the labelled real run': (T, lambda t: t.replace('Replay of a real run', 'Example run', 1)),
             'the hero ends with the labelled real run ': (T, lambda t: t.replace('Infra spec: write-driver, a skill that writes your own driver', '<img src="/art/launch-poster.webp" alt="write-driver">', 1)),
             'the hero ends with the labelled real run  ': (T, lambda t: t.replace('>Building</span>', '>Approved</span>', 1)),
-            'the hero ends with the labelled real run   ': (T, lambda t: t.replace('21 Nov 04:36:53 UTC', '21 Nov 04:36:54 UTC', 1)),
+            'the hero ends with the labelled real run   ': (T, lambda t: t.replace('21 Nov 04:36 UTC', '21 Nov 04:37 UTC', 1)),
             'the hero ends with the labelled real run    ': (T, lambda t: t.replace('WizSkills/pull/229', 'WizSkills/pull/230', 1)),
+            'the hero ends with the labelled real run     ': (T, lambda t: t.replace('The write-driver contract, first', 'The write-driver spec, first', 1)),
+            'the hero ends with the labelled real run      ': (T, lambda t: t.replace('Pull requests merged', 'Merged PRs', 1)),
             'unexpected repository link': (T, lambda t: t.replace('WizSite/pull/118', 'WizSite/pull/119', 1)),
             'unexpected repository link ': ('index.html', lambda t: t.replace('</main>', '<a href="https://github.com/openwizdev/WizSite/pull/118">PR</a></main>', 1)),
             'hides none of its copy  ': (T, lambda t: t.replace('>Play again</button>', '>Restart</button>', 1)),
@@ -772,6 +774,13 @@ class Checks(unittest.TestCase):
         temp, root = planted('team/index.html', lambda t: book.sub('data-book href="https://cal.com/someone/intro"', t))
         with temp:
             check_site(root)
+        import check
+        first = check.TEAM_REPLAY_TICKETS[0]
+        for bad_summary in ('The invented contract, first', 'The write-driver contract copy line ticket format'):
+            bad_tickets = ((first[0], first[1], bad_summary, *first[3:]),) + check.TEAM_REPLAY_TICKETS[1:]
+            with self.subTest(bad_summary=bad_summary), mock.patch.object(check, 'TEAM_REPLAY_TICKETS', bad_tickets), \
+                    self.assertRaisesRegex(AssertionError, 'each short ticket summary uses at most six words from its real title'):
+                check_site(ROOT / 'dist')
 
     def test_footer_source(self):
         import check

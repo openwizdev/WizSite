@@ -158,15 +158,20 @@ TEAM_REPLAY_TITLE = 'Infra spec: write-driver, a skill that writes your own driv
 TEAM_REPLAY_SPEC = 'https://github.com/openwizdev/OpenWiz/issues/1927'
 TEAM_REPLAY_OPENED = '2026-11-20T13:38:32Z'
 TEAM_REPLAY_CONTROL = '<button class="team-replay-control" type="button" hidden>Play again</button>'
+TEAM_REPLAY_LANDED_LABEL = 'Pull requests merged'
 TEAM_REPLAY_WIZSITE = 'https://github.com/openwizdev/WizSite/pull/118'
 TEAM_REPLAY_TICKETS = (
-    (1928, "Infra WD1: the write-driver contract: copy line, ticket format, live lessons and the timed report, first",
+    (1928, "WD1", "The write-driver contract, first",
+     "Infra WD1: the write-driver contract: copy line, ticket format, live lessons and the timed report, first",
      "2026-11-20T15:45:24Z", "2026-11-20T15:57:37Z", "2026-11-20T19:03:26Z"),
-    (1929, "Infra WD2: the write-driver skill takes a user from paste to a passing driver (WizSkills 0.2.1)",
+    (1929, "WD2", "Skill: paste to passing driver",
+     "Infra WD2: the write-driver skill takes a user from paste to a passing driver (WizSkills 0.2.1)",
      "2026-11-20T17:45:43Z", "2026-11-20T17:58:49Z", "2026-11-21T01:27:35Z"),
-    (1931, "Infra WD3: write-driver’s end-to-end eval against the template’s fake host (WizSkills 0.2.1)",
+    (1931, "WD3", "End-to-end eval against fake host",
+     "Infra WD3: write-driver’s end-to-end eval against the template’s fake host (WizSkills 0.2.1)",
      "2026-11-21T01:32:44Z", "2026-11-21T02:00:06Z", "2026-11-21T04:36:53Z"),
-    (1932, "Infra WD4: the Drivers page’s Write your own driver copy line",
+    (1932, "WD4", "The Drivers page’s copy line",
+     "Infra WD4: the Drivers page’s Write your own driver copy line",
      "2026-11-20T17:46:29Z", "2026-11-20T17:58:49Z", "2026-11-21T01:28:08Z"),
 )
 TEAM_REPLAY_LANDINGS = (
@@ -1523,10 +1528,9 @@ def check_team(htmls, pages):
         'the team page adds no embed, form or script beyond GSAP and site.js, and folds nothing away'
     main = team.split('<main', 1)[1].split('</main>', 1)[0]
     shown = re.sub(r'\s+', ' ', unescape(re.sub(r'<[^>]*>', ' ', main)))
-    # The public WD1 title uses "live lessons" as part of the ticket’s name.
-    forbidden = TEAM_NEVER.search(shown.replace(TEAM_REPLAY_TICKETS[0][1], '', 1))
+    forbidden = TEAM_NEVER.search(shown)
     assert not forbidden, f'a word the team page never uses: {forbidden[0]}'
-    assert "'" not in shown and "'" not in ' '.join(re.findall(r'aria-label="([^"]*)"', main)), \
+    assert "'" not in shown and "'" not in ' '.join(re.findall(r'(?:aria-label|title)="([^"]*)"', main)), \
         'the team page uses curly apostrophes'
     controls = main.replace(TEAM_REPLAY_CONTROL, '').replace('<button class="launch-play" type="button" hidden><span aria-hidden="true">', '')
     assert not re.search(r'\bhidden\b|aria-hidden', controls), 'the team page hides none of its copy'
@@ -1543,8 +1547,9 @@ def check_team(htmls, pages):
         f'the hero, in order: who it is for, the headline, what happens on the call, Book a call, what to bring: {TEAM_KICKER} / {TEAM_LEAD} / {TEAM_NEEDS}'
 
     def replay_time(at):
-        return f'<time datetime="{at}">{at[8:10]} Nov {at[11:19]} UTC</time>'
+        return f'<time datetime="{at}">{at[8:10]} Nov {at[11:16]} UTC</time>'
 
+    words = lambda text: re.findall(r"[A-Za-z0-9’'-]+", text.lower())
     replay = [
         f'<figure class="team-replay" data-team-replay="{TEAM_REPLAY_OPENED}">',
         '<figcaption class="team-replay-heading">',
@@ -1552,18 +1557,21 @@ def check_team(htmls, pages):
         f'<p class="team-replay-title"><a href="{TEAM_REPLAY_SPEC}">{TEAM_REPLAY_TITLE}</a></p>',
         '</figcaption>', '<ul class="team-tickets">',
     ]
-    for number, title, *times in TEAM_REPLAY_TICKETS:
+    for number, code, summary, title, *times in TEAM_REPLAY_TICKETS:
+        summary_words = words(summary)
+        assert 1 <= len(summary_words) <= 6 and set(summary_words) <= set(words(title)), \
+            f'each short ticket summary uses at most six words from its real title: {summary!r}'
         replay += ['<li>',
-                   f'<a class="team-ticket" href="https://github.com/openwizdev/OpenWiz/issues/{number}"><code>#{number}</code> {title}</a>',
+                   f'<a class="team-ticket" href="https://github.com/openwizdev/OpenWiz/issues/{number}" aria-label="{title}" title="{title}"><code>{code}</code> {summary}</a>',
                    '<div class="team-timeline" data-replay-stages>']
         for state, at in zip(('Building', 'In review', 'Merged'), times):
             current = ' aria-current="step"' if state == 'Merged' else ''
             replay.append(f'<div data-replay-event{current}><span>{state}</span> {replay_time(at)}</div>')
         replay += ['</div>', '</li>']
-    replay += ['</ul>', '<ul class="team-landings">']
-    replay += [f'<li data-replay-event><a href="{href}">{label}</a> · Merged {replay_time(at)}</li>'
+    replay += ['</ul>', '<div class="team-landed">', f'<p class="team-landed-label">{TEAM_REPLAY_LANDED_LABEL}</p>', '<ul class="team-landings">']
+    replay += [f'<li data-replay-event><a href="{href}">{label}</a> {replay_time(at)}</li>'
                for label, href, at in TEAM_REPLAY_LANDINGS]
-    replay += ['</ul>', TEAM_REPLAY_CONTROL, '</figure>']
+    replay += ['</ul>', '</div>', TEAM_REPLAY_CONTROL, '</figure>']
     assert not hero[:copy.start()].strip() and re.sub(r'\s+', ' ', hero[copy.end():]).strip() == ' '.join(replay), \
         'the hero ends with the labelled real run, its ordered ticket history and its pull request landings'
     page = Page(main)
