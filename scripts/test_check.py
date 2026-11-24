@@ -9,7 +9,7 @@ from unittest import mock
 
 import re
 
-from check import CTA, FAQ, FAQ_WHERE, FOOTER, INSTALL_NOTE_HTML, FINGERPRINTS, HASHED, INSTALL_SWITCH, ROOT, Page, check_changelog, check_release_data, check_releases, read_releases, split_releases, check_motion, check_privacy, check_ref, check_site, check_vector, check_webp, fingerprint
+from check import CTA, FAQ, FAQ_WHERE, FOOTER, INSTALL_NOTE_HTML, FINGERPRINTS, HASHED, INSTALL_SWITCH, ROOT, Page, check_changelog, check_release_data, check_releases, read_releases, split_releases, check_motion, check_privacy, check_ref, check_site, check_vector, check_webp, check_avif, check_png, fingerprint
 
 
 def edit_built(root, name, change):
@@ -128,6 +128,60 @@ class Checks(unittest.TestCase):
                     "%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cimage href='x'/%3E%3C/svg%3E"):
             with self.subTest(svg=bad), self.assertRaises(AssertionError):
                 check_ref(root, page, 'data:image/svg+xml,' + bad, pages)
+
+    def test_avif_metadata(self):
+        data = (ROOT / 'art/era-2-grill-sq-480.avif').read_bytes()
+        check_avif(data)
+        at = data.index(b'av01', data.index(b'infe'))
+        for bad in (data[:-1], data.replace(b'ftypavif', b'ftypheic', 1), data[:at] + b'Exif' + data[at + 4:], b'GIF89a' + b'\0' * 8):
+            with self.subTest(bad=bad[:16]), self.assertRaises(AssertionError):
+                check_avif(bad)
+        with self.assertRaises(AssertionError):
+            check_privacy('art/new.avif', data)
+        import zlib
+        chunk = lambda kind, body: len(body).to_bytes(4, 'big') + kind + body + zlib.crc32(kind + body).to_bytes(4, 'big')
+        png = lambda *extra: b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', bytes(13)) + b''.join(extra) + chunk(b'IDAT', b'x') + chunk(b'IEND', b'')
+        check_png(png())
+        check_privacy('docs/evidence/speed/x/home.png', png())
+        for bad in (png(chunk(b'tEXt', b'Author\0someone')), png(chunk(b'eXIf', b'x')), png()[:-3]):
+            with self.subTest(bad=bad[-24:]), self.assertRaises(AssertionError):
+                check_privacy('docs/evidence/speed/x/home.png', bad)
+        with self.assertRaises(AssertionError):
+            check_privacy('docs/new.png', png())
+
+    def test_right_sized_images(self):
+        phone = '<link rel="preload" as="image" type="image/avif" media="(max-width: 480px)"'
+        cases = (
+            ('index.html', phone, '<link rel="preload" as="image" type="image/avif" media="(max-width: 480px)" data-x', None),
+            ('index.html', 'class="landscape"', 'class="landscape" loading="lazy"', 'never lazy'),
+            ('index.html', 'class="moment-art" src="/art/moments-sea.webp" alt="" width="1600" height="705" loading="lazy"',
+             'class="moment-art" src="/art/moments-sea.webp" alt="" width="1600" height="705"', 'loading="lazy" decoding="async"'),
+            ('index.html', 'srcset="/art/moments-sea-1600.avif"', 'srcset="/art/moments-sea-9.avif"', 'missing local target'),
+            ('drivers/index.html', '<source type="image/avif" srcset="/art/drivers-d-sea-1536.avif">', '', 'unused art variants'),
+            ('index.html', 'imagesizes="470px"', 'imagesizes="400px"', 'preload the painting'),
+        )
+        for page, old, new, error in cases:
+            with self.subTest(page=page, new=new), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp) / 'dist'
+                shutil.copytree(ROOT / 'dist', root)
+                path = root / page
+                text = path.read_text()
+                self.assertIn(old, text)
+                if page == 'index.html' and old == phone:
+                    head, rest = text.split('</head>', 1)
+                    text = head.replace(old, '<!--', 1).replace('fetchpriority="high">', 'fetchpriority="high">-->', 1) + '</head>' + rest
+                    path.write_text(text)
+                    error = 'preload'
+                else:
+                    path.write_text(text.replace(old, new, 1))
+                with self.assertRaisesRegex(AssertionError, error or '.'):
+                    check_site(root)
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / 'dist'
+            shutil.copytree(ROOT / 'dist', root)
+            edit_built(root, 'site.css', lambda css: css.replace('.hero-fleet span { display: block;', '.hero-fleet span { background-image: url(/art/fleet-frames.webp); display: block;', 1))
+            with self.assertRaisesRegex(AssertionError, 'sprite sheet'):
+                check_site(root)
 
     def test_css_escapes_and_unreadable_urls(self):
         for bad in ('\np { background: url(https://exa\\\nmple.com/x.png) }\n',
@@ -845,9 +899,9 @@ class Checks(unittest.TestCase):
                 ('fixed', '<a href="https://github.com/openwizdev/WizMarket/blob/main/contracts/listing.v1.md">x</a>', None),
                 ('generated', f'<img src="{escape(listed)}" alt="x">', 'unexpected external URL'),
                 ('generated', f'<link rel="prefetch" href="{escape(listed)}">', 'unexpected external URL'),
-                ('generated', f'<img srcset="{escape(listed)} 1x" alt="x">', 'unexpected markup in the generated Market section'),
-                ('generated', f'<picture><source srcset="{escape(listed)}"></picture>', 'unexpected markup in the generated Market section'),
-                ('generated', f'<link rel="preload" as="image" imagesrcset="{escape(listed)} 1x">', 'unexpected markup in the generated Market section'),
+                ('generated', f'<img srcset="{escape(listed)} 1x" alt="x">', 'unexpected external URL'),
+                ('generated', f'<picture><source srcset="{escape(listed)}"></picture>', 'unexpected external URL'),
+                ('generated', f'<link rel="preload" as="image" imagesrcset="{escape(listed)} 1x">', 'unexpected external URL'),
                 ('generated', f'<p style="background:url({escape(listed)})">x</p>', 'unexpected markup in the generated Market section'),
                 ('generated', f'<a href="{escape(listed)}" ping="{escape(listed)}">x</a>', 'unexpected markup in the generated Market section'),
                 ('generated', f'<svg><image xlink:href="{escape(listed)}"></image></svg>', 'unexpected markup in the generated Market section'),

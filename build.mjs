@@ -7,7 +7,7 @@ import { withDrivers } from './scripts/drivers.mjs';
 const root = new URL('./', import.meta.url);
 const output = new URL('dist/', root);
 const vendor = ['vendor/gsap-3.15.1.min.js', 'vendor/GSAP-LICENSE.txt', 'vendor/LOBE-ICONS-LICENSE.txt', 'vendor/LUCIDE-LICENSE.txt'];
-const art = (await readdir(new URL('art/', root))).filter(name => name.endsWith('.webp')).sort().map(name => `art/${name}`);
+const art = (await readdir(new URL('art/', root))).filter(name => /\.(webp|avif)$/.test(name)).sort().map(name => `art/${name}`);
 const driverLogos = ['drivers/logos/boat-dev.svg', 'drivers/logos/cloudroom.png', 'drivers/logos/monitor.svg', 'drivers/logos/amp.svg', 'drivers/logos/antigravity.svg', 'drivers/logos/augment.svg', 'drivers/logos/capy.svg', 'drivers/logos/cline.svg', 'drivers/logos/conductor.svg', 'drivers/logos/crush.png', 'drivers/logos/cursor.svg', 'drivers/logos/devin.svg', 'drivers/logos/factory.svg', 'drivers/logos/gemini-cli.svg', 'drivers/logos/goose.png', 'drivers/logos/hermes.png', 'drivers/logos/kilo-code.svg', 'drivers/logos/kimi-code.svg', 'drivers/logos/kiro.svg', 'drivers/logos/ona.svg', 'drivers/logos/openclaw.svg', 'drivers/logos/opencode.svg', 'drivers/logos/openhands.svg', 'drivers/logos/pane.svg', 'drivers/logos/pi.svg', 'drivers/logos/qwen-code.svg', 'drivers/logos/sculptor.svg', 'drivers/logos/tembo.svg', 'drivers/logos/warp.svg'];
 const pages = ['index.html', 'changelog/index.html', 'drivers/index.html', 'team/index.html', 'faq/index.html', 'market/index.html', 'app/index.html'];
 const cta = await readFile(new URL('header-cta.html', root), 'utf8');

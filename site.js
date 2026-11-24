@@ -77,7 +77,25 @@ function showHero(gsap, paused, signal) {
     setCrew(index, 0);
   };
 
+  // The sprite sheets wait for the page's load event and for the demo to come near the viewport,
+  // so they never compete with the hero painting; the still Wiz shows until then.
+  const loaded = new Promise(resolve => {
+    if (document.readyState === 'complete') resolve();
+    else addEventListener('load', resolve, { once: true, signal });
+  });
+  const near = new Promise(resolve => {
+    const watch = new IntersectionObserver(([entry]) => {
+      if (!entry.isIntersecting) return;
+      watch.disconnect();
+      resolve();
+    }, { rootMargin: '400px 0px' });
+    watch.observe(demo);
+    signal.addEventListener('abort', () => watch.disconnect(), { once: true });
+  });
+
   const start = async () => {
+    await Promise.all([loaded, near]);
+    if (signal.aborted) return;
     await Promise.all([...sheets, '/art/fleet-frames.webp'].map(src => {
       const image = new Image();
       image.src = src;
