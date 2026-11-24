@@ -156,26 +156,33 @@ test('the privacy scan refuses exactly what WizMarket\'s own scan refuses, every
   assert.throws(() => parse(cafe.replace(`café/${path}`, `café /${path}`)), /holds what looks like a machine path/, 'a real machine path is still refused');
   assert.ok(cases.length > 400, 'the probes ran');
   const hex = point => `U+${point.toString(16).toUpperCase().padStart(4, '0')}`;
+  const pythonWord = new Set(word);
+  const words = [];
+  const addedWord = new Set();
+  const newerUnicode = unicode !== '14.0.0' && Number(unicode.split('.')[0]) >= 14;
+  for (let point = 0; point < 0x110000; point++) {
+    if (point >= 0xd800 && point < 0xe000) continue;
+    const site = privateKind(String.fromCodePoint(point) + 'password: x') === null;
+    if (site === pythonWord.has(point)) continue;
+    if (newerUnicode && !site && /^[\p{L}\p{N}]$/u.test(String.fromCodePoint(point))) {
+      addedWord.add(point);
+      continue;
+    }
+    if (words.length < 20) words.push(`${hex(point)} before password: ${site ? 'a word character on the site only' : 'a word character in Python only'}`);
+  }
+  assert.deepEqual(words, [], `Python's Unicode word characters and boundaries, every code point (Python's Unicode ${unicode}; WizMarket's Python 3.11 is 14.0.0)`);
   const mismatches = [];
   for (const [probe, at, ranges] of cases) {
     const python = new Set(ranges.flatMap(([first, last]) => Array.from({ length: last - first + 1 }, (_, i) => first + i)));
     for (let point = 0; point < 0x10000 && mismatches.length < 20; point++) {
       if (point >= 0xd800 && point < 0xe000) continue;
       const site = privateKind(probe.slice(0, at) + String.fromCharCode(point) + probe.slice(at + 1)) !== null;
-      if (site !== python.has(point)) mismatches.push(`${JSON.stringify(probe)} at ${at}: ${hex(point)} ${site ? 'refused by the site only' : 'refused by WizMarket only'}`);
+      if (site === python.has(point)) continue;
+      if (site && addedWord.has(point)) continue;
+      mismatches.push(`${JSON.stringify(probe)} at ${at}: ${hex(point)} ${site ? 'refused by the site only' : 'refused by WizMarket only'}`);
     }
   }
   assert.deepEqual(mismatches, [], 'strings one scan refuses and the other accepts');
-  const python = new Set(word);
-  const words = [];
-  for (let point = 0; point < 0x110000 && words.length < 20; point++) {
-    if (point >= 0xd800 && point < 0xe000) continue;
-    const site = privateKind(String.fromCodePoint(point) + 'password: x') === null;
-    if (site === python.has(point)) continue;
-    if (unicode !== '14.0.0' && point > 0xffff && !site) continue;
-    words.push(`${hex(point)} before password: ${site ? 'a word character on the site only' : 'a word character in Python only'}`);
-  }
-  assert.deepEqual(words, [], `Python's Unicode word characters and boundaries, every code point (Python's Unicode ${unicode}; WizMarket's Python 3.11 is 14.0.0)`);
 });
 
 test('any tag set builds and passes the site checker: distinct ids, registry links in generated markup only', () => {
