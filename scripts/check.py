@@ -296,12 +296,17 @@ COUNT_NOTICE = ('openwiz.dev counts visits with Cloudflare Web Analytics and sel
                 'without cookies or personal data.')
 X_ACCOUNT = 'https://x.com/openwiz'
 CLOUDROOM_LINK = 'https://cloudroom.dev'
+INSTALL_LINKS = (
+    'https://claude.com/product/claude-code',
+    'https://openai.com/codex/',
+    'https://cal.com/openwiz-jake/setup',
+)
 INSTALL_NOTE = ("No CloudRoom needed to install. In OpenWiz 0.01, you start builders by hand on this computer, with the Claude Code "
                 "or Codex you're signed in to, or on boat.dev; the automatic fleet runs in CloudRoom. "
                 'For an Apple-silicon Mac or x86_64 Linux.')
-INSTALL_NOTE_HTML = ('<p class="install-note">No CloudRoom needed to install. In OpenWiz 0.01, you start builders by hand on this '
+INSTALL_NOTE_HTML = ('<details class="install-note"><summary>Details for developers</summary><p>No CloudRoom needed to install. In OpenWiz 0.01, you start builders by hand on this '
                      "computer, with the Claude Code or Codex you're signed in to, or on boat.dev; the automatic fleet runs in "
-                     '<a href="https://cloudroom.dev" rel="noreferrer">CloudRoom</a>. For an Apple-silicon Mac or x86_64 Linux.</p>')
+                     '<a href="https://cloudroom.dev" rel="noreferrer">CloudRoom</a>. For an Apple-silicon Mac or x86_64 Linux.</p></details>')
 FAQ = (ROOT / 'faq.html').read_text()
 FAQ_TOP = re.sub(r'<(/?)h3\b', r'<\1h2', re.sub(r'<(/?)h2\b', r'<\1h1', FAQ))
 FAQ_SLOTS = {'<template data-slot="faq"></template>\n': FAQ, '<template data-slot="faq-h1"></template>\n': FAQ_TOP}
@@ -543,6 +548,7 @@ class Page(HTMLParser):
         self.launch_posts = 0
         self.report_links = 0
         self.cloudroom_links = 0
+        self.install_links = {url: 0 for url in INSTALL_LINKS}
         self.stylesheets, self.scripts = [], []
         self.feed(text)
 
@@ -600,6 +606,11 @@ class Page(HTMLParser):
             attrs = {key: value for key, value in attrs.items() if key != 'href'}
         elif tag == 'a' and attrs.get('href') == CLOUDROOM_LINK:
             self.cloudroom_links += 1
+            attrs = {key: value for key, value in attrs.items() if key != 'href'}
+        elif tag == 'a' and attrs.get('href') in self.install_links:
+            assert 'noreferrer' in (attrs.get('rel') or '').lower().split() and 'referrerpolicy' not in attrs, \
+                'install link needs rel="noreferrer"'
+            self.install_links[attrs['href']] += 1
             attrs = {key: value for key, value in attrs.items() if key != 'href'}
         elif tag == 'a' and attrs.get('href') == REPORT_LINK:
             assert 'noreferrer' in (attrs.get('rel') or '').lower().split() and 'referrerpolicy' not in attrs, \
@@ -1064,7 +1075,7 @@ def check_site(root, registry=ROOT / 'market/registry.json', now=None):
             fixed, section = (Page(part) for part in split_market(path.read_text()))
             market = market_urls(registry)
             assert not section.books, f'a booking link outside the team page: {path.name}'
-            for count, href in ((section.x_links, X_ACCOUNT), (section.cloudroom_links, CLOUDROOM_LINK), (section.report_links, REPORT_LINK)):
+            for count, href in ((section.x_links, X_ACCOUNT), (section.cloudroom_links, CLOUDROOM_LINK), (section.report_links, REPORT_LINK), *[(n, u) for u, n in section.install_links.items()]):
                 assert not count or href in market, 'unexpected external URL'
             check_market_refs(root, path, section, pages, market)
             check_market_markup(split_market(path.read_text())[1])
@@ -1076,7 +1087,7 @@ def check_site(root, registry=ROOT / 'market/registry.json', now=None):
                 for markup in slots:
                     slot = DriverSlot(markup, listing_urls)
                     assert not slot.books, 'a booking link outside the team page'
-                    assert not (slot.x_links or slot.cloudroom_links or slot.report_links or slot.launch_posts), \
+                    assert not (slot.x_links or slot.cloudroom_links or slot.report_links or slot.launch_posts or any(slot.install_links.values())), \
                         'unexpected external URL'
                     for ref in slot.refs:
                         check_ref(root, path, ref, pages, slot.favicons)
@@ -1091,6 +1102,8 @@ def check_site(root, registry=ROOT / 'market/registry.json', now=None):
                 check_ref(root, path, ref, pages, page.favicons)
         assert page.cloudroom_links == (1 if path == root / 'index.html' else 0), \
             f'CloudRoom link, the landing install box\'s only: {path.relative_to(root)} has {page.cloudroom_links}'
+        assert all(n == (1 if path == root / 'index.html' else 0) for n in page.install_links.values()), \
+            f'install helper/setup links, the landing install box\'s only: {path.relative_to(root)} has {page.install_links}'
         assert page.report_links == 1, f'Report a problem link: {path.relative_to(root)} has {page.report_links}, not 1'
         assert page.launch_posts == (1 if path == root / 'index.html' else 0), \
             f'the launch post link, the landing launch video\'s only: {path.relative_to(root)} has {page.launch_posts}'
@@ -1327,7 +1340,7 @@ def sentences(text):
 
 
 INSTALL_LINE = 'Install OpenWiz from github.com/openwizdev/OpenWiz'
-INSTALL_HINT = 'Paste this into your agent'
+INSTALL_HINT = 'Paste this into your AI helper'
 INSTALL_BUTTON = {'coming-soon': 'Copy · coming soon', 'live': 'Copy'}
 INSTALL_SWITCH = ('coming-soon', 'live')
 INSTALL_VERSION = 'OpenWiz 0.01 0.1.0'
@@ -1345,7 +1358,7 @@ def check_install(landing, page):
     label = re.search(r'<div class="install-box"[^>]*>\s*(<p class="install-version">([^<]*<small>[^<]*</small>)</p>)', landing)
     assert label and landing.count('install-version') == 1 and flat(label[2]) == INSTALL_VERSION, f'the install box must show {INSTALL_VERSION}'
     assert re.search(re.escape(INSTALL_NOTE_HTML) + r'\s*$', box) and landing.count('install-note') == 1 \
-        and flat(INSTALL_NOTE_HTML) == INSTALL_NOTE, f'the install box must end with: {INSTALL_NOTE}'
+        and flat(INSTALL_NOTE_HTML) == f'Details for developers{INSTALL_NOTE}', f'the install box must end with: {INSTALL_NOTE}'
     hints = re.findall(r'<p class="install-hint">([\s\S]*?)</p>', box)
     assert [flat(h) for h in hints] == [INSTALL_HINT], f'the install box must say: {INSTALL_HINT}'
     labels = re.findall(r'<button class="btn install"[^>]*>([\s\S]*?)</button>', landing)
