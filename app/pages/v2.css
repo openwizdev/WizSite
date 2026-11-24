@@ -1,29 +1,31 @@
 html[data-v2='1'] {
-  --em-bg: #14171b;
-  --em-side: #101216;
-  --em-card: #1b1e23;
-  --em-card-hover: #23272e;
-  --em-line: #343942;
-  --em-text: #ede6da;
-  --em-text-2: #c2bcb3;
-  --em-muted: #a7a29a;
-  --em-amber: #a8caf6;
-  --em-on-amber: #101a27;
-  --em-link: #a8caf6;
-  --v2-content: 720px;
+  --em-bg: #141b21;
+  --em-side: #10171c;
+  --em-card: #192229;
+  --em-card-hover: #222e37;
+  --em-line: #37444f;
+  --em-text: #f2e8d8;
+  --em-text-2: #d0c9bf;
+  --em-muted: #abaead;
+  --em-amber: #a5caf1;
+  --em-on-amber: #111c27;
+  --em-link: var(--em-amber);
+  --v2-content: 864px;
   --v2-gutter: 32px;
+  --v2-rim: #5b6972;
   --v2-label: 500 12px/1.4 var(--em-mono);
-  --v2-dots: radial-gradient(circle, #0f244337 .6px, transparent .85px) 0 0 / 4px 4px;
-  --v2-active: radial-gradient(circle, #9bbded23 .6px, transparent .9px) 0 0 / 4px 4px #1b2a40;
+  --v2-dots: radial-gradient(circle, #101e384a .65px, transparent .9px) 0 0 / 4px 4px;
+  --v2-active: radial-gradient(circle, #78a8de45 .65px, transparent .9px) 0 0 / 4px 4px #1a3147;
 }
 html[data-v2='1'] body { font-size: 16px; line-height: 1.5; }
 html[data-v2='1'] :focus-visible { outline: 2px solid var(--em-amber); outline-offset: 3px; }
 
-.v2-backdrop {
+html[data-v2='1'] .v2-backdrop {
   position: fixed;
   inset: 0;
   pointer-events: none;
-  background: linear-gradient(#0c11184a, #0c11184a), url('/art/moments-sea.webp') center / cover;
+  background: linear-gradient(#101a211a, #101a211a),
+    url('/app/art/sea-wide.webp') right 55% / max(calc(100vw + 80px), 160dvh) auto no-repeat;
 }
 .v2-frame, .v2-welcome-stage {
   position: relative;
@@ -32,13 +34,16 @@ html[data-v2='1'] :focus-visible { outline: 2px solid var(--em-amber); outline-o
   place-items: center;
   padding: 32px;
 }
+@media (min-width: 1200px) {
+  .v2-frame { padding-inline: clamp(192px, 16.25vw, 288px) clamp(32px, 4vw, 72px); }
+}
 .v2-welcome-stage .center { min-height: 0; width: 100%; }
 .v2-shell {
   display: grid;
-  grid-template-columns: 200px minmax(0, 1fr);
-  width: min(1160px, 100%);
-  height: min(776px, calc(100dvh - 64px));
-  border: 1px solid #41454d;
+  grid-template-columns: clamp(168px, 15vw, 224px) minmax(0, 1fr);
+  width: min(1216px, 100%);
+  height: min(768px, calc(100dvh - 64px));
+  border: 1px solid var(--v2-rim);
   border-radius: 20px;
   overflow: hidden;
   background: var(--em-bg);
@@ -46,11 +51,11 @@ html[data-v2='1'] :focus-visible { outline: 2px solid var(--em-amber); outline-o
 }
 .v2-side {
   background: var(--em-side);
-  border-right: 1px solid #2b2f35;
+  border-right: 1px solid var(--em-line);
   padding: 24px 16px 16px;
   display: flex;
   flex-direction: column;
-  gap: 32px;
+  gap: 24px;
   min-height: 0;
   overflow: auto;
 }
@@ -60,7 +65,7 @@ html[data-v2='1'] :focus-visible { outline: 2px solid var(--em-amber); outline-o
   gap: 8px;
   min-height: 44px;
   color: var(--em-text);
-  font-size: 17px;
+  font-size: 20px;
   font-weight: 650;
   letter-spacing: -.025em;
 }
@@ -76,9 +81,9 @@ html[data-v2='1'] :focus-visible { outline: 2px solid var(--em-amber); outline-o
   font: var(--v2-label);
   letter-spacing: 0;
 }
-nav.v2-nav { flex: 1; gap: 4px; }
+nav.v2-nav { flex: 1; gap: 4px; border-top: 1px solid var(--em-line); padding-top: 12px; }
 .v2-nav a.v2-bottom { margin-top: auto; }
-.v2-nav a.v2-nav-item { min-height: 44px; padding-inline: 12px; font-size: 15px; gap: 12px; border-radius: 8px; }
+.v2-nav a.v2-nav-item { min-height: 44px; padding-inline: 12px; font-size: 16px; gap: 12px; border-radius: 8px; }
 .v2-nav a.v2-nav-item[aria-current='page'], .v2-tabs a[aria-current='page'] {
   background: var(--v2-active);
   color: #c9dffb;
@@ -90,11 +95,11 @@ nav.v2-nav { flex: 1; gap: 4px; }
   text-align: center;
   padding: 1px 4px;
   color: var(--em-text-2);
-  background: #282d35;
+  background: #263542;
   border-radius: 4px;
   font: var(--v2-label);
 }
-.v2-nav [aria-current='page'] .v2-badge, .v2-tabs [aria-current='page'] .v2-badge { background: #293e59; color: #d4e5fc; }
+.v2-nav [aria-current='page'] .v2-badge, .v2-tabs [aria-current='page'] .v2-badge { background: #335375; color: #e1edfa; }
 
 .v2-main {
   position: relative;
@@ -177,7 +182,7 @@ nav.v2-nav { flex: 1; gap: 4px; }
 .v2-btn:disabled, .v2-send-btn:disabled, .v2-rail-btn:disabled, .v2-q-pill:disabled { opacity: .55; cursor: default; }
 .v2-btn.subtle { background-color: transparent; border-color: transparent; color: var(--em-text-2); }
 .v2-btn.subtle:hover { background-color: var(--em-card); color: var(--em-text); }
-.v2-btn.primary { background: var(--v2-dots) #a8caf6; border-color: #bad6f8; color: var(--em-on-amber); font-weight: 680; }
+.v2-btn.primary { background: var(--v2-dots) var(--em-amber); border-color: #b7d6f5; color: var(--em-on-amber); font-weight: 680; }
 .v2-btn.primary:hover { background-color: #bbd7fa; }
 .v2-btn .ic { width: 18px; height: 18px; }
 .v2-label { color: var(--em-muted); font: var(--v2-label); text-transform: uppercase; letter-spacing: .07em; }
@@ -340,22 +345,27 @@ nav.v2-nav { flex: 1; gap: 4px; }
 .v2-freshness { color: var(--em-muted); font-size: 14px; }
 .v2-muted { color: var(--em-muted); }
 
-.v2-welcome {
+html[data-v2='1'] .v2-welcome {
   display: grid;
-  grid-template-rows: auto 1fr;
-  align-items: center;
+  place-items: center end;
   min-height: 100dvh;
   max-width: none;
-  padding: 24px clamp(24px, 6vw, 88px) 48px;
-  background: linear-gradient(90deg, #11161ded 0%, #11161dc7 34%, #11161d20 74%), url('/art/drivers-c-boat.webp') 64% center / cover;
+  padding: 32px clamp(24px, 6vw, 96px);
+  background: linear-gradient(#111a2112, #111a2112), url('/app/art/sea-wide.webp') left 78% / max(115vw, 160dvh) auto no-repeat;
 }
-.v2-welcome-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.v2-welcome .v2-sample-tag { color: var(--em-text); background: #11161ddd; padding: 4px 8px; border-radius: 4px; }
-.v2-welcome-card { padding-block: 48px; max-width: 540px; }
-.v2-welcome h1 { font-size: clamp(40px, 5vw, 56px); text-wrap: balance; }
-.v2-welcome-copy { margin: 16px 0 24px; max-width: 40ch; color: var(--em-text-2); font-size: 16px; }
+.v2-welcome-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 32px; }
+.v2-welcome-card {
+  width: min(100%, 624px);
+  padding: 40px 48px 48px;
+  border: 1px solid var(--v2-rim);
+  border-radius: 20px;
+  background: var(--em-bg);
+  box-shadow: 0 20px 72px #090c1259;
+}
+.v2-welcome h1 { font-size: clamp(40px, 4.4vw, 64px); text-wrap: balance; }
+.v2-welcome-copy { margin: 16px 0 24px; max-width: 40ch; color: var(--em-text-2); font-size: 17px; }
 .v2-welcome .notice { margin-bottom: 16px; }
-.v2-welcome .v2-btn { min-height: 48px; }
+.v2-welcome .v2-btn { min-height: 56px; padding-inline: 20px; font-size: 17px; }
 .v2-sheet {
   width: min(480px, calc(100% - 32px));
   max-height: calc(100dvh - 32px);
@@ -393,20 +403,30 @@ nav.v2-nav { flex: 1; gap: 4px; }
 
 @media (max-width: 760px) {
   html[data-v2='1'] { --v2-gutter: 16px; }
-  .v2-frame { padding: 0; }
-  .v2-shell { display: block; border: 0; border-radius: 0; height: 100dvh; }
+  html[data-v2='1'] .v2-backdrop {
+    background: var(--em-side) url('/app/art/sea-tall.webp') center 65% / 100% auto no-repeat;
+    inset: 0 0 auto;
+    height: calc(104px + env(safe-area-inset-top));
+  }
+  .v2-frame { padding: calc(72px + env(safe-area-inset-top)) 4px 4px; }
+  .v2-shell {
+    display: block;
+    border-radius: 16px;
+    height: calc(100dvh - 76px - env(safe-area-inset-top));
+  }
   .v2-side { display: none; }
   .v2-main { height: 100%; }
   .v2-phone-bar {
     display: flex;
     align-items: center;
     flex: none;
-    padding: env(safe-area-inset-top) 16px 0;
-    border-bottom: 1px solid #292d35;
+    padding: 0 12px;
+    border-bottom: 1px solid var(--em-line);
     background: var(--em-side);
   }
   .v2-phone-brand img { width: 24px; height: 24px; }
-  .v2-main > .v2-sample-tag { inset: calc(14px + env(safe-area-inset-top)) 16px auto auto; }
+  .v2-phone-brand { font-size: 17px; }
+  .v2-main > .v2-sample-tag { inset: 14px 12px auto auto; }
   .v2-head { padding: 12px 0 8px; min-height: 54px; align-items: center; flex-wrap: wrap; }
   .v2-head h1 { font-size: 32px; }
   .v2-tabs {
@@ -463,14 +483,15 @@ nav.v2-nav { flex: 1; gap: 4px; }
   .v2-settings { padding: 12px 0 24px; }
   .v2-settings-group + .v2-settings-group { margin-top: 16px; }
   .v2-welcome-stage { padding: 8px; }
-  .v2-welcome {
-    min-height: 100dvh;
-    padding: calc(12px + env(safe-area-inset-top)) 24px calc(32px + env(safe-area-inset-bottom));
-    align-items: end;
-    background: linear-gradient(0deg, #11161d 7%, #11161de8 32%, #11161d0d 72%, #11161d77 100%), url('/art/drivers-c-boat.webp') 61% center / cover;
+  html[data-v2='1'] .v2-welcome {
+    place-items: end center;
+    padding: max(24px, 38dvh) 16px calc(clamp(24px, 8dvh, 72px) + env(safe-area-inset-bottom));
+    background: linear-gradient(#111a210a, #111a2133), url('/app/art/sea-tall.webp') center / cover no-repeat;
   }
-  .v2-welcome-card { padding-block: 32px 16px; }
-  .v2-welcome h1 { font-size: 32px; }
+  .v2-welcome-head { margin-bottom: 16px; }
+  .v2-welcome-card { padding: 16px 20px 24px; }
+  .v2-welcome h1 { font-size: clamp(32px, 9.3vw, 48px); }
+  .v2-welcome-copy { font-size: 16px; }
   .v2-welcome .v2-btn { width: 100%; }
   .v2-toast { bottom: calc(68px + env(safe-area-inset-bottom)); }
 }

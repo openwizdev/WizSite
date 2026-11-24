@@ -465,6 +465,9 @@
 
   function renderWelcome(root, { note, demoMode }) {
     const card = h('div', { class: 'v2-welcome-card' },
+      h('header', { class: 'v2-welcome-head' },
+        h('div', { class: 'v2-welcome-brand' }, mark(), h('span', {}, 'OpenWiz')),
+        demoMode ? h('span', { class: 'v2-sample-tag' }, 'Sample data') : null),
       h('h1', {}, 'Your software factory, in one quiet room.'),
       h('p', { class: 'v2-welcome-copy' }, demoMode
         ? 'Answer a few questions. Watch specs build. Tap Ship it.'
@@ -472,11 +475,7 @@
       note ? h('div', { class: 'notice bad', role: 'alert' }, icon('warn'), h('span', {}, note)) : null,
       h('a', { class: 'v2-btn primary', href: demoMode ? '#/chat' : '/api/sign-in/start' },
         demoMode ? 'Open Harbor workspace' : 'Continue with GitHub', icon('right')));
-    root.replaceChildren(h('main', { class: 'v2-welcome' },
-      h('header', { class: 'v2-welcome-head' },
-        h('div', { class: 'v2-welcome-brand' }, mark(), h('span', {}, 'OpenWiz')),
-        demoMode ? h('span', { class: 'v2-sample-tag' }, 'Sample data') : null),
-      card));
+    root.replaceChildren(h('main', { class: 'v2-welcome' }, card));
     document.title = 'OpenWiz';
   }
 
