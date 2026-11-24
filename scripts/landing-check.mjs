@@ -19,7 +19,6 @@ function serve() {
       response.writeHead(200, { 'content-type': TYPES[extname(path)] || 'application/octet-stream' });
       response.end(data);
     } catch {
-      // Like Cloudflare Pages: a missing path gets the root 404.html, with status 404.
       const page = await readFile(join(DIST, '404.html')).catch(() => '');
       response.writeHead(404, { 'content-type': TYPES['.html'] }).end(page);
     }
@@ -455,7 +454,6 @@ async function teamFilm(page, where, width, height, mode) {
 }
 
 const FAQ_PATHS = ['/', '/faq/'];
-// Any missing path; the server answers it with 404.html, as Pages does.
 const NOT_FOUND = '/no-such-page/';
 async function faq(page, where, width, mode) {
   const read = () => page.evaluate(`(() => { ${HELPERS}

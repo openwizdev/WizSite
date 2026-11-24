@@ -305,8 +305,8 @@ FAQ = (ROOT / 'faq.html').read_text()
 FAQ_TOP = re.sub(r'<(/?)h3\b', r'<\1h2', re.sub(r'<(/?)h2\b', r'<\1h1', FAQ))
 FAQ_SLOTS = {'<template data-slot="faq"></template>\n': FAQ, '<template data-slot="faq-h1"></template>\n': FAQ_TOP}
 FAQ_PAGE = 'faq/index.html'
-# Cloudflare Pages answers a missing path with the nearest 404.html, with status 404. Without one at the root it
-# serves the landing with 200, and a gone fingerprinted name would cache that HTML for a year.
+# External: Pages answers a missing path with the nearest 404.html and status 404, and with none at all serves the
+# landing with 200, https://developers.cloudflare.com/pages/configuration/serving-pages/#not-found-behavior
 NOT_FOUND_PAGE = '404.html'
 FAQ_ON = {'index.html': FAQ, FAQ_PAGE: FAQ_TOP}
 FAQ_TITLE = ('Questions', 'The short ones are here.')
