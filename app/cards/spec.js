@@ -127,7 +127,7 @@
     const say = (outcome, text, ...more) => status.replaceChildren(h('p', { 'data-outcome': outcome }, text, ...more));
     const buttons = () => {
       status.replaceChildren();
-      steer.replaceChildren(h('div', { class: 'spec-card-buttons' },
+      steer.replaceChildren(h('div', { class: 'spec-card-buttons spec-ship-actions' },
         h('button', { type: 'button', class: 'primary', onclick: () => compose({ form: 'spec.ship', item }) }, 'Ship it'),
         h('button', { type: 'button', onclick: change }, 'Change something'),
         h('button', { type: 'button', onclick: () => compose({ form: 'spec.not_now', item }) }, 'Not now')));

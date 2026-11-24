@@ -195,12 +195,17 @@
       state.cards.clear();
       if (state.deck) state.deck.activeKey = null;
     }
-    if (!picked || !specs.data || !specs.readAt || !OW.factory.model(feeds)) return;
+    if (!picked || !specs.data || !specs.readAt) return;
     if (specs.failedAt != null) state.failedSince = Math.max(state.failedSince ?? 0, specs.failedAt);
     const readAt = specs.readAt;
     const key = `${picked.full}|${OW.data.auth.session() ?? ''}|${OW.data.auth.account() ?? ''}|${readAt}`;
     if (state.key === key) return;
     state.key = key;
+    if (!OW.factory.model(feeds)) {
+      state.run = null;
+      state.result = { repository: picked.full, items: [], gaps: ['the spec read'], bindings: new Map() };
+      return;
+    }
     const session = OW.data.auth.session();
     const mine = build(feeds, picked);
     state.run = mine;
@@ -251,7 +256,7 @@
   function view() {
     const result = state.result;
     if (!result || state.failedSince === null) return result;
-    return { ...result, gaps: [...new Set([...result.gaps, 'the latest spec read'])],
+    return { ...result,
       items: result.items.map(item => (item.type === 'decision' && item.current === true ? { ...item, current: null, checked_at: null } : item)) };
   }
   function holder(item, result) {
@@ -276,19 +281,27 @@
 
   function draw(el) {
     const { deck } = state;
+    const { pager, readsPausedNote } = OW.v2 ?? {};
     const result = view();
     const items = result ? result.items.filter(shown) : [];
     const keys = new Set(items.map(item => item.key));
     for (const key of state.cards.keys()) if (!keys.has(key)) state.cards.delete(key);
     const gaps = result?.gaps || [];
-    const message = !result ? 'Reading GitHub…' : gaps.length
-      ? `This list may be missing items: GitHub gave only part of ${gaps.join(', ')}. The app tries again on its own.`
-      : items.length ? '' : `${EMPTY}.`;
-    if (deck.message !== message) {
+    const stale = state.failedSince !== null;
+    const partial = gaps.length > 0;
+    let message = '';
+    if (!result) message = 'Reading GitHub…';
+    else if (stale) {
+      message = `Couldn't read Specs from GitHub. Showing the last available read.${partial ? ` It was missing ${gaps.join(', ')}.` : ''}`;
+    } else if (partial) message = `This list may be missing items: GitHub gave only part of ${gaps.join(', ')}. The app tries again on its own.`;
+    else if (!items.length) message = `${EMPTY}.`;
+    const pausedUntil = readsPausedNote && OW.data.paused() ? OW.data.limit.pausedUntil : null;
+    if (deck.message !== message || deck.pausedUntil !== pausedUntil) {
       deck.message = message;
-      const notice = message && (gaps.length ? OW.ui.unknown(message) : result
+      deck.pausedUntil = pausedUntil;
+      const notice = message && (partial || stale ? OW.ui.unknown(message) : result
         ? h('div', { class: 'v2-clear-card' }, h('h2', {}, 'All clear'), h('p', {}, message)) : OW.ui.placeholder(message));
-      deck.status.replaceChildren(...(notice ? [notice] : []));
+      deck.status.replaceChildren(...[notice, pausedUntil ? readsPausedNote() : null].filter(Boolean));
     }
 
     if (!deck.activeKey) {
@@ -305,7 +318,7 @@
         deck.activeKey = deck.keys[next];
         updateDeck(el);
       };
-      const controls = OW.v2?.pager(index, items.length, go);
+      const controls = pager?.(index, items.length, go);
       deck.controls?.replaceChildren(...(controls ? [controls] : []));
       deck.position = position;
     }
