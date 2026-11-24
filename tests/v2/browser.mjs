@@ -93,8 +93,17 @@ async function siteHeaders(path) {
       const pattern = new RegExp(`^${line.trim().replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*')}$`);
       match = pattern.test(path);
     } else if (match) {
-      const at = line.indexOf(':');
-      out[line.slice(0, at).trim()] = line.slice(at + 1).trim();
+      const trimmed = line.trim();
+      if (trimmed.startsWith('!')) {
+        const drop = trimmed.slice(1).trim().toLowerCase();
+        for (const key of Object.keys(out)) if (key.toLowerCase() === drop) delete out[key];
+      } else {
+        const at = trimmed.indexOf(':');
+        const name = trimmed.slice(0, at).trim();
+        const value = trimmed.slice(at + 1).trim();
+        const existing = Object.keys(out).find(k => k.toLowerCase() === name.toLowerCase());
+        out[existing || name] = existing ? `${out[existing]}, ${value}` : value;
+      }
     }
   }
   return out;

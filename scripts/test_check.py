@@ -26,7 +26,7 @@ def edit_built(root, name, change):
 
 LANDING = ('<html><head><title>OpenWiz</title></head><body><header><nav><a href="/changelog/">Changelog</a></nav></header>'
            '<main><h1>Bring your own everything.</h1></main><footer><a href="/changelog/">Changelog</a></footer></body></html>')
-CHANGELOG = ('<html><head><title>Changelog — OpenWiz</title><style>.release{color:red}</style></head><body><main id="main">'
+CHANGELOG = ('<html><head><title>Changelog — OpenWiz</title></head><body><main id="main">'
              '<h1>Changelog</h1><p class="lead">What each public release lets you do.</p></main></body></html>')
 DATA = {
     '0.01.json': {'name': '0.01', 'semver': '0.1.2', 'date': '2031-01-02', 'headline': 'One thing.',
@@ -254,7 +254,7 @@ class Checks(unittest.TestCase):
                 (CHANGELOG.replace('lets you do.', 'lets you do in Wiz<b>Room</b>.'), 'private repository is named|nothing else'),
                 (CHANGELOG.replace('lets you do.', 'lets you do, since 0.01.'), 'version number or date'),
                 (CHANGELOG.replace('lets you do.', 'lets you do, since 2026.'), 'version number or date'),
-                (CHANGELOG.replace('.release{color:red}', '.release{transition:opacity .2s}'), 'motion outside')):
+                (CHANGELOG.replace('</title>', '</title><style>.release{color:red}</style>'), 'never inline')):
             with self.subTest(error=error, at=changelog[-120:]), self.assertRaisesRegex(AssertionError, error):
                 check_changelog(LANDING, changelog)
 
@@ -509,6 +509,28 @@ class Checks(unittest.TestCase):
             (root / '_headers').write_text('/*.css\n  Cache-Control: public, max-age=14400\n')
             with self.assertRaises(AssertionError):
                 check_site(root)
+
+    def test_security_headers_and_well_known(self):
+        cases = {
+            'missing HSTS': lambda root: (root / '_headers').write_text(
+                (root / '_headers').read_text().replace('  Strict-Transport-Security: max-age=31536000\n', '')),
+            'missing /app/* CSP detach': lambda root: (root / '_headers').write_text(
+                (root / '_headers').read_text().replace('  ! Content-Security-Policy\n', '')),
+            'missing /app/* Referrer-Policy detach': lambda root: (root / '_headers').write_text(
+                (root / '_headers').read_text().replace('  ! Referrer-Policy\n', '')),
+            'missing security.txt Expires': lambda root: (root / '.well-known/security.txt').write_text(
+                re.sub(r'^Expires:.*\n', '', (root / '.well-known/security.txt').read_text(), flags=re.M)),
+            'missing robots.txt Disallow': lambda root: (root / 'robots.txt').write_text('User-agent: *\nAllow: /\n'),
+            'inline style on market': lambda root: (root / 'market/index.html').write_text(
+                (root / 'market/index.html').read_text().replace('</head>', '<style>.x{color:red}</style></head>')),
+        }
+        for name, spoil in cases.items():
+            with self.subTest(name), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp) / 'dist'
+                shutil.copytree(ROOT / 'dist', root)
+                spoil(root)
+                with self.assertRaises(AssertionError):
+                    check_site(root)
 
     def test_install_wording_only_in_the_install_box(self):
         for extra in ('<a href="/">Copy · coming soon</a>', '<p>Install now</p>', '<p>Inst&#97;ll today</p>',
