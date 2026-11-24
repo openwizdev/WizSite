@@ -484,7 +484,7 @@
     return { items, complete: false };
   }
   async function moreComments(specs, picked) {
-    for (const detail of Object.values(specs || {})) {
+    for (const [key, detail] of Object.entries(specs || {})) {
       const list = detail?.comments;
       if (!list || !Number.isSafeInteger(detail.number) || (list.totalCount ?? 0) <= (list.nodes || []).length || paused()) continue;
       try {
@@ -492,7 +492,7 @@
         if (!got.complete) continue;
         const nodes = got.items.filter(c => Number.isSafeInteger(c?.id)).map(c => ({ databaseId: c.id, body: c.body ?? '', url: c.html_url,
           createdAt: c.created_at, updatedAt: c.updated_at, author: typeof c.user?.login === 'string' ? { login: c.user.login } : null }));
-        detail.comments = { totalCount: got.items.length, nodes };
+        specs[key] = { ...detail, comments: { totalCount: got.items.length, nodes } };
       } catch (error) {
         if (error instanceof Ended || error instanceof SignedOut) throw error;
       }
@@ -569,7 +569,7 @@
             if (mine !== generation) return;
             noteLimit(extra?.data?.rateLimit, second);
             const got = second.ok ? extra?.data?.repository : null;
-            if (limited(extra)) why = 'limit';
+            if (limited(extra)) { why = 'limit'; if (!paused()) limit.pausedUntil = Date.now() + PAUSE_DEFAULT; }
             const heavy = (extra?.errors || []).some(e => e?.type === 'RESOURCE_LIMITS_EXCEEDED');
             if (heavy && chunk.length > 1) { queue.unshift(...chunk.map(n => [n])); continue; }
             for (const n of chunk) {
