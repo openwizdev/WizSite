@@ -549,30 +549,39 @@ body.landing > main { flex: 1 0 auto; }
 @keyframes drivers-d-far { to { transform: translateY(6%); } }
 @keyframes drivers-d-near { to { transform: translateY(-10%); } }
 
+.team-page [data-stars] { display: none; }
 .team-page .nav-team { padding: 8px 0; border-radius: 0; background: none; color: var(--grey2); font-weight: 450; }
 .team-page .nav-team:hover { background: none; color: var(--ink); text-decoration: underline; text-underline-offset: 4px; }
 .team { display: grid; grid-template-columns: minmax(0, .85fr) minmax(0, 1.15fr); gap: clamp(28px, 4.5vw, 72px); align-items: center; padding-block: clamp(28px, 5vw, 80px); }
 .team-kicker { color: var(--grey2); font: 600 13px/1.3 var(--ow-font-sans); letter-spacing: .06em; text-transform: uppercase; }
 .team h1 { margin-top: 14px; max-width: 13ch; font-size: clamp(34px, 4.2vw, 56px); font-weight: 760; line-height: 1.04; letter-spacing: -.045em; text-wrap: balance; }
 .team-lead { margin-top: 18px; max-width: 42ch; color: #e1d7cb; font-size: clamp(17px, 1.5vw, 19px); line-height: 1.45; letter-spacing: -.01em; }
-.team-book { display: inline-flex; align-items: center; justify-content: center; min-height: 48px; margin-top: 26px; padding: 0 24px; border-radius: 10px; background: var(--brass); color: var(--on-brass); font-size: 16px; font-weight: 650; }
+.team-book { display: inline-flex; align-items: center; justify-content: center; min-height: 48px; padding: 0 24px; border-radius: 10px; background: var(--brass); color: var(--on-brass); font-size: 16px; font-weight: 650; }
 .team-book:hover { background: var(--brass-hi); text-decoration: none; }
 .team-book:focus-visible { outline: 2px solid var(--orchid); outline-offset: 3px; }
-.team-needs { margin-top: 14px; max-width: 42ch; color: var(--grey2); font-size: 15px; line-height: 1.45; }
+.team-booking { padding: 16px; border: 1px solid var(--edge); border-radius: var(--ow-radius-12); background: var(--panel); }
+.team-copy .team-booking { margin-top: 24px; }
+.team-booking-details { margin: 12px 0 0; color: var(--ink); font-size: 14px; line-height: 1.4; }
+.team-booking-details > div { display: grid; grid-template-columns: 6ch minmax(0, 1fr); gap: 2px 12px; }
+.team-booking-details > div + div { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); }
+.team-booking-details dt { align-self: baseline; color: var(--grey2); font: 600 13px/1.4 var(--ow-font-mono); }
+.team-booking-details dd { grid-column: 2; margin: 0; text-wrap: pretty; }
+.team-booking-reminder { color: var(--grey2); font-size: 14px; line-height: 1.4; }
 .team-film { margin: 0; }
 .team-part { padding-block: clamp(48px, 7vw, 104px); border-top: 1px solid var(--line); }
 .team-part h2 { font-size: clamp(26px, 2.6vw, 34px); font-weight: 740; line-height: 1.1; letter-spacing: -.04em; }
 .team-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px clamp(24px, 4vw, 56px); margin: clamp(24px, 3vw, 40px) 0 0; padding: 0; list-style: none; counter-reset: step; }
 .team-steps li { counter-increment: step; padding-top: 18px; border-top: 1px solid var(--edge); }
 .team-steps h3 { color: var(--ink); font-size: 19px; font-weight: 680; line-height: 1.25; letter-spacing: -.02em; }
-.team-steps h3::before { content: counter(step); margin-right: 12px; color: var(--brass); font: 600 14px/1 var(--ow-font-mono); }
+.team-steps h3::before { content: counter(step); margin-right: 12px; color: var(--grey2); font: 600 14px/1 var(--ow-font-mono); }
 .team-steps p { margin-top: 8px; color: var(--grey2); font-size: 17px; line-height: 1.5; }
 .team-facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px clamp(20px, 3vw, 40px); margin: 28px 0 0; padding: 0; list-style: none; }
 .team-facts li { padding-top: 14px; border-top: 1px solid var(--edge); color: var(--grey2); font-size: 16px; line-height: 1.5; }
-.team-facts a { color: var(--ink); text-decoration: underline; text-decoration-color: var(--brass); text-underline-offset: 4px; }
-.team-facts a:hover { color: var(--brass-hi); }
-.team-close { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 32px; }
-.team-close .team-book { margin-top: 0; }
+.team-facts a { color: var(--ink); text-decoration: underline; text-decoration-color: var(--grey2); text-underline-offset: 4px; }
+.team-facts a:hover { text-decoration-color: var(--ink); }
+.team-close { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px 32px; }
+.team-close .team-booking { display: flex; align-items: center; gap: 16px; }
+.team-close .team-book { flex: none; }
 @media (max-width: 960px) {
   .team-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
@@ -583,9 +592,10 @@ body.landing > main { flex: 1 0 auto; }
 @media (max-width: 560px) {
   .team h1 { font-size: clamp(28px, 8vw, 36px); }
   .team-lead { margin-top: 12px; font-size: 16px; }
-  .team-book { margin-top: 18px; }
-  .team-book, .team-close .team-book { display: flex; width: 100%; min-height: 52px; }
-  .team-needs { font-size: 14px; }
+  .team-copy .team-booking { margin-top: 18px; }
+  .team-booking { padding: 12px; }
+  .team-book { display: flex; width: 100%; }
+  .team-close .team-booking { flex-direction: column; gap: 10px; width: 100%; text-align: center; }
   .team-facts { grid-template-columns: 1fr; gap: 14px; }
   .team-facts li { font-size: 15px; }
   .team-steps p { font-size: 16px; }

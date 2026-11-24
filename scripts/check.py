@@ -152,7 +152,12 @@ TEAM_KICKER = 'For teams who use Claude Code or Codex'
 TEAM_HEADLINE = 'Leave the call with a reviewed pull request.'
 TEAM_LEAD = ('Jake, who built OpenWiz, sets up an agent factory with your team on your own repository. '
              'Pick one small, real change: your agents build and review it. Merging stays your call.')
-TEAM_NEEDS = '30 minutes. Bring a repository with working CI and a signed-in Claude Code or Codex.'
+TEAM_BOOKING_DETAILS = (
+    ('Call', ('30 minutes', 'With Jake, who built OpenWiz', 'On your own repository',
+              'You leave with a reviewed pull request; merging stays your call')),
+    ('Bring', ('a repository with working CI', 'a signed-in Claude Code or Codex')),
+)
+TEAM_BOOKING_REMINDER = '30 minutes with Jake on your own repository.'
 TEAM_STEPS = (('Connect', 'We connect OpenWiz to your repository and the coding agents you already use.'),
               ('Decide', 'You pick one small, real change and answer a few questions about it.'),
               ('Ship', 'Your agents build it, a second agent reviews it, and the pull request opens on your repository. '
@@ -1506,9 +1511,17 @@ def check_team(htmls, pages):
     assert hero, 'the team page needs its hero'
     hero = hero[1]
     copy = re.search(r'<div class="team-copy">\s*<p class="team-kicker">([^<]*)</p>\s*<h1>[^<]*</h1>\s*<p class="team-lead">([^<]*)</p>\s*'
-                     r'<a class="team-book" id="book" data-book [^>]*>Book a call</a>\s*<p class="team-needs">([^<]*)</p>\s*</div>', hero)
-    assert copy and tuple(map(unescape, copy.groups())) == (TEAM_KICKER, TEAM_LEAD, TEAM_NEEDS), \
-        f'the hero, in order: who it is for, the headline, what happens on the call, Book a call, what to bring: {TEAM_KICKER} / {TEAM_LEAD} / {TEAM_NEEDS}'
+                     r'<div class="team-booking">\s*<a class="team-book" id="book" data-book href="[^"]*">Book a call</a>\s*'
+                     r'<dl class="team-booking-details">([\s\S]*?)</dl>\s*</div>\s*</div>', hero)
+    assert copy and tuple(map(unescape, copy.groups()[:2])) == (TEAM_KICKER, TEAM_LEAD), \
+        'the hero, in order: who it is for, the headline, the lead, and the booking card with Book a call first'
+    group = r'<div>\s*<dt>([^<]*)</dt>\s*((?:<dd>[^<]*</dd>\s*)+)</div>'
+    details = re.fullmatch(rf'\s*{group}\s*{group}\s*', copy[3])
+    found_details = tuple(
+        (unescape(label), tuple(map(unescape, re.findall(r'<dd>([^<]*)</dd>', values))))
+        for label, values in (details.groups()[:2], details.groups()[2:])
+    ) if details else ()
+    assert found_details == TEAM_BOOKING_DETAILS, f'the booking card lists the call and what to bring: {TEAM_BOOKING_DETAILS}'
     page = Page(main)
     assert len(page.videos) == 1, 'the team page has one video: the launch film'
     clip = page.videos[0]
@@ -1535,8 +1548,10 @@ def check_team(htmls, pages):
     assert tuple(plain(i) for i in items) == TEAM_FACTS, f'What you\u2019re setting up: its four true lines, in order: {TEAM_FACTS}'
     assert re.findall(r'href="([^"]*)"', facts[1]) == ['/drivers/'], 'the drivers line links to the live Drivers page, and restates no count'
     close = re.search(r'<section class="team-part team-close wrap" aria-labelledby="team-call">\s*<h2 id="team-call">[^<]*</h2>\s*'
-                      r'<a class="team-book" data-book href="[^"]*">Book a call</a>\s*</section>\s*$', main)
-    assert close, 'the page closes on its second Book a call'
+                      r'<div class="team-booking">\s*<a class="team-book" data-book href="[^"]*">Book a call</a>\s*'
+                      r'<p class="team-booking-reminder">([^<]*)</p>\s*</div>\s*</section>\s*$', main)
+    assert close and unescape(close[1]) == TEAM_BOOKING_REMINDER, \
+        f'the page closes on its second Book a call and the reminder: {TEAM_BOOKING_REMINDER}'
     assert main.count('<a ') == 3 and main.count('<button') == 1, 'the team page offers Book a call twice, the Drivers link and the play button; nothing else'
 
 

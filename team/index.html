@@ -49,8 +49,23 @@
     <p class="team-kicker">For teams who use Claude Code or Codex</p>
     <h1>Leave the call with a reviewed pull request.</h1>
     <p class="team-lead">Jake, who built OpenWiz, sets up an agent factory with your team on your own repository. Pick one small, real change: your agents build and review it. Merging stays your call.</p>
-    <a class="team-book" id="book" data-book href="https://cal.com/openwiz-jake/setup">Book a call</a>
-    <p class="team-needs">30 minutes. Bring a repository with working CI and a signed-in Claude Code or Codex.</p>
+    <div class="team-booking">
+      <a class="team-book" id="book" data-book href="https://cal.com/openwiz-jake/setup">Book a call</a>
+      <dl class="team-booking-details">
+        <div>
+          <dt>Call</dt>
+          <dd>30 minutes</dd>
+          <dd>With Jake, who built OpenWiz</dd>
+          <dd>On your own repository</dd>
+          <dd>You leave with a reviewed pull request; merging stays your call</dd>
+        </div>
+        <div>
+          <dt>Bring</dt>
+          <dd>a repository with working CI</dd>
+          <dd>a signed-in Claude Code or Codex</dd>
+        </div>
+      </dl>
+    </div>
   </div>
   <figure class="launch team-film">
     <div class="launch-frame">
@@ -81,7 +96,10 @@
 </section>
 <section class="team-part team-close wrap" aria-labelledby="team-call">
   <h2 id="team-call">One small change. One call.</h2>
-  <a class="team-book" data-book href="https://cal.com/openwiz-jake/setup">Book a call</a>
+  <div class="team-booking">
+    <a class="team-book" data-book href="https://cal.com/openwiz-jake/setup">Book a call</a>
+    <p class="team-booking-reminder">30 minutes with Jake on your own repository.</p>
+  </div>
 </section>
 </main>
 <template data-slot="footer"></template>
