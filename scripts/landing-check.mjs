@@ -343,7 +343,7 @@ async function chrome(page, where, mode, path) {
       scroll: document.scrollingElement.scrollWidth, inner: innerWidth,
       mark: shown(mark) && mark.getAttribute('src') === '/art/wiz-mark.webp' && mark.naturalWidth === 128,
       star: shown(star) && star.getAttribute('href') === 'https://github.com/openwizdev/openwiz' &&
-        shown(star.querySelector('.star-icon')) && shown(star.querySelector('.github-mark')) === (innerWidth > 850),
+        shown(star.querySelector('.github-mark')) && shown(star.querySelector('.star-icon')),
       value: shown(value) ? star.innerText.trim() : null, name: star?.getAttribute('aria-label'),
       unboxed: starStyle?.borderStyle === 'none' && starStyle.backgroundColor === 'rgba(0, 0, 0, 0)' &&
         starStyle.fontSize === '14px',
@@ -381,13 +381,14 @@ async function buy(page, where, path) {
     document.documentElement.style.width = (innerWidth - 17) + 'px';
     const inside = el => shown(el) && el.getBoundingClientRect().left >= 0 &&
       el.getBoundingClientRect().right <= innerWidth - 17 && el.scrollWidth <= el.clientWidth + 1;
+    const starLink = stars.closest('a');
     const button = bar.querySelector('a.nav-team[href="/team/"]');
     const toggle = bar.querySelector('.nav-toggle');
     const facts = {
       scroll: document.scrollingElement.scrollWidth, inner: innerWidth,
       clipped: [...bar.querySelectorAll('a, button')].filter(el => shown(el) && !inside(el)).map(el => el.className || el.getAttribute('href')),
       button: inside(button) && button.innerText === (innerWidth <= 850 ? 'For teams' : 'Get it for your team'),
-      stars: inside(stars.closest('a')) && inside(stars),
+      stars: [starLink, starLink.querySelector('.github-mark'), starLink.querySelector('.star-icon'), stars].every(inside),
       drivers: inside(bar.querySelector('a[href="/drivers/"]')),
       toggle: shown(toggle),
       book: [...document.querySelectorAll('a[data-book]')].filter(shown).length,
@@ -400,7 +401,7 @@ async function buy(page, where, path) {
   expect(!facts.clipped.length, where, `the top bar clips with a star count and a scrollbar: ${facts.clipped.join(', ')}`);
   expect(facts.scroll <= facts.inner, where, `sideways scroll (${facts.scroll}px content in a ${facts.inner}px window)`);
   expect(facts.button, where, 'the top bar lacks the buy button inside the window');
-  expect(facts.stars, where, 'the top bar lacks a visible 12.3k star count');
+  expect(facts.stars, where, 'the GitHub mark, star icon and 12.3k count must all fit');
   expect(facts.toggle || facts.drivers, where, 'the top bar lacks the Drivers link or phone menu');
   if (path === '/team/') expect(facts.book === 2, where, `the team page needs its two Book a call links (${facts.book})`);
 }
@@ -583,7 +584,7 @@ async function main() {
         }
       }
     }
-    for (const width of (process.env.WIDTHS || '382,383,481,500,560,640,641,700,760,761,768,800,850,851,900,960,1024').split(',').map(Number)) {
+    for (const width of (process.env.WIDTHS || '360,361,382,383,481,500,560,640,641,700,760,761,768,800,850,851,900,960,1024').split(',').map(Number)) {
       for (const path of SITE_PATHS) {
         const other = await open(browser, origin, width, 800, MODES.motion, path);
         try {

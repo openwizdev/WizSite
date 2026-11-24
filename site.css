@@ -171,7 +171,6 @@ code,.v{font-family:var(--ow-font-mono)}
   .landing-brand { gap: 3px; margin-inline-end: auto; font-size: 14px; }
   .landing-brand img { width: 34px; height: 40px; object-fit: cover; }
   .landing-brand[aria-current]::after { inset-inline-start: 37px; }
-  .github-star .github-mark { display: none; }
   .github-star .star-icon { width: 14px; height: 14px; }
   .nav-team { padding-inline: 7px; font-size: 13px; }
   .nav-team-long { display: none; }
@@ -228,7 +227,7 @@ code,.v{font-family:var(--ow-font-mono)}
   .nav-row:has(.nav-toggle:not([hidden])) .nav-links::after { display: block; position: sticky; bottom: 0; margin-top: 10px; }
   html:has(.nav-toggle[aria-expanded="true"]) { overflow: hidden; scrollbar-gutter: stable; }
 }
-@media (max-width: 382px) {
+@media (max-width: 360px) {
   .landing-brand span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
   .landing-brand[aria-current]::after { inset-inline-start: 0; bottom: 0; }
 }
