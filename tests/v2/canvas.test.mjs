@@ -417,3 +417,49 @@ test('Canvas real data: a read skipped while GitHub\'s limit is paused says it w
     await run.close();
   }
 });
+
+test('Canvas real data: a spec chunk answered RATE_LIMIT with no limit data pauses reads, so the later chunks never fire', async () => {
+  const run = await start();
+  try {
+    world(run);
+    wrap(run, 'Specs', reply => {
+      const json = structuredClone(reply.json);
+      for (const spec of json.data.specSearch.nodes) spec.subIssuesSummary.total = 50;
+      return { ...reply, json };
+    });
+    const sizes = [];
+    wrap(run, 'SpecTickets', (reply, entry) => {
+      sizes.push(aliases(entry).length);
+      return { status: 200, json: { data: null, errors: [{ type: 'RATE_LIMIT', message: 'API rate limit already exceeded for user ID 1.' }] } };
+    });
+    await signIn(run.page);
+    await run.page.click('acme/factory');
+    await run.page.until('OW.data.feeds.specs.readAt || OW.data.feeds.specs.failedAt', 'the spec read');
+    assert.deepEqual(sizes, [1], `one chunk asked, the next one held: ${sizes}`);
+    assert.equal(await run.page.run('OW.data.paused()'), true);
+    assert.ok(await run.page.run('OW.data.limit.pausedUntil > Date.now() + 60 * 1000'), 'a default back-off, not an instant retry');
+  } finally {
+    await run.close();
+  }
+});
+
+test('Canvas real data: reading a spec\'s extra comments leaves the kept board\'s detail as it was', async () => {
+  const run = await start();
+  try {
+    world(run);
+    wrap(run, 'SpecTickets', reply => {
+      const repository = structuredClone(reply.json.data.repository);
+      repository.s48.comments.totalCount = 2;
+      return { status: 200, json: { data: { ...reply.json.data, repository } } };
+    });
+    const at = ago(1);
+    run.world.github['GET /repos/acme/factory/issues/48/comments'] = () => ({ status: 200, json: [9480, 9481].map(id => ({ id, body: `note ${id}`,
+      html_url: `${URL_OF(48)}#issuecomment-${id}`, created_at: at, updated_at: at, user: BOT })) });
+    await openCanvas(run);
+    assert.equal(await run.page.run('OW.data.feeds.specs.data.specs.s48.comments.nodes.length'), 2, 'the board shows every comment');
+    assert.equal(await run.page.run('OW.data.feeds.specs.details.specs.get(48).detail.comments.nodes.length'), 1, 'the kept detail is unchanged');
+    assert.equal(await run.page.run('OW.data.feeds.specs.details.specs.get(48).detail.comments.totalCount'), 2);
+  } finally {
+    await run.close();
+  }
+});
