@@ -518,6 +518,14 @@ class Checks(unittest.TestCase):
                 (root / '_headers').read_text().replace('  ! Content-Security-Policy\n', '')),
             'missing /app/* Referrer-Policy detach': lambda root: (root / '_headers').write_text(
                 (root / '_headers').read_text().replace('  ! Referrer-Policy\n', '')),
+            'Turnstile allowed site-wide': lambda root: (root / '_headers').write_text(
+                (root / '_headers').read_text().replace("script-src 'self'; style-src 'self'; img-src 'self' data:", "script-src 'self' https://challenges.cloudflare.com; style-src 'self'; img-src 'self' data:", 1)),
+            'Turnstile allowed under /app/': lambda root: (root / '_headers').write_text(
+                (root / '_headers').read_text().replace("default-src 'none'; script-src 'self';", "default-src 'none'; script-src 'self' https://challenges.cloudflare.com;")),
+            'missing /faq/* Turnstile rule': lambda root: (root / '_headers').write_text(
+                re.sub(r'^/faq/\*\n(  .*\n)*', '', (root / '_headers').read_text(), flags=re.M)),
+            'Turnstile frame-src wider than its origin': lambda root: (root / '_headers').write_text(
+                (root / '_headers').read_text().replace('frame-src https://challenges.cloudflare.com;', 'frame-src https:;')),
             'missing security.txt Expires': lambda root: (root / '.well-known/security.txt').write_text(
                 re.sub(r'^Expires:.*\n', '', (root / '.well-known/security.txt').read_text(), flags=re.M)),
             'missing robots.txt Disallow': lambda root: (root / 'robots.txt').write_text('User-agent: *\nAllow: /\n'),

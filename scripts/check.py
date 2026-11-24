@@ -142,6 +142,10 @@ SITE_HEADERS = (
     'X-Content-Type-Options: nosniff',
     'Referrer-Policy: strict-origin-when-cross-origin',
 )
+# The pages that host Ask a Wiz may also load and frame Cloudflare Turnstile, and nothing else more; no other rule may.
+TURNSTILE_ORIGIN = 'https://challenges.cloudflare.com'
+ASK_CSP = SITE_CSP.replace("script-src 'self';", f"script-src 'self' {TURNSTILE_ORIGIN};").replace("frame-src 'none';", f"frame-src {TURNSTILE_ORIGIN};")
+ASK_PATHS = ('/', '/faq/*')
 APP_CSP = ("default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; media-src 'self'; font-src 'self'; "
            "connect-src 'self' https://api.github.com; manifest-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
 SECURITY_TXT = '.well-known/security.txt'
@@ -835,6 +839,12 @@ def check_site(root, registry=ROOT / 'market/registry.json'):
     site_lines = site_rule[1].splitlines()
     for header in SITE_HEADERS:
         assert f'  {header}' in site_lines, f'_headers /* must include {header}'
+    for path in ASK_PATHS:
+        rule = re.search(rf'^{re.escape(path)}\n((?:  .*\n?)*)', headers, re.M)
+        lines = rule[1].splitlines() if rule else []
+        assert lines == ['  ! Content-Security-Policy', f'  Content-Security-Policy: {ASK_CSP}'], \
+            f'_headers must detach the site CSP for {path} and allow only Turnstile on top of it'
+    assert headers.count(TURNSTILE_ORIGIN) == 2 * len(ASK_PATHS), 'only the Ask a Wiz pages may allow Turnstile'
     sec_rule = re.search(r'^/\.well-known/security\.txt\n((?:  .*\n?)*)', headers, re.M)
     assert sec_rule and '  Content-Type: text/plain; charset=utf-8' in sec_rule[1].splitlines(), \
         '_headers must serve /.well-known/security.txt as text/plain; charset=utf-8'

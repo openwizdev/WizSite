@@ -29,7 +29,7 @@ Changes merge after green CI and one review from the other model family. No per-
 
 ## Security headers
 
-`_headers` sets site-wide security headers under `/*` (HSTS, a strict Content-Security-Policy with no `'unsafe-inline'` or `'unsafe-eval'`, `X-Frame-Options: DENY`, `Permissions-Policy`, `Cross-Origin-Opener-Policy: same-origin`, `X-Content-Type-Options: nosniff`, and `Referrer-Policy: strict-origin-when-cross-origin`). Under `/app/*`, `! Content-Security-Policy` and `! Referrer-Policy` detach the site-wide values before setting the stricter app policy so Cloudflare Pages does not comma-join both headers.
+`_headers` sets site-wide security headers under `/*` (HSTS, a strict Content-Security-Policy with no `'unsafe-inline'` or `'unsafe-eval'`, `X-Frame-Options: DENY`, `Permissions-Policy`, `Cross-Origin-Opener-Policy: same-origin`, `X-Content-Type-Options: nosniff`, and `Referrer-Policy: strict-origin-when-cross-origin`). Under `/app/*`, `! Content-Security-Policy` and `! Referrer-Policy` detach the site-wide values before setting the stricter app policy so Cloudflare Pages does not comma-join both headers. The two pages that host Ask a Wiz, `/` and `/faq/*`, detach the site-wide CSP the same way and set it again with only `https://challenges.cloudflare.com` added to `script-src` and `frame-src`, for Turnstile; the check refuses that origin anywhere else, `/app/*` included.
 
 To verify the effective merged headers locally after `npm run build`:
 
