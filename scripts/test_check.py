@@ -1256,7 +1256,16 @@ class Checks(unittest.TestCase):
             sw.write_text('self.addEventListener("fetch", e => e.respondWith(fetch(e.request)));')
             with self.assertRaisesRegex(AssertionError, 'service worker|/api/'):
                 check_site(root)
+            sw.write_text(sw_raw.replace('book-shell-', 'book-shell-__BOOK_CACHE__', 1))
+            with self.assertRaisesRegex(AssertionError, 'cache'):
+                check_site(root)
             sw.write_text(sw_raw)
+            book_js = next(root.glob('book/book.*.js'))
+            book_js_raw = book_js.read_text()
+            edit_built(root, 'book/book.js', lambda _: 'function broken( {')
+            with self.assertRaisesRegex(AssertionError, 'syntax'):
+                check_site(root)
+            edit_built(root, 'book/book.js', lambda _: book_js_raw)
             headers = root / '_headers'
             headers_raw = headers.read_text()
             headers.write_text(headers_raw.replace('/book/*', '/book-disabled/*'))

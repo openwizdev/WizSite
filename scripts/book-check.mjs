@@ -345,9 +345,9 @@ async function runWidth(browser, srv, { name, width, height, shotsDir }) {
     srv.state.slotsMode = 'ok';
     srv.state.slotsDelayMs = 350;
     await browser.send('Page.navigate', { url: `${srv.origin}/book/` }, tab.sessionId);
-    await tab.waitFor('Boolean(document.querySelector("[data-state=\'loading\']"))');
-    const hasSkeleton = await tab.evalJs('Boolean(document.querySelector(".book-skeleton"))');
-    assert(hasSkeleton, `${name}: expected quiet loading skeleton`);
+    await tab.waitFor('Boolean(document.querySelector("[data-state=\'loading\']:not([hidden])"))');
+    const hasSkeleton = await tab.evalJs('Boolean(document.querySelector("[data-state=\'loading\']:not([hidden]) .book-skeleton"))');
+    assert(hasSkeleton, `${name}: expected visible quiet loading skeleton`);
     srv.state.slotsDelayMs = 0;
 
     await tab.waitFor('document.querySelectorAll(".book-slot").length > 0');
@@ -359,6 +359,7 @@ async function runWidth(browser, srv, { name, width, height, shotsDir }) {
       const slots = [...document.querySelectorAll('.book-slot')];
       const minHeight = Math.min(...slots.map(s => s.getBoundingClientRect().height));
       const tzText = document.querySelector('.book-tz')?.textContent || '';
+      const navTeamBg = getComputedStyle(document.querySelector('.nav-team')).backgroundColor;
       const overflow = document.documentElement.scrollWidth > window.innerWidth;
       return {
         dayCount: days.length,
@@ -368,16 +369,19 @@ async function runWidth(browser, srv, { name, width, height, shotsDir }) {
         slotCount: slots.length,
         minHeight,
         tzText,
+        navTeamBg,
         overflow,
       };
     })()`);
-    assert(pickerCheck.dayCount === 14, `${name}: expected 14 days, got ${pickerCheck.dayCount}`);
-    assert(pickerCheck.enabledCount === 3, `${name}: expected 3 enabled days, got ${pickerCheck.enabledCount}`);
-    assert(pickerCheck.disabledCount === 11, `${name}: expected 11 disabled days, got ${pickerCheck.disabledCount}`);
+    assert(pickerCheck.dayCount >= 14 && pickerCheck.dayCount <= 15, `${name}: expected 14 or 15 days, got ${pickerCheck.dayCount}`);
+    assert(pickerCheck.enabledCount === 4, `${name}: expected 4 enabled days (including 15th-day slot), got ${pickerCheck.enabledCount}`);
     assert(pickerCheck.firstEnabledSelected, `${name}: first day with free time should be selected`);
     assert(pickerCheck.slotCount === 4, `${name}: expected 4 slots on first day, got ${pickerCheck.slotCount}`);
     assert(pickerCheck.minHeight >= 44, `${name}: slot tap target too small: ${pickerCheck.minHeight}px`);
-    assert(pickerCheck.tzText.includes('America/New_York'), `${name}: time zone not named: ${pickerCheck.tzText}`);
+    assert(pickerCheck.tzText.includes('New York') && !pickerCheck.tzText.includes('America/New_York'),
+      `${name}: time zone should be friendly, not raw IANA: ${pickerCheck.tzText}`);
+    assert(pickerCheck.navTeamBg === 'rgba(0, 0, 0, 0)' || pickerCheck.navTeamBg === 'transparent',
+      `${name}: .nav-team should be a quiet link on /book, got bg ${pickerCheck.navTeamBg}`);
     assert(!pickerCheck.overflow, `${name}: horizontal overflow on picker`);
     await tab.shot(shotPath('picker'));
 
@@ -435,6 +439,23 @@ async function runWidth(browser, srv, { name, width, height, shotsDir }) {
     assert(!formOverflow, `${name}: horizontal overflow on form`);
     await tab.shot(shotPath('form'));
 
+    srv.state.bookMode = 'rate_limited';
+    await tab.evalJs('document.querySelector(".book-submit").scrollIntoView({ block: "end" }); document.querySelector(".book-submit").click();');
+    await tab.waitFor('Boolean(document.querySelector("#book-alert:not([hidden])"))');
+    const postErrorCheck = await tab.evalJs(`(() => {
+      const el = document.querySelector('#book-alert');
+      const r = el.getBoundingClientRect();
+      return {
+        focused: document.activeElement === el,
+        inView: r.top >= 0 && r.bottom <= window.innerHeight,
+        top: r.top,
+        bottom: r.bottom,
+        vh: window.innerHeight,
+      };
+    })()`);
+    assert(postErrorCheck.focused && postErrorCheck.inView,
+      `${name}: POST error alert must be focused and visible in viewport: ${JSON.stringify(postErrorCheck)}`);
+
     srv.state.bookMode = 'slot_taken';
     const callsBefore = srv.state.slotsCalls;
     await tab.evalJs('document.querySelector(".book-submit").click()');
@@ -462,12 +483,15 @@ async function runWidth(browser, srv, { name, width, height, shotsDir }) {
 
     const confirmCheck = await tab.evalJs(`(() => {
       const text = document.querySelector('.book-confirm').textContent;
+      const when = document.querySelector('#book-confirm-when')?.textContent || '';
       const icsBtn = document.querySelector('.book-ics');
       const overflow = document.documentElement.scrollWidth > window.innerWidth;
-      return { text, hasIcs: Boolean(icsBtn), overflow };
+      return { text, when, hasIcs: Boolean(icsBtn), overflow };
     })()`);
     assert(confirmCheck.text.includes('A confirmation is on its way to alex@example.com'),
       `${name}: missing confirmation email wording: ${confirmCheck.text}`);
+    assert(!confirmCheck.when.includes('America/New_York'),
+      `${name}: confirmation time should not include raw IANA zone: ${confirmCheck.when}`);
     assert(confirmCheck.hasIcs, `${name}: missing Add to calendar button`);
     assert(/install/i.test(confirmCheck.text), `${name}: missing install hint`);
     assert(!confirmCheck.overflow, `${name}: horizontal overflow on confirmation`);
@@ -489,6 +513,9 @@ async function runWidth(browser, srv, { name, width, height, shotsDir }) {
     })()`);
     assert(icsContent.includes('BEGIN:VCALENDAR') && icsContent.includes('BEGIN:VEVENT') && icsContent.includes('END:VCALENDAR'),
       `${name}: invalid .ics download: ${icsContent.slice(0, 120)}`);
+    for (const line of icsContent.split('\r\n')) {
+      assert(Buffer.byteLength(line, 'utf8') <= 75, `${name}: .ics line exceeds 75 octets (${Buffer.byteLength(line, 'utf8')}): ${line}`);
+    }
 
     srv.state.bookMode = 'skipped';
     await tab.goto(`${srv.origin}/book/`);
@@ -507,44 +534,47 @@ async function runWidth(browser, srv, { name, width, height, shotsDir }) {
 
     srv.state.slotsMode = 'empty';
     await tab.goto(`${srv.origin}/book/`);
-    await tab.waitFor('Boolean(document.querySelector("[data-state=\'empty\']"))');
+    await tab.waitFor('Boolean(document.querySelector("[data-state=\'empty\']:not([hidden])"))');
 
     srv.state.slotsMode = 'rate_limited';
     await tab.goto(`${srv.origin}/book/`);
-    await tab.waitFor('Boolean(document.querySelector("[data-state=\'rate_limited\']"))');
+    await tab.waitFor('Boolean(document.querySelector("[data-state=\'rate_limited\']:not([hidden])"))');
 
     srv.state.slotsMode = 'unavailable';
     await tab.goto(`${srv.origin}/book/`);
-    await tab.waitFor('Boolean(document.querySelector("[data-state=\'unavailable\']"))');
+    await tab.waitFor('Boolean(document.querySelector("[data-state=\'unavailable\']:not([hidden])"))');
     const unavailCheck = await tab.evalJs(`(() => {
-      const box = document.querySelector('[data-state="unavailable"]');
+      const box = document.querySelector('[data-state="unavailable"]:not([hidden])');
       const link = box?.querySelector('a[href="/team/"]');
       const mailto = document.querySelector('a[href^="mailto:"]');
+      const heading = box?.querySelector('h2')?.textContent?.trim() || '';
       const overflow = document.documentElement.scrollWidth > window.innerWidth;
-      return { hasTeamLink: Boolean(link), hasMailto: Boolean(mailto), overflow };
+      return { hasTeamLink: Boolean(link), hasMailto: Boolean(mailto), heading, overflow };
     })()`);
     assert(unavailCheck.hasTeamLink && !unavailCheck.hasMailto && !unavailCheck.overflow,
       `${name}: unavailable state check failed: ${JSON.stringify(unavailCheck)}`);
+    assert(unavailCheck.heading === 'Booking is closed right now',
+      `${name}: unexpected unavailable heading: ${unavailCheck.heading}`);
     await tab.shot(shotPath('unavailable'));
 
     srv.state.cancelPayloads.length = 0;
     await tab.goto(`${srv.origin}/book/?cancel=bk_demo01.tok_example99`);
-    await tab.waitFor('Boolean(document.querySelector("[data-state=\'cancel\']"))');
+    await tab.waitFor('Boolean(document.querySelector("[data-state=\'cancel\']:not([hidden])"))');
     const cancelCheck = await tab.evalJs(`(() => ({
       search: location.search,
-      text: document.querySelector('[data-state="cancel"]').textContent,
-      btnCount: document.querySelectorAll('[data-state="cancel"] button').length,
+      text: document.querySelector('[data-state="cancel"]:not([hidden])').textContent,
+      btnCount: document.querySelectorAll('[data-state="cancel"]:not([hidden]) button').length,
     }))()`);
     assert(cancelCheck.search === '', `${name}: cancel token was not stripped from URL: ${cancelCheck.search}`);
     assert(cancelCheck.text.includes('Cancel this call?') && cancelCheck.btnCount === 1,
       `${name}: cancel view mismatch: ${JSON.stringify(cancelCheck)}`);
-    await tab.evalJs('document.querySelector("[data-state=\'cancel\'] button").click()');
-    await tab.waitFor('Boolean(document.querySelector("[data-state=\'cancelled\']"))');
+    await tab.evalJs('document.querySelector("[data-state=\'cancel\']:not([hidden]) button").click()');
+    await tab.waitFor('Boolean(document.querySelector("[data-state=\'cancelled\']:not([hidden])"))');
     assert(srv.state.cancelPayloads.length === 1 && srv.state.cancelPayloads[0].id === 'bk_demo01' && srv.state.cancelPayloads[0].token === 'tok_example99',
       `${name}: unexpected cancel payload: ${JSON.stringify(srv.state.cancelPayloads)}`);
     const cancelledCheck = await tab.evalJs(`(() => ({
-      text: document.querySelector('[data-state="cancelled"]').textContent,
-      hasBookLink: Boolean(document.querySelector('[data-state="cancelled"] a[href="/book/"]')),
+      text: document.querySelector('[data-state="cancelled"]:not([hidden])').textContent,
+      hasBookLink: Boolean(document.querySelector('[data-state="cancelled"]:not([hidden]) a[href="/book/"]')),
     }))()`);
     assert(cancelledCheck.text.includes('Cancelled') && cancelledCheck.hasBookLink,
       `${name}: cancelled view mismatch: ${JSON.stringify(cancelledCheck)}`);
@@ -600,15 +630,50 @@ async function runPwaAndOffline(browser, srv) {
     })()`);
     assert(standaloneRule, 'standalone display-mode rule must hide .landing-nav and .landing-footer');
 
-    await browser.send('Network.emulateNetworkConditions', {
-      offline: true,
+    const setOffline = offline => browser.send('Network.emulateNetworkConditions', {
+      offline,
       latency: 0,
-      downloadThroughput: 0,
-      uploadThroughput: 0,
+      downloadThroughput: offline ? 0 : -1,
+      uploadThroughput: offline ? 0 : -1,
     }, tab.sessionId);
+
+    srv.state.bookMode = 'skipped';
+    await tab.evalJs(`(() => {
+      document.querySelector('.book-slot').click();
+      document.querySelector('#book-name').value = 'Drop Test';
+      document.querySelector('#book-email').value = 'drop@example.com';
+      document.querySelector('#book-team').value = 'Testing offline resilience.';
+      document.querySelector('.book-submit').click();
+    })()`);
+    await tab.waitFor('Boolean(document.querySelector("[data-state=\'confirmed\']:not([hidden])"))');
+    await setOffline(true);
+    await new Promise(r => setTimeout(r, 250));
+    const stillConfirmedOffline = await tab.evalJs('!document.querySelector("[data-state=\'confirmed\']").hidden && Boolean(document.querySelector(".book-ics"))');
+    assert(stillConfirmedOffline, 'brief offline drop wiped the confirmation view');
+    await setOffline(false);
+    await new Promise(r => setTimeout(r, 250));
+    const stillConfirmedOnline = await tab.evalJs('!document.querySelector("[data-state=\'confirmed\']").hidden && Boolean(document.querySelector(".book-ics"))');
+    assert(stillConfirmedOnline, 'reconnecting wiped the confirmation view');
+
+    srv.state.cancelPayloads.length = 0;
+    await tab.goto(`${srv.origin}/book/?cancel=bk_drop1.tok_keep99`);
+    await tab.waitFor('Boolean(document.querySelector("[data-state=\'cancel\']:not([hidden])"))');
+    await setOffline(true);
+    await new Promise(r => setTimeout(r, 200));
+    const stillCancelOnDrop = await tab.evalJs('!document.querySelector("[data-state=\'cancel\']").hidden');
+    assert(stillCancelOnDrop, 'brief offline drop wiped the cancel view');
+    await tab.evalJs('document.querySelector("[data-state=\'cancel\'] button").click()');
+    await tab.waitFor('Boolean(document.querySelector("[data-state=\'offline\']:not([hidden])"))');
+    await setOffline(false);
+    await tab.evalJs('document.querySelector("#book-offline-retry").click()');
+    await tab.waitFor('Boolean(document.querySelector("[data-state=\'cancelled\']:not([hidden])"))');
+    assert(srv.state.cancelPayloads.length === 1 && srv.state.cancelPayloads[0].id === 'bk_drop1' && srv.state.cancelPayloads[0].token === 'tok_keep99',
+      `offline cancel retry lost token: ${JSON.stringify(srv.state.cancelPayloads)}`);
+
+    await setOffline(true);
     await browser.send('Page.reload', {}, tab.sessionId);
-    await tab.waitFor('Boolean(document.querySelector("[data-state=\'offline\']"))');
-    const offlineText = await tab.evalJs('document.querySelector("[data-state=\'offline\']").textContent');
+    await tab.waitFor('Boolean(document.querySelector("[data-state=\'offline\']:not([hidden])"))');
+    const offlineText = await tab.evalJs('document.querySelector("[data-state=\'offline\']:not([hidden])").textContent');
     assert(/connection|offline/i.test(offlineText), `unexpected offline text: ${offlineText}`);
   } finally {
     await tab.close();
