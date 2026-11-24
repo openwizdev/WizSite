@@ -125,11 +125,11 @@ APP_PARTS = APP_FOUND['app/pages', 'js'] + APP_FOUND['app/cards', 'js']
 APP_PART_STYLES = APP_FOUND['app/pages', 'css'] + APP_FOUND['app/cards', 'css']
 APP_LEGACY_ORDER = ('app/pages/you.js', 'app/pages/specs.js', 'app/pages/spec.js', 'app/pages/agents.js')
 APP_NEEDED = set(APP_FOUND['app/pages', 'js'] + APP_FOUND['app/pages', 'css'])
-APP_SCRIPTS = ('app/data.js', 'app/ui.js') + APP_PARTS + ('app/palette.js', 'app/shell.js')
+APP_SCRIPTS = ('app/data.js', 'app/records.js', 'app/ui.js') + APP_PARTS + ('app/palette.js', 'app/shell.js')
 APP_VENDOR = {'app/vendor/dagre-3.1.3.min.js': ('node_modules/@dagrejs/dagre/dist/dagre.min.js', 'app/pages/spec.js'),
               'app/vendor/dagre-LICENSE.txt': ('node_modules/@dagrejs/dagre/LICENSE', None)}
 HASHED += (APP_STYLE,) + APP_PART_STYLES + APP_SCRIPTS
-APP_CSP = ("default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; "
+APP_CSP = ("default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; media-src 'self'; font-src 'self'; "
            "connect-src 'self' https://api.github.com; manifest-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
 
 
@@ -336,13 +336,18 @@ DRIVER_WALL = (
     ('codespaces', 'GitHub Codespaces', 'hosts', 'waiting', PR + '2559', None),
     ('devin', 'Devin', 'hosts', 'waiting', PR + '2490', 'devin.svg'),
     ('sprites', 'Fly Sprites', 'hosts', 'review', PR + '2720', None),
-    ('openhands', 'OpenHands Cloud', 'hosts', 'building', PR + '2567', 'openhands.svg'),
-    ('warp-oz', 'Warp Oz', 'hosts', 'building', PR + '2555', 'warp.svg'),
-    ('tembo', 'Tembo', 'hosts', 'building', PR + '2662', 'tembo.svg'),
-    ('capy', 'Capy', 'hosts', 'building', PR + '2652', 'capy.svg'),
-    ('ona', 'Ona', 'hosts', 'building', PR + '2699', 'ona.svg'),
+    ('openhands', 'OpenHands Cloud', 'hosts', 'review', PR + '2567', 'openhands.svg'),
+    ('warp-oz', 'Warp Oz', 'hosts', 'review', PR + '2555', 'warp.svg'),
+    ('tembo', 'Tembo', 'hosts', 'review', PR + '2662', 'tembo.svg'),
+    ('capy', 'Capy', 'hosts', 'review', PR + '2652', 'capy.svg'),
+    ('ona', 'Ona', 'hosts', 'review', PR + '2699', 'ona.svg'),
     ('opencomputer', 'OpenComputer', 'hosts', 'held', ISSUE + '2587', None),
     ('grok-bot', 'Grok Bot', 'hosts', 'parked', ISSUE + '2318', None),
+    ('amp', 'Amp', 'harnesses', 'waiting', PR + '2767', 'amp.svg'),
+    ('antigravity', 'Antigravity CLI', 'harnesses', 'waiting', PR + '2773', 'antigravity.svg'),
+    ('warp-local', 'Warp local agent', 'harnesses', 'waiting', PR + '2766', 'warp.svg'),
+    ('auggie', 'Augment Auggie', 'harnesses', 'waiting', PR + '2639', 'augment.svg'),
+    ('junie', 'JetBrains Junie', 'harnesses', 'waiting', PR + '2638', None),
     ('copilot', 'GitHub Copilot CLI', 'harnesses', 'review', PR + '2782', None),
     ('cursor-cli', 'Cursor CLI', 'harnesses', 'review', PR + '2778', 'cursor.svg'),
     ('gemini', 'Gemini CLI', 'harnesses', 'review', PR + '2776', 'gemini-cli.svg'),
@@ -350,15 +355,10 @@ DRIVER_WALL = (
     ('kimi', 'Kimi Code', 'harnesses', 'review', PR + '2785', 'kimi-code.svg'),
     ('pi', 'Pi', 'harnesses', 'review', PR + '2774', 'pi.svg'),
     ('qwen', 'Qwen Code', 'harnesses', 'review', PR + '2794', 'qwen-code.svg'),
-    ('amp', 'Amp', 'harnesses', 'building', PR + '2767', 'amp.svg'),
-    ('antigravity', 'Antigravity CLI', 'harnesses', 'building', PR + '2773', 'antigravity.svg'),
-    ('auggie', 'Augment Auggie', 'harnesses', 'building', PR + '2639', 'augment.svg'),
-    ('crush', 'Crush', 'harnesses', 'building', PR + '2649', 'crush.png'),
-    ('junie', 'JetBrains Junie', 'harnesses', 'building', PR + '2638', None),
-    ('kilo', 'Kilo Code', 'harnesses', 'building', PR + '2640', 'kilo-code.svg'),
-    ('kiro', 'Kiro', 'harnesses', 'building', PR + '2631', 'kiro.svg'),
-    ('vibe', 'Mistral Vibe', 'harnesses', 'building', PR + '2643', None),
-    ('warp-local', 'Warp local agent', 'harnesses', 'building', PR + '2766', 'warp.svg'),
+    ('kiro', 'Kiro', 'harnesses', 'review', PR + '2631', 'kiro.svg'),
+    ('crush', 'Crush', 'harnesses', 'review', PR + '2649', 'crush.png'),
+    ('kilo', 'Kilo Code', 'harnesses', 'review', PR + '2640', 'kilo-code.svg'),
+    ('vibe', 'Mistral Vibe', 'harnesses', 'review', PR + '2643', None),
     ('opencode', 'OpenCode', 'harnesses', 'planned', ISSUE + '2462', 'opencode.svg'),
     ('sculptor', 'Sculptor', 'harnesses', 'planned', ISSUE + '2540', 'sculptor.svg'),
     ('cline', 'Cline', 'harnesses', 'held', ISSUE + '2530', 'cline.svg'),
@@ -1682,7 +1682,7 @@ def check_app(root, names, pages):
         'the app must load each of its pages\' scripts once (and a card\'s at most once)'
     assert [name for name in shown if name in APP_LEGACY_ORDER] == list(APP_LEGACY_ORDER), \
         'the app must load You, Specs, Spec and Agents in that order: it sets the v1 pages\' order and default route'
-    ordered = ('app/data.js', 'app/ui.js', *shown, 'app/palette.js', 'app/shell.js')
+    ordered = ('app/data.js', 'app/records.js', 'app/ui.js', *shown, 'app/palette.js', 'app/shell.js')
     assert page.scripts == [ref for name in ordered for ref in [f'/{v}' for v, (_, before) in APP_VENDOR.items() if before == name] + [f'/{names[name]}']], \
         'the app must load its fingerprinted scripts (and each pinned file before its user) in order'
     assert not page.inline_scripts, 'the app allows no inline script'

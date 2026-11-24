@@ -27,79 +27,36 @@ function specsAnswer(specs) {
     repository: { issues: { totalCount: specs.length, nodes: specs }, youIssues: { totalCount: 0, nodes: [] }, fleet: { text: FLEET } } } };
 }
 
-async function served(page) {
-  const html = await readFile(new URL(`dist${page}`, ROOT), 'utf8');
-  return [...html.matchAll(/src="(\/app\/data\.[0-9a-f]{10}\.js)"/g)].map(m => m[1])[0];
-}
-
-async function queueWorld(run, { specs = SPECS, details, grillAnswers = grill.refreshes[0].github, cards = false } = {}) {
+async function queueWorld(run, { specs = SPECS, details, grillAnswers = grill.refreshes[0].github } = {}) {
   const world = run.world;
+  world.github['GET /user'] = () => ({ status: 200, json: { id: 5001, login: 'acme-owner' } });
   world.graphql.Specs = async () => ({ status: 200, json: specsAnswer(specs) });
   world.graphql.SpecTickets = async () => ({ status: 200, json: { data: { rateLimit: RATE, repository: details ?? {
     s60: detail(60, [comment(9100021, 60, recordBody(RECORD), '2030-01-05T00:00:00Z')]),
     s61: detail(61, [comment(9100022, 61, `[Watch the narrated spec](${VIDEO})\n\nComment here to steer: stop, reset, or anything else.`, '2030-01-04T01:00:00Z')]),
     s62: detail(62, []) } } } });
+  world.graphql.SpecEdit = async () => ({ status: 200, json: { data: { repository: { issue: { lastEditedAt: null } } } } });
   world.record(grillAnswers);
   world.github['GET /repos/acme/factory/issues/comments/9100021'] = () => ({ status: 200, json: { id: 9100021,
-    issue_url: 'https://api.github.com/repos/acme/factory/issues/60', user: { login: 'factory-bot[bot]', id: 5900 }, body: recordBody(RECORD) } });
+    issue_url: 'https://api.github.com/repos/acme/factory/issues/60', user: { login: 'factory-bot[bot]', id: 5900 },
+    body: recordBody(RECORD), created_at: '2030-01-05T00:00:00Z' } });
   world.github['GET /repos/acme/factory/issues/60'] = () => ({ status: 200, json: { number: 60, state: 'open', body: SPEC_BODY } });
-  const dataPath = await served('/app/index.html');
-  const real = await readFile(new URL('app/data.js', ROOT), 'utf8');
-  const exported = real.replace('auth, repo, feeds, limit, paused,', 'auth, repo, feeds, limit, paused, github, noteLimit,');
-  assert.notEqual(exported, real, 'the stub could not add github to OW.data');
-  const stub = `${exported}
-OW.records = (() => {
-  const mode = () => JSON.parse(localStorage.getItem('openwiz.app.v2'));
-  const kept = new Map();
-  const at = item => item.repository + '#' + item.subject.number + ':' + item.comment_id;
-  let clock = 1900000000000;
-  window.checks = {};
-  window.checked = [];
-  window.composed = [];
-  return {
-    enabled: () => ['on', 'dry-run'].includes(mode()),
-    dryRun: () => mode() === 'dry-run',
-    async check(item) {
-      window.checked.push(item.key);
-      const result = window.checks[item.comment_id] || 'matched';
-      if (result === 'throw') throw new Error('synthetic check failure');
-      clock += 1;
-      if (result !== 'matched') {
-        kept.delete(at(item));
-        return { result, checked_at: result === 'unchecked' ? null : clock };
-      }
-      const binding = { ref: 'synthetic', digest: 'd'.repeat(64) };
-      kept.set(at(item), { binding, checked_at: clock });
-      return { result, binding: { ...binding }, checked_at: clock };
-    },
-    async compose(action) {
-      const known = kept.get(at(action.item));
-      const refused = !known ? 'source_unchecked' : action.item.checked_at !== known.checked_at ? 'source_changed' : null;
-      window.composed.push({ key: action.item.key, form: action.form, words: action.words ?? null, refused });
-      if (refused) return { refused };
-      return { op: 'op-' + window.composed.length, form: action.form, body: 'Synthetic preview of ' + action.form + (action.words ? ': ' + action.words : ''),
-        repository: action.item.repository, subject: { ...action.item.subject }, url: action.item.url, visibility: 'public', confirms: 1, source: known.binding };
-    },
-    confirm: () => ({ confirmed: 0, of: 1 }),
-    async post(preview) { return { outcome: 'refused', op: preview.op, reason: mode() === 'dry-run' ? 'dry_run' : 'disabled' }; },
-    pending: () => [],
-  };
-})();
-${cards ? `window.drawn = [];
-OW.cards = { decision(item, el) { window.drawn.push(item); el.replaceChildren(Object.assign(document.createElement('p'), { textContent: 'Decision card ' + item.key })); },
-  spec(item, el) { window.drawn.push(item); el.replaceChildren(Object.assign(document.createElement('p'), { textContent: 'Spec card ' + item.key })); } };` : ''}`;
-  world.site[dataPath] = () => ({ status: 200, raw: Buffer.from(stub), type: 'js' });
 }
 
 const CARD = await readFile(new URL('app/cards/decision.js', ROOT), 'utf8');
-async function openQueue(run, value, { card = false } = {}) {
+const MOCK_CARDS = `window.drawn = [];
+OW.cards = { decision(item, el) { window.drawn.push(item); el.replaceChildren(Object.assign(document.createElement('p'), { textContent: 'Decision card ' + item.key })); },
+  spec(item, el) { window.drawn.push(item); el.replaceChildren(Object.assign(document.createElement('p'), { textContent: 'Spec card ' + item.key })); } };`;
+async function openQueue(run, value, { card = false, cards = false } = {}) {
   await run.page.go(`${SITE}/app/`);
   await run.page.until(`document.readyState === 'complete'`, 'the app page');
   await run.page.run(`localStorage.setItem('openwiz.app.v2', ${JSON.stringify(JSON.stringify(value))})`);
   await signIn(run.page);
+  if (cards) await run.page.run(MOCK_CARDS);
   if (card) await run.page.run(CARD);
   await run.page.click('acme/factory');
 }
+const wasChecked = (world, id) => world.log.some(r => r.method === 'GET' && r.path === `/repos/acme/factory/issues/comments/${id}`);
 const latestOf = (run, key) => run.page.run(`window.drawn.filter(item => item.key === ${JSON.stringify(key)}).pop() ?? null`);
 async function refreshed(run) {
   const was = await run.page.run('OW.data.feeds.specs.readAt');
@@ -121,8 +78,8 @@ const pullsRead = world => world.log.filter(r => r.path === '/repos/acme/factory
 test('switch on: decisions and specs show in one ordered queue, drawn through the card interface', async () => {
   const run = await start();
   try {
-    await queueWorld(run, { cards: true });
-    await openQueue(run, 'on');
+    await queueWorld(run);
+    await openQueue(run, 'on', { cards: true });
     await run.page.until(`location.hash === '#/queue' && document.querySelector('main h1').textContent === 'Queue'`, 'the queue opening first');
     await run.page.until(`window.drawn.length >= 5`, 'five cards');
     const drawn = await run.page.run('window.drawn');
@@ -204,11 +161,11 @@ test('a complete read with nothing waiting says exactly what was read', async ()
 test('switch off: no queue, no pull request read, the You page first and the signed-out copy unchanged', async () => {
   const run = await start();
   try {
-    await queueWorld(run, { cards: true });
+    await queueWorld(run);
     await run.page.go(`${SITE}/app/`);
     await run.page.until(`document.body.innerText.includes('Sign in with GitHub')`, 'the signed-out screen');
     assert.match(await run.page.text(), /Read-only, on the repositories you choose\./);
-    await openQueue(run, 'off');
+    await openQueue(run, 'off', { cards: true });
     await run.page.until(`document.querySelector('main h1')?.textContent === 'You'`, 'the You page');
     await run.page.go(`${SITE}/app/#/queue`);
     await run.page.until(`document.querySelector('main h1')?.textContent === 'You'`, 'the queue route falling back');
@@ -247,12 +204,11 @@ test('a failed refresh never keeps an earlier true: the item turns unchecked and
   const failed = JSON.parse(await readFile(new URL('tests/v2/fixtures/queue/grill-refresh-failed.json', ROOT), 'utf8'));
   const run = await start();
   try {
-    await queueWorld(run, { specs: [], details: {}, grillAnswers: failed.refreshes[0].github, cards: true });
-    await openQueue(run, 'on');
+    await queueWorld(run, { specs: [], details: {}, grillAnswers: failed.refreshes[0].github });
+    await openQueue(run, 'on', { cards: true });
     await run.page.until(`window.drawn.some(item => item.key === 'decision:acme/factory#7:9100003' && item.current === true)`, 'the first, matched read');
     assert.ok(!(await run.page.text()).includes('may be missing'));
     run.world.record(failed.refreshes[1].github);
-    await run.page.run(`window.checks[9100003] = 'unchecked'`);
     await run.page.click('Refresh now');
     await run.page.until(`window.drawn.some(item => item.key === 'decision:acme/factory#7:9100003' && item.current === null)`, 'the refreshed, unchecked item');
     const last = (await run.page.run('window.drawn')).filter(item => item.key === 'decision:acme/factory#7:9100003').pop();
@@ -266,18 +222,16 @@ test('a failed refresh never keeps an earlier true: the item turns unchecked and
 test('R1: the queue registers its check through OW.records.check, so a current decision composes', async () => {
   const run = await start();
   try {
-    await queueWorld(run, { cards: false });
+    await queueWorld(run);
     await openQueue(run, 'dry-run', { card: true });
     await run.page.until(`document.querySelectorAll('article.decision').length >= 2`, 'the decision cards');
-    assert.ok((await run.page.run('window.checked')).includes(SPEC_DECISION), 'the queue never called OW.records.check');
+    assert.ok(wasChecked(run.world, 9100021), 'the queue never checked the spec decision through OW.records.check');
+    assert.ok(wasChecked(run.world, 9100003), 'the queue never checked the grill decision through OW.records.check');
     const yes = await run.page.run(`(() => { const card = document.querySelector('article.decision[data-key="${SPEC_DECISION}"]');
       const b = [...card.querySelectorAll('button')].find(b => b.textContent === 'Yes'); b.scrollIntoView({ block: 'center' }); return !b.disabled; })()`);
     assert.ok(yes, 'the current decision offers no Yes');
     await run.page.tap('Yes');
-    await run.page.until(`window.composed.length === 1`, 'one compose');
-    const [composed] = await run.page.run('window.composed');
-    assert.deepEqual(composed, { key: SPEC_DECISION, form: 'decision.yes', words: null, refused: null }, 'the answer preview was refused');
-    await run.page.until(`document.body.innerText.includes('Synthetic preview of decision.yes')`, 'the preview');
+    await run.page.until(`document.body.innerText.includes('openwiz decision answer v1') && document.body.innerText.includes('confirm spec #60')`, 'the real preview');
     assert.deepEqual(run.world.writes(), []);
     assert.deepEqual(run.world.violations, []);
   } finally {
@@ -288,10 +242,11 @@ test('R1: the queue registers its check through OW.records.check, so a current d
 test('R1: a check OW.records answers unchecked, or that throws, leaves the item unchecked with a gap', async () => {
   const run = await start();
   try {
-    await queueWorld(run, { cards: true });
-    await openQueue(run, 'on');
+    await queueWorld(run);
+    await openQueue(run, 'on', { cards: true });
     await run.page.until(`window.drawn.some(item => item.key === ${JSON.stringify(ROUND)} && item.current === true)`, 'the first, matched read');
-    await run.page.run(`window.checks[9100003] = 'throw'; window.checks[9100021] = 'changed'`);
+    run.world.record({ 'GET /repos/acme/factory/pulls/7': { status: 502, json: { message: 'Bad Gateway' } } });
+    run.world.graphql.SpecEdit = async () => ({ status: 200, json: { data: { repository: { issue: { lastEditedAt: '2030-01-06T00:00:00Z' } } } } });
     await refreshed(run);
     assert.match(await run.page.text(), /GitHub gave only part of #7's source check/);
     const round = await latestOf(run, ROUND);
@@ -299,6 +254,12 @@ test('R1: a check OW.records answers unchecked, or that throws, leaves the item 
     assert.equal(round.checked_at, null);
     const keys = await run.page.run(`[...document.querySelectorAll('.queue-item')].map(el => el.dataset.key)`);
     assert.ok(keys.includes(ROUND) && !keys.includes(SPEC_DECISION), `a changed source still shows its card: ${keys}`);
+    await run.page.run(`OW.records = { ...OW.records, check: async () => { throw new Error('synthetic check failure'); } }`);
+    await refreshed(run);
+    assert.match(await run.page.text(), /GitHub gave only part of #60's source check, #7's source check/);
+    const thrown = await latestOf(run, ROUND);
+    assert.equal(thrown.current, null);
+    assert.equal(thrown.checked_at, null);
   } finally {
     await run.close();
   }
@@ -307,8 +268,8 @@ test('R1: a check OW.records answers unchecked, or that throws, leaves the item 
 test('R2: a failed Specs refresh clears every earlier true and shows the gap', async () => {
   const run = await start();
   try {
-    await queueWorld(run, { cards: true });
-    await openQueue(run, 'on');
+    await queueWorld(run);
+    await openQueue(run, 'on', { cards: true });
     await run.page.until(`window.drawn.some(item => item.key === ${JSON.stringify(SPEC_DECISION)} && item.current === true)`
       + ` && window.drawn.some(item => item.key === ${JSON.stringify(ROUND)} && item.current === true)`, 'the first, matched read');
     run.world.graphql.Specs = async () => ({ status: 502, json: { message: 'Bad Gateway' } });
@@ -345,12 +306,12 @@ test('R2: a first Specs read with GraphQL errors and no nodes shows a gap, never
 test('R2: a Specs read with GraphQL errors makes no spec decision current', async () => {
   const run = await start();
   try {
-    await queueWorld(run, { cards: true });
+    await queueWorld(run);
     run.world.graphql.Specs = async () => ({ status: 200, json: { ...specsAnswer(SPECS), errors: [{ message: 'synthetic', path: ['specSearch'] }] } });
-    await openQueue(run, 'on');
+    await openQueue(run, 'on', { cards: true });
     await run.page.until(`window.drawn.some(item => item.key === ${JSON.stringify(SPEC_DECISION)})`, 'the spec decision');
     assert.equal((await latestOf(run, SPEC_DECISION)).current, null);
-    assert.ok(!(await run.page.run('window.checked')).includes(SPEC_DECISION), 'a partial spec read was source checked');
+    assert.ok(!wasChecked(run.world, 9100021), 'a partial spec read was source checked');
   } finally {
     await run.close();
   }
@@ -360,14 +321,14 @@ test('R3: a later page of the pull request list that fails leaves page one\'s gr
   const run = await start();
   try {
     const first = grill.refreshes[0].github;
-    await queueWorld(run, { cards: true, grillAnswers: { ...first, [pageOne]: { ...first[pageOne], next: true },
+    await queueWorld(run, { grillAnswers: { ...first, [pageOne]: { ...first[pageOne], next: true },
       'GET /repos/acme/factory/pulls?state=open&per_page=100&page=2': { status: 502, json: { message: 'Bad Gateway' } } } });
-    await openQueue(run, 'on');
+    await openQueue(run, 'on', { cards: true });
     await run.page.until(`window.drawn.some(item => item.key === ${JSON.stringify(ROUND)})`, 'the grill round');
     await run.page.until(`document.body.innerText.includes('may be missing items')`, 'the gap line');
     const round = await latestOf(run, ROUND);
     assert.deepEqual({ current: round.current, checked_at: round.checked_at }, { current: null, checked_at: null }, 'a partial pull list made a grill current');
-    assert.ok(!(await run.page.run('window.checked')).includes(ROUND));
+    assert.ok(!wasChecked(run.world, 9100003));
     assert.match(await run.page.text(), /GitHub gave only part of the open pull requests/);
   } finally {
     await run.close();
@@ -377,18 +338,21 @@ test('R3: a later page of the pull request list that fails leaves page one\'s gr
 test('R4: a later record in the same second supersedes the earlier one, by comment id', async () => {
   const run = await start();
   try {
+    let newer;
     const answers = withComments(list => {
       const older = list.find(c => c.id === 9100003);
-      const newer = withRecord({ ...older, id: 9100009, html_url: older.html_url.replace('9100003', '9100009') }, { ...recordIn(older), id: 'gr_notes_3' });
+      newer = withRecord({ ...older, id: 9100009, html_url: older.html_url.replace('9100003', '9100009') }, { ...recordIn(older), id: 'gr_notes_3' });
       return [newer, ...list];
     });
-    await queueWorld(run, { cards: true, grillAnswers: answers });
-    await openQueue(run, 'on');
+    answers['GET /repos/acme/factory/issues/comments/9100009'] = { status: 200, json: newer };
+    await queueWorld(run, { grillAnswers: answers });
+    await openQueue(run, 'on', { cards: true });
     await run.page.until(`window.drawn.some(item => item.key === 'decision:acme/factory#7:9100009')`, 'the newer request');
     const current = {};
     for (const id of [9100003, 9100009]) current[id] = (await latestOf(run, `decision:acme/factory#7:${id}`))?.current ?? 'not drawn';
     assert.deepEqual(current, { 9100003: 'not drawn', 9100009: true }, 'two requests of one grill file are current');
-    assert.ok(!(await run.page.run('window.checked')).includes(ROUND), 'the superseded request was checked');
+    assert.ok(!wasChecked(run.world, 9100003), 'the superseded request was checked');
+    assert.ok(wasChecked(run.world, 9100009), 'the newer request was not checked');
   } finally {
     await run.close();
   }
@@ -408,9 +372,8 @@ test('R5: a successful recheck of the same decision keeps the typed draft, and t
     await run.page.run(`(() => { const card = document.querySelector('article.decision[data-key="${SPEC_DECISION}"]');
       [...card.querySelectorAll('button')].find(b => b.textContent === 'Preview reply').scrollIntoView({ block: 'center' }); })()`);
     await run.page.tap('Preview reply');
-    await run.page.until(`window.composed.length === 1`, 'one compose');
-    assert.deepEqual((await run.page.run('window.composed'))[0],
-      { key: SPEC_DECISION, form: 'decision.own', words: 'Keep it, but later', refused: null }, 'the kept card composed with an old check');
+    await run.page.until(`document.body.innerText.includes('openwiz decision answer v1') && document.body.innerText.includes('Keep it, but later')`, 'the composed preview');
+    assert.deepEqual(run.world.writes(), []);
   } finally {
     await run.close();
   }
@@ -426,15 +389,15 @@ for (const [name, id] of [['an object with a string toString', { toString: 'N2' 
         record.questions[1].id = id;
         return withRecord(c, record);
       }));
-      await queueWorld(run, { cards: true, grillAnswers: answers });
-      await openQueue(run, 'on');
+      await queueWorld(run, { grillAnswers: answers });
+      await openQueue(run, 'on', { cards: true });
       await run.page.until(`document.querySelector('.queue-item') || document.body.innerText.includes('may be missing')`, 'the queue');
       await new Promise(resolve => setTimeout(resolve, 700));
       const keys = await run.page.run(`[...document.querySelectorAll('.queue-item')].map(el => el.dataset.key)`);
       assert.deepEqual(keys, [SPEC_DECISION, ROUND, 'decision:acme/factory#7:9100005', 'spec:acme/factory#61', 'spec:acme/factory#60']);
       const round = await latestOf(run, ROUND);
       assert.equal(round.request, null, 'a non-string question id passed validation');
-      assert.ok(!(await run.page.run('window.checked')).includes(ROUND), 'a malformed record was source checked');
+      assert.ok(!wasChecked(run.world, 9100003), 'a malformed record was source checked');
       assert.ok(!(await run.page.text()).includes('may be missing'), 'a malformed record made a gap');
     } finally {
       await run.close();

@@ -1,12 +1,12 @@
 {
   "name": "OpenWiz Viewer",
   "url": "https://openwiz.dev/",
-  "description": "Shows your OpenWiz factory at openwiz.dev/app: what needs you, every spec's ticket graph and the agents at work. Read-only, on the repositories you pick.",
+  "description": "Shows your OpenWiz factory at openwiz.dev/app: what needs you, every spec's ticket graph and the agents at work. On the repositories you pick it reads, and it posts only the answer and steer comments you confirm.",
   "public": true,
   "callback_urls": ["https://openwiz.dev/app"],
   "request_oauth_on_install": false,
   "setup_url": "https://openwiz.dev/app",
   "hook_attributes": { "url": "https://openwiz.dev/", "active": false },
-  "default_permissions": { "metadata": "read", "issues": "read", "pull_requests": "read" },
+  "default_permissions": { "metadata": "read", "issues": "write", "pull_requests": "read" },
   "default_events": []
 }
