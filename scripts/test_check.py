@@ -9,6 +9,8 @@ from unittest import mock
 
 import re
 
+from test_changelog import FIXTURES, fixture
+
 from check import FAQ, FAQ_WHERE, FOOTER, INSTALL_NOTE_HTML, FINGERPRINTS, HASHED, INSTALL_SWITCH, ROOT, Page, check_changelog, check_release_data, check_releases, read_releases, split_releases, check_motion, check_privacy, check_ref, check_site, check_vector, check_webp, fingerprint
 
 
@@ -28,22 +30,8 @@ LANDING = ('<html><head><title>OpenWiz</title></head><body><header><nav><a href=
            '<main><h1>Bring your own everything.</h1></main><footer><a href="/changelog/">Changelog</a></footer></body></html>')
 CHANGELOG = ('<html><head><title>Changelog — OpenWiz</title><style>.release{color:red}</style></head><body><main id="main">'
              '<h1>Changelog</h1><p class="lead">What each public release lets you do.</p></main></body></html>')
-DATA = {
-    '0.01.json': {'name': '0.01', 'semver': '0.1.2', 'date': '2031-01-02', 'headline': 'One thing.',
-                  'bullets': ['First line.', 'Second line.'], 'notes': 'https://github.com/openwizdev/OpenWiz/releases/tag/v0.1.2'},
-    '0.02.json': {'name': '0.02', 'semver': '0.1.10', 'date': '2031-02-03', 'headline': 'Two things.',
-                  'bullets': ['A <b> line & more.', 'Another.', 'Costs $$ and keeps $& as typed.'], 'notes': 'https://github.com/openwizdev/OpenWiz/releases/tag/v0.1.10'},
-}
-ENTRY = ('<article class="release" aria-labelledby="v{id}"><h2 id="v{id}">{name} <small>· <time datetime="{date}">{day}</time> ({semver})</small></h2>'
-         '<p class="headline">{headline}</p><ul>{bullets}</ul><p class="notes"><a href="{notes}">Full notes on GitHub</a></p></article>')
-PRE = 'https://github.com/openwizdev/OpenWiz/releases'
-LIVE = ('<section class="releases" aria-label="Releases">'
-        + ENTRY.format(id='0-02', name='0.02', date='2031-02-03', day='Feb 3, 2031', semver='0.1.10', headline='Two things.',
-                       bullets='<li>A &lt;b&gt; line &amp; more.</li><li>Another.</li><li>Costs $$ and keeps $&amp; as typed.</li>', notes=DATA['0.02.json']['notes'])
-        + ENTRY.format(id='0-01', name='0.01', date='2031-01-02', day='Jan 2, 2031', semver='0.1.2', headline='One thing.',
-                       bullets='<li>First line.</li><li>Second line.</li>', notes=DATA['0.01.json']['notes'])
-        + f'<p class="pre">Earlier pre-releases are on <a href="{PRE}">GitHub</a>.</p></section>')
-SOON = f'<section class="releases" aria-label="Releases"><p class="pre">No public release yet. The pre-releases are on <a href="{PRE}">GitHub</a>.</p></section>'
+DATA = read_releases(FIXTURES / 'two')
+SNAPSHOT = json.loads((FIXTURES / 'stats.json').read_text())
 
 
 def with_switch(state):
@@ -281,6 +269,9 @@ class Checks(unittest.TestCase):
                 ({'name': 'v1'}, 'names the file'),
                 ({'semver': '0.0.17', 'notes': 'https://github.com/openwizdev/OpenWiz/releases/tag/v0.0.17'}, 'from 0.1.0'),
                 ({'date': 'Nov 21'}, 'YYYY-MM-DD'),
+                ({'product': 'WizSite'}, 'unknown product'),
+                ({'published': '2031-02-03T10:44:00+01:00'}, 'UTC'),
+                ({'published': '2031-02-03T24:00:00Z'}, 'invalid date or published time'),
                 ({'bullets': 'One line.'}, 'bullets a list'),
                 ({'extra': 'x'}, 'unexpected fields')):
             with self.subTest(error=error), self.assertRaisesRegex(AssertionError, error):
@@ -292,7 +283,9 @@ class Checks(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             folder = Path(temp)
             for name, data in DATA.items():
-                (folder / name).write_text(json.dumps(data))
+                path = folder / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(json.dumps(data))
             self.assertEqual(read_releases(folder), DATA)
             (folder / '0.03.json').write_text(json.dumps({**one, 'name': '0.03'}))
             with self.assertRaisesRegex(AssertionError, 'each release once'):
@@ -307,40 +300,49 @@ class Checks(unittest.TestCase):
         read_releases()
 
     def test_generated_releases(self):
-        page = CHANGELOG.replace('</main>', '<!-- releases:start -->' + LIVE + '<!-- releases:end --></main>')
-        self.assertEqual(split_releases(page), (CHANGELOG, LIVE))
-        check_releases(LIVE, DATA, True)
-        check_releases(SOON, DATA, False)
-        check_releases(SOON, {}, True)
+        live = fixture('live')
+        soon = fixture('coming-soon')
+        page = CHANGELOG.replace('</main>', '<!-- releases:start -->' + live + '<!-- releases:end --></main>')
+        self.assertEqual(split_releases(page), (CHANGELOG, live))
+        check_releases(live, DATA, True, SNAPSHOT)
+        check_releases(soon, DATA, False, SNAPSHOT)
         for built in (CHANGELOG, page.replace('</main>', '</main><!-- releases:start --><!-- releases:end -->'),
                       page.replace('<!-- releases:end --></main>', '<!-- releases:end --><p>after</p></main>')):
             with self.subTest(built=built[-80:]), self.assertRaises(AssertionError):
                 split_releases(built)
-        first, second = LIVE.removeprefix('<section class="releases" aria-label="Releases">').split('</article>')[:2]
-        for section, live, error in (
-                (LIVE, False, 'entries shown'),
-                (SOON, True, 'entries shown'),
-                (SOON.replace('No public release yet.', 'OpenWiz 0.01 is coming.'), False, 'no release version'),
-                (SOON.replace('No public release yet.', 'Nov 21, 2026.'), False, 'no release version'),
-                (LIVE.replace(first + '</article>', ''), True, 'entries shown'),
-                (LIVE.replace(second + '</article>', second + '</article>' + second + '</article>'), True, 'entries shown'),
-                (LIVE.replace(first + '</article>', '').replace(second + '</article>', second + '</article>' + first + '</article>'), True, 'newest first'),
-                (LIVE.replace('(0.1.10)', '(0.1.11)'), True, 'newest first'),
-                (LIVE.replace('Feb 3, 2031', 'Feb 4, 2031'), True, 'newest first'),
-                (LIVE.replace('datetime="2031-02-03"', 'datetime="2031-02-04"'), True, "entry's date"),
-                (LIVE.replace('Two things.', 'Two things!'), True, "entry's headline"),
-                (LIVE.replace('<li>Another.</li>', ''), True, "entry's bullets"),
-                (LIVE.replace('<li>Another.</li>', '<li>Another.</li><li>Extra.</li>'), True, "entry's bullets"),
-                (LIVE.replace('Full notes on GitHub</a>', 'Full notes</a> <a href="/">here</a>'), True, 'one link'),
-                (LIVE.replace(DATA['0.02.json']['notes'], PRE), True, 'one link'),
-                (LIVE.replace('<p class="pre">Earlier pre-releases are on <a href="' + PRE + '">GitHub</a>.</p>', ''), True, 'pre-releases'),
-                (LIVE.replace(f'<a href="{PRE}">', '<a href="https://github.com/openwizdev/OpenWiz">'), True, 'pre-releases'),
-                (LIVE.replace('<li>Another.</li>', '<li><script>x</script></li>'), True, 'unexpected element'),
-                (LIVE.replace('<li>Another.</li>', '<li><img src="/x.png"></li>'), True, 'unexpected element'),
-                (LIVE.replace('<p class="headline">', '<p class="headline" onclick="x()">'), True, 'unexpected attribute'),
-                (LIVE.replace('<section class="releases" aria-label="Releases">', '<section class="releases">'), True, 'one Releases section')):
-            with self.subTest(error=error, live=live), self.assertRaisesRegex(AssertionError, error):
-                check_releases(section, DATA, live)
+        first, second = live.split('<article', 2)[1:]
+        first = '<article' + first
+        second = '<article' + second.split('</article>')[0] + '</article>'
+        for section, state, error in (
+                (live, False, 'entries shown'),
+                (soon, True, 'entries shown'),
+                (live.replace(first, ''), True, 'entries shown'),
+                (live.replace(first + second, second + first), True, 'newest first'),
+                (live.replace(' UTC</time> · v0.1.10', ' UTC</time> · v0.1.11'), True, 'UTC and the tag'),
+                (live.replace('Feb 3, 2031', 'Feb 4, 2031'), True, 'UTC and the tag'),
+                (live.replace('datetime="2031-02-03T10:44:00Z"', 'datetime="2031-02-04T10:44:00Z"'), True, "entry's date"),
+                (live.replace('One thing.', 'One thing!'), True, "entry's headline"),
+                (live.replace('<li>Another.</li>', ''), True, "entry's bullets"),
+                (live.replace('<li>Another.</li>', '<li>Another.</li><li>Extra.</li>'), True, "entry's bullets"),
+                (live.replace('Full notes on GitHub</a>', 'Full notes</a> <a href="/">here</a>'), True, 'one link'),
+                (live.replace(DATA['0.02.json']['notes'], DATA['0.01.json']['notes']), True, 'one link'),
+                (live.replace('Earlier OpenWiz pre-releases', 'Pre-releases'), True, 'pre-releases'),
+                (live.replace('<li>Another.</li>', '<li><script>x</script></li>'), True, 'unexpected element'),
+                (live.replace('<li>Another.</li>', '<li><img src="/x.png"></li>'), True, 'unexpected element'),
+                (live.replace('<p class="headline">', '<p class="headline" onclick="x()">'), True, 'unexpected attribute'),
+                (live.replace(' aria-label="Releases"', ''), True, 'one Releases section'),
+                (live.replace('>−0<', '>0<'), True, 'stats with signs'),
+                (live.replace('238,607 lines added', '238,606 lines added'), True, 'accessible line counts'),
+                (live.replace('<dd>250</dd>', '<dd>251</dd>'), True, 'match the snapshot')):
+            with self.subTest(error=error, live=state), self.assertRaisesRegex(AssertionError, error):
+                check_releases(section, DATA, state, SNAPSHOT)
+
+    def test_every_shown_release_needs_snapshot_stats_even_on_a_live_build(self):
+        missing_openwiz = {'products': {'WizSkills': SNAPSHOT['products']['WizSkills']}}
+        check_releases(fixture('coming-soon'), DATA, False, missing_openwiz)
+        live = fixture('live').replace('data-stats-source="snapshot"', 'data-stats-source="live"')
+        with self.assertRaisesRegex(AssertionError, 'OpenWiz v0.1.2: missing from changelog/stats.json'):
+            check_releases(live, DATA, True, missing_openwiz)
 
     def test_landing_starts_in_still_mode(self):
         for change, error in (

@@ -1,0 +1,13 @@
+{
+  "product": "WizSkills",
+  "name": "0.4.1",
+  "semver": "0.4.1",
+  "date": "2026-11-22",
+  "published": "2026-11-23T00:11:35Z",
+  "headline": "Connect to GitHub with your own login when you install without Cloudroom.",
+  "bullets": [
+    "You can still choose the GitHub App. Setup recommends it when you use Cloudroom.",
+    "Restarting setup keeps the installer from the release you picked."
+  ],
+  "notes": "https://github.com/openwizdev/WizSkills/releases/tag/v0.4.1"
+}

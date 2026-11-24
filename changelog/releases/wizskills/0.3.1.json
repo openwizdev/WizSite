@@ -1,0 +1,13 @@
+{
+  "product": "WizSkills",
+  "name": "0.3.1",
+  "semver": "0.3.1",
+  "date": "2026-11-22",
+  "published": "2026-11-22T09:43:59Z",
+  "headline": "Install OpenWiz 0.1.0 without Cloudroom.",
+  "bullets": [
+    "Set up OpenWiz without connecting a Cloudroom project.",
+    "Review all clashes with your existing skills and resolve them with one confirmation."
+  ],
+  "notes": "https://github.com/openwizdev/WizSkills/releases/tag/v0.3.1"
+}

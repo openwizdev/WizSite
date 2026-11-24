@@ -1,0 +1,14 @@
+{
+  "product": "WizSkills",
+  "name": "0.3.0",
+  "semver": "0.3.0",
+  "date": "2026-11-20",
+  "published": "2026-11-20T23:44:23Z",
+  "headline": "Keep clearer records as agents build and review work.",
+  "bullets": [
+    "Reviews flag comments that hide warnings or describe a workaround the code should fix.",
+    "Progress reports can name the exact version of each skill in use.",
+    "Installed skills take up less space by leaving out old test captures."
+  ],
+  "notes": "https://github.com/openwizdev/WizSkills/releases/tag/v0.3.0"
+}

@@ -1,0 +1,14 @@
+{
+  "product": "WizSkills",
+  "name": "0.4.0",
+  "semver": "0.4.0",
+  "date": "2026-11-22",
+  "published": "2026-11-22T20:21:40Z",
+  "headline": "Choose where agents run and try two new tools.",
+  "bullets": [
+    "Run your first team of agents on this computer, on boat.dev, or in Cloudroom.",
+    "Create your own OpenWiz driver and test it before you choose whether to share it.",
+    "Preview a feedback report and approve it before your agent posts it publicly."
+  ],
+  "notes": "https://github.com/openwizdev/WizSkills/releases/tag/v0.4.0"
+}

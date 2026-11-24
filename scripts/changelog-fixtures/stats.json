@@ -1,0 +1,30 @@
+{
+  "time": "2031-02-03T12:01:00Z",
+  "products": {
+    "OpenWiz": {
+      "v0.1.2": {
+        "prev": null,
+        "prs": 250,
+        "commits": 1716,
+        "added": 238607,
+        "removed": 0
+      },
+      "v0.1.10": {
+        "prev": "v0.1.2",
+        "prs": 2,
+        "commits": 9,
+        "added": 55,
+        "removed": 5
+      }
+    },
+    "WizSkills": {
+      "v0.1.2": {
+        "prev": null,
+        "prs": 250,
+        "commits": 1716,
+        "added": 238607,
+        "removed": 0
+      }
+    }
+  }
+}

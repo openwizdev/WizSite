@@ -1,0 +1,13 @@
+{
+  "product": "WizSkills",
+  "name": "0.1.1",
+  "semver": "0.1.1",
+  "date": "2026-11-16",
+  "published": "2026-11-17T00:55:46Z",
+  "headline": "See how agents settle review questions before a change ships.",
+  "bullets": [
+    "Builders record decisions on the pull request so you can follow their reasoning.",
+    "Reviewers turn remaining blockers into follow-up issues or leave decisions for you."
+  ],
+  "notes": "https://github.com/openwizdev/WizSkills/releases/tag/v0.1.1"
+}
