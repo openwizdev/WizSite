@@ -26,7 +26,7 @@ html[data-v2='1'] {
 }
 
 html[data-v2='1'] body { font-size: 15px; line-height: 1.5; }
-html[data-v2='1'] [hidden] { display: none; }
+html[data-v2='1'] [hidden] { display: none !important; }
 html[data-v2='1'] :focus-visible { outline-color: var(--v2-blue); outline-offset: 3px; }
 html[data-v2='1'] .v2-backdrop,
 html[data-v2='1'] .v2-veil { position: fixed; inset: 0; pointer-events: none; }

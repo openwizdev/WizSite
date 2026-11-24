@@ -64,6 +64,7 @@ test('demo: complete the sample walkthrough, preserve drafts, and make zero API 
     await run.page.tap('At month end');
     await run.page.tap('Accept all 3');
     await run.page.until(`location.hash === '#/feed' && document.querySelector('.v2-card-title')?.textContent === 'Usage-based seat billing'`, 'accepted answers open the resulting spec');
+    assert.equal(await run.page.run(`document.querySelector('.v2-toast button').offsetParent`), null);
     await run.page.tap('Chat');
     await run.page.until(`document.querySelector('.v2-composer input')`, 'return to Chat');
     assert.equal(await run.page.run(`document.querySelector('.v2-composer input').value`), 'Keep my draft');
@@ -142,6 +143,7 @@ test('real v2 Settings works when Specs is unknown and the palette only offers l
     await run.page.until(`document.querySelector('.v2-panel .repo') && OW.data.feeds.specs.state === 'unknown'`, 'settings with a failed Specs read');
     assert.match(await run.page.text(), /Coming soon/);
     assert.match(await run.page.text(), /Sign out/);
+    assert.doesNotMatch(await run.page.text(), /Refresh now/);
     assert.doesNotMatch(await run.page.text(), /Balanced|0\.02|Local computer|Agents/);
     await run.page.key('k', 'Ctrl');
     await run.page.until(`OW.palette.shown()`, 'command palette');
