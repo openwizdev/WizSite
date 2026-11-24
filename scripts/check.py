@@ -1167,7 +1167,7 @@ def sentences(text):
 
 INSTALL_LINE = 'Install OpenWiz from github.com/openwizdev/OpenWiz'
 INSTALL_HINT = 'Paste this into your agent'
-INSTALL_BUTTON = 'Copy · coming soon'
+INSTALL_BUTTON = {'coming-soon': 'Copy · coming soon', 'live': 'Copy'}
 INSTALL_SWITCH = ('coming-soon', 'live')
 INSTALL_VERSION = 'OpenWiz 0.01 0.1.0'
 
@@ -1188,7 +1188,8 @@ def check_install(landing, page):
     hints = re.findall(r'<p class="install-hint">([\s\S]*?)</p>', box)
     assert [flat(h) for h in hints] == [INSTALL_HINT], f'the install box must say: {INSTALL_HINT}'
     labels = re.findall(r'<button class="btn install"[^>]*>([\s\S]*?)</button>', landing)
-    assert len(labels) == 1 and flat(labels[0]) == INSTALL_BUTTON, f'the install button must read {INSTALL_BUTTON}'
+    want = INSTALL_BUTTON[switch[1]]
+    assert len(labels) == 1 and flat(labels[0]) == want, f'with data-install="{switch[1]}" the install button must read {want}'
     installs = [b for b in page.buttons if 'install' in (b.get('class') or '').split()]
     assert len(installs) == 1, 'exactly one install button'
     assert 'disabled' in installs[0], 'the install button must ship natively disabled'

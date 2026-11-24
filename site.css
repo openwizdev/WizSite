@@ -109,7 +109,7 @@ code,.v{font-family:var(--ow-font-mono)}
 .install-note a { color: var(--ink); text-decoration: underline; text-underline-offset: 2px; }
 .install-box[data-install="coming-soon"] .install-note { display: none; }
 .install-row { display: flex; align-items: center; gap: 12px; padding: 5px 6px 5px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); color: var(--grey); font: 13px var(--ow-font-mono); }
-.install-line { min-width: 0; overflow-wrap: anywhere; color: #e1d7cb; font: inherit; user-select: all; }
+.install-line { min-width: 0; overflow-wrap: anywhere; color: #e1d7cb; font: inherit; -webkit-user-select: all; user-select: all; }
 .install-box[data-install="coming-soon"] .install-line { color: var(--grey); }
 .landing .install { flex: none; min-height: 36px; padding: 0 12px; border: 0; border-radius: 6px; background: #cfc6b8; color: var(--ground); font: 650 13px var(--ow-font-sans); cursor: pointer; }
 .landing .install:disabled { background: var(--navy); color: var(--grey2); font-weight: 550; cursor: not-allowed; }

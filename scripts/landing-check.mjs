@@ -94,6 +94,8 @@ async function open(browser, origin, width, height, mode, path = '/') {
   await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: width <= 480 });
   await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: mode.reduced ? 'reduce' : 'no-preference' }] });
   if (mode.noScript) await send('Emulation.setScriptExecutionDisabled', { value: true });
+  if (mode.touch) await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
+  if (mode.init) await send('Page.addScriptToEvaluateOnNewDocument', { source: mode.init });
   const loaded = new Promise(resolve => browser.on(m => m.sessionId === sessionId && m.method === 'Page.loadEventFired' && resolve()));
   await send('Page.navigate', { url: `${origin}${path}` });
   await loaded;
@@ -113,7 +115,11 @@ async function open(browser, origin, width, height, mode, path = '/') {
       clip: await evaluate(`({ x: 0, y: 0, width: ${width}, height: document.documentElement.scrollHeight, scale: 1 })`) });
     await writeFile(path, Buffer.from(data, 'base64'));
   };
-  return { send, evaluate, click, shot, close: () => browser.send('Target.closeTarget', { targetId }) };
+  const tap = async (x, y) => {
+    await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+    await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  };
+  return { send, evaluate, click, tap, shot, close: () => browser.send('Target.closeTarget', { targetId }) };
 }
 
 const HELPERS = `
@@ -452,6 +458,52 @@ async function teamFilm(page, where, width, height, mode) {
   expect(after.playHidden && after.controls && !after.muted && after.focused, where, 'a click on the team film starts it with sound, controls and focus');
 }
 
+const INSTALL_LINE = 'Install OpenWiz from github.com/openwizdev/OpenWiz';
+// Each case runs before site.js: it keeps the real clipboard for reading back, counts beacons, then breaks what the case needs.
+const COPY_INIT = `window.copyCheck = { clipboard: navigator.clipboard, beacons: [], exec: [] };
+  { const beacon = navigator.sendBeacon.bind(navigator); navigator.sendBeacon = (url, data) => { copyCheck.beacons.push(String(data)); return beacon(url, data); }; }
+  { const exec = document.execCommand.bind(document); document.execCommand = (...args) => { copyCheck.exec.push(args[0]); return copyCheck.execFails ? false : exec(...args); }; }`;
+const COPY_CASES = {
+  'Clipboard API': { init: '', via: [] },
+  'no Clipboard API': { init: "Object.defineProperty(Navigator.prototype, 'clipboard', { get: () => undefined, configurable: true });", via: ['copy'] },
+  'nothing copies': { init: `Object.defineProperty(Navigator.prototype, 'clipboard', { get: () => ({ writeText: () => Promise.reject(new DOMException('denied', 'NotAllowedError')) }), configurable: true });
+    copyCheck.execFails = true;`, via: ['copy'] },
+};
+const COPY_VIEWPORTS = [['desktop', 1280, 800, {}], ['phone', 390, 844, { touch: true }]];
+async function copy(browser, origin, where, [width, height, viewport], name, { init, via }) {
+  const page = await open(browser, origin, width, height, { ...viewport, init: `${COPY_INIT}\n${init}` });
+  try {
+    await page.send('Page.bringToFront');
+    await page.send('Emulation.setFocusEmulationEnabled', { enabled: true });
+    const before = await page.evaluate(`(() => { const b = document.querySelector('.install-box button.install');
+      b.scrollIntoView({ block: 'center' }); const r = b.getBoundingClientRect();
+      return { text: b.textContent, disabled: b.disabled, x: r.left + r.width / 2, y: r.top + r.height / 2,
+        selectAll: getComputedStyle(document.querySelector('.install-line')).userSelect }; })()`);
+    expect(before.text === 'Copy' && !before.disabled, where, `the live install button reads Copy and is enabled (${JSON.stringify(before)})`);
+    expect(before.selectAll === 'all', where, 'one tap or click selects the whole install line');
+    await page.evaluate(`copyCheck.clipboard.writeText('stale').then(() => true)`);
+    await (viewport.touch ? page.tap : page.click)(before.x, before.y);
+    const after = await page.evaluate(`new Promise(resolve => setTimeout(async () => resolve({
+      text: document.querySelector('.install-box button.install').textContent,
+      selected: getSelection().toString(), exec: copyCheck.exec, beacons: copyCheck.beacons,
+      pasted: await copyCheck.clipboard.readText() }), 150))`);
+    expect(after.beacons.filter(b => b === 'install-copy').length === 1, where, `one install-copy count per click (${after.beacons})`);
+    expect(JSON.stringify(after.exec) === JSON.stringify(via), where, `copies through ${via.length ? 'execCommand' : 'the Clipboard API'} (${after.exec})`);
+    if (name === 'nothing copies') {
+      expect(after.text === 'Line selected: copy it', where, `says the line is selected (${after.text})`);
+      expect(after.selected === INSTALL_LINE, where, `leaves the exact line selected (${after.selected})`);
+      expect(after.pasted === 'stale', where, 'nothing reaches the clipboard');
+      const later = await page.evaluate(`new Promise(r => setTimeout(() => r(document.querySelector('.install-box button.install').textContent), 3100))`);
+      expect(later === 'Copy', where, `returns to Copy after 3 s (${later})`);
+    } else {
+      expect(after.text === 'Copied', where, `shows Copied (${after.text})`);
+      expect(after.pasted === INSTALL_LINE, where, `the clipboard holds the exact line (${after.pasted})`);
+    }
+  } finally {
+    await page.close();
+  }
+}
+
 const FAQ_PATHS = ['/', '/faq/'];
 async function faq(page, where, width, mode) {
   const read = () => page.evaluate(`(() => { ${HELPERS}
@@ -511,6 +563,17 @@ async function main() {
   const origin = `http://127.0.0.1:${server.address().port}`;
   const browser = await launch();
   try {
+    await browser.send('Browser.grantPermissions', { origin, permissions: ['clipboardReadWrite', 'clipboardSanitizedWrite'] });
+    for (const [label, ...viewport] of COPY_VIEWPORTS) {
+      for (const [name, copyCase] of Object.entries(COPY_CASES)) await copy(browser, origin, `copy, ${label}, ${name}`, viewport, name, copyCase);
+    }
+    const still = await open(browser, origin, 390, 844, MODES['no JavaScript']);
+    try {
+      const button = await still.evaluate(`(() => { const b = document.querySelector('.install-box button.install'); return { text: b.textContent, disabled: b.disabled }; })()`);
+      expect(button.text === 'Copy' && button.disabled, 'copy, no JavaScript', `the live install button reads Copy, natively disabled (${JSON.stringify(button)})`);
+    } finally {
+      await still.close();
+    }
     for (const [width, height] of WIDTHS) {
       for (const [name, mode] of Object.entries(MODES)) {
         const where = `${width}px, ${name}`;
