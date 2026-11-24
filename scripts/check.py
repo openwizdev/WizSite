@@ -125,11 +125,11 @@ APP_PARTS = APP_FOUND['app/pages', 'js'] + APP_FOUND['app/cards', 'js']
 APP_PART_STYLES = APP_FOUND['app/pages', 'css'] + APP_FOUND['app/cards', 'css']
 APP_LEGACY_ORDER = ('app/pages/you.js', 'app/pages/specs.js', 'app/pages/spec.js', 'app/pages/agents.js')
 APP_NEEDED = set(APP_FOUND['app/pages', 'js'] + APP_FOUND['app/pages', 'css'])
-APP_SCRIPTS = ('app/data.js', 'app/ui.js') + APP_PARTS + ('app/palette.js', 'app/shell.js')
+APP_SCRIPTS = ('app/data.js', 'app/records.js', 'app/ui.js') + APP_PARTS + ('app/palette.js', 'app/shell.js')
 APP_VENDOR = {'app/vendor/dagre-3.1.3.min.js': ('node_modules/@dagrejs/dagre/dist/dagre.min.js', 'app/pages/spec.js'),
               'app/vendor/dagre-LICENSE.txt': ('node_modules/@dagrejs/dagre/LICENSE', None)}
 HASHED += (APP_STYLE,) + APP_PART_STYLES + APP_SCRIPTS
-APP_CSP = ("default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; "
+APP_CSP = ("default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; media-src 'self'; font-src 'self'; "
            "connect-src 'self' https://api.github.com; manifest-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
 
 
@@ -336,13 +336,18 @@ DRIVER_WALL = (
     ('codespaces', 'GitHub Codespaces', 'hosts', 'waiting', PR + '2559', None),
     ('devin', 'Devin', 'hosts', 'waiting', PR + '2490', 'devin.svg'),
     ('sprites', 'Fly Sprites', 'hosts', 'review', PR + '2720', None),
-    ('openhands', 'OpenHands Cloud', 'hosts', 'building', PR + '2567', 'openhands.svg'),
-    ('warp-oz', 'Warp Oz', 'hosts', 'building', PR + '2555', 'warp.svg'),
-    ('tembo', 'Tembo', 'hosts', 'building', PR + '2662', 'tembo.svg'),
-    ('capy', 'Capy', 'hosts', 'building', PR + '2652', 'capy.svg'),
-    ('ona', 'Ona', 'hosts', 'building', PR + '2699', 'ona.svg'),
+    ('openhands', 'OpenHands Cloud', 'hosts', 'review', PR + '2567', 'openhands.svg'),
+    ('warp-oz', 'Warp Oz', 'hosts', 'review', PR + '2555', 'warp.svg'),
+    ('tembo', 'Tembo', 'hosts', 'review', PR + '2662', 'tembo.svg'),
+    ('capy', 'Capy', 'hosts', 'review', PR + '2652', 'capy.svg'),
+    ('ona', 'Ona', 'hosts', 'review', PR + '2699', 'ona.svg'),
     ('opencomputer', 'OpenComputer', 'hosts', 'held', ISSUE + '2587', None),
     ('grok-bot', 'Grok Bot', 'hosts', 'parked', ISSUE + '2318', None),
+    ('amp', 'Amp', 'harnesses', 'waiting', PR + '2767', 'amp.svg'),
+    ('antigravity', 'Antigravity CLI', 'harnesses', 'waiting', PR + '2773', 'antigravity.svg'),
+    ('warp-local', 'Warp local agent', 'harnesses', 'waiting', PR + '2766', 'warp.svg'),
+    ('auggie', 'Augment Auggie', 'harnesses', 'waiting', PR + '2639', 'augment.svg'),
+    ('junie', 'JetBrains Junie', 'harnesses', 'waiting', PR + '2638', None),
     ('copilot', 'GitHub Copilot CLI', 'harnesses', 'review', PR + '2782', None),
     ('cursor-cli', 'Cursor CLI', 'harnesses', 'review', PR + '2778', 'cursor.svg'),
     ('gemini', 'Gemini CLI', 'harnesses', 'review', PR + '2776', 'gemini-cli.svg'),
@@ -350,15 +355,10 @@ DRIVER_WALL = (
     ('kimi', 'Kimi Code', 'harnesses', 'review', PR + '2785', 'kimi-code.svg'),
     ('pi', 'Pi', 'harnesses', 'review', PR + '2774', 'pi.svg'),
     ('qwen', 'Qwen Code', 'harnesses', 'review', PR + '2794', 'qwen-code.svg'),
-    ('amp', 'Amp', 'harnesses', 'building', PR + '2767', 'amp.svg'),
-    ('antigravity', 'Antigravity CLI', 'harnesses', 'building', PR + '2773', 'antigravity.svg'),
-    ('auggie', 'Augment Auggie', 'harnesses', 'building', PR + '2639', 'augment.svg'),
-    ('crush', 'Crush', 'harnesses', 'building', PR + '2649', 'crush.png'),
-    ('junie', 'JetBrains Junie', 'harnesses', 'building', PR + '2638', None),
-    ('kilo', 'Kilo Code', 'harnesses', 'building', PR + '2640', 'kilo-code.svg'),
-    ('kiro', 'Kiro', 'harnesses', 'building', PR + '2631', 'kiro.svg'),
-    ('vibe', 'Mistral Vibe', 'harnesses', 'building', PR + '2643', None),
-    ('warp-local', 'Warp local agent', 'harnesses', 'building', PR + '2766', 'warp.svg'),
+    ('kiro', 'Kiro', 'harnesses', 'review', PR + '2631', 'kiro.svg'),
+    ('crush', 'Crush', 'harnesses', 'review', PR + '2649', 'crush.png'),
+    ('kilo', 'Kilo Code', 'harnesses', 'review', PR + '2640', 'kilo-code.svg'),
+    ('vibe', 'Mistral Vibe', 'harnesses', 'review', PR + '2643', None),
     ('opencode', 'OpenCode', 'harnesses', 'planned', ISSUE + '2462', 'opencode.svg'),
     ('sculptor', 'Sculptor', 'harnesses', 'planned', ISSUE + '2540', 'sculptor.svg'),
     ('cline', 'Cline', 'harnesses', 'held', ISSUE + '2530', 'cline.svg'),
@@ -602,6 +602,21 @@ def check_market_refs(root, path, page, pages, market):
         check_ref(root, path, ref, pages, page.favicons)
 
 
+MARKET_TAGS = {'section', 'nav', 'h2', 'h3', 'p', 'code', 'ul', 'li', 'div', 'article', 'dl', 'dt', 'dd', 'span', 'a'}
+MARKET_ATTRS = {'class', 'id', 'aria-label', 'aria-labelledby', 'data-listing', 'data-status', 'data-stage'}
+
+
+class MarketMarkup(HTMLParser):
+    def handle_starttag(self, tag, attrs):
+        allowed = MARKET_ATTRS | ({'href', 'rel'} if tag == 'a' else set())
+        assert tag in MARKET_TAGS and all(name in allowed for name, _ in attrs), 'unexpected markup in the generated Market section'
+        assert dict(attrs).get('rel', 'noreferrer') == 'noreferrer', 'unexpected markup in the generated Market section'
+
+
+def check_market_markup(section):
+    MarketMarkup(convert_charrefs=True).feed(section)
+
+
 def split_market(built):
     start, end = MARKET
     assert built.count(start) == 1 and built.count(end) == 1, 'the built Market page has one generated section'
@@ -681,6 +696,7 @@ def check_site(root, registry=ROOT / 'market/registry.json'):
             for count, href in ((section.x_links, X_ACCOUNT), (section.cloudroom_links, CLOUDROOM_LINK), (section.report_links, REPORT_LINK)):
                 assert not count or href in market, 'unexpected external URL'
             check_market_refs(root, path, section, pages, market)
+            check_market_markup(split_market(path.read_text())[1])
             page = fixed
         assert page.social and all(s.startswith(SITE_URL) and s.removeprefix(SITE_URL).split('?')[0] in STATIC for s in page.social), 'social image must be a built file on the site'
         assert path == root / TEAM_PAGE or not page.books, f'a booking link outside the team page: {path.name}'
@@ -1682,7 +1698,7 @@ def check_app(root, names, pages):
         'the app must load each of its pages\' scripts once (and a card\'s at most once)'
     assert [name for name in shown if name in APP_LEGACY_ORDER] == list(APP_LEGACY_ORDER), \
         'the app must load You, Specs, Spec and Agents in that order: it sets the v1 pages\' order and default route'
-    ordered = ('app/data.js', 'app/ui.js', *shown, 'app/palette.js', 'app/shell.js')
+    ordered = ('app/data.js', 'app/records.js', 'app/ui.js', *shown, 'app/palette.js', 'app/shell.js')
     assert page.scripts == [ref for name in ordered for ref in [f'/{v}' for v, (_, before) in APP_VENDOR.items() if before == name] + [f'/{names[name]}']], \
         'the app must load its fingerprinted scripts (and each pinned file before its user) in order'
     assert not page.inline_scripts, 'the app allows no inline script'

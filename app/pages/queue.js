@@ -198,7 +198,7 @@
     if (!picked || !specs.data || !specs.readAt || !OW.factory.model(feeds)) return;
     if (specs.failedAt != null) state.failedSince = Math.max(state.failedSince ?? 0, specs.failedAt);
     const readAt = specs.readAt;
-    const key = `${picked.full}|${readAt}`;
+    const key = `${picked.full}|${OW.data.auth.session() ?? ''}|${OW.data.auth.account() ?? ''}|${readAt}`;
     if (state.key === key) return;
     state.key = key;
     let mine;
