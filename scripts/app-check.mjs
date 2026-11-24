@@ -461,7 +461,7 @@ async function main() {
       await page.close();
     });
 
-    await check('picker and shell: the picked repository opens the shell with You, Specs and Agents, and is remembered', async () => {
+    await check('picker and shell: the picked repository opens the shell with You, Specs, Agents, Canvas and Models, and is remembered', async () => {
       const world = new World();
       world.graphql.Specs = ok('specs.json');
       world.graphql.Agents = ok('agents.json');
@@ -470,7 +470,7 @@ async function main() {
       await page.click('acme/factory');
       await page.until(`document.querySelector('nav a[aria-current="page"]')`, 'the navigation');
       const nav = await page.run(`(() => { ${LABEL} return [...document.querySelectorAll('nav.main a')].map(label); })()`);
-      assert(JSON.stringify(nav) === JSON.stringify(['You', 'Specs', 'Agents', 'Models']), `navigation is ${JSON.stringify(nav)}`);
+      assert(JSON.stringify(nav) === JSON.stringify(['You', 'Specs', 'Agents', 'Canvas', 'Models']), `navigation is ${JSON.stringify(nav)}`);
       await page.click('Specs');
       await page.until(`location.hash === '#/specs' && document.querySelector('h1').textContent.trim() === 'Specs'`, 'the Specs page');
       await page.go(`${SITE}/app/`);
@@ -1800,7 +1800,7 @@ async function main() {
     const CREAM = '#cfc6b8';
     const CHARCOAL = '#1b1916';
     const LAYOUT = {
-      laptop: { brand: [12, 20, 239, 34], mark: [22, 23, 28, 28], nav: [12, 142, 239, 204], title: [312, 40] },
+      laptop: { brand: [12, 20, 239, 34], mark: [22, 23, 28, 28], nav: [12, 142, 239, 256], title: [312, 40] },
       phone: { top: [0, 0, 390, 65], brand: [14, 18, 28, 28], mark: [14, 18, 28, 28], title: [16, 87] },
       panel: { brand: [490, 307, 460, 30], mark: [490, 308, 28, 28], title: [490, 360] },
     };
