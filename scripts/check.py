@@ -296,7 +296,7 @@ HOST_PILLS = (
     ('cloudroom', 'Cloudroom', 'passed 5 of 5', 'passed'),
     ('boat-dev', 'boat.dev', 'passed 5 of 5', 'passed'),
 )
-DRIVER_NUMBERS = {'2026', '11', '19', '20', '22', '1', '2', '3', '4', '5', '6', '7', '9', '12', '14'}
+DRIVER_NUMBERS = {'2026', '11', '19', '20', '22', '1', '2', '3', '5', '6', '7', '9', '14'}
 DRIVER_JARGON = re.compile(r'\b\d+\s+(?:drivers?|words?|checks?|commands?|passed)\b|\b(?!5 of 5\b)\d+\s+of\s+\d+\b', re.I)
 DRIVER_RESULT = re.compile(r'\ball five checks\b|\bfive passed checks\b|\bfive of five\b', re.I)
 DRIVER_RESULT_MAX = 2
@@ -340,6 +340,7 @@ DRIVER_WALL = (
     ('amp', 'Amp', 'harnesses', 'waiting', PR + '2767', 'amp.svg'),
     ('antigravity', 'Antigravity CLI', 'harnesses', 'waiting', PR + '2773', 'antigravity.svg'),
     ('warp-local', 'Warp local agent', 'harnesses', 'waiting', PR + '2766', 'warp.svg'),
+    ('auggie', 'Augment Auggie', 'harnesses', 'waiting', PR + '2639', 'augment.svg'),
     ('junie', 'JetBrains Junie', 'harnesses', 'waiting', PR + '2638', None),
     ('copilot', 'GitHub Copilot CLI', 'harnesses', 'review', PR + '2782', None),
     ('cursor-cli', 'Cursor CLI', 'harnesses', 'review', PR + '2778', 'cursor.svg'),
@@ -349,7 +350,6 @@ DRIVER_WALL = (
     ('pi', 'Pi', 'harnesses', 'review', PR + '2774', 'pi.svg'),
     ('qwen', 'Qwen Code', 'harnesses', 'review', PR + '2794', 'qwen-code.svg'),
     ('kiro', 'Kiro', 'harnesses', 'review', PR + '2631', 'kiro.svg'),
-    ('auggie', 'Augment Auggie', 'harnesses', 'review', PR + '2639', 'augment.svg'),
     ('crush', 'Crush', 'harnesses', 'review', PR + '2649', 'crush.png'),
     ('kilo', 'Kilo Code', 'harnesses', 'review', PR + '2640', 'kilo-code.svg'),
     ('vibe', 'Mistral Vibe', 'harnesses', 'review', PR + '2643', None),
