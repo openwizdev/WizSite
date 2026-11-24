@@ -182,6 +182,10 @@ test('demo isolates a saved GitHub session from boot, visibility refresh, and th
     await run.page.go('about:blank');
     run.world.log.length = 0;
 
+    await run.page.go(`${SITE}/app/?v2=dry-run&demo=1#/welcome`);
+    await run.page.until(`document.querySelector('.v2-welcome-sample')`, 'demo welcome with stored session');
+    assert.equal(await run.page.run(`document.querySelector('.v2-welcome-sample').getAttribute('href')`), '/app/');
+
     await run.page.go(`${SITE}/app/?v2=dry-run&demo=1#/feed`);
     await run.page.until(`document.body.innerText.includes('Magic-link sign-in')`, 'the sample feed');
     await run.page.run(`Object.defineProperty(document, 'hidden', { configurable: true, value: false });
@@ -234,6 +238,36 @@ test('real signed-in v2: welcome, picker, calm Chat card, Feed states, and truth
     assert.match(await run.page.text(), /Where it runs\s+Coming soon/);
     assert.match(await run.page.text(), /GitHub\s+Connected/);
     assert.match(await run.page.text(), /acme\/factory/);
+    assert.deepEqual(run.world.violations, []);
+  } finally {
+    await run.close();
+  }
+});
+
+test('real signed-in v2 Feed: Read failed and Partial read state cards', async () => {
+  const run = await start();
+  try {
+    const emptySpecs = { data: { rateLimit: { limit: 5000, remaining: 4800, resetAt: '2099-01-01T00:00:00Z' },
+      specSearch: { totalCount: 0, nodes: [] },
+      repository: { issues: { totalCount: 0, nodes: [] }, youIssues: { totalCount: 0, nodes: [] },
+        fleet: { text: FLEET } } } };
+
+    run.world.graphql.Specs = () => ({ status: 500, json: { message: 'boom' } });
+    run.world.github['GET /repos/acme/factory/pulls'] = () => ({ status: 200, json: [] });
+
+    await run.page.go(`${SITE}/app/?v2=dry-run&code=c0de&state=${'S'.repeat(43)}`);
+    await run.page.until(`document.body.innerText.includes('acme/factory')`, 'repository picker');
+    await run.page.click('acme/factory');
+
+    await run.page.until(`document.querySelector('.v2-state-warn .v2-label')?.textContent === 'Read failed'`, 'Feed Read failed state card');
+    assert.match(await run.page.run(`document.querySelector('.v2-state-warn').textContent`), /Read failed/);
+
+    run.world.graphql.Specs = () => ({ status: 200, json: emptySpecs });
+    run.world.github['GET /repos/acme/factory/pulls'] = () => ({ status: 500, json: { message: 'boom' } });
+    await run.page.click('Refresh now');
+
+    await run.page.until(`document.querySelector('.v2-state-warn .v2-label')?.textContent === 'Partial read'`, 'Feed Partial read state card');
+    assert.match(await run.page.run(`document.querySelector('.v2-state-warn').textContent`), /Partial read/);
     assert.deepEqual(run.world.violations, []);
   } finally {
     await run.close();

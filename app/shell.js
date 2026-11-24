@@ -245,7 +245,8 @@
     const pager = h('div', { class: 'v2-pager-slot' });
     const head = h('div', { class: 'v2-head' }, title, h('div', { class: 'v2-head-tools' }, pager, refresh));
     const phoneBar = h('header', { class: 'v2-phone-bar' },
-      h('a', { class: 'v2-phone-brand', href: home() }, logo(), h('span', {}, 'OpenWiz')));
+      h('a', { class: 'v2-phone-brand', href: home() }, logo(), h('span', {}, 'OpenWiz')),
+      demo ? h('span', { class: 'v2-sample-tag' }, 'Sample data') : null);
     const notices = h('div', { class: 'notices v2-notices', role: 'status' });
     const body = h('section', { class: 'v2-body' });
     const view = h('div', { class: 'v2-view' }, notices, body);
@@ -259,11 +260,11 @@
               logo(),
               h('span', { class: 'v2-brand-text' },
                 h('span', { class: 'v2-brand-name' }, 'OpenWiz'),
-                h('span', { class: 'v2-brand-sub' }, workspace))),
+                h('span', { class: 'v2-brand-sub' }, workspace),
+                demo ? h('span', { class: 'v2-sample-tag' }, 'Sample data') : null)),
             h('nav', { class: 'main v2-nav', 'aria-label': 'Pages' }, side.map(item => item.link))),
           h('main', { id: 'content', class: 'v2-main' },
             phoneBar,
-            demo ? h('span', { class: 'v2-sample-tag' }, 'Sample data') : null,
             head,
             view,
             h('nav', { class: 'v2-tabs', 'aria-label': 'Pages' }, tabs.map(item => item.link))))));
