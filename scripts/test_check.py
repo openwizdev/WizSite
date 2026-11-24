@@ -504,6 +504,26 @@ class Checks(unittest.TestCase):
                 with self.assertRaises(AssertionError):
                     check_site(root)
 
+    def test_one_stylesheet_per_page(self):
+        css = FINGERPRINTS['site.css']
+        link = f'<link rel="stylesheet" href="/{css}">'
+        tokens = fingerprint('tokens.css', (ROOT / 'tokens.css').read_bytes())
+        cases = {
+            'second link': ('index.html', lambda text: text.replace(link, link + link), 'exactly one stylesheet'),
+            'split again': ('team/index.html', lambda text: text.replace(link, f'<link rel="stylesheet" href="/{tokens}">' + link), 'exactly one stylesheet'),
+            'wrong bundle': ('changelog/index.html', lambda text: text.replace(f'"/{FINGERPRINTS["changelog/changelog.css"]}"', f'"/{css}"'), 'must apply exactly'),
+        }
+        for name, (rel, change, pattern) in cases.items():
+            with self.subTest(name), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp) / 'dist'
+                shutil.copytree(ROOT / 'dist', root)
+                page = root / rel
+                text = page.read_text()
+                self.assertEqual(text.count('rel="stylesheet"'), 1)
+                page.write_text(change(text))
+                with self.assertRaisesRegex(AssertionError, pattern):
+                    check_site(root)
+
     def test_headers_revalidate(self):
         cases = {
             'broken file': lambda text: '/*.css\n  Cache-Control: public, max-age=14400\n',
@@ -550,10 +570,10 @@ class Checks(unittest.TestCase):
 
     def test_font_subset_and_fingerprinting(self):
         def rewrite_tokens(root, transform):
-            old = FINGERPRINTS['tokens.css']
+            old = FINGERPRINTS['site.css']
             text = transform((root / old).read_text())
             data = text.encode('utf-8')
-            new = fingerprint('tokens.css', data)
+            new = fingerprint('site.css', data)
             (root / old).unlink()
             (root / new).write_bytes(data)
             for page in root.rglob('*.html'):

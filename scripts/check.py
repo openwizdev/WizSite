@@ -62,6 +62,30 @@ ICON_HASHES = {
     'app/icon-180.png': 'deb93ec39812c224c1470e2f1730f7f4ead7be3d27428a20a2a83284b77fbc2f',
 }
 DOC_HASHES = {
+    'docs/evidence/speed/one-stylesheet/index-390x844-before.png': 'a31c02061e1665a0f7e153622a7b0ae870e3bd51daccc3092d98424db6f4c0e9',
+    'docs/evidence/speed/one-stylesheet/index-390x844-after.png': 'a31c02061e1665a0f7e153622a7b0ae870e3bd51daccc3092d98424db6f4c0e9',
+    'docs/evidence/speed/one-stylesheet/index-1280x800-before.png': 'b94a9e5b459786ea69641b97eec3a8c96cd17d2cdb41bf17fb7ba250ba00bc3c',
+    'docs/evidence/speed/one-stylesheet/index-1280x800-after.png': 'b94a9e5b459786ea69641b97eec3a8c96cd17d2cdb41bf17fb7ba250ba00bc3c',
+    'docs/evidence/speed/one-stylesheet/changelog-390x844-before.png': 'a5418e5887e19336e540f579a538be4ca3a5262dbac0d0ba9a44e1c95d7c7318',
+    'docs/evidence/speed/one-stylesheet/changelog-390x844-after.png': 'a5418e5887e19336e540f579a538be4ca3a5262dbac0d0ba9a44e1c95d7c7318',
+    'docs/evidence/speed/one-stylesheet/changelog-1280x800-before.png': 'df00b6386ab36c2919b583345fb218a2182526ae4fea93db5bd336f853e14851',
+    'docs/evidence/speed/one-stylesheet/changelog-1280x800-after.png': 'df00b6386ab36c2919b583345fb218a2182526ae4fea93db5bd336f853e14851',
+    'docs/evidence/speed/one-stylesheet/drivers-390x844-before.png': 'd674cc5a4f35f9668a35e13d3ed4f975208baa8d8455438179848817c19751a2',
+    'docs/evidence/speed/one-stylesheet/drivers-390x844-after.png': 'd674cc5a4f35f9668a35e13d3ed4f975208baa8d8455438179848817c19751a2',
+    'docs/evidence/speed/one-stylesheet/drivers-1280x800-before.png': '6737672f20f0cda9b279e8356272e44a1b003ade2b7042f2f9117589f4b79be6',
+    'docs/evidence/speed/one-stylesheet/drivers-1280x800-after.png': '6737672f20f0cda9b279e8356272e44a1b003ade2b7042f2f9117589f4b79be6',
+    'docs/evidence/speed/one-stylesheet/team-390x844-before.png': '76cfcf2e31a6e90dcff7716061a0a8b111395e615900154bc17297717066f477',
+    'docs/evidence/speed/one-stylesheet/team-390x844-after.png': '76cfcf2e31a6e90dcff7716061a0a8b111395e615900154bc17297717066f477',
+    'docs/evidence/speed/one-stylesheet/team-1280x800-before.png': 'deeca3ce6b20ca9afd723d4e0a9ef8f4672740c3ef830b79fb95f7d7dae2e7d7',
+    'docs/evidence/speed/one-stylesheet/team-1280x800-after.png': 'deeca3ce6b20ca9afd723d4e0a9ef8f4672740c3ef830b79fb95f7d7dae2e7d7',
+    'docs/evidence/speed/one-stylesheet/faq-390x844-before.png': '78bfc111ae0b6a8620fe4d55ccb6c578a8bead6d5c5e9067a83ea91dda8f9817',
+    'docs/evidence/speed/one-stylesheet/faq-390x844-after.png': '78bfc111ae0b6a8620fe4d55ccb6c578a8bead6d5c5e9067a83ea91dda8f9817',
+    'docs/evidence/speed/one-stylesheet/faq-1280x800-before.png': '011896b855c625e370688da3cfc3660c8813d98e9c58098ce4948bb3398d5783',
+    'docs/evidence/speed/one-stylesheet/faq-1280x800-after.png': '011896b855c625e370688da3cfc3660c8813d98e9c58098ce4948bb3398d5783',
+    'docs/evidence/speed/one-stylesheet/market-390x844-before.png': '56d39c45cee590e6df6cf9bc729fe6166d5bb1801f8d028d669ce5534efce4a9',
+    'docs/evidence/speed/one-stylesheet/market-390x844-after.png': '56d39c45cee590e6df6cf9bc729fe6166d5bb1801f8d028d669ce5534efce4a9',
+    'docs/evidence/speed/one-stylesheet/market-1280x800-before.png': '43e471c6622425f860e9d132d96df2331110c79182368595bf97df59ac27f06c',
+    'docs/evidence/speed/one-stylesheet/market-1280x800-after.png': '43e471c6622425f860e9d132d96df2331110c79182368595bf97df59ac27f06c',
     'docs/map.png': '19fc57ff3f588b36e2ca412f5656483eaf873718d0d19a39aceb83e007333e6b',
     'docs/map-phone.png': 'cdd21a74a880d3adab68ce794de1b18060d916d6df5d00ceb54eb06736cf3fd2',
     'docs/evidence/speed/fonts/app-1280x800.png': 'db6128e1d62daf1112ca41246fd04665bcc0b3060b99192bbc66927ef6fb66cf',
@@ -135,7 +159,10 @@ DRIVER_LOGOS = {
 
 FONT_FILES = ('fonts/Geist-var.woff2', 'fonts/GeistMono-var.woff2')
 PAGE_STYLES = {'changelog/index.html': 'changelog/changelog.css', 'market/index.html': 'market/market.css'}
-HASHED = FONT_FILES + ('tokens.css', 'site.css', *PAGE_STYLES.values(), GSAP, 'site.js', 'faq.js')
+# Each site page links one stylesheet, its sources joined in cascade order by build.mjs.
+STYLE_SOURCES = {'site.css': ('tokens.css', 'site.css'),
+                 **{name: ('tokens.css', 'site.css', name) for name in PAGE_STYLES.values()}}
+HASHED = FONT_FILES + (*STYLE_SOURCES, GSAP, 'site.js', 'faq.js')
 APP_PAGE = 'app/index.html'
 APP_STYLE = 'app/ember.css'
 APP_FOUND = {(folder, ext): tuple(sorted(p.relative_to(ROOT).as_posix() for p in (ROOT / folder).glob(f'*.{ext}')))
@@ -239,7 +266,8 @@ def fingerprint(name, data):
 
 
 def built_asset_bytes(name, font_names=None):
-    data = (ROOT / name).read_bytes()
+    data = b''.join(part if part.endswith(b'\n') else part + b'\n' for part in ((ROOT / src).read_bytes() for src in STYLE_SOURCES[name])) \
+        if name in STYLE_SOURCES else (ROOT / name).read_bytes()
     if name.endswith('.css') and font_names:
         text = data.decode('utf-8')
         for font, hashed in font_names.items():
@@ -248,7 +276,16 @@ def built_asset_bytes(name, font_names=None):
     return data
 
 
+def one_stylesheet(html):
+    links = re.findall(r'<link rel="stylesheet" href="/([^"]+)">', html)
+    bundle = next((name for name, parts in STYLE_SOURCES.items() if list(parts) == links), None)
+    assert bundle, f'a site page links an unknown stylesheet set: {links}'
+    return html.replace(''.join(f'<link rel="stylesheet" href="/{link}">' for link in links), f'<link rel="stylesheet" href="/{bundle}">')
+
+
 def fingerprinted_page(html, cta=False):
+    if cta:
+        html = one_stylesheet(html)
     for name, hashed in FINGERPRINTS.items():
         html = html.replace(f'"/{name}"', f'"/{hashed}"')
     return with_faq(with_footer(with_cta(html))) if cta else html
@@ -886,7 +923,8 @@ def check_site(root, registry=ROOT / 'market/registry.json', now=None):
     for path, page in pages.items():
         rel = path.relative_to(root).as_posix()
         assert not set(page.refs) & {f'/{name}' for name in HASHED}, 'a page uses an unfingerprinted style or script'
-        expected = [f'/{names["tokens.css"]}', f'/{names["site.css"]}'] + ([f'/{names[PAGE_STYLES[rel]]}'] if rel in PAGE_STYLES else [])
+        assert len(page.stylesheets) == 1, f'{rel} must link exactly one stylesheet, got {page.stylesheets}'
+        expected = [f'/{names[PAGE_STYLES.get(rel, "site.css")]}']
         assert page.stylesheets == expected, f'{rel} must apply exactly {expected}, got {page.stylesheets}'
         assert not Outline(path.read_text()).styles, f'{rel} must not use inline <style> blocks'
     page = pages[root / 'index.html']
@@ -948,7 +986,7 @@ def check_site(root, registry=ROOT / 'market/registry.json', now=None):
             f'the launch post link, the landing launch video\'s only: {path.relative_to(root)} has {page.launch_posts}'
         for ref in css_refs(path.read_text()):
             check_ref(root, path, ref, pages)
-    for path in (root / names[name] for name in ('tokens.css', 'site.css', *PAGE_STYLES.values())):
+    for path in (root / names[name] for name in STYLE_SOURCES):
         for ref in css_refs(path.read_text()):
             check_ref(root, path, ref, pages)
     check_app(root, names, pages)
@@ -959,15 +997,16 @@ def check_site(root, registry=ROOT / 'market/registry.json', now=None):
             assert data[:4] == b'wOF2', 'invalid WOFF2 signature'
         else:
             assert b'SIL OPEN FONT LICENSE' in data, 'missing OFL licence'
-    tokens_css = (root / names['tokens.css']).read_text()
-    faces = re.findall(r'@font-face\s*\{([^}]*)\}', tokens_css)
-    assert len(faces) == 2, 'tokens.css must declare exactly Geist and GeistMono @font-face rules'
-    for face in faces:
-        assert re.search(r'font-display\s*:\s*optional\b', face), 'tokens.css @font-face must keep font-display: optional'
-        assert f'unicode-range: {font_chars.UNICODE_RANGE};' in face, 'tokens.css @font-face must declare the subset unicode-range'
-    for font in FONT_FILES:
-        assert f"'/{font}'" not in tokens_css and f'"/{font}"' not in tokens_css, 'tokens.css uses an unfingerprinted font URL'
-        assert f"'/{names[font]}'" in tokens_css, f'tokens.css must reference fingerprinted {font}'
+    for style in STYLE_SOURCES:
+        tokens_css = (root / names[style]).read_text()
+        faces = re.findall(r'@font-face\s*\{([^}]*)\}', tokens_css)
+        assert len(faces) == 2, f'{style}: tokens.css must declare exactly Geist and GeistMono @font-face rules'
+        for face in faces:
+            assert re.search(r'font-display\s*:\s*optional\b', face), 'tokens.css @font-face must keep font-display: optional'
+            assert f'unicode-range: {font_chars.UNICODE_RANGE};' in face, 'tokens.css @font-face must declare the subset unicode-range'
+        for font in FONT_FILES:
+            assert f"'/{font}'" not in tokens_css and f'"/{font}"' not in tokens_css, 'tokens.css uses an unfingerprinted font URL'
+            assert f"'/{names[font]}'" in tokens_css, f'tokens.css must reference fingerprinted {font}'
     font_chars.check_font_chars(root, ROOT)
     headers = (root / '_headers').read_text()
     site_rule = re.search(r'^/\*\n((?:  .*\n?)*)', headers, re.M)
@@ -1074,7 +1113,7 @@ def check_site(root, registry=ROOT / 'market/registry.json', now=None):
     for attrs in pages[root / 'index.html'].images:
         if attrs.get('src') == '/art/era-2-grill.webp':
             assert (attrs.get('alt') or '').strip(), f'painting without a description: {attrs.get("src")}'
-    for style_name in ('site.css', *PAGE_STYLES.values()):
+    for style_name in STYLE_SOURCES:
         check_motion((root / names[style_name]).read_text())
     check_driver_css((root / names['site.css']).read_text())
     unlabelled = check_install(landing, pages[root / 'index.html'])

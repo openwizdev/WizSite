@@ -16,6 +16,13 @@ const withCta = html => {
   if (html.split(bar).length !== 2) throw new Error('a site page needs exactly one top bar');
   return html.replace(bar, cta + bar);
 };
+const withStyle = html => {
+  const tag = href => `<link rel="stylesheet" href="/${href}">`;
+  const links = [...html.matchAll(/<link rel="stylesheet" href="\/([^"]+)">/g)].map(m => m[1]);
+  const bundle = Object.keys(styles).find(name => styles[name].join() === links.join());
+  if (!bundle || html.split(links.map(tag).join('')).length !== 2) throw new Error(`a site page links an unknown stylesheet set: ${links.join(', ')}`);
+  return html.replace(links.map(tag).join(''), tag(bundle));
+};
 const footer = await readFile(new URL('footer.html', root), 'utf8');
 const withFooter = html => {
   const slot = '<template data-slot="footer"></template>\n';
@@ -29,7 +36,9 @@ const appFolder = async folder => (await readdir(new URL(`${folder}/`, root)).ca
 const app = ['app/ember.css', 'app/data.js', 'app/records.js', 'app/ui.js', ...await appFolder('app/pages'), ...await appFolder('app/cards'), 'app/palette.js', 'app/shell.js'];
 const npmVendor = { 'app/vendor/dagre-3.1.3.min.js': 'node_modules/@dagrejs/dagre/dist/dagre.min.js', 'app/vendor/dagre-LICENSE.txt': 'node_modules/@dagrejs/dagre/LICENSE' };
 const fonts = ['fonts/Geist-var.woff2', 'fonts/GeistMono-var.woff2'];
-const hashed = ['tokens.css', 'site.css', 'changelog/changelog.css', 'market/market.css', 'site.js', 'faq.js', vendor[0], ...app];
+// Each site page links one stylesheet: its sources joined at build time, in their cascade order.
+const styles = { 'site.css': ['tokens.css', 'site.css'], 'changelog/changelog.css': ['tokens.css', 'site.css', 'changelog/changelog.css'], 'market/market.css': ['tokens.css', 'site.css', 'market/market.css'] };
+const hashed = [...Object.keys(styles), 'site.js', 'faq.js', vendor[0], ...app];
 const brand = ['favicon.ico', 'favicon.svg', 'apple-touch-icon.png', 'brand/openwiz-lockup.svg', 'brand/og.png'];
 const appBrand = ['app/mark.svg', 'app/icon.svg', 'app/icon.ico', 'app/icon-180.png', 'app/wiz-reviewer.svg'];
 const files = ['_headers', '.well-known/security.txt', 'robots.txt', 'app/manifest.webmanifest', ...appBrand, ...art, ...driverLogos, 'art/todo-spec.mp4', 'art/todo-spec.vtt', 'art/spec-video.mp4', 'art/spec-video.vtt', 'art/launch-video.mp4', 'art/launch-video.vtt', ...vendor.slice(1), ...brand, 'fonts/OFL.txt'];
@@ -52,7 +61,10 @@ for (const file of fonts) {
   await put(names[file], data);
 }
 for (const file of hashed) {
-  let data = await readFile(new URL(file, root));
+  let data = styles[file] ? Buffer.concat(await Promise.all(styles[file].map(async part => {
+    const text = await readFile(new URL(part, root), 'utf8');
+    return Buffer.from(text.endsWith('\n') ? text : `${text}\n`, 'utf8');
+  }))) : await readFile(new URL(file, root));
   if (file.endsWith('.css')) {
     let text = data.toString('utf8');
     for (const font of fonts) text = text.replaceAll(`'/${font}'`, `'/${names[font]}'`).replaceAll(`"/${font}"`, `"/${names[font]}"`);
@@ -64,6 +76,7 @@ for (const file of hashed) {
 }
 for (const page of pages) {
   let html = await readFile(new URL(page, root), 'utf8');
+  if (page !== 'app/index.html') html = withStyle(html);
   for (const [file, name] of Object.entries(names)) html = html.replaceAll(`"/${file}"`, `"/${name}"`);
   if (page !== 'app/index.html') html = withFaq(withFooter(withCta(html)));
   if (page === 'changelog/index.html') html = withReleases(html, render(releases, live));
