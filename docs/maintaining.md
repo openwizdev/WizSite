@@ -31,7 +31,7 @@ Changes merge after green CI and one review from the other model family. No per-
 
 `_headers` sets site-wide security headers under `/*` (HSTS, a strict Content-Security-Policy with no `'unsafe-inline'` or `'unsafe-eval'`, `X-Frame-Options: DENY`, `Permissions-Policy`, `Cross-Origin-Opener-Policy: same-origin`, `X-Content-Type-Options: nosniff`, and `Referrer-Policy: strict-origin-when-cross-origin`). Under `/app/*`, `! Content-Security-Policy` and `! Referrer-Policy` detach the site-wide values before setting the stricter app policy so Cloudflare Pages does not comma-join both headers.
 
-For caching, `/*` defaults to `Cache-Control: public, max-age=0, must-revalidate` (keeping HTML and any unhashed `.css`/`.js` revalidated on every visit so a deploy never serves stale HTML pointing at removed hashed files). More-specific rules detach with `! Cache-Control` before setting a single value: fingerprinted and version-pinned styles/scripts (`/*.:hash.css`, `/*.:hash.js`) use `public, max-age=31536000, immutable`; fonts (`/fonts/*`) use `public, max-age=2592000, stale-while-revalidate=604800`; and unhashed images, icons, art, video, and captions (`/art/*`, `/brand/*`, `/drivers/logos/*`, root favicons, `/app/*.svg|png|ico`, `/*.mp4`, `/*.vtt`) use `public, max-age=604800, stale-while-revalidate=2592000`. These rules take effect when the zone's Browser Cache TTL is set to respect existing headers.
+For caching, `/*` defaults to `Cache-Control: public, max-age=0, must-revalidate` (keeping HTML and any unhashed `.css`/`.js` revalidated on every visit so a deploy never serves stale HTML pointing at removed hashed files). More-specific rules detach with `! Cache-Control` before setting a single value: fingerprinted and version-pinned styles/scripts (`/*.:hash.css`, `/*.:hash.js`) use `public, max-age=31536000, immutable`; fingerprinted fonts (`/fonts/*.woff2`, named `name.<hash>.woff2` by the build) use `public, max-age=31536000, immutable`; and unhashed images, icons, art, video, and captions (`/art/*`, `/brand/*`, `/drivers/logos/*`, root favicons, `/app/*.svg|png|ico`, `/*.mp4`, `/*.vtt`) use `public, max-age=604800, stale-while-revalidate=2592000`. These rules take effect when the zone's Browser Cache TTL is set to respect existing headers.
 
 The site-wide policy allows exactly two outside origins besides GitHub's API, both for Cloudflare Web Analytics: `script-src` allows `https://static.cloudflareinsights.com`, where the beacon script Cloudflare injects into every HTML page is served from, and `connect-src` allows `https://cloudflareinsights.com`, where the beacon reports (`/cdn-cgi/rum`). The `/app/*` policy does not allow them, because analytics is meant to exclude the app.
 
@@ -89,7 +89,15 @@ The logo files are the favicons (`favicon.ico` with 16, 32 and 48 px images, `fa
 
 The old README map (`docs/map.png`, and `docs/map-phone.png`) is for GitHub only, and the README no longer shows it: the build never copies it, and the check pins both by hash in `DOC_HASHES` like the icons. Its source is `maps/draw.mjs` in `openwizdev/.github`.
 
-The Geist and Geist Mono fonts ship unmodified with `fonts/OFL.txt`. Keep the licence in source and the static export. The build does not fetch fonts from an external service.
+The Geist (Version 1.802) and Geist Mono (Version 1.802) variable fonts ship subsetted with `fonts/OFL.txt`. Keep the OFL licence in source and the static export. The build does not fetch fonts from an external service, fingerprints both `.woff2` files (`fonts/Geist-var.<hash>.woff2` and `fonts/GeistMono-var.<hash>.woff2`), rewrites `url()` in CSS and `<link rel="preload">` in HTML, and `_headers` caches `/fonts/*.woff2` for one year (`public, max-age=31536000, immutable`). Both `@font-face` rules declare `unicode-range` so characters outside the subset fall back to the system font, and `tokens.css` keeps `font-display: optional`.
+
+To inspect the site's character set run `python3 scripts/font_chars.py`; `npm run check` fails if any built page, CSS `content:`, JS string, changelog or market entry uses a character outside the subset. To re-subset from upstream Geist 1.802 / Geist Mono 1.802 variable `.woff2` files (keeping the `wght` axis and `kern,liga,tnum,ccmp,locl,mark,mkmk` layout features):
+
+```sh
+UNICODES='U+0020-007E,U+00A0-00FF,U+0100-017F,U+2000-206F,U+20A0-20CF,U+2190-21FF,U+2212'
+pyftsubset Geist-var.woff2 --output-file=fonts/Geist-var.woff2 --flavor=woff2 --unicodes="$UNICODES" --layout-features='kern,liga,tnum,ccmp,locl,mark,mkmk'
+pyftsubset GeistMono-var.woff2 --output-file=fonts/GeistMono-var.woff2 --flavor=woff2 --unicodes="$UNICODES" --layout-features='kern,liga,tnum,ccmp,locl,mark,mkmk'
+```
 
 ## Privacy and verification limits
 
