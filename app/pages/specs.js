@@ -261,6 +261,7 @@
     const was = had ? active.getAttribute('data-focus') : null;
     build();
     if (!had || el.contains(document.activeElement)) return;
+    if (OW.v2 && active.isConnected && !active.closest('[hidden]')) return active.focus();
     const same = was && [...el.querySelectorAll('[data-focus]')].find(e => e.getAttribute('data-focus') === was);
     const target = OW.v2 && same?.disabled ? el.querySelector('.v2-rail-btn:not(:disabled)') : same;
     (target || el.querySelector('.spec-title') || document.querySelector('main h1'))?.focus();

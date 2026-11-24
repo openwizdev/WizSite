@@ -24,7 +24,7 @@ test('switch off: none of the v2 shell renders and demo=1 is ignored', async () 
 test('switch on + demo=1: renders v2 shell, deep links, interactions, and makes zero network requests', async () => {
   const run = await start();
   try {
-    await run.page.go(`${SITE}/app/?v2=dry-run&demo=1#/welcome`);
+    await run.page.go(`${SITE}/app/?v2=on&demo=1#/welcome`);
     await run.page.until(`document.body.innerText.includes('Your software factory, in one quiet room.')`, 'v2 welcome screen');
     assert.equal(await run.page.run(`document.documentElement.dataset.v2`), '1');
     assert.equal(await run.page.run(`document.querySelector('.v2-sample-tag').textContent`), 'Sample data');

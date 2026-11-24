@@ -253,6 +253,7 @@
   ];
 
   function shortcuts() {
+    if (OW.data.demo) return;
     if (dialog?.open) close(false);
     if (help?.open) return;
     if (!focusReturn) focusReturn = document.activeElement;

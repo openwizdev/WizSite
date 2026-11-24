@@ -8,6 +8,7 @@
   function initialDemoState() {
     return {
       feedIdx: 0,
+      draft: '',
       messages: [
         {
           id: 'm1',
@@ -258,11 +259,14 @@
         placeholder: 'Tell Wiz what to build or change…',
         'aria-label': 'Tell Wiz what to build or change',
       });
+      input.value = demo.draft;
+      input.addEventListener('input', () => { demo.draft = input.value; });
       const composer = h('form', { class: 'v2-composer', onsubmit: event => {
         event.preventDefault();
         const text = input.value;
         if (!text.trim()) return;
         input.value = '';
+        demo.draft = '';
         submitChatPrompt(text);
         input.focus({ preventScroll: true });
       } }, input, h('button', { type: 'submit', class: 'v2-send-btn', 'aria-label': 'Send message' }, icon('up')));
@@ -435,7 +439,10 @@
       settingsGroup('Connections', [connection('GitHub', 'github'), connection('Notifications', 'notifications')]),
       settingsGroup('Account', [
         choose('Repository', 'repository', ['Harbor · main', 'Harbor · staging']),
-        h('a', { class: 'v2-btn subtle v2-sign-out', href: '#/welcome' }, 'Sign out'),
+        h('a', { class: 'v2-btn subtle v2-sign-out', href: '#/welcome', onclick: () => {
+          demo = initialDemoState();
+          if (toastEl) toastEl.hidden = true;
+        } }, 'Sign out'),
       ])));
   }
 

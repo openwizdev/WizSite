@@ -1,6 +1,6 @@
 'use strict';
 (() => {
-  const { h, time } = OW.ui;
+  const { h, icon, time } = OW.ui;
   const GRILL = ['grill_round', 'grill_confirmation'];
   const SPEC = ['spec_confirmation', 'plan_approval'];
   const QUESTION = /^[A-Z]{1,2}[1-9][0-9]*$/;
@@ -166,17 +166,20 @@
       items.push(...(await decisions(repository, { kind: 'pull_request', number: pull.number }, pull.title, records, pulls.complete && got.complete, authors, gaps, bindings)));
     }
     const updated = new Map((data?.specIssues?.nodes || []).filter(Boolean).map(issue => [issue.number, Date.parse(issue.updatedAt) || 0]));
+    const progress = new Map();
     const specs = seen.specs.filter(spec => spec.total > 0 && spec.done < spec.total).map(spec => {
       const videos = (spec.detail?.comments?.nodes || []).filter(c => c && Number.isSafeInteger(c.databaseId) && authorOk(authors, c.author?.login)
         && VIDEO.test(String(c.body ?? ''))).sort((a, b) => b.databaseId - a.databaseId);
-      return { type: 'spec', key: `spec:${repository}#${spec.number}`, repository, subject: { kind: 'issue', number: spec.number },
+      const key = `spec:${repository}#${spec.number}`;
+      if (spec.done !== null) progress.set(key, `${spec.done} of ${spec.total} tickets complete`);
+      return { type: 'spec', key, repository, subject: { kind: 'issue', number: spec.number },
         title: spec.title, url: spec.url, at: updated.get(spec.number) ?? 0,
         video: videos.length ? { url: videos[0].body.match(VIDEO)[1] } : null, graph: spec.graph };
     });
     const byKey = (a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0);
     items.sort((a, b) => a.at - b.at || byKey(a, b));
     specs.sort((a, b) => b.at - a.at || byKey(a, b));
-    return { repository, items: [...items, ...specs], gaps: [...new Set(gaps)], bindings };
+    return { repository, items: [...items, ...specs], gaps: [...new Set(gaps)], bindings, progress };
   }
 
   const state = { key: null, run: null, result: null, failedSince: null, el: null, cards: new Map() };
@@ -226,20 +229,24 @@
     spec_confirmation: 'Spec to confirm',
     plan_approval: 'Plan to approve',
   };
-  function plain(item) {
-    const head = (word, tell) => h('a', { class: 'card v2-live-card', href: item.url, target: '_blank', rel: 'noreferrer', 'data-focus': `queue:${item.key}` },
-      h('div', { class: 'v2-label' }, `${word} · #${item.subject.number}${item.at ? ` · ${time(item.at)}` : ''}`),
-      h('h3', {}, item.title), h('p', {}, tell), h('span', { class: 'v2-queue-link' }, 'Open on GitHub'));
-    if (item.type === 'spec') {
-      const spec = OW.factory.model(OW.data.feeds)?.specs.find(spec => spec.number === item.subject.number);
-      const progress = spec?.total && spec.done !== null ? `${spec.done} of ${spec.total} tickets complete. ` : '';
-      return head('Spec to watch', progress + (item.video ? 'Narrated spec available on GitHub.' : 'See its plan on GitHub.'));
-    }
-    if (!item.request) {
-      return head('Decision couldn\'t be read', 'Its details or author couldn\'t be checked. Review it on GitHub.');
-    }
-    return head(WORDS[item.request.kind], item.current ? 'Review and answer on GitHub.' : 'Its source couldn\'t be checked yet. Review it on GitHub.');
-
+  function plain(item, progress) {
+    const request = item.request;
+    const spec = item.type === 'spec';
+    const label = spec ? 'Spec to watch' : request ? WORDS[request.kind] : 'Decision couldn\'t be read';
+    const detail = spec ? progress : request?.headline || request?.summary?.[0]
+      || request?.questions?.find(q => !request.answered.includes(q.id))?.decides;
+    const status = spec ? null : !request ? 'Its details or author couldn\'t be checked.'
+      : item.current ? null : 'Its source couldn\'t be checked yet.';
+    return [
+      h('a', { class: 'card v2-live-card', href: item.url, target: '_blank', rel: 'noreferrer', 'data-focus': `queue:${item.key}` },
+        h('div', { class: 'v2-label' }, `${label} · #${item.subject.number}${item.at ? ` · ${time(item.at)}` : ''}`),
+        h('h3', {}, item.title),
+        detail ? h('p', {}, detail) : null,
+        status ? h('p', {}, status) : null,
+        h('span', { class: 'v2-queue-link' }, 'Open on GitHub', icon('right'))),
+      item.video ? h('a', { class: 'v2-btn subtle v2-queue-video', href: item.video.url,
+        target: '_blank', rel: 'noreferrer', 'data-focus': `video:${item.key}` }, 'Watch the narrated spec', icon('right')) : null,
+    ].filter(Boolean);
   }
   function view() {
     const result = state.result;
@@ -247,8 +254,9 @@
     return { ...result, gaps: [...new Set([...result.gaps, 'the latest spec read'])],
       items: result.items.map(item => (item.type === 'decision' && item.current === true ? { ...item, current: null, checked_at: null } : item)) };
   }
-  function holder(item, bindings) {
-    const identity = JSON.stringify([{ ...item, checked_at: null }, bindings.get(item.key) ?? null]);
+  function holder(item, result) {
+    const progress = result.progress?.get(item.key);
+    const identity = JSON.stringify([{ ...item, checked_at: null }, result.bindings.get(item.key), progress]);
     const kept = state.cards.get(item.key);
     if (kept && kept.identity === identity) {
       kept.item.checked_at = item.checked_at;
@@ -257,7 +265,7 @@
     const el = h('div', { class: 'queue-item', 'data-key': item.key });
     const card = OW.cards?.[item.type];
     if (typeof card === 'function') card(item, el);
-    else el.replaceChildren(plain(item));
+    else el.replaceChildren(...plain(item, progress));
     state.cards.set(item.key, { identity, item, el });
     return el;
   }
@@ -301,11 +309,16 @@
       deck.controls?.replaceChildren(...(controls ? [controls] : []));
       deck.position = position;
     }
+    for (const row of [...deck.cards.children]) {
+      if (!keys.has(row.dataset.key)) row.remove();
+    }
     items.forEach((item, i) => {
-      const row = holder(item, result.bindings);
-      row.hidden = i !== index;
+      const row = holder(item, result);
+      row.hidden = Boolean(deck.controls) && i !== index;
       const before = deck.cards.children[i];
-      if (before !== row) deck.cards.insertBefore(row, before || null);
+      if (before === row) return;
+      if (before?.dataset.key === item.key) before.replaceWith(row);
+      else deck.cards.insertBefore(row, before || null);
     });
     while (deck.cards.children.length > items.length) deck.cards.lastElementChild.remove();
     deck.onCount?.();

@@ -132,6 +132,8 @@ test('switch on without card modules: plain cards link to GitHub, in the same or
     assert.match(await run.page.text(), /couldn't be read/i);
     await run.page.tap('Next card');
     assert.match(await run.page.text(), /Spec to watch · #61/i);
+    assert.match(await run.page.text(), /0 of 2 tickets complete/);
+    assert.equal(await run.page.run(`document.querySelector('.queue-item:not([hidden]) .v2-queue-video')?.href`), VIDEO);
     assert.deepEqual(run.world.violations, []);
   } finally {
     await run.close();
@@ -203,6 +205,36 @@ test('switch on: the signed-out copy no longer says read-only, and the queue lea
     await run.page.until(`document.querySelector('main h1')?.textContent === 'Feed'`, 'the feed');
     const nav = await run.page.run(`[...document.querySelectorAll('nav.main a')].map(a => a.getAttribute('href'))`);
     assert.deepEqual(nav, ['#/chat', '#/feed', '#/settings']);
+  } finally {
+    await run.close();
+  }
+});
+
+test('v2 Settings stays available after a failed Specs read and the palette offers current pages', async () => {
+  const run = await start();
+  try {
+    await queueWorld(run);
+    run.world.graphql.Specs = async () => ({ status: 502, json: { message: 'Bad Gateway' } });
+    await openQueue(run, 'dry-run');
+    await run.page.until(`document.body.innerText.includes("Feed couldn't be read from GitHub")`, 'the unknown Feed');
+    await run.page.tap('Refresh now');
+    await run.page.click('Settings');
+    await run.page.until(`document.querySelector('.v2-settings .v2-sign-out')`, 'settings after the read failed');
+    assert.match(await run.page.text(), /Where it runs\s+Coming soon/);
+    assert.match(await run.page.text(), /Specs: unknown/);
+    await run.page.run(`document.querySelector('.v2-settings button.repo').click()`);
+    await run.page.until(`document.querySelector('.v2-settings .repo-list button[aria-current="true"]')`, 'the repository choices');
+    await run.page.key('Escape');
+    await run.page.key('k', 'Ctrl');
+    await run.page.until(`OW.palette.shown()`, 'the command palette');
+    const results = await run.page.run(`document.querySelector('#palette-results').textContent`);
+    assert.match(results, /Chat.*Feed.*Settings/);
+    assert.doesNotMatch(results, /Show only (specs|tickets|agents)|synthetic notes|synthetic tags/i);
+    await run.page.key('Escape');
+    await run.page.tap('Sign out');
+    await run.page.until(`document.body.innerText.includes('Continue with GitHub')`, 'the signed-out screen');
+    assert.deepEqual(run.world.writes(), []);
+    assert.deepEqual(run.world.violations, []);
   } finally {
     await run.close();
   }
