@@ -79,6 +79,12 @@ DOC_HASHES = {
     'docs/evidence/speed/fonts/market-390x844.png': 'a183102af047c3fff12ad64437419255f0e3699e7545ca140d4c1b94f427b12e',
     'docs/evidence/speed/fonts/team-1280x800.png': '39341122e3a7f63eb6edc82f7be689f406fad216bf23d3e5fcff0eaa9e08cafd',
     'docs/evidence/speed/fonts/team-390x844.png': 'c1ba52e547ef48d4134271b1648bc8e67b6adf1ea6820165b90bc56e51d1267b',
+    'docs/evidence/speed/not-found/after-404-1280.png': 'b1afd463d8a49b53ab0a5ce3c594d2c344ade0ebcc0f90b988e1978e54d6b7bc',
+    'docs/evidence/speed/not-found/after-404-390.png': 'd5844541c133a1deaae6107b6bd3bd0c087909c31b992f6072ecba2affc6da7a',
+    'docs/evidence/speed/not-found/before-faq-1280.png': '3b014e1cc37521a0a36dad20fb2fc85045916c94880ebed4d7509c12770c26cb',
+    'docs/evidence/speed/not-found/before-faq-390.png': '188492e48f88b43991a01ed922814c56c6f7f2a71de5c8e6d9189ac3a4b0ba20',
+    'docs/evidence/speed/not-found/before-landing-1280.png': 'd1b4df666035bc5bcedf3a450da58f12bf069f4c6fdcce1d0b8ad210710d81ee',
+    'docs/evidence/speed/not-found/before-landing-390.png': 'd311786755c286f4e13d1b85d8417a3d4ad7d9405459503493a7599316c843da',
 }
 VECTORS = ('favicon.svg', 'brand/openwiz-lockup.svg', 'app/mark.svg', 'app/icon.svg', 'app/wiz-reviewer.svg')
 MARK, OLD_MARK = '#cfc6b8', '#2b2bff'
