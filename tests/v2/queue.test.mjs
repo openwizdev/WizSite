@@ -7,7 +7,7 @@ const ROOT = new URL('../../', import.meta.url);
 const grill = JSON.parse(await readFile(new URL('tests/v2/fixtures/queue/grill-round.json', ROOT), 'utf8'));
 const FLEET = grill.fleet;
 const RATE = { limit: 5000, remaining: 4800, resetAt: '2099-01-01T00:00:00Z' };
-const EMPTY = 'No open spec or grill pull request is waiting on you';
+const EMPTY = 'Nothing is waiting on you';
 const VIDEO = 'https://example.com/synthetic/spec.mp4';
 
 const specIssue = (number, title, updatedAt, total, completed) => ({ number, title, url: `https://github.com/acme/factory/issues/${number}`,
@@ -59,7 +59,7 @@ async function openQueue(run, value, { card = false, cards = false } = {}) {
 const wasChecked = (world, id) => world.log.some(r => r.method === 'GET' && r.path === `/repos/acme/factory/issues/comments/${id}`);
 const latestOf = (run, key) => run.page.run(`window.drawn.filter(item => item.key === ${JSON.stringify(key)}).pop() ?? null`);
 async function triggerRefresh(run) {
-  await run.page.run(`OW.data.refreshAll()`);
+  await run.page.tap('Refresh now');
 }
 async function refreshed(run) {
   const was = await run.page.run('OW.data.feeds.specs.readAt');
@@ -102,6 +102,11 @@ test('switch on: decisions and specs show in one ordered queue, drawn through th
     assert.deepEqual(tags.subject, { kind: 'issue', number: 61 });
     assert.equal(notes.video, null);
     assert.deepEqual(notes.graph, { tickets: [], unknown: 0 });
+    assert.equal(await run.page.run(`document.querySelectorAll('.queue-item:not([hidden])').length`), 1);
+    await run.page.run(`document.querySelector('button[aria-label="Next card"]').focus()`);
+    await run.page.key('Enter');
+    await run.page.until(`location.hash === '#/feed/2' && document.querySelector('.queue-item:not([hidden])')?.dataset.key === ${JSON.stringify(ROUND)}`, 'second Feed item');
+    await run.page.go(`${SITE}/app/#/queue`);
     const text = await run.page.text();
     assert.ok(text.indexOf('Decision card decision:acme/factory#60:9100021') < text.indexOf('Spec card spec:acme/factory#61'), text);
     assert.ok(!text.includes('#62'), 'a spec with every ticket done is not in the queue');
@@ -117,6 +122,7 @@ test('switch on without card modules: plain cards link to GitHub, in the same or
   try {
     await queueWorld(run);
     await openQueue(run, 'dry-run');
+    await run.page.go(`${SITE}/app/#/queue`);
     await run.page.until(`document.querySelectorAll('.queue a.card').length === 5`, 'five plain cards');
     const links = await run.page.run(`[...document.querySelectorAll('.queue a.card')].map(a => [a.getAttribute('href'), a.target])`);
     assert.deepEqual(links, [['https://github.com/acme/factory/issues/60#issuecomment-9100021', '_blank'],
@@ -124,7 +130,7 @@ test('switch on without card modules: plain cards link to GitHub, in the same or
       ['https://github.com/acme/factory/issues/61', '_blank'], ['https://github.com/acme/factory/issues/60', '_blank']]);
     const text = await run.page.text();
     assert.match(text, /Spec to confirm · #60/);
-    assert.match(text, /Grill round to answer · #7/);
+    assert.match(text, /Questions to answer · #7/);
     assert.match(text, /couldn't be read/);
     assert.match(text, /Spec to watch · #61/);
     assert.deepEqual(run.world.violations, []);
@@ -190,7 +196,7 @@ test('switch on: the signed-out copy no longer says read-only, and the queue lea
     await run.page.until(`document.readyState === 'complete'`, 'the app page');
     await run.page.run(`localStorage.setItem('openwiz.app.v2', '"on"')`);
     await run.page.go(`${SITE}/app/`);
-    await run.page.until(`document.body.innerText.includes('Sign in with GitHub')`, 'the signed-out screen');
+    await run.page.until(`document.body.innerText.includes('Continue with GitHub')`, 'the signed-out screen');
     const text = await run.page.text();
     assert.ok(!/read-only/i.test(text), text);
     await signIn(run.page);
