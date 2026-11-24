@@ -8,7 +8,7 @@
   const ROUTES = () => OW.pages.map(page => page.id);
   let built = null;
   const INSTALL = 'https://github.com/apps/openwiz-viewer/installations/new';
-  const v2 = Boolean(OW.records?.enabled?.());
+  const v2 = data.v2.get() !== 'off';
   const isDemo = Boolean(v2 && data.demo?.());
   let queuePage;
 
