@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { SITE, start } from './browser.mjs';
 
-const ROOT = new URL('../../', import.meta.url);
 const FORMS = new URL('fixtures/forms/', import.meta.url);
 const json = async name => JSON.parse(await readFile(new URL(name, FORMS), 'utf8'));
 const KINDS = ['grill_round', 'grill_confirmation', 'spec_confirmation', 'plan_approval'];
@@ -15,21 +14,8 @@ const page = () => run.page;
 
 before(async () => {
   run = await start();
-  for (const file of ['decision.js', 'decision.css']) {
-    const data = await readFile(new URL(`app/cards/${file}`, ROOT));
-    run.world.site[`/app/cards/${file}`] = () => ({ status: 200, raw: data, type: file.split('.').pop() });
-  }
   await run.page.go(`${SITE}/app/`);
   await run.page.until(`document.readyState === 'complete' && window.OW && OW.ui`, 'the app page');
-  await run.page.run(`new Promise((resolve, reject) => {
-    const link = document.createElement('link');
-    link.rel = 'stylesheet'; link.href = '/app/cards/decision.css';
-    document.head.append(link);
-    const script = document.createElement('script');
-    script.src = '/app/cards/decision.js'; script.onload = resolve; script.onerror = reject;
-    document.head.append(script);
-  })`);
-  await run.page.until(`typeof OW.cards.decision === 'function'`, 'the decision card');
 });
 
 after(async () => {
@@ -137,6 +123,23 @@ async function answer(input) {
     await page().tap(TAPS[choice]);
   }
 }
+
+test('the built app loads the decision card script and stylesheet', async () => {
+  const loaded = await page().run(`(() => {
+    const link = [...document.querySelectorAll('link[rel="stylesheet"]')].find(el => /^\\/app\\/cards\\/decision\\.[0-9a-f]{10}\\.css$/.test(el.getAttribute('href') ?? ''));
+    const script = [...document.querySelectorAll('script[src]')].find(el => /^\\/app\\/cards\\/decision\\.[0-9a-f]{10}\\.js$/.test(el.getAttribute('src') ?? ''));
+    return {
+      fn: typeof OW.cards?.decision,
+      script: script?.getAttribute('src') ?? null,
+      style: link?.getAttribute('href') ?? null,
+      rules: link?.sheet?.cssRules?.length ?? 0,
+    };
+  })()`);
+  assert.equal(loaded.fn, 'function', 'app/index.html did not load OW.cards.decision');
+  assert.match(loaded.script ?? '', /^\/app\/cards\/decision\.[0-9a-f]{10}\.js$/, 'app/index.html did not load fingerprinted decision.js');
+  assert.match(loaded.style ?? '', /^\/app\/cards\/decision\.[0-9a-f]{10}\.css$/, 'app/index.html did not load fingerprinted decision.css');
+  assert.ok(loaded.rules > 0, 'decision.css had no loaded stylesheet rules');
+});
 
 for (const choice of ['yes', 'no', 'own']) {
   for (const kind of KINDS) {
