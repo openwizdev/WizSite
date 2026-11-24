@@ -371,7 +371,8 @@ class Checks(unittest.TestCase):
                 (spec(lambda t: re.sub(r'<track [^>]*>', '', t, count=1)), 'spec video needs default captions'),
                 (lambda t: t.replace('class="spec-link"', 'class="spec-link" hidden', 1), 'plain link to the spec video'),
                 (spec(lambda t: t.replace(' muted', '', 1)), 'spec video must start muted inline'),
-                (spec(lambda t: t.replace('preload="none"', 'preload="auto"', 1)), 'recording must be opt-in')):
+                (spec(lambda t: t.replace('preload="none"', 'preload="auto"', 1)), 'recording must be opt-in'),
+                (spec(lambda t: t.replace(' controls', ' loop controls', 1)), 'recording must be opt-in')):
             with self.subTest(error=error), tempfile.TemporaryDirectory() as temp:
                 root = Path(temp) / 'dist'
                 shutil.copytree(ROOT / 'dist', root)
