@@ -180,8 +180,8 @@ class Checks(unittest.TestCase):
                 (lambda t: t.replace('The real narrated spec of an OpenWiz-built to-do app', 'A sample spec'), "to-do app's real spec"),
                 (lambda t: t.replace('<p class="spec-wish"><span>The wish</span>Build a to-do app</p>', '<p class="spec-wish">A wish</p>'), 'poster must carry the wish'),
                 (lambda t: t.replace('<span class="spec-time">0:38</span>', ''), 'one play control with the duration'),
-                (lambda t: t.replace('<li>4 tickets</li>', '<li>tickets</li>'), 'step line must read'),
-                (lambda t: t.replace('<li>merged</li>', '<li>merged</li><li>shipped</li>'), 'step line must read'),
+                (lambda t: t.replace('<span class="step-mark step-count">4</span> ', '<span class="step-mark step-count"></span> '), 'step line must read'),
+                (lambda t: t.replace('<span class="step-meta">20 Nov</span></span></li>', '<span class="step-meta">20 Nov</span></span></li><li>shipped</li>'), 'step line must read'),
                 (lambda t: t.replace('<ol class="moment-steps"', '<p>One wish becomes a spec, then four tickets, then agents build them and the pull requests merge.</p><ol class="moment-steps"'), 'words outside their small links'),
                 (lambda t: t.replace('<summary>The live app</summary>', '<summary>The app</summary>'), 'small links must be'),
                 (lambda t: t.replace('<p class="reply">Yes, greyed out.</p>', '<p class="reply">Yes.</p>'), '"The questions" link must show'),
@@ -370,7 +370,10 @@ class Checks(unittest.TestCase):
             mark = '<div class="spec-moment">'
             return lambda t: t.split(mark)[0] + mark + change(t.split(mark, 1)[1])
         for change, error in (
-                (spec(lambda t: re.sub(r' poster="[^"]*"', '', t, count=1)), 'spec video needs a pinned poster'),
+                (spec(lambda t: t.replace(' preload="none"', ' poster="/art/todo-spec-engraved.webp" preload="none"', 1)), 'spec video needs a pinned poster'),
+                (spec(lambda t: t.replace('<template class="spec-later">', '', 1).replace('</picture></template>', '</picture>', 1)), 'spec video needs a pinned poster'),
+                (spec(lambda t: t.replace(' srcset="/art/todo-spec-engraved-640.webp"', ' srcset="/art/todo-spec-engraved.webp"', 1)), 'spec video needs a pinned poster'),
+                (spec(lambda t: t.replace(' loading="lazy" decoding', ' decoding', 1)), 'spec video needs a pinned poster'),
                 (spec(lambda t: re.sub(r'<track [^>]*>', '', t, count=1)), 'spec video needs default captions'),
                 (lambda t: t.replace('class="spec-link"', 'class="spec-link" hidden', 1), 'plain link to the spec video'),
                 (spec(lambda t: t.replace(' muted', '', 1)), 'spec video must start muted inline'),

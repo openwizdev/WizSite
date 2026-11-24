@@ -14,7 +14,7 @@ TODO_RUN = (
     ('openwizdev.github.io/todo-demo',),
 )
 TODO_APP = '/art/todo-app.webp'
-MOMENT_STEPS = ('spec', '4 tickets', 'agents building', 'merged')
+MOMENT_STEPS = ('Spec #1', '4 tickets #2–#5', 'Agents building', '4 merged 20 Nov')
 MOMENT_LINKS = ('The questions', 'The spec', 'The live app')
 MOMENT_WORDS = 30
 ART_HASHES = {
@@ -40,6 +40,7 @@ ART_HASHES = {
     'art/hero-steam-frames.webp': '20f057c963be16ebc3cabbf1d2ab849e2e8144d29a3e419344a867eef2c41f3c',
     'art/todo-spec.mp4': '52bb1fa94a154e17270f7512db19efcedae921e4769a28742bc8a36093d1c732',
     'art/todo-spec-engraved.webp': '177a5d4c8f4d2d9e1bdfb30fb8b87f4d76aa5e118ae22aa43f47bbd6ad27cc11',
+    'art/todo-spec-engraved-640.webp': '48bdac72984be6510a611f7332f96e96e7fcdab3c66dc24a498b6c612dd013fe',
     'art/todo-spec.vtt': '47e9ffb41081dd72f541110c43312521a8dd92f1c8e58c11092ecd0daa74eee2',
     'art/todo-app.webp': 'ccc5be87687b1d4ac387cfb623033c0f567890cfe73570f8e4d4bb4b8a81de54',
     'art/spec-video.mp4': 'feb357b9a80453d676123a31285a36c34b5873e102ed58c95728bfd6315bfe16',
@@ -769,7 +770,10 @@ def check_site(root, registry=ROOT / 'market/registry.json'):
     clip = next((v for v in page.videos if 'spec-video' in (v.get('class') or '').split()), {})
     assert clip.get('preload') == 'none' and 'autoplay' not in clip and 'loop' not in clip, 'spec recording must be opt-in'
     assert 'muted' in clip and 'playsinline' in clip, 'spec video must start muted inline'
-    assert clip.get('poster', '').removeprefix('/') in ART, 'spec video needs a pinned poster'
+    landing_html = (root / 'index.html').read_text()
+    still = re.search(r'<template class="spec-later"><picture class="spec-still">\s*<source media="\(max-width: 599px\)" srcset="/([^"]+)" width="640" height="640">\s*<img src="/([^"]+)"([^>]*)>\s*</picture></template>', landing_html)
+    assert 'poster' not in clip and still and {still[1], still[2]} <= ART and still[1] != still[2] and 'loading="lazy"' in still[3] and 'alt=""' in still[3], \
+        'spec video needs a pinned poster that waits for the viewport: a <picture class="spec-still"> in a <template class="spec-later"> with a 640 px phone source, no poster attribute'
     assert any(t.get('kind') == 'captions' and 'default' in t and t.get('src', '').removeprefix('/') in ART for t in page.tracks_of(clip)), 'spec video needs default captions'
     assert any(a.get('href') == clip.get('src') and 'hidden' not in a for a in page.links), 'needs a plain link to the spec video'
     for attrs in page.buttons:

@@ -141,6 +141,9 @@ async function layout(page, where, width, mode) {
     return {
       scroll: document.scrollingElement.scrollWidth, inner: innerWidth,
       list: box(list), rows, poster: box(document.querySelector('.moments .spec-frame')),
+      cells: [...list.children].map(li => ({ mark: shown(li.querySelector('.step-mark')),
+        label: parseFloat(getComputedStyle(li.querySelector('.step-label') || li).fontSize) })),
+      pulse: getComputedStyle(list.querySelector('.step-dot') || list).animationName,
       pause: shown(pause) ? box(pause) : null, window: box(document.querySelector('.product-window')),
       play: shown(play) ? box(play) : null,
       wizTops: [...new Set(wizes.map(w => Math.round(w.top)))],
@@ -152,7 +155,10 @@ async function layout(page, where, width, mode) {
     };
   })()`);
   expect(facts.scroll <= facts.inner, where, `sideways scroll (${facts.scroll}px content in a ${facts.inner}px window)`);
-  expect(facts.rows.length === 1, where, `the step line under the poster wraps onto ${facts.rows.length} rows`);
+  const grid = width < 600 ? [2, 2] : [4];
+  expect(facts.rows.map(r => r.length).join() === grid.join(), where, `the step strip under the poster shows rows of ${facts.rows.map(r => r.length)}, not ${grid}`);
+  expect(facts.cells.length === 4 && facts.cells.every(c => c.mark && c.label >= 14), where, `each step needs a state mark and a label of at least 14px: ${JSON.stringify(facts.cells)}`);
+  expect(mode === 'reduced' ? facts.pulse === 'none' : true, where, `the agents' dot still pulses with reduced motion (${facts.pulse})`);
   for (const row of facts.rows) {
     const left = Math.min(...row.map(i => i.left));
     const right = Math.max(...row.map(i => i.right));

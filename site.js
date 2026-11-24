@@ -288,6 +288,14 @@ function specVideo() {
   const frame = video.closest('.spec-frame');
   const track = video.textTracks[0];
   frame?.classList.add('is-resting');
+  const later = frame?.querySelector('.spec-later');
+  const still = () => later?.isConnected && later.replaceWith(later.content.cloneNode(true));
+  if (later && 'IntersectionObserver' in window) {
+    const near = new IntersectionObserver(entries => {
+      if (entries.some(entry => entry.isIntersecting)) { near.disconnect(); still(); }
+    }, { rootMargin: '600px 0px' });
+    near.observe(frame);
+  } else still();
   video.controls = false;
   if (track) track.mode = 'hidden';
   sound.hidden = false;
