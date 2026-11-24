@@ -125,7 +125,8 @@ BOOK_STYLE = 'book/book.css'
 BOOK_SCRIPT = 'book/book.js'
 BOOK_MANIFEST = 'book/manifest.webmanifest'
 BOOK_SW = 'book/sw.js'
-BOOK_CSP = ("default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; media-src 'self'; font-src 'self'; "
+BOOK_CSP = ("default-src 'none'; script-src 'self' https://challenges.cloudflare.com; "
+            "frame-src https://challenges.cloudflare.com; style-src 'self'; img-src 'self'; media-src 'self'; font-src 'self'; "
             "connect-src 'self'; worker-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
 BOOK_PRICE = re.compile(r'[$€£]\s*\d|\b(?:price|pricing|cost|payment|pay|paid|checkout|billing|per\s+(?:month|seat|user))\b', re.I)
 BOOK_COPY = ('Book 30 minutes with Jake', '30 minutes', 'Your repo and your agent', 'A pull request ships')
@@ -1871,6 +1872,7 @@ def check_book(root, names, pages):
     headers = (root / '_headers').read_text()
     rule = re.search(r'^/book/\*\n((?:  .*\n?)*)', headers, re.M)
     assert rule and f'  Content-Security-Policy: {BOOK_CSP}' in rule[1].splitlines(), '_headers must give /book/* the book CSP'
+    assert '  ! Content-Security-Policy' in rule[1].splitlines(), '_headers must detach the site CSP for /book/*'
     assert '  Referrer-Policy: no-referrer' in rule[1].splitlines(), '_headers must give /book/* no-referrer'
     assert '  X-Content-Type-Options: nosniff' in rule[1].splitlines(), '_headers must give /book/* nosniff'
 
