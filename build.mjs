@@ -9,11 +9,12 @@ const vendor = ['vendor/gsap-3.15.1.min.js', 'vendor/GSAP-LICENSE.txt', 'vendor/
 const art = (await readdir(new URL('art/', root))).filter(name => name.endsWith('.webp')).sort().map(name => `art/${name}`);
 const driverLogos = ['drivers/logos/boat-dev.svg', 'drivers/logos/cloudroom.png', 'drivers/logos/monitor.svg', 'drivers/logos/amp.svg', 'drivers/logos/antigravity.svg', 'drivers/logos/augment.svg', 'drivers/logos/capy.svg', 'drivers/logos/cline.svg', 'drivers/logos/conductor.svg', 'drivers/logos/crush.png', 'drivers/logos/cursor.svg', 'drivers/logos/devin.svg', 'drivers/logos/factory.svg', 'drivers/logos/gemini-cli.svg', 'drivers/logos/goose.png', 'drivers/logos/hermes.png', 'drivers/logos/kilo-code.svg', 'drivers/logos/kimi-code.svg', 'drivers/logos/kiro.svg', 'drivers/logos/ona.svg', 'drivers/logos/openclaw.svg', 'drivers/logos/opencode.svg', 'drivers/logos/openhands.svg', 'drivers/logos/pane.svg', 'drivers/logos/pi.svg', 'drivers/logos/qwen-code.svg', 'drivers/logos/sculptor.svg', 'drivers/logos/tembo.svg', 'drivers/logos/warp.svg'];
 const pages = ['index.html', 'changelog/index.html', 'drivers/index.html', 'team/index.html', 'faq/index.html', 'market/index.html', 'app/index.html'];
-const cta = await readFile(new URL('header-cta.html', root), 'utf8');
-const withCta = html => {
-  const bar = '  </nav>\n</header>';
-  if (html.split(bar).length !== 2) throw new Error('a site page needs exactly one top bar');
-  return html.replace(bar, cta + bar);
+const header = await readFile(new URL('header.html', root), 'utf8');
+const withHeader = (html, page) => {
+  const slot = '<template data-slot="header"></template>\n';
+  if (html.split(slot).length !== 2) throw new Error('a site page needs exactly one header slot');
+  const href = '/' + page.replace(/index\.html$/, '');
+  return html.replace(slot, header.replace(`href="${href}"`, `href="${href}" aria-current="page"`));
 };
 const footer = await readFile(new URL('footer.html', root), 'utf8');
 const withFooter = html => {
@@ -52,7 +53,7 @@ for (const file of hashed) {
 for (const page of pages) {
   let html = await readFile(new URL(page, root), 'utf8');
   for (const [file, name] of Object.entries(names)) html = html.replaceAll(`"/${file}"`, `"/${name}"`);
-  if (page !== 'app/index.html') html = withFaq(withFooter(withCta(html)));
+  if (page !== 'app/index.html') html = withFaq(withFooter(withHeader(html, page)));
   if (page === 'changelog/index.html') html = withReleases(html, render(releases, live));
   if (page === 'market/index.html') html = withMarket(html, renderMarket(registry));
   await put(page, html);
