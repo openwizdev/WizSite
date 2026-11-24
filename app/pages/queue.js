@@ -172,7 +172,7 @@
       const videos = (spec.detail?.comments?.nodes || []).filter(c => c && Number.isSafeInteger(c.databaseId) && authorOk(authors, c.author?.login)
         && VIDEO.test(String(c.body ?? ''))).sort((a, b) => b.databaseId - a.databaseId);
       const key = `spec:${repository}#${spec.number}`;
-      if (spec.done !== null) progress.set(key, `${spec.done} of ${spec.total} tickets complete`);
+      if (spec.done !== null) progress.set(key, { merged: spec.done, total: spec.total });
       return { type: 'spec', key, repository, subject: { kind: 'issue', number: spec.number },
         title: spec.title, url: spec.url, at: updated.get(spec.number) ?? 0,
         video: videos.length ? { url: videos[0].body.match(VIDEO)[1] } : null, graph: spec.graph };
@@ -250,7 +250,7 @@
     const request = item.request;
     const spec = item.type === 'spec';
     const label = spec ? 'Spec to watch' : request ? WORDS[request.kind] : 'Decision couldn\'t be read';
-    const detail = spec ? progress : request?.headline || request?.summary?.[0]
+    const detail = spec ? (progress && `${progress.merged} of ${progress.total} tickets complete`) : request?.headline || request?.summary?.[0]
       || request?.questions?.find(q => !request.answered.includes(q.id))?.decides;
     const status = spec ? null : !request ? 'Its details or author couldn\'t be checked.'
       : item.current ? null : 'Its source couldn\'t be checked yet.';
@@ -268,7 +268,7 @@
   function view() {
     const result = state.result;
     if (!result || state.failedSince === null) return result;
-    return { ...result, gaps: [...new Set([...result.gaps, 'the latest spec read'])],
+    return { ...result,
       items: result.items.map(item => (item.type === 'decision' && item.current === true ? { ...item, current: null, checked_at: null } : item)) };
   }
   function saveDraft(kept) {
@@ -319,7 +319,10 @@
 
   function draw(el) {
     const { deck } = state;
-    const result = view();
+    const { allClear, buildingSection, pager } = OW.v2 ?? {};
+    const unknown = deck.specs.state === 'unknown';
+    const stale = state.failedSince !== null;
+    const result = unknown ? null : view();
     const items = result ? result.items.filter(shown) : [];
     const keys = new Set(items.map(item => item.key));
     if (result) {
@@ -337,14 +340,21 @@
       }
     }
     const gaps = result?.gaps || [];
-    const message = !result ? 'Reading GitHub…' : gaps.length
-      ? `This list may be missing items: GitHub gave only part of ${gaps.join(', ')}. The app tries again on its own.`
+    const pause = OW.data.paused() ? `GitHub’s rate limit paused reads until ${time(OW.data.limit.pausedUntil)}.` : '';
+    const gap = gaps.length ? `This list may be missing items: GitHub gave only part of ${gaps.join(', ')}.` : '';
+    const message = unknown ? "Feed couldn't be read from GitHub. The app tries again on its own."
+      : stale ? `Couldn't read Specs from GitHub. Showing the last successful read.${gap ? ` ${gap}` : ''}`
+      : !result ? 'Reading GitHub…'
+      : gap ? `${gap} The app tries again on its own.`
       : items.length ? '' : `${EMPTY}.`;
-    if (deck.message !== message) {
+    if (deck.message !== message || deck.pause !== pause) {
       deck.message = message;
-      const notice = message && (gaps.length ? OW.ui.unknown(message) : result
-        ? h('div', { class: 'v2-clear-card' }, h('h2', {}, 'All clear'), h('p', {}, message)) : OW.ui.placeholder(message));
-      deck.status.replaceChildren(...(notice ? [notice] : []));
+      deck.pause = pause;
+      const notice = !message ? null
+        : unknown || stale || gap ? OW.ui.unknown(message)
+        : result ? (allClear?.(message) ?? OW.ui.placeholder(message))
+        : OW.ui.placeholder(message);
+      deck.status.replaceChildren(...[pause ? h('p', { class: 'v2-pause-note' }, pause) : null, notice].filter(Boolean));
     }
 
     if (!deck.activeKey) {
@@ -355,13 +365,23 @@
     const index = Math.max(0, selected);
     deck.activeKey = items[index]?.key;
     deck.keys = items.map(item => item.key);
+    if (deck.result !== result || deck.buildingKey !== deck.activeKey) {
+      deck.result = result;
+      deck.buildingKey = deck.activeKey;
+      const projects = items.flatMap(item => {
+        const progress = result?.progress?.get(item.key);
+        return progress && item.key !== deck.activeKey ? [{ title: item.title, href: item.url, ...progress }] : [];
+      }).slice(0, 3);
+      const building = buildingSection?.(projects);
+      deck.building.replaceChildren(...(building ? [building] : []));
+    }
     const position = `${index}/${items.length}`;
     if (deck.position !== position) {
       const go = next => {
         deck.activeKey = deck.keys[next];
         updateDeck(el);
       };
-      const controls = OW.v2?.pager(index, items.length, go);
+      const controls = pager?.(index, items.length, go);
       deck.controls?.replaceChildren(...(controls ? [controls] : []));
       deck.position = position;
     }
@@ -386,18 +406,20 @@
     icon: 'clock',
     v2: true,
     feeds: ['specs'],
-    badge: () => state.result?.repository === OW.data.repo.get()?.full ? view()?.items.filter(shown).length || null : null,
+    badge: () => state.result?.repository === OW.data.repo.get()?.full ? view()?.items.filter(item => item.type === 'decision' && shown(item)).length || null : null,
     render(el, feeds, { arg, controls, onCount } = {}) {
       if (!el.contains(state.deck?.cards)) {
         const status = h('div', { class: 'v2-queue-status' });
         const cards = h('div', { class: 'queue' });
-        el.replaceChildren(h('div', { class: 'v2-live-feed' }, status, cards));
-        state.deck = { status, controls, cards, arg, onCount };
+        const building = h('div');
+        el.replaceChildren(h('div', { class: 'v2-live-feed' }, status, cards, building));
+        state.deck = { status, controls, cards, building, arg, onCount };
       } else if (state.deck.arg !== arg) {
         state.deck.arg = arg;
         state.deck.activeKey = null;
       }
       state.el = el;
+      state.deck.specs = feeds.specs;
       refresh(feeds);
       updateDeck(el);
     },

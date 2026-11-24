@@ -25,22 +25,31 @@ test('switch on + demo=1: renders v2 shell, deep links, interactions, and makes 
   const run = await start();
   try {
     await run.page.go(`${SITE}/app/?v2=on&demo=1#/welcome`);
-    await run.page.until(`document.body.innerText.includes('Your software factory, in one quiet room.')`, 'v2 welcome screen');
+    await run.page.until(`document.body.innerText.includes('Run your software factory from here.')`, 'v2 welcome screen');
     assert.equal(await run.page.run(`document.documentElement.dataset.v2`), '1');
     assert.equal(await run.page.run(`document.querySelector('.v2-sample-tag').textContent`), 'Sample data');
+    assert.equal(await run.page.run(`document.querySelector('.v2-welcome-sample').getAttribute('href')`), '/api/sign-in/start');
 
     await run.page.click('Open Harbor workspace');
     await run.page.until(`location.hash === '#/chat' && document.body.innerText.includes('Accept all 3')`, 'v2 chat with grill round');
     const nav = await run.page.run(`[...document.querySelectorAll('nav.main a')].map(a => a.getAttribute('href'))`);
     assert.deepEqual(nav, ['#/chat', '#/feed', '#/settings']);
 
-    await run.page.run(`document.querySelector('.v2-composer input').focus()`);
+    await run.page.run(`window.originalMessages = [...document.querySelector('.v2-chat-thread').children];
+      window.originalChoices = [...document.querySelectorAll('.v2-q-pill')];
+      document.querySelector('.v2-composer input').focus()`);
     await run.page.type('An unfinished idea');
     await run.page.click('Right away');
     assert.equal(await run.page.run(`document.activeElement.value`), 'An unfinished idea');
+    assert.equal(await run.page.run(`window.originalChoices.every((choice, i) =>
+      choice === document.querySelectorAll('.v2-q-pill')[i])`), true, 'answering replaced question controls');
+    assert.equal(await run.page.run(`window.originalChoices[1].getAttribute('aria-pressed')`), 'true');
     await run.page.run(`document.querySelector('.v2-q-pill').click()`);
     await run.page.click('Accept all 3');
     await run.page.until(`document.body.innerText.includes('Answers saved · Open Feed')`, 'grill accepted');
+    assert.equal(await run.page.run(`window.originalMessages.every((message, i) =>
+      message === document.querySelector('.v2-chat-thread').children[i])`), true, 'accepting replayed the thread');
+    assert.equal(await run.page.run(`document.querySelector('.v2-chat-thread').children.length`), 5);
 
     await run.page.go(`${SITE}/app/?v2=dry-run&demo=1#/feed`);
     await run.page.until(`document.body.innerText.includes('Magic-link sign-in')`, 'feed spec card');
@@ -51,14 +60,42 @@ test('switch on + demo=1: renders v2 shell, deep links, interactions, and makes 
     await run.page.tap('Change something');
     await run.page.type('Make the link last ten minutes');
     await run.page.tap('Send change');
-    assert.match(await run.page.text(), /Make the link last ten minutes/);
-    assert.equal(await run.page.run(`document.activeElement.dataset.focus`), 'change');
-    await run.page.click('Ship it');
-    await run.page.until(`document.body.innerText.includes('Pricing copy on the checkout banner')`, 'advances after shipping');
+    await run.page.until(`location.hash === '#/feed/2' && document.activeElement.textContent === 'Keep the free plan?'`, 'a change advances to the next card and focuses its title');
+    await run.page.go(`${SITE}/app/?demo=1#/chat`);
+    await run.page.until(`document.body.innerText.includes('Make the link last ten minutes')`, 'change request recorded in Chat');
+    await run.page.go(`${SITE}/app/?demo=1#/feed/clear`);
+    await run.page.until(`document.querySelector('.v2-building')?.textContent.includes('Magic-link sign-in')`, 'revised spec moved to Building');
 
     await run.page.go(`${SITE}/app/?v2=dry-run&demo=1#/feed/2`);
-    await run.page.until(`document.body.innerText.includes('Pricing copy on the checkout banner')`, 'deep link to decision card');
-    assert.ok((await run.page.text()).includes('Show "Save 20%"'));
+    await run.page.until(`document.querySelector('.v2-card-title')?.textContent === 'Keep the free plan?'`, 'deep link to decision card');
+    assert.match(await run.page.text(), /Recommended: keep it, cap at 3 seats/);
+    assert.equal(await run.page.run(`document.querySelector('.v2-hero-card .v2-preview')`), null);
+    await run.page.go(`${SITE}/app/?demo=1#/feed`);
+    const badges = () => run.page.run(`[...document.querySelectorAll('a[href="#/feed"] .v2-badge')].map(badge => badge.hidden ? null : badge.textContent)`);
+    await run.page.until(`document.querySelector('.v2-card-title')?.textContent === 'Magic-link sign-in'`, 'spec card to ship');
+    assert.deepEqual(await badges(), ['3', '3']);
+    await run.page.click('Ship it');
+    await run.page.until(`document.querySelector('.v2-card-title')?.textContent === 'Keep the free plan?'`, 'advances after shipping');
+    assert.deepEqual(await badges(), ['2', '2']);
+    await run.page.click('Ship it');
+    await run.page.until(`document.querySelector('.v2-card-title')?.textContent === 'Retention window for deleted projects'`, 'next decision');
+    assert.deepEqual(await badges(), ['1', '1']);
+    await run.page.click('Not now');
+    await run.page.until(`location.hash === '#/feed/clear' && document.querySelector('.v2-clear-card h2')?.textContent === 'All clear.'`, 'all clear after the last decision');
+    assert.deepEqual(await badges(), [null, null]);
+    assert.equal(await run.page.run(`document.querySelector('.v2-building progress').value`), 5);
+    await run.page.run(`document.querySelector('.v2-toast button').focus()`);
+    await new Promise(resolve => setTimeout(resolve, 4700));
+    assert.equal(await run.page.run(`document.querySelector('.v2-toast').hidden`), false, 'Undo expired while focused');
+    await run.page.key('Enter');
+    await run.page.until(`document.querySelector('.v2-card-title')?.textContent === 'Retention window for deleted projects'`, 'undo restores the last decision');
+    assert.deepEqual(await badges(), ['1', '1']);
+    await run.page.click('Ship it');
+    await run.page.until(`location.hash === '#/feed/clear' && document.querySelector('.v2-lighthouse')`, 'approving the final decision clears Feed');
+    assert.deepEqual(await badges(), [null, null]);
+    await run.page.go(`${SITE}/app/?v2=dry-run&demo=1#/feed/clear`);
+    await run.page.until(`document.querySelector('.v2-clear-card h2')?.textContent === 'All clear.'`, 'deep link to all clear');
+    assert.deepEqual(await badges(), [null, null]);
 
     await run.page.go(`${SITE}/app/?v2=dry-run&demo=1#/settings`);
     await run.page.until(`document.querySelector('select[aria-label="Where it runs"]')?.value === 'Local workstation'`, 'settings screen');
@@ -66,8 +103,13 @@ test('switch on + demo=1: renders v2 shell, deep links, interactions, and makes 
     assert.equal(await run.page.run(`document.querySelector('[aria-label="Notifications"]').getAttribute('aria-checked')`), 'true');
 
     assert.deepEqual(apiRequests(run.world), [], 'demo mode sent an API or external network request');
+    assert.deepEqual(await run.page.run(`performance.getEntriesByType('resource').filter(entry =>
+      ['fetch', 'xmlhttprequest', 'beacon'].includes(entry.initiatorType)).map(entry => entry.name)`), []);
     assert.deepEqual(run.world.writes(), [], 'demo mode wrote something');
     assert.deepEqual(run.world.violations, [], 'demo mode hit a CSP or console violation');
+    await run.page.click('Exit sample workspace');
+    await run.page.until(`location.pathname === '/app/' && !location.search && OW.data.demo === false
+      && document.querySelector('.v2-welcome-sample')?.textContent === 'See a sample factory'`, 'exiting reaches the real welcome');
   } finally {
     await run.close();
   }

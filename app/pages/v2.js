@@ -3,46 +3,39 @@
   const { h, icon } = OW.ui;
   const isDemo = OW.data.demo;
   const mark = () => h('img', { src: '/app/mark.svg', alt: '', width: 28, height: 28 });
-  const avatar = () => h('img', { class: 'v2-avatar', src: '/art/family-01.webp', alt: '', width: 32, height: 32 });
+  const avatar = () => h('span', { class: 'v2-avatar' }, mark());
 
   function initialDemoState() {
     return {
-      feedIdx: 0,
       draft: '',
       messages: [
         {
-          id: 'm1',
           role: 'user',
           time: '9:12 AM',
           text: 'Add usage-based seat billing. Keep upgrades simple for small teams.',
         },
         {
-          id: 'm2',
           role: 'wiz',
           time: '9:12 AM',
           text: 'Three quick choices before I draft the spec.',
         },
         {
-          id: 'g1',
           role: 'grill',
           specTitle: 'Usage-based seat billing',
-          specGoal: 'Charge for active editors with monthly true-up, free viewers, and a 7-day renewal grace window.',
           answered: false,
           questions: [
-            { id: 'Q1', prompt: 'When should we charge for new seats?', rec: 0, selected: 0, options: ['At month end', 'Right away'] },
-            { id: 'Q2', prompt: 'Should read-only viewers pay?', rec: 0, selected: 0, options: ['Keep viewers free', 'Count all members'] },
-            { id: 'Q3', prompt: 'How long before a failed renewal locks edits?', rec: 0, selected: 0, options: ['7 days', '48 hours'] },
+            { prompt: 'When should we charge for new seats?', rec: 0, selected: 0, options: ['At month end', 'Right away'] },
+            { prompt: 'Should read-only viewers pay?', rec: 0, selected: 0, options: ['Keep viewers free', 'Count all members'] },
+            { prompt: 'How long before a failed renewal locks edits?', rec: 0, selected: 0, options: ['7 days', '48 hours'] },
           ],
         },
       ],
       cards: [
         {
-          id: 'c-spec-1',
           type: 'spec',
           status: 'ready',
-          kicker: 'Spec · Ready',
           title: 'Magic-link sign-in',
-          goal: 'Passwordless sign-in with 15-minute links and automatic session refresh.',
+          goal: 'A simpler way into Harbor.',
           merged: 6,
           total: 6,
           scenes: [
@@ -51,47 +44,25 @@
             '0:08 · All six tickets merged.',
           ],
           sceneIdx: 0,
-          note: '',
         },
         {
-          id: 'c-dec-1',
           type: 'decision',
           status: 'pending',
-          kicker: 'Decision · Needs you',
-          title: 'Pricing copy on the checkout banner',
-          goal: 'Show annual savings as a percentage or a dollar amount?',
-          context: 'Annual plans save $240/yr per 10 seats. The rest of the pricing page uses percentages.',
-          rec: 'Show "Save 20%"',
-          note: '',
+          title: 'Keep the free plan?',
+          goal: 'Harbor’s free plan costs about $40 a month to run.',
+          rec: 'keep it, cap at 3 seats',
         },
         {
-          id: 'c-spec-2',
-          type: 'spec',
-          status: 'building',
-          kicker: 'Spec · Building',
-          title: 'CSV export for audit log',
-          goal: 'Export up to 90 days of workspace events as a streaming CSV file.',
-          merged: 5,
-          total: 7,
-          scenes: [
-            '0:02 · Pick date range (7d / 30d / 90d)',
-            '0:05 · Streams rows without memory spikes',
-            '0:08 · 2 tickets left: signed download + rate limit',
-          ],
-          sceneIdx: 0,
-          note: '',
-        },
-        {
-          id: 'c-dec-2',
           type: 'decision',
           status: 'pending',
-          kicker: 'Decision · Needs you',
           title: 'Retention window for deleted projects',
-          goal: 'Keep soft-deleted projects recoverable for 30 days or purge after 7 days?',
-          context: 'Storage cost is under $2/mo; 30 days matches standard workspace recovery expectations.',
-          rec: '30-day recovery window',
-          note: '',
+          goal: 'Deleted projects can stay recoverable for 7 or 30 days.',
+          rec: 'allow recovery for 30 days',
         },
+      ],
+      building: [
+        { title: 'Audit log export', merged: 5, total: 7 },
+        { title: 'Project activity digest', merged: 2, total: 4 },
       ],
       settings: {
         host: 'Local workstation',
@@ -105,38 +76,55 @@
     };
   }
 
-  let demo = initialDemoState();
+  const demo = initialDemoState();
+  if (isDemo && location.hash === '#/feed/clear') demo.cards = [];
   let redraw = () => {};
-  let toastTimer = null;
+  let toastTimer;
   let toastEl;
+  let toastStatus;
+  let dismissToast;
   let chatView;
+
+  function scheduleToast() {
+    clearTimeout(toastTimer);
+    if (!toastEl.hidden && !toastEl.matches(':hover, :focus-within')) {
+      toastTimer = setTimeout(dismissToast, 4500);
+    }
+  }
 
   function showToast(text, undo = null) {
     const returnTo = document.activeElement;
     if (!toastEl) {
-      toastEl = h('div', { class: 'v2-toast', role: 'status' });
-      document.body.append(toastEl);
+      toastEl = h('div', { class: 'v2-toast', hidden: true,
+        onpointerenter: () => clearTimeout(toastTimer),
+        onpointerleave: () => queueMicrotask(scheduleToast),
+        onfocusin: () => clearTimeout(toastTimer),
+        onfocusout: () => queueMicrotask(scheduleToast),
+      });
+      toastStatus = h('span', { class: 'visually-hidden', role: 'status' });
+      document.body.append(toastEl, toastStatus);
     }
-    const dismiss = () => {
+    dismissToast = () => {
+      clearTimeout(toastTimer);
+      const hadFocus = toastEl.contains(document.activeElement);
       toastEl.hidden = true;
-      if (toastEl.contains(document.activeElement)) {
+      if (hadFocus) {
         (returnTo?.isConnected && returnTo !== document.body ? returnTo : document.querySelector('.v2-head h1'))?.focus();
       }
     };
-    toastEl.replaceChildren(h('span', {}, text), undo ? h('button', {
+    toastEl.replaceChildren(h('span', { 'aria-hidden': 'true' }, text), undo ? h('button', {
       type: 'button',
       class: 'v2-btn subtle',
-      onclick: () => { dismiss(); undo(); },
+      onclick: () => { dismissToast(); undo(); },
     }, 'Undo') : null);
     toastEl.hidden = false;
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(dismiss, 4500);
+    toastStatus.textContent = text;
+    scheduleToast();
   }
 
-  function openSheet(card, opener) {
+  function openSheet(card, opener, onSend) {
     const title = h('h2', { id: 'v2-sheet-title' }, 'Change something');
     const input = h('textarea', { rows: 3, required: true, placeholder: 'What should change?', 'aria-label': 'What should change?' });
-    input.value = card.note;
     const sheet = h('dialog', { class: 'v2-sheet', 'aria-labelledby': title.id });
     const chips = [
       ['Simplify copy', 'Simplify the copy to one line'],
@@ -150,14 +138,12 @@
       event.preventDefault();
       const text = input.value.trim();
       if (!text) return input.focus();
-      card.note = text;
       demo.messages.push(
         { role: 'user', time: 'Just now', text: `On “${card.title}”: ${text}` },
         { role: 'wiz', time: 'Just now', text: `I’ll update “${card.title}” and check it again.` });
       sheet.close();
       opener.focus();
-      redraw();
-      showToast('Change sent');
+      onSend();
     } }, title, h('p', {}, card.title), input,
     h('div', { class: 'v2-quick-chips' }, chips),
     h('div', { class: 'v2-sheet-actions' },
@@ -177,32 +163,14 @@
     if (grill.answered) return;
     grill.answered = true;
     const summary = grill.questions.map(q => q.options[q.selected]).join(' · ');
-    demo.messages.push({ id: `u-${Date.now()}`, role: 'user', time: 'Just now', text: summary });
+    demo.messages.push({ role: 'user', time: 'Just now', text: summary });
     demo.messages.push({
-      id: `w-${Date.now() + 1}`,
       role: 'wiz',
       time: 'Just now',
       text: `“${grill.specTitle}” is now in Feed.`,
       jumpFeed: true,
     });
-    demo.cards.push({
-      id: `c-new-${Date.now()}`,
-      type: 'spec',
-      status: 'building',
-      kicker: 'Spec · Just started',
-      title: grill.specTitle,
-      goal: grill.specGoal,
-      merged: 1,
-      total: 5,
-      scenes: [
-        '0:02 · Spec drafted from your answers',
-        '0:05 · Ticket 1 of 5 merged — data model ready',
-        '0:08 · Building checkout and grace banner next',
-      ],
-      sceneIdx: 0,
-      note: '',
-    });
-    demo.feedIdx = visibleDemoCards().length - 1;
+    demo.building.unshift({ title: grill.specTitle, merged: 0, total: 5 });
     showToast(`Answers saved · "${grill.specTitle}" added to Feed`);
     redraw();
   }
@@ -211,47 +179,62 @@
     const clean = text.trim();
     if (!clean) return;
     const shortTitle = clean.length > 42 ? `${clean.slice(0, 42).replace(/\s+\S*$/, '')}…` : clean;
-    demo.messages.push({ id: `u-${Date.now()}`, role: 'user', time: 'Just now', text: clean });
+    demo.messages.push({ role: 'user', time: 'Just now', text: clean });
     demo.messages.push({
-      id: `g-${Date.now() + 1}`,
       role: 'grill',
       specTitle: shortTitle,
-      specGoal: clean,
       answered: false,
       questions: [
-        { id: 'Q1', prompt: 'Ship to everyone at once, or roll out to active workspaces first?', rec: 0, selected: 0, options: ['Active workspaces first', 'Everyone at once'] },
-        { id: 'Q2', prompt: 'Include an opt-out toggle in workspace settings?', rec: 0, selected: 0, options: ['Yes, one-click toggle', 'Always on'] },
-        { id: 'Q3', prompt: 'Should Wiz record a short walkthrough video for the Feed?', rec: 0, selected: 0, options: ['Yes, 10s walkthrough', 'Skip video'] },
+        { prompt: 'Ship to everyone at once, or roll out to active workspaces first?', rec: 0, selected: 0, options: ['Active workspaces first', 'Everyone at once'] },
+        { prompt: 'Include an opt-out toggle in workspace settings?', rec: 0, selected: 0, options: ['Yes, one-click toggle', 'Always on'] },
+        { prompt: 'Should Wiz record a short walkthrough video for the Feed?', rec: 0, selected: 0, options: ['Yes, 10s walkthrough', 'Skip video'] },
       ],
     });
     redraw();
   }
 
   function renderQuestions(message) {
-    const allRecommended = message.questions.every(q => q.selected === q.rec);
+    const description = h('p');
+    const saved = h('a', { class: 'v2-btn subtle', href: '#/feed' }, icon('check'), 'Answers saved · Open Feed');
+    const submit = h('button', { type: 'button', class: 'v2-btn primary', onclick: () => {
+      const hadFocus = document.activeElement === submit;
+      submit.replaceWith(saved);
+      groups.forEach(group => group.querySelectorAll('button').forEach(button => { button.disabled = true; }));
+      completeGrill(message);
+      if (hadFocus) saved.focus({ preventScroll: true });
+    } });
+    const updateSummary = () => {
+      const allRecommended = message.questions.every(q => q.selected === q.rec);
+      const hint = allRecommended ? 'Recommended answers selected' : 'Review your selected answers';
+      const action = allRecommended ? 'Accept all 3' : 'Send 3 answers';
+      if (description.textContent !== hint) description.textContent = hint;
+      if (submit.textContent !== action) submit.textContent = action;
+    };
+    const groups = message.questions.map(q => {
+      const choices = q.options.map((option, i) => h('button', {
+        type: 'button', class: 'v2-q-pill', disabled: message.answered,
+        'aria-pressed': String(i === q.selected),
+        'aria-label': i === q.rec ? `${option} (recommended)` : option,
+        onclick: () => {
+          if (i === q.selected) return;
+          choices[q.selected].setAttribute('aria-pressed', 'false');
+          choices[i].setAttribute('aria-pressed', 'true');
+          q.selected = i;
+          updateSummary();
+        },
+      }, i === q.rec ? icon('check') : null, option));
+      return h('div', { class: 'v2-grill-q' }, h('p', {}, q.prompt),
+        h('div', { class: 'v2-q-opts', role: 'group', 'aria-label': q.prompt }, choices));
+    });
+    updateSummary();
     return h('article', { class: 'v2-grill', 'aria-label': message.specTitle },
-      h('div', { class: 'v2-grill-head' }, h('h2', {}, message.specTitle),
-        h('p', {}, allRecommended ? 'Recommended answers selected' : 'Review your selected answers')),
-      message.questions.map(q => h('div', { class: 'v2-grill-q' },
-        h('p', {}, q.prompt),
-        h('div', { class: 'v2-q-opts', role: 'group', 'aria-label': q.prompt }, q.options.map((option, i) => h('button', {
-          type: 'button',
-          class: 'v2-q-pill',
-          'aria-pressed': i === q.selected ? 'true' : 'false',
-          'aria-label': i === q.rec ? `${option} (recommended)` : option,
-          'data-focus': `answer:${message.id}:${q.id}:${i}`,
-          disabled: message.answered,
-          onclick: () => { q.selected = i; redraw(); },
-        }, i === q.rec ? icon('check') : null, option))))),
-      h('div', { class: 'v2-grill-foot' }, message.answered
-        ? h('a', { class: 'v2-btn subtle', href: '#/feed', 'data-focus': `send:${message.id}` }, icon('check'), 'Answers saved · Open Feed')
-        : h('button', { type: 'button', class: 'v2-btn primary', 'data-focus': `send:${message.id}`,
-          onclick: () => completeGrill(message) }, allRecommended ? 'Accept all 3' : 'Send 3 answers')));
+      h('div', { class: 'v2-grill-head' }, h('h2', {}, message.specTitle), description),
+      groups, h('div', { class: 'v2-grill-foot' }, message.answered ? saved : submit));
   }
 
   function renderDemoChat(el) {
     if (!chatView || !el.contains(chatView.scroll)) {
-      const scroll = h('div', { class: 'v2-chat-scroll', role: 'log', 'aria-live': 'polite' });
+      const scroll = h('div', { class: 'v2-chat-scroll', role: 'log', 'aria-live': 'polite', 'aria-relevant': 'additions' });
       const thread = h('div', { class: 'v2-chat-thread' });
       scroll.append(thread);
       const input = h('input', {
@@ -274,8 +257,9 @@
       chatView = { scroll, thread, length: 0 };
     }
     const { scroll, thread, length } = chatView;
+    if (length === demo.messages.length) return;
     const top = scroll.scrollTop;
-    thread.replaceChildren(...demo.messages.map(message => {
+    thread.append(...demo.messages.slice(length).map(message => {
       if (message.role === 'grill') return h('div', { class: 'v2-msg questions' }, renderQuestions(message));
       const fromWiz = message.role === 'wiz';
       return h('div', { class: `v2-msg ${fromWiz ? 'wiz' : 'user'}` },
@@ -306,103 +290,147 @@
       h('div', { class: 'v2-composer-wrap' }, h('div', { class: 'v2-composer' }, input, send))));
   }
 
-  function visibleDemoCards() {
-    return demo.cards.filter(card => !['shipped', 'decided', 'deferred'].includes(card.status));
+  function pendingDemoCards() {
+    return demo.cards.filter(card => card.status === 'ready' || card.status === 'pending');
   }
 
-  function feedIndex(list, arg) {
-    const linked = arg ? list.findIndex(card => card === demo.cards[Number(arg) - 1]) : -1;
-    return linked >= 0 ? linked : Math.min(demo.feedIdx, list.length - 1);
+  function cardHref(card) {
+    if (!card) return '#/feed/clear';
+    const number = demo.cards.indexOf(card) + 1;
+    return number === 1 ? '#/feed' : `#/feed/${number}`;
   }
 
   function pager(index, total, go) {
     if (total < 2) return null;
     const button = (label, glyph, next) => h('button', {
       type: 'button', class: 'v2-rail-btn', 'aria-label': label,
-      'data-focus': glyph, disabled: next < 0 || next >= total,
+      'data-focus': `pager:${glyph}`, disabled: next < 0 || next >= total,
       onclick: () => go(next),
     }, icon(glyph), h('span', { class: 'visually-hidden' }, label));
     return h('div', { class: 'v2-feed-rail', role: 'group', 'aria-label': 'Card navigation' },
       button('Previous card', 'up', index - 1),
-      h('span', { class: 'v2-rail-count', 'aria-live': 'polite' }, `${index + 1} / ${total}`),
+      h('span', { class: 'v2-rail-count', 'aria-live': 'polite' }, `${index + 1} of ${total}`),
       button('Next card', 'down', index + 1));
   }
 
-  function renderDemoFeed(el, arg, controls) {
-    const list = visibleDemoCards();
-    if (!list.length) {
-      controls.replaceChildren();
-      el.replaceChildren(h('div', { class: 'v2-feed-stage' },
-        h('div', { class: 'v2-clear-card' },
-          h('h2', {}, 'All clear'),
-          h('p', {}, 'Nothing needs your attention right now.'),
-          h('div', { class: 'v2-clear-actions' },
-            h('a', { class: 'v2-btn primary', href: '#/chat' }, 'Open Chat'),
-            h('button', { type: 'button', class: 'v2-btn subtle', onclick: () => {
-              demo.cards = initialDemoState().cards;
-              demo.feedIdx = 0;
-              redraw();
-            } }, 'Reset sample feed')))));
-      return;
-    }
+  function allClear(message) {
+    const line = (d, attrs = {}) => h('path', { d, ...attrs });
+    const lighthouse = h('svg', { class: 'v2-lighthouse', viewBox: '0 0 176 112', 'aria-hidden': 'true',
+      fill: 'none', stroke: 'currentColor', 'stroke-linecap': 'round', 'stroke-linejoin': 'round' },
+      line('M80 80 84 36h13l5 44M82 36h17v-5H82zm2-5V19h13v12M82 19l8.5-8 8.5 8M90.5 11V7', { fill: '#243a52' }),
+      line('M88 19v12m5-12v12m-9 20h15m-16 3h16m-17 13h18m-18 3h19M89 78v-7h5v8', { opacity: '.82' }),
+      line('M76 26 49 23m27 6-39 2m67-5 23-3m-23 6 37 2', { opacity: '.4', 'stroke-dasharray': '1 3' }),
+      line('m44 88 12-4 8 1 14-6 11 1 12-3 12 6 12-1 10 6Z', { fill: '#263d56' }),
+      line('m60 88 17-5 7 1m11 1 7-4 12 7m-7-2 9-1 9 3M22 92h132m-117 4h38m8 0h55m-77 4h54m-41 4h27', { opacity: '.66' }),
+      line('M47 90h85m-85 5h78m-59 7h47', { opacity: '.55', 'stroke-dasharray': '1 2' }));
+    return h('div', { class: 'v2-clear-card' }, lighthouse, h('h2', { tabindex: '-1' }, 'All clear.'), h('p', {}, message));
+  }
 
-    const index = feedIndex(list, arg);
-    const card = list[index];
-    const decision = card.type === 'decision';
-    const go = next => {
-      demo.feedIdx = next;
-      const number = demo.cards.indexOf(list[next]) + 1;
-      history.replaceState(null, '', number === 1 ? '#/feed' : `#/feed/${number}`);
-      redraw();
-    };
-    const resolve = (status, label) => {
-      const previous = card.status;
-      card.status = status;
-      demo.feedIdx = Math.min(index, Math.max(0, list.length - 2));
-      history.replaceState(null, '', '#/feed');
-      redraw();
-      showToast(`${label} “${card.title}”`, () => {
-        card.status = previous;
-        demo.feedIdx = index;
-        redraw();
-      });
-    };
-    const poster = h('div', { class: `v2-preview${decision ? ' decision' : ''}` },
-      h('div', { class: 'v2-preview-art', 'aria-hidden': 'true' }),
-      decision ? null : h('div', { class: 'v2-preview-top' },
-        h('span', { class: 'v2-preview-label' }, 'Narrated spec'),
+  function buildingSection(items) {
+    if (!items.length) return null;
+    return h('section', { class: 'v2-building', 'aria-labelledby': 'v2-building-title' },
+      h('h2', { id: 'v2-building-title' }, 'Building'),
+      h('ul', {}, items.map(({ title, merged, total, href }) => h('li', {},
+        h('div', { class: 'v2-building-row' },
+          href ? h('a', { href, target: '_blank', rel: 'noreferrer', 'data-focus': `building:${href}` }, title) : h('span', {}, title),
+          h('span', { class: 'v2-building-count' }, `${merged} of ${total}`)),
+        h('progress', { value: merged, max: total, 'aria-label': `Tickets complete for ${title}` })))));
+  }
+
+  function nextPreview(card, go) {
+    if (!card) return null;
+    const href = cardHref(card);
+    return h('a', { class: 'v2-next-preview', href, onclick: event => {
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      event.preventDefault();
+      go(href);
+    } },
+      h('span', { class: 'v2-label' }, 'Next'),
+      h('span', { class: 'v2-next-title' }, card.title),
+      h('span', { class: 'v2-next-task' }, card.type === 'decision' ? 'Decision' : 'Review'),
+      icon('right'));
+  }
+
+  function specPreview(card) {
+    const envelope = h('svg', { class: 'v2-envelope', viewBox: '0 0 240 144', 'aria-hidden': 'true',
+      fill: 'none', stroke: 'currentColor', 'stroke-linejoin': 'round' },
+      h('path', { d: 'M36 28h168v94H36Z', fill: '#162b41', 'stroke-width': '1.5' }),
+      h('path', { d: 'm37 121 66-52m100 52-66-52M36 29l68 52a26 26 0 0 0 32 0l68-52', 'stroke-width': '1.5' }),
+      h('path', { d: 'M41 35v79m158-79v79M44 32h150M44 118h152m-154-6 56-43m100 43-56-43M46 41l60 45a23 23 0 0 0 28 0l60-45',
+        opacity: '.68', 'stroke-dasharray': '1 2' }),
+      h('path', { d: 'M45 106h19m-18-4h24m-24-4h29m-29-4h35m-34-4h39m-40-4h45m52 0h55m-49 4h49m-43 4h43m-38 4h38m-32 4h32m-27 4h27',
+        opacity: '.48', 'stroke-dasharray': '.6 2' }),
+      h('circle', { cx: 120, cy: 76, r: 15, fill: '#223f5d', 'stroke-width': '1.5' }),
+      h('circle', { cx: 120, cy: 76, r: 11, opacity: '.65', 'stroke-dasharray': '1 2' }),
+      h('path', { d: 'M115 77q3-4 6 0t6 0m-12 4q3-4 6 0t6 0' }));
+    return h('div', { class: 'v2-preview' },
+      h('div', { class: 'v2-preview-art', 'aria-hidden': 'true' }, envelope),
+      h('div', { class: 'v2-preview-top' }, h('span', { class: 'v2-preview-label' }, 'Narrated spec')),
+      h('div', { class: 'v2-preview-caption' },
         h('button', { type: 'button', class: 'v2-preview-btn', 'data-focus': 'scene',
           'aria-label': `Next scene, scene ${card.sceneIdx + 1} of ${card.scenes.length}`,
           onclick: () => { card.sceneIdx = (card.sceneIdx + 1) % card.scenes.length; redraw(); },
-        }, `Scene ${card.sceneIdx + 1}/${card.scenes.length}`, icon('right'))),
-      decision ? null : h('div', { class: 'v2-preview-caption', 'aria-live': 'polite' }, card.scenes[card.sceneIdx]));
+        }, icon('right')),
+        h('span', { 'aria-live': 'polite' }, card.scenes[card.sceneIdx])));
+  }
+
+  function renderDemoFeed(el, arg, controls) {
+    const list = pendingDemoCards();
+    if (arg === 'clear' || !list.length) {
+      controls.replaceChildren();
+      el.replaceChildren(h('div', { class: 'v2-feed-stage v2-feed-clear' },
+        allClear('Wiz is building. You’ll hear when something needs you.'),
+        buildingSection(demo.building)));
+      return;
+    }
+
+    const index = Math.max(0, list.indexOf(demo.cards[Number(arg) - 1]));
+    const card = list[index];
+    const next = list[index + 1];
+    const decision = card.type === 'decision';
+    const go = href => {
+      history.replaceState(null, '', href);
+      el.closest('.v2-view').scrollTop = 0;
+      redraw();
+    };
+    const focusCard = () => el.querySelector('.v2-hero-card h2, .v2-clear-card h2')?.focus({ preventScroll: true });
+    const resolve = (status, label, revision) => {
+      const previous = card.status;
+      card.status = status;
+      if (revision) demo.building.unshift(revision);
+      go(cardHref(next || list[index - 1]));
+      focusCard();
+      showToast(label, status === 'changing' ? null : () => {
+        card.status = previous;
+        go(cardHref(card));
+        focusCard();
+      });
+    };
     const details = decision
-      ? h('div', { class: 'v2-decision-box' },
-        h('span', { class: 'v2-label' }, 'Recommendation'),
-        h('strong', {}, card.rec),
-        h('p', {}, card.context))
+      ? h('p', { class: 'v2-recommendation' }, 'Recommended: ', card.rec)
       : h('div', { class: 'v2-progress-box' },
         h('p', {}, h('strong', {}, `${card.merged} of ${card.total}`), ' tickets merged'),
         h('div', { class: 'v2-pips', 'aria-hidden': 'true' },
           Array.from({ length: card.total }, (_, i) => h('span', { class: i < card.merged ? 'merged' : '' }))));
-    const hero = h('article', { class: 'v2-hero-card' },
+    const hero = h('article', { class: `v2-hero-card ${decision ? 'v2-decision-card' : 'v2-spec-card'}` },
       h('div', { class: 'v2-card-top' },
-        h('span', { class: 'v2-label' }, card.kicker),
-        h('h2', { class: 'v2-card-title' }, card.title),
+        h('span', { class: 'v2-label' }, decision ? 'Needs you' : 'Ready to ship'),
+        h('h2', { class: 'v2-card-title', tabindex: '-1' }, card.title),
         h('p', { class: 'v2-card-goal' }, card.goal)),
-      poster,
+      decision ? null : specPreview(card),
       details,
-      card.note ? h('p', { class: 'v2-note' }, 'Requested change: ', card.note) : null,
       h('div', { class: 'v2-card-actions' },
         h('button', { type: 'button', class: 'v2-btn primary', 'data-focus': 'ship',
-          onclick: () => resolve(decision ? 'decided' : 'shipped', decision ? 'Approved' : 'Shipped') }, icon('check'), 'Ship it'),
-        h('button', { type: 'button', class: 'v2-btn', 'data-focus': 'change',
-          onclick: event => openSheet(card, event.currentTarget) }, 'Change something'),
-        h('button', { type: 'button', class: 'v2-btn subtle', 'data-focus': 'defer',
-          onclick: () => resolve('deferred', 'Saved for later') }, 'Not now')));
-    const navigation = pager(index, list.length, go);
+          onclick: () => resolve(decision ? 'decided' : 'shipped', `${decision ? 'Approved' : 'Shipped'} “${card.title}”`) }, 'Ship it'),
+        h('button', { type: 'button', class: 'v2-btn v2-change', 'data-focus': 'change',
+          onclick: event => openSheet(card, event.currentTarget, () => resolve('changing', 'Change sent', decision
+            ? null : { title: card.title, merged: 0, total: 1 })) }, 'Change something'),
+        h('button', { type: 'button', class: 'v2-btn subtle v2-defer', 'data-focus': 'defer',
+          onclick: () => resolve('deferred', `Saved “${card.title}” for later`) }, 'Not now')));
+    const navigation = pager(index, list.length, i => go(cardHref(list[i])));
     controls.replaceChildren(...(navigation ? [navigation] : []));
-    el.replaceChildren(h('div', { class: 'v2-feed-stage' }, hero));
+    el.replaceChildren(h('div', { class: `v2-feed-stage${decision ? ' v2-feed-decision' : ''}` },
+      hero, nextPreview(next, href => { go(href); focusCard(); }), buildingSection(demo.building)));
   }
 
   const settingRow = (label, value) => h('div', { class: 'v2-set-row' }, h('span', {}, label), value);
@@ -439,10 +467,7 @@
       settingsGroup('Connections', [connection('GitHub', 'github'), connection('Notifications', 'notifications')]),
       settingsGroup('Account', [
         choose('Repository', 'repository', ['Harbor · main', 'Harbor · staging']),
-        h('a', { class: 'v2-btn subtle v2-sign-out', href: '#/welcome', onclick: () => {
-          demo = initialDemoState();
-          if (toastEl) toastEl.hidden = true;
-        } }, 'Sign out'),
+        h('a', { class: 'v2-btn subtle v2-sign-out', href: '/app/' }, 'Exit sample workspace'),
       ])));
   }
 
@@ -465,24 +490,24 @@
 
   function renderWelcome(root, { note, demoMode }) {
     const card = h('div', { class: 'v2-welcome-card' },
-      h('h1', {}, 'Your software factory, in one quiet room.'),
-      h('p', { class: 'v2-welcome-copy' }, demoMode
-        ? 'Answer a few questions. Watch specs build. Tap Ship it.'
-        : 'Review decisions and follow the work in your GitHub repository.'),
+      h('h1', {}, 'Run your software factory from here.'),
       note ? h('div', { class: 'notice bad', role: 'alert' }, icon('warn'), h('span', {}, note)) : null,
       h('a', { class: 'v2-btn primary', href: demoMode ? '#/chat' : '/api/sign-in/start' },
-        demoMode ? 'Open Harbor workspace' : 'Continue with GitHub', icon('right')));
-    root.replaceChildren(h('main', { class: 'v2-welcome' },
-      h('header', { class: 'v2-welcome-head' },
-        h('div', { class: 'v2-welcome-brand' }, mark(), h('span', {}, 'OpenWiz')),
-        demoMode ? h('span', { class: 'v2-sample-tag' }, 'Sample data') : null),
-      card));
+        demoMode ? 'Open Harbor workspace' : 'Continue with GitHub', icon('right')),
+      h('a', { class: 'v2-btn subtle v2-welcome-sample', href: demoMode ? '/api/sign-in/start' : '/app/?demo=1#/chat' },
+        demoMode ? 'Continue with GitHub' : 'See a sample factory'));
+    card.prepend(h('header', { class: 'v2-welcome-head' },
+      h('div', { class: 'v2-welcome-brand' }, mark(), h('span', {}, 'OpenWiz')),
+      demoMode ? h('span', { class: 'v2-sample-tag' }, 'Sample data') : null));
+    root.replaceChildren(h('main', { class: 'v2-welcome' }, card));
     document.title = 'OpenWiz';
   }
 
   OW.v2 = {
     setRedraw: fn => { redraw = fn; },
     renderWelcome,
+    allClear,
+    buildingSection,
     pager,
     pages(ctx) {
       return [
@@ -501,7 +526,7 @@
           title: 'Feed',
           icon: 'feed',
           feeds: isDemo ? [] : ['specs'],
-          badge: () => (isDemo ? visibleDemoCards().length : OW.queue.badge()) || null,
+          badge: () => (isDemo ? pendingDemoCards().length : OW.queue.badge()) || null,
           render(el, feeds, arg, controls) {
             if (isDemo) OW.factory.redraw(el.closest('main'), () => renderDemoFeed(el, arg, controls));
             else OW.queue.render(el, feeds, { arg, controls, onCount: ctx.updateBadges });
