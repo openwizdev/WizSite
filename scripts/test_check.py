@@ -10,7 +10,7 @@ from unittest import mock
 
 import re
 
-from check import CTA, FAQ, FAQ_WHERE, FOOTER, INSTALL_NOTE_HTML, FINGERPRINTS, HASHED, INSTALL_SWITCH, ROOT, Page, check_changelog, check_release_data, check_releases, read_releases, split_releases, check_motion, check_privacy, check_ref, check_security_txt, check_site, check_vector, check_webp, fingerprint
+from check import CTA, FAQ, FAQ_PREREQS, FAQ_WHERE, FOOTER, INSTALL_NOTE_HTML, INSTALL_PREREQS_HTML, FINGERPRINTS, HASHED, INSTALL_SWITCH, ROOT, Page, check_changelog, check_release_data, check_releases, read_releases, split_releases, check_motion, check_privacy, check_ref, check_security_txt, check_site, check_vector, check_webp, fingerprint
 
 
 def edit_built(root, name, change):
@@ -690,7 +690,7 @@ class Checks(unittest.TestCase):
             ('index.html', note, ''),
             ('index.html', note, note + note),
             ('index.html', note, note.replace('x86_64 Linux', 'Linux')),
-            ('index.html', note, note.replace('Apple-silicon Mac', 'Mac')),
+            ('index.html', note, note.replace('Mac (Apple silicon or Intel)', 'Mac')),
             ('index.html', note, note.replace('No CloudRoom needed to install. ', '')),
             ('index.html', note, note.replace(link, 'CloudRoom')),
             ('index.html', note, note.replace('https://cloudroom.dev', 'https://cloudroom.dev/x')),
@@ -698,6 +698,8 @@ class Checks(unittest.TestCase):
             ('index.html', note, ''),
             ('index.html', '</main>', f'<p>{link}</p></main>'),
             ('drivers/index.html', '</main>', f'<p>{link}</p></main>'),
+            ('index.html', INSTALL_PREREQS_HTML, ''),
+            ('index.html', INSTALL_PREREQS_HTML, INSTALL_PREREQS_HTML.replace('Python 3.9 or later', 'Python')),
         ]
         for i, (page, good, bad) in enumerate(breaks):
             with self.subTest(page=page, bad=bad), tempfile.TemporaryDirectory() as temp:
@@ -1043,7 +1045,7 @@ class Checks(unittest.TestCase):
         for message, (page, change) in {
             'the index.html page needs the one Questions': ('index.html', lambda t: t.replace(FAQ, '', 1)),
             'the faq/index.html page needs the one Questions': ('faq/index.html', lambda t: t.replace('What is a kernel?', 'What is a core?', 1)),
-            'the team/index.html page shows no Questions|never uses: CloudRoom': ('team/index.html', lambda t: t.replace('</main>', FAQ + '</main>', 1)),
+            'the team/index.html page shows no Questions|never uses: (?:CloudRoom|install)': ('team/index.html', lambda t: t.replace('</main>', FAQ + '</main>', 1)),
             'needs faq.js': ('faq/index.html', lambda t: re.sub(r'<script src="/faq\.[0-9a-f]+\.js" defer></script>', '', t)),
         }.items():
             temp, root = planted(page, change)
@@ -1058,6 +1060,7 @@ class Checks(unittest.TestCase):
             'open and disabled until faq.js runs ': lambda f: f.replace('aria-expanded="true"', 'aria-expanded="false"', 1),
             'a button that names its answer ': lambda f: f.replace('aria-controls="faq-a2"', 'aria-controls="faq-a1"', 1),
             'links off the site': lambda f: f.replace('href="/team/#book"', 'href="https://example.com/"', 1),
+            'answer to What do I need before installing': lambda f: f.replace('Python 3.9 or later', 'Python', 1),
             'answer to Where do my agents run': lambda f: f.replace(FAQ_WHERE, 'Wherever you choose: your own computer or a VPS, Cloudroom, or boat.dev. Each has a driver that passed the same five-check test.', 1),
             'answer to Where do my agents run ': lambda f: f.replace(' In OpenWiz 0.01, you start builders by hand on this computer or boat.dev, and the automatic fleet runs in CloudRoom.', '', 1),
             'answer to Where do my agents run  ': lambda f: f.replace(FAQ_WHERE, 'Anywhere.', 1).replace('OpenWiz is free and open source', FAQ_WHERE + ' OpenWiz is free and open source', 1),

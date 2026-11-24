@@ -289,21 +289,27 @@ COUNT_NOTICE = ('openwiz.dev counts visits with Cloudflare Web Analytics and sel
                 'without cookies or personal data.')
 X_ACCOUNT = 'https://x.com/openwiz'
 CLOUDROOM_LINK = 'https://cloudroom.dev'
+INSTALL_GUIDE = 'https://github.com/openwizdev/OpenWiz/blob/main/docs/install.md#openwiz-010'
 INSTALL_NOTE = ("No CloudRoom needed to install. In OpenWiz 0.01, you start builders by hand on this computer, with the Claude Code "
                 "or Codex you're signed in to, or on boat.dev; the automatic fleet runs in CloudRoom. "
-                'For an Apple-silicon Mac or x86_64 Linux.')
+                'For a Mac (Apple silicon or Intel) or x86_64 Linux.')
 INSTALL_NOTE_HTML = ('<p class="install-note">No CloudRoom needed to install. In OpenWiz 0.01, you start builders by hand on this '
                      "computer, with the Claude Code or Codex you're signed in to, or on boat.dev; the automatic fleet runs in "
-                     '<a href="https://cloudroom.dev" rel="noreferrer">CloudRoom</a>. For an Apple-silicon Mac or x86_64 Linux.</p>')
+                     '<a href="https://cloudroom.dev" rel="noreferrer">CloudRoom</a>. For a Mac (Apple silicon or Intel) or x86_64 Linux.</p>')
+INSTALL_PREREQS = 'You need Python 3.9 or later, git, and the GitHub CLI (gh). See the install guide.'
+INSTALL_PREREQS_HTML = (f'<p class="install-prereqs">You need Python 3.9 or later, git, and the GitHub CLI (gh). '
+                        f'See <a href="{INSTALL_GUIDE}">the install guide</a>.</p>')
 FAQ = (ROOT / 'faq.html').read_text()
 FAQ_TOP = re.sub(r'<(/?)h3\b', r'<\1h2', re.sub(r'<(/?)h2\b', r'<\1h1', FAQ))
 FAQ_SLOTS = {'<template data-slot="faq"></template>\n': FAQ, '<template data-slot="faq-h1"></template>\n': FAQ_TOP}
 FAQ_PAGE = 'faq/index.html'
 FAQ_ON = {'index.html': FAQ, FAQ_PAGE: FAQ_TOP}
 FAQ_TITLE = ('Questions', 'The short ones are here.')
-FAQ_QUESTIONS = ('What is OpenWiz?', 'What is a kernel?', 'What do I need to run it?', 'Where do my agents run?',
-                 'Does OpenWiz see my code or my logins?', 'What does it cost?', 'Can you set it up for my team?',
-                 'How does openwiz.dev count visits and clicks?')
+FAQ_QUESTIONS = ('What is OpenWiz?', 'What is a kernel?', 'What do I need to run it?', 'What do I need before installing?',
+                 'Where do my agents run?', 'Does OpenWiz see my code or my logins?', 'What does it cost?',
+                 'Can you set it up for my team?', 'How does openwiz.dev count visits and clicks?')
+FAQ_PREREQS = ('A Mac (Apple silicon or Intel) or x86_64 Linux, with Python 3.9 or later, git, and the GitHub CLI (gh). '
+               'See the install guide for every step and command.')
 FAQ_TEAM = 'Yes. Book a 30-minute call. Your first fleet ships on it.'
 FAQ_WHERE = ("Builders run where you choose: this computer, with the Claude Code or Codex you're signed in to, boat.dev, "
              'or CloudRoom. Each is a driver that passed the same five-check test. In OpenWiz 0.01, you start builders by '
@@ -1183,8 +1189,10 @@ def check_install(landing, page):
     assert lines == [INSTALL_LINE], f'the install line must read exactly: {INSTALL_LINE}'
     label = re.search(r'<div class="install-box"[^>]*>\s*(<p class="install-version">([^<]*<small>[^<]*</small>)</p>)', landing)
     assert label and landing.count('install-version') == 1 and flat(label[2]) == INSTALL_VERSION, f'the install box must show {INSTALL_VERSION}'
-    assert re.search(re.escape(INSTALL_NOTE_HTML) + r'\s*$', box) and landing.count('install-note') == 1 \
-        and flat(INSTALL_NOTE_HTML) == INSTALL_NOTE, f'the install box must end with: {INSTALL_NOTE}'
+    assert re.search(re.escape(INSTALL_NOTE_HTML) + r'\s*' + re.escape(INSTALL_PREREQS_HTML) + r'\s*$', box) \
+        and landing.count('install-note') == 1 and landing.count('install-prereqs') == 1 \
+        and flat(INSTALL_NOTE_HTML) == INSTALL_NOTE and flat(INSTALL_PREREQS_HTML) == INSTALL_PREREQS, \
+        f'the install box must end with: {INSTALL_NOTE} {INSTALL_PREREQS}'
     hints = re.findall(r'<p class="install-hint">([\s\S]*?)</p>', box)
     assert [flat(h) for h in hints] == [INSTALL_HINT], f'the install box must say: {INSTALL_HINT}'
     labels = re.findall(r'<button class="btn install"[^>]*>([\s\S]*?)</button>', landing)
@@ -1196,7 +1204,10 @@ def check_install(landing, page):
     rest = landing.replace(box, ' ', 1)
     reader = Text(rest)
     for reading in [reader.joined(), reader.spaced()] + reader.shown:
-        assert not re.search(r'install|coming soon|paid plans|works today', re.sub(r'\s+', ' ', reading), re.I), 'unsettled landing claim or a second install mention'
+        assert not re.search(r'coming soon|paid plans|works today', re.sub(r'\s+', ' ', reading), re.I), 'unsettled landing claim or a second install mention'
+    no_faq = Text(rest.replace(FAQ, ' ', 1))
+    for reading in [no_faq.joined(), no_faq.spaced()] + no_faq.shown:
+        assert not re.search(r'install', re.sub(r'\s+', ' ', reading), re.I), 'unsettled landing claim or a second install mention'
     return landing[:label.start(1)] + landing[label.end(1):]
 
 
@@ -1783,7 +1794,9 @@ def check_faq(htmls, pages, names):
             f'each question ships open and disabled until faq.js runs: {plain(question)}'
         assert plain(answer), f'a question without its answer: {plain(question)}'
         for href in re.findall(r'href="([^"]*)"', answer):
-            assert href.startswith('/'), f'an answer links off the site: {href}'
+            assert href.startswith('/') or href == INSTALL_GUIDE, f'an answer links off the site: {href}'
+    prereqs = [plain(a) for _, q, _, a in rows if plain(q) == 'What do I need before installing?']
+    assert prereqs == [FAQ_PREREQS], f'the Questions\u2019 answer to What do I need before installing?: {FAQ_PREREQS}'
     where = [plain(a) for _, q, _, a in rows if plain(q) == 'Where do my agents run?']
     assert where == [FAQ_WHERE], f'the Questions\u2019 answer to Where do my agents run?: {FAQ_WHERE}'
     assert plain(rows[-2][3]) == FAQ_TEAM, f'the Questions’ team answer: {FAQ_TEAM}'
