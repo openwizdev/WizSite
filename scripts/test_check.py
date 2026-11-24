@@ -209,7 +209,7 @@ class Checks(unittest.TestCase):
 
     def test_hero_names_no_approval_step(self):
         for name, old, new in (
-                ('index.html', 'Turn an idea into a spec and reviewed code.', 'Turn an idea into an approved plan and reviewed code.'),
+                ('index.html', 'Tell it your idea in plain words.', 'Tell it your idea in plain words and an approved plan.'),
                 ('index.html', '<p class="demo-status">', '<p class="demo-status">Approve the plan · '),
                 ('site.js', "label: 'Writing the spec'", "label: 'Approving the plan'")):
             with self.subTest(new=new), tempfile.TemporaryDirectory() as temp:
@@ -631,7 +631,7 @@ class Checks(unittest.TestCase):
 
     def test_install_line_and_its_switch(self):
         line = '<code class="install-line">Install OpenWiz from github.com/openwizdev/OpenWiz</code>'
-        hint = '<p class="install-hint">Paste this into your agent</p>'
+        hint = '<p class="install-hint">Paste this into your AI helper</p>'
         text = (ROOT / 'dist/index.html').read_text()
         shipped = re.findall(r'data-install="([^"]*)"', text)
         labels = {'coming-soon': 'Copy · coming soon', 'live': 'Copy'}
@@ -660,7 +660,7 @@ class Checks(unittest.TestCase):
                 (line, ''),
                 (line, line + line),
                 (hint, ''),
-                (hint, hint.replace('your agent', 'your terminal')),
+                (hint, hint.replace('your AI helper', 'your terminal')),
                 (switch, ''),
                 (switch, 'data-install="on"'),
                 (button_here, button_here.replace(' disabled', '')),

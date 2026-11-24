@@ -1832,7 +1832,7 @@ async function main() {
     const LAYOUT = {
       laptop: { brand: [12, 20, 239, 34], mark: [22, 23, 28, 28], nav: [12, 142, 239, 256], title: [312, 40] },
       phone: { top: [0, 0, 390, 65], brand: [14, 18, 28, 28], mark: [14, 18, 28, 28], title: [16, 87] },
-      panel: { brand: [490, 307, 460, 30], mark: [490, 308, 28, 28], title: [490, 360] },
+      panel: { brand: [490, 280, 460, 30], mark: [490, 281, 28, 28], title: [490, 332] },
     };
     const box = selector => `(() => { const el = [...document.querySelectorAll(${JSON.stringify(selector)})].find(e => e.getClientRects().length);
       if (!el) return null; const r = el.getBoundingClientRect(); return [r.x, r.y, r.width, r.height].map(Math.round); })()`;
