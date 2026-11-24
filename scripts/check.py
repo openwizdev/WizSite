@@ -1741,6 +1741,11 @@ def check_book(root, names, pages):
     assert "addEventListener('fetch'" in sw or 'addEventListener("fetch"' in sw, 'the booking service worker must handle fetch'
     assert '/api/' in sw, 'the booking service worker must explicitly skip /api/'
     assert "addEventListener('activate'" in sw or 'addEventListener("activate"' in sw, 'the booking service worker must clean old caches on activate'
+    assert '__BOOK_CACHE__' not in sw and re.search(r"book-shell-[0-9a-f]{10}", sw), \
+        'the booking service worker must stamp a build-tied cache name'
+    for script_path in (root / names[BOOK_SCRIPT], root / BOOK_SW, ROOT / 'scripts/book-check.mjs'):
+        syntax = subprocess.run(['node', '--check', str(script_path)], capture_output=True, text=True)
+        assert syntax.returncode == 0, f'booking script syntax error in {script_path.name}: {syntax.stderr.strip()}'
     check_motion((root / names[BOOK_STYLE]).read_text())
     main = html.split('<footer', 1)[0]
     flat = re.sub(r'\s+', ' ', unescape(re.sub(r'<[^>]*>', ' ', main)))
@@ -1805,9 +1810,11 @@ def check_privacy(path, data):
 def main():
     output = ROOT / 'dist'
     check_site(output)
-    for name in RUNTIME - set(FINGERPRINTS.values()) - set(ALL_PAGES) - {ASK_INDEX}:
+    for name in RUNTIME - set(FINGERPRINTS.values()) - set(ALL_PAGES) - {ASK_INDEX, BOOK_SW}:
         source = APP_VENDOR[name][0] if name in APP_VENDOR else name
         assert (ROOT / source).read_bytes() == (output / name).read_bytes(), f'export differs: {name}'
+    book_cache = sha256(f'{FINGERPRINTS[BOOK_STYLE]}:{FINGERPRINTS[BOOK_SCRIPT]}'.encode()).hexdigest()[:10]
+    assert (ROOT / BOOK_SW).read_text().replace('__BOOK_CACHE__', book_cache) == (output / BOOK_SW).read_text(), f'export differs: {BOOK_SW}'
     assert built_fingerprints(output) == FINGERPRINTS, 'build is stale: rebuild the site'
     for name, hashed in FINGERPRINTS.items():
         assert (ROOT / name).read_bytes() == (output / hashed).read_bytes(), f'export differs: {name}'

@@ -27,7 +27,7 @@ const withFaq = html => html.replace('<template data-slot="faq"></template>\n', 
 const app = ['app/ember.css', 'app/data.js', 'app/records.js', 'app/ui.js', 'app/pages/you.js', 'app/pages/specs.js', 'app/pages/spec.js', 'app/pages/agents.js', 'app/palette.js', 'app/shell.js'];
 const npmVendor = { 'app/vendor/dagre-3.1.3.min.js': 'node_modules/@dagrejs/dagre/dist/dagre.min.js', 'app/vendor/dagre-LICENSE.txt': 'node_modules/@dagrejs/dagre/LICENSE' };
 const book = ['book/book.css', 'book/book.js'];
-const bookFiles = ['book/manifest.webmanifest', 'book/sw.js', 'book/icon-192.png', 'book/icon-512.png', 'book/icon-maskable-512.png'];
+const bookFiles = ['book/manifest.webmanifest', 'book/icon-192.png', 'book/icon-512.png', 'book/icon-maskable-512.png'];
 const hashed = ['tokens.css', 'site.css', 'site.js', 'faq.js', vendor[0], ...book, ...app];
 const brand = ['favicon.ico', 'favicon.svg', 'apple-touch-icon.png', 'brand/openwiz-lockup.svg', 'brand/og.png'];
 const appBrand = ['app/mark.svg', 'app/icon.svg', 'app/icon.ico', 'app/icon-180.png', 'app/wiz-reviewer.svg'];
@@ -59,9 +59,12 @@ for (const page of pages) {
   await put(page, html);
 }
 await put('ask-index.json', await (await import('./scripts/ask-index.mjs')).snapshotIndex(output, new URL('ask-docs/', root)));
+const bookCache = createHash('sha256').update(`${names['book/book.css']}:${names['book/book.js']}`).digest('hex').slice(0, 10);
+const bookSw = (await readFile(new URL('book/sw.js', root), 'utf8')).replace('__BOOK_CACHE__', bookCache);
+await put('book/sw.js', bookSw);
 for (const [file, source] of Object.entries(npmVendor)) await put(file, await readFile(new URL(source, root)));
 for (const file of files) {
   await mkdir(new URL('./', new URL(file, output)), { recursive: true });
   await copyFile(new URL(file, root), new URL(file, output));
 }
-console.log(`Static site: ${pages.length + hashed.length + files.length + Object.keys(npmVendor).length} public files in dist/ (${Object.values(names).join(', ')})`);
+console.log(`Static site: ${pages.length + hashed.length + files.length + Object.keys(npmVendor).length + 1} public files in dist/ (${Object.values(names).join(', ')})`);

@@ -1,5 +1,5 @@
 const CACHE_PREFIX = 'book-shell-';
-const CACHE_NAME = 'book-shell-v1';
+const CACHE_NAME = 'book-shell-__BOOK_CACHE__';
 const SHELL_URL = '/book/';
 
 self.addEventListener('install', event => {
@@ -22,11 +22,17 @@ self.addEventListener('activate', event => {
   );
 });
 
-function isCacheableAsset(pathname) {
+function isNetworkFirstAsset(pathname) {
   return (
     pathname === '/book/' ||
     pathname === '/book' ||
-    pathname.startsWith('/book/') ||
+    pathname === '/book/manifest.webmanifest' ||
+    (pathname.startsWith('/book/icon-') && pathname.endsWith('.png'))
+  );
+}
+
+function isImmutableAsset(pathname) {
+  return (
     pathname.startsWith('/fonts/') ||
     pathname.endsWith('.css') ||
     pathname.endsWith('.js')
@@ -40,22 +46,23 @@ self.addEventListener('fetch', event => {
   if (url.origin !== self.location.origin) return;
   if (url.pathname.startsWith('/api/')) return;
 
-  if (request.mode === 'navigate' || url.pathname === '/book/' || url.pathname === '/book') {
+  if (request.mode === 'navigate' || isNetworkFirstAsset(url.pathname)) {
+    const cacheKey = request.mode === 'navigate' || url.pathname === '/book' ? SHELL_URL : request;
     event.respondWith(
       fetch(request)
         .then(response => {
           if (response.ok) {
             const copy = response.clone();
-            caches.open(CACHE_NAME).then(cache => cache.put(SHELL_URL, copy));
+            caches.open(CACHE_NAME).then(cache => cache.put(cacheKey, copy));
           }
           return response;
         })
-        .catch(() => caches.match(SHELL_URL)),
+        .catch(() => caches.match(cacheKey)),
     );
     return;
   }
 
-  if (!isCacheableAsset(url.pathname)) return;
+  if (!isImmutableAsset(url.pathname)) return;
 
   event.respondWith(
     caches.match(request).then(cached => {

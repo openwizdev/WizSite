@@ -63,6 +63,7 @@ const state = {
   selectedSlot: null,
   booking: null,
   cancelPair: null,
+  currentView: els.loading,
 };
 
 function announce(text) {
@@ -72,7 +73,7 @@ function announce(text) {
   });
 }
 
-function showAlert(text) {
+function showAlert(text, { focus = false } = {}) {
   if (!text) {
     els.alert.hidden = true;
     els.alert.textContent = '';
@@ -80,9 +81,14 @@ function showAlert(text) {
   }
   els.alert.textContent = text;
   els.alert.hidden = false;
+  if (focus) {
+    els.alert.scrollIntoView({ behavior: 'instant', block: 'center' });
+    els.alert.focus({ preventScroll: true });
+  }
 }
 
 function showView(target) {
+  state.currentView = target;
   for (const view of views) {
     view.hidden = view !== target;
   }
@@ -99,17 +105,28 @@ function localDayKey(date) {
   return `${byType.year}-${byType.month}-${byType.day}`;
 }
 
-function nextFourteenDays() {
+function buildDayList(rawSlots) {
   const days = [];
   const seen = new Set();
   const now = new Date();
-  for (let i = 0; days.length < 14 && i < 20; i++) {
+  let lastSlotKey = '';
+  for (const iso of rawSlots) {
+    const key = localDayKey(new Date(iso));
+    if (key > lastSlotKey) lastSlotKey = key;
+  }
+  let prevMonth = null;
+  for (let i = 0; i < 22; i++) {
     const d = new Date(now.getTime() + i * 86400000);
     const key = localDayKey(d);
     if (seen.has(key)) continue;
     seen.add(key);
+    const month = new Intl.DateTimeFormat(undefined, { month: 'short', timeZone: visitorTz }).format(d);
+    const monthChanged = prevMonth !== null && month !== prevMonth;
+    prevMonth = month;
     days.push({
       key,
+      month,
+      monthChanged,
       weekday: new Intl.DateTimeFormat(undefined, { weekday: 'short', timeZone: visitorTz }).format(d),
       dayNum: new Intl.DateTimeFormat(undefined, { day: 'numeric', timeZone: visitorTz }).format(d),
       fullLabel: new Intl.DateTimeFormat(undefined, {
@@ -118,15 +135,26 @@ function nextFourteenDays() {
         day: 'numeric',
         timeZone: visitorTz,
       }).format(d),
-      shortLabel: new Intl.DateTimeFormat(undefined, {
-        weekday: 'short',
-        month: 'short',
-        day: 'numeric',
-        timeZone: visitorTz,
-      }).format(d),
     });
+    if (days.length >= 14 && (!lastSlotKey || key >= lastSlotKey)) break;
   }
   return days;
+}
+
+function shortZoneName(date) {
+  const parts = new Intl.DateTimeFormat(undefined, {
+    timeZone: visitorTz,
+    timeZoneName: 'short',
+  }).formatToParts(date);
+  return parts.find(p => p.type === 'timeZoneName')?.value || '';
+}
+
+function friendlyZoneLabel(sampleIso) {
+  const sampleDate = sampleIso ? new Date(sampleIso) : new Date();
+  const abbr = shortZoneName(sampleDate);
+  if (visitorTz === 'UTC' || visitorTz === 'Etc/UTC') return 'Times in UTC';
+  const city = visitorTz.split('/').pop().replaceAll('_', ' ');
+  return abbr ? `Times in ${city} time (${abbr})` : `Times in ${city} time`;
 }
 
 function formatTime(iso) {
@@ -151,7 +179,7 @@ function formatFullSlot(iso) {
     timeZoneName: 'short',
     timeZone: visitorTz,
   }).format(d);
-  return `${day} · ${time} (${visitorTz})`;
+  return `${day} · ${time}`;
 }
 
 function renderDays() {
@@ -167,12 +195,19 @@ function renderDays() {
     if (slots.length === 0) btn.disabled = true;
 
     const wd = document.createElement('span');
-    wd.className = 'book-day-wd';
-    wd.textContent = day.weekday;
+    wd.className = day.monthChanged ? 'book-day-wd book-day-month' : 'book-day-wd';
+    wd.textContent = day.monthChanged ? day.month : day.weekday;
     const num = document.createElement('span');
     num.className = 'book-day-num';
     num.textContent = day.dayNum;
     btn.append(wd, num);
+
+    if (slots.length > 0) {
+      const dot = document.createElement('span');
+      dot.className = 'book-day-dot';
+      dot.setAttribute('aria-hidden', 'true');
+      btn.appendChild(dot);
+    }
 
     btn.addEventListener('click', () => selectDay(day.key, true));
     btn.addEventListener('keydown', onDayKeyDown);
@@ -287,10 +322,32 @@ function toIcsUtc(iso) {
   return new Date(iso).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
 }
 
+function foldIcsLine(line) {
+  const encoder = new TextEncoder();
+  const out = [];
+  let current = '';
+  let bytes = 0;
+  let limit = 75;
+  for (const ch of line) {
+    const len = encoder.encode(ch).length;
+    if (bytes + len > limit && current) {
+      out.push(current);
+      current = ' ' + ch;
+      bytes = 1 + len;
+      limit = 75;
+    } else {
+      current += ch;
+      bytes += len;
+    }
+  }
+  if (current) out.push(current);
+  return out.join('\r\n');
+}
+
 function downloadIcs() {
   if (!state.booking) return;
   const { id, start, end } = state.booking;
-  const lines = [
+  const rawLines = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
     'PRODID:-//OpenWiz//Book//EN',
@@ -301,12 +358,12 @@ function downloadIcs() {
     `DTSTART:${toIcsUtc(start)}`,
     `DTEND:${toIcsUtc(end)}`,
     'SUMMARY:OpenWiz — 30-minute team call',
-    'DESCRIPTION:30-minute setup call with Jake. Bring your repo and your coding agent.',
+    'DESCRIPTION:30-minute setup call with Jake. Bring your repo and agent.',
     'END:VEVENT',
     'END:VCALENDAR',
-    '',
   ];
-  const blob = new Blob([lines.join('\r\n')], { type: 'text/calendar;charset=utf-8' });
+  const ics = rawLines.map(foldIcsLine).join('\r\n') + '\r\n';
+  const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
@@ -323,8 +380,7 @@ async function submitBooking(event) {
   if (!fields || !state.selectedSlot) return;
 
   if (!navigator.onLine) {
-    showAlert('');
-    showView(els.offline);
+    showAlert('Booking needs an internet connection. Reconnect and try again.', { focus: true });
     announce('Booking needs an internet connection.');
     return;
   }
@@ -361,28 +417,28 @@ async function submitBooking(event) {
 
     if (res.status === 409 || data.error === 'slot_taken') {
       state.selectedSlot = null;
-      showAlert('That time was just taken. Pick another below.');
+      showAlert('That time was just taken. Pick another below.', { focus: true });
       await loadSlots({ keepAlert: true });
       return;
     }
 
     if (res.status === 429 || data.error === 'rate_limited') {
-      showAlert(data.message || 'Too many requests. Wait a minute and try again.');
+      showAlert(data.message || 'Too many requests. Wait a minute and try again.', { focus: true });
       return;
     }
 
     if (res.status === 503 || data.error === 'unavailable') {
-      els.unavailableText.textContent = data.message || 'The calendar is unavailable at the moment.';
+      els.unavailableText.textContent = data.message || 'Booking isn’t open right now.';
       showView(els.unavailable);
       return;
     }
 
-    showAlert(data.message || 'Check your details and try again.');
+    showAlert(data.message || 'Check your details and try again.', { focus: true });
   } catch {
     if (!navigator.onLine) {
-      showView(els.offline);
+      showAlert('Booking needs an internet connection. Reconnect and try again.', { focus: true });
     } else {
-      showAlert('Something went wrong. Please try again.');
+      showAlert('Something went wrong. Please try again.', { focus: true });
     }
   } finally {
     els.submit.disabled = false;
@@ -409,15 +465,15 @@ async function loadSlots({ keepAlert = false } = {}) {
     }
 
     if (!res.ok) {
-      els.unavailableText.textContent = data.message || 'The calendar is unavailable at the moment.';
+      els.unavailableText.textContent = data.message || 'Booking isn’t open right now.';
       showView(els.unavailable);
-      announce('Booking is unavailable right now.');
+      announce('Booking is closed right now.');
       return;
     }
 
     state.minutes = data.minutes || 30;
     const rawSlots = Array.isArray(data.slots) ? data.slots : [];
-    state.dayList = nextFourteenDays();
+    state.dayList = buildDayList(rawSlots);
     state.dayMap = new Map();
     for (const day of state.dayList) state.dayMap.set(day.key, []);
 
@@ -435,7 +491,8 @@ async function loadSlots({ keepAlert = false } = {}) {
       return;
     }
 
-    els.tz.textContent = `Times in ${visitorTz}`;
+    const sampleSlot = state.dayMap.get(firstOpen.key)[0];
+    els.tz.textContent = friendlyZoneLabel(sampleSlot);
     state.selectedDay = firstOpen.key;
     renderDays();
     selectDay(firstOpen.key, false);
@@ -446,9 +503,9 @@ async function loadSlots({ keepAlert = false } = {}) {
       showView(els.offline);
       announce('Booking needs an internet connection.');
     } else {
-      els.unavailableText.textContent = 'The calendar is unavailable at the moment.';
+      els.unavailableText.textContent = 'Booking isn’t open right now.';
       showView(els.unavailable);
-      announce('Booking is unavailable right now.');
+      announce('Booking is closed right now.');
     }
   }
 }
@@ -456,6 +513,11 @@ async function loadSlots({ keepAlert = false } = {}) {
 async function runCancel() {
   if (!state.cancelPair) return;
   showAlert('');
+  if (!navigator.onLine) {
+    showView(els.offline);
+    announce('Booking needs an internet connection.');
+    return;
+  }
   els.cancelBtn.disabled = true;
   try {
     const res = await fetch('/api/book/cancel', {
@@ -464,17 +526,21 @@ async function runCancel() {
       body: JSON.stringify(state.cancelPair),
     });
     if (res.ok) {
+      state.cancelPair = null;
       showView(els.cancelled);
       announce('Your call has been cancelled.');
       return;
     }
     const data = await res.json().catch(() => ({}));
-    showAlert(data.message || 'Could not cancel this call.');
+    showView(els.cancel);
+    showAlert(data.message || 'Could not cancel this call.', { focus: true });
   } catch {
     if (!navigator.onLine) {
       showView(els.offline);
+      announce('Booking needs an internet connection.');
     } else {
-      showAlert('Could not cancel this call. Please try again.');
+      showView(els.cancel);
+      showAlert('Could not cancel this call. Please try again.', { focus: true });
     }
   } finally {
     els.cancelBtn.disabled = false;
@@ -508,15 +574,29 @@ function init() {
   });
   els.icsBtn.addEventListener('click', downloadIcs);
   els.rateRetry.addEventListener('click', () => loadSlots());
-  els.offlineRetry.addEventListener('click', () => loadSlots());
+  els.offlineRetry.addEventListener('click', () => {
+    if (state.cancelPair) {
+      runCancel();
+    } else {
+      loadSlots();
+    }
+  });
   els.cancelBtn.addEventListener('click', runCancel);
 
   window.addEventListener('offline', () => {
-    showView(els.offline);
-    announce('Booking needs an internet connection.');
+    if (state.currentView === els.loading || state.currentView === els.picker) {
+      showView(els.offline);
+      announce('Booking needs an internet connection.');
+    }
   });
   window.addEventListener('online', () => {
-    if (!els.offline.hidden && !state.cancelPair) loadSlots();
+    if (state.currentView === els.offline) {
+      if (state.cancelPair) {
+        showView(els.cancel);
+      } else {
+        loadSlots();
+      }
+    }
   });
 
   const params = new URLSearchParams(window.location.search);
@@ -532,7 +612,7 @@ function init() {
       showView(els.cancel);
       return;
     }
-    showAlert('This cancel link is not valid.');
+    showAlert('This cancel link is not valid.', { focus: true });
   }
 
   loadSlots();

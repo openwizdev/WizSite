@@ -57,7 +57,7 @@
     </section>
     <section class="book-surface" aria-label="Booking calendar" id="book-app">
       <div class="sr-only" id="book-live" aria-live="polite" aria-atomic="true"></div>
-      <div class="book-alert" id="book-alert" role="alert" hidden></div>
+      <div class="book-alert" id="book-alert" role="alert" tabindex="-1" hidden></div>
 
       <div class="book-view" data-state="loading" id="book-loading">
         <div class="book-skeleton">
@@ -86,11 +86,8 @@
 
       <form class="book-form" id="book-form" novalidate hidden>
         <div class="book-chosen">
-          <div>
-            <p class="book-chosen-label">Selected time</p>
-            <p class="book-chosen-when" id="book-chosen-when"></p>
-          </div>
-          <button type="button" class="book-change" id="book-change">Change time</button>
+          <p class="book-chosen-when" id="book-chosen-when"></p>
+          <button type="button" class="book-change" id="book-change">Change</button>
         </div>
         <div class="book-field">
           <label for="book-name">Name</label>
@@ -138,7 +135,7 @@
       </div>
 
       <div class="book-message" data-state="unavailable" id="book-unavailable" hidden>
-        <h2>Calendar unavailable</h2>
+        <h2>Booking is closed right now</h2>
         <p id="book-unavailable-text">Booking isn’t open right now.</p>
         <a class="book-fallback" href="/team/">See the team page</a>
       </div>
