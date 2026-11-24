@@ -263,6 +263,7 @@
         h('span', { class: 'v2-queue-link' }, 'Open on GitHub', icon('right'))),
       item.video ? h('a', { class: 'v2-btn subtle v2-queue-video', href: item.video.url,
         target: '_blank', rel: 'noreferrer', 'data-focus': `video:${item.key}` }, 'Watch the narrated spec', icon('right')) : null,
+      spec ? h('a', { class: 'v2-btn subtle v2-queue-video', href: `#/canvas/${item.subject.number}`, 'data-focus': `canvas:${item.key}` }, 'See it on Canvas', icon('right')) : null,
     ].filter(Boolean);
   }
   function view() {
