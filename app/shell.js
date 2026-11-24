@@ -200,6 +200,7 @@
 
   function readLine(feed) {
     if (feed.state === 'loading') return [h('span', {}, `${feed.label}: reading…`)];
+    if (feed.state === 'waiting') return [h('span', { class: 'bad' }, `${feed.label}: waits for GitHub's limit${data.limit.pausedUntil ? ` (until ${time(data.limit.pausedUntil)})` : ''}`)];
     if (feed.state === 'unknown') return [h('span', { class: 'bad' }, `${feed.label}: unknown (couldn't read at ${time(feed.failedAt)})`)];
     return [h('span', {}, `${feed.label} read `), h('b', {}, time(feed.readAt)), feed.state === 'stale' ? h('span', { class: 'bad' }, ' · last read failed') : null];
   }
@@ -229,7 +230,7 @@
     built.phoneReads.replaceChildren(...mine.flatMap((feed, i) => [i ? ' · ' : '', ...readLine(feed)]).filter(part => part !== null && part !== ''));
     const notes = [];
     if (data.paused()) {
-      notes.push(notice('slow', 'pause', 'GitHub\'s limit is low', `(${limit.remaining ?? 0} left). Reads are paused until ${time(limit.pausedUntil)}, then resume on their own.`));
+      notes.push(notice('slow', 'pause', 'GitHub\'s hourly read limit for your account is nearly used up', `(${limit.remaining ?? 0} left; your agents on the same GitHub login share it). Reads are paused until ${time(limit.pausedUntil)}, then resume on their own. Until then the app shows its last read, never a guess.`));
     }
     for (const feed of mine) {
       if (feed.state === 'unknown') notes.push(notice('bad', 'warn', `Couldn't read ${feed.label} from GitHub`, `at ${time(feed.failedAt)}. It shows as unknown, not as empty, until a read works.`));
