@@ -245,19 +245,41 @@
       totalCount
       nodes { number title url updatedAt labels(first: 20) { nodes { name } } subIssuesSummary { total completed } }
     }
-    youIssues: issues(first: 50, states: OPEN, labels: ["needs-info", "ready-for-human"], orderBy: {field: UPDATED_AT, direction: DESC}) {
+    youIssues: issues(first: 50, states: OPEN, labels: ["needs-info"], orderBy: {field: UPDATED_AT, direction: DESC}) {
+      totalCount
+      nodes { number title url updatedAt labels(first: 20) { nodes { name } } issueDependenciesSummary { blockedBy } }
+    }
+    peopleIssues: issues(first: 50, states: OPEN, labels: ["ready-for-human"], orderBy: {field: UPDATED_AT, direction: DESC}) {
       totalCount
       nodes { number title url updatedAt labels(first: 20) { nodes { name } } issueDependenciesSummary { blockedBy } }
     }
     fleet: object(expression: "HEAD:docs/agents/fleet.md") { ... on Blob { text } }
   }
 }`;
-  const SPEC_DETAILS = 30;
+  const SPEC_DETAILS = 60;
   const RECENT = 'orderBy: {field: UPDATED_AT, direction: DESC}';
   const TICKET = 'number title url state stateReason repository { nameWithOwner }';
-  function specTickets(repository) {
-    const numbers = (repository.specIssues?.nodes || []).map(issue => issue?.number).filter(Number.isSafeInteger).slice(0, SPEC_DETAILS);
-    if (!numbers.length) return null;
+  const SPEC_CHUNK = 6;
+  const STALE_MAX = 60 * 60 * 1000;
+  const CHUNK_TICKETS = 60;
+  function specNumbers(repository) {
+    return (repository.specIssues?.nodes || []).filter(issue => Number.isSafeInteger(issue?.number)).slice(0, SPEC_DETAILS)
+      .map(issue => ({ n: issue.number, tickets: Math.min(50, issue.subIssuesSummary?.total ?? 50) }));
+  }
+  function chunksOf(specs) {
+    const out = [];
+    let chunk = [];
+    let tickets = 0;
+    for (const spec of specs) {
+      if (chunk.length && (chunk.length >= SPEC_CHUNK || tickets + spec.tickets > CHUNK_TICKETS)) { out.push(chunk); chunk = []; tickets = 0; }
+      chunk.push(spec.n);
+      tickets += spec.tickets;
+    }
+    if (chunk.length) out.push(chunk);
+    return out;
+  }
+  const whole = detail => Boolean(detail?.subIssues && detail.comments && (detail.subIssues.nodes || []).every(Boolean));
+  function specTickets(numbers) {
     return `query SpecTickets($owner: String!, $name: String!) {
   rateLimit { limit remaining resetAt }
   repository(owner: $owner, name: $name) {${numbers.map(n => `
@@ -270,6 +292,7 @@
   }
 }`;
   }
+  const limited = answer => Array.isArray(answer?.errors) && answer.errors.some(e => e?.type === 'RATE_LIMIT');
   const PULLS = `closedByPullRequestsReferences(first: 5, includeClosedPrs: true) { totalCount nodes { url state isDraft reviewDecision
           commits(last: 1) { nodes { commit { statusCheckRollup { state } } } } } }`;
   const AGENTS = `query Agents($owner: String!, $name: String!, $since: DateTime!, $after: String) {
@@ -308,7 +331,7 @@
   }
 }`;
   const feeds = {
-    specs: { label: 'Specs', every: 10 * 60 * 1000, query: SPECS, more: specTickets,
+    specs: { label: 'Specs', every: 10 * 60 * 1000, query: SPECS, more: specNumbers,
       variables: picked => ({ specs: SPEC_SEARCH(picked.full) }),
       shape: (data, answer) => { data.specIssues = specsOf(answer.specSearch); } },
     agents: { label: 'Agents', every: 2 * 60 * 1000, run: agentsRead },
@@ -461,7 +484,7 @@
     return { items, complete: false };
   }
   async function moreComments(specs, picked) {
-    for (const detail of Object.values(specs || {})) {
+    for (const [key, detail] of Object.entries(specs || {})) {
       const list = detail?.comments;
       if (!list || !Number.isSafeInteger(detail.number) || (list.totalCount ?? 0) <= (list.nodes || []).length || paused()) continue;
       try {
@@ -469,7 +492,7 @@
         if (!got.complete) continue;
         const nodes = got.items.filter(c => Number.isSafeInteger(c?.id)).map(c => ({ databaseId: c.id, body: c.body ?? '', url: c.html_url,
           createdAt: c.created_at, updatedAt: c.updated_at, author: typeof c.user?.login === 'string' ? { login: c.user.login } : null }));
-        detail.comments = { totalCount: got.items.length, nodes };
+        specs[key] = { ...detail, comments: { totalCount: got.items.length, nodes } };
       } catch (error) {
         if (error instanceof Ended || error instanceof SignedOut) throw error;
       }
@@ -483,6 +506,8 @@
   const paused = () => limit.pausedUntil !== null && limit.pausedUntil > Date.now();
 
   function noteLimit(rate, response) {
+    const resource = response.headers.get('x-ratelimit-resource');
+    if (!rate && resource && resource !== 'graphql' && response.status !== 429 && response.status !== 403) return;
     const remaining = rate?.remaining ?? Number(response.headers.get('x-ratelimit-remaining') ?? NaN);
     const reset = rate?.resetAt ? Date.parse(rate.resetAt) : Number(response.headers.get('x-ratelimit-reset') ?? NaN) * 1000;
     if (Number.isFinite(remaining)) {
@@ -499,7 +524,11 @@
   async function read(name) {
     const feed = feeds[name];
     const picked = repo.get();
-    if (!picked || feed.busy || paused()) return;
+    if (!picked || feed.busy) return;
+    if (paused()) {
+      if (feed.state === 'loading') { feed.state = 'waiting'; changed(); }
+      return;
+    }
     const mine = generation;
     feed.busy = true;
     try {
@@ -517,33 +546,63 @@
       const answer = await response.json().catch(() => null);
       if (mine !== generation) return;
       noteLimit(answer?.data?.rateLimit, response);
+      if (limited(answer)) feed.why = 'limit';
       if (!response.ok || !answer?.data?.repository) throw new Error(`GitHub answered ${response.status}`);
+      feed.why = null;
       const data = answer.data.repository;
       feed.shape?.(data, answer.data);
       const errors = [...(answer.errors || [])];
       const more = feed.more?.(data);
-      if (more) {
-        data.specs = null;
-        if (paused()) {
-          errors.push({ message: 'the second read waits for GitHub\'s limit' });
-        } else {
+      if (more?.length) {
+        const kept = feed.details?.repo === picked.full ? feed.details.specs : new Map();
+        for (const [n, k] of kept) if (Date.now() - k.at > STALE_MAX) kept.delete(n);
+        const fresh = new Map();
+        const missed = new Set();
+        let why = null;
+        const queue = chunksOf(more);
+        while (queue.length) {
+          const chunk = queue.shift();
+          if (paused()) { chunk.forEach(n => missed.add(n)); why ||= 'limit'; continue; }
           try {
-            const second = await github('POST', '/graphql', { query: more, variables: { owner: picked.owner, name: picked.name } });
+            const second = await github('POST', '/graphql', { query: specTickets(chunk), variables: { owner: picked.owner, name: picked.name } });
             const extra = await second.json().catch(() => null);
             if (mine !== generation) return;
             noteLimit(extra?.data?.rateLimit, second);
-            if (second.ok && extra?.data?.repository) {
-              data.specs = extra.data.repository;
-              await moreComments(data.specs, picked);
-              if (mine !== generation) return;
+            const got = second.ok ? extra?.data?.repository : null;
+            if (limited(extra)) { why = 'limit'; if (!paused()) limit.pausedUntil = Date.now() + PAUSE_DEFAULT; }
+            const heavy = (extra?.errors || []).some(e => e?.type === 'RESOURCE_LIMITS_EXCEEDED');
+            if (heavy && chunk.length > 1) { queue.unshift(...chunk.map(n => [n])); continue; }
+            for (const n of chunk) {
+              const detail = got?.[`s${n}`];
+              if (whole(detail)) fresh.set(n, detail);
+              else if (detail && !kept.has(n)) { fresh.set(n, detail); missed.add(n); } else missed.add(n);
             }
-            errors.push(...(second.ok && extra?.data?.repository ? extra.errors || [] : [{ message: `GitHub answered ${second.status}` }]));
+            if (!got) why ||= 'failed';
           } catch (error) {
             if (error instanceof Ended || error instanceof SignedOut) throw error;
             if (mine !== generation) return;
-            errors.push({ message: 'the second read failed' });
+            chunk.forEach(n => missed.add(n));
+            why ||= 'failed';
           }
         }
+        if (mine !== generation) return;
+        const specs = {};
+        const stale = {};
+        for (const { n } of more) {
+          if (fresh.has(n) && !missed.has(n)) { specs[`s${n}`] = fresh.get(n); kept.set(n, { detail: fresh.get(n), at: Date.now() }); } else if (kept.has(n)) {
+            specs[`s${n}`] = kept.get(n).detail;
+            stale[`s${n}`] = kept.get(n).at;
+          } else if (fresh.has(n)) specs[`s${n}`] = fresh.get(n);
+        }
+        feed.details = { repo: picked.full, specs: kept };
+        data.specs = specs;
+        data.specsStale = stale;
+        data.specsMissed = [...missed];
+        data.specsWhy = missed.size ? why || 'partial' : null;
+        if (missed.size) errors.push({ message: why === 'limit' ? 'GitHub\'s hourly limit ran out before every spec\'s tickets were read' : 'part of the spec tickets read failed' });
+        if (mine !== generation) return;
+        await moreComments(specs, picked);
+        if (mine !== generation) return;
       }
       feed.data = data;
       feed.state = errors.length ? 'partial' : 'ok';
@@ -585,7 +644,7 @@
     generation += 1;
     for (const feed of Object.values(feeds)) {
       clearTimeout(feed.timer);
-      Object.assign(feed, { state: 'loading', data: null, readAt: null, failedAt: null, busy: false, kept: null });
+      Object.assign(feed, { state: 'loading', data: null, readAt: null, failedAt: null, busy: false, kept: null, details: null, why: null });
     }
   }
   function refreshAll() {

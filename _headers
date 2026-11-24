@@ -19,9 +19,9 @@
 /*.:hash.js
   ! Cache-Control
   Cache-Control: public, max-age=31536000, immutable
-/fonts/*
+/fonts/*.woff2
   ! Cache-Control
-  Cache-Control: public, max-age=2592000, stale-while-revalidate=604800
+  Cache-Control: public, max-age=31536000, immutable
 /art/*
   ! Cache-Control
   Cache-Control: public, max-age=604800, stale-while-revalidate=2592000
@@ -65,3 +65,11 @@
   Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; media-src 'self'; font-src 'self'; connect-src 'self' https://api.github.com; manifest-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
   ! Referrer-Policy
   Referrer-Policy: no-referrer
+/llms.txt
+  Content-Type: text/plain; charset=utf-8
+/llms-full.txt
+  Content-Type: text/plain; charset=utf-8
+/SKILL.md
+  Content-Type: text/plain; charset=utf-8
+/c76a1a01e62d088edd3789d30d6a4d29.txt
+  Content-Type: text/plain; charset=utf-8

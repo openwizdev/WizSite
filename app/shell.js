@@ -37,8 +37,8 @@
   function signedOut(note) {
     data.stop();
     screen(
-      h('h1', {}, 'Your factory, at a glance'),
-      h('p', {}, 'See what needs you, every spec and the agents at work. Sign in to pick a repository.'),
+      h('h1', {}, 'See your idea being built'),
+      h('p', {}, 'Watch your AI helpers at work: what needs your answer, the plan, and each helper\'s progress. Sign in with GitHub (the free website where your project is kept) to pick your project.'),
       note ? h('div', { class: 'notices' }, h('div', { class: 'notice bad', role: 'alert' }, icon('warn'), h('span', {}, note))) : null,
       h('a', { class: 'btn primary', href: '/api/sign-in/start' }, 'Sign in with GitHub'),
       h('p', { class: 'small' }, v2
@@ -200,6 +200,7 @@
 
   function readLine(feed) {
     if (feed.state === 'loading') return [h('span', {}, `${feed.label}: reading…`)];
+    if (feed.state === 'waiting') return [h('span', { class: 'bad' }, `${feed.label}: waits for GitHub's limit${data.limit.pausedUntil ? ` (until ${time(data.limit.pausedUntil)})` : ''}`)];
     if (feed.state === 'unknown') return [h('span', { class: 'bad' }, `${feed.label}: unknown (couldn't read at ${time(feed.failedAt)})`)];
     return [h('span', {}, `${feed.label} read `), h('b', {}, time(feed.readAt)), feed.state === 'stale' ? h('span', { class: 'bad' }, ' · last read failed') : null];
   }
@@ -229,7 +230,7 @@
     built.phoneReads.replaceChildren(...mine.flatMap((feed, i) => [i ? ' · ' : '', ...readLine(feed)]).filter(part => part !== null && part !== ''));
     const notes = [];
     if (data.paused()) {
-      notes.push(notice('slow', 'pause', 'GitHub\'s limit is low', `(${limit.remaining ?? 0} left). Reads are paused until ${time(limit.pausedUntil)}, then resume on their own.`));
+      notes.push(notice('slow', 'pause', 'GitHub\'s hourly read limit for your account is nearly used up', `(${limit.remaining ?? 0} left; your agents on the same GitHub login share it). Reads are paused until ${time(limit.pausedUntil)}, then resume on their own. Until then the app shows its last read, never a guess.`));
     }
     for (const feed of mine) {
       if (feed.state === 'unknown') notes.push(notice('bad', 'warn', `Couldn't read ${feed.label} from GitHub`, `at ${time(feed.failedAt)}. It shows as unknown, not as empty, until a read works.`));
