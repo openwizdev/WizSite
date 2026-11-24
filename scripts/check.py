@@ -150,11 +150,13 @@ TEAM_PAGE = 'team/index.html'
 BOOK_PLACEHOLDER = '#book'
 TEAM_KICKER = 'For teams who use Claude Code or Codex'
 TEAM_HEADLINE = 'Leave the call with a reviewed pull request.'
-TEAM_LEAD = ('Jake, who built OpenWiz, sets up an agent factory with your team on your own repository. '
-             'Pick one small, real change: your agents build and review it. Merging stays your call.')
+TEAM_LEAD = ('Jake, who built OpenWiz, sets up an agent factory on your repository. '
+             'Your agents build and review one small, real change. Merging stays your call. '
+             'The panel here replays a real run of agents building and reviewing.')
 TEAM_NEEDS = '30 minutes. Bring a repository with working CI and a signed-in Claude Code or Codex.'
 TEAM_REPLAY_LABEL = 'Replay of a real run · spec #1927 · 20–21 Nov 2026'
 TEAM_REPLAY_TITLE = 'Infra spec: write-driver, a skill that writes your own driver'
+TEAM_REPLAY_CAPTION = 'Each row is a task agents built and reviewed, with the merged pull requests below.'
 TEAM_REPLAY_SPEC = 'https://github.com/openwizdev/OpenWiz/issues/1927'
 TEAM_REPLAY_OPENED = '2026-11-20T13:38:32Z'
 TEAM_REPLAY_CONTROL = '<button class="team-replay-control" type="button" hidden>Play again</button>'
@@ -1550,6 +1552,7 @@ def check_team(htmls, pages):
         '<figcaption class="team-replay-heading">',
         f'<p class="team-replay-meta">{TEAM_REPLAY_LABEL}</p>',
         f'<p class="team-replay-title"><a href="{TEAM_REPLAY_SPEC}">{TEAM_REPLAY_TITLE}</a></p>',
+        f'<p class="team-replay-caption">{TEAM_REPLAY_CAPTION}</p>',
         '</figcaption>', '<ul class="team-tickets">',
     ]
     for number, title, *times in TEAM_REPLAY_TICKETS:
