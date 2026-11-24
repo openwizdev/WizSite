@@ -233,6 +233,7 @@ ABOUT_LINK = '<p class="wrap about-link"><a href="/what-is-openwiz/">What is Ope
 STATIC = {
     'index.html', 'changelog/index.html', 'drivers/index.html', 'team/index.html', 'faq/index.html', 'market/index.html', '_headers', APP_PAGE, 'app/manifest.webmanifest',
     'fonts/Geist-var.woff2', 'fonts/GeistMono-var.woff2', 'fonts/OFL.txt',
+    'c76a1a01e62d088edd3789d30d6a4d29.txt',
 } | ART | set(ICON_HASHES) | set(VECTORS) | (set(VENDOR_HASHES) - {GSAP}) | set(APP_VENDOR) | set(DRIVER_LOGOS) | {ASK_INDEX, ABOUT_PAGE, NOT_FOUND} | DISCOVERY_FILES
 RUNTIME = STATIC | set(FINGERPRINTS.values())
 
