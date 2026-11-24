@@ -153,31 +153,28 @@ TEAM_HEADLINE = 'Leave the call with a reviewed pull request.'
 TEAM_LEAD = ('Jake, who built OpenWiz, sets up an agent factory with your team on your own repository. '
              'Pick one small, real change: your agents build and review it. Merging stays your call.')
 TEAM_NEEDS = '30 minutes. Bring a repository with working CI and a signed-in Claude Code or Codex.'
-TEAM_SPEC_TITLE = 'spec: openwiz.dev/book, our own booking page for the team call'
-TEAM_SPEC_PR = 'https://github.com/openwizdev/WizSite/pull/183'
-TEAM_SPEC_TICKETS = ('BK1: busy time from iCal and the open slots',
-                     'BK3: confirmation email and Google Calendar',
-                     'BK2: the booking API',
-                     'BK4: the booking page and its installable app')
-TEAM_SPEC_ROWS = tuple(f'<li><span>{title}</span><span class="team-spec-state merged">Merged</span></li>'
-                       for title in TEAM_SPEC_TICKETS)
-TEAM_SNAPSHOT = f'''
-  <section class="team-spec" aria-labelledby="team-spec-title">
-    <h2 class="team-spec-heading" id="team-spec-title">
-      <code>#2963</code>
-      <a href="https://github.com/openwizdev/OpenWiz/issues/2963">{TEAM_SPEC_TITLE}</a>
-    </h2>
-    <ul class="team-spec-tickets">
-      {' '.join(TEAM_SPEC_ROWS)}
-    </ul>
-    <div class="team-spec-merge">
-      <p>Latest merged pull request</p>
-      <a href="{TEAM_SPEC_PR}"><code>openwizdev/WizSite #183</code> <span>BK2: the booking API (#2966)</span></a>
-      <p class="team-spec-meta"><span class="team-spec-state merged">Merged</span> <time datetime="2026-11-24T13:00:20Z">24 Nov 2026, 13:00 UTC</time></p>
-    </div>
-    <p class="team-spec-origin" role="status">Snapshot from GitHub · <time datetime="2026-11-24T14:33:00Z">24 Nov 2026, 14:33 UTC</time></p>
-  </section>
-'''
+TEAM_REPLAY_LABEL = 'Replay of a real run · spec #1927 · 20–21 Nov 2026'
+TEAM_REPLAY_TITLE = 'Infra spec: write-driver, a skill that writes your own driver'
+TEAM_REPLAY_SPEC = 'https://github.com/openwizdev/OpenWiz/issues/1927'
+TEAM_REPLAY_OPENED = '2026-11-20T13:38:32Z'
+TEAM_REPLAY_CONTROL = '<button class="team-replay-control" type="button" hidden>Play again</button>'
+TEAM_REPLAY_WIZSITE = 'https://github.com/openwizdev/WizSite/pull/118'
+TEAM_REPLAY_TICKETS = (
+    (1928, "Infra WD1: the write-driver contract: copy line, ticket format, live lessons and the timed report, first",
+     "2026-11-20T15:45:24Z", "2026-11-20T15:57:37Z", "2026-11-20T19:03:26Z"),
+    (1929, "Infra WD2: the write-driver skill takes a user from paste to a passing driver (WizSkills 0.2.1)",
+     "2026-11-20T17:45:43Z", "2026-11-20T17:58:49Z", "2026-11-21T01:27:35Z"),
+    (1931, "Infra WD3: write-driver’s end-to-end eval against the template’s fake host (WizSkills 0.2.1)",
+     "2026-11-21T01:32:44Z", "2026-11-21T02:00:06Z", "2026-11-21T04:36:53Z"),
+    (1932, "Infra WD4: the Drivers page’s Write your own driver copy line",
+     "2026-11-20T17:46:29Z", "2026-11-20T17:58:49Z", "2026-11-21T01:28:08Z"),
+)
+TEAM_REPLAY_LANDINGS = (
+    ("OpenWiz #1945", "https://github.com/openwizdev/OpenWiz/pull/1945", "2026-11-20T19:03:26Z"),
+    ("WizSkills #212", "https://github.com/openwizdev/WizSkills/pull/212", "2026-11-21T01:27:33Z"),
+    ("WizSite #118", TEAM_REPLAY_WIZSITE, "2026-11-21T01:28:08Z"),
+    ("WizSkills #229", "https://github.com/openwizdev/WizSkills/pull/229", "2026-11-21T04:36:53Z"),
+)
 TEAM_STEPS = (('Connect', 'We connect OpenWiz to your repository and the coding agents you already use.'),
               ('Decide', 'You pick one small, real change and answer a few questions about it.'),
               ('Ship', 'Your agents build it, a second agent reviews it, and the pull request opens on your repository. '
@@ -668,8 +665,8 @@ def check_ref(root, source, ref, pages, favicons=(), market=None):
             assert not url.username and not url.password and not url.query, 'unexpected external URL parts'
             return
         assert url.scheme == 'https' and url.netloc == 'github.com', 'unexpected external URL'
-        assert (source == root / TEAM_PAGE and ref == TEAM_SPEC_PR) or \
-            re.match(r'^/openwizdev/(?:openwiz|OpenWiz|WizSkills|WizPlugins)(?:/|$)', url.path), 'unexpected repository link'
+        assert re.match(r'^/openwizdev/(?:openwiz|OpenWiz|WizSkills|WizPlugins)(?:/|$)', url.path) or (
+            source == root / TEAM_PAGE and ref == TEAM_REPLAY_WIZSITE), 'unexpected repository link'
         assert not url.username and not url.password and not url.query, 'unexpected external URL parts'
         return
     assert not url.query, 'unexpected local query'
@@ -1529,15 +1526,15 @@ def check_team(htmls, pages):
         'the team page loads only GSAP and site.js'
     main = team.split('<main', 1)[1].split('</main>', 1)[0]
     shown = re.sub(r'\s+', ' ', unescape(re.sub(r'<[^>]*>', ' ', main)))
-    # The real BK4 title contains “installable”. The panel below pins the exact row.
-    forbidden = TEAM_NEVER.search(unescape(re.sub(r'<[^>]*>', ' ', main.replace(TEAM_SPEC_ROWS[-1], '', 1))))
+    # The public WD1 title uses "live lessons" as part of the ticket’s name. The hero check pins that row.
+    forbidden = TEAM_NEVER.search(shown.replace(TEAM_REPLAY_TICKETS[0][1], '', 1))
     assert not forbidden, f'a word the team page never uses: {forbidden[0]}'
     assert "'" not in shown and "'" not in ' '.join(re.findall(r'aria-label="([^"]*)"', main)), \
         'the team page uses curly apostrophes'
-    assert not re.search(r'\bhidden\b|aria-hidden', re.sub(r'<button class="launch-play" type="button" hidden><span aria-hidden="true">', '', main)), 'the team page hides none of its copy'
-    parts = [plain(h) for h in re.findall(r'<h2 id="team-[^"]+">([\s\S]*?)</h2>', main)]
-    assert parts == list(TEAM_PARTS) and len(re.findall(r'<h2\b', main)) == len(TEAM_PARTS) + 1, \
-        f'the team page sections, in order: the spec panel and {parts}'
+    controls = main.replace(TEAM_REPLAY_CONTROL, '', 1).replace('<button class="launch-play" type="button" hidden><span aria-hidden="true">', '', 1)
+    assert not re.search(r'\bhidden\b|aria-hidden', controls), 'the team page hides none of its copy'
+    parts = [plain(h) for h in re.findall(r'<h2\b[^>]*>([\s\S]*?)</h2>', main)]
+    assert parts == list(TEAM_PARTS), f'the team page sections, in order: {parts}'
     h1 = re.findall(r'<h1\b[^>]*>([\s\S]*?)</h1>', main)
     assert [plain(h) for h in h1] == [TEAM_HEADLINE], f'the team page headline: {h1}'
     hero = re.search(r'<div class="team wrap">([\s\S]*?)\n</div>\n', main)
@@ -1547,8 +1544,31 @@ def check_team(htmls, pages):
                      r'<a class="team-book" id="book" data-book [^>]*>Book a call</a>\s*<p class="team-needs">([^<]*)</p>\s*</div>', hero)
     assert copy and tuple(map(unescape, copy.groups())) == (TEAM_KICKER, TEAM_LEAD, TEAM_NEEDS), \
         f'the hero, in order: who it is for, the headline, what happens on the call, Book a call, what to bring: {TEAM_KICKER} / {TEAM_LEAD} / {TEAM_NEEDS}'
-    assert not hero[:copy.start()].strip() and hero[copy.end():].split() == TEAM_SNAPSHOT.split(), \
-        'the hero ends with the frozen GitHub spec snapshot, including its links, states and timestamps'
+
+    def replay_time(at):
+        return f'<time datetime="{at}">{at[8:10]} Nov {at[11:19]} UTC</time>'
+
+    replay = [
+        f'<figure class="team-replay" data-team-replay="{TEAM_REPLAY_OPENED}">',
+        '<figcaption class="team-replay-heading">',
+        f'<p class="team-replay-meta">{TEAM_REPLAY_LABEL}</p>',
+        f'<p class="team-replay-title"><a href="{TEAM_REPLAY_SPEC}">{TEAM_REPLAY_TITLE}</a></p>',
+        '</figcaption>', '<ul class="team-tickets">',
+    ]
+    for number, title, *times in TEAM_REPLAY_TICKETS:
+        replay += ['<li>',
+                   f'<a class="team-ticket" href="https://github.com/openwizdev/OpenWiz/issues/{number}"><code>#{number}</code> {title}</a>',
+                   '<div class="team-timeline" data-replay-stages>']
+        for state, at in zip(('Building', 'In review', 'Merged'), times):
+            current = ' aria-current="step"' if state == 'Merged' else ''
+            replay.append(f'<div data-replay-event{current}><span>{state}</span> {replay_time(at)}</div>')
+        replay += ['</div>', '</li>']
+    replay += ['</ul>', '<ul class="team-landings">']
+    replay += [f'<li data-replay-event><a href="{href}">{label}</a> · Merged {replay_time(at)}</li>'
+               for label, href, at in TEAM_REPLAY_LANDINGS]
+    replay += ['</ul>', TEAM_REPLAY_CONTROL, '</figure>']
+    assert not hero[:copy.start()].strip() and re.sub(r'\s+', ' ', hero[copy.end():]).strip() == ' '.join(replay), \
+        'the hero ends with the labelled real run, its ordered ticket history and its pull request landings'
     page = Page(main)
     assert len(page.videos) == 1, 'the team page has one video: the launch film'
     clip = page.videos[0]
@@ -1576,12 +1596,13 @@ def check_team(htmls, pages):
     facts = re.search(r'<section class="team-part wrap" aria-labelledby="team-what">\s*<h2 id="team-what">[^<]*</h2>\s*<ul class="team-facts">([\s\S]*?)</ul>\s*</section>', main)
     items = re.findall(r'<li>([\s\S]*?)</li>', facts[1]) if facts else []
     assert tuple(plain(i) for i in items) == TEAM_FACTS, f'What you\u2019re setting up: its four true lines, in order: {TEAM_FACTS}'
-    assert re.findall(r'href="([^"]*)" data-count="drivers"', facts[1]) == ['/drivers/'], 'the drivers line links to the live Drivers page, and restates no count'
+    assert re.findall(r'href="([^"]*)" data-count="drivers"', facts[1]) == ['/drivers/'], 'the drivers line links to the Drivers page, and restates no count'
     close = re.search(r'<section class="team-part team-close wrap" aria-labelledby="team-call">\s*<h2 id="team-call">[^<]*</h2>\s*'
                       r'<a class="team-book" data-book href="[^"]*" data-count="book-call">Book a call</a>\s*</section>\s*$', main)
     assert close, 'the page closes on its second Book a call'
-    assert len(page.links) == 5 and main.count('<button') == 1, \
-        'the team page offers two booking links, the Drivers link, the snapshot’s spec and pull request links, and the play button; nothing else'
+    assert len(page.links) == 4 + len(TEAM_REPLAY_TICKETS) + len(TEAM_REPLAY_LANDINGS) and len(page.buttons) == 2 \
+        and main.count('<button') == 2, \
+        'the team page offers its booking, driver and replay links and its two playback controls; nothing else'
 
 
 
