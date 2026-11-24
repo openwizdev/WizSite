@@ -118,7 +118,9 @@ For a local test, set `TURNSTILE_SITE_KEY=1x00000000000000000000AA` and `TURNSTI
 
 | Name | Secret | Default | Purpose |
 | --- | --- | --- | --- |
-| `TURNSTILE_SITE_KEY` | No | *(none)* | Public Managed Turnstile widget key served by the slots endpoint when verification is enabled |\n| `TURNSTILE_SECRET_KEY` | Yes | *(none)* | Siteverify key. Setting it requires verification on every booking POST |\n| `BOOK_MODE` | No | `off` | Switch: `off`, `fake`, or `live` |
+| `TURNSTILE_SITE_KEY` | No | *(none)* | Public Managed Turnstile widget key served by the slots endpoint when verification is enabled |
+| `TURNSTILE_SECRET_KEY` | Yes | *(none)* | Siteverify key. Setting it requires verification on every booking POST |
+| `BOOK_MODE` | No | `off` | Switch: `off`, `fake`, or `live` |
 | `BOOK_DB` | Binding | `ASK_A_WIZ_COUNTERS` | Cloudflare D1 database binding for `book_*` tables |
 | `BOOK_TIMEZONE` | No | `America/Los_Angeles` | IANA timezone for working hours and daily caps |
 | `BOOK_DAYS` | No | `1,2,3,4,5` | Comma-separated weekdays (`0` Sunday through `6` Saturday) |
