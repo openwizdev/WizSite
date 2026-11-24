@@ -325,6 +325,7 @@
 
   function update() {
     if (!built) return;
+    if (demo) OW.v2.dismissToastOnRouteChange();
     const page = current();
     const feeds = data.feeds;
     const limit = data.limit;
@@ -376,6 +377,7 @@
   function draw() {
     if (demo) {
       if (!location.hash || route().id === 'welcome') {
+        OW.v2.dismissToastOnRouteChange();
         built = null;
         return OW.v2.renderWelcome(root, { demoMode: true });
       }

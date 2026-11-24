@@ -211,6 +211,8 @@ test('switch on: the signed-out copy no longer says read-only, and the queue lea
     await run.page.until(`document.querySelector('main h1')?.textContent === 'Feed'`, 'the feed');
     const nav = await run.page.run(`[...document.querySelectorAll('nav.main a')].map(a => a.getAttribute('href'))`);
     assert.deepEqual(nav, ['#/chat', '#/feed', '#/settings']);
+    await run.page.until(`document.querySelectorAll('.queue-item[data-key^="spec:"]').length === 2`, 'both specs in Feed');
+    assert.equal(await run.page.run(`document.querySelector('.v2-building')`), null, 'spec cards must not duplicate as Building rows');
   } finally {
     await run.close();
   }
@@ -316,29 +318,38 @@ test('R1: a check OW.records answers unchecked, or that throws, leaves the item 
   }
 });
 
-test('R2: a failed Specs refresh clears every earlier true and shows the gap', async () => {
-  const run = await start();
-  try {
-    await queueWorld(run);
-    await openQueue(run, 'on', { cards: true });
-    await run.page.until(`window.drawn.some(item => item.key === ${JSON.stringify(SPEC_DECISION)} && item.current === true)`
-      + ` && window.drawn.some(item => item.key === ${JSON.stringify(ROUND)} && item.current === true)`, 'the first, matched read');
-    run.world.graphql.Specs = async () => ({ status: 502, json: { message: 'Bad Gateway' } });
-    await triggerRefresh(run);
-    await run.page.until(`document.body.innerText.includes("Couldn't read Specs")`, 'the failed refresh');
-    await new Promise(resolve => setTimeout(resolve, 700));
-    const shown = await run.page.run(`[...document.querySelectorAll('.queue-item')].map(el => el.dataset.key)`);
-    const current = {};
-    for (const key of [SPEC_DECISION, ROUND]) current[key] = (await latestOf(run, key)).current;
-    assert.deepEqual(current, { [SPEC_DECISION]: null, [ROUND]: null }, 'a failed refresh kept an earlier true');
-    assert.ok(shown.includes(SPEC_DECISION) && shown.includes(ROUND), 'the cards from the last good read went away');
-    const text = await run.page.text();
-    assert.match(text, /Couldn't read Specs from GitHub\. Showing the last successful read\./);
-    assert.equal((text.match(/Couldn't read Specs/g) || []).length, 1, 'the Specs failure appears once');
-  } finally {
-    await run.close();
-  }
-});
+for (const reply of [
+  { status: 429, headers: { 'Retry-After': '600' }, json: { message: 'Rate limited' } },
+  { status: 502, json: { message: 'Bad Gateway' } },
+]) {
+  test(`R2: Specs refresh ${reply.status} clears every earlier true and shows one warning`, async () => {
+    const run = await start();
+    try {
+      await queueWorld(run);
+      await openQueue(run, 'on', { cards: true });
+      await run.page.until(`window.drawn.some(item => item.key === ${JSON.stringify(SPEC_DECISION)} && item.current === true)`
+        + ` && window.drawn.some(item => item.key === ${JSON.stringify(ROUND)} && item.current === true)`, 'the first, matched read');
+      const lastGood = await run.page.run('OW.ui.time(OW.data.feeds.specs.readAt)');
+      await run.page.run(`window.realNow = Date.now; Date.now = () => window.realNow() + 120_000`);
+      run.world.graphql.Specs = async () => reply;
+      await triggerRefresh(run);
+      await run.page.until(`document.body.innerText.includes("Couldn't read Specs")`, 'the failed refresh');
+      const shown = await run.page.run(`[...document.querySelectorAll('.queue-item')].map(el => el.dataset.key)`);
+      const current = {};
+      for (const key of [SPEC_DECISION, ROUND]) current[key] = (await latestOf(run, key)).current;
+      assert.deepEqual(current, { [SPEC_DECISION]: null, [ROUND]: null }, 'a failed refresh kept an earlier true');
+      assert.ok(shown.includes(SPEC_DECISION) && shown.includes(ROUND), 'the cards from the last good read went away');
+      const text = await run.page.text();
+      const failed = await run.page.run('OW.ui.time(OW.data.feeds.specs.failedAt)');
+      assert.notEqual(failed, lastGood);
+      assert.ok(text.includes(`Couldn't read Specs at ${failed}. Showing the read from ${lastGood}.`), text);
+      assert.equal(await run.page.run(`document.querySelectorAll('.v2-notices .notice, .v2-queue-status .unknown').length`), 1);
+      assert.equal((text.match(/Couldn't read Specs/g) || []).length, 1, 'the Specs failure appears once');
+    } finally {
+      await run.close();
+    }
+  });
+}
 
 test('R2: a first Specs read with GraphQL errors and no nodes shows a gap, never the empty line', async () => {
   const run = await start();

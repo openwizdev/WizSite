@@ -225,7 +225,7 @@
     mine.then(result => {
       if (!still()) return;
       state.run = null;
-      state.result = result;
+      state.result = { ...result, readAt };
       if (state.failedSince !== null && readAt > state.failedSince) state.failedSince = null;
       if (state.deck?.cards.isConnected) updateDeck(state.el);
       else state.deck?.onCount?.();
@@ -234,7 +234,7 @@
       state.run = null;
       if (error instanceof OW.data.Ended) return;
       if (error instanceof OW.data.SignedOut) return OW.onSignedOut?.();
-      state.result = { repository: picked.full, items: [], gaps: ['the queue\'s reads'], bindings: new Map() };
+      state.result = { repository: picked.full, items: [], gaps: ['the queue\'s reads'], bindings: new Map(), readAt };
       if (state.deck?.cards.isConnected) updateDeck(state.el);
       else state.deck?.onCount?.();
     });
@@ -319,7 +319,7 @@
 
   function draw(el) {
     const { deck } = state;
-    const { allClear, buildingSection, pager } = OW.v2 ?? {};
+    const { allClear, pager } = OW.v2 ?? {};
     const unknown = deck.specs.state === 'unknown';
     const stale = state.failedSince !== null;
     const result = unknown ? null : view();
@@ -343,7 +343,7 @@
     const pause = OW.data.paused() ? `GitHub’s rate limit paused reads until ${time(OW.data.limit.pausedUntil)}.` : '';
     const gap = gaps.length ? `This list may be missing items: GitHub gave only part of ${gaps.join(', ')}.` : '';
     const message = unknown ? "Feed couldn't be read from GitHub. The app tries again on its own."
-      : stale ? `Couldn't read Specs from GitHub. Showing the last successful read.${gap ? ` ${gap}` : ''}`
+      : stale ? `Couldn't read Specs at ${time(state.failedSince)}. Showing the read from ${time(result?.readAt ?? deck.specs.readAt)}.${gap ? ` ${gap}` : ''}`
       : !result ? 'Reading GitHub…'
       : gap ? `${gap} The app tries again on its own.`
       : items.length ? '' : `${EMPTY}.`;
@@ -365,16 +365,6 @@
     const index = Math.max(0, selected);
     deck.activeKey = items[index]?.key;
     deck.keys = items.map(item => item.key);
-    if (deck.result !== result || deck.buildingKey !== deck.activeKey) {
-      deck.result = result;
-      deck.buildingKey = deck.activeKey;
-      const projects = items.flatMap(item => {
-        const progress = result?.progress?.get(item.key);
-        return progress && item.key !== deck.activeKey ? [{ title: item.title, href: item.url, ...progress }] : [];
-      }).slice(0, 3);
-      const building = buildingSection?.(projects);
-      deck.building.replaceChildren(...(building ? [building] : []));
-    }
     const position = `${index}/${items.length}`;
     if (deck.position !== position) {
       const go = next => {
@@ -411,9 +401,8 @@
       if (!el.contains(state.deck?.cards)) {
         const status = h('div', { class: 'v2-queue-status' });
         const cards = h('div', { class: 'queue' });
-        const building = h('div');
-        el.replaceChildren(h('div', { class: 'v2-live-feed' }, status, cards, building));
-        state.deck = { status, controls, cards, building, arg, onCount };
+        el.replaceChildren(h('div', { class: 'v2-live-feed' }, status, cards));
+        state.deck = { status, controls, cards, arg, onCount };
       } else if (state.deck.arg !== arg) {
         state.deck.arg = arg;
         state.deck.activeKey = null;
