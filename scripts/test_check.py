@@ -9,7 +9,7 @@ from unittest import mock
 
 import re
 
-from check import CTA, FAQ, FAQ_WHERE, FOOTER, INSTALL_NOTE_HTML, FINGERPRINTS, HASHED, INSTALL_SWITCH, ROOT, Page, check_changelog, check_release_data, check_releases, read_releases, split_releases, check_motion, check_privacy, check_ref, check_site, check_vector, check_webp, fingerprint
+from check import FAQ, FAQ_WHERE, FOOTER, INSTALL_NOTE_HTML, FINGERPRINTS, HASHED, INSTALL_SWITCH, ROOT, Page, check_changelog, check_release_data, check_releases, read_releases, split_releases, check_motion, check_privacy, check_ref, check_site, check_vector, check_webp, fingerprint
 
 
 def edit_built(root, name, change):
@@ -113,7 +113,7 @@ class Checks(unittest.TestCase):
             body = b'WEBP' + b''.join(k + len(v).to_bytes(4, 'little') + v + b'\0' * (len(v) & 1) for k, v in chunks)
             return b'RIFF' + len(body).to_bytes(4, 'little') + body
         check_webp(webp((b'VP8L', b'xyz')))
-        for bad in (webp((b'VP8L', b'xyz'), (b'EXIF', b'name')), webp((b'XMP ', b'x')), b'GIF89a' + b'\0' * 8):
+        for bad in (webp((b'VP8L', b'xyz'), (b'EXIF', b'name')), webp((b'XMP ', b'x')), webp((b'ICCP', b'x')), b'GIF89a' + b'\0' * 8):
             with self.subTest(bad=bad[:16]), self.assertRaises(AssertionError):
                 check_webp(bad)
         for path in ('elsewhere/x.webp', 'art/new.webp', 'art/seal.webp'):
@@ -688,8 +688,8 @@ class Checks(unittest.TestCase):
             return temp, root
         book = re.compile(r'data-book href="[^"]*"')
         refused = {
-            'buy button': ('changelog/index.html', lambda t: t.replace(CTA, '', 1)),
-            'buy button to /team/': ('team/index.html', lambda t: t.replace('<a class="nav-team" href="/team/">', '<a class="nav-team" href="/">', 1)),
+            'buy button': ('changelog/index.html', lambda t: re.sub(r'<a class="nav-team"[^>]*>.*?</a>', '', t, count=1)),
+            'buy button to /team/': ('team/index.html', lambda t: t.replace('<a class="nav-team" href="/team/" aria-current="page">', '<a class="nav-team" href="/">', 1)),
             'two booking links': ('team/index.html', lambda t: t.replace('</main>', '<a data-book href="https://cal.com/x">Book</a></main>', 1)),
             'one booking value': ('team/index.html', lambda t: book.sub('data-book href="https://cal.com/x"', t, count=1)),
             'outside the team page': ('index.html', lambda t: t.replace('</main>', '<a data-book href="https://cal.com/x">Book</a></main>', 1)),
@@ -922,14 +922,14 @@ class Checks(unittest.TestCase):
                 ('drivers/index.html', boat, boat.replace(' hero', ''), 'boat.dev is the hero|spotlight'),
                 ('drivers/index.html', '<article class="driver" id="cloudroom"', '<article class="driver hero" id="cloudroom"', 'boat.dev is the hero'),
                 ('drivers/index.html', 'href="https://github.com/openwizdev/OpenWiz/tree/main/adapters/template"', 'href="https://github.com/openwizdev/WizSkills"', 'only to the public OpenWiz'),
-                ('drivers/index.html', '>Changelog</a>', '>Changes</a>', 'identical to the landing'),
+                ('drivers/index.html', '>Changelog</a>', '>Changes</a>', 'phone menu needs Drivers'),
                 ('drivers/index.html', ' aria-current="page">Drivers', '>Drivers', 'aria-current'),
                 ('drivers/index.html', '</main>', '<p>Used by 300 teams.</p></main>', 'invented number'),
                 ('drivers/index.html', '</main>', '<p hidden>Later.</p></main>', 'without a script|waits for a script'),
                 ('drivers/index.html', '</head>', '<script>1</script></head>', 'never its own'),
                 ('drivers/index.html', '</head>', '<script src="/drivers/logos/monitor.svg"></script></head>', 'never its own'),
-                ('index.html', '<a class="nav-drivers" href="/drivers/">Drivers</a>', '', 'identical to the landing|landing top bar needs one Drivers'),
-                ('changelog/index.html', '<a class="nav-drivers" href="/drivers/">Drivers</a>', '', 'Changelog top bar needs one Drivers')):
+                ('index.html', '<a href="/drivers/">Drivers</a>', '', 'phone menu needs Drivers'),
+                ('changelog/index.html', '<a href="/drivers/">Drivers</a>', '', 'phone menu needs Drivers')):
             self.broken(name, old, new, error)
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp) / 'dist'
@@ -1021,8 +1021,8 @@ class Checks(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp) / 'dist'
             shutil.copytree(ROOT / 'dist', root)
-            (root / 'art/drivers-x-unused.webp').write_bytes((root / 'art/drivers-d-sea.webp').read_bytes())
-            with mock.patch.dict('check.ART_HASHES', {'art/drivers-x-unused.webp': 'f2699bd8fe4763993a492dfac2bdbfc3eae46ec33bae0ab74127ad6ebc6a6285'}), \
+            (root / 'art/drivers-x-unused.webp').write_bytes((root / 'art/family-02.webp').read_bytes())
+            with mock.patch.dict('check.ART_HASHES', {'art/drivers-x-unused.webp': '0c64fa6a32853b694b7c2b09c2f8a2d296ca878c464b57ba9d0aae101aed81d2'}), \
                     mock.patch('check.ART', set(__import__('check').ART) | {'art/drivers-x-unused.webp'}), \
                     mock.patch('check.STATIC', set(__import__('check').STATIC) | {'art/drivers-x-unused.webp'}), \
                     self.assertRaisesRegex(AssertionError, 'unused drivers art'):
@@ -1159,18 +1159,18 @@ class Checks(unittest.TestCase):
                 ('<h2 id="more-title">Also shipped</h2>', '<h2 id="more-title">Also shipped</h2><p>Only boat.dev has passed.</p>', 'never the only one')):
             self.broken(page, old, new, error)
 
-    def test_drivers_nav_and_description(self):
-        for name in ('index.html', 'changelog/index.html', 'drivers/index.html'):
-            with self.subTest(page=name), tempfile.TemporaryDirectory() as temp:
-                root = Path(temp) / 'dist'
-                shutil.copytree(ROOT / 'dist', root)
-                page = root / name
-                text = page.read_text()
-                self.assertIn('<a class="nav-drivers" href="/drivers/"', text)
-                page.write_text(text.replace('<a class="nav-drivers" href="/drivers/"', '<a class="nav-log" href="/drivers/"', 1))
-                with mock.patch('check.check_drivers'), self.assertRaisesRegex(AssertionError, 'hidden on phones'):
-                    check_site(root)
-        self.broken('', '', '', 'hidden on phones', css='\n@media (max-width: 480px) { .landing-nav .nav-drivers { display: none; } }\n')
+    def test_shared_top_bar(self):
+        for name, old, new, error in (
+                ('index.html', 'src="/art/wiz-mark.webp"', 'src="/favicon.svg"', 'painted Wiz'),
+                ('market/index.html', 'class="star-icon"', 'class="extra-icon"', 'star icon'),
+                ('faq/index.html', 'aria-controls="site-navigation"', 'aria-controls="main"', 'button linked'),
+                ('team/index.html', 'id="site-navigation"', 'id="site-navigation" hidden', 'without JavaScript'),
+                ('changelog/index.html', '<a href="/market/">Market</a>', '', 'phone menu needs Drivers'),
+                ('faq/index.html', ' aria-current="page">FAQ', '>FAQ', 'aria-current'),
+                ('market/index.html', 'aria-label="Main navigation"', 'aria-label="Navigation"', 'identical to the landing')):
+            self.broken(name, old, new, error)
+
+    def test_drivers_description(self):
         for old, new, error in (
                 ('boat.dev, Cloudroom and your own computer or VPS passed all five checks', 'boat.dev passed all five checks', 'must say boat.dev, Cloudroom and your own computer or VPS passed'),
                 ('every other host and harness shows its true state', 'Grok Bot passed too', 'must say boat.dev|Grok Bot has not passed'),

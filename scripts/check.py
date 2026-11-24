@@ -138,15 +138,15 @@ def fingerprint(name, data):
     return re.sub(r'\.(css|js)$', rf'.{sha256(data).hexdigest()[:10]}.\1', name)
 
 
-def fingerprinted_page(html, cta=False):
+def fingerprinted_page(html, page):
     for name, hashed in FINGERPRINTS.items():
         html = html.replace(f'"/{name}"', f'"/{hashed}"')
-    return with_faq(with_footer(with_cta(html))) if cta else html
+    return with_faq(with_footer(with_header(html, page))) if page != APP_PAGE else html
 
 
-CTA = (ROOT / 'header-cta.html').read_text()
+HEADER = (ROOT / 'header.html').read_text()
+HEADER_SLOT = '<template data-slot="header"></template>\n'
 CTA_LINK = '<a class="nav-team" href="/team/">'
-TOP_BAR_END = '  </nav>\n</header>'
 TEAM_PAGE = 'team/index.html'
 BOOK_PLACEHOLDER = '#book'
 TEAM_HEADLINE = 'Book 30 minutes. Leave with a shipped pull request.'
@@ -214,9 +214,10 @@ def with_faq(html):
     return html
 
 
-def with_cta(html):
-    assert html.count(TOP_BAR_END) == 1, 'a site page needs exactly one top bar'
-    return html.replace(TOP_BAR_END, CTA + TOP_BAR_END)
+def with_header(html, page):
+    assert html.count(HEADER_SLOT) == 1, 'a site page needs exactly one header slot'
+    href = '/' + page.removesuffix('index.html')
+    return html.replace(HEADER_SLOT, HEADER.replace(f'href="{href}"', f'href="{href}" aria-current="page"', 1))
 
 
 FINGERPRINTS = {name: fingerprint(name, (ROOT / name).read_bytes()) for name in HASHED}
@@ -270,7 +271,6 @@ MARKET_PAGE = 'market/index.html'
 MARKET = ('<!-- market:start -->', '<!-- market:end -->')
 MARKET_SLOT = '<template data-slot="market"></template>'
 MARKET_REPO = 'https://github.com/openwizdev/WizMarket'
-DRIVERS_LINKS = ('/drivers/', '/drivers')
 DRIVERS = (
     ('boat-dev', 'boat.dev', 'Passed all five checks', 'passed'),
     ('vps', 'Your own computer or VPS', 'Passed the kit on a Linux PC', 'passed'),
@@ -506,13 +506,16 @@ def check_launch(landing, page):
     assert landing.count('<figure class="launch">') == 1 and landing.count(LAUNCH_POST) == 1, 'one launch video, one launch post link'
 
 
-def check_webp(data):
+def check_webp(data, *, allow_color_profile=False):
     # PRIVACY: a plain WebP image only: EXIF or XMP metadata chunks could carry private details.
     assert data[:4] == b'RIFF' and data[8:12] == b'WEBP', 'invalid WebP signature'
+    chunks = (b'VP8 ', b'VP8L', b'VP8X', b'ALPH')
+    if allow_color_profile:
+        chunks += (b'ICCP',)
     at = 12
     while at + 8 <= len(data):
         kind, size = data[at:at + 4], int.from_bytes(data[at + 4:at + 8], 'little')
-        assert kind in (b'VP8 ', b'VP8L', b'VP8X', b'ALPH'), f'unexpected WebP chunk {kind!r}'
+        assert kind in chunks, f'unexpected WebP chunk {kind!r}'
         at += 8 + size + (size & 1)
     assert at == len(data), 'truncated WebP'
 
@@ -811,11 +814,12 @@ def check_site(root, registry=ROOT / 'market/registry.json'):
     unused = sorted(name for name in drivers_art if f'/{name}' not in (root / DRIVERS_PAGE).read_text())
     assert not unused, f'unused drivers art: {unused}'
     check_driver_logo_files(root)
-    check_drivers(landing, changelog, (root / DRIVERS_PAGE).read_text(), pages[root / DRIVERS_PAGE])
-    check_drivers_nav((root / names['site.css']).read_text(), {name: (root / name).read_text() for name in PAGES})
+    check_drivers(landing, (root / DRIVERS_PAGE).read_text(), pages[root / DRIVERS_PAGE])
     check_changelog(landing, changelog)
     check_releases(releases, read_releases(), install_switch(landing) == 'live')
-    check_team({name: (root / name).read_text() for name in PAGES}, {name: pages[root / name] for name in PAGES})
+    site_html = {name: (root / name).read_text() for name in PAGES}
+    check_team(site_html, {name: pages[root / name] for name in PAGES})
+    check_top_bars(site_html)
     check_footer({name: (root / name).read_text() for name in PAGES})
     check_faq({name: (root / name).read_text() for name in PAGES}, {name: pages[root / name] for name in PAGES}, names)
     main = re.search(r'<main\b[^>]*>[\s\S]*?</main>', changelog)
@@ -1022,20 +1026,12 @@ class DriverOutline(HTMLParser):
 
 
 def top_bar(html):
-    found = re.findall(r'<header class="landing-nav wrap">[\s\S]*?</header>', html)
+    found = re.findall(r'<header class="landing-nav">[\s\S]*?</header>', html)
     assert len(found) == 1, 'a page needs exactly one landing top bar'
     return found[0]
 
 
-def check_drivers(landing, changelog, drivers, page):
-    bar = top_bar(drivers)
-    current = re.findall(r'<a [^>]*aria-current="page"[^>]*>([^<]*)</a>', bar)
-    assert current == ['Drivers'] and re.search(r'<a class="nav-drivers" href="/drivers/" aria-current="page">Drivers</a>', bar), \
-        'the drivers top bar must mark its Drivers link aria-current="page"'
-    assert bar.replace(' aria-current="page"', '') == top_bar(landing), 'the drivers top bar must be identical to the landing\'s'
-    for name, html in (('landing', landing), ('Changelog', changelog)):
-        links = [text for href, text in Outline(top_bar(html)).links if href in DRIVERS_LINKS]
-        assert links == ['Drivers'], f'the {name} top bar needs one Drivers nav link: {links}'
+def check_drivers(landing, drivers, page):
     assert re.search(r'<body class="[^"]*\bdrivers-page\b', drivers), 'the drivers page body is scoped .drivers-page'
     description = re.findall(r'<meta name="description" content="([^"]*)"', drivers)
     assert len(description) == 1 and DRIVER_DESCRIPTION in description[0], \
@@ -1391,7 +1387,7 @@ def check_driver_token(drivers, main):
 def check_team(htmls, pages):
     for name, html in htmls.items():
         bar = top_bar(html)
-        assert bar.count('class="nav-team"') == 1 and bar.count(CTA_LINK) == 1, f'the {name} top bar needs its one buy button to /team/'
+        assert bar.count('class="nav-team"') == 1 and bar.replace(' aria-current="page"', '').count(CTA_LINK) == 1, f'the {name} top bar needs its one buy button to /team/'
         assert html.count('class="nav-team"') == 1, f'the {name} page needs exactly one buy button'
     books = [(name, href) for name, page in pages.items() for href in page.books]
     assert len(books) == 2 and all(name == TEAM_PAGE for name, _ in books), f'the site needs its two booking links, both on the team page: {books}'
@@ -1506,18 +1502,29 @@ def check_faq(htmls, pages, names):
     assert not re.search(r'<(?:form|input|textarea)\b', FAQ), 'part 1 asks nothing: no form or input in the Questions'
 
 
-def check_drivers_nav(css, pages):
-    hidden = set()
-    for block in re.findall(r'@media[^{]*\{((?:[^{}]*\{[^{}]*\})*)[^{}]*\}', css):
-        for selectors, body in re.findall(r'([^{}]+)\{([^{}]*)\}', block):
-            if re.search(r'display\s*:\s*none', body):
-                for selector in selectors.split(','):
-                    hidden.update(re.findall(r'\.([\w-]+)', selector.strip().split()[-1]))
+def check_top_bars(pages):
+    expected_links = [('/drivers/', 'Drivers'), ('/market/', 'Market'),
+                      ('/changelog/', 'Changelog'), ('/faq/', 'FAQ')]
+    home = top_bar(pages['index.html']).replace(' aria-current="page"', '')
     for name, html in pages.items():
-        found = re.findall(r'<a ([^>]*)href="/drivers/"[^>]*>Drivers</a>', top_bar(html))
-        assert len(found) == 1, f'the {name} top bar needs one Drivers nav link'
-        classes = set((re.search(r'class="([^"]*)"', found[0]) or [None, ''])[1].split())
-        assert not classes & hidden, f'the {name} Drivers nav link is hidden on phones by {sorted(classes & hidden)}'
+        bar = top_bar(html)
+        nav = re.search(r'<nav [^>]*id="site-navigation"[^>]*>[\s\S]*?</nav>', bar)
+        assert nav and Outline(nav[0]).links == expected_links, f'the {name} phone menu needs Drivers, Market, Changelog and FAQ'
+        assert re.search(r'<button [^>]*aria-expanded="false" aria-controls="site-navigation" hidden>', bar), \
+            f'the {name} phone menu needs a button linked to its navigation'
+        assert ' hidden' not in nav[0], f'the {name} phone menu links must work without JavaScript'
+        assert ('<img src="/art/wiz-mark.webp" alt="" width="128" height="128" decoding="async"><span>OpenWiz</span>' in bar), \
+            f'the {name} top bar needs the painted Wiz and its live wordmark'
+        star = re.search(r'<a class="github-star" href="https://github.com/openwizdev/openwiz" aria-label="Star on GitHub">([\s\S]*?)</a>', bar)
+        assert star and all(part in star[1] for part in ('class="github-mark"', 'class="star-icon"', 'Star<span data-stars hidden>')), \
+            f'the {name} top bar needs its GitHub mark, star icon, Star label and count slot'
+        assert '<a class="sign-in" href="/app/">Sign in</a>' in bar, f'the {name} top bar needs its Sign in link'
+        assert '<span class="nav-team-long">Get it for your team</span><span class="nav-team-short">For teams</span>' in bar, \
+            f'the {name} top bar needs both buy labels'
+        href = '/' + name.removesuffix('index.html')
+        assert re.findall(r'href="([^"]+)" aria-current="page"', bar) == [href], \
+            f'the {name} top bar must mark {href} aria-current="page"'
+        assert bar.replace(' aria-current="page"', '') == home, f'the {name} top bar must be identical to the landing bar'
 
 
 def css_rules(css, selector):
@@ -1723,7 +1730,8 @@ def check_app(root, names, pages):
 def check_art(name, data):
     assert name in ART_HASHES and sha256(data).hexdigest() == ART_HASHES[name], 'unreviewed art or recording'
     if name.endswith('.webp'):
-        check_webp(data)
+        # The pinned official header mark carries an ICC profile.
+        check_webp(data, allow_color_profile=name == 'art/wiz-mark.webp')
     elif name.endswith('.vtt'):
         assert data.startswith(b'WEBVTT') and data.decode('utf-8'), 'invalid WebVTT captions'
     else:
@@ -1773,7 +1781,7 @@ def main():
             built = split_releases(built)[0]
         if name == MARKET_PAGE:
             built = split_market(built)[0]
-        assert fingerprinted_page((ROOT / name).read_text(), cta=name != APP_PAGE) == built, f'export differs: {name}'
+        assert fingerprinted_page((ROOT / name).read_text(), name) == built, f'export differs: {name}'
     paths = subprocess.check_output(['git', 'ls-files', '-z', '--cached', '--others', '--exclude-standard'], cwd=ROOT).decode().split('\0')
     for name in set(paths) - {''}:
         path = ROOT / name

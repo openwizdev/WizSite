@@ -5,10 +5,63 @@ async function showStars() {
   if (!Number.isSafeInteger(count) || count < 0) return;
   const formatted = new Intl.NumberFormat(document.documentElement.lang).format(count);
   for (const value of document.querySelectorAll('[data-stars]')) {
-    value.textContent = formatted;
+    const inHeader = value.parentElement.classList.contains('github-star');
+    value.textContent = inHeader && count >= 10000
+      ? new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(count).toLowerCase()
+      : formatted;
     value.hidden = false;
     value.parentElement.setAttribute('aria-label', `Star on GitHub · ${formatted} ${count === 1 ? 'star' : 'stars'}`);
   }
+}
+
+function enablePhoneMenu() {
+  const toggle = document.querySelector('.nav-toggle');
+  if (!toggle) return;
+  const panel = document.getElementById(toggle.getAttribute('aria-controls'));
+  const signIn = document.querySelector('.landing-nav .sign-in');
+  const team = document.querySelector('.landing-nav .nav-team');
+  const stars = document.querySelector('.landing-nav .github-star');
+  const phone = matchMedia('(max-width: 850px)');
+  const background = [...document.querySelectorAll('body > :is(main, footer, .skip):not([inert])')];
+
+  function setOpen(open) {
+    toggle.setAttribute('aria-expanded', String(open));
+    panel.hidden = !open;
+    for (const element of background) element.inert = open;
+  }
+
+  function updateLayout() {
+    const focused = document.activeElement;
+    setOpen(false);
+    toggle.hidden = !phone.matches;
+    if (phone.matches) {
+      toggle.after(panel);
+      panel.append(signIn);
+      if (panel.contains(focused)) toggle.focus();
+    } else {
+      if (panel.contains(signIn)) {
+        team.before(signIn);
+        stars.before(panel);
+      }
+      panel.hidden = false;
+      if (panel.contains(focused) || focused === signIn) focused.focus();
+      if (focused === toggle) panel.querySelector('a').focus();
+    }
+  }
+
+  toggle.addEventListener('click', () => {
+    const open = toggle.getAttribute('aria-expanded') === 'false';
+    setOpen(open);
+    (open ? panel.querySelector('a') : toggle).focus();
+  });
+  document.addEventListener('keydown', event => {
+    if (event.key !== 'Escape' || toggle.getAttribute('aria-expanded') !== 'true') return;
+    event.preventDefault();
+    setOpen(false);
+    toggle.focus();
+  });
+  phone.addEventListener('change', updateLayout);
+  updateLayout();
 }
 
 const scenes = [
@@ -634,6 +687,7 @@ async function askAWiz() {
 
 enableCopy();
 askAWiz();
+enablePhoneMenu();
 showStars().catch(() => {});
 launchVideo();
 specVideo();
