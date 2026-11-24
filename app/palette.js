@@ -15,6 +15,7 @@
     const out = [];
     OW.pages.forEach((page, i) => out.push({ kind: 'page', id: `page:${page.id}`, title: page.title, detail: `Press ${i + 1}`, go: `#/${page.id}` }));
     out.push(...actions());
+    if (OW.v2) return out;
     const seen = OW.factory.model(feeds);
     const tickets = new Map();
     const ticket = (t, spec, where) => ({ kind: 'ticket', id: `ticket:${t.key}`, title: `#${t.number} ${t.title}`,
@@ -55,7 +56,7 @@
       { kind: 'action', id: 'copy', title: 'Copy a link to this page', detail: 'This page of the app', run: () => copy(location.href, 'this page') },
       { kind: 'action', id: 'github', title: 'Open this page on GitHub', detail: specUrl ? `Spec #${spec}` : home ? `${home}'s issues` : '',
         run: () => openOnGitHub(specUrl || (home ? `https://github.com/${home}/issues` : null)) },
-      ...Object.entries(FILTERS).map(([kind, words]) => ({ kind: 'action', id: `filter:${kind}`, title: `Show only ${words}`, detail: 'Filter the palette',
+      ...Object.entries(FILTERS).filter(([kind]) => !OW.v2 || kind === 'page').map(([kind, words]) => ({ kind: 'action', id: `filter:${kind}`, title: `Show only ${words}`, detail: 'Filter the palette',
         run: () => { filter = kind; input.value = ''; draw(); } })),
       { kind: 'action', id: 'shortcuts', title: 'Show keyboard shortcuts', detail: 'Press ?', run: () => { close(true); shortcuts(); } },
     ];
@@ -131,7 +132,8 @@
 
   function build() {
     input = h('input', { type: 'text', role: 'combobox', 'aria-expanded': 'true', 'aria-controls': 'palette-results', 'aria-autocomplete': 'list',
-      'aria-label': 'Find a page, spec, ticket or agent, or an action', placeholder: 'Find a page, spec, ticket or agent…', autocomplete: 'off', spellcheck: 'false' });
+      'aria-label': OW.v2 ? 'Find a page or action' : 'Find a page, spec, ticket or agent, or an action',
+      placeholder: OW.v2 ? 'Find a page or action…' : 'Find a page, spec, ticket or agent…', autocomplete: 'off', spellcheck: 'false' });
     css(input, { width: '100%', 'min-height': 'var(--em-tap)', padding: '0 14px', 'font-size': '17px', color: 'var(--em-text)',
       background: 'var(--em-bg)', border: '1px solid var(--em-line)', 'border-radius': 'var(--em-radius-sm)' });
     list = css(h('ul', { id: 'palette-results', role: 'listbox', 'aria-label': 'Results' }),
@@ -209,6 +211,7 @@
   }
 
   function open() {
+    if (OW.data.demo) return;
     if (!dialog) build();
     if (dialog.open) return;
     const was = help?.open ? focusReturn : document.activeElement;
@@ -234,11 +237,11 @@
 
   const SHORTCUTS = () => [
     ['Anywhere', [
-      [PALETTE_KEY, 'Open the command palette: go to any page, spec, ticket or agent, or run an action'],
+      [PALETTE_KEY, OW.v2 ? 'Open the command palette' : 'Open the command palette: go to any page, spec, ticket or agent, or run an action'],
       ...OW.pages.map((page, i) => [String(i + 1), `Go to ${page.title}`]),
       ['?', 'Show these shortcuts'],
       ['Tab, Shift Tab', 'Move between links and buttons; Enter opens the focused one'],
-      ['Esc', 'Close the palette or this list; on a spec\'s page, back to all specs'],
+      ['Esc', OW.v2 ? 'Close the palette or this list' : 'Close the palette or this list; on a spec\'s page, back to all specs'],
     ]],
     ['In the palette', [
       ['↑ ↓', 'Choose a result (Up and Down)'],
@@ -250,6 +253,7 @@
   ];
 
   function shortcuts() {
+    if (OW.data.demo) return;
     if (dialog?.open) close(false);
     if (help?.open) return;
     if (!focusReturn) focusReturn = document.activeElement;

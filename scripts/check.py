@@ -124,7 +124,8 @@ APP_FOUND = {(folder, ext): tuple(sorted(p.relative_to(ROOT).as_posix() for p in
 APP_PARTS = APP_FOUND['app/pages', 'js'] + APP_FOUND['app/cards', 'js']
 APP_PART_STYLES = APP_FOUND['app/pages', 'css'] + APP_FOUND['app/cards', 'css']
 APP_LEGACY_ORDER = ('app/pages/you.js', 'app/pages/specs.js', 'app/pages/spec.js', 'app/pages/agents.js')
-APP_NEEDED = set(APP_FOUND['app/pages', 'js'] + APP_FOUND['app/pages', 'css'])
+APP_V2_LAZY = {'app/pages/v2.js', 'app/pages/v2.css'}
+APP_NEEDED = set(APP_FOUND['app/pages', 'js'] + APP_FOUND['app/pages', 'css']) - APP_V2_LAZY
 APP_SCRIPTS = ('app/data.js', 'app/records.js', 'app/ui.js') + APP_PARTS + ('app/palette.js', 'app/shell.js')
 APP_VENDOR = {'app/vendor/dagre-3.1.3.min.js': ('node_modules/@dagrejs/dagre/dist/dagre.min.js', 'app/pages/spec.js'),
               'app/vendor/dagre-LICENSE.txt': ('node_modules/@dagrejs/dagre/LICENSE', None)}
@@ -1682,7 +1683,11 @@ def check_releases(section, releases, live):
 
 
 def check_app(root, names, pages):
-    page = Page((root / APP_PAGE).read_text())
+    html = (root / APP_PAGE).read_text()
+    page = Page(html)
+    assert f'data-v2-script="/{names["app/pages/v2.js"]}"' in html and f'data-v2-style="/{names["app/pages/v2.css"]}"' in html, \
+        'the app must point to its fingerprinted v2 assets for lazy loading'
+    assert not {f'/{names[name]}' for name in APP_V2_LAZY} & set(page.refs), 'v2 assets must load only when enabled'
     assert not page.books, 'a booking link outside the team page: the app'
     assert not page.x_links, 'one X link per page, the footer\'s: the app has one'
     assert not page.report_links, 'Report a problem link, the footer\'s: the app has one'

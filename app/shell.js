@@ -1,5 +1,5 @@
 'use strict';
-(() => {
+(async () => {
   const { h, icon, time } = OW.ui;
   const logo = () => h('img', { src: '/app/mark.svg', alt: '', width: 28, height: 28 });
   const wiz = () => h('p', {}, h('img', { src: '/app/wiz-reviewer.svg', alt: '', width: 96, height: 105 }));
@@ -8,9 +8,26 @@
   const ROUTES = () => OW.pages.map(page => page.id);
   let built = null;
   const INSTALL = 'https://github.com/apps/openwiz-viewer/installations/new';
-  const v2 = Boolean(OW.records?.enabled?.());
-  const demo = Boolean(OW.v2?.demo);
-  if (v2) document.documentElement.dataset.v2 = '1';
+  const v2 = data.v2.get() !== 'off';
+  const demo = data.demo;
+  if (v2) {
+    const { v2Style, v2Script } = document.currentScript.dataset;
+    const load = el => new Promise((resolve, reject) => {
+      el.addEventListener('load', resolve, { once: true });
+      el.addEventListener('error', reject, { once: true });
+      document.head.append(el);
+    });
+    try {
+      await Promise.all([
+        load(h('link', { rel: 'stylesheet', href: v2Style })),
+        load(h('script', { src: v2Script })),
+      ]);
+    } catch {
+      root.replaceChildren(h('div', { class: 'center', role: 'alert' }, 'OpenWiz could not load. Reload to try again.'));
+      return;
+    }
+    document.documentElement.dataset.v2 = '1';
+  }
   const queue = OW.pages.findIndex(page => page.v2);
   if (queue >= 0) {
     const [page] = OW.pages.splice(queue, 1);
@@ -37,7 +54,6 @@
     if (v2 && OW.v2) {
       root.replaceChildren(
         h('div', { class: 'v2-backdrop', 'aria-hidden': 'true' }),
-        h('div', { class: 'v2-veil', 'aria-hidden': 'true' }),
         h('div', { class: 'v2-welcome-stage' }, view));
     } else {
       root.replaceChildren(view);
@@ -140,7 +156,7 @@
     buildShell();
     data.start();
     update();
-    root.querySelector(`${side} button.repo`)?.focus();
+    root.querySelector(v2 ? '.v2-settings button.repo' : `${side} button.repo`)?.focus();
   }
   function repoSwitch(picked) {
     const list = h('div', { class: 'repo-list', hidden: true, id: `repos-${Math.random().toString(36).slice(2)}` });
@@ -187,17 +203,18 @@
   }
 
   function freshnessNodes() {
-    const feeds = data.feeds;
+    const feeds = v2 ? [data.feeds.specs] : Object.values(data.feeds);
     const limit = data.limit;
     return [
-      ...Object.values(feeds).flatMap(feed => [h('div', {}, ...readLine(feed))]),
+      ...feeds.map(feed => h('div', {}, ...readLine(feed))),
       h('div', {}, limit.remaining === null ? 'GitHub limit: not read yet' : `GitHub limit: ${limit.remaining.toLocaleString()} left`),
+      ...(v2 && data.paused() ? [h('div', {}, `Reads paused until ${time(limit.pausedUntil)}`)] : []),
     ];
   }
 
   if (v2 && OW.v2) {
     const v2Pages = OW.v2.pages({
-      get repoFull() { return data.repo.get()?.full || 'Harbor'; },
+      updateBadges,
       repoSwitch: () => repoSwitch(data.repo.get()),
       freshnessNodes,
       signOut: () => { data.auth.signOut(); signedOut(); },
@@ -208,7 +225,7 @@
 
   function v2NavLinks(kind) {
     return OW.pages.map(page => {
-      const badge = h('span', { class: `v2-badge${page.hotBadge ? ' hot' : ''}`, hidden: true });
+      const badge = h('span', { class: 'v2-badge', hidden: true });
       const cls = kind === 'main' ? `v2-nav-item${page.bottom ? ' v2-bottom' : ''}` : '';
       const link = h('a', { href: `#/${page.id}`, class: cls || null }, icon(page.icon), h('span', {}, page.title), badge);
       return { page, link, badge };
@@ -216,24 +233,23 @@
   }
 
   function buildV2Shell() {
-    const workspace = demo ? 'Harbor' : (data.repo.get()?.full || 'OpenWiz');
+    const workspace = demo ? 'Harbor' : data.repo.get()?.full;
     const side = v2NavLinks('main');
     const tabs = v2NavLinks('tabs');
     const title = h('h1', { tabindex: '-1' });
-    const headSub = h('p', { class: 'v2-head-sub' });
-    const head = h('div', { class: 'v2-head' },
-      h('div', {}, title, headSub),
-      h('span', { class: 'v2-engraved-tag' }, demo ? 'Harbor · main' : workspace));
-    const phoneTitle = h('span', { class: 'v2-engraved-tag' });
+    const refresh = demo ? null : h('button', {
+      class: 'v2-btn subtle v2-refresh', type: 'button', onclick: () => data.refreshAll(), hidden: true,
+    }, icon('refresh'), 'Refresh now');
+    const pager = h('div', { class: 'v2-pager-slot' });
+    const head = h('div', { class: 'v2-head' }, title, h('div', { class: 'v2-head-tools' }, pager, refresh));
     const phoneBar = h('header', { class: 'v2-phone-bar' },
-      h('a', { class: 'v2-phone-brand', href: home() }, logo(), h('span', {}, 'OpenWiz'), phoneTitle),
-      demo ? h('span', { class: 'v2-sample-tag' }, 'Sample data') : null);
+      h('a', { class: 'v2-phone-brand', href: home() }, logo(), h('span', {}, 'OpenWiz')));
     const notices = h('div', { class: 'notices v2-notices', role: 'status' });
     const body = h('section', { class: 'v2-body' });
+    const view = h('div', { class: 'v2-view' }, notices, body);
     root.replaceChildren(
       h('a', { class: 'skip', href: '#content', onclick: event => { event.preventDefault(); title.focus(); } }, 'Skip to the page'),
       h('div', { class: 'v2-backdrop', 'aria-hidden': 'true' }),
-      h('div', { class: 'v2-veil', 'aria-hidden': 'true' }),
       h('div', { class: 'v2-frame' },
         h('div', { class: 'v2-shell' },
           h('aside', { class: 'v2-side' },
@@ -242,15 +258,14 @@
               h('span', { class: 'v2-brand-text' },
                 h('span', { class: 'v2-brand-name' }, 'OpenWiz'),
                 h('span', { class: 'v2-brand-sub' }, workspace))),
-            demo ? h('span', { class: 'v2-sample-tag' }, 'Sample data') : null,
             h('nav', { class: 'main v2-nav', 'aria-label': 'Pages' }, side.map(item => item.link))),
           h('main', { id: 'content', class: 'v2-main' },
             phoneBar,
+            demo ? h('span', { class: 'v2-sample-tag' }, 'Sample data') : null,
             head,
-            notices,
-            body,
+            view,
             h('nav', { class: 'v2-tabs', 'aria-label': 'Pages' }, tabs.map(item => item.link))))));
-    built = { side, tabs, title, headSub, head, phoneTitle, notices, body, page: null, isV2: true };
+    built = { side, tabs, title, refresh, pager, notices, body, view, page: null, isV2: true };
   }
 
   function buildShell() {
@@ -293,17 +308,29 @@
     return h('div', { class: `notice ${kind}` }, icon(iconName), h('span', {}, h('b', {}, strong), ' ', text));
   }
 
+  function updateBadges() {
+    if (!built) return;
+    const page = current();
+    for (const { page: p, link, badge } of [...built.side, ...built.tabs]) {
+      if (p.id === page.id) link.setAttribute('aria-current', 'page');
+      else link.removeAttribute('aria-current');
+      const count = p.badge?.(data.feeds);
+      badge.hidden = !count;
+      badge.textContent = count ? String(count) : '';
+    }
+  }
+
   function update() {
     if (!built) return;
     const page = current();
     const feeds = data.feeds;
     const limit = data.limit;
-    for (const { page: p, link, badge, kind } of [...built.side.map(x => ({ ...x, kind: 'side' })), ...built.tabs.map(x => ({ ...x, kind: 'tabs' }))]) {
-      if (p.id === page.id) link.setAttribute('aria-current', 'page');
-      else link.removeAttribute('aria-current');
-      const count = kind === 'tabs' && p.tabBadge ? p.tabBadge(feeds) : p.badge?.(feeds);
-      badge.hidden = !count;
-      badge.textContent = count ? String(count) : '';
+    updateBadges();
+    if (built.isV2 && built.page !== page.id) {
+      built.body.replaceChildren();
+      built.pager.replaceChildren();
+      built.view.dataset.page = page.id;
+      built.view.scrollTop = 0;
     }
     const mine = page.feeds.map(name => feeds[name]);
     if (!built.isV2) {
@@ -312,13 +339,12 @@
       const latest = mine.filter(feed => feed.readAt).map(feed => feed.readAt);
       built.read.textContent = latest.length ? `Read ${time(Math.min(...latest))}` : '';
       built.phoneReads.replaceChildren(...mine.flatMap((feed, i) => [i ? ' · ' : '', ...readLine(feed)]).filter(part => part !== null && part !== ''));
-    } else {
-      built.headSub.textContent = page.sub || '';
-      built.phoneTitle.textContent = page.title;
-      built.head.classList.toggle('show-phone', Boolean(page.showPhoneHead));
+    } else if (built.refresh) {
+      built.refresh.hidden = page.id !== 'feed';
+      built.refresh.disabled = data.paused();
     }
     const notes = [];
-    if (!demo && data.paused()) {
+    if (!v2 && data.paused()) {
       notes.push(notice('slow', 'pause', 'GitHub\'s limit is low', `(${limit.remaining ?? 0} left). Reads are paused until ${time(limit.pausedUntil)}, then resume on their own.`));
     }
     if (!demo) {
@@ -334,7 +360,7 @@
     } else if (!demo && mine.length && mine.some(feed => feed.state === 'loading') && !mine.some(feed => feed.data)) {
       built.body.replaceChildren(OW.ui.placeholder('Reading GitHub…'));
     } else {
-      page.render(built.body, feeds, route().arg);
+      page.render(built.body, feeds, route().arg, built.pager);
     }
     if (built.page !== page.id) {
       built.title.textContent = page.title;
@@ -346,7 +372,7 @@
 
   function draw() {
     if (demo) {
-      if (route().id === 'welcome') {
+      if (!location.hash || route().id === 'welcome') {
         built = null;
         return OW.v2.renderWelcome(root, { demoMode: true });
       }
@@ -368,7 +394,7 @@
   OW.onSignedOut = () => signedOut('Your sign-in ended. Sign in again.');
   window.addEventListener('hashchange', () => (demo ? draw() : built ? update() : null));
   document.addEventListener('keydown', event => {
-    if (!built) return;
+    if (!built || (v2 && (event.defaultPrevented || document.querySelector('.v2-sheet[open]')))) return;
     if ((event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'k') {
       event.preventDefault();
       return OW.palette.toggle();

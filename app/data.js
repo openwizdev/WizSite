@@ -80,6 +80,8 @@
   }
 
 
+  const demo = v2.get() !== 'off' && new URLSearchParams(location.search).get('demo') === '1';
+
   class Refused extends Error {}
   const WRITE = Symbol('the records layer');
   const OWNER_NAME = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$/;
@@ -105,6 +107,7 @@
     return method === 'POST' && object(body) && (url === '/api/sign-in/token' || url === '/api/sign-in/refresh');
   }
   async function ask(method, url, body, headers = {}, key, redirect = 'follow') {
+    if (demo) throw new Refused('Network access is disabled in the sample workspace');
     const text = body === undefined ? undefined : JSON.stringify(body);
     if (!allowed(method, url, text, key)) throw new Refused(`the app never sends ${method} ${url}`);
     return fetch(url, {
@@ -147,6 +150,7 @@
   class SignedOut extends Error {}
 
   async function github(method, path, body) {
+    if (demo) throw new Ended();
     const session = auth.session();
     if (!session) throw new Ended();
     const still = () => { if (auth.session() !== session) throw new Ended(); };
@@ -568,6 +572,7 @@
     }, feed.every);
   }
   function start() {
+    if (demo) return;
     for (const name of Object.keys(feeds)) {
       read(name);
       schedule(name);
@@ -581,7 +586,7 @@
     }
   }
   function refreshAll() {
-    if (paused()) return;
+    if (demo || paused()) return;
     feeds.agents.forceFull = true;
     for (const name of Object.keys(feeds)) {
       read(name);
@@ -589,7 +594,7 @@
     }
   }
   document.addEventListener('visibilitychange', () => {
-    if (document.hidden || !repo.get() || !auth.signedIn()) return;
+    if (demo || document.hidden || !repo.get() || !auth.signedIn()) return;
     for (const [name, feed] of Object.entries(feeds)) {
       if (!feed.readAt || Date.now() - feed.readAt >= feed.every) read(name);
     }
@@ -597,6 +602,7 @@
 
   let resolving = null;
   function resolveAccount() {
+    if (demo) return Promise.resolve();
     const kept = auth.get();
     if (!kept?.token || positive(kept.account) || v2.get() === 'off') return Promise.resolve();
     if (resolving?.session !== kept.session) {
@@ -623,6 +629,7 @@
       && picked?.name === pin.name && picked?.full === pin.full && (!write || v2.get() === 'on');
   }
   async function pinned(pin, method, path, body, write) {
+    if (demo) throw new Ended();
     if (!pinOk(pin, write)) throw new Refused('an unreadable operation context');
     const url = path === '/graphql' ? `${API}/graphql` : `${API}/repos/${pin.owner}/${pin.name}${path}`;
     let parsed;
@@ -655,9 +662,9 @@
   }
 
   OW.data = Object.freeze({
-    auth, repo, v2, feeds, limit, paused, finishSignIn, repositories, start, stop, refreshAll, SignedOut, Ended, Refused, noteLimit, claim,
+    auth, repo, v2, demo, feeds, limit, paused, finishSignIn, repositories, start, stop, refreshAll, SignedOut, Ended, Refused, noteLimit, claim,
     github: (method, path, body) => github(method, path, body),
     onChange: listener => listeners.add(listener),
   });
-  if (auth.signedIn()) resolveAccount();
+  if (!demo && auth.signedIn()) resolveAccount();
 })();

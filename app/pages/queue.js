@@ -1,6 +1,6 @@
 'use strict';
 (() => {
-  const { h, STATES, time } = OW.ui;
+  const { h, icon, time } = OW.ui;
   const GRILL = ['grill_round', 'grill_confirmation'];
   const SPEC = ['spec_confirmation', 'plan_approval'];
   const QUESTION = /^[A-Z]{1,2}[1-9][0-9]*$/;
@@ -166,29 +166,34 @@
       items.push(...(await decisions(repository, { kind: 'pull_request', number: pull.number }, pull.title, records, pulls.complete && got.complete, authors, gaps, bindings)));
     }
     const updated = new Map((data?.specIssues?.nodes || []).filter(Boolean).map(issue => [issue.number, Date.parse(issue.updatedAt) || 0]));
+    const progress = new Map();
     const specs = seen.specs.filter(spec => spec.total > 0 && spec.done < spec.total).map(spec => {
       const videos = (spec.detail?.comments?.nodes || []).filter(c => c && Number.isSafeInteger(c.databaseId) && authorOk(authors, c.author?.login)
         && VIDEO.test(String(c.body ?? ''))).sort((a, b) => b.databaseId - a.databaseId);
-      return { type: 'spec', key: `spec:${repository}#${spec.number}`, repository, subject: { kind: 'issue', number: spec.number },
+      const key = `spec:${repository}#${spec.number}`;
+      if (spec.done !== null) progress.set(key, `${spec.done} of ${spec.total} tickets complete`);
+      return { type: 'spec', key, repository, subject: { kind: 'issue', number: spec.number },
         title: spec.title, url: spec.url, at: updated.get(spec.number) ?? 0,
         video: videos.length ? { url: videos[0].body.match(VIDEO)[1] } : null, graph: spec.graph };
     });
     const byKey = (a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0);
     items.sort((a, b) => a.at - b.at || byKey(a, b));
     specs.sort((a, b) => b.at - a.at || byKey(a, b));
-    return { repository, items: [...items, ...specs], gaps: [...new Set(gaps)], bindings };
+    return { repository, items: [...items, ...specs], gaps: [...new Set(gaps)], bindings, progress };
   }
 
   const state = { key: null, run: null, result: null, failedSince: null, el: null, cards: new Map() };
   const shown = item => item.type === 'spec' || item.request === null || (item.request.status === 'open' && item.current !== false);
 
   function refresh(feeds) {
+    if (OW.data.demo) return;
     const picked = OW.data.repo.get();
     const specs = feeds.specs;
     if (!picked || state.result?.repository !== picked.full) {
       state.result = null;
       state.failedSince = null;
       state.cards.clear();
+      if (state.deck) state.deck.activeKey = null;
     }
     if (!picked || !specs.data || !specs.readAt || !OW.factory.model(feeds)) return;
     if (specs.failedAt != null) state.failedSince = Math.max(state.failedSince ?? 0, specs.failedAt);
@@ -205,35 +210,43 @@
       state.run = null;
       state.result = result;
       if (state.failedSince !== null && readAt > state.failedSince) state.failedSince = null;
-      if (state.el?.isConnected) OW.factory.redraw(state.el, () => draw(state.el));
+      if (state.deck?.cards.isConnected) updateDeck(state.el);
+      else state.deck?.onCount?.();
     }, error => {
       if (!still()) return;
       state.run = null;
       if (error instanceof OW.data.Ended) return;
       if (error instanceof OW.data.SignedOut) return OW.onSignedOut?.();
       state.result = { repository: picked.full, items: [], gaps: ['the queue\'s reads'], bindings: new Map() };
-      if (state.el?.isConnected) OW.factory.redraw(state.el, () => draw(state.el));
+      if (state.deck?.cards.isConnected) updateDeck(state.el);
+      else state.deck?.onCount?.();
     });
   }
 
   const WORDS = {
-    grill_round: 'Grill round to answer',
-    grill_confirmation: 'Grill summary to confirm',
+    grill_round: 'Questions to answer',
+    grill_confirmation: 'Answers to confirm',
     spec_confirmation: 'Spec to confirm',
     plan_approval: 'Plan to approve',
   };
-  function plain(item) {
-    const head = (word, colour, tell) => h('a', { class: 'card you', href: item.url, target: '_blank', rel: 'noreferrer', '--c': colour, 'data-focus': `queue:${item.key}` },
-      h('div', { class: 'num' }, `${word} · #${item.subject.number}${item.at ? ` · ${time(item.at)}` : ''}`), h('h3', {}, item.title), h('p', {}, tell));
-    if (item.type === 'spec') {
-      return head('Spec to watch', STATES.building.colour, item.video ? 'Watch its video and steer it on GitHub.' : 'See its plan and steer it on GitHub.');
-    }
-    if (!item.request) {
-      return head('A decision record that couldn\'t be read', STATES.unknown.colour,
-        'It isn\'t a valid request from the factory, or its author couldn\'t be checked. Open it on GitHub to read it.');
-    }
-    return head(WORDS[item.request.kind], item.current ? STATES.you.colour : STATES.unknown.colour,
-      item.current ? 'Open it on GitHub to answer it.' : 'Its source couldn\'t be checked yet, so read it on GitHub first.');
+  function plain(item, progress) {
+    const request = item.request;
+    const spec = item.type === 'spec';
+    const label = spec ? 'Spec to watch' : request ? WORDS[request.kind] : 'Decision couldn\'t be read';
+    const detail = spec ? progress : request?.headline || request?.summary?.[0]
+      || request?.questions?.find(q => !request.answered.includes(q.id))?.decides;
+    const status = spec ? null : !request ? 'Its details or author couldn\'t be checked.'
+      : item.current ? null : 'Its source couldn\'t be checked yet.';
+    return [
+      h('a', { class: 'card v2-live-card', href: item.url, target: '_blank', rel: 'noreferrer', 'data-focus': `queue:${item.key}` },
+        h('div', { class: 'v2-label' }, `${label} · #${item.subject.number}${item.at ? ` · ${time(item.at)}` : ''}`),
+        h('h3', {}, item.title),
+        detail ? h('p', {}, detail) : null,
+        status ? h('p', {}, status) : null,
+        h('span', { class: 'v2-queue-link' }, 'Open on GitHub', icon('right'))),
+      item.video ? h('a', { class: 'v2-btn subtle v2-queue-video', href: item.video.url,
+        target: '_blank', rel: 'noreferrer', 'data-focus': `video:${item.key}` }, 'Watch the narrated spec', icon('right')) : null,
+    ].filter(Boolean);
   }
   function view() {
     const result = state.result;
@@ -241,8 +254,9 @@
     return { ...result, gaps: [...new Set([...result.gaps, 'the latest spec read'])],
       items: result.items.map(item => (item.type === 'decision' && item.current === true ? { ...item, current: null, checked_at: null } : item)) };
   }
-  function holder(item, bindings) {
-    const identity = JSON.stringify([{ ...item, checked_at: null }, bindings.get(item.key) ?? null]);
+  function holder(item, result) {
+    const progress = result.progress?.get(item.key);
+    const identity = JSON.stringify([{ ...item, checked_at: null }, result.bindings.get(item.key), progress]);
     const kept = state.cards.get(item.key);
     if (kept && kept.identity === identity) {
       kept.item.checked_at = item.checked_at;
@@ -251,21 +265,63 @@
     const el = h('div', { class: 'queue-item', 'data-key': item.key });
     const card = OW.cards?.[item.type];
     if (typeof card === 'function') card(item, el);
-    else el.replaceChildren(plain(item));
+    else el.replaceChildren(...plain(item, progress));
     state.cards.set(item.key, { identity, item, el });
     return el;
   }
 
+  function updateDeck(el) {
+    OW.factory.redraw(el.closest('main') || el, () => draw(el));
+  }
+
   function draw(el) {
+    const { deck } = state;
     const result = view();
-    if (!result) return el.replaceChildren(OW.ui.placeholder('Reading GitHub…'));
-    const items = result.items.filter(shown);
+    const items = result ? result.items.filter(shown) : [];
     const keys = new Set(items.map(item => item.key));
-    for (const key of [...state.cards.keys()]) if (!keys.has(key)) state.cards.delete(key);
-    const missing = result.gaps.length
-      ? OW.ui.unknown(`This list may be missing items: GitHub gave only part of ${result.gaps.join(', ')}. The app tries again on its own.`) : null;
-    el.replaceChildren(...[missing, items.length ? h('div', { class: 'queue' }, items.map(item => holder(item, result.bindings)))
-      : missing ? null : OW.ui.placeholder(`${EMPTY}.`)].filter(Boolean));
+    for (const key of state.cards.keys()) if (!keys.has(key)) state.cards.delete(key);
+    const gaps = result?.gaps || [];
+    const message = !result ? 'Reading GitHub…' : gaps.length
+      ? `This list may be missing items: GitHub gave only part of ${gaps.join(', ')}. The app tries again on its own.`
+      : items.length ? '' : `${EMPTY}.`;
+    if (deck.message !== message) {
+      deck.message = message;
+      const notice = message && (gaps.length ? OW.ui.unknown(message) : result
+        ? h('div', { class: 'v2-clear-card' }, h('h2', {}, 'All clear'), h('p', {}, message)) : OW.ui.placeholder(message));
+      deck.status.replaceChildren(...(notice ? [notice] : []));
+    }
+
+    if (!deck.activeKey) {
+      const requested = Math.min(Number(deck.arg || 1) - 1, items.length - 1);
+      deck.activeKey = items[requested]?.key;
+    }
+    const selected = items.findIndex(item => item.key === deck.activeKey);
+    const index = Math.max(0, selected);
+    deck.activeKey = items[index]?.key;
+    deck.keys = items.map(item => item.key);
+    const position = `${index}/${items.length}`;
+    if (deck.position !== position) {
+      const go = next => {
+        deck.activeKey = deck.keys[next];
+        updateDeck(el);
+      };
+      const controls = OW.v2?.pager(index, items.length, go);
+      deck.controls?.replaceChildren(...(controls ? [controls] : []));
+      deck.position = position;
+    }
+    for (const row of [...deck.cards.children]) {
+      if (!keys.has(row.dataset.key)) row.remove();
+    }
+    items.forEach((item, i) => {
+      const row = holder(item, result);
+      row.hidden = Boolean(deck.controls) && i !== index;
+      const before = deck.cards.children[i];
+      if (before === row) return;
+      if (before?.dataset.key === item.key) before.replaceWith(row);
+      else deck.cards.insertBefore(row, before || null);
+    });
+    while (deck.cards.children.length > items.length) deck.cards.lastElementChild.remove();
+    deck.onCount?.();
   }
 
   const queuePage = {
@@ -274,11 +330,20 @@
     icon: 'clock',
     v2: true,
     feeds: ['specs'],
-    badge: () => view()?.items.filter(shown).length || null,
-    render(el, feeds) {
+    badge: () => state.result?.repository === OW.data.repo.get()?.full ? view()?.items.filter(shown).length || null : null,
+    render(el, feeds, { arg, controls, onCount } = {}) {
+      if (!el.contains(state.deck?.cards)) {
+        const status = h('div', { class: 'v2-queue-status' });
+        const cards = h('div', { class: 'queue' });
+        el.replaceChildren(h('div', { class: 'v2-live-feed' }, status, cards));
+        state.deck = { status, controls, cards, arg, onCount };
+      } else if (state.deck.arg !== arg) {
+        state.deck.arg = arg;
+        state.deck.activeKey = null;
+      }
       state.el = el;
       refresh(feeds);
-      OW.factory.redraw(el, () => draw(el));
+      updateDeck(el);
     },
   };
   OW.queue = queuePage;
