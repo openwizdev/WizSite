@@ -299,6 +299,9 @@ FAQ = (ROOT / 'faq.html').read_text()
 FAQ_TOP = re.sub(r'<(/?)h3\b', r'<\1h2', re.sub(r'<(/?)h2\b', r'<\1h1', FAQ))
 FAQ_SLOTS = {'<template data-slot="faq"></template>\n': FAQ, '<template data-slot="faq-h1"></template>\n': FAQ_TOP}
 FAQ_PAGE = 'faq/index.html'
+# Cloudflare Pages answers a missing path with the nearest 404.html, with status 404. Without one at the root it
+# serves the landing with 200, and a gone fingerprinted name would cache that HTML for a year.
+NOT_FOUND_PAGE = '404.html'
 FAQ_ON = {'index.html': FAQ, FAQ_PAGE: FAQ_TOP}
 FAQ_TITLE = ('Questions', 'The short ones are here.')
 FAQ_QUESTIONS = ('What is OpenWiz?', 'What is a kernel?', 'What do I need to run it?', 'Where do my agents run?',
@@ -330,7 +333,7 @@ FONT_FINGERPRINTS = {name: fingerprint(name, (ROOT / name).read_bytes()) for nam
 FINGERPRINTS = {name: fingerprint(name, built_asset_bytes(name, FONT_FINGERPRINTS)) for name in HASHED}
 ASK_INDEX = 'ask-index.json'
 STATIC = {
-    'index.html', 'changelog/index.html', 'drivers/index.html', 'team/index.html', 'faq/index.html', 'market/index.html', '_headers', SECURITY_TXT, ROBOTS_TXT, APP_PAGE, 'app/manifest.webmanifest',
+    'index.html', 'changelog/index.html', 'drivers/index.html', 'team/index.html', 'faq/index.html', 'market/index.html', NOT_FOUND_PAGE, '_headers', SECURITY_TXT, ROBOTS_TXT, APP_PAGE, 'app/manifest.webmanifest',
     'fonts/OFL.txt',
 } | ART | set(ICON_HASHES) | set(VECTORS) | (set(VENDOR_HASHES) - {GSAP}) | set(APP_VENDOR) | set(DRIVER_LOGOS) | {ASK_INDEX}
 RUNTIME = STATIC | set(FINGERPRINTS.values())
@@ -355,7 +358,7 @@ FONT_HASHES = {
     'fonts/GeistMono-var.woff2': '9e8aaba5adee50826485cff3187dc86d45f7dd4799a80371af0f369bbd999989',
     'fonts/OFL.txt': 'c683bfbcc7e087f5d37a54ef628f10387c451a83ddc459b151403a164ac46c90',
 }
-PAGES = ('index.html', 'changelog/index.html', 'drivers/index.html', TEAM_PAGE, FAQ_PAGE, 'market/index.html')
+PAGES = ('index.html', 'changelog/index.html', 'drivers/index.html', TEAM_PAGE, FAQ_PAGE, 'market/index.html', NOT_FOUND_PAGE)
 ALL_PAGES = PAGES + (APP_PAGE,)
 STORY_COPY = ('Build a to-do app', 'Bring any agent', 'Sign in with GitHub', 'Put the app on your phone')
 OLD_EXAMPLE = ('dark mode', 'dark-mode')
@@ -879,9 +882,12 @@ def check_security_txt(text, now=None):
 
 def check_site(root, registry=ROOT / 'market/registry.json', now=None):
     files = {p.relative_to(root).as_posix() for p in root.rglob('*') if p.is_file()}
+    assert sorted(f for f in files if f.rsplit('/', 1)[-1] == NOT_FOUND_PAGE) == [NOT_FOUND_PAGE], \
+        'the site needs one 404.html, at its root: Pages serves a deeper one for its folder, and none means a 200 landing'
     names = built_fingerprints(root)
     assert files == STATIC | set(names.values()), 'unexpected or missing build output'
     pages = {root / f: Page((root / f).read_text()) for f in PAGES}
+    check_not_found((root / NOT_FOUND_PAGE).read_text(), pages[root / NOT_FOUND_PAGE])
     drivers_html = (root / DRIVERS_PAGE).read_text()
     for path, page in pages.items():
         rel = path.relative_to(root).as_posix()
@@ -1759,6 +1765,15 @@ def check_footer(htmls):
     assert plain(FOOTER).count(COUNT_NOTICE) == 1, 'the footer has one visit and click notice'
     assert '<p class="footer-wordmark">OpenWiz</p>' in FOOTER, 'the footer shows the wordmark'
     assert FOOTER.count('class="family-wiz"') == 12, 'the footer has the twelve Wizes'
+
+
+def check_not_found(html, page):
+    assert '<meta name="robots" content="noindex">' in html, 'the not-found page must not be indexed'
+    relative = [ref for ref in page.refs if not ref.startswith(('/', '#', 'https://'))]
+    assert not relative, f'the not-found page answers at any depth, so every link and resource is root-absolute: {relative}'
+    main = re.search(r'<main\b[^>]*>([\s\S]*?)</main>', html)
+    assert main and re.search(r'<h1>Page not found</h1>', main[1]) and '<a href="/">' in main[1], \
+        'the not-found page says the page was not found and links home'
 
 
 def check_faq(htmls, pages, names):

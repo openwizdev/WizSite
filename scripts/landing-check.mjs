@@ -19,7 +19,9 @@ function serve() {
       response.writeHead(200, { 'content-type': TYPES[extname(path)] || 'application/octet-stream' });
       response.end(data);
     } catch {
-      response.writeHead(404).end();
+      // Like Cloudflare Pages: a missing path gets the root 404.html, with status 404.
+      const page = await readFile(join(DIST, '404.html')).catch(() => '');
+      response.writeHead(404, { 'content-type': TYPES['.html'] }).end(page);
     }
   });
   return new Promise(resolve => server.listen(0, '127.0.0.1', () => resolve(server)));
@@ -453,6 +455,8 @@ async function teamFilm(page, where, width, height, mode) {
 }
 
 const FAQ_PATHS = ['/', '/faq/'];
+// Any missing path; the server answers it with 404.html, as Pages does.
+const NOT_FOUND = '/no-such-page/';
 async function faq(page, where, width, mode) {
   const read = () => page.evaluate(`(() => { ${HELPERS}
     const faq = document.querySelector('section.faq');
@@ -527,7 +531,7 @@ async function main() {
         } finally {
           await page.close();
         }
-        for (const path of ['/', '/changelog/', '/drivers/', '/team/', '/faq/']) {
+        for (const path of ['/', '/changelog/', '/drivers/', '/team/', '/faq/', NOT_FOUND]) {
           const other = await open(browser, origin, width, height, mode, path);
           try {
             await buy(other, `${path} ${where}`, path);
@@ -545,7 +549,7 @@ async function main() {
       }
     }
     for (const width of (process.env.WIDTHS || '481,500,560,640,641,700,760,761,800,900,960,1024').split(',').map(Number)) {
-      for (const path of ['/', '/changelog/', '/drivers/', '/team/', '/faq/']) {
+      for (const path of ['/', '/changelog/', '/drivers/', '/team/', '/faq/', NOT_FOUND]) {
         const other = await open(browser, origin, width, 800, MODES.motion, path);
         try {
           await buy(other, `${path} ${width}px, motion`, path);

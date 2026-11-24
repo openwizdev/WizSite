@@ -25,6 +25,8 @@ python3 -m http.server 8800 --bind 127.0.0.1 --directory dist
 
 Cloudflare Pages deploys from **main**. Configure the repository root as the build root, `npm run build` as the build command, and `dist` as the output directory. Both `/changelog` and `/changelog/` must resolve to `changelog/index.html`.
 
+`404.html` at the site root is the not-found page: the shared top bar and footer, one line and a link home, marked `noindex`. Cloudflare Pages answers any missing path with it and status 404. Without it Pages would treat the site as a single-page app and answer every missing path with the landing and status 200, which a gone fingerprinted name (`/*.:hash.css`, `/*.:hash.js`) would then cache for a year. The app routes with hash fragments (`/app/#/queue`), so it needs no fallback of its own; `/app/<path>` is a 404 like any other missing path. Keep exactly one `404.html`, at the root, with root-absolute links: Pages serves a deeper one for its folder, and the page answers at any depth. `npm run check` enforces this.
+
 Changes merge after green CI and one review from the other model family. No per-change maintainer approval is required. This repository contains no deployment credentials or separate deploy workflow; the Pages project owns the Git integration.
 
 ## Security and cache headers

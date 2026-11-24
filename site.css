@@ -607,6 +607,10 @@ body.landing > main { flex: 1 0 auto; }
 .faq-a a { color: var(--ink); text-decoration: underline; text-decoration-color: var(--brass); text-underline-offset: 4px; }
 .faq[data-ready] .faq-q:has([aria-expanded="false"]) + .faq-a { grid-template-rows: 0fr; opacity: 0; visibility: hidden; }
 .faq-main .faq { border-top: 0; }
+.not-found { padding-block: clamp(64px, 10vw, 128px); }
+.not-found h1 { font-size: clamp(40px, 5vw, 64px); font-weight: 760; line-height: 1; letter-spacing: -.05em; }
+.not-found p { margin-top: 16px; color: var(--grey2); font-size: 17px; line-height: 1.6; }
+.not-found a { color: var(--ink); text-decoration: underline; text-decoration-color: var(--brass); text-underline-offset: 4px; }
 .faq-main .faq-title { font-size: clamp(40px, 5vw, 64px); font-weight: 760; line-height: 1; letter-spacing: -.05em; }
 @media (prefers-reduced-motion:no-preference) {
   .faq[data-moving] .faq-a { transition: grid-template-rows .35s ease-out, opacity .35s ease-out, visibility 0s linear; }

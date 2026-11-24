@@ -20,7 +20,7 @@ def edit_built(root, name, change):
     new = fingerprint(name, data)
     old.unlink()
     (root / new).write_bytes(data)
-    for page in ('index.html', 'changelog/index.html', 'drivers/index.html', 'team/index.html', 'faq/index.html', 'market/index.html', 'app/index.html'):
+    for page in ('index.html', 'changelog/index.html', 'drivers/index.html', 'team/index.html', 'faq/index.html', 'market/index.html', '404.html', 'app/index.html'):
         path = root / page
         path.write_text(path.read_text().replace(f'"/{was}"', f'"/{new}"'))
 
@@ -904,6 +904,27 @@ class Checks(unittest.TestCase):
                 with self.assertRaisesRegex(AssertionError, message.strip()):
                     check_site(root)
 
+    def test_not_found_page(self):
+        html = (ROOT / 'dist/404.html').read_text()
+        self.assertIn('<h1>Page not found</h1>', html)
+        self.assertEqual(html.count('<footer'), 1)
+        one_root = 'one 404.html, at its root'
+        for message, change in {
+            one_root: lambda root: (root / '404.html').unlink(),
+            one_root + ' ': lambda root: shutil.copy(root / '404.html', root / 'app/404.html'),
+            'must not be indexed': lambda root: (root / '404.html').write_text(html.replace('<meta name="robots" content="noindex">', '', 1)),
+            'root-absolute': lambda root: (root / '404.html').write_text(html.replace('href="/drivers/" data-count', 'href="drivers/" data-count', 1)),
+            'links home': lambda root: (root / '404.html').write_text(html.replace('<a href="/">Go to', '<a href="/faq/">Go to', 1)),
+            'was not found': lambda root: (root / '404.html').write_text(html.replace('<h1>Page not found</h1>', '<h1>Oops</h1>', 1)),
+            'site footer': lambda root: (root / '404.html').write_text(html.replace('<footer', '<div', 1)),
+        }.items():
+            with tempfile.TemporaryDirectory() as temp, self.subTest(message=message):
+                root = Path(temp) / 'dist'
+                shutil.copytree(ROOT / 'dist', root)
+                change(root)
+                with self.assertRaisesRegex(AssertionError, message.strip()):
+                    check_site(root)
+
     def test_market_links_only_the_registry_and_wizmarket(self):
         registry = ROOT / 'tests/market-fixtures/check-index.json'
         listed = json.loads(registry.read_text())['listings'][0]['links'][0]['url']
@@ -1001,7 +1022,7 @@ class Checks(unittest.TestCase):
 
     def test_report_a_problem_link(self):
         form = '<a href="https://github.com/openwizdev/openwiz/issues/new?template=feedback.yml" rel="noreferrer" data-count="github">Report a problem</a>'
-        for page, count in {'index.html': 1, 'drivers/index.html': 1, 'team/index.html': 1, 'faq/index.html': 1, 'changelog/index.html': 1, 'app/index.html': 0}.items():
+        for page, count in {'index.html': 1, 'drivers/index.html': 1, 'team/index.html': 1, 'faq/index.html': 1, 'changelog/index.html': 1, '404.html': 1, 'app/index.html': 0}.items():
             with self.subTest(page=page):
                 self.assertEqual((ROOT / 'dist' / page).read_text().count(form), count)
         href = 'https://github.com/openwizdev/openwiz/issues/new?template=feedback.yml'
