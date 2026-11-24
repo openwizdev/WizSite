@@ -171,7 +171,7 @@ test('switch off: no queue, no pull request read, the You page first and the sig
     await run.page.until(`document.querySelector('main h1')?.textContent === 'You'`, 'the queue route falling back');
     await new Promise(resolve => setTimeout(resolve, 500));
     const nav = await run.page.run(`[...document.querySelectorAll('nav.main a')].map(a => a.getAttribute('href'))`);
-    assert.deepEqual(nav, ['#/you', '#/specs', '#/agents']);
+    assert.deepEqual(nav, ['#/you', '#/specs', '#/agents', '#/models']);
     assert.deepEqual(pullsRead(run.world), [], 'the switch off still read pull requests');
     assert.deepEqual(await run.page.run('window.drawn'), []);
   } finally {
@@ -194,7 +194,7 @@ test('switch on: the signed-out copy no longer says read-only, and the queue lea
     await run.page.click('acme/factory');
     await run.page.until(`document.querySelector('main h1')?.textContent === 'Queue'`, 'the queue');
     const nav = await run.page.run(`[...document.querySelectorAll('nav.main a')].map(a => a.getAttribute('href'))`);
-    assert.deepEqual(nav, ['#/queue', '#/you', '#/specs', '#/agents']);
+    assert.deepEqual(nav, ['#/queue', '#/you', '#/specs', '#/agents', '#/models']);
   } finally {
     await run.close();
   }
