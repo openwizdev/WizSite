@@ -217,9 +217,9 @@ code,.v{font-family:var(--ow-font-mono)}
 .spec-video:focus-visible { outline: 2px solid var(--orchid); outline-offset: -2px; }
 .spec-video::cue { color: #fff; background: rgba(15, 17, 21, .85); }
 .spec-frame { container-type: inline-size; }
-.spec-frame:not(.is-ambient) .spec-video[controls] { height: calc(56.25cqw + max(9.375cqw, 36px)); aspect-ratio: auto; object-fit: contain; object-position: top; }
+.spec-frame:not(.is-resting) .spec-video[controls] { height: calc(56.25cqw + max(9.375cqw, 36px)); aspect-ratio: auto; object-fit: contain; object-position: top; }
 .spec-video:fullscreen { object-position: center; }
-.spec-frame.is-ambient .spec-video { aspect-ratio: 1280 / 432; }
+.spec-frame.is-resting .spec-video { aspect-ratio: 1280 / 432; }
 .spec-caption { display: grid; gap: 6px; padding: clamp(14px, 1.6vw, 18px) clamp(16px, 2.4vw, 28px) clamp(16px, 2vw, 24px); background: #25211e; }
 .spec-video[controls] + .spec-caption .spec-play { display: none; }
 .spec-title { display: flex; align-items: center; gap: 12px; }
