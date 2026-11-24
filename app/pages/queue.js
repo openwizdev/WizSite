@@ -351,11 +351,15 @@
     if (deck.message !== message || deck.pause !== pause) {
       deck.message = message;
       deck.pause = pause;
+      const stateCard = OW.v2?.stateCard;
       const notice = !message ? null
-        : unknown || stale || gap ? OW.ui.unknown(message)
+        : unknown ? (stateCard?.('failed', message) ?? OW.ui.unknown(message))
+        : stale ? (stateCard?.('stale', message) ?? OW.ui.unknown(message))
+        : gap ? (stateCard?.('partial', message) ?? OW.ui.unknown(message))
         : result ? (allClear?.(message) ?? OW.ui.placeholder(message))
-        : OW.ui.placeholder(message);
-      deck.status.replaceChildren(...[pause ? h('p', { class: 'v2-pause-note' }, pause) : null, notice].filter(Boolean));
+        : (stateCard?.('reading', message) ?? OW.ui.placeholder(message));
+      const pauseNode = pause ? (stateCard?.('pause', pause) ?? h('p', { class: 'v2-pause-note' }, pause)) : null;
+      deck.status.replaceChildren(...[pauseNode, notice].filter(Boolean));
     }
 
     if (!deck.activeKey) {

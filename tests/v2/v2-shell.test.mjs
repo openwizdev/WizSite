@@ -1,6 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import { SITE, signIn, start } from './browser.mjs';
+
+const FLEET = JSON.parse(await readFile(new URL('fixtures/queue/grill-round.json', import.meta.url), 'utf8')).fleet;
 
 const apiRequests = world => world.log.filter(r => r.origin !== SITE || r.path.startsWith('/api/'));
 const withoutFingerprint = path => path.replace(/\.[a-f0-9]{10}(?=\.(?:css|js)$)/, '');
@@ -63,7 +66,9 @@ test('switch on + demo=1: renders v2 shell, deep links, interactions, and makes 
     await run.page.until(`document.body.innerText.includes('Run your software factory from here.')`, 'v2 welcome screen');
     assert.equal(await run.page.run(`document.documentElement.dataset.v2`), '1');
     assert.equal(await run.page.run(`document.querySelector('.v2-sample-tag').textContent`), 'Sample data');
-    assert.equal(await run.page.run(`document.querySelector('.v2-welcome-sample').getAttribute('href')`), '/app/');
+    assert.equal(await run.page.run(`document.querySelector('.v2-welcome-sample').textContent`), 'Continue with GitHub');
+    assert.equal(await run.page.run(`document.querySelector('.v2-welcome-sample').getAttribute('href')`), '/api/sign-in/start');
+    assert.doesNotMatch(await run.page.text(), /Exit sample workspace/);
 
     await run.page.click('Open Harbor workspace');
     await run.page.until(`location.hash === '#/chat' && document.body.innerText.includes('Accept all 3')`, 'v2 chat with grill round');
@@ -105,7 +110,8 @@ test('switch on + demo=1: renders v2 shell, deep links, interactions, and makes 
 
     await run.page.go(`${SITE}/app/?v2=dry-run&demo=1#/feed/2`);
     await run.page.until(`document.querySelector('.v2-card-title')?.textContent === 'Keep the free plan?'`, 'deep link to decision card');
-    assert.match(await run.page.text(), /Recommended:\s+Keep it, cap at 3 seats/);
+    assert.equal(await run.page.run(`document.querySelector('.v2-recommendation')`), null);
+    assert.equal(await run.page.run(`document.querySelector('.v2-rec-tag')?.textContent`), 'Recommended');
     assert.equal(await run.page.run(`document.querySelector('.v2-hero-card .v2-preview')`), null);
     assert.equal(await run.page.run(`document.querySelector('.v2-hero-card button.primary').textContent`), 'Keep it, cap at 3 seats');
     await run.page.tap('Change something');
@@ -189,6 +195,45 @@ test('demo isolates a saved GitHub session from boot, visibility refresh, and th
     assert.doesNotMatch(await run.page.text(), /acme\/factory/);
     assert.deepEqual(await run.page.run(stored), session);
     assert.deepEqual(apiRequests(run.world), [], 'demo used network access with a saved session');
+    assert.deepEqual(run.world.violations, []);
+  } finally {
+    await run.close();
+  }
+});
+
+test('real signed-in v2: welcome, picker, calm Chat card, Feed states, and truthful Settings', async () => {
+  const run = await start();
+  try {
+    const emptySpecs = { data: { rateLimit: { limit: 5000, remaining: 4800, resetAt: '2099-01-01T00:00:00Z' },
+      specSearch: { totalCount: 0, nodes: [] },
+      repository: { issues: { totalCount: 0, nodes: [] }, youIssues: { totalCount: 0, nodes: [] },
+        fleet: { text: FLEET } } } };
+    run.world.graphql.Specs = () => ({ status: 200, json: emptySpecs });
+    run.world.github['GET /repos/acme/factory/pulls'] = () => ({ status: 200, json: [] });
+
+    await run.page.go(`${SITE}/app/?v2=dry-run`);
+    await run.page.until(`document.body.innerText.includes('Continue with GitHub')`, 'real v2 signed-out welcome');
+    assert.equal(await run.page.run(`document.querySelector('.v2-welcome-sample')?.textContent`), 'See a sample factory');
+    assert.equal(await run.page.run(`document.querySelector('.v2-sample-tag')`), null);
+
+    await run.page.go(`${SITE}/app/?v2=dry-run&code=c0de&state=${'S'.repeat(43)}`);
+    await run.page.until(`document.body.innerText.includes('Pick a repository') && document.body.innerText.includes('acme/factory')`, 'v2 repository picker');
+    assert.equal(await run.page.run(`Boolean(document.querySelector('.v2-welcome-stage .panel'))`), true);
+    await run.page.click('acme/factory');
+
+    await run.page.until(`location.hash === '#/feed' && document.querySelector('.v2-clear-card h2')?.textContent === 'All clear.'`, 'real v2 Feed all-clear');
+    assert.match(await run.page.text(), /No open spec or grill pull request is waiting on you/);
+
+    await run.page.click('Chat');
+    await run.page.until(`document.querySelector('.v2-chat-empty h2')?.textContent === 'Start work from here'`, 'real v2 Chat coming-soon card');
+    assert.doesNotMatch(await run.page.text(), /\b0\.\d+/);
+    assert.equal(await run.page.run(`document.querySelector('.v2-composer input').disabled`), true);
+
+    await run.page.click('Settings');
+    await run.page.until(`document.querySelector('.v2-settings .v2-sign-out')`, 'real v2 Settings');
+    assert.match(await run.page.text(), /Where it runs\s+Coming soon/);
+    assert.match(await run.page.text(), /GitHub\s+Connected/);
+    assert.match(await run.page.text(), /acme\/factory/);
     assert.deepEqual(run.world.violations, []);
   } finally {
     await run.close();
