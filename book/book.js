@@ -1,0 +1,541 @@
+const visitorTz = (() => {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+  } catch {
+    return 'UTC';
+  }
+})();
+
+const els = {
+  live: document.getElementById('book-live'),
+  alert: document.getElementById('book-alert'),
+  loading: document.getElementById('book-loading'),
+  picker: document.getElementById('book-picker'),
+  tz: document.getElementById('book-tz'),
+  days: document.getElementById('book-days'),
+  dayHeading: document.getElementById('book-day-heading'),
+  slots: document.getElementById('book-slots'),
+  form: document.getElementById('book-form'),
+  chosenWhen: document.getElementById('book-chosen-when'),
+  changeBtn: document.getElementById('book-change'),
+  name: document.getElementById('book-name'),
+  email: document.getElementById('book-email'),
+  team: document.getElementById('book-team'),
+  website: document.getElementById('book-website'),
+  nameErr: document.getElementById('book-name-error'),
+  emailErr: document.getElementById('book-email-error'),
+  teamErr: document.getElementById('book-team-error'),
+  submit: document.getElementById('book-submit'),
+  confirm: document.getElementById('book-confirm'),
+  confirmWhen: document.getElementById('book-confirm-when'),
+  confirmNote: document.getElementById('book-confirm-note'),
+  icsBtn: document.getElementById('book-ics'),
+  empty: document.getElementById('book-empty'),
+  rateLimited: document.getElementById('book-rate-limited'),
+  rateRetry: document.getElementById('book-rate-retry'),
+  unavailable: document.getElementById('book-unavailable'),
+  unavailableText: document.getElementById('book-unavailable-text'),
+  offline: document.getElementById('book-offline'),
+  offlineRetry: document.getElementById('book-offline-retry'),
+  cancel: document.getElementById('book-cancel'),
+  cancelBtn: document.getElementById('book-cancel-btn'),
+  cancelled: document.getElementById('book-cancelled'),
+};
+
+const views = [
+  els.loading,
+  els.picker,
+  els.form,
+  els.confirm,
+  els.empty,
+  els.rateLimited,
+  els.unavailable,
+  els.offline,
+  els.cancel,
+  els.cancelled,
+];
+
+const state = {
+  minutes: 30,
+  dayMap: new Map(),
+  dayList: [],
+  selectedDay: null,
+  selectedSlot: null,
+  booking: null,
+  cancelPair: null,
+};
+
+function announce(text) {
+  els.live.textContent = '';
+  requestAnimationFrame(() => {
+    els.live.textContent = text;
+  });
+}
+
+function showAlert(text) {
+  if (!text) {
+    els.alert.hidden = true;
+    els.alert.textContent = '';
+    return;
+  }
+  els.alert.textContent = text;
+  els.alert.hidden = false;
+}
+
+function showView(target) {
+  for (const view of views) {
+    view.hidden = view !== target;
+  }
+}
+
+function localDayKey(date) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: visitorTz,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
+  const byType = Object.fromEntries(parts.map(p => [p.type, p.value]));
+  return `${byType.year}-${byType.month}-${byType.day}`;
+}
+
+function nextFourteenDays() {
+  const days = [];
+  const seen = new Set();
+  const now = new Date();
+  for (let i = 0; days.length < 14 && i < 20; i++) {
+    const d = new Date(now.getTime() + i * 86400000);
+    const key = localDayKey(d);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    days.push({
+      key,
+      weekday: new Intl.DateTimeFormat(undefined, { weekday: 'short', timeZone: visitorTz }).format(d),
+      dayNum: new Intl.DateTimeFormat(undefined, { day: 'numeric', timeZone: visitorTz }).format(d),
+      fullLabel: new Intl.DateTimeFormat(undefined, {
+        weekday: 'long',
+        month: 'long',
+        day: 'numeric',
+        timeZone: visitorTz,
+      }).format(d),
+      shortLabel: new Intl.DateTimeFormat(undefined, {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+        timeZone: visitorTz,
+      }).format(d),
+    });
+  }
+  return days;
+}
+
+function formatTime(iso) {
+  return new Intl.DateTimeFormat(undefined, {
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZone: visitorTz,
+  }).format(new Date(iso));
+}
+
+function formatFullSlot(iso) {
+  const d = new Date(iso);
+  const day = new Intl.DateTimeFormat(undefined, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    timeZone: visitorTz,
+  }).format(d);
+  const time = new Intl.DateTimeFormat(undefined, {
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZoneName: 'short',
+    timeZone: visitorTz,
+  }).format(d);
+  return `${day} · ${time} (${visitorTz})`;
+}
+
+function renderDays() {
+  els.days.textContent = '';
+  for (const day of state.dayList) {
+    const slots = state.dayMap.get(day.key) || [];
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'book-day';
+    btn.dataset.day = day.key;
+    btn.setAttribute('aria-label', slots.length ? `${day.fullLabel}, ${slots.length} open times` : `${day.fullLabel}, no open times`);
+    btn.setAttribute('aria-pressed', day.key === state.selectedDay ? 'true' : 'false');
+    if (slots.length === 0) btn.disabled = true;
+
+    const wd = document.createElement('span');
+    wd.className = 'book-day-wd';
+    wd.textContent = day.weekday;
+    const num = document.createElement('span');
+    num.className = 'book-day-num';
+    num.textContent = day.dayNum;
+    btn.append(wd, num);
+
+    btn.addEventListener('click', () => selectDay(day.key, true));
+    btn.addEventListener('keydown', onDayKeyDown);
+    els.days.appendChild(btn);
+  }
+}
+
+function onDayKeyDown(event) {
+  const keys = ['ArrowRight', 'ArrowLeft', 'Home', 'End'];
+  if (!keys.includes(event.key)) return;
+  const enabled = [...els.days.querySelectorAll('.book-day:not(:disabled)')];
+  const idx = enabled.indexOf(event.currentTarget);
+  if (idx === -1) return;
+  event.preventDefault();
+  let nextIdx = idx;
+  if (event.key === 'ArrowRight') nextIdx = (idx + 1) % enabled.length;
+  if (event.key === 'ArrowLeft') nextIdx = (idx - 1 + enabled.length) % enabled.length;
+  if (event.key === 'Home') nextIdx = 0;
+  if (event.key === 'End') nextIdx = enabled.length - 1;
+  const target = enabled[nextIdx];
+  selectDay(target.dataset.day, true);
+  target.focus();
+}
+
+function selectDay(dayKey, announceChange) {
+  state.selectedDay = dayKey;
+  for (const btn of els.days.querySelectorAll('.book-day')) {
+    btn.setAttribute('aria-pressed', btn.dataset.day === dayKey ? 'true' : 'false');
+  }
+  const dayInfo = state.dayList.find(d => d.key === dayKey);
+  const slots = state.dayMap.get(dayKey) || [];
+  els.dayHeading.textContent = dayInfo ? dayInfo.fullLabel : '';
+  els.slots.textContent = '';
+
+  for (const iso of slots) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'book-slot';
+    btn.dataset.slot = iso;
+    btn.textContent = formatTime(iso);
+    btn.setAttribute('aria-pressed', iso === state.selectedSlot ? 'true' : 'false');
+    btn.addEventListener('click', () => chooseSlot(iso));
+    els.slots.appendChild(btn);
+  }
+
+  if (announceChange && dayInfo) {
+    announce(`${dayInfo.fullLabel}, ${slots.length} open times`);
+  }
+}
+
+function chooseSlot(iso) {
+  state.selectedSlot = iso;
+  showAlert('');
+  els.chosenWhen.textContent = formatFullSlot(iso);
+  showView(els.form);
+  els.name.focus();
+  announce(`Selected ${formatFullSlot(iso)}`);
+}
+
+function clearFieldErrors() {
+  for (const [input, err] of [
+    [els.name, els.nameErr],
+    [els.email, els.emailErr],
+    [els.team, els.teamErr],
+  ]) {
+    input.removeAttribute('aria-invalid');
+    input.removeAttribute('aria-describedby');
+    err.textContent = '';
+  }
+}
+
+function hasControlChars(text) {
+  for (let i = 0; i < text.length; i++) {
+    const code = text.charCodeAt(i);
+    if (code < 32 || code === 127) return true;
+  }
+  return false;
+}
+
+function validateForm() {
+  clearFieldErrors();
+  const name = els.name.value.trim();
+  const email = els.email.value.trim();
+  const team = els.team.value.trim();
+  const errors = [];
+
+  if (!name || name.length > 80 || hasControlChars(name)) {
+    errors.push([els.name, els.nameErr, 'Enter your name (up to 80 characters).']);
+  }
+  if (!email || email.length > 254 || hasControlChars(email) || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    errors.push([els.email, els.emailErr, 'Enter a valid email address.']);
+  }
+  if (!team || team.length > 200 || hasControlChars(team)) {
+    errors.push([els.team, els.teamErr, 'Add one line about your team (up to 200 characters).']);
+  }
+
+  if (errors.length) {
+    for (const [input, err, msg] of errors) {
+      input.setAttribute('aria-invalid', 'true');
+      input.setAttribute('aria-describedby', err.id);
+      err.textContent = msg;
+    }
+    errors[0][0].focus();
+    announce(errors[0][2]);
+    return null;
+  }
+
+  return { name, email, team, website: els.website.value };
+}
+
+function toIcsUtc(iso) {
+  return new Date(iso).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
+}
+
+function downloadIcs() {
+  if (!state.booking) return;
+  const { id, start, end } = state.booking;
+  const lines = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//OpenWiz//Book//EN',
+    'CALSCALE:GREGORIAN',
+    'BEGIN:VEVENT',
+    `UID:${id}@openwiz.dev`,
+    `DTSTAMP:${toIcsUtc(new Date().toISOString())}`,
+    `DTSTART:${toIcsUtc(start)}`,
+    `DTEND:${toIcsUtc(end)}`,
+    'SUMMARY:OpenWiz — 30-minute team call',
+    'DESCRIPTION:30-minute setup call with Jake. Bring your repo and your coding agent.',
+    'END:VEVENT',
+    'END:VCALENDAR',
+    '',
+  ];
+  const blob = new Blob([lines.join('\r\n')], { type: 'text/calendar;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'openwiz-call.ics';
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+async function submitBooking(event) {
+  event.preventDefault();
+  const fields = validateForm();
+  if (!fields || !state.selectedSlot) return;
+
+  if (!navigator.onLine) {
+    showAlert('');
+    showView(els.offline);
+    announce('Booking needs an internet connection.');
+    return;
+  }
+
+  showAlert('');
+  els.submit.disabled = true;
+  try {
+    const res = await fetch('/api/book', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({
+        start: state.selectedSlot,
+        name: fields.name,
+        email: fields.email,
+        team: fields.team,
+        website: fields.website,
+        tz: visitorTz,
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+
+    if (res.status === 200 && data.ok && data.booking) {
+      state.booking = data.booking;
+      els.confirmWhen.textContent = formatFullSlot(data.booking.start);
+      if (data.email === 'sent') {
+        els.confirmNote.textContent = `A confirmation is on its way to ${fields.email}.`;
+      } else {
+        els.confirmNote.textContent = 'You’re booked. Save the time below.';
+      }
+      showView(els.confirm);
+      announce('Your call is booked.');
+      return;
+    }
+
+    if (res.status === 409 || data.error === 'slot_taken') {
+      state.selectedSlot = null;
+      showAlert('That time was just taken. Pick another below.');
+      await loadSlots({ keepAlert: true });
+      return;
+    }
+
+    if (res.status === 429 || data.error === 'rate_limited') {
+      showAlert(data.message || 'Too many requests. Wait a minute and try again.');
+      return;
+    }
+
+    if (res.status === 503 || data.error === 'unavailable') {
+      els.unavailableText.textContent = data.message || 'The calendar is unavailable at the moment.';
+      showView(els.unavailable);
+      return;
+    }
+
+    showAlert(data.message || 'Check your details and try again.');
+  } catch {
+    if (!navigator.onLine) {
+      showView(els.offline);
+    } else {
+      showAlert('Something went wrong. Please try again.');
+    }
+  } finally {
+    els.submit.disabled = false;
+  }
+}
+
+async function loadSlots({ keepAlert = false } = {}) {
+  if (!keepAlert) showAlert('');
+  if (!navigator.onLine) {
+    showView(els.offline);
+    announce('Booking needs an internet connection.');
+    return;
+  }
+  showView(els.loading);
+
+  try {
+    const res = await fetch('/api/book/slots', { headers: { Accept: 'application/json' } });
+    const data = await res.json().catch(() => ({}));
+
+    if (res.status === 429 || data.error === 'rate_limited') {
+      showView(els.rateLimited);
+      announce('Too many requests.');
+      return;
+    }
+
+    if (!res.ok) {
+      els.unavailableText.textContent = data.message || 'The calendar is unavailable at the moment.';
+      showView(els.unavailable);
+      announce('Booking is unavailable right now.');
+      return;
+    }
+
+    state.minutes = data.minutes || 30;
+    const rawSlots = Array.isArray(data.slots) ? data.slots : [];
+    state.dayList = nextFourteenDays();
+    state.dayMap = new Map();
+    for (const day of state.dayList) state.dayMap.set(day.key, []);
+
+    for (const iso of rawSlots) {
+      const key = localDayKey(new Date(iso));
+      if (state.dayMap.has(key)) {
+        state.dayMap.get(key).push(iso);
+      }
+    }
+
+    const firstOpen = state.dayList.find(d => (state.dayMap.get(d.key) || []).length > 0);
+    if (!firstOpen) {
+      showView(els.empty);
+      announce('No open times in the next 14 days.');
+      return;
+    }
+
+    els.tz.textContent = `Times in ${visitorTz}`;
+    state.selectedDay = firstOpen.key;
+    renderDays();
+    selectDay(firstOpen.key, false);
+    showView(els.picker);
+    announce(`Loaded open times. ${firstOpen.fullLabel} selected.`);
+  } catch {
+    if (!navigator.onLine) {
+      showView(els.offline);
+      announce('Booking needs an internet connection.');
+    } else {
+      els.unavailableText.textContent = 'The calendar is unavailable at the moment.';
+      showView(els.unavailable);
+      announce('Booking is unavailable right now.');
+    }
+  }
+}
+
+async function runCancel() {
+  if (!state.cancelPair) return;
+  showAlert('');
+  els.cancelBtn.disabled = true;
+  try {
+    const res = await fetch('/api/book/cancel', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify(state.cancelPair),
+    });
+    if (res.ok) {
+      showView(els.cancelled);
+      announce('Your call has been cancelled.');
+      return;
+    }
+    const data = await res.json().catch(() => ({}));
+    showAlert(data.message || 'Could not cancel this call.');
+  } catch {
+    if (!navigator.onLine) {
+      showView(els.offline);
+    } else {
+      showAlert('Could not cancel this call. Please try again.');
+    }
+  } finally {
+    els.cancelBtn.disabled = false;
+  }
+}
+
+function registerWorker() {
+  if (!('serviceWorker' in navigator)) return;
+  navigator.serviceWorker.register('/book/sw.js', { scope: '/book/' }).catch(() => {});
+}
+
+function init() {
+  registerWorker();
+  els.form.addEventListener('submit', submitBooking);
+  for (const [input, err] of [
+    [els.name, els.nameErr],
+    [els.email, els.emailErr],
+    [els.team, els.teamErr],
+  ]) {
+    input.addEventListener('input', () => {
+      if (input.getAttribute('aria-invalid') === 'true') {
+        input.removeAttribute('aria-invalid');
+        input.removeAttribute('aria-describedby');
+        err.textContent = '';
+      }
+    });
+  }
+  els.changeBtn.addEventListener('click', () => {
+    showAlert('');
+    showView(els.picker);
+  });
+  els.icsBtn.addEventListener('click', downloadIcs);
+  els.rateRetry.addEventListener('click', () => loadSlots());
+  els.offlineRetry.addEventListener('click', () => loadSlots());
+  els.cancelBtn.addEventListener('click', runCancel);
+
+  window.addEventListener('offline', () => {
+    showView(els.offline);
+    announce('Booking needs an internet connection.');
+  });
+  window.addEventListener('online', () => {
+    if (!els.offline.hidden && !state.cancelPair) loadSlots();
+  });
+
+  const params = new URLSearchParams(window.location.search);
+  const cancelParam = params.get('cancel');
+  if (cancelParam) {
+    window.history.replaceState(null, '', window.location.pathname);
+    const dot = cancelParam.indexOf('.');
+    if (dot > 0 && dot < cancelParam.length - 1) {
+      state.cancelPair = {
+        id: cancelParam.slice(0, dot),
+        token: cancelParam.slice(dot + 1),
+      };
+      showView(els.cancel);
+      return;
+    }
+    showAlert('This cancel link is not valid.');
+  }
+
+  loadSlots();
+}
+
+init();

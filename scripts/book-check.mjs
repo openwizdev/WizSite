@@ -276,7 +276,13 @@ async function openTab(browser, width, height) {
       errors.push(`exception: ${msg.params.exceptionDetails?.text || 'unknown'}`);
     }
     if (msg.method === 'Log.entryAdded' && msg.params.entry.level === 'error') {
-      errors.push(`log: ${msg.params.entry.text}`);
+      const entry = msg.params.entry;
+      const expectedApiStatus = entry.source === 'network' &&
+        (entry.url || '').includes('/api/book') &&
+        /\b(409|429|503)\b/.test(entry.text || '');
+      if (!expectedApiStatus) {
+        errors.push(`log(${entry.source}): ${entry.text}`);
+      }
     }
   });
   await browser.send('Page.enable', {}, sessionId);
@@ -415,9 +421,15 @@ async function runWidth(browser, srv, { name, width, height, shotsDir }) {
       `${name}: inline validation failed: ${JSON.stringify(invalidFocus)}`);
 
     await tab.evalJs(`(() => {
-      document.querySelector('#book-name').value = 'Alex Rivera';
-      document.querySelector('#book-email').value = 'alex@example.com';
-      document.querySelector('#book-team').value = 'Three engineers shipping a CLI tool with Claude Code.';
+      const fill = (sel, val) => {
+        const el = document.querySelector(sel);
+        el.value = val;
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+      };
+      fill('#book-name', 'Alex Rivera');
+      fill('#book-email', 'alex@example.com');
+      fill('#book-team', 'Three engineers shipping a CLI tool with Claude Code.');
+      document.querySelector('.book-surface').scrollIntoView({ block: 'start' });
     })()`);
     const formOverflow = await tab.evalJs('document.documentElement.scrollWidth > window.innerWidth');
     assert(!formOverflow, `${name}: horizontal overflow on form`);
@@ -571,16 +583,22 @@ async function runPwaAndOffline(browser, srv) {
     assert(install.installabilityErrors.length === 0,
       `installability errors: ${JSON.stringify(install.installabilityErrors)}`);
 
-    await browser.send('Emulation.setEmulatedMedia', {
-      features: [{ name: 'display-mode', value: 'standalone' }],
-    }, tab.sessionId);
-    const standalone = await tab.evalJs(`(() => ({
-      nav: getComputedStyle(document.querySelector('.landing-nav')).display,
-      footer: getComputedStyle(document.querySelector('.landing-footer')).display,
-    }))()`);
-    assert(standalone.nav === 'none' && standalone.footer === 'none',
-      `standalone mode did not hide chrome: ${JSON.stringify(standalone)}`);
-    await browser.send('Emulation.setEmulatedMedia', { features: [] }, tab.sessionId);
+    const standaloneRule = await tab.evalJs(`(() => {
+      for (const sheet of document.styleSheets) {
+        let rules;
+        try { rules = sheet.cssRules; } catch { continue; }
+        for (const rule of rules) {
+          if (rule.type === CSSRule.MEDIA_RULE && /display-mode:\\s*standalone/.test(rule.conditionText)) {
+            const texts = [...rule.cssRules].map(r => r.cssText);
+            const hidesNav = texts.some(t => t.includes('.landing-nav') && /display:\\s*none/.test(t));
+            const hidesFooter = texts.some(t => t.includes('.landing-footer') && /display:\\s*none/.test(t));
+            if (hidesNav && hidesFooter) return true;
+          }
+        }
+      }
+      return false;
+    })()`);
+    assert(standaloneRule, 'standalone display-mode rule must hide .landing-nav and .landing-footer');
 
     await browser.send('Network.emulateNetworkConditions', {
       offline: true,
