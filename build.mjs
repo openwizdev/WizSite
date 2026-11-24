@@ -2,6 +2,7 @@ import { copyFile, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promi
 import { createHash } from 'node:crypto';
 import { installSwitch, readReleases, render, summary, withReleases } from './scripts/changelog.mjs';
 import { readRegistry, render as renderMarket, summary as marketSummary, withMarket } from './scripts/market.mjs';
+import { withDrivers } from './scripts/drivers.mjs';
 
 const root = new URL('./', import.meta.url);
 const output = new URL('dist/', root);
@@ -24,7 +25,8 @@ const withFooter = html => {
 const faq = await readFile(new URL('faq.html', root), 'utf8');
 const faqTop = faq.replace(/<(\/?)h2\b/g, '<$1h1').replace(/<(\/?)h3\b/g, '<$1h2');
 const withFaq = html => html.replace('<template data-slot="faq"></template>\n', faq).replace('<template data-slot="faq-h1"></template>\n', faqTop);
-const app = ['app/ember.css', 'app/data.js', 'app/records.js', 'app/ui.js', 'app/pages/you.js', 'app/pages/specs.js', 'app/pages/spec.js', 'app/pages/agents.js', 'app/palette.js', 'app/shell.js'];
+const appFolder = async folder => (await readdir(new URL(`${folder}/`, root)).catch(() => [])).filter(name => /\.(js|css)$/.test(name)).sort().map(name => `${folder}/${name}`);
+const app = ['app/ember.css', 'app/data.js', 'app/records.js', 'app/ui.js', ...await appFolder('app/pages'), ...await appFolder('app/cards'), 'app/palette.js', 'app/shell.js'];
 const npmVendor = { 'app/vendor/dagre-3.1.3.min.js': 'node_modules/@dagrejs/dagre/dist/dagre.min.js', 'app/vendor/dagre-LICENSE.txt': 'node_modules/@dagrejs/dagre/LICENSE' };
 const book = ['book/book.css', 'book/book.js'];
 const bookFiles = ['book/manifest.webmanifest', 'book/icon-192.png', 'book/icon-512.png', 'book/icon-maskable-512.png'];
@@ -56,6 +58,7 @@ for (const page of pages) {
   if (page !== 'app/index.html') html = withFaq(withFooter(withCta(html)));
   if (page === 'changelog/index.html') html = withReleases(html, render(releases, live));
   if (page === 'market/index.html') html = withMarket(html, renderMarket(registry));
+  if (page === 'drivers/index.html') html = withDrivers(html, registry);
   await put(page, html);
 }
 await put('ask-index.json', await (await import('./scripts/ask-index.mjs')).snapshotIndex(output, new URL('ask-docs/', root)));

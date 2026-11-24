@@ -131,10 +131,16 @@ BOOK_PRICE = re.compile(r'[$€£]\s*\d|\b(?:price|pricing|cost|payment|pay|paid
 BOOK_COPY = ('Book 30 minutes with Jake', '30 minutes', 'Your repo and your agent', 'A pull request ships')
 APP_PAGE = 'app/index.html'
 APP_STYLE = 'app/ember.css'
-APP_SCRIPTS = ('app/data.js', 'app/records.js', 'app/ui.js', 'app/pages/you.js', 'app/pages/specs.js', 'app/pages/spec.js', 'app/pages/agents.js', 'app/palette.js', 'app/shell.js')
+APP_FOUND = {(folder, ext): tuple(sorted(p.relative_to(ROOT).as_posix() for p in (ROOT / folder).glob(f'*.{ext}')))
+             for folder in ('app/pages', 'app/cards') for ext in ('js', 'css')}
+APP_PARTS = APP_FOUND['app/pages', 'js'] + APP_FOUND['app/cards', 'js']
+APP_PART_STYLES = APP_FOUND['app/pages', 'css'] + APP_FOUND['app/cards', 'css']
+APP_LEGACY_ORDER = ('app/pages/you.js', 'app/pages/specs.js', 'app/pages/spec.js', 'app/pages/agents.js')
+APP_NEEDED = set(APP_FOUND['app/pages', 'js'] + APP_FOUND['app/pages', 'css'])
+APP_SCRIPTS = ('app/data.js', 'app/records.js', 'app/ui.js') + APP_PARTS + ('app/palette.js', 'app/shell.js')
 APP_VENDOR = {'app/vendor/dagre-3.1.3.min.js': ('node_modules/@dagrejs/dagre/dist/dagre.min.js', 'app/pages/spec.js'),
               'app/vendor/dagre-LICENSE.txt': ('node_modules/@dagrejs/dagre/LICENSE', None)}
-HASHED += (BOOK_STYLE, BOOK_SCRIPT, APP_STYLE) + APP_SCRIPTS
+HASHED += (BOOK_STYLE, BOOK_SCRIPT, APP_STYLE) + APP_PART_STYLES + APP_SCRIPTS
 APP_CSP = ("default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; media-src 'self'; font-src 'self'; "
            "connect-src 'self' https://api.github.com; manifest-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
 
@@ -664,11 +670,87 @@ def check_ref(root, source, ref, pages, favicons=(), market=None):
         assert target in pages and unquote(url.fragment) in pages[target].ids, f'missing fragment: {ref}'
 
 
+DRIVER_SLOTS = ('marks', 'tally', 'spotlight', 'shipped', 'hosts', 'harnesses')
+DRIVER_SLOT = re.compile(
+    r'(<template data-slot="drivers-([a-z]+)-start"></template>)([\s\S]*?)(<template data-slot="drivers-\2-end"></template>)')
+
+
+def drivers_fallback(built, source):
+    slots = {match[2]: match[3] for match in DRIVER_SLOT.finditer(source)}
+    assert tuple(slots) == DRIVER_SLOTS, 'the Drivers source has its six build slots'
+    changed = []
+
+    def restore(match):
+        opening, name, body, closing = match.groups()
+        if body != slots[name]:
+            changed.append(body)
+        return opening + slots[name] + closing
+
+    assert tuple(match[2] for match in DRIVER_SLOT.finditer(built)) == DRIVER_SLOTS, 'the Drivers export has its six build slots'
+    fallback = DRIVER_SLOT.sub(restore, built)
+    fixed = DRIVER_SLOT.sub(lambda match: match[0] if match[3] == slots[match[2]] else match[1] + match[4], built)
+    return fallback, fixed, changed
+
+
+def driver_listing_urls(registry):
+    urls = {}
+    for listing in json.loads(registry.read_text())['listings']:
+        if not {'driver', 'harness'}.intersection(listing['tags']):
+            continue
+        allowed = {listing['url'], *(entry['url'] for entry in listing.get('links', ()))}
+        receipt = listing.get('proof', {}).get('receipt')
+        if receipt:
+            allowed.add(receipt['url'])
+        urls[listing['id']] = allowed
+    return urls
+
+
+class DriverSlot(Page):
+    def __init__(self, markup, listing_urls):
+        self.listing_urls = listing_urls
+        self.listing = self.listing_tag = None
+        super().__init__(markup)
+
+    def handle_starttag(self, tag, attrs):
+        fields = dict(attrs)
+        assert not {'srcset', 'imagesrcset', 'ping'} & fields.keys(), 'unexpected Drivers resource attributes'
+        if 'data-listing' in fields:
+            assert tag in ('article', 'li') and self.listing is None, 'unexpected Drivers listing markup'
+            self.listing, self.listing_tag = fields['data-listing'], tag
+            assert self.listing in self.listing_urls, 'unexpected Drivers listing'
+        if tag == 'a' and self.listing is not None:
+            href = fields.get('href') or ''
+            url = urlsplit(href)
+            assert href in self.listing_urls[self.listing] and url.scheme == 'https' and url.netloc \
+                and url.username is None and url.password is None, 'unexpected Drivers registry URL'
+            assert sum(key == 'href' for key, _ in attrs) == 1, 'duplicate Drivers anchor href'
+            assert 'data-book' not in fields, 'a booking link outside the team page'
+            attrs = [(key, value) for key, value in attrs if key != 'href']
+        super().handle_starttag(tag, attrs)
+
+    def handle_endtag(self, tag):
+        if tag == self.listing_tag:
+            self.listing = self.listing_tag = None
+        super().handle_endtag(tag)
+
+
+def check_drivers_export(built):
+    source = fingerprinted_page((ROOT / DRIVERS_PAGE).read_text(), cta=True)
+    expected = subprocess.run(['node', '--input-type=module', '-e', """
+        import { readFileSync } from 'node:fs';
+        import { withDrivers } from './scripts/drivers.mjs';
+        import { readRegistry } from './scripts/market.mjs';
+        process.stdout.write(withDrivers(readFileSync(0, 'utf8'), await readRegistry()));
+    """], cwd=ROOT, input=source, text=True, stdout=subprocess.PIPE, check=True).stdout
+    assert expected == built, f'export differs: {DRIVERS_PAGE}'
+
+
 def check_site(root, registry=ROOT / 'market/registry.json'):
     files = {p.relative_to(root).as_posix() for p in root.rglob('*') if p.is_file()}
     names = built_fingerprints(root)
     assert files == STATIC | set(names.values()), 'unexpected or missing build output'
     pages = {root / f: Page((root / f).read_text()) for f in PAGES}
+    drivers_html = (root / DRIVERS_PAGE).read_text()
     for path, page in pages.items():
         assert not set(page.refs) & {f'/{name}' for name in HASHED}, 'a page uses an unfingerprinted style or script'
         expected_css = [f'/{names["tokens.css"]}', f'/{names["site.css"]}', f'/{names[BOOK_STYLE]}'] if path == root / BOOK_PAGE else [f'/{names["tokens.css"]}', f'/{names["site.css"]}']
@@ -705,6 +787,18 @@ def check_site(root, registry=ROOT / 'market/registry.json'):
             check_market_refs(root, path, section, pages, market)
             check_market_markup(split_market(path.read_text())[1])
             page = fixed
+        if path == root / DRIVERS_PAGE:
+            listing_urls = driver_listing_urls(registry)
+            if listing_urls:
+                drivers_html, fixed, slots = drivers_fallback(drivers_html, (ROOT / DRIVERS_PAGE).read_text())
+                for markup in slots:
+                    slot = DriverSlot(markup, listing_urls)
+                    assert not slot.books, 'a booking link outside the team page'
+                    assert not (slot.x_links or slot.cloudroom_links or slot.report_links or slot.launch_posts), \
+                        'unexpected external URL'
+                    for ref in slot.refs:
+                        check_ref(root, path, ref, pages, slot.favicons)
+                page = Page(fixed)
         assert page.social and all(s.startswith(SITE_URL) and s.removeprefix(SITE_URL).split('?')[0] in STATIC for s in page.social), 'social image must be a built file on the site'
         assert path == root / TEAM_PAGE or not page.books, f'a booking link outside the team page: {path.name}'
         x_links = 2 if path == root / TEAM_PAGE else 1
@@ -818,7 +912,7 @@ def check_site(root, registry=ROOT / 'market/registry.json'):
     unused = sorted(name for name in drivers_art if f'/{name}' not in (root / DRIVERS_PAGE).read_text())
     assert not unused, f'unused drivers art: {unused}'
     check_driver_logo_files(root)
-    check_drivers(landing, changelog, (root / DRIVERS_PAGE).read_text(), pages[root / DRIVERS_PAGE])
+    check_drivers(landing, changelog, drivers_html, pages[root / DRIVERS_PAGE])
     check_drivers_nav((root / names['site.css']).read_text(), {name: (root / name).read_text() for name in PAGES})
     check_changelog(landing, changelog)
     check_releases(releases, read_releases(), install_switch(landing) == 'live')
@@ -1695,8 +1789,19 @@ def check_app(root, names, pages):
     assert not page.x_links, 'one X link per page, the footer\'s: the app has one'
     assert not page.report_links, 'Report a problem link, the footer\'s: the app has one'
     assert not set(page.refs) & {f'/{name}' for name in HASHED}, 'the app uses an unfingerprinted style or script'
-    assert page.stylesheets == [f'/{names[APP_STYLE]}'], 'the app must apply exactly the fingerprinted ember.css'
-    assert page.scripts == [ref for name in APP_SCRIPTS for ref in [f'/{v}' for v, (_, before) in APP_VENDOR.items() if before == name] + [f'/{names[name]}']], \
+    styles = {f'/{names[name]}': name for name in APP_PART_STYLES}
+    applied = [styles.get(ref, ref) for ref in page.stylesheets[1:]]
+    assert page.stylesheets[:1] == [f'/{names[APP_STYLE]}'] and len(set(applied)) == len(applied) \
+        and set(applied) <= set(APP_PART_STYLES) and APP_NEEDED & set(APP_PART_STYLES) <= set(applied), \
+        'the app must apply exactly the fingerprinted ember.css, then each of its pages\' styles once (and a card\'s at most once)'
+    parts = {f'/{names[name]}': name for name in APP_PARTS}
+    shown = [parts[ref] for ref in page.scripts if ref in parts]
+    assert len(set(shown)) == len(shown) and APP_NEEDED & set(APP_PARTS) <= set(shown), \
+        'the app must load each of its pages\' scripts once (and a card\'s at most once)'
+    assert [name for name in shown if name in APP_LEGACY_ORDER] == list(APP_LEGACY_ORDER), \
+        'the app must load You, Specs, Spec and Agents in that order: it sets the v1 pages\' order and default route'
+    ordered = ('app/data.js', 'app/records.js', 'app/ui.js', *shown, 'app/palette.js', 'app/shell.js')
+    assert page.scripts == [ref for name in ordered for ref in [f'/{v}' for v, (_, before) in APP_VENDOR.items() if before == name] + [f'/{names[name]}']], \
         'the app must load its fingerprinted scripts (and each pinned file before its user) in order'
     assert not page.inline_scripts, 'the app allows no inline script'
     for ref in page.refs:
@@ -1706,8 +1811,9 @@ def check_app(root, names, pages):
     assert manifest['start_url'] == manifest['scope'] == '/app/' and manifest['display'] == 'standalone', 'the app manifest must open /app/ standalone'
     for icon in manifest['icons']:
         assert icon['src'].lstrip('/') in STATIC, f'manifest icon is not a built file: {icon["src"]}'
-    style = (root / names[APP_STYLE]).read_text()
-    assert not re.search(r'\b(animation|transition)\s*:', style), 'Ember allows no motion'
+    for name in (APP_STYLE,) + APP_PART_STYLES:
+        style = (root / names[name]).read_text()
+        assert not re.search(r'\b(animation|transition)\s*:', style), f'Ember allows no motion: {name}'
     headers = (root / '_headers').read_text()
     for path in ('/app/*',):
         rule = re.search(rf'^{re.escape(path)}\n((?:  .*\n?)*)', headers, re.M)
@@ -1824,6 +1930,9 @@ def main():
             built = split_releases(built)[0]
         if name == MARKET_PAGE:
             built = split_market(built)[0]
+        if name == DRIVERS_PAGE and driver_listing_urls(ROOT / 'market/registry.json'):
+            check_drivers_export(built)
+            continue
         assert fingerprinted_page((ROOT / name).read_text(), cta=name != APP_PAGE) == built, f'export differs: {name}'
     paths = subprocess.check_output(['git', 'ls-files', '-z', '--cached', '--others', '--exclude-standard'], cwd=ROOT).decode().split('\0')
     for name in set(paths) - {''}:

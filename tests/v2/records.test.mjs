@@ -33,6 +33,8 @@ class Net {
     this.account = OWNER;
     this.edited = {};
     this.held = [];
+    this.intercept = null;
+    this.link = undefined;
   }
   writes() { return this.log.filter(r => r.method !== 'GET' && !(r.url === `${API}/graphql`) && !r.url.startsWith('/api/')); }
   posts() { return this.log.filter(r => r.method === 'POST' && /\/comments$/.test(r.url)); }
@@ -47,6 +49,10 @@ class Net {
     const headers = Object.fromEntries(new Headers(init.headers).entries());
     this.log.push({ method, url: String(url), headers, body: init.body, redirect: init.redirect });
     const at = new URL(url, 'https://openwiz.dev');
+    if (this.intercept) {
+      const out = await this.intercept(method, at, init);
+      if (out) return out;
+    }
     const answer = (status, body, extra = {}) => Response.json(body, { status, headers: extra });
     if (at.origin === 'https://openwiz.dev' && method === 'POST' && at.pathname === '/api/sign-in/token') {
       return answer(200, { access_token: TOKEN, expires_in: 28800, refresh_token: 'synthetic-refresh', refresh_token_expires_in: 1e6 });
@@ -69,6 +75,7 @@ class Net {
       const page = Number(at.searchParams.get('page'));
       const all = [...this.recorded(full, number), ...this.list(number, full).map(c => ({ html_url: `https://github.com/${full}/issues/${number}#issuecomment-${c.id}`,
         issue_url: `${API}/repos/${full}/issues/${number}`, ...c }))];
+      if (this.link !== undefined && page === 1) return answer(200, all, { Link: this.link });
       if (this.pages && page === 1) return answer(200, all.slice(0, 1), { Link: `<${API}${at.pathname}?per_page=100&page=2>; rel="next"` });
       if (this.pages && page === 2) return this.pages === 'fail' ? answer(502, {}) : answer(200, all.slice(1));
       return answer(200, page === 1 ? all : []);
@@ -925,6 +932,164 @@ test('R15: a spec edited after its confirmation request was posted is never matc
     net.edited[41] = edited;
     const checked = plain(await run.records.check(input.action.item));
     assert.equal(checked.result, result, `last edited ${edited}`);
+  }
+});
+
+test('R9 (#2923): an older check finishing after a newer changed or unchecked check never publishes currentness', async () => {
+  for (const newerOutcome of ['changed', 'unchecked']) {
+    const { input, net, run, key } = await grillRound();
+    const original = structuredClone(net.github[key]);
+    let release;
+    const gate = new Promise(resolve => { release = resolve; });
+    let held = false;
+    net.intercept = async (method, at) => {
+      if (method === 'GET' && at.pathname.includes('/contents/') && !held) {
+        held = true;
+        await gate;
+        return Response.json(original.json, { status: original.status });
+      }
+      return null;
+    };
+    const olderPromise = run.records.check(input.action.item);
+    await settle();
+    assert.equal(held, true, `${newerOutcome}: older check did not reach contents read`);
+    if (newerOutcome === 'changed') {
+      net.github['GET /repos/acme/factory/pulls/7'].json.state = 'closed';
+    } else {
+      net.github[key] = { status: 502, json: { message: 'Bad Gateway' } };
+    }
+    const newer = plain(await run.records.check(input.action.item));
+    assert.equal(newer.result, newerOutcome, `${newerOutcome}: newer check did not produce expected negative outcome`);
+    release();
+    const older = plain(await olderPromise);
+    assert.deepEqual(older, { result: 'unchecked', binding: null, checked_at: null },
+      `${newerOutcome}: older check published currentness after newer ${newerOutcome}`);
+    net.github['GET /repos/acme/factory/pulls/7'].json.state = 'open';
+    net.github[key] = structuredClone(original);
+    const composed = plain(await run.records.compose({ ...input.action, item: { ...input.action.item, checked_at: older.checked_at ?? 1 } }));
+    assert.equal(composed.refused, 'source_unchecked',
+      `${newerOutcome}: older check left a kept binding that allowed compose: ${JSON.stringify(composed)}`);
+  }
+});
+
+test('R11 (#2923): a replacement or unreadable record posted while post source check runs is refused before dispatch, while landed sends still reconcile first', async () => {
+  const later = (id, body) => ({ id, user: { login: 'factory-bot[bot]', id: 5900 }, body, created_at: '2030-01-08T00:00:00.000Z' });
+  const replacement = '```json\n{"schema":"openwiz.decisions.v1","kind":"spec_confirmation","id":"sc_notes_2","status":"open","fingerprint":"2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f","risk":"ordinary","spec":41,"summary":["Keep notes in two lists."],"headline":"Keep your notes in one list.","tickets":[],"graph":[]}\n```';
+  const unreadable = '```json\n{"schema":"openwiz.decisions.v1","kind":"spec_confirmation",\n```';
+  for (const [body, reason] of [[replacement, 'source_changed'], [unreadable, 'source_unchecked']]) {
+    const { input, net, run } = await specConfirmation();
+    const preview = await composeLike(run.records, input.action);
+    await confirmAll(run.records, preview);
+    let injected = false;
+    net.intercept = async (method, at) => {
+      if (method === 'GET' && at.pathname === '/repos/acme/factory/issues/41' && !injected) {
+        injected = true;
+        net.add(41, later(9100019, body));
+      }
+      return null;
+    };
+    const outcome = plain(await run.records.post(preview));
+    assert.equal(injected, true, `${reason}: sourceCheck did not read the spec`);
+    assert.deepEqual(outcome, { outcome: 'refused', op: preview.op, reason }, JSON.stringify(outcome));
+    assert.deepEqual(net.posts(), [], `${reason}: post sent despite late record during source check`);
+  }
+  {
+    const { input, net, run } = await specConfirmation();
+    const preview = await composeLike(run.records, input.action);
+    await confirmAll(run.records, preview);
+    net.mode = 'dropped';
+    assert.equal(plain(await run.records.post(preview)).outcome, 'unknown');
+    net.mode = 'ok';
+    let injected = false;
+    net.intercept = async (method, at) => {
+      if (method === 'GET' && at.pathname === '/repos/acme/factory/issues/41' && !injected) {
+        injected = true;
+        net.add(41, later(9100020, replacement));
+      }
+      return null;
+    };
+    await confirmAll(run.records, preview);
+    const outcome = plain(await run.records.post(preview));
+    assert.equal(injected, true, 'retry: sourceCheck did not run');
+    assert.deepEqual(outcome, { outcome: 'refused', op: preview.op, reason: 'source_changed' }, JSON.stringify(outcome));
+    assert.equal(net.posts().length, 1, 'retry: sent a second POST despite late replacement');
+    assert.deepEqual(plain(run.records.pending()), [], 'retry: retired receipt stayed pending');
+  }
+  {
+    const { input, net, run } = await specConfirmation();
+    const preview = await composeLike(run.records, input.action);
+    await confirmAll(run.records, preview);
+    net.mode = 'lost';
+    assert.equal(plain(await run.records.post(preview)).outcome, 'unknown');
+    net.mode = 'ok';
+    net.add(41, later(9100021, replacement));
+    await confirmAll(run.records, preview);
+    const outcome = plain(await run.records.post(preview));
+    assert.equal(outcome.outcome, 'posted', `landed send was not reconciled first: ${JSON.stringify(outcome)}`);
+    assert.equal(net.posts().length, 1, 'landed send sent a second POST');
+  }
+});
+
+test('R12 (#2923): a present but unreadable Link header is an incomplete read before either branch of reconcile and on baseline reads', async () => {
+  const badLinks = [
+    '',
+    'garbage',
+    `<${API}/repos/acme/factory/issues/41/comments?per_page=100&page=2>; rel=next`,
+    `<${API}/repos/acme/factory/issues/41/comments?per_page=100&page=2>; rel="last"`,
+    `<${API}/repos/acme/factory/issues/41/comments?per_page=100&page=2>; rel="next", broken`,
+  ];
+  for (const bad of badLinks) {
+    {
+      const run = await boot();
+      const preview = await steerPreview(run);
+      run.records.confirm(preview, tap());
+      run.net.mode = 'dropped';
+      assert.equal(plain(await run.records.post(preview)).outcome, 'unknown');
+      run.net.mode = 'ok';
+      run.net.link = bad;
+      run.records.confirm(preview, tap());
+      const outcome = plain(await run.records.post(preview));
+      assert.deepEqual(outcome, { outcome: 'unknown', op: preview.op, reason: 'incomplete' }, `empty branch (${bad}): ${JSON.stringify(outcome)}`);
+      assert.equal(run.net.posts().length, 1, `empty branch (${bad}): resent on unreadable Link`);
+    }
+    {
+      const run = await boot();
+      const preview = await steerPreview(run);
+      run.records.confirm(preview, tap());
+      run.net.mode = 'lost';
+      assert.equal(plain(await run.records.post(preview)).outcome, 'unknown');
+      run.net.mode = 'ok';
+      run.net.link = bad;
+      run.records.confirm(preview, tap());
+      const outcome = plain(await run.records.post(preview));
+      assert.deepEqual(outcome, { outcome: 'unknown', op: preview.op, reason: 'incomplete' }, `found branch (${bad}): ${JSON.stringify(outcome)}`);
+      assert.equal(run.net.posts().length, 1, `found branch (${bad}): sent again`);
+    }
+    {
+      const run = await boot();
+      const preview = await steerPreview(run);
+      run.records.confirm(preview, tap());
+      run.net.link = bad;
+      const outcome = plain(await run.records.post(preview));
+      assert.deepEqual(outcome, { outcome: 'refused', op: preview.op, reason: 'source_unchecked' }, `baseline (${bad}): ${JSON.stringify(outcome)}`);
+      assert.equal(run.net.posts().length, 0, `baseline (${bad}): posted despite unreadable Link`);
+    }
+  }
+  {
+    const run = await boot();
+    const preview = await steerPreview(run);
+    run.records.confirm(preview, tap());
+    run.net.intercept = async (method, at) => {
+      if (method === 'GET' && at.pathname === '/repos/acme/factory/issues/41/comments') {
+        const page = Number(at.searchParams.get('page'));
+        if (page === 1) return Response.json([], { status: 200, headers: { Link: `<${API}${at.pathname}?per_page=100&page=2>; rel="next", <${API}${at.pathname}?per_page=100&page=2>; rel="last"` } });
+        if (page === 2) return Response.json([], { status: 200, headers: { Link: `<${API}${at.pathname}?per_page=100&page=1>; rel="prev", <${API}${at.pathname}?per_page=100&page=1>; rel="first"` } });
+      }
+      return null;
+    };
+    const outcome = plain(await run.records.post(preview));
+    assert.equal(outcome.outcome, 'posted', `valid two-page Link header was refused: ${JSON.stringify(outcome)}`);
+    assert.equal(run.net.posts().length, 1);
   }
 });
 

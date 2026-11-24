@@ -197,15 +197,42 @@
     if (!response.ok) return null;
     return { json: await response.json().catch(() => undefined), response };
   }
-  function following(response, pin, path, page) {
-    const next = (response.headers.get('Link') || '').split(',').filter(part => /;\s*rel="next"\s*$/.test(part));
-    if (!next.length) return 'done';
-    const link = next.length === 1 && next[0].match(/^\s*<([^>]*)>\s*;\s*rel="next"\s*$/);
+  function sameListUrl(rawUrl, pin, path) {
     let url;
-    try { url = link && new URL(link[1]); } catch { return 'unreadable'; }
-    const where = url && (url.pathname === `/repos/${pin.owner}/${pin.name}${path}` || new RegExp(`^/repositories/[1-9][0-9]*${path}$`).test(url.pathname));
-    return where && url.origin === API && !url.hash && url.searchParams.get('page') === String(page + 1)
-      && [...url.searchParams.keys()].every(k => k === 'per_page' || k === 'page') ? 'next' : 'unreadable';
+    try { url = new URL(rawUrl); } catch { return null; }
+    const repoPath = `/repos/${pin.owner}/${pin.name}${path}`;
+    const idPath = url.pathname.startsWith('/repositories/') && url.pathname.endsWith(path)
+      && /^[1-9][0-9]*$/.test(url.pathname.slice('/repositories/'.length, url.pathname.length - path.length));
+    if (url.origin !== API || url.hash || !(url.pathname === repoPath || idPath)) return null;
+    if (![...url.searchParams.keys()].every(k => k === 'per_page' || k === 'page')) return null;
+    if (url.searchParams.getAll('page').length !== 1 || url.searchParams.getAll('per_page').length > 1) return null;
+    if (url.searchParams.has('per_page') && !matches(url.searchParams.get('per_page'), /^[1-9][0-9]*$/)) return null;
+    const rawPage = url.searchParams.get('page');
+    if (!matches(rawPage, /^[1-9][0-9]*$/)) return null;
+    const num = Number(rawPage);
+    return Number.isSafeInteger(num) ? num : null;
+  }
+  function following(response, pin, path, page) {
+    const header = response.headers.get('Link');
+    if (header === null) return 'done';
+    if (!header.trim()) return 'unreadable';
+    const rels = new Map();
+    for (const part of header.split(',')) {
+      const m = part.match(/^\s*<([^<>]+)>\s*;\s*rel="(prev|next|last|first)"\s*$/);
+      if (!m || rels.has(m[2])) return 'unreadable';
+      const target = sameListUrl(m[1], pin, path);
+      if (target === null) return 'unreadable';
+      rels.set(m[2], target);
+    }
+    if (rels.has('prev') && rels.get('prev') !== page - 1) return 'unreadable';
+    if (rels.has('first') && rels.get('first') !== 1) return 'unreadable';
+    if (rels.has('next')) {
+      if (rels.get('next') !== page + 1) return 'unreadable';
+      if (rels.has('last') && rels.get('last') < page + 1) return 'unreadable';
+      return 'next';
+    }
+    if (rels.has('last') && rels.get('last') > page) return 'unreadable';
+    return 'done';
   }
   async function pages(pin, path, readable) {
     const items = [];
@@ -401,15 +428,20 @@
   async function check(item) {
     const snap = snapshot(item);
     const pin = context();
-    if (!snap || !itemShape(snap, 'decision') || !pin) return { result: 'unchecked', binding: null, checked_at: null };
-    const seq = ++checks;
-    const got = await sourceCheck(pin, snap);
-    const checkedAt = got.result === 'unchecked' ? null : (stamped = Math.max(Date.now(), stamped + 1));
+    if (!snap || !itemShape(snap, 'decision')) return { result: 'unchecked', binding: null, checked_at: null };
     const key = verifiedKey(snap);
-    if (!(verified.get(key)?.seq > seq)) {
-      if (got.result === 'matched') {
-        verified.set(key, frozen({ seq, binding: { ...got.binding }, checked_at: checkedAt, session: pin.session, account: pin.account, item: itemCanon(snap) }));
-      } else verified.delete(key);
+    const seq = ++checks;
+    if (!pin) {
+      if (!(verified.get(key)?.seq > seq)) verified.set(key, frozen({ seq, binding: null }));
+      return { result: 'unchecked', binding: null, checked_at: null };
+    }
+    const got = await sourceCheck(pin, snap);
+    if (verified.get(key)?.seq > seq) return { result: 'unchecked', binding: null, checked_at: null };
+    const checkedAt = got.result === 'unchecked' ? null : (stamped = Math.max(Date.now(), stamped + 1));
+    if (got.result === 'matched') {
+      verified.set(key, frozen({ seq, binding: { ...got.binding }, checked_at: checkedAt, session: pin.session, account: pin.account, item: itemCanon(snap) }));
+    } else {
+      verified.set(key, frozen({ seq, binding: null }));
     }
     return { result: got.result, binding: got.result === 'matched' ? { ...got.binding } : null, checked_at: checkedAt };
   }
@@ -569,8 +601,9 @@
       && r.preview.repository === preview.repository && same(r.preview.subject, preview.subject));
     if (other) return refused(op, 'pending');
     const prior = saved && PENDING.includes(saved.state) ? saved : null;
-    const list = await pages(pin, `/issues/${pin.number}/comments`, readableComment);
+    let baseline = null;
     if (prior) {
+      const list = await pages(pin, `/issues/${pin.number}/comments`, readableComment);
       const found = reconcile(list, prior, book, pin.account);
       if (found.found) {
         const comment = { id: found.found.id, url: found.found.html_url };
@@ -581,18 +614,42 @@
         await commit(pin.account, op, { ...prior, state: 'unknown' });
         return unknown(op, found.unknown);
       }
-    } else if (!list.complete) return refused(op, 'source_unchecked');
+      baseline = list;
+    }
     if (state.action.item.type === 'decision') {
       const got = await sourceCheck(pin, state.action.item);
-      const reason = got.result === 'unchecked' ? 'source_unchecked'
-        : got.result !== 'matched' || !same(got.binding, preview.source) ? 'source_changed' : conversationCheck(list, state.action.item);
+      let reason = got.result === 'unchecked' ? 'source_unchecked'
+        : got.result !== 'matched' || !same(got.binding, preview.source) ? 'source_changed' : null;
+      if (!reason) {
+        const fresh = await pages(pin, `/issues/${pin.number}/comments`, readableComment);
+        if (!fresh.complete) reason = 'source_unchecked';
+        else {
+          if (prior) {
+            const found = reconcile(fresh, prior, book, pin.account);
+            if (found.found) {
+              const comment = { id: found.found.id, url: found.found.html_url };
+              await commit(pin.account, op, { ...prior, state: 'posted', comment });
+              return { outcome: 'posted', op, comment };
+            }
+            if (found.unknown) {
+              await commit(pin.account, op, { ...prior, state: 'unknown' });
+              return unknown(op, found.unknown);
+            }
+          }
+          reason = conversationCheck(fresh, state.action.item);
+          baseline = fresh;
+        }
+      }
       if (reason) {
         if (prior) await commit(pin.account, op, { ...prior, ...(reason === 'source_changed' ? { state: 'retired', reason } : { state: 'unknown' }) });
         return refused(op, reason);
       }
+    } else if (!baseline) {
+      baseline = await pages(pin, `/issues/${pin.number}/comments`, readableComment);
+      if (!baseline.complete) return refused(op, 'source_unchecked');
     }
     const base = { v: 1, op, account: pin.account, preview: JSON.parse(JSON.stringify(preview)), action: state.action,
-      sent_at: Date.now(), before: list.items.filter(c => c.user.id === pin.account && c.body === preview.body).map(c => c.id) };
+      sent_at: Date.now(), before: baseline.items.filter(c => c.user.id === pin.account && c.body === preview.body).map(c => c.id) };
     if (!(await commit(pin.account, op, { ...base, state: 'sending' }))) return refused(op, 'pending');
     return send(preview, state, pin, base);
   }
