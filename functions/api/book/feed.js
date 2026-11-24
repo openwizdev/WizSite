@@ -44,7 +44,7 @@ export async function handle(request, env, options = {}) {
   }
 
   const db = getDb(env);
-  if (!db) {
+  if (cfg.mode === 'off' || !db) {
     return errorResponse(503, 'unavailable', 'Booking feed is not available right now.');
   }
 
@@ -70,7 +70,7 @@ export async function handle(request, env, options = {}) {
       email: row.email,
       team: row.team,
       status: row.status,
-      created: toIsoUtc(row.created),
+      created: toIsoUtc(Math.floor(row.created / 1000) * 1000),
     })),
   });
 }

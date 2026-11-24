@@ -1,3 +1,4 @@
+import { epochToWall, wallToEpochMs } from '../../../lib/book/ical.js';
 import { settings, window, openSlots } from '../../../lib/book/slots.js';
 import { googleReady, googleInsert } from '../../../lib/book/google.js';
 import { sendBookingMail } from '../../../lib/book/mail.js';
@@ -34,6 +35,29 @@ const BOOKINGS_PER_DAY_GLOBAL = 20;
 const MAX_NAME = 80;
 const MAX_TEAM = 200;
 const MAX_TZ = 100;
+
+function bookingDayBounds(start, timezone) {
+  const { year, month, day } = epochToWall(start, timezone);
+  const midnight = { year, month, day, hour: 0, minute: 0, second: 0 };
+  const next = new Date(Date.UTC(year, month - 1, day + 1));
+  const tomorrow = { ...midnight, year: next.getUTCFullYear(), month: next.getUTCMonth() + 1, day: next.getUTCDate() };
+  return {
+    dayStart: wallToEpochMs(midnight, timezone),
+    dayEnd: wallToEpochMs(tomorrow, timezone),
+  };
+}
+
+async function bookingLimitResponse(store, day, visitorKey, email, nowMs) {
+  const counts = await store.bookingCounts(day, visitorKey, email, nowMs);
+  const retry = { 'Retry-After': String(untilDayEnds(nowMs, day)) };
+  if (counts.visitor >= BOOKINGS_PER_DAY_VISITOR || counts.global >= BOOKINGS_PER_DAY_GLOBAL) {
+    return errorResponse(429, 'rate_limited', 'Booking limit reached for today. Please try again tomorrow.', retry);
+  }
+  if (counts.email >= UPCOMING_PER_EMAIL) {
+    return errorResponse(429, 'rate_limited', 'You already have the maximum number of upcoming bookings.', retry);
+  }
+  return null;
+}
 
 export function onRequest(context) {
   return handle(context.request, context.env);
@@ -110,7 +134,7 @@ export async function handle(request, env, options = {}) {
   const hour = utcHour(nowMs);
   const store = openStore(db, storeTimeout);
 
-  let visitorBookKey;
+  let visitorKey;
   try {
     const salt = await store.salt(day);
     const hash = await visitorHash(salt, request.headers.get('CF-Connecting-IP') ?? '');
@@ -121,22 +145,9 @@ export async function handle(request, env, options = {}) {
       });
     }
 
-    visitorBookKey = `book:${hash}`;
-    const [visitorCount, globalCount, emailUpcoming] = await Promise.all([
-      store.getLimit(day, visitorBookKey),
-      store.getLimit(day, 'global'),
-      store.countUpcomingByEmail(email, nowMs),
-    ]);
-    if (visitorCount >= BOOKINGS_PER_DAY_VISITOR || globalCount >= BOOKINGS_PER_DAY_GLOBAL) {
-      return errorResponse(429, 'rate_limited', 'Booking limit reached for today. Please try again tomorrow.', {
-        'Retry-After': String(untilDayEnds(nowMs, day)),
-      });
-    }
-    if (emailUpcoming >= UPCOMING_PER_EMAIL) {
-      return errorResponse(429, 'rate_limited', 'You already have the maximum number of upcoming bookings.', {
-        'Retry-After': String(untilDayEnds(nowMs, day)),
-      });
-    }
+    visitorKey = `book:${hash}`;
+    const limited = await bookingLimitResponse(store, day, visitorKey, email, nowMs);
+    if (limited) return limited;
   } catch {
     return errorResponse(503, 'unavailable', 'Booking is not available right now.');
   }
@@ -163,7 +174,7 @@ export async function handle(request, env, options = {}) {
   const cancelHash = await sha256Hex(cancelToken);
 
   try {
-    await store.insertBooking(
+    const inserted = await store.insertBooking(
       {
         id,
         start: startMs,
@@ -175,13 +186,22 @@ export async function handle(request, env, options = {}) {
         cancelHash,
         created: nowMs,
       },
-      day,
-      visitorBookKey,
+      {
+        day,
+        visitorKey,
+        visitorMax: BOOKINGS_PER_DAY_VISITOR,
+        globalMax: BOOKINGS_PER_DAY_GLOBAL,
+        emailMax: UPCOMING_PER_EMAIL,
+        ...bookingDayBounds(startMs, cfg.timezone),
+        dayMax: cfg.maxPerDay,
+        bufferMs: cfg.bufferMin * 60_000,
+      },
     );
-  } catch (err) {
-    if (err?.code === 'slot_taken') {
-      return errorResponse(409, 'slot_taken', 'That time slot is no longer available.');
+    if (!inserted) {
+      return await bookingLimitResponse(store, day, visitorKey, email, nowMs) ??
+        errorResponse(409, 'slot_taken', 'That time slot is no longer available.');
     }
+  } catch {
     return errorResponse(503, 'unavailable', 'Booking is not available right now.');
   }
 

@@ -98,11 +98,13 @@ openwiz.dev/app signs in through the read-only [OpenWiz Viewer](https://github.c
 The booking API (`openwiz.book.v1`) runs on Cloudflare Pages Functions under `functions/api/book/` backed by D1 (`BOOK_DB`, falling back to `ASK_A_WIZ_COUNTERS`):
 
 - `GET /api/book/slots`: lists open 30-minute UTC slots (`Cache-Control: no-store`).
-- `POST /api/book`: validates a same-origin JSON booking, checks rate limits and slot availability, inserts into `book_bookings`, writes a Google Calendar event when configured, and sends confirmation email via Resend.
-- `POST /api/book/cancel`: cancels an upcoming booking by `id` and `token` (idempotent), deletes any Google Calendar event, and sends cancellation email.
-- `GET /api/book/feed`: lists bookings from 7 days back to the horizon when `Authorization: Bearer <BOOK_FEED_TOKEN>` matches (`404` when unset, `401` on mismatch).
+- `POST /api/book`: validates a same-origin JSON booking, checks availability and atomically enforces the booking caps and buffer when inserting into `book_bookings`, writes a Google Calendar event when configured, and sends confirmation email via Resend.
+- `POST /api/book/cancel`: cancels an upcoming booking by `id` and `token` (idempotent), deletes any Google Calendar event and sends cancellation email when the booking changes to cancelled.
+- `GET /api/book/feed`: lists bookings from 7 days back to the horizon with UTC timestamps to the second. It returns `404` when `BOOK_FEED_TOKEN` is unset, `401` when the bearer token does not match, and `503` when the token matches and booking is off.
 
-**Switch:** `BOOK_MODE` defaults to `off` (every booking endpoint answers `503 unavailable`). Set it to `fake` for local previews (`node scripts/book-dev.mjs`, bound to `127.0.0.1:8801` with an in-memory SQLite D1 wrapper and synthetic busy times) or `live` in production.
+**Switch:** `BOOK_MODE` defaults to `off`. Set it to `fake` for local previews or `live` in production.
+
+For local previews, run `node scripts/book-dev.mjs` and open `http://127.0.0.1:8801/book/`. The server defaults to fake mode and uses an in-memory SQLite D1 wrapper with synthetic busy times. In fake mode without a Resend key, the server simulates email delivery and prints the cancel link to its terminal.
 
 **Settings and secrets:**
 

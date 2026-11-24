@@ -50,25 +50,29 @@ function createMemoryD1() {
   const db = new DatabaseSync(':memory:');
   const exec = (sql, values) => {
     const stmt = db.prepare(sql);
-    return stmt.columns().length ? stmt.all(...values).map(row => ({ ...row })) : (stmt.run(...values), []);
+    if (stmt.columns().length) {
+      return { success: true, results: stmt.all(...values).map(row => ({ ...row })), meta: { changes: 0 } };
+    }
+    const { changes } = stmt.run(...values);
+    return { success: true, results: [], meta: { changes } };
   };
   const statement = (sql, values = []) => ({
     sql,
     values,
     bind: (...more) => statement(sql, more),
-    all: async () => ({ success: true, results: exec(sql, values), meta: {} }),
+    all: async () => exec(sql, values),
     first: async column => {
-      const row = exec(sql, values)[0] ?? null;
+      const row = exec(sql, values).results[0] ?? null;
       return column && row ? row[column] : row;
     },
-    run: async () => ({ success: true, results: exec(sql, values), meta: {} }),
+    run: async () => exec(sql, values),
   });
   return {
     prepare: sql => statement(sql),
     batch: async statements => {
       db.exec('BEGIN');
       try {
-        const out = statements.map(s => ({ success: true, results: exec(s.sql, s.values), meta: {} }));
+        const out = statements.map(s => exec(s.sql, s.values));
         db.exec('COMMIT');
         return out;
       } catch (err) {
@@ -89,9 +93,7 @@ async function readNodeBody(req) {
   return Buffer.concat(chunks);
 }
 
-async function toFetchRequest(req, port) {
-  const host = req.headers.host || `${HOST}:${port}`;
-  const url = `http://${host}${req.url || '/'}`;
+async function toFetchRequest(req, url) {
   const headers = new Headers();
   for (const [k, v] of Object.entries(req.headers)) {
     if (v === undefined) continue;
@@ -147,11 +149,25 @@ async function serveStatic(pathname, res) {
 }
 
 const port = parsePort(process.argv.slice(2));
+const origin = `http://${HOST}:${port}`;
 const env = {
   ...process.env,
   BOOK_MODE: process.env.BOOK_MODE || 'fake',
   BOOK_DB: createMemoryD1(),
 };
+
+const options = {};
+if (env.BOOK_MODE.trim() === 'fake' && !env.RESEND_API_KEY?.trim()) {
+  env.RESEND_API_KEY = 'local-preview';
+  options.fetch = async (url, init) => {
+    if (url !== 'https://api.resend.com/emails') return globalThis.fetch(url, init);
+    const { text } = JSON.parse(init.body);
+    const label = 'Need to cancel? ';
+    const line = text.split('\n').find(value => value.startsWith(`${label}${origin}/book/?cancel=`));
+    if (line) process.stdout.write(`Cancel booking: ${line.slice(label.length)}\n`);
+    return Response.json({ id: 'local-preview' });
+  };
+}
 
 const ROUTES = new Map([
   ['/api/book/slots', slotsHandle],
@@ -163,11 +179,11 @@ const ROUTES = new Map([
 
 const server = http.createServer(async (req, res) => {
   try {
-    const url = new URL(req.url || '/', `http://${HOST}:${port}`);
+    const url = new URL(req.url || '/', origin);
     const handler = ROUTES.get(url.pathname);
     if (handler) {
-      const fetchReq = await toFetchRequest(req, port);
-      const response = await handler(fetchReq, env);
+      const fetchReq = await toFetchRequest(req, origin + url.pathname + url.search);
+      const response = await handler(fetchReq, env, options);
       await writeFetchResponse(res, response);
       return;
     }

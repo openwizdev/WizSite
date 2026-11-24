@@ -75,12 +75,9 @@ export async function handle(request, env, options = {}) {
     return errorResponse(404, 'not_found', 'Booking not found.');
   }
 
-  if (booking.status === 'cancelled') {
-    return jsonResponse({ ok: true });
-  }
-
   try {
-    await store.cancelBooking(id);
+    const changed = await store.cancelBooking(id);
+    if (!changed) return jsonResponse({ ok: true });
   } catch {
     return errorResponse(503, 'unavailable', 'Booking is not available right now.');
   }

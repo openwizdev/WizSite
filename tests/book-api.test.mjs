@@ -7,7 +7,7 @@ import { handle as cancelHandle, onRequest as cancelOnRequest } from '../functio
 import { handle as feedHandle, onRequest as feedOnRequest } from '../functions/api/book/feed.js';
 
 const ORIGIN = 'https://openwiz.dev';
-const NOW = Date.parse('2026-11-24T12:00:00Z');
+const NOW = Date.parse('2026-11-24T12:00:00.123Z');
 const ICAL_SECRET_URL = 'https://calendar.example.invalid/private-ical-secret-9999/basic.ics';
 const FEED_SECRET = 'feed-secret-token-abcdef0123456789';
 const RESEND_SECRET = 're_fake_secret_key_0123456789';
@@ -30,24 +30,29 @@ const SAMPLE_ICS = [
   '',
 ].join('\r\n');
 
-function fakeD1({ fails = false, hang = false, failWhen = null } = {}) {
+function fakeD1({ fails = false, hang = false, failWhen = null, delay = 0 } = {}) {
   const db = new DatabaseSync(':memory:');
   const exec = (sql, values) => {
     if (failWhen?.(sql)) throw new Error('synthetic D1 failure');
     const stmt = db.prepare(sql);
-    return stmt.columns().length ? stmt.all(...values).map(row => ({ ...row })) : (stmt.run(...values), []);
+    if (stmt.columns().length) {
+      return { success: true, results: stmt.all(...values).map(row => ({ ...row })), meta: { changes: 0 } };
+    }
+    const { changes } = stmt.run(...values);
+    return { success: true, results: [], meta: { changes } };
   };
   const gate = async () => {
     if (hang) return new Promise(() => {});
     if (fails) throw new Error('synthetic D1 failure');
+    if (delay) await new Promise(resolve => setTimeout(resolve, delay));
   };
   const statement = (sql, values = []) => ({
     sql,
     values,
     bind: (...more) => statement(sql, more),
-    all: async () => { await gate(); return { success: true, results: exec(sql, values), meta: {} }; },
-    first: async column => { await gate(); const row = exec(sql, values)[0] ?? null; return column && row ? row[column] : row; },
-    run: async () => { await gate(); return { success: true, results: exec(sql, values), meta: {} }; },
+    all: async () => { await gate(); return exec(sql, values); },
+    first: async column => { await gate(); const row = exec(sql, values).results[0] ?? null; return column && row ? row[column] : row; },
+    run: async () => { await gate(); return exec(sql, values); },
   });
   return {
     db,
@@ -57,7 +62,7 @@ function fakeD1({ fails = false, hang = false, failWhen = null } = {}) {
         await gate();
         db.exec('BEGIN');
         try {
-          const out = statements.map(s => ({ success: true, results: exec(s.sql, s.values), meta: {} }));
+          const out = statements.map(s => exec(s.sql, s.values));
           db.exec('COMMIT');
           return out;
         } catch (err) {
@@ -502,8 +507,85 @@ test('POST /api/book enforces all booking rate limits (attempts/hr, bookings/day
   assert.equal(overGlobal.json.error, 'rate_limited');
 });
 
+test('parallel bookings enforce each cap before sending mail', async t => {
+  for (const { cap, count, sharedIp, sharedEmail, sameDay, status } of [
+    { cap: 2, count: 10, sharedIp: true, sharedEmail: true, status: 429 },
+    { cap: 3, count: 10, sharedIp: true, status: 429 },
+    { cap: 4, count: 5, sameDay: true, status: 409 },
+    { cap: 20, count: 21, status: 429 },
+  ]) {
+    await t.test(`at most ${cap} bookings`, async () => {
+      const store = fakeD1({ delay: 20 });
+      const env = makeEnv(store, {
+        RESEND_API_KEY: RESEND_SECRET,
+        BOOK_MAX_PER_DAY: sameDay ? '4' : '48',
+        BOOK_START: '08:00',
+        BOOK_END: '23:00',
+      });
+      const slots = (await readJson(await slotsHandle(getReq('/api/book/slots'), env, { now: NOW }))).json.slots;
+      const candidates = sameDay
+        ? slots.filter(slot => slot >= '2026-11-25T08:00:00Z' && slot < '2026-11-26T08:00:00Z')
+        : slots;
+      const selected = [];
+      for (const slot of candidates) {
+        if (!selected.length || Date.parse(slot) - Date.parse(selected.at(-1)) >= 60 * 60_000) {
+          selected.push(slot);
+        }
+        if (selected.length === count) break;
+      }
+      assert.equal(selected.length, count);
+
+      let sent = 0;
+      const fetch = async () => {
+        sent += 1;
+        return Response.json({ id: 'mail-1' });
+      };
+      const replies = await Promise.all(selected.map((slot, i) => bookHandle(
+        postJson('/api/book', bookingPayload(slot, { email: sharedEmail ? 'same@example.com' : `visitor${i}@example.com` }), {
+          ip: sharedIp ? VISITOR_IP : `198.51.100.${100 + i}`,
+        }),
+        env,
+        { now: NOW, fetch },
+      ).then(readJson)));
+      assert.deepEqual(replies.map(reply => reply.status).sort(), [
+        ...Array(cap).fill(200),
+        ...Array(count - cap).fill(status),
+      ]);
+      assert.equal(store.bookings().length, cap);
+      assert.equal(store.limits().find(row => row.key === 'global').count, cap);
+      assert.equal(sent, cap);
+      for (const reply of replies.filter(reply => reply.status === 429)) {
+        assert.equal(reply.json.error, 'rate_limited');
+        assert.ok(Number(reply.headers.get('retry-after')) > 0);
+      }
+    });
+  }
+});
+
+test('parallel bookings for back-to-back slots keep the booking buffer', async () => {
+  const store = fakeD1({ delay: 20 });
+  const env = makeEnv(store, { BOOK_MODE: 'live', BOOK_ICAL_URL: ICAL_SECRET_URL });
+  const replies = await Promise.all(['2026-11-25T21:00:00Z', '2026-11-25T21:30:00Z'].map((slot, i) =>
+    bookHandle(postJson('/api/book', bookingPayload(slot, { email: `visitor${i}@example.com` })), env, {
+      now: NOW,
+      fetch: async () => new Response(SAMPLE_ICS),
+    }).then(readJson),
+  ));
+  assert.deepEqual(replies.map(reply => reply.status).sort(), [200, 409]);
+  assert.equal(store.bookings().length, 1);
+});
+
+test('POST /api/book accepts addresses that pass the booking page email check', async () => {
+  const env = makeEnv(fakeD1());
+  const slots = (await readJson(await slotsHandle(getReq('/api/book/slots'), env, { now: NOW }))).json.slots;
+  for (const [i, email] of ['visitor@example.c', 'visitor@exämple.com'].entries()) {
+    const reply = await bookHandle(postJson('/api/book', bookingPayload(slots[i * 2], { email })), env, { now: NOW });
+    assert.equal(reply.status, 200);
+  }
+});
+
 test('POST /api/book/cancel cancels, reopens slot for rebooking, is idempotent, and rejects bad/past requests', async () => {
-  const store = fakeD1();
+  const store = fakeD1({ delay: 20 });
   const env = makeEnv(store, {
     RESEND_API_KEY: RESEND_SECRET,
     GOOGLE_CLIENT_ID,
@@ -552,9 +634,13 @@ test('POST /api/book/cancel cancels, reopens slot for rebooking, is idempotent, 
   const pastCancel = await readJson(await cancelHandle(postJson('/api/book/cancel', { id, token: cancelToken }), env, { now: Date.parse(chosen) + 1000, fetch: mockFetch }));
   assert.equal(pastCancel.status, 404);
 
-  const cancelled = await readJson(await cancelHandle(postJson('/api/book/cancel', { id, token: cancelToken }), env, { now: NOW, fetch: mockFetch }));
-  assert.equal(cancelled.status, 200);
-  assert.deepEqual(cancelled.json, { ok: true });
+  const cancellations = await Promise.all(Array.from({ length: 3 }, () =>
+    cancelHandle(postJson('/api/book/cancel', { id, token: cancelToken }), env, { now: NOW, fetch: mockFetch }).then(readJson),
+  ));
+  for (const cancelled of cancellations) {
+    assert.equal(cancelled.status, 200);
+    assert.deepEqual(cancelled.json, { ok: true });
+  }
   assert.equal(deletedEvents, 1);
   assert.equal(cancelMails, 1);
 
@@ -604,6 +690,14 @@ test('GET /api/book/feed returns 404 without token, 401 on mismatch, and 200 wit
   assert.match(ok.json.bookings[0].created, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
   assert.equal('cancel_hash' in ok.json.bookings[0], false);
   assertNoSecrets(ok.text);
+
+  const off = await readJson(await feedHandle(
+    getReq('/api/book/feed', { headers: { Authorization: `Bearer ${FEED_SECRET}` } }),
+    { ...env, BOOK_MODE: 'off' },
+    { now: NOW },
+  ));
+  assert.equal(off.status, 503);
+  assert.equal(off.json.error, 'unavailable');
 });
 
 test('D1 failures and timeouts answer 503 unavailable on all routes', async () => {
@@ -693,7 +787,7 @@ test('POST /api/book succeeds when Google insert fails and reports skipped or fa
   assert.equal(failed.json.email, 'failed');
 });
 
-test('concurrent double booking hits the unique index and returns one 200 and one 409', async () => {
+test('concurrent booking of the same slot returns one 200 and one 409', async () => {
   const store = fakeD1();
   const env = makeEnv(store, { BOOK_MODE: 'live', BOOK_ICAL_URL: ICAL_SECRET_URL });
   let release;
