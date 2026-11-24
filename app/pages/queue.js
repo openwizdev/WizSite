@@ -221,8 +221,8 @@
   }
 
   const WORDS = {
-    grill_round: 'Grill round to answer',
-    grill_confirmation: 'Grill summary to confirm',
+    grill_round: 'Questions to answer',
+    grill_confirmation: 'Answers to confirm',
     spec_confirmation: 'Spec to confirm',
     plan_approval: 'Plan to approve',
   };
@@ -262,14 +262,36 @@
 
   function draw(el) {
     const result = view();
-    if (!result) return el.replaceChildren(OW.ui.placeholder('Reading GitHub…'));
+    if (!result) {
+      const text = OW.data.feeds.specs.state === 'unknown' ? 'Specs and decisions are unavailable.' : 'Reading GitHub…';
+      if (el.textContent !== text) el.replaceChildren(OW.ui.placeholder(text));
+      return;
+    }
     const items = result.items.filter(shown);
     const keys = new Set(items.map(item => item.key));
     for (const key of [...state.cards.keys()]) if (!keys.has(key)) state.cards.delete(key);
-    const missing = result.gaps.length
-      ? OW.ui.unknown(`This list may be missing items: GitHub gave only part of ${result.gaps.join(', ')}. The app tries again on its own.`) : null;
-    el.replaceChildren(...[missing, items.length ? h('div', { class: 'queue' }, items.map(item => holder(item, result.bindings)))
-      : missing ? null : OW.ui.placeholder(`${EMPTY}.`)].filter(Boolean));
+    const message = result.gaps.length
+      ? `This list may be missing items: GitHub gave only part of ${result.gaps.join(', ')}. The app tries again on its own.` : '';
+    const existing = el.querySelector(':scope > .queue');
+    const deck = existing || h('div', { class: 'queue' });
+    const children = items.map(item => holder(item, result.bindings));
+    if (deck.children.length !== children.length || children.some((child, i) => deck.children[i] !== child)) {
+      const active = deck.contains(document.activeElement) ? document.activeElement : null;
+      deck.replaceChildren(...children);
+      if (deck.contains(active)) active.focus({ preventScroll: true });
+    }
+    if (!state.present) for (const card of children) card.hidden = false;
+    const controls = state.present?.(deck);
+    const oldNote = el.querySelector(':scope > .unknown');
+    const note = message ? (oldNote?.textContent === message ? oldNote : OW.ui.unknown(message)) : null;
+    const oldEmpty = el.querySelector(':scope > .placeholder');
+    const empty = !items.length && !note ? (oldEmpty?.matches('.v2-queue-clear') ? oldEmpty
+      : h('div', { class: 'placeholder v2-queue-clear' }, h('h2', {}, 'All clear'), h('div', {}, `${EMPTY}.`))) : null;
+    const next = [note, items.length ? deck : null, controls, empty].filter(Boolean);
+    for (const child of [...el.children]) if (!next.includes(child)) child.remove();
+    next.forEach((child, i) => {
+      if (el.children[i] !== child) el.insertBefore(child, el.children[i] || null);
+    });
   }
 
   OW.queue = {
@@ -277,8 +299,9 @@
     count: () => view()?.items.filter(shown).length || null,
     items: () => view()?.items.filter(shown) || [],
     onUpdate: fn => listeners.add(fn),
-    render(el, feeds) {
+    render(el, feeds, present) {
       state.el = el;
+      state.present = present;
       refresh(feeds);
       OW.factory.redraw(el, () => draw(el));
     },

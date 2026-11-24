@@ -133,7 +133,8 @@
 
   function build() {
     input = h('input', { type: 'text', role: 'combobox', 'aria-expanded': 'true', 'aria-controls': 'palette-results', 'aria-autocomplete': 'list',
-      'aria-label': 'Find a page, spec, ticket or agent, or an action', placeholder: 'Find a page, spec, ticket or agent…', autocomplete: 'off', spellcheck: 'false' });
+      'aria-label': v2 ? 'Find a page or action' : 'Find a page, spec, ticket or agent, or an action',
+      placeholder: v2 ? 'Find a page or action…' : 'Find a page, spec, ticket or agent…', autocomplete: 'off', spellcheck: 'false' });
     css(input, { width: '100%', 'min-height': 'var(--em-tap)', padding: '0 14px', 'font-size': '17px', color: 'var(--em-text)',
       background: 'var(--em-bg)', border: '1px solid var(--em-line)', 'border-radius': 'var(--em-radius-sm)' });
     list = css(h('ul', { id: 'palette-results', role: 'listbox', 'aria-label': 'Results' }),

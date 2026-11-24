@@ -2,146 +2,96 @@
 (() => {
   const { h, icon } = OW.ui;
 
-  function renderGrill(m) {
-    const allRecs = m.questions.every(q => q.selected === q.rec);
-    const list = m.questions.map((q, qi) => h('div', { class: 'v2-grill-q' },
-      h('div', { class: 'v2-grill-q-head' },
-        h('span', { class: 'v2-mono v2-q-id' }, q.id),
-        h('span', { class: 'v2-q-prompt' }, q.prompt)),
-      h('div', { class: 'v2-q-opts', role: 'group', 'aria-label': q.prompt },
-        q.options.map((opt, oi) => {
-          const isRec = oi === q.rec;
-          const isSel = oi === q.selected;
-          return h('button', {
-            type: 'button',
-            class: `v2-opt${isSel ? ' selected' : ''}${isRec ? ' rec' : ''}`,
-            'aria-pressed': String(isSel),
-            disabled: m.answered,
-            onclick: () => OW.demo.pickOption(m.id, qi, oi),
-          },
-          h('span', {}, opt),
-          isRec ? h('span', { class: 'v2-rec-tag v2-mono' }, 'REC') : null);
-        }))));
+  function questions(message) {
+    const { id, questions: choices, answered } = message;
+    const recommended = choices.every(q => q.selected === q.rec);
+    const list = choices.map((q, qi) => h('div', { class: 'v2-question' },
+      h('span', { class: 'v2-question-text', id: `${id}-q-${qi}` }, q.prompt),
+      h('div', { class: 'v2-options', role: 'group', 'aria-labelledby': `${id}-q-${qi}` },
+        q.options.map((opt, oi) => h('button', {
+          type: 'button',
+          class: 'v2-opt',
+          'aria-pressed': String(oi === q.selected),
+          'aria-label': oi === q.rec ? `${opt}, recommended` : opt,
+          'data-focus': `${id}:${qi}:${oi}`,
+          disabled: answered,
+          onclick: () => OW.demo.pickOption(id, qi, oi),
+        }, oi === q.rec ? icon('check') : null, opt)))));
 
-    const foot = m.answered
-      ? h('div', { class: 'v2-grill-done' },
-        icon('check'),
-        h('span', {}, 'Answered · Spec queued in Feed'),
-        h('a', { class: 'v2-inline-link', href: '#/feed' }, 'Open Feed'))
-      : h('button', {
-        type: 'button',
-        class: 'v2-btn v2-btn-primary v2-btn-full',
-        onclick: () => OW.demo.completeGrill(m.id),
-      }, allRecs ? 'Accept all 3 recs' : 'Send 3 answers');
-
-    return h('div', { class: 'v2-msg v2-msg-wiz' },
-      h('div', { class: 'v2-avatar', 'aria-hidden': 'true' }, h('img', { src: '/app/mark.svg', alt: '', width: 20, height: 20 })),
-      h('article', { class: 'v2-grill-card' },
-        h('div', { class: 'v2-grill-head' },
-          h('strong', {}, `Grill round ${m.round} · ${m.specTitle}`),
-          h('span', { class: 'v2-mono' }, `${m.questions.length} plain questions`)),
-        h('div', { class: 'v2-grill-body' }, list),
-        h('div', { class: 'v2-grill-foot' }, foot)));
+    return h('article', { class: 'v2-questions' },
+      h('h2', {}, message.specTitle),
+      list,
+      h('div', { class: 'v2-question-foot' },
+        answered
+          ? h('p', { class: 'v2-muted' }, icon('check'), 'Answered · Spec queued in Feed')
+          : h('p', { class: 'v2-muted' }, recommended ? 'Recommended answers selected' : 'Answers updated'),
+        answered
+          ? h('a', { class: 'v2-inline-link', href: '#/feed', 'data-focus': id }, 'Open Feed')
+          : h('button', {
+            type: 'button', class: 'v2-btn v2-btn-primary', 'data-focus': id,
+            onclick: () => OW.demo.completeGrill(id),
+          }, recommended ? 'Accept all 3' : 'Send 3 answers')));
   }
 
-  function renderDemo(el) {
-    const state = OW.demo.state;
-    const input = h('input', {
-      type: 'text',
-      class: 'v2-composer-input',
-      placeholder: 'Tell Wiz what to build or change…',
-      'aria-label': 'Tell Wiz what to build or change',
-    });
-    const form = h('form', {
-      class: 'v2-composer',
-      onsubmit: event => {
-        event.preventDefault();
-        if (!input.value.trim()) return;
-        OW.demo.sendChat(input.value);
-        input.value = '';
-      },
-    },
-    input,
-    h('button', { type: 'submit', class: 'v2-composer-send', 'aria-label': 'Send message' }, icon('arrowUp')));
+  function demoMessage(message) {
+    if (message.role === 'grill') return questions(message);
+    return h('div', { class: `v2-message v2-message-${message.role}` },
+      h('span', { class: 'v2-mono v2-muted' }, message.role === 'user' ? 'You' : 'Wiz'),
+      h('p', {}, message.text),
+      message.jumpFeed ? h('a', { class: 'v2-inline-link', href: '#/feed', 'data-focus': message.id }, 'Open in Feed') : null);
+  }
 
-    const stream = h('div', { class: 'v2-chat-stream' }, state.messages.map(m => {
-      if (m.role === 'user') {
-        return h('div', { class: 'v2-msg v2-msg-user' },
-          h('div', { class: 'v2-bubble v2-bubble-user' },
-            h('div', { class: 'v2-bubble-meta v2-mono' }, `You · ${m.time}`),
-            h('p', {}, m.text)));
-      }
-      if (m.role === 'wiz') {
-        return h('div', { class: 'v2-msg v2-msg-wiz' },
-          h('div', { class: 'v2-avatar', 'aria-hidden': 'true' }, h('img', { src: '/app/mark.svg', alt: '', width: 20, height: 20 })),
-          h('div', { class: 'v2-bubble' },
-            h('div', { class: 'v2-bubble-meta v2-mono' }, `Wiz · ${m.time}`),
-            h('p', {}, m.text),
-            m.jumpFeed ? h('a', { class: 'v2-btn v2-btn-subtle v2-jump-btn', href: '#/feed' }, 'Open in Feed', icon('arrowRight')) : null));
-      }
-      return renderGrill(m);
-    }));
-
-    el.replaceChildren(
-      h('div', { class: 'v2-chat-layout' },
-        h('header', { class: 'v2-chat-band' },
-          h('div', { class: 'v2-painted-layer art-sea', 'aria-hidden': 'true' }),
-          h('div', { class: 'v2-dither-layer', 'aria-hidden': 'true' }),
-          h('div', { class: 'v2-chat-band-inner' },
-            h('div', {},
-              h('h1', { class: 'v2-h1', tabindex: '-1' }, 'Chat'),
-              h('p', { class: 'v2-sub' }, 'Three plain questions at a time. Recommendations pre-picked.')),
-            h('span', { class: 'v2-pill v2-mono' }, `${state.workspace} · ${state.branch}`))),
+  function render(el) {
+    const demo = OW.data.demo();
+    let layout = el.querySelector('.v2-chat');
+    if (!layout) {
+      const input = h('input', {
+        type: 'text',
+        class: 'v2-composer-input',
+        placeholder: 'Tell Wiz what to build or change…',
+        'aria-label': 'Tell Wiz what to build or change',
+        disabled: !demo,
+        oninput: demo ? event => { OW.demo.state.draft = event.target.value; } : null,
+      });
+      if (demo) input.value = OW.demo.state.draft;
+      const form = h('form', {
+        class: 'v2-composer',
+        onsubmit: event => {
+          event.preventDefault();
+          if (!demo || !input.value.trim()) return;
+          const text = input.value;
+          input.value = '';
+          OW.demo.state.draft = '';
+          OW.demo.sendChat(text);
+          input.focus();
+        },
+      }, input, h('button', {
+        type: 'submit', class: 'v2-icon-btn', 'aria-label': 'Send message', disabled: !demo,
+      }, icon('arrowRight')));
+      const stream = h('div', { class: 'v2-chat-stream' });
+      layout = h('div', { class: 'v2-chat' },
+        h('header', { class: 'v2-page-head' }, h('h1', { class: 'v2-h1', tabindex: '-1' }, 'Chat')),
         h('div', { class: 'v2-chat-scroll' }, stream),
-        h('div', { class: 'v2-composer-wrap' }, form)));
-  }
-
-  function renderReal(el, feeds) {
-    const repo = OW.data.repo.get();
-    const grills = (OW.queue?.items?.() || []).filter(item => item.type === 'decision' && item.request?.kind === 'grill_round');
-    const items = grills.length
-      ? grills.map(item => h('a', { class: 'v2-real-row', href: '#/feed' },
-        h('span', { class: 'v2-mono v2-kicker' }, `Grill round · #${item.subject.number}`),
-        h('strong', {}, item.title),
-        h('span', { class: 'v2-muted' }, 'Open in Feed to review and answer.')))
-      : [h('div', { class: 'v2-empty-card' },
-        h('h2', {}, 'Direct chat is coming in 0.02'),
-        h('p', {}, 'Your connected repository does not expose a live chat backend yet. Active specs and decision requests are ready in Feed.'),
-        h('a', { class: 'v2-btn v2-btn-primary', href: '#/feed' }, 'Open Feed'))];
-
-    el.replaceChildren(
-      h('div', { class: 'v2-chat-layout' },
-        h('header', { class: 'v2-chat-band' },
-          h('div', { class: 'v2-painted-layer art-sea', 'aria-hidden': 'true' }),
-          h('div', { class: 'v2-dither-layer', 'aria-hidden': 'true' }),
-          h('div', { class: 'v2-chat-band-inner' },
-            h('div', {},
-              h('h1', { class: 'v2-h1', tabindex: '-1' }, 'Chat'),
-              h('p', { class: 'v2-sub' }, 'Grill, steer, or start something new.')),
-            repo ? h('span', { class: 'v2-pill v2-mono' }, repo.full) : null)),
-        h('div', { class: 'v2-chat-scroll' }, h('div', { class: 'v2-chat-stream' }, items)),
-        h('div', { class: 'v2-composer-wrap' },
-          h('div', { class: 'v2-composer v2-composer-disabled' },
-            h('input', {
-              type: 'text',
-              class: 'v2-composer-input',
-              disabled: true,
-              placeholder: 'Free-text chat is coming in 0.02…',
-              'aria-label': 'Free-text chat is coming in 0.02',
-            }),
-            h('button', { type: 'button', class: 'v2-composer-send', disabled: true, 'aria-label': 'Send message' }, icon('arrowUp'))))));
+        h('div', { class: 'v2-composer-wrap' }, form));
+      el.replaceChildren(layout);
+      if (!demo) {
+        stream.append(h('div', { class: 'v2-empty-card' },
+          h('h2', {}, 'Chat is coming soon'),
+          h('p', {}, 'Open Feed to review specs and decisions from your repository.'),
+          h('a', { class: 'v2-btn v2-btn-primary', href: '#/feed' }, 'Open Feed')));
+      }
+    }
+    if (!demo) return;
+    const stream = layout.querySelector('.v2-chat-stream');
+    const { messages } = OW.demo.state;
+    const follow = stream.childElementCount > 0 && messages.length > stream.childElementCount;
+    OW.factory.redraw(stream, () => stream.replaceChildren(...messages.map(demoMessage)));
+    if (follow) stream.lastElementChild?.scrollIntoView({ block: 'end' });
   }
 
   OW.page({
-    id: 'chat',
-    title: 'Chat',
-    icon: 'chat',
-    v2Shell: true,
-    feeds: ['specs'],
+    id: 'chat', title: 'Chat', icon: 'chat',
     badge: () => (OW.data.demo() ? OW.demo.openQuestionsCount() : null),
-    render(el, feeds) {
-      if (OW.data.demo()) renderDemo(el);
-      else renderReal(el, feeds);
-    },
+    render,
   });
 })();

@@ -4,7 +4,7 @@
   OW.cards = OW.cards || {};
 
   const RISKS = ['ordinary', 'live', 'release', 'publish'];
-  const KINDS = { grill_round: 'Grill round', grill_confirmation: 'Grill summary', spec_confirmation: 'Spec to confirm', plan_approval: 'Plan to approve' };
+  const KINDS = { grill_round: 'Questions to answer', grill_confirmation: 'Answers to confirm', spec_confirmation: 'Spec to confirm', plan_approval: 'Plan to approve' };
   const SUBJECTS = { issue: 'issue', pull_request: 'pull request' };
   const REC = {
     grill_confirmation: () => 'confirm this summary',

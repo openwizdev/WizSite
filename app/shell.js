@@ -10,18 +10,17 @@
   const INSTALL = 'https://github.com/apps/openwiz-viewer/installations/new';
   const v2 = Boolean(OW.records?.enabled?.());
   const isDemo = Boolean(v2 && data.demo?.());
-  let allPages;
+  let queuePage;
 
   function registerPages() {
-    allPages = OW.pages.slice();
+    queuePage = OW.pages.find(page => page.id === 'queue');
     if (v2) {
       document.documentElement.dataset.v2 = '1';
-      const order = ['chat', 'feed', 'settings'];
-      const shellPages = order.map(id => allPages.find(page => page.id === id)).filter(Boolean);
-      OW.pages.splice(0, OW.pages.length, ...shellPages);
+      const pages = ['chat', 'feed', 'settings'].map(id => OW.pages.find(page => page.id === id));
+      OW.pages.splice(0, OW.pages.length, ...pages);
     } else {
       for (let i = OW.pages.length - 1; i >= 0; i -= 1) {
-        if (OW.pages[i].v2 || OW.pages[i].v2Shell) OW.pages.splice(i, 1);
+        if (OW.pages[i].v2) OW.pages.splice(i, 1);
       }
     }
   }
@@ -29,16 +28,15 @@
 
   const route = () => {
     const [id, arg] = location.hash.replace(/^#\/?/, '').split('/');
-    if (id === 'specs' && /^[1-9]\d*$/.test(arg || '')) return { id, arg };
+    if (!v2 && id === 'specs' && /^[1-9]\d*$/.test(arg || '')) return { id, arg };
     if (v2 && id === 'feed' && /^[1-9]\d*$/.test(arg || '')) return { id, arg };
     return { id: arg === undefined ? id : '', arg: null };
   };
   const current = () => {
     const { id } = route();
-    const pool = v2 ? allPages : OW.pages;
-    const found = pool.find(page => page.id === id);
-    if (found) return found;
-    return v2 ? (pool.find(page => page.id === (isDemo ? 'chat' : 'feed')) || OW.pages[0]) : OW.pages[0];
+    if (v2 && !isDemo && id === 'queue') return queuePage;
+    return OW.pages.find(page => page.id === id)
+      || (v2 && !isDemo ? OW.pages.find(page => page.id === 'feed') : OW.pages[0]);
   };
 
   function screen(...children) {
@@ -53,37 +51,20 @@
   function welcomeScreen(note, demoPreview) {
     built = null;
     OW.palette.close();
-    const view = h('div', { class: 'v2-welcome-wrap' },
+    const view = h('main', { class: 'v2-welcome-wrap' },
       h('div', { class: 'v2-welcome-card' },
-        h('div', { class: 'v2-welcome-art' },
-          h('div', { class: 'v2-painted-layer art-boat', 'aria-hidden': 'true' }),
-          h('div', { class: 'v2-dither-layer', 'aria-hidden': 'true' }),
-          h('div', { class: 'v2-welcome-art-meta' },
-            h('span', { class: 'v2-mono' }, 'OPENWIZ · 0.02'),
-            demoPreview ? h('span', { class: 'v2-sample-pill v2-mono' }, 'Sample data') : null)),
-        h('div', { class: 'v2-welcome-body' },
-          h('div', { class: 'v2-welcome-brand' }, logo(), h('span', {}, 'OpenWiz')),
-          h('h1', { class: 'v2-welcome-title' }, 'Your software factory, in one quiet room.'),
-          h('p', { class: 'v2-welcome-lead' }, 'Answer three plain questions. Watch specs build. Tap Ship it.'),
-          h('ol', { class: 'v2-welcome-steps' },
-            h('li', {}, h('span', { class: 'v2-mono' }, '01'), h('span', {}, 'Grill — recommendations pre-picked')),
-            h('li', {}, h('span', { class: 'v2-mono' }, '02'), h('span', {}, 'Watch — narrated specs and progress')),
-            h('li', {}, h('span', { class: 'v2-mono' }, '03'), h('span', {}, 'Decide — Ship it, Change something, or Not now'))),
-          note ? h('div', { class: 'notices' }, h('div', { class: 'notice bad', role: 'alert' }, icon('warn'), h('span', {}, note))) : null,
-          h('div', { class: 'v2-welcome-actions' },
-            demoPreview
-              ? h('button', {
-                class: 'v2-btn v2-btn-primary',
-                type: 'button',
-                onclick: () => { location.hash = '#/chat'; },
-              }, 'Start Harbor', icon('arrowRight'))
-              : h('a', { class: 'v2-btn v2-btn-primary', href: '/api/sign-in/start' }, 'Sign in with GitHub'),
-            demoPreview
-              ? h('a', { class: 'v2-btn v2-btn-ghost', href: '/api/sign-in/start' }, 'Sign in with GitHub')
-              : null),
-          h('p', { class: 'v2-welcome-note' }, demoPreview
-            ? 'Interactive sample workspace. Makes no network requests and no writes.'
-            : 'On the repositories you choose, it posts only the comments you see and confirm. Your sign-in stays in this browser; the app talks only to GitHub.'))));
+        h('div', { class: 'v2-welcome-brand' }, logo(), h('span', {}, 'OpenWiz'),
+          demoPreview ? h('span', { class: 'v2-sample-pill v2-mono' }, 'Sample data') : null),
+        h('h1', {}, demoPreview ? 'Run your software factory from here.' : 'Your specs and decisions, in one place.'),
+        note ? h('div', { class: 'notice bad', role: 'alert' }, icon('warn'), h('span', {}, note)) : null,
+        h('div', { class: 'v2-welcome-actions' },
+          demoPreview
+            ? h('a', { class: 'v2-btn v2-btn-primary', href: '#/chat' }, 'Open sample workspace', icon('arrowRight'))
+            : h('a', { class: 'v2-btn v2-btn-primary', href: '/api/sign-in/start' }, 'Continue with GitHub'),
+          demoPreview ? null : h('a', {
+            class: 'v2-inline-link',
+            href: `/app/?v2=${data.v2.get()}&demo=1#/welcome`,
+          }, 'See a sample workspace'))));
     root.replaceChildren(view);
     document.title = 'OpenWiz';
     return view;
@@ -235,7 +216,6 @@
     const sideMain = topPages.map(makeLink);
     const sideBottom = bottomPages.map(makeLink);
     const tabs = OW.pages.map(makeLink);
-    const notices = h('div', { class: 'notices', role: 'status' });
     const body = h('section', { class: 'page-body v2-page-body' });
     const toastHost = h('div', { class: 'v2-toast-host', role: 'status', 'aria-live': 'polite' });
     const sample = isDemo ? h('span', { class: 'v2-sample-pill v2-mono' }, 'Sample data') : null;
@@ -255,9 +235,9 @@
           h('a', { class: 'brand', href: isDemo ? '#/welcome' : home() }, logo(), h('span', {}, 'OpenWiz')),
           h('span', { class: 'v2-top-space' }, picked?.full || ''),
           sampleTop),
-        h('main', { id: 'content', class: 'v2-main' }, notices, body, toastHost),
+        h('main', { id: 'content', class: 'v2-main' }, body, toastHost),
         h('nav', { class: 'tabs v2-tabs', 'aria-label': 'Pages' }, tabs.map(item => item.link))));
-    built = { v2: true, side: [...sideMain, ...sideBottom], tabs, notices, body, toastHost, page: null };
+    built = { v2: true, side: [...sideMain, ...sideBottom], tabs, body, toastHost, page: null };
   }
 
   function buildShell() {
@@ -303,7 +283,6 @@
   function updateV2() {
     const page = current();
     const feeds = data.feeds;
-    const limit = data.limit;
     for (const { page: p, link, badge } of [...built.side, ...built.tabs]) {
       if (p.id === page.id || (page.id === 'queue' && p.id === 'feed')) link.setAttribute('aria-current', 'page');
       else link.removeAttribute('aria-current');
@@ -311,54 +290,21 @@
       badge.hidden = !count;
       badge.textContent = count ? String(count) : '';
     }
-    const notes = [];
-    if (!isDemo) {
-      const mine = (page.feeds || []).map(name => feeds[name]).filter(Boolean);
-      if (data.paused()) {
-        notes.push(notice('slow', 'pause', 'GitHub\'s limit is low', `(${limit.remaining ?? 0} left). Reads are paused until ${time(limit.pausedUntil)}, then resume on their own.`));
-      }
-      for (const feed of mine) {
-        if (feed.state === 'unknown') notes.push(notice('bad', 'warn', `Couldn't read ${feed.label} from GitHub`, `at ${time(feed.failedAt)}. It shows as unknown, not as empty, until a read works.`));
-        if (feed.state === 'stale') notes.push(notice('bad', 'warn', `Couldn't read ${feed.label} at ${time(feed.failedAt)}.`, `Showing the read from ${time(feed.readAt)}.`));
-        if (feed.state === 'partial') notes.push(notice('bad', 'warn', 'Part of this read failed', `(${feed.label}, ${time(feed.readAt)}). What's missing shows as unknown.`));
-      }
+    if (built.page !== page.id) {
+      OW.palette.close();
+      root.querySelector('.v2-dialog[open]')?.close();
+      built.body.replaceChildren();
+      built.body.scrollTop = 0;
     }
-    built.notices.replaceChildren(...notes);
-    if (!isDemo && page.id === 'queue') {
-      const mine = page.feeds.map(name => feeds[name]);
-      if (mine.every(feed => feed.state === 'unknown')) {
-        built.body.replaceChildren(h('h1', { class: 'v2-h1', tabindex: '-1' }, page.title), OW.ui.unknown(`${page.title} couldn't be read from GitHub. The app tries again on its own, or press Refresh now in Settings.`));
-      } else if (mine.some(feed => feed.state === 'loading') && !mine.some(feed => feed.data)) {
-        built.body.replaceChildren(h('h1', { class: 'v2-h1', tabindex: '-1' }, page.title), OW.ui.placeholder('Reading GitHub…'));
-      } else {
-        const slot = h('div', {});
-        built.body.replaceChildren(
-          h('div', { class: 'v2-queue-head' },
-            h('h1', { class: 'v2-h1', tabindex: '-1' }, page.title),
-            h('button', { class: 'v2-btn', type: 'button', disabled: data.paused(), onclick: () => data.refreshAll() }, icon('refresh'), 'Refresh now')),
-          slot);
-        page.render(slot, feeds, route().arg);
-      }
-    } else if (!isDemo && (page.feeds || []).length && page.id !== 'settings' && page.id !== 'chat') {
-      const mine = page.feeds.map(name => feeds[name]);
-      if (mine.every(feed => feed.state === 'unknown')) {
-        built.body.replaceChildren(OW.ui.unknown(`${page.title} couldn't be read from GitHub. The app tries again on its own, or press Refresh now in Settings.`));
-      } else if (mine.some(feed => feed.state === 'loading') && !mine.some(feed => feed.data)) {
-        built.body.replaceChildren(OW.ui.placeholder('Reading GitHub…'));
-      } else {
-        page.render(built.body, feeds, route().arg);
-      }
-    } else {
-      page.render(built.body, feeds, route().arg);
-    }
-    if (isDemo && OW.demo.state.toast) {
-      const t = OW.demo.state.toast;
-      built.toastHost.replaceChildren(
-        h('div', { class: 'v2-toast' },
-          h('span', {}, t.message),
-          t.undo ? h('button', { type: 'button', class: 'v2-toast-undo', onclick: () => { t.undo(); OW.demo.clearToast(); } }, 'Undo') : null));
-    } else {
-      built.toastHost.replaceChildren();
+    if (page.id === 'queue') OW.feed.real(built.body, feeds, route().arg, true);
+    else page.render(built.body, feeds, route().arg);
+    if (isDemo && built.toast !== OW.demo.state.toast) {
+      const toast = OW.demo.state.toast;
+      if (built.toastHost.contains(document.activeElement)) built.body.querySelector('h1')?.focus();
+      built.toastHost.replaceChildren(...(toast ? [h('div', { class: 'v2-toast' },
+        h('span', {}, toast.message),
+        toast.undo ? h('button', { type: 'button', class: 'v2-toast-undo', onclick: () => { toast.undo(); OW.demo.clearToast(); } }, 'Undo') : null)] : []));
+      built.toast = toast;
     }
     if (built.page !== page.id) {
       document.title = `${page.title} · OpenWiz`;
@@ -422,7 +368,7 @@
     }
     if (!data.auth.signedIn()) return signedOut();
     if (!data.repo.get()) return picker();
-    const valid = v2 ? allPages.map(page => page.id) : ROUTES();
+    const valid = v2 ? [...ROUTES(), 'queue'] : ROUTES();
     if (!valid.includes(route().id)) history.replaceState(null, '', home());
     if (!built) {
       buildShell();
@@ -433,32 +379,18 @@
 
   data.onChange(update);
   if (v2 && OW.queue?.onUpdate) OW.queue.onUpdate(update);
-  OW.onSignedOut = () => signedOut('Your sign-in ended. Sign in again.');
+  OW.onSignedOut = (expired = true) => signedOut(expired ? 'Your sign-in ended. Sign in again.' : null);
   OW.onRepoReset = () => picker();
   window.addEventListener('hashchange', () => (isDemo ? draw() : built ? update() : null));
   document.addEventListener('keydown', event => {
     if (!built) return;
-    if (isDemo && route().id === 'feed' && OW.demo.state.changeTarget && event.key === 'Escape') {
-      event.preventDefault();
-      OW.demo.closeChange();
-      return;
-    }
+    if (v2 && !OW.palette.shown() && document.querySelector('dialog[open]')) return;
     if ((event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'k') {
       event.preventDefault();
       if (!isDemo) return OW.palette.toggle();
       return;
     }
     if (OW.palette.shown() || event.altKey || event.ctrlKey || event.metaKey || /input|textarea|select/i.test(event.target.tagName)) return;
-    if (isDemo && route().id === 'feed' && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
-      event.preventDefault();
-      const cards = OW.demo.visibleCards();
-      if (!cards.length) return;
-      const next = Math.max(0, Math.min(OW.demo.state.feedIndex + (event.key === 'ArrowDown' ? 1 : -1), cards.length - 1));
-      OW.demo.state.feedIndex = next;
-      history.replaceState(null, '', next === 0 ? '#/feed' : `#/feed/${next + 1}`);
-      OW.demo.notify();
-      return;
-    }
     if (event.key === '?') {
       event.preventDefault();
       if (!isDemo) return OW.palette.shortcuts();
