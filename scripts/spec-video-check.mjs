@@ -140,7 +140,7 @@ async function open(browser, origin, width, height, mode) {
   return { evaluate, click, swipe, shot, requests, close: () => browser.send('Target.closeTarget', { targetId }) };
 }
 
-const MOMENT = "[...document.querySelectorAll('.moments li')].find(li => li.querySelector('h3')?.textContent === 'Watch your spec')";
+const MOMENT = "document.querySelector('.moments')";
 const FACTS = `(() => {
   const moment = ${MOMENT};
   const shown = el => !!el && el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden';

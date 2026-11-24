@@ -875,33 +875,43 @@ def check_site(root, registry=ROOT / 'market/registry.json'):
     labels = re.findall(r"label: '([^']*)'", (root / names['site.js']).read_text())
     for reading in [hero_text.spaced()] + hero_text.shown + labels:
         assert not re.search(r'approv', reading, re.I), 'the hero names an approval step'
-    moments = ('Answer a few questions', 'Watch your spec', 'Watch it ship')
-    captions = re.findall(r'<h3>([^<]+)</h3>', landing)
-    assert tuple(captions) == moments, 'the three moments must appear in order'
-    assert 'The real spec of an OpenWiz-built to-do app' in flat, 'the spec video must say it is the to-do app\'s real spec'
+    timeline_steps = (
+        ('Wish', '"Build a to-do app"'),
+        ('Spec', '#1'),
+        ('Tickets', '#2–#5'),
+        ('Agents', 'building'),
+        ('Merged', '4 PRs, 20 Nov 10:46–13:33 UTC'),
+    )
     section = re.search(r'<section class="moments[\s\S]*?</section>', re.sub(r'<!--.*?-->', '', landing, flags=re.S))
     section = section[0] if section else ''
     links = Page(section)
     assert not links.books and not links.x_links and all(ref.startswith('/') and not ref.startswith('//') for ref in links.refs), \
         'the moments must keep visitors on the site: no link out'
-    blocks = {}
-    for block in re.findall(r'<li class="(?:moment-step|spec-moment)[^"]*">.*?</(?:details|div)>\s*</li>', section, re.S):
-        blocks[re.search(r'<h3>([^<]+)</h3>', block)[1]] = Text(block).spaced()
-    for card, texts in zip(moments, TODO_RUN):
-        for text in texts:
-            assert text in blocks.get(card, ''), f'the {card} moment must show the real to-do run in place: {text}'
+    assert '/art/moments-sea.webp' not in section, 'the warm sea painting must not appear in the moments section'
+    found_steps = tuple(
+        (unescape(stage), unescape(fact))
+        for stage, fact in re.findall(
+            r'<span class="timeline-stage">([^<]+)</span>\s*<span class="timeline-fact">([^<]+)</span>', section)
+    )
+    assert found_steps == timeline_steps, f'the five timeline steps must appear in order: {found_steps}'
+    panels = (
+        re.search(r'<div class="moment-panel grill-panel">[\s\S]*?</div>', section),
+        re.search(r'<article class="moment-panel spec-doc"[\s\S]*?</article>', section),
+        re.search(r'<figure class="moment-panel app-panel">[\s\S]*?</figure>', section),
+    )
     grill = TODO_RUN[0]
-    chat = re.search(r'<div class="moment-chat"[^>]*>(.*?)</div>', section, re.S)
-    panel = re.search(r'<div class="moment-panel grill-panel">(.*?)</div>', section, re.S)
+    panel = panels[0]
     for question, answer in zip(grill[::2], grill[1::2]):
         q, a = re.escape(escape(question, quote=False)), re.escape(escape(answer, quote=False))
-        assert chat and re.search(rf'<p class="ask">{q}</p>\s*<p class="reply">{a}</p>', chat[1]), \
-            f'the grill bubbles must show each question with its answer: {question}'
-        assert panel and re.search(rf'<p class="ask"><strong>{q}</strong>[^<]*<span>[^<]*</span></p>\s*<p class="reply">{a}</p>', panel[1]), \
+        assert panel and re.search(rf'<p class="ask"><strong>{q}</strong>[^<]*<span>[^<]*</span></p>\s*<p class="reply">{a}</p>', panel[0]), \
             f'the expanded grill must show each question with its answer: {question}'
-    ship = re.search(r'<li class="moment-step moment-ship">.*?</li>', section, re.S)
-    shot = next((i for i in Page(ship[0]).images if i.get('src') == TODO_APP and (i.get('alt') or '').strip()), None) if ship else None
-    assert shot, f'the Watch it ship moment lost its described capture of the live app: {TODO_APP}'
+    for name, match, texts in zip(('The questions', 'The spec', 'The live app'), panels, TODO_RUN):
+        panel_text = Text(match[0]).spaced() if match else ''
+        for text in texts:
+            assert text in panel_text, f'the {name} panel must show the real to-do run in place: {text}'
+    app_panel = panels[2]
+    shot = next((i for i in Page(app_panel[0]).images if i.get('src') == TODO_APP and (i.get('alt') or '').strip()), None) if app_panel else None
+    assert shot, f'the live app panel lost its described capture of the live app: {TODO_APP}'
     for text in ('Illustration, not live data', 'Building in public'):
         assert text.lower() not in flat.lower(), f'cut copy is back: {text}'
     for text in STORY_COPY:

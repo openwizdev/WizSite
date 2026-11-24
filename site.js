@@ -294,6 +294,7 @@ function specVideo() {
   const listen = event => {
     if (!event.isTrusted || video.controls) return;
     frame?.classList.remove('is-resting');
+    sound.hidden = true;
     video.controls = true;
     if (track) track.mode = 'showing';
     video.muted = false;

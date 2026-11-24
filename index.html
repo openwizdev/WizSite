@@ -123,104 +123,117 @@
     </ul>
   </section>
   <section class="moments wrap" aria-labelledby="moments-title">
-    <h2 id="moments-title">From idea to shipped.</h2>
-    <div class="moment-stage">
-      <img class="moment-art" src="/art/moments-sea.webp" alt="" width="1600" height="705" loading="lazy" decoding="async">
-      <ol>
-        <li class="moment-step moment-grill">
-          <span class="moment-num" aria-hidden="true">1</span>
-          <h3>Answer a few questions</h3>
-          <div class="moment-chat" aria-hidden="true"><p class="chat-label">Build a to-do app</p><p class="ask">Where should tasks live?</p><p class="reply">One list for now.</p><p class="ask">Keep completed tasks visible?</p><p class="reply">Yes, greyed out.</p></div>
-          <details class="moment-more">
-            <summary>The questions</summary>
-            <div class="moment-panel grill-panel">
-              <p class="panel-note">The grill behind the to-do app's spec, "Build a to-do app": the questions as asked, with their answers.</p>
-              <p class="ask"><strong>Where should tasks live?</strong> One list holds every task, or tasks sit in several named lists (Work, Home). Several lists need list create, rename and delete, and a way to move between them. <span>Recommended: one list for now.</span></p>
-              <p class="reply">One list for now.</p>
-              <p class="ask"><strong>Keep completed tasks visible?</strong> Completed tasks either disappear from the list, or stay in it marked done. Staying visible lets you see what you did and undo a mistaken tick. <span>Recommended: yes, greyed out.</span></p>
-              <p class="reply">Yes, greyed out.</p>
-              <p class="panel-note">Already settled: tasks are kept after a reload.</p>
-            </div>
-          </details>
-        </li>
-        <li class="spec-moment">
-          <div class="spec-frame">
-            <video class="spec-video" src="/art/todo-spec.mp4" poster="/art/todo-spec-poster.webp" preload="none" muted playsinline controls aria-label="The to-do app's narrated spec video">
-              <track kind="captions" src="/art/todo-spec.vtt" srclang="en" label="English" default>
-            </video>
-            <div class="spec-caption">
-              <div class="spec-title"><span class="moment-num" aria-hidden="true">2</span><h3>Watch your spec</h3></div>
-              <p class="moment-copy">The real spec of an OpenWiz-built to-do app.</p>
-              <div class="spec-actions"><button class="spec-play" type="button" hidden><svg aria-hidden="true" viewBox="0 0 16 16"><path d="M5 3l8 5-8 5z"/></svg>Play with sound</button><a class="spec-link" href="/art/todo-spec.mp4">The video</a>
-                <details class="moment-more spec-more">
-                  <summary>The spec</summary>
-                  <article class="moment-panel spec-doc" tabindex="0" aria-label="The to-do app's spec">
-                    <h4>Problem Statement</h4>
-                    <p>You want a simple place to write down what you need to do and tick it off. Nothing here does that yet: the app is a placeholder page.</p>
-                    <h4>Solution</h4>
-                    <p>A to-do app in the browser with <strong>one list for now</strong>. You type a task and add it; it appears in the list. You tick a task to mark it complete: it <strong>stays in the list, greyed out</strong>, and you can untick it. Your tasks are <strong>kept after a reload</strong>. The app is a static page on GitHub Pages, with no account and no server: tasks live in your browser.</p>
-                    <h4>Changelog headline</h4>
-                    <p>A to-do app with one list: add a task, mark it complete (it stays, greyed out), and your tasks are kept after a reload.</p>
-                    <h4>User Stories</h4>
-                    <ol>
-                      <li>As a user, I want to type a task and add it, so that it is in my list.</li>
-                      <li>As a user, I want an empty task to be refused, so that my list holds only real tasks.</li>
-                      <li>As a user, I want to mark a task complete, so that I can see what I have done.</li>
-                      <li>As a user, I want completed tasks to stay in the list, greyed out, so that I can still see them.</li>
-                      <li>As a user, I want to untick a completed task, so that a mistaken tick is easy to undo.</li>
-                      <li>As a user, I want my tasks kept after a reload, so that closing the tab loses nothing.</li>
-                      <li>As a user, I want the app to work on my phone and with the keyboard, so that I can use it anywhere.</li>
-                    </ol>
-                    <h4>Implementation Decisions</h4>
-                    <ul>
-                      <li><strong>One list for now:</strong> no named lists, no list switching. Tasks keep the order they were added in.</li>
-                      <li><strong>The task list, first (contract-first ticket):</strong> <code>app/todos.js</code> is a dependency-free ES module of pure functions that every other ticket builds on. A task is <code>{ id, text, done }</code>. <code>addTask(tasks, text)</code> returns a new array with the trimmed text added at the end, or the same array for blank text; <code>toggleTask(tasks, id)</code> flips <code>done</code>; <code>loadTasks(storage)</code> and <code>saveTasks(storage, tasks)</code> read and write one <code>localStorage</code> key, <code>todo-demo.tasks.v1</code>, as JSON, and a missing or unreadable value loads as an empty list. <code>docs/markup.md</code> fixes the list's markup and class names (the form, the list, one item, its checkbox, and the <code>done</code> state) so the view and the styles agree.</li>
-                      <li><strong>The view:</strong> <code>app/view.js</code> turns tasks into the list's markup as <code>docs/markup.md</code> says, escaping task text.</li>
-                      <li><strong>The page:</strong> <code>app/index.html</code> and <code>app/main.js</code> wire it up: load at start, add on submit, toggle on the checkbox, save after each change, render.</li>
-                      <li><strong>The look:</strong> <code>app/style.css</code>: a calm single column that fits a phone; a completed task greyed out with its text struck through; visible keyboard focus.</li>
-                      <li>No dependencies, no build step. GitHub Pages serves <code>app/</code> after every merge to <code>main</code>.</li>
-                    </ul>
-                    <h4>Testing Decisions</h4>
-                    <ul>
-                      <li><code>npm test</code> (<code>node --test</code>) proves the task list and the view at their module seams: <code>app/todos.js</code> and <code>app/view.js</code>, with an in-memory stand-in for <code>localStorage</code>.</li>
-                      <li>The page itself has no browser test (no dependencies); it is proven by the live check.</li>
-                    </ul>
-                    <h4>Proof</h4>
-                    <table>
-                      <thead><tr><th>Claim</th><th>Proof</th></tr></thead>
-                      <tbody>
-                        <tr><td>P1. Adding a task appends it; blank text adds nothing</td><td><code>tests/todos.test.mjs</code>, red first</td></tr>
-                        <tr><td>P2. Toggling flips one task's <code>done</code> and nothing else</td><td><code>tests/todos.test.mjs</code>, red first</td></tr>
-                        <tr><td>P3. Tasks saved are the tasks loaded; a missing or broken value loads as empty</td><td><code>tests/todos.test.mjs</code>, red first</td></tr>
-                        <tr><td>P4. The view marks completed tasks <code>done</code>, checks their box and escapes text</td><td><code>tests/view.test.mjs</code>, red first</td></tr>
-                        <tr><td>P5. On the live page: add, complete (greyed out), untick, reload keeps them</td><td>The live check below</td></tr>
-                      </tbody>
-                    </table>
-                    <h4>Live check</h4>
-                    <p>On openwizdev.github.io/todo-demo: add two tasks, mark one complete and see it greyed out, reload and see both with the same states, untick it.</p>
-                    <h4>Out of Scope</h4>
-                    <p>Several or named lists, editing or deleting a task, due dates, sync between devices, accounts.</p>
-                    <h4>Further Notes</h4>
-                    <p>Decided in a short grill for "Build a to-do app": its replies are the openwiz.dev landing page's own example answers, recorded as such. Tasks live in one list for now; completed tasks stay visible, greyed out; tasks are kept after a reload, as the landing's spec card says.</p>
-                  </article>
-                </details>
-              </div>
-            </div>
-          </div>
-        </li>
-        <li class="moment-step moment-ship">
-          <span class="moment-num" aria-hidden="true">3</span>
-          <h3>Watch it ship</h3>
-          <img class="moment-thumb" src="/art/todo-app.webp" alt="" width="720" height="623" loading="lazy" decoding="async">
-          <details class="moment-more">
-            <summary>The live app</summary>
-            <figure class="moment-panel app-panel">
-              <img class="app-shot" src="/art/todo-app.webp" alt="The live to-do app: a New task box with an Add button, two ticked tasks greyed out and one still to do." width="720" height="623" loading="lazy" decoding="async">
-              <figcaption>The to-do app as it runs live today, built by the fleet from this spec and served by GitHub Pages at <span>openwizdev.github.io/todo-demo</span>.</figcaption>
-            </figure>
-          </details>
-        </li>
-      </ol>
+    <div class="moment-split">
+      <h2 id="moments-title">From idea to shipped.</h2>
+      <div class="moment-timeline-wrap">
+        <svg class="timeline-rail" aria-hidden="true" viewBox="0 0 20 200" preserveAspectRatio="none">
+          <line x1="10" y1="0" x2="10" y2="200" stroke="currentColor" stroke-width="1" vector-effect="non-scaling-stroke"/>
+          <line x1="13.5" y1="0" x2="13.5" y2="200" stroke="currentColor" stroke-width="1" stroke-dasharray="1 4" opacity=".4" vector-effect="non-scaling-stroke"/>
+        </svg>
+        <ol class="moment-timeline">
+          <li>
+            <svg class="timeline-node" aria-hidden="true" viewBox="0 0 20 20" width="20" height="20"><line x1="0" y1="10" x2="3.5" y2="10" stroke="currentColor" stroke-width="1" opacity=".55"/><line x1="16.5" y1="10" x2="20" y2="10" stroke="currentColor" stroke-width="1" opacity=".55"/><circle cx="10" cy="10" r="5.5" fill="#1b1916" stroke="currentColor" stroke-width="1.2"/><circle cx="10" cy="10" r="2" fill="currentColor"/></svg>
+            <div class="timeline-row"><span class="timeline-stage">Wish</span><span class="timeline-fact">"Build a to-do app"</span></div>
+          </li>
+          <li>
+            <svg class="timeline-node" aria-hidden="true" viewBox="0 0 20 20" width="20" height="20"><line x1="0" y1="10" x2="3.5" y2="10" stroke="currentColor" stroke-width="1" opacity=".55"/><line x1="16.5" y1="10" x2="20" y2="10" stroke="currentColor" stroke-width="1" opacity=".55"/><circle cx="10" cy="10" r="5.5" fill="#1b1916" stroke="currentColor" stroke-width="1.2"/><circle cx="10" cy="10" r="2" fill="currentColor"/></svg>
+            <div class="timeline-row"><span class="timeline-stage">Spec</span><span class="timeline-fact">#1</span></div>
+          </li>
+          <li>
+            <svg class="timeline-node" aria-hidden="true" viewBox="0 0 20 20" width="20" height="20"><line x1="0" y1="10" x2="3.5" y2="10" stroke="currentColor" stroke-width="1" opacity=".55"/><line x1="16.5" y1="10" x2="20" y2="10" stroke="currentColor" stroke-width="1" opacity=".55"/><circle cx="10" cy="10" r="5.5" fill="#1b1916" stroke="currentColor" stroke-width="1.2"/><circle cx="10" cy="10" r="2" fill="currentColor"/></svg>
+            <div class="timeline-row"><span class="timeline-stage">Tickets</span><span class="timeline-fact">#2–#5</span></div>
+          </li>
+          <li>
+            <svg class="timeline-node" aria-hidden="true" viewBox="0 0 20 20" width="20" height="20"><line x1="0" y1="10" x2="3.5" y2="10" stroke="currentColor" stroke-width="1" opacity=".55"/><line x1="16.5" y1="10" x2="20" y2="10" stroke="currentColor" stroke-width="1" opacity=".55"/><circle cx="10" cy="10" r="5.5" fill="#1b1916" stroke="currentColor" stroke-width="1.2"/><circle cx="10" cy="10" r="2" fill="currentColor"/></svg>
+            <div class="timeline-row"><span class="timeline-stage">Agents</span><span class="timeline-fact">building</span></div>
+          </li>
+          <li class="is-merged">
+            <svg class="timeline-node" aria-hidden="true" viewBox="0 0 20 20" width="20" height="20"><line x1="0" y1="10" x2="3" y2="10" stroke="currentColor" stroke-width="1" opacity=".65"/><line x1="17" y1="10" x2="20" y2="10" stroke="currentColor" stroke-width="1" opacity=".65"/><circle cx="10" cy="10" r="6" fill="currentColor" fill-opacity=".22" stroke="currentColor" stroke-width="1.2"/><circle cx="10" cy="10" r="2.75" fill="currentColor"/></svg>
+            <div class="timeline-row"><span class="timeline-stage">Merged</span><span class="timeline-fact">4 PRs, 20 Nov 10:46–13:33 UTC</span></div>
+          </li>
+        </ol>
+      </div>
+      <div class="spec-moment">
+        <div class="spec-frame">
+          <video class="spec-video" src="/art/todo-spec.mp4" poster="/art/todo-spec-poster.webp" preload="none" muted playsinline controls aria-label="The to-do app's narrated spec video">
+            <track kind="captions" src="/art/todo-spec.vtt" srclang="en" label="English" default>
+          </video>
+          <button class="spec-play" type="button" hidden aria-label="Play the to-do app's spec video with sound"><span class="spec-play-badge"><svg aria-hidden="true" viewBox="0 0 16 16"><path d="M5 3l8 5-8 5z"/></svg>Play with sound</span></button>
+        </div>
+      </div>
+    </div>
+    <div class="moment-links">
+      <details class="moment-more">
+        <summary>The questions</summary>
+        <div class="moment-panel grill-panel">
+          <p class="panel-note">The grill behind the to-do app's spec, "Build a to-do app": the questions as asked, with their answers.</p>
+          <p class="ask"><strong>Where should tasks live?</strong> One list holds every task, or tasks sit in several named lists (Work, Home). Several lists need list create, rename and delete, and a way to move between them. <span>Recommended: one list for now.</span></p>
+          <p class="reply">One list for now.</p>
+          <p class="ask"><strong>Keep completed tasks visible?</strong> Completed tasks either disappear from the list, or stay in it marked done. Staying visible lets you see what you did and undo a mistaken tick. <span>Recommended: yes, greyed out.</span></p>
+          <p class="reply">Yes, greyed out.</p>
+          <p class="panel-note">Already settled: tasks are kept after a reload.</p>
+        </div>
+      </details>
+      <details class="moment-more spec-more">
+        <summary>The spec</summary>
+        <article class="moment-panel spec-doc" tabindex="0" aria-label="The to-do app's spec">
+          <h4>Problem Statement</h4>
+          <p>You want a simple place to write down what you need to do and tick it off. Nothing here does that yet: the app is a placeholder page.</p>
+          <h4>Solution</h4>
+          <p>A to-do app in the browser with <strong>one list for now</strong>. You type a task and add it; it appears in the list. You tick a task to mark it complete: it <strong>stays in the list, greyed out</strong>, and you can untick it. Your tasks are <strong>kept after a reload</strong>. The app is a static page on GitHub Pages, with no account and no server: tasks live in your browser.</p>
+          <h4>Changelog headline</h4>
+          <p>A to-do app with one list: add a task, mark it complete (it stays, greyed out), and your tasks are kept after a reload.</p>
+          <h4>User Stories</h4>
+          <ol>
+            <li>As a user, I want to type a task and add it, so that it is in my list.</li>
+            <li>As a user, I want an empty task to be refused, so that my list holds only real tasks.</li>
+            <li>As a user, I want to mark a task complete, so that I can see what I have done.</li>
+            <li>As a user, I want completed tasks to stay in the list, greyed out, so that I can still see them.</li>
+            <li>As a user, I want to untick a completed task, so that a mistaken tick is easy to undo.</li>
+            <li>As a user, I want my tasks kept after a reload, so that closing the tab loses nothing.</li>
+            <li>As a user, I want the app to work on my phone and with the keyboard, so that I can use it anywhere.</li>
+          </ol>
+          <h4>Implementation Decisions</h4>
+          <ul>
+            <li><strong>One list for now:</strong> no named lists, no list switching. Tasks keep the order they were added in.</li>
+            <li><strong>The task list, first (contract-first ticket):</strong> <code>app/todos.js</code> is a dependency-free ES module of pure functions that every other ticket builds on. A task is <code>{ id, text, done }</code>. <code>addTask(tasks, text)</code> returns a new array with the trimmed text added at the end, or the same array for blank text; <code>toggleTask(tasks, id)</code> flips <code>done</code>; <code>loadTasks(storage)</code> and <code>saveTasks(storage, tasks)</code> read and write one <code>localStorage</code> key, <code>todo-demo.tasks.v1</code>, as JSON, and a missing or unreadable value loads as an empty list. <code>docs/markup.md</code> fixes the list's markup and class names (the form, the list, one item, its checkbox, and the <code>done</code> state) so the view and the styles agree.</li>
+            <li><strong>The view:</strong> <code>app/view.js</code> turns tasks into the list's markup as <code>docs/markup.md</code> says, escaping task text.</li>
+            <li><strong>The page:</strong> <code>app/index.html</code> and <code>app/main.js</code> wire it up: load at start, add on submit, toggle on the checkbox, save after each change, render.</li>
+            <li><strong>The look:</strong> <code>app/style.css</code>: a calm single column that fits a phone; a completed task greyed out with its text struck through; visible keyboard focus.</li>
+            <li>No dependencies, no build step. GitHub Pages serves <code>app/</code> after every merge to <code>main</code>.</li>
+          </ul>
+          <h4>Testing Decisions</h4>
+          <ul>
+            <li><code>npm test</code> (<code>node --test</code>) proves the task list and the view at their module seams: <code>app/todos.js</code> and <code>app/view.js</code>, with an in-memory stand-in for <code>localStorage</code>.</li>
+            <li>The page itself has no browser test (no dependencies); it is proven by the live check.</li>
+          </ul>
+          <h4>Proof</h4>
+          <table>
+            <thead><tr><th>Claim</th><th>Proof</th></tr></thead>
+            <tbody>
+              <tr><td>P1. Adding a task appends it; blank text adds nothing</td><td><code>tests/todos.test.mjs</code>, red first</td></tr>
+              <tr><td>P2. Toggling flips one task's <code>done</code> and nothing else</td><td><code>tests/todos.test.mjs</code>, red first</td></tr>
+              <tr><td>P3. Tasks saved are the tasks loaded; a missing or broken value loads as empty</td><td><code>tests/todos.test.mjs</code>, red first</td></tr>
+              <tr><td>P4. The view marks completed tasks <code>done</code>, checks their box and escapes text</td><td><code>tests/view.test.mjs</code>, red first</td></tr>
+              <tr><td>P5. On the live page: add, complete (greyed out), untick, reload keeps them</td><td>The live check below</td></tr>
+            </tbody>
+          </table>
+          <h4>Live check</h4>
+          <p>On openwizdev.github.io/todo-demo: add two tasks, mark one complete and see it greyed out, reload and see both with the same states, untick it.</p>
+          <h4>Out of Scope</h4>
+          <p>Several or named lists, editing or deleting a task, due dates, sync between devices, accounts.</p>
+          <h4>Further Notes</h4>
+          <p>Decided in a short grill for "Build a to-do app": its replies are the openwiz.dev landing page's own example answers, recorded as such. Tasks live in one list for now; completed tasks stay visible, greyed out; tasks are kept after a reload, as the landing's spec card says.</p>
+        </article>
+      </details>
+      <details class="moment-more">
+        <summary>The live app</summary>
+        <figure class="moment-panel app-panel">
+          <img class="app-shot" src="/art/todo-app.webp" alt="The live to-do app: a New task box with an Add button, two ticked tasks greyed out and one still to do." width="720" height="623" loading="lazy" decoding="async">
+          <figcaption>The to-do app as it runs live today, built by the fleet from this spec and served by GitHub Pages at <span>openwizdev.github.io/todo-demo</span>.</figcaption>
+        </figure>
+      </details>
+      <a class="spec-link" href="/art/todo-spec.mp4">The video</a>
     </div>
   </section>
 <template data-slot="faq"></template>
