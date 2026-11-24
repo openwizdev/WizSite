@@ -1,0 +1,116 @@
+name: Refresh snapshots
+on:
+  schedule:
+    - cron: '17 */6 * * *'
+  workflow_dispatch:
+permissions:
+  contents: write
+  pull-requests: write
+concurrency:
+  group: refresh-snapshots
+  cancel-in-progress: false
+env:
+  BRANCH: refresh/snapshots
+  TITLE: Refresh market and landing snapshots
+  SNAPSHOTS: market/registry.json landing/reach.json
+jobs:
+  refresh:
+    name: Sync, build, check and open the refresh pull request
+    if: github.repository == 'openwizdev/WizSite'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: '24'
+      - name: Start from the refresh branch with main merged in
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898798+github-actions[bot]@users.noreply.github.com'
+          if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null; then
+            git fetch --quiet --no-tags origin "$BRANCH"
+            git checkout --quiet -B "$BRANCH" FETCH_HEAD
+            git merge --quiet --no-edit -X theirs origin/main
+          else
+            git checkout --quiet -B "$BRANCH" origin/main
+          fi
+      - name: Clone WizMarket main and OpenWiz main
+        run: |
+          git clone --quiet --depth 1 --single-branch --branch main https://github.com/openwizdev/WizMarket "$RUNNER_TEMP/WizMarket"
+          git clone --quiet --depth 1 --single-branch --branch main https://github.com/openwizdev/OpenWiz "$RUNNER_TEMP/OpenWiz"
+      - name: Sync the market snapshot
+        run: node scripts/market-sync.mjs "$RUNNER_TEMP/WizMarket"
+      - name: Sync the landing snapshot (only once scripts/landing-sync.mjs exists)
+        if: hashFiles('scripts/landing-sync.mjs') != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh pr list -R openwizdev/OpenWiz --state open --limit 500 --json number,title,url,headRefName,files > "$RUNNER_TEMP/openwiz-prs.json"
+          node scripts/landing-sync.mjs "$RUNNER_TEMP/OpenWiz" "$RUNNER_TEMP/openwiz-prs.json"
+      - name: Install the pinned npm dependencies
+        run: npm ci
+      - name: Build static site
+        run: npm run build
+      - name: Check links, resources and privacy
+        run: npm run check
+      - name: Commit, push and open or update the pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          open=$(gh pr list --head "$BRANCH" --base main --state open --json number --jq '.[0].number // empty')
+          if git diff --quiet origin/main -- $SNAPSHOTS; then
+            echo 'The snapshots match main.' >> "$GITHUB_STEP_SUMMARY"
+            if [ -n "$open" ]; then gh pr close "$open" --comment 'Main already has these snapshots.'; fi
+            exit 0
+          fi
+          counts() {
+            node --input-type=module -e '
+              import { readFileSync, existsSync } from "node:fs";
+              import { execFileSync } from "node:child_process";
+              const [ref] = process.argv.slice(1);
+              const read = path => {
+                if (ref === "HEAD") return existsSync(path) ? readFileSync(path, "utf8") : null;
+                try { return execFileSync("git", ["show", `${ref}:${path}`], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }); } catch { return null; }
+              };
+              const market = read("market/registry.json");
+              const tiers = {};
+              const walk = value => {
+                if (Array.isArray(value)) return value.forEach(walk);
+                if (!value || typeof value !== "object") return;
+                if (typeof value.tier === "string") tiers[value.tier] = (tiers[value.tier] || 0) + 1;
+                Object.values(value).forEach(walk);
+              };
+              const reach = read("landing/reach.json");
+              if (reach) walk(JSON.parse(reach));
+              const parts = [market ? `${JSON.parse(market).listings.length} WizMarket listings` : "no market snapshot"];
+              parts.push(reach ? Object.entries(tiers).map(([tier, n]) => `${n} ${tier}`).join(", ") || "no tiers" : "no landing snapshot");
+              console.log(parts.join("; "));
+            ' "$1"
+          }
+          before=$(counts origin/main)
+          after=$(counts HEAD)
+          git add -- $SNAPSHOTS 2>/dev/null || git add -- market/registry.json
+          if ! git diff --cached --quiet; then
+            git commit --quiet -m "$TITLE"
+          fi
+          git push --quiet origin "HEAD:refs/heads/$BRANCH"
+          market=$(git -C "$RUNNER_TEMP/WizMarket" rev-parse HEAD)
+          openwiz=$(git -C "$RUNNER_TEMP/OpenWiz" rev-parse HEAD)
+          printf '%s\n' \
+            'The scheduled refresh synced the pinned snapshots from public main and the build and check passed on this branch.' '' \
+            "- Before (main): $before" \
+            "- After: $after" \
+            "- WizMarket main: \`$market\`" \
+            "- OpenWiz main: \`$openwiz\`" \
+            "- Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" > "$RUNNER_TEMP/body.md"
+          cat "$RUNNER_TEMP/body.md" >> "$GITHUB_STEP_SUMMARY"
+          if [ -n "$open" ]; then
+            gh pr edit "$open" --body-file "$RUNNER_TEMP/body.md"
+          else
+            gh pr create --base main --head "$BRANCH" --title "$TITLE" --body-file "$RUNNER_TEMP/body.md"
+          fi
