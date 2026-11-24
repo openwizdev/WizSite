@@ -27,6 +27,20 @@ Cloudflare Pages deploys from **main**. Configure the repository root as the bui
 
 Changes merge after green CI and one review from the other model family. No per-change maintainer approval is required. This repository contains no deployment credentials or separate deploy workflow; the Pages project owns the Git integration.
 
+## Security headers
+
+`_headers` sets site-wide security headers under `/*` (HSTS, a strict Content-Security-Policy with no `'unsafe-inline'` or `'unsafe-eval'`, `X-Frame-Options: DENY`, `Permissions-Policy`, `Cross-Origin-Opener-Policy: same-origin`, `X-Content-Type-Options: nosniff`, and `Referrer-Policy: strict-origin-when-cross-origin`). Under `/app/*`, `! Content-Security-Policy` and `! Referrer-Policy` detach the site-wide values before setting the stricter app policy so Cloudflare Pages does not comma-join both headers.
+
+To verify the effective merged headers locally after `npm run build`:
+
+```sh
+npx wrangler pages dev dist --port 8788
+curl -sI http://127.0.0.1:8788/
+curl -sI http://127.0.0.1:8788/app/
+curl -sI http://127.0.0.1:8788/.well-known/security.txt
+curl -sI http://127.0.0.1:8788/robots.txt
+```
+
 ## The Changelog's releases
 
 `/changelog` lists one short entry per public release, newest first by semver. Each entry is one data file, `changelog/releases/<public name>.json`, which `build.mjs` reads (through `scripts/changelog.mjs`) and writes into the page; nothing is read from the network.
@@ -53,7 +67,7 @@ The repository map and the *What exists today* text that used to open the page a
 
 ## Site assets
 
-WizSite owns `tokens.css`. The landing page and the Changelog use it with `site.css`; the Changelog keeps its own styles inline in `changelog/index.html`, so the landing never loads them. The landing also loads the pinned GSAP 3.15.1 core and `site.js`. The build fingerprints these styles and scripts so new HTML gets the matching assets. The GreenSock Standard No Charge licence and the agent icon notices ship in `vendor/`.
+WizSite owns `tokens.css`. Every site page uses it with `site.css`; the Changelog and Market keep their own styles in `changelog/changelog.css` and `market/market.css`, so the landing never loads them and no page uses inline `<style>` blocks. The landing also loads the pinned GSAP 3.15.1 core and `site.js`. The build fingerprints these styles and scripts so new HTML gets the matching assets. The GreenSock Standard No Charge licence and the agent icon notices ship in `vendor/`.
 
 The landing page opens on an Ember-style OpenWiz window that walks through one to-do build. Right under the hero (its headline, install box and demo window), above everything else, sits the two-minute launch video (`art/launch-video.mp4`, a 1280×666 web copy of the launch film with its 40 px black bars cropped: H.264 high profile at about 1.1 Mbps with 128 kbps AAC and `+faststart`) on a wide player: its poster (`art/launch-poster.webp`, the ship at sunset) and one **Watch OpenWiz in two minutes** button. It loads nothing until that button is pressed (`preload="none"`, never autoplay), then plays from the start with sound, native controls and captions on offer (`art/launch-video.vtt`, the narrator's lines, without the spell shouts). Without scripts it keeps the video's native controls. A two-sentence text alternative describes it to screen readers, and one small **See the launch post** link under it opens the launch post on X. Painted WebP costume and crew sprites sit alongside HTML ticket states and an SVG working pulse. Below it are the supported agent logos and three product moments. The spec card plays the real narrated spec video of the to-do app an OpenWiz fleet built (openwizdev/todo-demo, J267); the grill and ship cards link that run's grill questions and the live app, muted and inline while in view, with Play with sound, captions, a poster and a plain link; it loads only when it first plays. The footer's twelve waving Wizes look toward the pointer. The demo pauses off screen, offers a Pause motion control and keeps a readable still when reduced motion is on or either script is unavailable. The install box shows the one line, `Install OpenWiz from github.com/openwizdev/OpenWiz`, with **Paste this into your agent** and a **Copy** button, which stays disabled as **Copy · coming soon** until the box's `data-install` switch in `index.html` reads `live`. Sign in and the phone home-screen instructions lead to the existing app.
 
