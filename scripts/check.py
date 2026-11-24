@@ -153,23 +153,46 @@ TEAM_HEADLINE = 'Leave the call with a reviewed pull request.'
 TEAM_LEAD = ('Jake, who built OpenWiz, sets up an agent factory with your team on your own repository. '
              'Pick one small, real change: your agents build and review it. Merging stays your call.')
 TEAM_NEEDS = '30 minutes. Bring a repository with working CI and a signed-in Claude Code or Codex.'
-TEAM_EXAMPLE = ('your-org/your-repo', 'Example', '#128', 'Add CSV export to the reports page',
-                'Built by: your builder agent', 'Reviewed by: a second agent Approved',
-                'Checks: CI passed', 'Merge: your call')
+TEAM_SPEC_TITLE = 'spec: openwiz.dev/book, our own booking page for the team call'
+TEAM_SPEC_PR = 'https://github.com/openwizdev/WizSite/pull/183'
+TEAM_SPEC_TICKETS = ('BK1: busy time from iCal and the open slots',
+                     'BK3: confirmation email and Google Calendar',
+                     'BK2: the booking API',
+                     'BK4: the booking page and its installable app')
+TEAM_SPEC_ROWS = tuple(f'<li><span>{title}</span><span class="team-spec-state merged">Merged</span></li>'
+                       for title in TEAM_SPEC_TICKETS)
+TEAM_SNAPSHOT = f'''
+  <section class="team-spec" aria-labelledby="team-spec-title">
+    <h2 class="team-spec-heading" id="team-spec-title">
+      <code>#2963</code>
+      <a href="https://github.com/openwizdev/OpenWiz/issues/2963">{TEAM_SPEC_TITLE}</a>
+    </h2>
+    <ul class="team-spec-tickets">
+      {' '.join(TEAM_SPEC_ROWS)}
+    </ul>
+    <div class="team-spec-merge">
+      <p>Latest merged pull request</p>
+      <a href="{TEAM_SPEC_PR}"><code>openwizdev/WizSite #183</code> <span>BK2: the booking API (#2966)</span></a>
+      <p class="team-spec-meta"><span class="team-spec-state merged">Merged</span> <time datetime="2026-11-24T13:00:20Z">24 Nov 2026, 13:00 UTC</time></p>
+    </div>
+    <p class="team-spec-origin" role="status">Snapshot from GitHub · <time datetime="2026-11-24T14:33:00Z">24 Nov 2026, 14:33 UTC</time></p>
+  </section>
+'''
 TEAM_STEPS = (('Connect', 'We connect OpenWiz to your repository and the coding agents you already use.'),
               ('Decide', 'You pick one small, real change and answer a few questions about it.'),
               ('Ship', 'Your agents build it, a second agent reviews it, and the pull request opens on your repository. '
                        'Merging is your call.'))
-TEAM_PARTS = ('On the call', 'Launch film', 'What you’re setting up', 'One small change. One call.')
+TEAM_PARTS = ('On the call', 'OpenWiz in two minutes', 'What you’re setting up', 'One small change. One call.')
 TEAM_FACTS = ('OpenWiz 0.01 is out: open source, Apache-2.0.',
               'It never touches a login and runs no server of ours.',
-              'Which drivers passed their live check: the Drivers page.',
+              'Which drivers passed their check: the Drivers page.',
               'One person built it, with fleets of agents.')
 TEAM_DESCRIPTION = ('A 30-minute call with Jake, who built OpenWiz. Bring your repository; leave with a pull request '
                     'your agents built and reviewed.')
 TEAM_NEVER = re.compile(r'\binstall|\bguarantee|\bpric(?:e|es|ing)\b|\bcost|\bfree\b|\bcheckout|[$€£]\s*\d|\bper (?:month|seat|user)\b'
                         r'|\bcustomers?\b|\btrusted\b|\btestimonial|\bresults?\b|\bcloudroom\b|\bships on\b|\bminute \d'
-                        r'|\b(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten) (?:drivers|hosts)\b|\b\d+ of \d+\b', re.I)
+                        r'|\b(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten) (?:drivers|hosts)\b|\b\d+ of \d+\b'
+                        r'|\blive\b|\bright now\b', re.I)
 REPORT_LINK = 'https://github.com/openwizdev/openwiz/issues/new?template=feedback.yml'
 FOOTER = (ROOT / 'footer.html').read_text()
 FOOTER_SLOT = '<template data-slot="footer"></template>\n'
@@ -645,7 +668,8 @@ def check_ref(root, source, ref, pages, favicons=(), market=None):
             assert not url.username and not url.password and not url.query, 'unexpected external URL parts'
             return
         assert url.scheme == 'https' and url.netloc == 'github.com', 'unexpected external URL'
-        assert re.match(r'^/openwizdev/(?:openwiz|OpenWiz|WizSkills|WizPlugins)(?:/|$)', url.path), 'unexpected repository link'
+        assert (source == root / TEAM_PAGE and ref == TEAM_SPEC_PR) or \
+            re.match(r'^/openwizdev/(?:openwiz|OpenWiz|WizSkills|WizPlugins)(?:/|$)', url.path), 'unexpected repository link'
         assert not url.username and not url.password and not url.query, 'unexpected external URL parts'
         return
     assert not url.query, 'unexpected local query'
@@ -1500,14 +1524,20 @@ def check_team(htmls, pages):
     assert description and unescape(description[1]) == TEAM_DESCRIPTION, f'the team page description: {TEAM_DESCRIPTION}'
     assert not re.search(r'<(?:iframe|embed|object|form|details)\b', team) and team.count('<script') == 2, \
         'the team page adds no embed, form or script beyond GSAP and site.js, and folds nothing away'
+    page = pages[TEAM_PAGE]
+    assert page.scripts == [s for s in pages['index.html'].scripts if not s.startswith('/faq.')] and not page.inline_scripts, \
+        'the team page loads only GSAP and site.js'
     main = team.split('<main', 1)[1].split('</main>', 1)[0]
     shown = re.sub(r'\s+', ' ', unescape(re.sub(r'<[^>]*>', ' ', main)))
-    assert not TEAM_NEVER.search(shown), f'a word the team page never uses: {TEAM_NEVER.search(shown)[0]}'
+    # The real BK4 title contains “installable”. The panel below pins the exact row.
+    forbidden = TEAM_NEVER.search(unescape(re.sub(r'<[^>]*>', ' ', main.replace(TEAM_SPEC_ROWS[-1], '', 1))))
+    assert not forbidden, f'a word the team page never uses: {forbidden[0]}'
     assert "'" not in shown and "'" not in ' '.join(re.findall(r'aria-label="([^"]*)"', main)), \
         'the team page uses curly apostrophes'
     assert not re.search(r'\bhidden\b|aria-hidden', re.sub(r'<button class="launch-play" type="button" hidden><span aria-hidden="true">', '', main)), 'the team page hides none of its copy'
-    parts = [plain(h) for h in re.findall(r'<h2\b[^>]*>([\s\S]*?)</h2>', main)]
-    assert parts == list(TEAM_PARTS), f'the team page sections, in order: {parts}'
+    parts = [plain(h) for h in re.findall(r'<h2 id="team-[^"]+">([\s\S]*?)</h2>', main)]
+    assert parts == list(TEAM_PARTS) and len(re.findall(r'<h2\b', main)) == len(TEAM_PARTS) + 1, \
+        f'the team page sections, in order: the spec panel and {parts}'
     h1 = re.findall(r'<h1\b[^>]*>([\s\S]*?)</h1>', main)
     assert [plain(h) for h in h1] == [TEAM_HEADLINE], f'the team page headline: {h1}'
     hero = re.search(r'<div class="team wrap">([\s\S]*?)\n</div>\n', main)
@@ -1517,16 +1547,8 @@ def check_team(htmls, pages):
                      r'<a class="team-book" id="book" data-book [^>]*>Book a call</a>\s*<p class="team-needs">([^<]*)</p>\s*</div>', hero)
     assert copy and tuple(map(unescape, copy.groups())) == (TEAM_KICKER, TEAM_LEAD, TEAM_NEEDS), \
         f'the hero, in order: who it is for, the headline, what happens on the call, Book a call, what to bring: {TEAM_KICKER} / {TEAM_LEAD} / {TEAM_NEEDS}'
-    example = re.fullmatch(r'\s*<figure class="team-pr">\s*<figcaption class="team-pr-heading">\s*'
-                           r'<p class="team-pr-meta"><code>([^<]+)</code> <span>([^<]+)</span></p>\s*'
-                           r'<p class="team-pr-title"><span>([^<]+)</span> ([^<]+)</p>\s*</figcaption>\s*'
-                           r'<dl class="team-pr-details">\s*'
-                           r'<div>(<dt>[^<]+</dt> <dd>[^<]+</dd>)</div>\s*'
-                           r'<div>(<dt>[^<]+</dt> <dd>[^<]+ <span class="team-pr-approved">[^<]+</span></dd>)</div>\s*'
-                           r'<div>(<dt>[^<]+</dt> <dd>[^<]+</dd>)</div>\s*'
-                           r'<div>(<dt>[^<]+</dt> <dd>[^<]+</dd>)</div>\s*</dl>\s*</figure>\s*', hero[copy.end():])
-    assert example and not hero[:copy.start()].strip() and tuple(unescape(plain(s)) for s in example.groups()) == TEAM_EXAMPLE, \
-        f'the hero ends with the labelled pull request example, in real text: {TEAM_EXAMPLE}'
+    assert not hero[:copy.start()].strip() and hero[copy.end():].split() == TEAM_SNAPSHOT.split(), \
+        'the hero ends with the frozen GitHub spec snapshot, including its links, states and timestamps'
     page = Page(main)
     assert len(page.videos) == 1, 'the team page has one video: the launch film'
     clip = page.videos[0]
@@ -1558,7 +1580,8 @@ def check_team(htmls, pages):
     close = re.search(r'<section class="team-part team-close wrap" aria-labelledby="team-call">\s*<h2 id="team-call">[^<]*</h2>\s*'
                       r'<a class="team-book" data-book href="[^"]*" data-count="book-call">Book a call</a>\s*</section>\s*$', main)
     assert close, 'the page closes on its second Book a call'
-    assert main.count('<a ') == 3 and main.count('<button') == 1, 'the team page offers Book a call twice, the Drivers link and the play button; nothing else'
+    assert len(page.links) == 5 and main.count('<button') == 1, \
+        'the team page offers two booking links, the Drivers link, the snapshot’s spec and pull request links, and the play button; nothing else'
 
 
 

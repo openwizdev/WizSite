@@ -646,7 +646,189 @@ async function askAWiz() {
 
 enableCopy();
 askAWiz();
-showStars().catch(() => {});
+const teamSpecPanel = document.querySelector('.team-spec');
+if (teamSpecPanel) {
+  const api = 'https://api.github.com';
+  const repo = '/repos/openwizdev/OpenWiz';
+  const issueBase = 'https://github.com/openwizdev/OpenWiz/issues/';
+  const cacheKey = 'openwiz-team-spec-v1';
+  const cacheAge = 10 * 60 * 1000;
+  const stateLabels = Object.fromEntries(ticketStates);
+  const hourMinute = new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC', hour: '2-digit', minute: '2-digit' });
+  const date = new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC', day: 'numeric', month: 'short', year: 'numeric' });
+  const heading = teamSpecPanel.querySelector('.team-spec-heading');
+  const list = teamSpecPanel.querySelector('.team-spec-tickets');
+  const merge = teamSpecPanel.querySelector('.team-spec-merge');
+  const origin = teamSpecPanel.querySelector('.team-spec-origin');
+
+  const issueNumber = number => Number.isSafeInteger(number) && number > 0;
+  const titleFits = title => typeof title === 'string' && title.trim() &&
+    !/[$€£]\s*\d|\b(?:prices?|pricing|cost\w*|free|checkout|customers?|trusted|testimonial\w*|cloudroom|guarantee\w*|live)\b|\b(?:per (?:month|seat|user)|right now)\b/i.test(title);
+  const validIssue = issue => issueNumber(issue?.number) && titleFits(issue.title) &&
+    typeof issue.html_url === 'string' &&
+    issue.html_url.toLowerCase() === (issueBase + issue.number).toLowerCase();
+  const validPullLink = pull => /^openwizdev\/(?!\.{1,2}$)[\w.-]+$/i.test(pull?.repo) && issueNumber(pull.number) &&
+    pull.url === `https://github.com/${pull.repo}/pull/${pull.number}`;
+  const validMergeTime = time => typeof time === 'string' &&
+    /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/.test(time) && Number.isFinite(Date.parse(time));
+
+  function element(tag, text, className) {
+    const node = document.createElement(tag);
+    if (text !== undefined) node.textContent = text;
+    if (className) node.className = className;
+    return node;
+  }
+
+  function render({ spec, tickets, latest, readAt }) {
+    const specLink = heading.querySelector('a');
+    specLink.href = spec.html_url;
+    specLink.textContent = spec.title.replaceAll("'", '’');
+    heading.querySelector('code').textContent = `#${spec.number}`;
+    list.replaceChildren(...tickets.map(ticket => {
+      const row = element('li');
+      row.append(element('span', ticket.title.replaceAll("'", '’')),
+        element('span', stateLabels[ticket.state], `team-spec-state ${ticket.state}`));
+      return row;
+    }));
+    if (latest) {
+      const link = merge.querySelector('a') || element('a');
+      link.href = latest.url;
+      link.replaceChildren(element('code', `${latest.repo} #${latest.number}`), ' ',
+        element('span', latest.title.replaceAll("'", '’')));
+      const mergedAt = Date.parse(latest.mergedAt);
+      const time = element('time', `${date.format(mergedAt)}, ${hourMinute.format(mergedAt)} UTC`);
+      time.dateTime = latest.mergedAt;
+      const meta = element('p', undefined, 'team-spec-meta');
+      meta.append(element('span', stateLabels.merged, 'team-spec-state merged'), time);
+      // Keep the existing link in the document so a focused link stays focused.
+      if (link.parentNode === merge) {
+        merge.lastElementChild.replaceWith(meta);
+      } else {
+        merge.replaceChildren(element('p', 'Latest merged pull request'), link, meta);
+      }
+    } else {
+      if (merge.contains(document.activeElement)) specLink.focus({ preventScroll: true });
+      merge.replaceChildren(element('p', 'No merged pull request yet'));
+    }
+    const time = element('time', hourMinute.format(readAt));
+    time.dateTime = new Date(readAt).toISOString();
+    origin.replaceChildren('Live from GitHub · read ', time);
+  }
+
+  function ticketFromTimeline(issue, events) {
+    if (!Array.isArray(events) || events.length >= 100) throw new Error('Invalid or incomplete timeline');
+    const pulls = [];
+    let building = false;
+    for (const event of events) {
+      if (typeof event?.event !== 'string') throw new Error('Invalid timeline event');
+      if (event.event === 'commented') {
+        if (typeof event.body !== 'string') throw new Error('Invalid timeline comment');
+        building ||= event.body.startsWith('launch-fleet: start') ||
+          (event.body.includes('<!-- openwiz:status v1 -->') && /\bagent:[ \t]*builder\b/.test(event.body));
+      }
+      if (event.event !== 'cross-referenced') continue;
+      const source = event.source?.issue;
+      if (!source) throw new Error('Invalid cross-reference');
+      if (!source.pull_request) continue;
+      const repository = /^https:\/\/api\.github\.com\/repos\/([\w-]+\/[\w.-]+)$/.exec(source.repository_url);
+      if (!repository) throw new Error('Invalid pull request repository');
+      if (!repository[1].toLowerCase().startsWith('openwizdev/')) continue;
+      const pull = {
+        repo: repository[1], number: source.number, title: source.title,
+        url: source.html_url, mergedAt: source.pull_request.merged_at,
+      };
+      if (!validPullLink(pull) || typeof pull.title !== 'string' || !['open', 'closed'].includes(source.state) ||
+          (pull.mergedAt !== null && (source.state !== 'closed' || !validMergeTime(pull.mergedAt)))) {
+        throw new Error('Invalid pull request');
+      }
+      pulls.push({ ...pull, open: source.state === 'open' });
+    }
+    let state = 'waiting';
+    if ((issue.state === 'closed' && issue.state_reason === 'completed') ||
+        (pulls.length && pulls.every(pull => pull.mergedAt))) state = 'merged';
+    else if (pulls.some(pull => pull.open)) state = 'review';
+    else if (issue.state === 'open' && !pulls.length && building) state = 'building';
+    return { title: issue.title, state, pulls };
+  }
+
+  async function read() {
+    let cached;
+    try {
+      const stored = JSON.parse(localStorage.getItem(cacheKey));
+      if (stored && Number.isSafeInteger(stored.readAt) && stored.readAt > 0 && stored.readAt <= Date.now() &&
+          validIssue(stored.spec) && Array.isArray(stored.tickets) && stored.tickets.length >= 2 && stored.tickets.length <= 4 &&
+          stored.tickets.every(ticket => titleFits(ticket?.title) && Object.hasOwn(stateLabels, ticket.state)) &&
+          (stored.latest === null || (validPullLink(stored.latest) && titleFits(stored.latest.title) &&
+            validMergeTime(stored.latest.mergedAt)))) cached = stored;
+    } catch {
+      // Storage can be unavailable or contain obsolete data.
+    }
+    if (cached) {
+      render(cached);
+      if (Date.now() - cached.readAt < cacheAge) return;
+    }
+    const visibility = new AbortController();
+    const cancelWhenHidden = () => {
+      if (document.visibilityState !== 'visible') visibility.abort();
+    };
+    document.addEventListener('visibilitychange', cancelWhenHidden);
+    const get = async path => {
+      cancelWhenHidden();
+      visibility.signal.throwIfAborted();
+      const signal = AbortSignal.any([visibility.signal, AbortSignal.timeout(5000)]);
+      const response = await fetch(api + path, { credentials: 'omit', cache: 'no-store', redirect: 'error', signal });
+      if (response.status !== 200) throw new Error('GitHub read failed');
+      return response.json();
+    };
+    try {
+      const search = await get('/search/issues?q=repo:openwizdev/OpenWiz+is:issue+in:title+%22spec:%22&sort=updated&per_page=20');
+      if (!Array.isArray(search?.items)) return;
+      const spec = search.items.find(item => {
+        const count = item?.sub_issues_summary?.total;
+        if (!['open', 'closed'].includes(item?.state) || !Number.isSafeInteger(count) || count < 0) {
+          throw new Error('Invalid search result');
+        }
+        return item.state === 'open' && count >= 2 && count <= 6;
+      });
+      if (!validIssue(spec)) return;
+      const issues = await get(`${repo}/issues/${spec.number}/sub_issues?per_page=20`);
+      // Search and sub-issues leave room for at most four timeline requests.
+      if (!Array.isArray(issues) || issues.length > 4 || issues.length !== spec.sub_issues_summary.total ||
+          !issues.every(issue => validIssue(issue) && ['open', 'closed'].includes(issue.state) &&
+            (issue.state === 'open' || ['completed', 'not_planned', 'duplicate', 'reopened', null].includes(issue.state_reason))) ||
+          new Set(issues.map(issue => issue.number)).size !== issues.length) return;
+      const records = await Promise.all(issues.map(async issue =>
+        ticketFromTimeline(issue, await get(`${repo}/issues/${issue.number}/timeline?per_page=100`))));
+      cancelWhenHidden();
+      visibility.signal.throwIfAborted();
+      const latest = records.flatMap(record => record.pulls).filter(pull => pull.mergedAt)
+        .sort((a, b) => b.mergedAt.localeCompare(a.mergedAt))[0] ?? null;
+      if (latest && !titleFits(latest.title)) return;
+      const result = {
+        spec: { number: spec.number, title: spec.title, html_url: spec.html_url },
+        tickets: records.map(({ title, state }) => ({ title, state })),
+        latest, readAt: Date.now(),
+      };
+      render(result);
+      try { localStorage.setItem(cacheKey, JSON.stringify(result)); } catch { /* Storage is optional. */ }
+    } catch {
+      // The snapshot or the last successful read is already displayed.
+    } finally {
+      visibility.abort();
+      document.removeEventListener('visibilitychange', cancelWhenHidden);
+    }
+  }
+
+  function readWhenVisible() {
+    if (document.visibilityState !== 'visible') return;
+    document.removeEventListener('visibilitychange', readWhenVisible);
+    read();
+  }
+  document.addEventListener('visibilitychange', readWhenVisible);
+  readWhenVisible();
+} else {
+  showStars().catch(() => {});
+}
 launchVideo();
 specVideo();
 oneVoiceAtATime();

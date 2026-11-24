@@ -559,57 +559,56 @@ body.landing > main { flex: 1 0 auto; }
 .team-book:hover { background: var(--brass-hi); text-decoration: none; }
 .team-book:focus-visible { outline: 2px solid var(--orchid); outline-offset: 3px; }
 .team-needs { margin-top: 14px; max-width: 42ch; color: var(--grey2); font-size: 15px; line-height: 1.45; }
-.team-pr {
-  --team-pr-inset: clamp(16px, 2.5vw, 32px);
-  margin: 0;
+.team-spec {
+  padding: clamp(12px, 2vw, 24px);
   border: 1px solid var(--edge);
   border-radius: var(--round);
-  background: var(--panel);
+  background: linear-gradient(145deg, rgb(217 175 232 / 5%), transparent 75%), var(--panel);
   box-shadow: var(--ow-shadow-panel);
+  overflow-wrap: anywhere;
 }
-.team-pr-heading { padding: var(--team-pr-inset); }
-.team-pr-meta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px 12px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--line);
-  color: var(--grey2);
-  font: 500 clamp(12px, 1vw, 14px)/1.4 var(--ow-font-mono);
-}
-.team-pr-meta code { overflow-wrap: anywhere; }
-.team-pr-meta span { padding: 2px 8px; border: 1px solid var(--edge); border-radius: 6px; }
-.team-pr-title {
-  margin-top: clamp(12px, 1.5vw, 22px);
-  color: var(--ink);
-  font-size: clamp(21px, 2.5vw, 36px);
-  font-weight: 700;
-  line-height: 1.1;
-  letter-spacing: -.035em;
-  text-wrap: balance;
-}
-.team-pr-title span { color: var(--grey2); font: 500 .65em var(--ow-font-mono); letter-spacing: 0; }
-.team-pr-details { margin: 0; font: 500 clamp(12px, 1vw, 14px)/1.45 var(--ow-font-mono); }
-.team-pr-details > div {
+.team-spec-heading {
   display: grid;
-  grid-template-columns: 7.5em minmax(0, 1fr);
+  grid-template-columns: max-content minmax(0, 1fr);
   align-items: baseline;
-  padding: clamp(8px, 1vw, 14px) var(--team-pr-inset);
+  gap: 10px;
+  padding-bottom: clamp(10px, 1.3vw, 16px);
+  font-size: clamp(16px, 1.65vw, 23px);
+  font-weight: 650;
+  line-height: 1.25;
+  letter-spacing: -.025em;
+}
+.team-spec-heading code { color: var(--grey2); font: 500 12px/1.4 var(--ow-font-mono); }
+.team-spec a { text-decoration: underline; text-decoration-color: var(--grey); text-underline-offset: .18em; }
+.team-spec a:hover { text-decoration-color: currentColor; }
+.team-spec-tickets { margin: 0; padding: 0; list-style: none; font: 400 clamp(12px, 1.03vw, 14px)/1.4 var(--ow-font-mono); }
+.team-spec-tickets li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  align-items: center;
+  gap: 10px;
+  padding-block: clamp(6px, .75vw, 11px);
   border-top: 1px solid var(--line);
 }
-.team-pr-details dt { color: var(--grey2); }
-.team-pr-details dd { margin: 0; overflow-wrap: anywhere; }
-.team-pr-approved { display: inline-flex; align-items: center; gap: 7px; margin-inline-start: .65em; white-space: nowrap; }
-.team-pr-approved::before {
-  content: "";
-  width: 5px;
-  height: 9px;
-  border: solid var(--brass);
-  border-width: 0 2px 2px 0;
-  transform: translateY(-1px) rotate(45deg);
+.team-spec-state {
+  display: inline-block;
+  padding: 2px 6px;
+  border: 1px solid var(--edge);
+  border-radius: 5px;
+  color: var(--grey2);
+  font: 500 11px/1.3 var(--ow-font-mono);
+  white-space: nowrap;
 }
+.team-spec-state.building { color: var(--brass-hi); }
+.team-spec-state.review { color: var(--sea); }
+.team-spec-state.merged { color: var(--orchid); }
+.team-spec-merge { padding-top: clamp(8px, 1vw, 14px); border-top: 1px solid var(--line); font: 500 13px/1.4 var(--ow-font-sans); }
+.team-spec-merge > p:first-child { margin-bottom: 4px; color: var(--grey2); }
+.team-spec-merge a { display: inline-block; }
+.team-spec-merge a code { display: block; font-size: 11px; color: var(--grey2); }
+.team-spec-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; margin-top: 5px; }
+.team-spec-meta time, .team-spec-origin { color: var(--grey2); font: 400 11px/1.4 var(--ow-font-mono); }
+.team-spec-origin { margin-top: clamp(9px, 1.15vw, 17px); }
 .team-film { max-width: 940px; margin: clamp(20px, 3vw, 40px) auto 0; }
 .team-part { padding-block: clamp(48px, 7vw, 104px); border-top: 1px solid var(--line); }
 .team-part h2 { font-size: clamp(26px, 2.6vw, 34px); font-weight: 740; line-height: 1.1; letter-spacing: -.04em; }
