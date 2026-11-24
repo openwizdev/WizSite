@@ -368,7 +368,8 @@ async function main() {
     const servedAs = (world, state) => {
       assert(shipped.length === 1 && ['data-install="coming-soon"', 'data-install="live"'].includes(shipped[0]),
         `the landing has no single install switch: ${JSON.stringify(shipped)}`);
-      world.site['/'] = async () => ({ status: 200, raw: Buffer.from(landing.replace(shipped[0], `data-install="${state}"`)), type: 'html' });
+      const html = landing.replace(shipped[0], `data-install="${state}"`).replace(/(data-count="install-copy">)[^<]*</, `$1${state === 'live' ? 'Copy' : 'Copy · coming soon'}<`);
+      world.site['/'] = async () => ({ status: 200, raw: Buffer.from(html), type: 'html' });
     };
     const installBox = page => page.run(`(() => { ${LABEL} const box = document.querySelector('.install-box'); const b = box.querySelector('button.install');
       const line = box.querySelector('.install-line'); const hint = box.querySelector('.install-hint');
@@ -411,6 +412,30 @@ async function main() {
       await page.until(`document.querySelector('.install-box button.install').innerText.trim() === 'Copied'`, 'Copied');
       const copied = await page.clipboard();
       assert(copied === LINE, `the clipboard does not hold exactly the install line: ${JSON.stringify(copied)}`);
+      await waitFor(() => world.answered('/api/count'), 'the install Copy count request');
+      checkRequestLog(world, { installCount: true });
+      await page.close();
+    });
+
+    await check('install box switched on without the Clipboard API: Copy still copies the line through the fallback', async () => {
+      const world = new World();
+      servedAs(world, 'live');
+      world.site['/api/count'] = async () => ({ status: 204, raw: Buffer.alloc(0) });
+      const page = await open(browser, world);
+      await page.go(`${SITE}/`);
+      await landed(page);
+      await page.run(`navigator.clipboard.writeText('untouched')`);
+      await page.until(`!document.querySelector('.install-box button.install').disabled`, 'Copy to be enabled');
+      await page.run(`(() => { window.__clip = navigator.clipboard; Object.defineProperty(Navigator.prototype, 'clipboard', { get: () => undefined, configurable: true }); })()`);
+      await page.click('Copy');
+      await page.until(`['Copied', 'Line selected: copy it'].includes(document.querySelector('.install-box button.install').innerText.trim())`, 'a fallback result');
+      const selected = await page.run(`String(window.getSelection())`);
+      assert(selected === LINE, `the fallback did not select exactly the install line: ${JSON.stringify(selected)}`);
+      const label = await page.run(`document.querySelector('.install-box button.install').innerText.trim()`);
+      if (label === 'Copied') {
+        const copied = await page.run(`window.__clip.readText()`);
+        assert(copied === LINE, `the fallback said Copied but the clipboard holds ${JSON.stringify(copied)}`);
+      }
       await waitFor(() => world.answered('/api/count'), 'the install Copy count request');
       checkRequestLog(world, { installCount: true });
       await page.close();
