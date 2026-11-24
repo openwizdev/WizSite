@@ -61,7 +61,7 @@
         <li data-host="cloudroom" data-state="passed"><span class="host-mark"><img class="host-tile" src="/drivers/logos/cloudroom.png" alt="Cloudroom logo" width="256" height="256"></span><span class="host-name">Cloudroom</span> <span class="host-state">passed 5 of 5</span></li>
         <li data-host="boat-dev" data-state="passed"><span class="host-mark"><img class="host-lockup" src="/drivers/logos/boat-dev.svg" alt="boat.dev" width="390" height="109"></span> <span class="host-state">passed 5 of 5</span></li>
       </ul>
-      <ul class="tally" aria-label="Every driver and harness, by state"><li data-state="shipped"><b>3</b> shipped</li><li data-state="live"><b>1</b> passed live, not in a release yet</li><li data-state="waiting"><b>7</b> waiting on live checks</li><li data-state="review"><b>8</b> in review</li><li data-state="building"><b>14</b> being built</li><li data-state="planned"><b>2</b> planned</li><li data-state="held"><b>2</b> held</li><li data-state="parked"><b>1</b> parked</li></ul>
+      <ul class="tally" aria-label="Every driver and harness, by state"><li data-state="shipped"><b>3</b> shipped</li><li data-state="live"><b>1</b> passed live, not in a release yet</li><li data-state="waiting"><b>12</b> waiting on live checks</li><li data-state="review"><b>17</b> in review</li><li data-state="building"><b>0</b> being built</li><li data-state="planned"><b>2</b> planned</li><li data-state="held"><b>2</b> held</li><li data-state="parked"><b>1</b> parked</li></ul>
       <a class="voyage-pass" href="#boat-dev">See boat.dev's five passed checks</a>
     </div>
   </section>
@@ -114,7 +114,7 @@
     <p class="wall-kicker">Hosts</p>
     <h2 id="hosts-title">Where your agents run</h2>
     <p class="wall-lead">Each host gets its own driver. It ships only after it passes the same five-check test on its real host and lands in a release.</p>
-    <nav class="wall-jump" aria-label="Where your agents run, by state"><a href="#hosts-live" data-state="live">Passed live, not in a release yet <span>1</span></a><a href="#hosts-waiting" data-state="waiting">Built, waiting on its live check <span>7</span></a><a href="#hosts-review" data-state="review">In review <span>1</span></a><a href="#hosts-building" data-state="building">Being built <span>5</span></a><a href="#hosts-held" data-state="held">Held <span>1</span></a><a href="#hosts-parked" data-state="parked">Parked <span>1</span></a></nav>
+    <nav class="wall-jump" aria-label="Where your agents run, by state"><a href="#hosts-live" data-state="live">Passed live, not in a release yet <span>1</span></a><a href="#hosts-waiting" data-state="waiting">Built, waiting on its live check <span>7</span></a><a href="#hosts-review" data-state="review">In review <span>6</span></a><a href="#hosts-held" data-state="held">Held <span>1</span></a><a href="#hosts-parked" data-state="parked">Parked <span>1</span></a></nav>
     <div class="wall-group" id="hosts-live" data-state="live">
       <h3 class="group-title">Passed live, not in a release yet <span class="group-count">1</span></h3>
       <ul class="tiles">
@@ -181,47 +181,42 @@
       </ul>
     </div>
     <div class="wall-group" id="hosts-review" data-state="review">
-      <h3 class="group-title">In review <span class="group-count">1</span></h3>
+      <h3 class="group-title">In review <span class="group-count">6</span></h3>
       <ul class="tiles">
         <li class="tile no-mark" id="sprites" data-state="review">
           <h4 class="tile-name">Fly Sprites</h4>
           <p class="tile-state">In review</p>
           <a class="tile-link" href="https://github.com/openwizdev/OpenWiz/pull/2720">Pull request</a>
         </li>
-      </ul>
-    </div>
-    <div class="wall-group" id="hosts-building" data-state="building">
-      <h3 class="group-title">Being built <span class="group-count">5</span></h3>
-      <ul class="tiles">
-        <li class="tile" id="openhands" data-state="building">
+        <li class="tile" id="openhands" data-state="review">
           <span class="tile-mark"><img src="/drivers/logos/openhands.svg" alt="OpenHands logo" width="32" height="32" loading="lazy"></span>
           <h4 class="tile-name">OpenHands Cloud</h4>
-          <p class="tile-state">Being built</p>
-          <a class="tile-link" href="https://github.com/openwizdev/OpenWiz/pull/2567">Draft pull request</a>
+          <p class="tile-state">In review</p>
+          <a class="tile-link" href="https://github.com/openwizdev/OpenWiz/pull/2567">Pull request</a>
         </li>
-        <li class="tile" id="warp-oz" data-state="building">
+        <li class="tile" id="warp-oz" data-state="review">
           <span class="tile-mark"><img src="/drivers/logos/warp.svg" alt="Warp logo" width="32" height="32" loading="lazy"></span>
           <h4 class="tile-name">Warp Oz</h4>
-          <p class="tile-state">Being built</p>
-          <a class="tile-link" href="https://github.com/openwizdev/OpenWiz/pull/2555">Draft pull request</a>
+          <p class="tile-state">In review</p>
+          <a class="tile-link" href="https://github.com/openwizdev/OpenWiz/pull/2555">Pull request</a>
         </li>
-        <li class="tile" id="tembo" data-state="building">
+        <li class="tile" id="tembo" data-state="review">
           <span class="tile-mark"><img src="/drivers/logos/tembo.svg" alt="Tembo logo" width="32" height="32" loading="lazy"></span>
           <h4 class="tile-name">Tembo</h4>
-          <p class="tile-state">Being built</p>
-          <a class="tile-link" href="https://github.com/openwizdev/OpenWiz/pull/2662">Draft pull request</a>
+          <p class="tile-state">In review</p>
+          <a class="tile-link" href="https://github.com/openwizdev/OpenWiz/pull/2662">Pull request</a>
         </li>
-        <li class="tile" id="capy" data-state="building">
+        <li class="tile" id="capy" data-state="review">
           <span class="tile-mark"><img src="/drivers/logos/capy.svg" alt="Capy logo" width="32" height="32" loading="lazy"></span>
           <h4 class="tile-name">Capy</h4>
-          <p class="tile-state">Being built</p>
-          <a class="tile-link" href="https://github.com/openwizdev/OpenWiz/pull/2652">Draft pull request</a>
+          <p class="tile-state">In review</p>
+          <a class="tile-link" href="https://github.com/openwizdev/OpenWiz/pull/2652">Pull request</a>
         </li>
-        <li class="tile" id="ona" data-state="building">
+        <li class="tile" id="ona" data-state="review">
           <span class="tile-mark"><img src="/drivers/logos/ona.svg" alt="Ona logo" width="32" height="32" loading="lazy"></span>
           <h4 class="tile-name">Ona</h4>
-          <p class="tile-state">Being built</p>
-          <a class="tile-link" href="https://github.com/openwizdev/OpenWiz/pull/2699">Draft pull request</a>
+          <p class="tile-state">In review</p>
+          <a class="tile-link" href="https://github.com/openwizdev/OpenWiz/pull/2699">Pull request</a>
         </li>
       </ul>
     </div>
@@ -250,9 +245,43 @@
     <p class="wall-kicker">Harnesses</p>
     <h2 id="harnesses-title">Which agent you already use</h2>
     <p class="wall-lead">Harnesses run as rows on the local driver, on your computer or a VPS. Today that driver runs Claude Code and Codex; every row below is still on its way.</p>
-    <nav class="wall-jump" aria-label="Which agent you already use, by state"><a href="#harnesses-review" data-state="review">In review <span>7</span></a><a href="#harnesses-building" data-state="building">Being built <span>9</span></a><a href="#harnesses-planned" data-state="planned">Planned <span>2</span></a><a href="#harnesses-held" data-state="held">Held <span>1</span></a></nav>
+    <nav class="wall-jump" aria-label="Which agent you already use, by state"><a href="#harnesses-waiting" data-state="waiting">Built, waiting on its live check <span>5</span></a><a href="#harnesses-review" data-state="review">In review <span>11</span></a><a href="#harnesses-planned" data-state="planned">Planned <span>2</span></a><a href="#harnesses-held" data-state="held">Held <span>1</span></a></nav>
+    <div class="wall-group" id="harnesses-waiting" data-state="waiting">
+      <h3 class="group-title">Built, waiting on its live check <span class="group-count">5</span></h3>
+      <ul class="tiles">
+        <li class="tile" id="amp" data-state="waiting">
+          <span class="tile-mark"><img src="/drivers/logos/amp.svg" alt="Amp logo" width="32" height="32" loading="lazy"></span>
+          <h4 class="tile-name">Amp</h4>
+          <p class="tile-state">Built, waiting on its live check</p>
+          <a class="tile-link" href="https://github.com/openwizdev/OpenWiz/pull/2767">Pull request</a>
+        </li>
+        <li class="tile" id="antigravity" data-state="waiting">
+          <span class="tile-mark"><img src="/drivers/logos/antigravity.svg" alt="Antigravity logo" width="32" height="32" loading="lazy"></span>
+          <h4 class="tile-name">Antigravity CLI</h4>
+          <p class="tile-state">Built, waiting on its live check</p>
+          <a class="tile-link" href="https://github.com/openwizdev/OpenWiz/pull/2773">Pull request</a>
+        </li>
+        <li class="tile" id="warp-local" data-state="waiting">
+          <span class="tile-mark"><img src="/drivers/logos/warp.svg" alt="Warp logo" width="32" height="32" loading="lazy"></span>
+          <h4 class="tile-name">Warp local agent</h4>
+          <p class="tile-state">Built, waiting on its live check</p>
+          <a class="tile-link" href="https://github.com/openwizdev/OpenWiz/pull/2766">Pull request</a>
+        </li>
+        <li class="tile" id="auggie" data-state="waiting">
+          <span class="tile-mark"><img src="/drivers/logos/augment.svg" alt="Augment logo" width="32" height="32" loading="lazy"></span>
+          <h4 class="tile-name">Augment Auggie</h4>
+          <p class="tile-state">Built, waiting on its live check</p>
+          <a class="tile-link" href="https://github.com/openwizdev/OpenWiz/pull/2639">Pull request</a>
+        </li>
+        <li class="tile no-mark" id="junie" data-state="waiting">
+          <h4 class="tile-name">JetBrains Junie</h4>
+          <p class="tile-state">Built, waiting on its live check</p>
+          <a class="tile-link" href="https://github.com/openwizdev/OpenWiz/pull/2638">Pull request</a>
+        </li>
+      </ul>
+    </div>
     <div class="wall-group" id="harnesses-review" data-state="review">
-      <h3 class="group-title">In review <span class="group-count">7</span></h3>
+      <h3 class="group-title">In review <span class="group-count">11</span></h3>
       <ul class="tiles">
         <li class="tile no-mark" id="copilot" data-state="review">
           <h4 class="tile-name">GitHub Copilot CLI</h4>
@@ -295,62 +324,28 @@
           <p class="tile-state">In review</p>
           <a class="tile-link" href="https://github.com/openwizdev/OpenWiz/pull/2794">Pull request</a>
         </li>
-      </ul>
-    </div>
-    <div class="wall-group" id="harnesses-building" data-state="building">
-      <h3 class="group-title">Being built <span class="group-count">9</span></h3>
-      <ul class="tiles">
-        <li class="tile" id="amp" data-state="building">
-          <span class="tile-mark"><img src="/drivers/logos/amp.svg" alt="Amp logo" width="32" height="32" loading="lazy"></span>
-          <h4 class="tile-name">Amp</h4>
-          <p class="tile-state">Being built</p>
-          <a class="tile-link" href="https://github.com/openwizdev/OpenWiz/pull/2767">Draft pull request</a>
-        </li>
-        <li class="tile" id="antigravity" data-state="building">
-          <span class="tile-mark"><img src="/drivers/logos/antigravity.svg" alt="Antigravity logo" width="32" height="32" loading="lazy"></span>
-          <h4 class="tile-name">Antigravity CLI</h4>
-          <p class="tile-state">Being built</p>
-          <a class="tile-link" href="https://github.com/openwizdev/OpenWiz/pull/2773">Draft pull request</a>
-        </li>
-        <li class="tile" id="auggie" data-state="building">
-          <span class="tile-mark"><img src="/drivers/logos/augment.svg" alt="Augment logo" width="32" height="32" loading="lazy"></span>
-          <h4 class="tile-name">Augment Auggie</h4>
-          <p class="tile-state">Being built</p>
-          <a class="tile-link" href="https://github.com/openwizdev/OpenWiz/pull/2639">Draft pull request</a>
-        </li>
-        <li class="tile" id="crush" data-state="building">
-          <span class="tile-mark"><img src="/drivers/logos/crush.png" alt="Crush logo" width="32" height="32" loading="lazy"></span>
-          <h4 class="tile-name">Crush</h4>
-          <p class="tile-state">Being built</p>
-          <a class="tile-link" href="https://github.com/openwizdev/OpenWiz/pull/2649">Draft pull request</a>
-        </li>
-        <li class="tile no-mark" id="junie" data-state="building">
-          <h4 class="tile-name">JetBrains Junie</h4>
-          <p class="tile-state">Being built</p>
-          <a class="tile-link" href="https://github.com/openwizdev/OpenWiz/pull/2638">Draft pull request</a>
-        </li>
-        <li class="tile" id="kilo" data-state="building">
-          <span class="tile-mark"><img src="/drivers/logos/kilo-code.svg" alt="Kilo Code logo" width="32" height="32" loading="lazy"></span>
-          <h4 class="tile-name">Kilo Code</h4>
-          <p class="tile-state">Being built</p>
-          <a class="tile-link" href="https://github.com/openwizdev/OpenWiz/pull/2640">Draft pull request</a>
-        </li>
-        <li class="tile" id="kiro" data-state="building">
+        <li class="tile" id="kiro" data-state="review">
           <span class="tile-mark"><img src="/drivers/logos/kiro.svg" alt="Kiro logo" width="32" height="32" loading="lazy"></span>
           <h4 class="tile-name">Kiro</h4>
-          <p class="tile-state">Being built</p>
-          <a class="tile-link" href="https://github.com/openwizdev/OpenWiz/pull/2631">Draft pull request</a>
+          <p class="tile-state">In review</p>
+          <a class="tile-link" href="https://github.com/openwizdev/OpenWiz/pull/2631">Pull request</a>
         </li>
-        <li class="tile no-mark" id="vibe" data-state="building">
+        <li class="tile" id="crush" data-state="review">
+          <span class="tile-mark"><img src="/drivers/logos/crush.png" alt="Crush logo" width="32" height="32" loading="lazy"></span>
+          <h4 class="tile-name">Crush</h4>
+          <p class="tile-state">In review</p>
+          <a class="tile-link" href="https://github.com/openwizdev/OpenWiz/pull/2649">Pull request</a>
+        </li>
+        <li class="tile" id="kilo" data-state="review">
+          <span class="tile-mark"><img src="/drivers/logos/kilo-code.svg" alt="Kilo Code logo" width="32" height="32" loading="lazy"></span>
+          <h4 class="tile-name">Kilo Code</h4>
+          <p class="tile-state">In review</p>
+          <a class="tile-link" href="https://github.com/openwizdev/OpenWiz/pull/2640">Pull request</a>
+        </li>
+        <li class="tile no-mark" id="vibe" data-state="review">
           <h4 class="tile-name">Mistral Vibe</h4>
-          <p class="tile-state">Being built</p>
-          <a class="tile-link" href="https://github.com/openwizdev/OpenWiz/pull/2643">Draft pull request</a>
-        </li>
-        <li class="tile" id="warp-local" data-state="building">
-          <span class="tile-mark"><img src="/drivers/logos/warp.svg" alt="Warp logo" width="32" height="32" loading="lazy"></span>
-          <h4 class="tile-name">Warp local agent</h4>
-          <p class="tile-state">Being built</p>
-          <a class="tile-link" href="https://github.com/openwizdev/OpenWiz/pull/2766">Draft pull request</a>
+          <p class="tile-state">In review</p>
+          <a class="tile-link" href="https://github.com/openwizdev/OpenWiz/pull/2643">Pull request</a>
         </li>
       </ul>
     </div>
