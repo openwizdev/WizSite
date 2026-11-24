@@ -1163,6 +1163,7 @@ class Checks(unittest.TestCase):
         for name, old, new, error in (
                 ('index.html', 'src="/art/wiz-mark.webp"', 'src="/favicon.svg"', 'painted Wiz'),
                 ('market/index.html', 'class="star-icon"', 'class="extra-icon"', 'star icon'),
+                ('market/index.html', '<span data-stars>Star</span>', '<span data-stars hidden>Star</span>', 'Star label and count slot'),
                 ('faq/index.html', 'aria-controls="site-navigation"', 'aria-controls="main"', 'button linked'),
                 ('team/index.html', 'id="site-navigation"', 'id="site-navigation" hidden', 'without JavaScript'),
                 ('changelog/index.html', '<a href="/market/">Market</a>', '', 'phone menu needs Drivers'),
