@@ -137,7 +137,7 @@ test('switch on + demo=1: renders v2 shell, deep links, interactions, and makes 
     await run.page.until(`location.hash === '#/feed/clear' && document.querySelector('.v2-clear-card h2')?.textContent === 'All clear.'`, 'all clear after the last decision');
     assert.deepEqual(await badges(), [null, null]);
     assert.deepEqual(await run.page.run(`[...document.querySelectorAll('.v2-build-card')].map(card => [card.getAttribute('href'), card.querySelectorAll('.cv-blocks i').length, card.querySelector('.cv-sheet-line').textContent])`),
-      [['#/canvas/201', 7, '1\u00a0building · 5\u00a0of\u00a07\u00a0done'], ['#/canvas/221', 4, '1\u00a0building · 1\u00a0in\u00a0review · 2\u00a0of\u00a04\u00a0done']]);
+      [['#/canvas/201', 7, '1\u00a0working · 5\u00a0of\u00a07\u00a0done'], ['#/canvas/221', 4, '1\u00a0working · 1\u00a0in\u00a0review · 2\u00a0of\u00a04\u00a0done']]);
     await run.page.run(`document.querySelector('.v2-toast button').focus()`);
     await new Promise(resolve => setTimeout(resolve, 4700));
     assert.equal(await run.page.run(`document.querySelector('.v2-toast').hidden`), false, 'Undo expired while focused');
@@ -156,6 +156,9 @@ test('switch on + demo=1: renders v2 shell, deep links, interactions, and makes 
     assert.equal(await run.page.run(`document.querySelector('.cv-title h2').textContent`), '#201 Audit log export');
     assert.deepEqual(await run.page.run(`[...document.querySelectorAll('.cv-rail .cv-sheet-name')].map(name => name.textContent)`),
       ['#201 Audit log export', '#221 Project activity digest', '#211 Magic-link sign-in']);
+    assert.equal(await run.page.run(`document.querySelectorAll('.cv-behind').length`), 0, 'v2 canvas cards have no ghost offset edges');
+    assert.equal(await run.page.run(`document.querySelector('.cv-chip-go')?.firstElementChild?.className`), 'cv-chip-text', 'v2 needs-you chip leads with plain title');
+    assert.equal(await run.page.run(`document.querySelector('.cv-stack[data-ticket$="#207"] .pill')?.textContent`), 'Working', 'v2 active pill says Working');
     assert.equal(await run.page.run(`[...document.querySelectorAll('.cv a')].some(link => /^https?:/.test(link.getAttribute('href')))`), false, 'the sample board links off the app');
 
     await run.page.go(`${SITE}/app/?v2=dry-run&demo=1#/settings`);
@@ -225,7 +228,7 @@ test('demo isolates a saved GitHub session from boot, visibility refresh, and th
     await run.page.click('Allow recovery for 30 days');
     await run.page.until(`document.querySelector('.v2-build-card')?.textContent.includes('Audit log export')`, 'Feed with the Building cards');
     await run.page.run(`document.querySelector('.v2-build-card').click()`);
-    await run.page.until(`location.hash === '#/canvas/201' && document.querySelector('.cv-stack[data-ticket$="#208"] .pill')?.textContent === 'Building'`, 'Building opens the board, with the decided ticket building');
+    await run.page.until(`location.hash === '#/canvas/201' && document.querySelector('.cv-stack[data-ticket$="#208"] .pill')?.textContent === 'Working'`, 'Building opens the board, with the decided ticket working');
     await run.page.run(`Object.defineProperty(document, 'hidden', { configurable: true, value: false });
       document.dispatchEvent(new Event('visibilitychange'))`);
     assert.deepEqual(await run.page.run(stored), session);

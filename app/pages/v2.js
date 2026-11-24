@@ -301,7 +301,7 @@
           q.selected = i;
           updateSummary();
         },
-      }, i === q.rec ? icon('check') : null, option));
+      }, icon('check'), option));
       return h('div', { class: 'v2-grill-q' }, h('p', {}, q.prompt),
         h('div', { class: 'v2-q-opts', role: 'group', 'aria-label': q.prompt }, choices));
     });
@@ -442,6 +442,8 @@
       h('circle', { cx: 120, cy: 76, r: 15, fill: '#352d24', 'stroke-width': '1.5' }),
       h('circle', { cx: 120, cy: 76, r: 11, opacity: '.65', 'stroke-dasharray': '1 2' }),
       h('path', { d: 'M115 77q3-4 6 0t6 0m-12 4q3-4 6 0t6 0' }));
+    const scene = card.scenes[card.sceneIdx];
+    const [sceneTime, ...sceneRest] = scene.split(' · ');
     return h('div', { class: 'v2-preview' },
       h('div', { class: 'v2-preview-art', 'aria-hidden': 'true' }, envelope),
       h('div', { class: 'v2-preview-top' }, h('span', { class: 'v2-preview-label' }, 'Narrated spec')),
@@ -450,16 +452,17 @@
           'aria-label': `Next scene, scene ${card.sceneIdx + 1} of ${card.scenes.length}`,
           onclick: () => { card.sceneIdx = (card.sceneIdx + 1) % card.scenes.length; redraw(); },
         }, icon('right')),
-        h('span', { 'aria-live': 'polite' }, card.scenes[card.sceneIdx])));
+        h('span', { 'aria-live': 'polite' }, sceneRest.length ? [h('span', { class: 'v2-mono' }, sceneTime), ` · ${sceneRest.join(' · ')}`] : scene)));
   }
 
   function renderDemoFeed(el, arg, controls) {
     const list = pendingDemoCards();
     if (arg === 'clear' || !list.length) {
       controls.replaceChildren();
-      el.replaceChildren(h('div', { class: 'v2-feed-stage v2-feed-clear' },
-        allClear('Wiz is building. You’ll hear when something needs you.'),
-        buildingSection(sampleBuilding())));
+      const building = buildingSection(sampleBuilding());
+      el.replaceChildren(h('div', { class: `v2-feed-stage v2-feed-clear${building ? ' has-aside' : ''}` },
+        h('div', { class: 'v2-feed-main' }, allClear('Wiz is building. You’ll hear when something needs you.')),
+        building ? h('aside', { class: 'v2-feed-aside', 'aria-label': 'Building' }, building) : null));
       return;
     }
 
@@ -492,7 +495,7 @@
     };
     const spec = decision ? null : sampleSpec(card.spec);
     const details = spec && h('div', { class: 'v2-progress-box' },
-      h('p', {}, h('strong', {}, `${spec.done} of ${spec.total}`), ' tickets merged'),
+      h('p', {}, h('strong', { class: 'v2-mono' }, `${spec.done} of ${spec.total}`), ' tickets merged'),
       OW.canvas.blocks(spec));
     const primaryAction = h('button', { type: 'button', class: 'v2-btn primary', 'data-focus': 'ship',
       onclick: () => resolve(decision ? 'decided' : 'shipped', `${decision ? 'Approved' : 'Shipped'} “${card.title}”`) }, icon('check'), decision ? card.rec : 'Ship it');
@@ -512,8 +515,10 @@
           onclick: () => resolve('deferred', `Saved “${card.title}” for later`) }, 'Not now')));
     const navigation = pager(index, list.length, i => go(cardHref(list[i])));
     controls.replaceChildren(...(navigation ? [navigation] : []));
-    el.replaceChildren(h('div', { class: 'v2-feed-stage' },
-      hero, nextPreview(next, href => { go(href); focusCard(); }), buildingSection(sampleBuilding())));
+    const aside = [nextPreview(next, href => { go(href); focusCard(); }), buildingSection(sampleBuilding())].filter(Boolean);
+    el.replaceChildren(h('div', { class: `v2-feed-stage${aside.length ? ' has-aside' : ''}` },
+      h('div', { class: 'v2-feed-main' }, hero),
+      aside.length ? h('aside', { class: 'v2-feed-aside', 'aria-label': 'Up next and building' }, ...aside) : null));
   }
 
   const settingIcons = {
@@ -582,8 +587,8 @@
   function renderDemoSettings(el) {
     if (el.querySelector('.v2-settings')) return;
     const s = demo.settings;
-    const row = (key, label, current, content) => {
-      const value = h('span', { class: 'v2-setting-value' }, current());
+    const row = (key, label, current, content, valueClass = '') => {
+      const value = h('span', { class: `v2-setting-value${valueClass ? ` ${valueClass}` : ''}` }, current());
       let close;
       const opener = h('button', {
         type: 'button', class: 'v2-set-row v2-setting-trigger', 'aria-haspopup': 'dialog', 'aria-expanded': 'false',
@@ -594,9 +599,9 @@
       }, settingLabel(key, label), ' ', value, icon('chevron'));
       return opener;
     };
-    const choose = (key, label, values) => row(key, label, () => s[key], save =>
+    const choose = (key, label, values, valueClass = '') => row(key, label, () => s[key], save =>
       h('div', { class: 'v2-setting-choices' },
-        values.map(value => settingOption(value, value === s[key], () => save(() => { s[key] = value; })))));
+        values.map(value => settingOption(value, value === s[key], () => save(() => { s[key] = value; })))), valueClass);
     const connectionSummary = () => {
       if (s.github && s.notifications) return '2 connected';
       if (s.github) return 'GitHub connected';
@@ -610,7 +615,7 @@
       choose('effort', 'Effort', ['Fast', 'Balanced', 'Thorough']),
       choose('models', 'Models', ['Recommended', 'Faster', 'Higher accuracy']),
       row('connections', 'Connections', connectionSummary, connectionChoices),
-      choose('budget', 'Budget', ['$25 / day', '$50 / day', '$100 / day']),
+      choose('budget', 'Budget', ['$25 / day', '$50 / day', '$100 / day'], 'v2-mono'),
       choose('repository', 'Repository', ['Harbor · main', 'Harbor · staging']),
       h('a', { class: 'v2-set-row v2-sign-out', href: '/app/' }, settingLabel('exit', 'Exit sample workspace'))));
   }

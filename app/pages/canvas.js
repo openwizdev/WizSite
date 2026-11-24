@@ -112,7 +112,7 @@
   let shown = null;
   const home = () => OW.data.repo.get()?.full;
 
-  const PLAIN = { merged: 'Done', review: 'In review', building: 'Building', ready: 'Ready', waiting: 'Waiting', you: 'Needs you', held: 'Paused', unknown: 'Unknown' };
+  const PLAIN = { merged: 'Done', review: 'In review', building: 'Working', ready: 'Ready', waiting: 'Waiting', you: 'Needs you', held: 'Paused', unknown: 'Unknown' };
   const NOTE_STATE = { working: 'building', asking: 'you', done: 'merged', stopped: 'held', lapsed: 'waiting', second: 'waiting', unknown: 'unknown' };
   function plainState(t) {
     if (t.state === 'merged') return 'merged';
@@ -180,9 +180,7 @@
       h('span', { class: 'cv-name' }, t.title),
       h('span', { class: 'cv-step' }, line),
       h('span', { class: 'cv-meta' }, plainPill(state), stamp(t.activity, now)))),
-    h('span', { class: 'cv-tile', 'aria-hidden': 'true' }, dot(colour, state === 'waiting' || state === 'ready'), h('b', {}, `#${t.number}`), h('span', {}, t.title)),
-    t.members.length > 1 ? h('span', { class: 'cv-behind', 'aria-hidden': 'true' },
-      t.members.slice(1, 3).map(() => h('span', { class: 'cv-card', '--c': colour }))) : null);
+    h('span', { class: 'cv-tile', 'aria-hidden': 'true' }, dot(colour, state === 'waiting' || state === 'ready'), h('b', {}, `#${t.number}`), h('span', {}, t.title)));
     return el;
   }
 
@@ -459,7 +457,7 @@
     else if (c.you) parts.push(`${c.you} need${c.you === 1 ? 's' : ''} you`);
     if (V2()) {
       const at = state => sheet.tickets.filter(t => !t.outside && plainState(t) === state).length;
-      if (at('building')) parts.push(`${at('building')} building`);
+      if (at('building')) parts.push(`${at('building')} working`);
       if (at('review')) parts.push(`${at('review')} in review`);
     } else if (c.working) parts.push(`${c.working} working`);
     if (!sheet.read) parts.push('tickets unknown');
@@ -489,7 +487,7 @@
       const hits = view.query ? matches(s).length : null;
       items.push(h('a', { class: `cv-sheet${s.number === view.sheet ? ' on' : ''}${s.counts.you ? ' you' : ''}${s.quiet ? ' quiet' : ''}`,
         href: `#/canvas/${s.number}`, 'data-sheet': s.number, 'data-focus': `sheet:${s.number}`, 'aria-current': s.number === view.sheet ? 'page' : null },
-      h('span', { class: 'cv-sheet-name' }, `#${s.number} ${s.title}`), blocks(s),
+      h('span', { class: 'cv-sheet-name' }, V2() ? [h('span', { class: 'cv-sheet-num' }, `#${s.number}`), ` ${s.title}`] : `#${s.number} ${s.title}`), blocks(s),
       h('span', { class: 'cv-sheet-line' }, hits === null ? railLine(s) : `${plural(hits, 'match', 'matches')}`)));
     }
     if (quiet.length) items.push(quietToggle(quiet));
@@ -512,13 +510,18 @@
     }
     return h('div', { class: 'cv-inbox', role: 'list', 'aria-label': 'Needs you' },
       h('span', { class: 'cv-inbox-label' }, dot(STATES.you.colour), `Needs you · ${m.inbox.length}`),
-      (view.inboxAll ? m.inbox : m.inbox.slice(0, INBOX_SHOWN)).map((item, i) => h('span', { class: 'cv-chip', role: 'listitem' },
-        item.href ? h('a', { class: 'cv-chip-go', href: item.href, 'data-focus': `inbox:${i}`, 'data-item': item.kind },
-          h('span', { class: 'num' }, `#${item.number}`), h('span', { class: 'cv-chip-text' }, INBOX_WORDS[item.kind](item)))
-        : h('button', { type: 'button', class: 'cv-chip-go', 'data-focus': `inbox:${i}`, 'data-item': item.kind,
-          disabled: item.sheet === null ? true : null, onclick: () => goTo(item) },
-        h('span', { class: 'num' }, item.ticket ? `#${item.number}` : `spec #${item.number}`), h('span', { class: 'cv-chip-text' }, INBOX_WORDS[item.kind](item))),
-        item.url ? h('a', { href: item.url, rel: 'noreferrer', target: '_blank', 'aria-label': `Open #${item.number} on GitHub`, 'data-focus': `inbox-link:${i}` }, 'GitHub ↗') : null)),
+      (view.inboxAll ? m.inbox : m.inbox.slice(0, INBOX_SHOWN)).map((item, i) => {
+        const chipLabel = (numText) => (V2()
+          ? [h('span', { class: 'cv-chip-text' }, INBOX_WORDS[item.kind](item)), h('span', { class: 'num' }, numText)]
+          : [h('span', { class: 'num' }, numText), h('span', { class: 'cv-chip-text' }, INBOX_WORDS[item.kind](item))]);
+        return h('span', { class: 'cv-chip', role: 'listitem' },
+          item.href ? h('a', { class: 'cv-chip-go', href: item.href, 'data-focus': `inbox:${i}`, 'data-item': item.kind },
+            ...chipLabel(`#${item.number}`))
+          : h('button', { type: 'button', class: 'cv-chip-go', 'data-focus': `inbox:${i}`, 'data-item': item.kind,
+            disabled: item.sheet === null ? true : null, onclick: () => goTo(item) },
+          ...chipLabel(item.ticket ? `#${item.number}` : `spec #${item.number}`)),
+          item.url ? h('a', { href: item.url, rel: 'noreferrer', target: '_blank', 'aria-label': `Open #${item.number} on GitHub`, 'data-focus': `inbox-link:${i}` }, 'GitHub ↗') : null);
+      }),
       m.inbox.length > INBOX_SHOWN ? h('button', { type: 'button', class: 'cv-more-items', 'data-focus': 'inbox-more', 'aria-expanded': String(Boolean(view.inboxAll)),
         onclick: () => { view.inboxAll = !view.inboxAll; rerender(); } }, view.inboxAll ? 'Show fewer' : `${m.inbox.length - INBOX_SHOWN} more`) : null);
   }
@@ -652,7 +655,7 @@
     const slat = (s, i, offset) => {
       const el = h('button', { type: 'button', class: `cv-slat${s.counts.you ? ' you' : ''}`, 'data-sheet': s.number, 'data-offset': String(offset),
         'data-focus': `slat:${s.number}`, 'aria-label': `#${s.number} ${s.title}: ${sheetLine(s)}`, onclick: () => pick(i) },
-      h('span', { class: 'cv-sheet-name' }, `#${s.number} ${s.title}`), blocks(s), h('span', { class: 'cv-sheet-line' }, sheetLine(s)));
+      h('span', { class: 'cv-sheet-name' }, V2() ? [h('span', { class: 'cv-sheet-num' }, `#${s.number}`), ` ${s.title}`] : `#${s.number} ${s.title}`), blocks(s), h('span', { class: 'cv-sheet-line' }, sheetLine(s)));
       return el;
     };
     const s = sheets[at];
