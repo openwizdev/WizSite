@@ -73,7 +73,8 @@ test('switch on + demo=1: renders v2 shell, deep links, interactions, and makes 
     await run.page.click('Open Harbor workspace');
     await run.page.until(`location.hash === '#/chat' && document.body.innerText.includes('Accept all 3')`, 'v2 chat with grill round');
     const nav = await run.page.run(`[...document.querySelectorAll('nav.main a')].map(a => a.getAttribute('href'))`);
-    assert.deepEqual(nav, ['#/chat', '#/feed', '#/settings']);
+    assert.deepEqual(nav, ['#/chat', '#/feed', '#/canvas', '#/settings']);
+    assert.deepEqual(await run.page.run(`[...document.querySelectorAll('nav.v2-tabs a')].map(a => a.getAttribute('href'))`), nav);
 
     await run.page.run(`window.originalMessages = [...document.querySelector('.v2-chat-thread').children];
       window.originalChoices = [...document.querySelectorAll('.v2-q-pill')];
@@ -106,7 +107,9 @@ test('switch on + demo=1: renders v2 shell, deep links, interactions, and makes 
     await run.page.until(`document.querySelector('.v2-toast').hidden`, 'route change dismisses the toast');
     await run.page.until(`document.body.innerText.includes('Make the link last ten minutes')`, 'change request recorded in Chat');
     await run.page.go(`${SITE}/app/?demo=1#/feed/clear`);
-    await run.page.until(`document.querySelector('.v2-building')?.textContent.includes('Magic-link sign-in')`, 'revised spec moved to Building');
+    await run.page.until(`document.querySelector('.v2-watch-tab[aria-pressed="true"]')?.textContent.includes('Magic-link sign-in')`, 'revised spec leads Building');
+    assert.equal(await run.page.run(`document.querySelector('.v2-watch-tab[aria-pressed="true"] .v2-count').textContent`), '6 of 7');
+    assert.ok(await run.page.run(`[...document.querySelectorAll('.v2-watch .cv-plain h3')].some(el => el.textContent === 'Your change')`));
 
     await run.page.go(`${SITE}/app/?v2=dry-run&demo=1#/feed/2`);
     await run.page.until(`document.querySelector('.v2-card-title')?.textContent === 'Keep the free plan?'`, 'deep link to decision card');
@@ -136,7 +139,8 @@ test('switch on + demo=1: renders v2 shell, deep links, interactions, and makes 
     await run.page.click('Not now');
     await run.page.until(`location.hash === '#/feed/clear' && document.querySelector('.v2-clear-card h2')?.textContent === 'All clear.'`, 'all clear after the last decision');
     assert.deepEqual(await badges(), [null, null]);
-    assert.equal(await run.page.run(`document.querySelector('.v2-building progress').value`), 5);
+    assert.equal(await run.page.run(`document.querySelectorAll('.v2-watch-tab .cv-blocks i').length`), 11, 'one block per ticket');
+    assert.equal(await run.page.run(`document.querySelector('.v2-watch [data-ticket="harbor#44"] .pill').textContent`), 'On hold');
     await run.page.run(`document.querySelector('.v2-toast button').focus()`);
     await new Promise(resolve => setTimeout(resolve, 4700));
     assert.equal(await run.page.run(`document.querySelector('.v2-toast').hidden`), false, 'Undo expired while focused');
@@ -149,6 +153,13 @@ test('switch on + demo=1: renders v2 shell, deep links, interactions, and makes 
     await run.page.go(`${SITE}/app/?v2=dry-run&demo=1#/feed/clear`);
     await run.page.until(`document.querySelector('.v2-clear-card h2')?.textContent === 'All clear.'`, 'deep link to all clear');
     assert.deepEqual(await badges(), [null, null]);
+    assert.equal(await run.page.run(`document.querySelector('.v2-watch [data-ticket="harbor#44"] .pill').textContent`), 'Building',
+      'an answered decision moves its ticket on');
+
+    await run.page.go(`${SITE}/app/?demo=1#/feed/2`);
+    await run.page.until(`document.querySelectorAll('.v2-watch .cv-stack').length === 7`, 'Feed beside the board');
+    await run.page.run(`document.querySelector('.v2-watch-tab:nth-child(2)').click()`);
+    await run.page.until(`document.querySelectorAll('.v2-watch .cv-stack').length === 4`, 'the other spec\'s board');
 
     await run.page.go(`${SITE}/app/?v2=dry-run&demo=1#/settings`);
     const hostValue = `document.querySelector('.v2-setting-trigger .v2-setting-value')?.textContent`;
@@ -201,6 +212,26 @@ test('demo isolates a saved GitHub session from boot, visibility refresh, and th
       OW.data.refreshAll();
       Promise.allSettled([OW.data.github('GET', '/user'), OW.data.repositories()])`);
     await run.page.key('k', 'Ctrl');
+
+    await run.page.run(`document.querySelector('.v2-watch [data-ticket="harbor#44"]').click()`);
+    await run.page.until(`document.querySelector('.v2-card-title')?.textContent === 'Retention window for deleted projects'`, 'a ticket that needs you opens its card');
+    await run.page.run(`document.querySelector('.v2-watch [data-ticket="harbor#46"]').click()`);
+    await run.page.until(`document.querySelector('.v2-watch .cv-focus')?.textContent.includes('Laying out the date range')`, 'a ticket opens beside the card');
+    await run.page.key('Escape');
+    await run.page.until(`document.activeElement.dataset.ticket === 'harbor#46'`, 'Escape returns to the board');
+
+    await run.page.run(`location.hash = '#/canvas'`);
+    await run.page.until(`document.querySelector('main h1')?.textContent === 'Canvas' && document.querySelectorAll('.cv-stack').length === 7`, 'the sample Canvas');
+    assert.deepEqual(await run.page.run(`[...document.querySelectorAll('.cv-rail .cv-sheet-name')].map(el => el.textContent)`),
+      ['#41 Audit log export', '#51 Project activity digest', '#30 Magic-link sign-in']);
+    assert.deepEqual(await run.page.run(`[...new Set([...document.querySelectorAll('.cv-stack .pill')].map(p => p.textContent))].sort()`),
+      ['Building', 'Done', 'In review', 'Needs you', 'Waiting']);
+    assert.doesNotMatch(await run.page.text(), /Builder|Reviewer|Claude|Codex|Opus/);
+    assert.equal(await run.page.run(`document.querySelectorAll('main a[href^="http"]').length`), 0, 'the sample board links outside');
+    await run.page.go(`${SITE}/app/?demo=1#/canvas/51`);
+    await run.page.until(`document.querySelectorAll('.cv-stack').length === 4`, 'a sample sheet by address');
+    await run.page.run(`document.querySelector('.cv-chip-go').click()`);
+    await run.page.until(`location.hash === '#/feed' && document.querySelector('.v2-card-title')?.textContent === 'Magic-link sign-in'`, 'the strip opens Feed');
 
     assert.equal(await run.page.run('OW.palette.shown()'), false);
     assert.doesNotMatch(await run.page.text(), /acme\/factory/);

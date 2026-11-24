@@ -299,7 +299,7 @@ test('Canvas: widening the window refits a board that is still at its fitted vie
   }
 });
 
-test('switch on: #/canvas still opens the Canvas page under the v2 shell, which keeps its own nav', async () => {
+test('switch on: Canvas is a v2 page with plain states, hides agent roles, and Feed shows the same board beside the cards', async () => {
   const run = await start();
   try {
     world(run);
@@ -313,7 +313,28 @@ test('switch on: #/canvas still opens the Canvas page under the v2 shell, which 
     assert.equal(await run.page.run('location.hash'), '#/canvas');
     assert.equal(await run.page.run(`document.querySelector('main h1')?.textContent`), 'Canvas');
     assert.deepEqual(await sheets(run), ['#41 Spec: checkout', '#48 Spec: accounts', 'Quiet · 1']);
-    assert.deepEqual(await run.page.run(`[...document.querySelectorAll('nav.main a')].map(a => a.getAttribute('href'))`), ['#/chat', '#/feed', '#/settings']);
+    assert.deepEqual(await run.page.run(`[...document.querySelectorAll('nav.main a')].map(a => a.getAttribute('href'))`), ['#/chat', '#/feed', '#/canvas', '#/settings']);
+    assert.deepEqual(await run.page.run(`[...document.querySelectorAll('.cv-stack .pill')].map(p => p.textContent)`),
+      ['Done', 'In review', 'Needs you', 'Needs you', 'Waiting', 'On hold']);
+    const machinery = /Builder|Reviewer|Claude Code|Codex|Opus|Sol 6|Lapsed|Working/;
+    assert.doesNotMatch(await run.page.text(), machinery);
+    assert.match(await run.page.run(`document.querySelector('.cv-chip-go[data-item="asking"]').textContent`), /Question: which tax rule applies/);
+    await run.page.run(`document.querySelector('.cv-stack[data-ticket$="#44"]').click()`);
+    await run.page.until(`document.querySelector('.cv-focus h3')?.textContent.includes('Shipping options')`, 'the plain ticket view');
+    assert.match(await run.page.text(), /reviewing at the exact head/);
+    assert.doesNotMatch(await run.page.text(), machinery);
+    await run.page.key('Escape');
+    await run.page.until(`document.activeElement.dataset.ticket === 'acme/factory#44'`, 'back on the board at #44');
+    assert.equal(await run.page.run(`document.querySelectorAll('.cv-line').length`), 6);
+    await run.page.size(1440, 900, false);
+    await run.page.click('Feed');
+    await run.page.until(`location.hash === '#/feed' && document.querySelectorAll('.v2-watch .cv-stack[data-ticket]').length === 6`, 'the board beside the Feed cards');
+    assert.equal(await run.page.run(`document.querySelector('.v2-watch-tab[aria-pressed="true"] .v2-watch-name').textContent`), 'Spec: checkout');
+    assert.doesNotMatch(await run.page.text(), machinery);
+    await run.page.size(390, 844, true);
+    await run.page.until(`document.querySelectorAll('.v2-row').length === 6 && !document.querySelector('.v2-watch .cv-board')`, 'ticket rows on a phone');
+    assert.equal(await run.page.run(`document.querySelector('.v2-row .pill').textContent`), 'Needs you');
+    await run.page.size(1440, 900, false);
     await run.page.go(`${SITE}/app/#/canvas/41`);
     await run.page.until(`document.querySelector('main h1')?.textContent === 'Canvas' && document.querySelectorAll('.cv-stack[data-ticket]').length >= 6`, 'the Canvas page at spec #41');
     assert.equal(await run.page.run('location.hash'), '#/canvas/41');

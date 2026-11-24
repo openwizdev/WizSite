@@ -5,9 +5,7 @@
   const wiz = () => h('p', {}, h('img', { src: '/app/wiz-reviewer.svg', alt: '', width: 96, height: 105 }));
   const data = OW.data;
   const root = document.getElementById('app');
-  // Pages that open by address but have no nav entry (Canvas under the v2 shell, for now).
-  const hidden = [];
-  const ROUTES = () => [...OW.pages, ...hidden].map(page => page.id);
+  const ROUTES = () => OW.pages.map(page => page.id);
   let built = null;
   const INSTALL = 'https://github.com/apps/openwiz-viewer/installations/new';
   const v2 = Boolean(OW.records?.enabled?.());
@@ -46,7 +44,7 @@
   };
   const current = () => {
     const { id } = route();
-    return OW.pages.find(page => page.id === id) || hidden.find(page => page.id === id) || OW.pages.find(page => page.id === 'feed') || OW.pages[0];
+    return OW.pages.find(page => page.id === id) || OW.pages.find(page => page.id === 'feed') || OW.pages[0];
   };
 
   function screen(...children) {
@@ -54,9 +52,7 @@
     OW.palette.close();
     const view = h('div', { class: 'center' }, h('div', { class: 'panel' }, h('div', { class: 'brand' }, logo(), h('span', {}, 'OpenWiz')), ...children));
     if (v2 && OW.v2) {
-      root.replaceChildren(
-        h('div', { class: 'v2-backdrop', 'aria-hidden': 'true' }),
-        h('div', { class: 'v2-welcome-stage' }, view));
+      root.replaceChildren(h('div', { class: 'v2-welcome-stage' }, view));
     } else {
       root.replaceChildren(view);
     }
@@ -205,7 +201,7 @@
   }
 
   function freshnessNodes() {
-    const feeds = v2 ? [data.feeds.specs] : Object.values(data.feeds);
+    const feeds = v2 ? [data.feeds.specs, data.feeds.agents] : Object.values(data.feeds);
     const limit = data.limit;
     return [
       ...feeds.map(feed => h('div', {}, ...readLine(feed))),
@@ -214,6 +210,8 @@
     ];
   }
 
+  const labelOf = feed => (v2 && OW.v2 && feed === data.feeds.agents ? 'Activity' : feed.label);
+
   if (v2 && OW.v2) {
     const v2Pages = OW.v2.pages({
       updateBadges,
@@ -221,7 +219,6 @@
       freshnessNodes,
       signOut: () => { data.auth.signOut(); signedOut(); },
     });
-    hidden.push(...OW.pages.filter(page => page.id === 'canvas'));
     OW.pages.splice(0, OW.pages.length, ...v2Pages);
     OW.v2.setRedraw(() => update());
   }
@@ -246,7 +243,8 @@
       class: 'v2-btn subtle v2-refresh', type: 'button', onclick: () => data.refreshAll(), hidden: true,
     }, icon('refresh'), 'Refresh now');
     const pager = h('div', { class: 'v2-pager-slot' });
-    const head = h('div', { class: 'v2-head' }, title, h('div', { class: 'v2-head-tools' }, pager, refresh));
+    const aside = h('div', { class: 'v2-head-side' });
+    const head = h('div', { class: 'v2-head' }, h('div', { class: 'v2-head-main' }, title, h('div', { class: 'v2-head-tools' }, pager, refresh)), aside);
     const phoneBar = h('header', { class: 'v2-phone-bar' },
       h('a', { class: 'v2-phone-brand', href: home() }, logo(), h('span', {}, 'OpenWiz')),
       demo ? h('span', { class: 'v2-sample-tag' }, 'Sample data') : null);
@@ -255,23 +253,21 @@
     const view = h('div', { class: 'v2-view' }, notices, body);
     root.replaceChildren(
       h('a', { class: 'skip', href: '#content', onclick: event => { event.preventDefault(); title.focus(); } }, 'Skip to the page'),
-      h('div', { class: 'v2-backdrop', 'aria-hidden': 'true' }),
-      h('div', { class: 'v2-frame' },
-        h('div', { class: 'v2-shell' },
-          h('aside', { class: 'v2-side' },
-            h('a', { class: 'v2-brand', href: home() },
-              logo(),
-              h('span', { class: 'v2-brand-text' },
-                h('span', { class: 'v2-brand-name' }, 'OpenWiz'),
-                h('span', { class: 'v2-brand-sub' }, workspace),
-                demo ? h('span', { class: 'v2-sample-tag' }, 'Sample data') : null)),
-            h('nav', { class: 'main v2-nav', 'aria-label': 'Pages' }, side.map(item => item.link))),
-          h('main', { id: 'content', class: 'v2-main' },
-            phoneBar,
-            head,
-            view,
-            h('nav', { class: 'v2-tabs', 'aria-label': 'Pages' }, tabs.map(item => item.link))))));
-    built = { side, tabs, title, refresh, pager, notices, body, view, page: null, isV2: true };
+      h('div', { class: 'v2-shell' },
+        h('aside', { class: 'v2-side' },
+          h('a', { class: 'v2-brand', href: home() },
+            logo(),
+            h('span', { class: 'v2-brand-text' },
+              h('span', { class: 'v2-brand-name' }, 'OpenWiz'),
+              h('span', { class: 'v2-brand-sub' }, workspace),
+              demo ? h('span', { class: 'v2-sample-tag' }, 'Sample data') : null)),
+          h('nav', { class: 'main v2-nav', 'aria-label': 'Pages' }, side.map(item => item.link))),
+        h('main', { id: 'content', class: 'v2-main' },
+          phoneBar,
+          head,
+          view,
+          h('nav', { class: 'v2-tabs', 'aria-label': 'Pages' }, tabs.map(item => item.link)))));
+    built = { side, tabs, title, refresh, pager, aside, head, notices, body, view, page: null, isV2: true };
   }
 
   function buildShell() {
@@ -305,9 +301,9 @@
   }
 
   function readLine(feed) {
-    if (feed.state === 'loading') return [h('span', {}, `${feed.label}: reading…`)];
-    if (feed.state === 'unknown') return [h('span', { class: 'bad' }, `${feed.label}: unknown (couldn't read at ${time(feed.failedAt)})`)];
-    return [h('span', {}, `${feed.label} read `), h('b', {}, time(feed.readAt)), feed.state === 'stale' ? h('span', { class: 'bad' }, ' · last read failed') : null];
+    if (feed.state === 'loading') return [h('span', {}, `${labelOf(feed)}: reading…`)];
+    if (feed.state === 'unknown') return [h('span', { class: 'bad' }, `${labelOf(feed)}: unknown (couldn't read at ${time(feed.failedAt)})`)];
+    return [h('span', {}, `${labelOf(feed)} read `), h('b', {}, time(feed.readAt)), feed.state === 'stale' ? h('span', { class: 'bad' }, ' · last read failed') : null];
   }
 
   function notice(kind, iconName, strong, text) {
@@ -336,7 +332,8 @@
     if (built.isV2 && built.page !== page.id) {
       built.body.replaceChildren();
       built.pager.replaceChildren();
-      built.view.dataset.page = page.id;
+      built.aside.replaceChildren();
+      built.head.dataset.page = built.view.dataset.page = page.id;
       built.view.scrollTop = 0;
     }
     const mine = page.feeds.map(name => feeds[name]);
@@ -348,7 +345,7 @@
       built.read.textContent = latest.length ? `Read ${time(Math.min(...latest))}` : '';
       built.phoneReads.replaceChildren(...mine.flatMap((feed, i) => [i ? ' · ' : '', ...readLine(feed)]).filter(part => part !== null && part !== ''));
     } else if (built.refresh) {
-      built.refresh.hidden = page.id !== 'feed';
+      built.refresh.hidden = page.id !== 'feed' && page.id !== 'canvas';
     }
     const notes = [];
     if (!v2 && data.paused()) {
@@ -356,9 +353,9 @@
     }
     if (!demo && !liveFeed) {
       for (const feed of mine) {
-        if (feed.state === 'unknown') notes.push(notice('bad', 'warn', `Couldn't read ${feed.label} from GitHub`, `at ${time(feed.failedAt)}. It shows as unknown, not as empty, until a read works.`));
-        if (feed.state === 'stale') notes.push(notice('bad', 'warn', `Couldn't read ${feed.label} at ${time(feed.failedAt)}.`, `Showing the read from ${time(feed.readAt)}.`));
-        if (feed.state === 'partial') notes.push(notice('bad', 'warn', 'Part of this read failed', `(${feed.label}, ${time(feed.readAt)}). What's missing shows as unknown.`));
+        if (feed.state === 'unknown') notes.push(notice('bad', 'warn', `Couldn't read ${labelOf(feed)} from GitHub`, `at ${time(feed.failedAt)}. It shows as unknown, not as empty, until a read works.`));
+        if (feed.state === 'stale') notes.push(notice('bad', 'warn', `Couldn't read ${labelOf(feed)} at ${time(feed.failedAt)}.`, `Showing the read from ${time(feed.readAt)}.`));
+        if (feed.state === 'partial') notes.push(notice('bad', 'warn', 'Part of this read failed', `(${labelOf(feed)}, ${time(feed.readAt)}). What's missing shows as unknown.`));
       }
     }
     built.notices.replaceChildren(...notes);
@@ -367,7 +364,7 @@
     } else if (!demo && !liveFeed && mine.length && mine.some(feed => feed.state === 'loading') && !mine.some(feed => feed.data)) {
       built.body.replaceChildren(OW.ui.placeholder('Reading GitHub…'));
     } else {
-      page.render(built.body, feeds, route().arg, built.pager);
+      page.render(built.body, feeds, route().arg, built.pager, built.aside);
     }
     if (built.page !== page.id) {
       built.title.textContent = page.title;

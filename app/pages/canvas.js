@@ -5,6 +5,8 @@
   const DAY = 24 * 60 * 60 * 1000;
   const QUIET = 3 * DAY;
   const NODE = { width: 260, height: 128 };
+  const PLAIN_NODE = { width: 236, height: 92 };
+  const nodeSize = () => (OW.v2 ? PLAIN_NODE : NODE);
   const ZOOM = { min: 0.25, max: 1.6, far: 0.6 };
   const PHONE = matchMedia('(max-width: 760px)');
 
@@ -103,23 +105,57 @@
     inbox.sort((a, b) => b.at - a.at);
     return { sheets, inbox, gaps: seen.gaps.slice(), partial: seen.partialSpecs };
   }
-  const view = { sheet: null, cams: new Map(), mode: 'board', focus: null, spread: null, query: '', quietOpen: false, over: 0, aim: null, inboxAll: false };
+  function read(feeds, now) {
+    if (OW.data.demo && OW.canvas.source) return OW.canvas.source(now);
+    return model(OW.factory.model(feeds), OW.agents.notes(now), now, home());
+  }
+  const view = { place: 'page', sheet: null, cams: new Map(), mode: 'board', focus: null, spread: null, query: '', quietOpen: false, over: 0, aim: null, inboxAll: false };
   let last = null;
   let shown = null;
   const home = () => OW.data.repo.get()?.full;
 
-  const colourOf = t => (t.lead ? OW.agents.WORDS[t.lead][1] : STATES[t.state]?.colour || STATES.unknown.colour);
-  const wordOf = t => (t.lead ? OW.agents.WORDS[t.lead][0] : STATES[t.state]?.word || 'Unknown');
+  const PLAIN = {
+    you: ['Needs you', STATES.you.colour],
+    building: ['Building', STATES.building.colour],
+    review: ['In review', STATES.review.colour],
+    merged: ['Done', STATES.merged.colour],
+    ready: ['Up next', STATES.ready.colour],
+    waiting: ['Waiting', STATES.waiting.colour],
+    held: ['On hold', STATES.held.colour],
+    unknown: ['Unknown', STATES.unknown.colour],
+  };
+  function plainOf(t) {
+    if (t.you) return 'you';
+    if (t.state === 'merged' || t.state === 'review' || t.state === 'held') return t.state;
+    if (t.lead === 'stopped') return 'held';
+    if (t.working) return 'building';
+    return PLAIN[t.state] ? t.state : 'unknown';
+  }
+  const pillOf = t => (OW.v2 ? h('span', { class: 'pill', '--c': PLAIN[plainOf(t)][1] }, PLAIN[plainOf(t)][0]) : OW.ui.pill(t.state));
+  const colourOf = t => (OW.v2 ? PLAIN[plainOf(t)][1] : t.lead ? OW.agents.WORDS[t.lead][1] : STATES[t.state]?.colour || STATES.unknown.colour);
+  const wordOf = t => (OW.v2 ? PLAIN[plainOf(t)][0] : t.lead ? OW.agents.WORDS[t.lead][0] : STATES[t.state]?.word || 'Unknown');
   const dot = (colour, ring) => h('span', { class: `cv-dot${ring ? ' ring' : ''}`, '--c': colour, 'aria-hidden': 'true' });
 
   function layout(sheet, phone) {
     const g = new dagre.graphlib.Graph();
-    g.setGraph({ rankdir: phone ? 'TB' : 'LR', nodesep: phone ? 24 : 36, ranksep: phone ? 56 : 84, marginx: 32, marginy: 40 });
+    g.setGraph({ rankdir: phone ? 'TB' : 'LR', nodesep: phone ? 24 : 36, ranksep: view.place === 'embed' ? 72 : phone || OW.v2 ? 56 : 84, marginx: OW.v2 ? 16 : 32, marginy: OW.v2 ? 24 : 40 });
     g.setDefaultEdgeLabel(() => ({}));
-    for (const t of sheet.tickets) g.setNode(t.key, { ...NODE });
+    for (const t of sheet.tickets) g.setNode(t.key, { ...nodeSize() });
     for (const t of sheet.tickets) for (const b of t.blockers) if (g.hasNode(b)) g.setEdge(b, t.key);
     dagre.layout(g);
     return g;
+  }
+
+  function plainCard(t) {
+    return h('div', { class: 'cv-card cv-plain', '--c': colourOf(t) },
+      h('div', { class: 'cv-plain-top' }, h('span', { class: 'num' }, t.number ? `#${t.number}` : 'Blocked by'), pillOf(t)),
+      h('h3', {}, t.title));
+  }
+  function plainNote(m, now) {
+    const row = m.row;
+    return h('div', { class: 'cv-card', '--c': PLAIN[m.status === 'asking' ? 'you' : m.status === 'working' ? 'building' : m.status === 'done' ? 'merged' : 'waiting'][1] },
+      h('p', { class: 'cv-step' }, row.unknown ? 'An update that couldn\'t be read.' : row.note.step),
+      h('p', { class: 'cv-meta' }, ago(row.unknown ? row.at : Date.parse(row.note.time) || row.at, now)));
   }
 
   function memberCard(m, t, now, front) {
@@ -154,6 +190,7 @@
 
   function stackEl(t, now) {
     const colour = colourOf(t);
+    if (OW.v2) return plainStack(t, colour);
     if (t.gap || t.outside) {
       return h('div', { class: 'cv-stack outside', 'data-ticket': t.key, 'data-state': t.state, '--c': colour },
         h('div', { class: 'cv-card', '--c': colour }, h('div', { class: 'num' }, t.gap ? 'Blocked by' : `#${t.number} · outside this spec`),
@@ -177,6 +214,27 @@
     el.addEventListener('keydown', event => {
       if (event.key === ' ') { event.preventDefault(); spreadToggle(t.key); }
       if (event.key === 'Enter') { event.preventDefault(); open(t.key); }
+    });
+    return el;
+  }
+
+  function plainStack(t, colour) {
+    if (t.gap || t.outside) {
+      return h('div', { class: 'cv-stack outside', 'data-ticket': t.key, 'data-state': t.state, '--c': colour }, h('div', { class: 'cv-front' }, plainCard(t)));
+    }
+    const layers = Math.min(2, t.members.filter(m => m.kind !== 'ticket').length);
+    const el = h('div', { class: `cv-stack${t.you ? ' you' : ''}`, 'data-ticket': t.key, 'data-state': t.state, 'data-lead': t.lead || '',
+      'data-focus': `stack:${t.key}`, tabindex: '0', role: 'button', 'aria-label': `#${t.number} ${t.title}: ${wordOf(t)}`, '--c': colour },
+    h('div', { class: 'cv-front' }, plainCard(t)),
+    h('div', { class: 'cv-tile', 'aria-hidden': 'true' }, dot(colour, t.state === 'waiting' || t.state === 'ready'), h('b', {}, `#${t.number}`), h('span', {}, t.title)),
+    layers ? h('div', { class: 'cv-behind', 'aria-hidden': 'true' }, Array.from({ length: layers }, () => h('div', { class: 'cv-card' }))) : null);
+    const choose = () => {
+      if (view.place === 'embed' && t.href) location.hash = t.href;
+      else open(t.key);
+    };
+    el.addEventListener('click', choose);
+    el.addEventListener('keydown', event => {
+      if (event.key === ' ' || event.key === 'Enter') { event.preventDefault(); choose(); }
     });
     return el;
   }
@@ -213,10 +271,10 @@
   function fit(board) {
     const r = board.viewport.getBoundingClientRect();
     const { width, height } = board.size;
-    const TOP = 56;
+    const TOP = view.place === 'embed' ? 0 : OW.v2 ? 72 : 56;
     const across = (r.width - 24) / width;
     const z = Math.max(ZOOM.min, Math.min(1, PHONE.matches ? across : Math.min(across, (r.height - TOP - 24) / height)));
-    const cam = { z, x: (r.width - width * z) / 2, y: PHONE.matches ? TOP : Math.max(TOP, (r.height - height * z) / 2 + TOP / 2) };
+    const cam = { z, x: (r.width - width * z) / 2, y: PHONE.matches ? TOP : Math.max(TOP, (r.height - height * z) / 2 + (OW.v2 ? 0 : TOP / 2)) };
     view.cams.set(board.sheet.number, cam);
     if (PHONE.matches) css(board.root, { height: `${Math.max(380, Math.ceil(height * z + TOP + 24))}px` });
     fitted.set(board.sheet.number, { ...cam });
@@ -258,8 +316,9 @@
   }
 
   function boardOf(sheet, now) {
-    const phone = PHONE.matches;
-    const g = layout(sheet, phone);
+    const embedded = view.place === 'embed';
+    const size = nodeSize();
+    const g = layout(sheet, PHONE.matches || embedded);
     const { width, height } = g.graph();
     const lines = svg('svg', { class: 'cv-lines', width, height, viewBox: `0 0 ${width} ${height}`, 'aria-hidden': 'true' });
     const marker = svg('marker', { id: 'cv-arrow', viewBox: '0 0 10 10', refX: 9, refY: 5, markerWidth: 7, markerHeight: 7, orient: 'auto-start-reverse' });
@@ -277,12 +336,17 @@
     const world = css(h('div', { class: 'cv-world' }, lines), { width: `${width}px`, height: `${height}px` });
     for (const t of sheet.tickets) {
       const at = g.node(t.key);
-      world.append(css(stackEl(t, now), { left: `${at.x - NODE.width / 2}px`, top: `${at.y - NODE.height / 2}px`, width: `${NODE.width}px` }));
+      world.append(css(stackEl(t, now), { left: `${at.x - size.width / 2}px`, top: `${at.y - size.height / 2}px`, width: `${size.width}px` }));
     }
     const viewport = h('div', { class: 'cv-view', 'aria-label': `Board of spec #${sheet.number}`, role: 'group' }, world);
     const zoom = h('span', { class: 'cv-zoom', 'aria-live': 'polite' });
     const root = h('div', { class: 'cv-board' });
     const board = { sheet, g, size: { width, height }, world, viewport, zoom, root, mini: null };
+    if (embedded) {
+      root.append(viewport);
+      refitOnResize(board);
+      return board;
+    }
     const button = (text, label, onclick) => h('button', { class: 'btn cv-tool', type: 'button', 'aria-label': label, onclick }, text);
     const tools = h('div', { class: 'cv-tools' },
       button('−', 'Zoom out', () => { const r = viewport.getBoundingClientRect(); zoomAt(board, 1 / 1.25, r.width / 2, r.height / 2); }),
@@ -298,13 +362,14 @@
 
   function minimap(board) {
     const { width, height } = board.size;
+    const size = nodeSize();
     const scale = Math.min(150 / width, 96 / height);
     const frame = h('span', { class: 'cv-mini-frame' });
     const el = css(h('div', { class: 'cv-mini', 'aria-hidden': 'true' }), { width: `${width * scale}px`, height: `${height * scale}px` });
     for (const t of board.sheet.tickets) {
       const n = board.g.node(t.key);
-      el.append(css(h('i', { '--c': colourOf(t) }), { left: `${(n.x - NODE.width / 2) * scale}px`, top: `${(n.y - NODE.height / 2) * scale}px`,
-        width: `${NODE.width * scale}px`, height: `${NODE.height * scale}px` }));
+      el.append(css(h('i', { '--c': colourOf(t) }), { left: `${(n.x - size.width / 2) * scale}px`, top: `${(n.y - size.height / 2) * scale}px`,
+        width: `${size.width * scale}px`, height: `${size.height * scale}px` }));
     }
     el.append(frame);
     el.addEventListener('pointerdown', event => {
@@ -322,6 +387,10 @@
 
   function legend() {
     const W = OW.agents.WORDS;
+    if (OW.v2) {
+      return h('p', { class: 'cv-legend', 'aria-hidden': 'true' },
+        ['you', 'building', 'review', 'merged', 'waiting'].map(state => h('span', {}, dot(PLAIN[state][1], state === 'waiting'), PLAIN[state][0])));
+    }
     return h('p', { class: 'cv-legend', 'aria-hidden': 'true' },
       ...[['working', W.working], ['asking', [STATES.you.word, STATES.you.colour]], ['review', [STATES.review.word, STATES.review.colour]],
         ['merged', [STATES.merged.word, STATES.merged.colour]], ['stopped', W.stopped]]
@@ -388,7 +457,8 @@
     const c = sheet.counts;
     const parts = [];
     if (c.you) parts.push(`${c.you} need${c.you === 1 ? 's' : ''} you`);
-    if (c.working) parts.push(`${c.working} working`);
+    const building = OW.v2 ? sheet.tickets.filter(t => !t.outside && plainOf(t) === 'building').length : c.working;
+    if (building) parts.push(`${building} ${OW.v2 ? 'building' : 'working'}`);
     if (!sheet.read) parts.push('tickets unknown');
     else if (sheet.total === 0) parts.push(sheet.decisions.length ? 'no tickets yet' : 'no tickets');
     else if (sheet.total) parts.push(`${sheet.done} of ${sheet.total} done`);
@@ -416,8 +486,9 @@
 
   const INBOX_SHOWN = 6;
   const INBOX_WORDS = {
-    asking: item => `${item.agent ? `${OW.agents.KIND[item.agent]} asks` : 'Asking you'}: ${item.step}`,
-    ticket: () => 'Ticket marked for you',
+    asking: item => `${OW.v2 ? 'Question' : item.agent ? `${OW.agents.KIND[item.agent]} asks` : 'Asking you'}: ${item.step}`,
+    feed: item => item.title,
+    ticket: () => (OW.v2 ? 'Ticket waiting on you' : 'Ticket marked for you'),
     spec_confirmation: () => 'Spec to confirm',
     plan_approval: () => 'Plan to approve',
     unreadable: () => 'A decision record that couldn\'t be read',
@@ -426,6 +497,13 @@
     if (!m.inbox.length) {
       return h('p', { class: 'cv-inbox calm' }, m.gaps.length ? 'Nothing needs you in what GitHub gave; part of the read is missing, so this may change.'
         : 'Nothing needs you right now.');
+    }
+    if (OW.v2 && m.inbox.every(item => item.href)) {
+      const label = [dot(STATES.you.colour), `Needs you · ${m.inbox.length}`];
+      if (PHONE.matches) return h('a', { class: 'cv-inbox cv-inbox-link', href: m.inbox[0].href, 'data-focus': 'inbox:0' }, h('span', { class: 'cv-inbox-label' }, label), OW.ui.icon('right'));
+      return h('div', { class: 'cv-inbox', role: 'list', 'aria-label': 'Needs you' }, h('span', { class: 'cv-inbox-label' }, label),
+        m.inbox.map((item, i) => h('span', { class: 'cv-chip', role: 'listitem' },
+          h('a', { class: 'cv-chip-go', href: item.href, 'data-focus': `inbox:${i}`, 'data-item': item.kind }, h('span', { class: 'cv-chip-text' }, INBOX_WORDS[item.kind](item))))));
     }
     return h('div', { class: 'cv-inbox', role: 'list', 'aria-label': 'Needs you' },
       h('span', { class: 'cv-inbox-label' }, dot(STATES.you.colour), `Needs you · ${m.inbox.length}`),
@@ -491,7 +569,37 @@
     });
   }
 
+  function plainFocus(sheet, t, now) {
+    const back = () => { view.focus = null; view.aim = t.key; rerender(); };
+    const notes = t.members.filter(m => m.kind === 'note');
+    const names = keys => (keys.length ? keys.map(k => {
+      const other = sheet.tickets.find(x => x.key === k);
+      return h('span', { class: 'cv-fact-ticket' }, `#${k.split('#').pop()} ${other?.title ?? ''}`, other ? pillOf(other) : null);
+    }) : 'Nothing');
+    const pane = h('section', { class: 'cv-focus', 'aria-label': `Ticket #${t.number}`, '--c': colourOf(t) },
+      h('div', { class: 'cv-focus-head' },
+        h('h3', { tabindex: '-1', 'data-focus': 'focus-title' }, h('span', { class: 'num' }, `#${t.number}`), ` ${t.title}`), pillOf(t),
+        h('span', { class: 'cv-gap' }),
+        t.href ? h('a', { class: 'v2-btn primary', href: t.href, 'data-focus': 'focus-decide' }, 'Decide in Feed') : null,
+        t.url ? h('a', { class: 'v2-btn', href: t.url, rel: 'noreferrer', target: '_blank', 'data-focus': 'focus-ticket' }, 'Open the ticket ↗') : null,
+        h('button', { class: 'v2-btn', type: 'button', onclick: back, 'aria-keyshortcuts': 'Escape', 'data-focus': 'focus-back' }, 'Back')),
+      h('div', { class: 'cv-focus-body' },
+        h('div', { class: 'cv-focus-notes' },
+          notes.length ? notes.map(m => plainNote(m, now)) : h('p', { class: 'cv-calm' }, 'No updates in the last day.')),
+        h('dl', { class: 'cv-facts' },
+          h('dt', {}, 'Spec'), h('dd', {}, sheet.title),
+          h('dt', {}, 'Waits for'), h('dd', {}, names(t.blockers), t.missing ? ` ${plural(t.missing, 'ticket')} couldn't be read` : ''),
+          h('dt', {}, 'Unblocks'), h('dd', {}, names(t.blocks)))));
+    if (view.place === 'embed') {
+      pane.addEventListener('keydown', event => {
+        if (event.key === 'Escape') { event.stopPropagation(); back(); }
+      });
+    }
+    return pane;
+  }
+
   function focusPane(sheet, t, now) {
+    if (OW.v2) return plainFocus(sheet, t, now);
     const back = () => { view.focus = null; view.aim = t.key; rerender(); };
     const notes = t.members.filter(m => m.kind === 'note');
     const pr = t.members.find(m => m.kind === 'pr')?.pr;
@@ -566,9 +674,8 @@
 
   function draw(el, feeds, arg) {
     const now = Date.now();
-    const seen = OW.factory.model(feeds);
-    if (!seen) return el.replaceChildren(OW.ui.placeholder('Reading GitHub…'));
-    const m = model(seen, OW.agents.notes(now), now, home());
+    const m = read(feeds, now);
+    if (!m) return el.replaceChildren(OW.ui.placeholder('Reading GitHub…'));
     shown = m;
     const asked = arg ? Number(arg) : view.sheet;
     const sheet = m.sheets.find(s => s.number === asked) || (arg ? null : m.sheets.find(s => !s.quiet) || m.sheets[0] || null);
@@ -577,14 +684,15 @@
     const head = h('div', { class: 'cv-head' }, inbox(m), search(m));
     if (!m.sheets.length) {
       return el.replaceChildren(h('div', { class: 'cv' }, ...notices(m, null), head,
-        OW.ui.placeholder('No open spec yet. When a spec has a plan graph, its fleet shows here as a sheet.')));
+        OW.ui.placeholder(OW.v2 ? 'Nothing is building yet. A spec shows here once it has tickets.'
+          : 'No open spec yet. When a spec has a plan graph, its fleet shows here as a sheet.')));
     }
     if (!sheet) {
       return el.replaceChildren(h('div', { class: 'cv' }, ...notices(m, null), head, h('div', { class: 'cv-area' }, rail(m),
         OW.ui.unknown(`Spec #${arg} isn't among the open specs GitHub gave this read.`))));
     }
     const title = h('div', { class: 'cv-title' },
-      h('h2', {}, h('a', { href: sheet.url, rel: 'noreferrer', target: '_blank', 'data-focus': 'sheet-link' }, `#${sheet.number} ${sheet.title}`)),
+      h('h2', {}, !sheet.url ? sheet.title : h('a', { href: sheet.url, rel: 'noreferrer', target: '_blank', 'data-focus': 'sheet-link' }, `#${sheet.number} ${sheet.title}`)),
       h('span', { class: 'cv-sheet-line' }, sheetLine(sheet)),
       ...sheet.decisions.map(d => h('a', { class: 'pill', '--c': STATES.you.colour, href: d.url, rel: 'noreferrer', target: '_blank' },
         d.kind === 'plan_approval' ? 'Plan to approve' : 'Spec to confirm')));
@@ -594,34 +702,68 @@
     else if (view.focus && sheet.tickets.find(t => t.key === view.focus)) stage = focusPane(sheet, sheet.tickets.find(t => t.key === view.focus), now);
     else if (!sheet.read || !sheet.tickets.length) {
       stage = h('div', { class: 'cv-empty' }, sheet.read ? OW.ui.placeholder(sheet.decisions.length
-        ? 'No tickets yet: its spec or plan waits on you. Open it from the strip above.' : 'No tickets yet: its plan graph isn\'t written.') : null);
+        ? 'No tickets yet: its spec or plan waits on you. Open it from the strip above.'
+        : OW.v2 ? 'No tickets yet. They show here once the plan is written.' : 'No tickets yet: its plan graph isn\'t written.') : null);
     } else {
       board = boardOf(sheet, now);
       stage = board.root;
     }
     el.replaceChildren(h('div', { class: 'cv' }, ...notices(m, sheet), head, h('div', { class: 'cv-area' }, rail(m), h('div', { class: 'cv-stage' }, title, stage))));
+    settle(el, board, sheet);
+    if (view.mode === 'over') (el.querySelector('.cv-open') || el.querySelector('.cv-over'))?.focus({ preventScroll: true });
+    mark();
+  }
+
+  function settle(el, board, sheet) {
     if (board) {
       if (!camOf(sheet.number)) fit(board);
       else apply(board);
       if (view.aim && board.g.node(view.aim)) {
-        centre(board, view.aim);
+        if (view.place !== 'embed') centre(board, view.aim);
         const target = board.world.querySelector(`[data-ticket="${CSS.escape(view.aim)}"]`);
         target?.classList.add('flash');
         target?.focus({ preventScroll: true });
       }
     }
     view.aim = null;
-    if (view.mode === 'over') (el.querySelector('.cv-open') || el.querySelector('.cv-over'))?.focus({ preventScroll: true });
     if (view.focus && !board) el.querySelector('[data-focus="focus-title"]')?.focus({ preventScroll: true });
-    mark();
+  }
+
+  function enter(place) {
+    if (view.place === place) return;
+    Object.assign(view, { place, focus: null, spread: null, aim: null, query: '', mode: 'board' });
+    view.cams.clear();
+    fitted.clear();
+  }
+  function embed(el, feeds, number) {
+    enter('embed');
+    last = [el, feeds, null, number];
+    const now = Date.now();
+    const m = read(feeds, now);
+    const sheet = m?.sheets.find(s => s.number === number);
+    if (!sheet) return el.replaceChildren();
+    if (view.sheet !== number) Object.assign(view, { sheet: number, focus: null, aim: null });
+    const t = view.focus && sheet.tickets.find(x => x.key === view.focus);
+    OW.factory.redraw(el, () => {
+      const board = t ? null : boardOf(sheet, now);
+      el.replaceChildren(t ? focusPane(sheet, t, now) : board.root);
+      settle(el, board, sheet);
+    });
+  }
+  function show(number, key) {
+    enter('page');
+    Object.assign(view, { sheet: number, focus: key, mode: 'board' });
+    go(number);
   }
 
   function render(el, feeds, arg) {
+    enter('page');
     last = [el, feeds, arg];
     OW.factory.redraw(el, () => draw(el, feeds, arg));
   }
   function rerender() {
     if (!last || !last[0].isConnected) return;
+    if (view.place === 'embed') return embed(last[0], last[1], last[3]);
     const arg = location.hash.match(/^#\/canvas\/([1-9]\d*)$/)?.[1] || null;
     render(last[0], last[1], arg);
   }
@@ -653,7 +795,7 @@
     if (event.key === '0') { event.preventDefault(); tools[2]?.click(); }
   });
 
-  OW.canvas = { model };
+  OW.canvas = { model, read, embed, show, blocks, sheetLine, pillOf, plainOf };
   OW.page({
     id: 'canvas',
     title: 'Canvas',
