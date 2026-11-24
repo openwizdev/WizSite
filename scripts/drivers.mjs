@@ -1,3 +1,4 @@
+import { clickLinkAttribute } from './count-links.mjs';
 const labels = {
   live: 'Passed live, not in a release yet',
   waiting: 'Built, waiting on its live check',
@@ -30,7 +31,7 @@ const attributes = listing => `data-listing="${listing.id}" data-stage="${listin
 const shipped = listing => listing.stage === 'available' && listing.status === 'verified';
 const login = listing => listing.login ? `<p class="driver-login">Login: ${esc(listing.login)}</p>` : '';
 const dateLink = ({ url, date }, label, className = '') =>
-  `<a${className ? ` class="${className}"` : ''} href="${esc(url)}">${label}, <time datetime="${date}">${date}</time></a>`;
+  `<a${className ? ` class="${className}"` : ''} href="${esc(url)}"${clickLinkAttribute(url)}>${label}, <time datetime="${date}">${date}</time></a>`;
 
 function slot(page, name) {
   const start = `<template data-slot="drivers-${name}-start"></template>`;
@@ -91,7 +92,7 @@ function tile(listing, id, previousState, fallback = '') {
   const mark = fallback.match(/<span class="tile-mark">.*?<\/span>/)?.[0]
     ?? `<span class="tile-mark">${logo(listing, 32)}</span>`;
   const href = work ?? (!receipt ? { url: listing.url, label: 'Get it' } : undefined);
-  const workLink = href ? `<a class="tile-link" href="${esc(href.url)}">${esc(href.label)}</a>` : '';
+  const workLink = href ? `<a class="tile-link" href="${esc(href.url)}"${clickLinkAttribute(href.url)}>${esc(href.label)}</a>` : '';
   const proofLink = receipt ? dateLink(receipt, 'Live check receipt', 'tile-link') : '';
   const html = `<li class="tile" id="${id}" data-state="${state}" ${attributes(listing)}>`
     + `${mark}<h4 class="tile-name">${esc(listing.name)}</h4><p class="tile-state">${words}</p>`

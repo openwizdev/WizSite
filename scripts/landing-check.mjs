@@ -408,7 +408,7 @@ async function footer(page, where, mode) {
       count: document.querySelectorAll('footer').length,
       buttons: footer.querySelectorAll('.family-wiz[role="button"]').length,
       links: links.length, inside: links.every(a => shown(a) && a.getBoundingClientRect().left >= 0 && a.getBoundingClientRect().right <= innerWidth),
-      line: shown(footer.querySelector('.footer-line')),
+      lines: [...footer.querySelectorAll('.footer-line')].filter(shown).length,
       dbg: [glyphs.left, f.left, glyphs.right, f.right, glyphs.bottom, m.bottom, f.bottom].map(Math.round),
       whole: glyphs.left >= f.left && glyphs.right <= f.right && glyphs.bottom <= m.bottom + 1 && m.bottom <= f.bottom,
       gap: Math.round(painted - glyphs.bottom),
@@ -418,7 +418,7 @@ async function footer(page, where, mode) {
   expect(facts.count === 1, where, `one footer (${facts.count})`);
   expect(facts.buttons === (mode === 'no JavaScript' ? 0 : 12), where, `the footer Wizes are not the landing's (${facts.buttons} of 12 respond)`);
   expect(facts.links === 10 && facts.inside, where, 'the footer link groups are not all shown inside the window');
-  expect(facts.line, where, 'the footer lacks its Apache-2.0 line');
+  expect(facts.lines === 2, where, 'the footer must show the license and counting notice');
   expect(facts.whole, where, `the footer wordmark is clipped (ink and box: ${facts.dbg})`);
   expect(facts.gap >= 0 && facts.gap <= 16, where, `a ${facts.gap}px painted gap between the wordmark's ink and the Wizes (0 to 16)`);
   expect(facts.bottom >= facts.inner && facts.bottom >= facts.height - 1, where, `the footer ends at ${facts.bottom}px, above the window's bottom (${facts.inner}px)`);
@@ -469,7 +469,7 @@ async function faq(page, where, width, mode) {
     };
   })()`);
   const facts = await read();
-  expect(facts.rows === 7, where, `the Questions have ${facts.rows} rows`);
+  expect(facts.rows === 8, where, `the Questions have ${facts.rows} rows`);
   if (width >= 1280) {
     const third = (facts.head.right - facts.head.left) / facts.width;
     expect(facts.list.left > facts.head.right && Math.abs(facts.head.top - facts.list.top) < 2 && third > .25 && third < .4, where,
