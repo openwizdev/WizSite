@@ -40,7 +40,7 @@ function serve() {
       }
       let body = '';
       for await (const chunk of request) body += chunk;
-      fake.asked.push({ body: JSON.parse(body), origin: request.headers.origin, type: request.headers['content-type'] });
+      fake.asked.push({ body: JSON.parse(body), origin: request.headers.origin, type: request.headers['content-type'], token: request.headers['cf-turnstile-response'] });
       const { status = 200, lines, hold, type = 'application/x-ndjson; charset=utf-8' } = fake.answers.shift();
       const held = new Promise(resolve => { fake.release = resolve; response.on('close', resolve); });
       response.writeHead(status, { 'content-type': type, 'cache-control': 'no-store' });
@@ -105,11 +105,30 @@ before(async () => {
 });
 after(async () => { await browser?.close(); server?.close(); });
 
-async function open(path = '/', { width = 1280, height = 900, reduced = false, scroll = true } = {}) {
+const FAKE_TURNSTILE = `window.__ts = { renders: [], resets: 0, removes: 0 };
+window.turnstile = (() => { const widgets = {}; let n = 0;
+  const issue = id => setTimeout(() => { const w = widgets[id]; if (!w) return; w.token = 'synthetic-token-' + id + '-' + (++w.count); w.options.callback(w.token); }, 50);
+  return {
+    render(container, options) { const id = 'w' + (++n); widgets[id] = { options, token: '', count: 0 }; window.__ts.renders.push({ ...options, inForm: !!container.closest('form') }); issue(id); return id; },
+    getResponse: id => widgets[id]?.token, isExpired: () => false,
+    reset(id) { window.__ts.resets++; widgets[id].token = ''; issue(id); },
+    remove(id) { window.__ts.removes++; delete widgets[id]; },
+  }; })();`;
+
+async function open(path = '/', { width = 1280, height = 900, reduced = false, scroll = true, turnstile = null } = {}) {
   const { targetId } = await browser.send('Target.createTarget', { url: 'about:blank' });
   const { sessionId } = await browser.send('Target.attachToTarget', { targetId, flatten: true });
   const send = (method, params) => browser.send(method, params, sessionId);
   await send('Page.enable');
+  if (turnstile) {
+    await send('Fetch.enable', { patterns: [{ urlPattern: 'https://challenges.cloudflare.com/*' }] });
+    browser.on(m => {
+      if (m.sessionId !== sessionId || m.method !== 'Fetch.requestPaused') return;
+      turnstile.push(m.params.request.url);
+      send('Fetch.fulfillRequest', { requestId: m.params.requestId, responseCode: 200, responseHeaders: [{ name: 'Content-Type', value: 'text/javascript' }],
+        body: Buffer.from(FAKE_TURNSTILE).toString('base64') }).catch(() => {});
+    });
+  }
   await send('Network.setBlockedURLs', { urls: ['*api.github.com*'] }).catch(() => {});
   await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: width <= 480 });
   await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: reduced ? 'reduce' : 'no-preference' }] });
@@ -161,7 +180,10 @@ test('with the switch off the FAQ shows no input row, and asks nothing', async (
     { status: 200, body: '{"schema":"openwiz.ask-a-wiz.v1","enabled":false,"max_question_chars":300}' },
     { status: 200, body: '{"schema":"openwiz.ask-a-wiz.v1","enabled":true}' },
     { status: 200, body: '{"schema":"openwiz.ask-a-wiz.v1","enabled":true,"max_question_chars":299}' },
-    { status: 200, body: '{"schema":"openwiz.ask-a-wiz.v1","enabled":true,"max_question_chars":300,"extra":1}' }]) {
+    { status: 200, body: '{"schema":"openwiz.ask-a-wiz.v1","enabled":true,"max_question_chars":300,"extra":1}' },
+    { status: 200, body: '{"schema":"openwiz.ask-a-wiz.v1","enabled":true,"max_question_chars":300,"turnstile_site_key":"bad key"}' },
+    { status: 200, body: '{"schema":"openwiz.ask-a-wiz.v1","enabled":true,"max_question_chars":300,"turnstile_site_key":""}' },
+    { status: 200, body: '{"schema":"openwiz.ask-a-wiz.v1","enabled":true,"max_question_chars":300,"turnstile_site_key":5}' }]) {
     fake.probe = probe;
     for (const path of ['/', '/faq/']) {
       const probed = fake.probed, page = await open(path);
@@ -179,6 +201,48 @@ test('with the switch off the FAQ shows no input row, and asks nothing', async (
   await page.evaluate(`document.querySelector('section.faq').scrollIntoView()`);
   await page.until(`true`).then(() => new Promise(resolve => setTimeout(resolve, 300)));
   assert.equal(fake.probed, probed + 1, 'and asks once it does');
+  await page.close();
+});
+
+test('without a site key in the probe, no Turnstile loads and questions carry no token', async () => {
+  probeOn();
+  fake.answers.push({ lines: ANSWER });
+  const loads = [], page = await open('/faq/', { turnstile: loads });
+  await page.until(`document.querySelector('.faq-ask input')`);
+  await page.ask('What does OpenWiz run?');
+  await waitForAnswers(page, 1);
+  assert.deepEqual(loads, []);
+  assert.equal(fake.asked.at(-1).token, undefined);
+  assert.equal(await page.evaluate(`document.querySelectorAll('.faq-ask-human').length`), 0);
+  await page.close();
+});
+
+test('with a site key, Turnstile loads only once the Ask box is used, and each question carries a fresh token', async () => {
+  const SITE = '1x00000000000000000000AA';
+  fake.probe = { status: 200, body: `{"schema":"openwiz.ask-a-wiz.v1","enabled":true,"max_question_chars":300,"turnstile_site_key":"${SITE}"}` };
+  fake.answers.push({ lines: ANSWER }, { status: 403, lines: [refused('not_human', "Please confirm you're human and try again.")] }, { lines: ANSWER });
+  const loads = [], page = await open('/', { turnstile: loads });
+  await page.until(`document.querySelector('.faq-ask input')`);
+  await page.evaluate('new Promise(resolve => setTimeout(resolve, 300))');
+  assert.deepEqual(loads, [], 'a plain visit loads no Turnstile, even with the row shown');
+  await page.ask('What does OpenWiz run?');
+  await waitForAnswers(page, 1);
+  assert.deepEqual(loads, ['https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit']);
+  const first = await page.evaluate('window.__ts.renders[0]');
+  assert.deepEqual([first.sitekey, first.action, first.appearance, first.inForm], [SITE, 'ask', 'interaction-only', true]);
+  assert.match(fake.asked.at(-1).token, /^synthetic-token-w1-1$/);
+  await page.ask('Second question?');
+  await page.until(`document.querySelector('.faq-ask .faq-a')?.innerText.includes('confirm you')`, 'the not_human refusal');
+  let seen = (await rows(page)).at(-1);
+  assert.deepEqual([seen.a, seen.buttons], ["Please confirm you're human and try again.", ['Retry', 'Edit']]);
+  assert.equal(await told(page), seen.a);
+  assert.match(fake.asked.at(-1).token, /^synthetic-token-w2-1$/, 'the new row has its own widget');
+  await page.press('Retry');
+  await waitForAnswers(page, 2, 'the retried answer');
+  assert.match(fake.asked.at(-1).token, /^synthetic-token-w2-2$/, 'a retry sends a fresh token, never the used one');
+  assert.equal(new Set(fake.asked.map(a => a.token)).size, fake.asked.length, 'no token sent twice');
+  assert.deepEqual(loads.length, 1, 'the script loads once');
+  assert.ok(await page.evaluate('window.__ts.resets') >= 3, 'reset after each submit');
   await page.close();
 });
 

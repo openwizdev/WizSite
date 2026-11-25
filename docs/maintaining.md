@@ -35,7 +35,7 @@ Changes merge after green CI and one review from the other model family. No per-
 
 ## Security and cache headers
 
-`_headers` sets site-wide security headers under `/*` (HSTS, a strict Content-Security-Policy with no `'unsafe-inline'` or `'unsafe-eval'`, `X-Frame-Options: DENY`, `Permissions-Policy`, `Cross-Origin-Opener-Policy: same-origin`, `X-Content-Type-Options: nosniff`, and `Referrer-Policy: strict-origin-when-cross-origin`). Under `/app/*`, `! Content-Security-Policy` and `! Referrer-Policy` detach the site-wide values before setting the stricter app policy so Cloudflare Pages does not comma-join both headers.
+`_headers` sets site-wide security headers under `/*` (HSTS, a strict Content-Security-Policy with no `'unsafe-inline'` or `'unsafe-eval'`, `X-Frame-Options: DENY`, `Permissions-Policy`, `Cross-Origin-Opener-Policy: same-origin`, `X-Content-Type-Options: nosniff`, and `Referrer-Policy: strict-origin-when-cross-origin`). Under `/app/*`, `! Content-Security-Policy` and `! Referrer-Policy` detach the site-wide values before setting the stricter app policy so Cloudflare Pages does not comma-join both headers. The two pages that host Ask a Wiz, `/` and `/faq/*`, detach the site-wide CSP the same way and set it again with only `https://challenges.cloudflare.com` added to `script-src` and `frame-src`, for Turnstile; the check refuses that origin anywhere else, `/app/*` included.
 
 For caching, `/*` defaults to `Cache-Control: public, max-age=0, must-revalidate` (keeping HTML and any unhashed `.css`/`.js` revalidated on every visit so a deploy never serves stale HTML pointing at removed hashed files). More-specific rules detach with `! Cache-Control` before setting a single value: fingerprinted and version-pinned styles/scripts (`/*.:hash.css`, `/*.:hash.js`) use `public, max-age=31536000, immutable`; fingerprinted fonts (`/fonts/*.woff2`, named `name.<hash>.woff2` by the build) use `public, max-age=31536000, immutable`; and unhashed images, icons, art, video, and captions (`/art/*`, `/brand/*`, `/drivers/logos/*`, root favicons, `/app/*.svg|png|ico`, `/*.mp4`, `/*.vtt`) use `public, max-age=604800, stale-while-revalidate=2592000`. These rules take effect when the zone's Browser Cache TTL is set to respect existing headers.
 
@@ -102,6 +102,19 @@ UNICODES='U+0020-007E,U+00A0-00FF,U+0100-017F,U+2000-206F,U+20A0-20CF,U+2190-21F
 pyftsubset Geist-var.woff2 --output-file=fonts/Geist-var.woff2 --flavor=woff2 --unicodes="$UNICODES" --layout-features='kern,liga,tnum,ccmp,locl,mark,mkmk'
 pyftsubset GeistMono-var.woff2 --output-file=fonts/GeistMono-var.woff2 --flavor=woff2 --unicodes="$UNICODES" --layout-features='kern,liga,tnum,ccmp,locl,mark,mkmk'
 ```
+
+## Ask a Wiz: Turnstile
+
+`/api/ask` spends money on a model call, so besides its origin check and its per-visitor and daily caps it can require a free Cloudflare Turnstile check. Two Cloudflare Pages environment variables (Settings > Variables and Secrets, Production and Preview) turn it on:
+
+| Name | Kind | Holds |
+| --- | --- | --- |
+| `TURNSTILE_SITE_KEY` | Variable (public) | The widget's site key. `GET /api/ask` hands it to the page as `turnstile_site_key` |
+| `TURNSTILE_SECRET_KEY` | Secret (encrypted) | The widget's secret key. Only the function reads it, to call siteverify |
+
+To create the widget: Cloudflare dashboard > **Turnstile** > **Add widget**, name it, add the hostname `openwiz.dev` (and any preview hostname you want to test on, such as the Pages project's `*.pages.dev` host), choose **Managed** mode, then copy the site key and secret key into the two variables. Variables apply on the next deploy: redeploy (or push to main) after setting them.
+
+With `TURNSTILE_SECRET_KEY` unset, Ask a Wiz works exactly as before: no widget, no check. Once it is set, `TURNSTILE_SITE_KEY` must be valid too, or every question is `unavailable`. Each question then carries a fresh single-use token in the `CF-Turnstile-Response` header; the function checks it with siteverify (5 s timeout) before any counter write or model call and refuses anything but a pass for action `ask` on the request's own hostname with `403 not_human`, a network error included. The page loads `https://challenges.cloudflare.com/turnstile/v0/api.js` only after the probe names a site key and the visitor first focuses or uses the Ask box, and renders it invisible (`interaction-only`) unless Cloudflare needs a click. To test locally, put Cloudflare's test keys in an untracked `.dev.vars` for `wrangler pages dev`: site `1x00000000000000000000AA` with secret `1x0000000000000000000000000000000AA` always passes, secret `2x0000000000000000000000000000000AA` always fails.
 
 ## Privacy and verification limits
 

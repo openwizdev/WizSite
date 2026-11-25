@@ -193,6 +193,10 @@ SITE_HEADERS = (
     'X-Content-Type-Options: nosniff',
     'Referrer-Policy: strict-origin-when-cross-origin',
 )
+TURNSTILE_ORIGIN = 'https://challenges.cloudflare.com'
+ASK_CSP = re.sub(r"(script-src [^;]*);", rf"\1 {TURNSTILE_ORIGIN};", SITE_CSP, count=1).replace("frame-src 'none';", f"frame-src {TURNSTILE_ORIGIN};")
+assert ASK_CSP.count(TURNSTILE_ORIGIN) == 2, 'the Ask a Wiz CSP must add Turnstile to script-src and frame-src'
+ASK_PATHS = ('/', '/faq/*')
 APP_CSP = ("default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; media-src 'self'; font-src 'self'; "
            "connect-src 'self' https://api.github.com; manifest-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
 CACHE_HTML = 'public, max-age=0, must-revalidate'
@@ -1204,6 +1208,12 @@ def check_site(root, registry=ROOT / 'market/registry.json', now=None):
     site_lines = site_rule[1].splitlines()
     for header in SITE_HEADERS:
         assert f'  {header}' in site_lines, f'_headers /* must include {header}'
+    for path in ASK_PATHS:
+        rule = re.search(rf'^{re.escape(path)}\n((?:  .*\n?)*)', headers, re.M)
+        lines = rule[1].splitlines() if rule else []
+        assert lines == ['  ! Content-Security-Policy', f'  Content-Security-Policy: {ASK_CSP}'], \
+            f'_headers must detach the site CSP for {path} and allow only Turnstile on top of it'
+    assert headers.count(TURNSTILE_ORIGIN) == 2 * len(ASK_PATHS), 'only the Ask a Wiz pages may allow Turnstile'
     sec_rule = re.search(r'^/\.well-known/security\.txt\n((?:  .*\n?)*)', headers, re.M)
     assert sec_rule and '  Content-Type: text/plain; charset=utf-8' in sec_rule[1].splitlines(), \
         '_headers must serve /.well-known/security.txt as text/plain; charset=utf-8'
@@ -1223,6 +1233,8 @@ def check_site(root, registry=ROOT / 'market/registry.json', now=None):
                 assert merged.get(name) == [APP_CSP], f'_headers {name} mismatch for {url_path}: {merged.get(name)}'
             elif url_path.startswith('/app/') and name == 'referrer-policy':
                 assert merged.get(name) == ['no-referrer'], f'_headers {name} mismatch for {url_path}: {merged.get(name)}'
+            elif url_path in ('/', '/faq/') and name == 'content-security-policy':
+                assert merged.get(name) == [ASK_CSP], f'_headers {name} mismatch for {url_path}: {merged.get(name)}'
             else:
                 assert merged.get(name) == [value], f'_headers {name} mismatch for {url_path}: {merged.get(name)}'
     for unhashed in ('/site.js', '/tokens.css', '/app/shell.js', '/app/ember.css'):
