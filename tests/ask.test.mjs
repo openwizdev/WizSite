@@ -424,9 +424,10 @@ test('Turnstile: a siteverify network error, timeout, redirect or non-200 fails 
   }
 });
 
-test('Turnstile: the always-pass test secret answers, sending siteverify the secret, token, visitor IP and an idempotency key', async () => {
+test('Turnstile: the always-pass test secret answers on loopback, sending siteverify the secret, token, visitor IP and an idempotency key', async () => {
   answer = verifier();
-  const out = await run(gated());
+  const c = gated(PASS_SECRET, { Origin: 'http://127.0.0.1:8788' });
+  const out = await run(c, { request: new Request('http://127.0.0.1:8788/api/ask', c.request) });
   assert.equal(out.response.status, 200);
   assert.equal(events(out.body).at(-1).type, 'done');
   assert.deepEqual(calls.map(call => call.url), [SITEVERIFY, UPSTREAM]);
@@ -439,6 +440,33 @@ test('Turnstile: the always-pass test secret answers, sending siteverify the sec
   assert.equal(calls[0].method, 'POST');
   assert.ok(!out.body.includes(PASS_SECRET) && !out.body.includes(TOKEN));
   assert.equal(out.store.counters.find(r => r.key.startsWith('visitor:')).count, 3, 'counted once it passes');
+});
+
+test('Turnstile: result_with_testing_key skips action and hostname only on loopback hosts', async () => {
+  for (const origin of ['http://localhost:8788', 'http://127.0.0.1:8788', 'http://[::1]:8788']) {
+    calls.length = 0;
+    answer = verifier();
+    const c = gated(PASS_SECRET, { Origin: origin });
+    const out = await run(c, { request: new Request(`${origin}/api/ask`, c.request) });
+    assert.equal(out.response.status, 200, `${origin} accepts testing-key verdict`);
+    assert.equal(sent(), 1);
+  }
+  for (const origin of ['https://openwiz.dev', 'https://preview.wizsite.pages.dev', 'https://localhost.example.invalid']) {
+    calls.length = 0;
+    answer = verifier();
+    const c = gated(PASS_SECRET, { Origin: origin });
+    const store = fakeD1(c.store);
+    const out = await run(c, { store, request: new Request(`${origin}/api/ask`, c.request) });
+    assert.equal(out.response.status, 403, `${origin} refuses testing-key verdict without matching action and hostname`);
+    assert.equal(out.body, NOT_HUMAN);
+    assert.deepEqual(store.log, []);
+    assert.equal(sent(), 0);
+  }
+  calls.length = 0;
+  answer = verifier({ success: true, action: 'ask', hostname: 'openwiz.dev', metadata: { result_with_testing_key: true } });
+  const matched = await run(gated('synthetic-real-secret'));
+  assert.equal(matched.response.status, 200, 'non-loopback still passes when action and hostname match');
+  assert.equal(sent(), 1);
 });
 
 test('a missing or invalid secret, model, store or maximum price is unavailable before the request is read', async () => {

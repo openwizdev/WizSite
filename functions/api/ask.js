@@ -25,6 +25,7 @@ const TURNSTILE_ACTION = 'ask';
 const TURNSTILE_HEADER = 'CF-Turnstile-Response';
 const TURNSTILE_KEY = /^[0-9A-Za-z_-]{1,100}$/;
 const MAX_TOKEN = 2048;
+const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
 
 const SYSTEM = "You answer questions about OpenWiz for visitors to openwiz.dev. Answer only from the passages in the user's message, in plain text, in at most three short paragraphs. If the passages do not answer the question, reply with exactly NOT_COVERED and nothing else.";
 const NOT_COVERED = {
@@ -109,9 +110,10 @@ async function human(gate, request, timeout) {
     if (response.status !== 200) { response.body?.cancel().catch(() => {}); return false; }
     const result = await response.json();
     if (result?.success !== true) return false;
+    const host = new URL(request.url).hostname;
     // External: Cloudflare's test secrets pass any token, name no action and the host example.com, https://developers.cloudflare.com/turnstile/troubleshooting/testing/
-    if (result.metadata?.result_with_testing_key === true) return true;
-    return result.action === TURNSTILE_ACTION && result.hostname === new URL(request.url).hostname;
+    if (result.metadata?.result_with_testing_key === true && LOOPBACK_HOSTS.has(host)) return true;
+    return result.action === TURNSTILE_ACTION && result.hostname === host;
   } catch {
     return false;
   }

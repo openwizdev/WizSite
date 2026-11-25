@@ -299,7 +299,9 @@ The function checks in this order, and stops at the first that fails:
    with the secret, the token, `remoteip` (`CF-Connecting-IP`) and an
    idempotency key, under a short timeout. Only `success: true` with action
    `ask` and the request's own hostname passes (a result Cloudflare marks
-   `result_with_testing_key` passes as is: only a test secret yields it). A
+   `result_with_testing_key` passes on `success` alone only on loopback hosts
+   `localhost`, `127.0.0.1` and `[::1]`; elsewhere it must pass the normal
+   action and hostname checks). A
    missing or overlong token, a failed check, a non-200 or a network error
    all refuse, before any store write or model call.
 4. The visitor's rate limit (`rate_limited`). A question that passes counts,

@@ -2,10 +2,10 @@
   "name": "0.01",
   "semver": "0.1.0",
   "date": "2026-11-21",
-  "headline": "Run your agents anywhere.",
+  "headline": "Run builders where you choose.",
   "bullets": [
-    "Three drivers: your own computer, Cloudroom and boat.dev.",
-    "One line sets up a fleet on your repo.",
+    "Three drivers: your own computer (Claude Code or Codex), boat.dev and CloudRoom.",
+    "Start builders by hand on this computer or boat.dev; the automatic fleet runs in CloudRoom.",
     "Watch every spec and agent at openwiz.dev/app."
   ],
   "notes": "https://github.com/openwizdev/OpenWiz/releases/tag/v0.1.0"
