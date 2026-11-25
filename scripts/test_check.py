@@ -1000,7 +1000,7 @@ class Checks(unittest.TestCase):
             'must be https://buy.polar.sh/  ': (P, lambda t: checkout.sub('data-checkout href="https://buy.polar.sh/"', t)),
             'must be https://buy.polar.sh/   ': (P, lambda t: checkout.sub('data-checkout href="https://example.com/pay"', t)),
             'checkout placeholder needs its id': (P, lambda t: t.replace('id="checkout" ', '', 1)),
-            'the pro page title': (P, lambda t: t.replace('<title>OpenWiz Pro · $20 a year</title>', '<title>Pro</title>', 1)),
+            'the pro page title': (P, lambda t: t.replace('OpenWiz Pro · $20 a year', 'OpenWiz Pro')),
             'the pro page heading': (P, lambda t: t.replace('<h1 id="pro-title">OpenWiz Pro</h1>', '<h1 id="pro-title">Back OpenWiz.</h1>', 1)),
             'the pro page copy': (P, lambda t: t.replace('Get Pro · $20 a year', 'Go Pro · $20 a year', 1)),
             'the pro page perks': (P, lambda t: t.replace('Your issues read first, with a public Pro label.', 'Priority issues.', 1)),
