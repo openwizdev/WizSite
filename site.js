@@ -661,7 +661,7 @@ function browseMarket() {
     }
     const mode = sortMode();
     const rank = { driver: 0, harness: 1, skill: 2, other: 3 };
-    cards.slice().sort((a, b) => {
+    const sorted = cards.slice().sort((a, b) => {
       if (mode === 'market-sort-verified') {
         const delta = Number(Boolean(b.querySelector('[data-status="verified"]'))) - Number(Boolean(a.querySelector('[data-status="verified"]')));
         if (delta) return delta;
@@ -670,7 +670,8 @@ function browseMarket() {
         if (delta) return delta;
       }
       return byName(a, b);
-    }).forEach((card, index) => { card.style.order = String(index); });
+    });
+    root.querySelector('.market-cards').append(...sorted);
     const filtering = Boolean(query || tag || selected !== 'all' || onlyVerified);
     root.classList.toggle('is-empty', shown === 0);
     root.classList.toggle('is-filtered', filtering);
@@ -686,9 +687,26 @@ function browseMarket() {
     if (location.hash.startsWith('#tag-')) history.replaceState(null, '', location.pathname + location.search);
     apply();
   });
+  const kindOfPill = { '#tag-driver': 'driver', '#tag-harness': 'harness', '#tag-skill': 'skill', '#by-tag': 'other' };
   root.addEventListener('click', event => {
-    const anchor = event.target.closest('a[href^="#tag-"]');
+    const anchor = event.target.closest('a');
     if (!anchor || !root.contains(anchor)) return;
+    if (anchor.closest('.market-stats')) {
+      event.preventDefault();
+      const href = anchor.getAttribute('href');
+      tag = '';
+      if (location.hash.startsWith('#tag-')) history.replaceState(null, '', location.pathname + location.search);
+      if (href === '#all-listings') {
+        search.value = '';
+        tools.querySelector('#market-kind-all').checked = true;
+        tools.querySelector('#market-verified-only').checked = false;
+      } else if (kindOfPill[href]) {
+        tools.querySelector(`#market-kind-${kindOfPill[href]}`).checked = true;
+      }
+      apply();
+      return;
+    }
+    if (!anchor.getAttribute('href')?.startsWith('#tag-')) return;
     event.preventDefault();
     tag = anchor.getAttribute('href').slice('#tag-'.length);
     apply();
