@@ -105,11 +105,12 @@ before(async () => {
 });
 after(async () => { await browser?.close(); server?.close(); });
 
-async function open(path = '/', { width = 1280, height = 900, reduced = false, scroll = true } = {}) {
+async function open(path = '/', { width = 1280, height = 900, reduced = false, scroll = true, preload } = {}) {
   const { targetId } = await browser.send('Target.createTarget', { url: 'about:blank' });
   const { sessionId } = await browser.send('Target.attachToTarget', { targetId, flatten: true });
   const send = (method, params) => browser.send(method, params, sessionId);
   await send('Page.enable');
+  if (preload) await send('Page.addScriptToEvaluateOnNewDocument', { source: preload });
   await send('Network.setBlockedURLs', { urls: ['*api.github.com*'] }).catch(() => {});
   await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: width <= 480 });
   await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: reduced ? 'reduce' : 'no-preference' }] });
@@ -329,4 +330,30 @@ test('phone and laptop fit, and reduced motion keeps the row still', async () =>
     await page.shot(`answered-${width}${reduced ? '-reduced' : ''}`);
     await page.close();
   }
+});
+
+test('Ask a Wiz stops loader intervals when an answer or not_covered finishes after ~300 ms', async () => {
+  probeOn();
+  const track = `(() => {
+    const iv = new Map(), set = window.setInterval, clear = window.clearInterval;
+    window.__iv = iv;
+    window.setInterval = (...args) => { const id = set(...args); iv.set(id, args[1]); return id; };
+    window.clearInterval = id => { iv.delete(id); return clear(id); };
+  })()`;
+  fake.answers.push({ lines: [], hold: ANSWER }, { lines: [], hold: NOT_COVERED });
+  const page = await open('/faq/', { preload: track });
+  await page.until(`document.querySelector('.faq-ask input')`);
+  await page.ask('Does the loader stop on a fast answer?');
+  await page.until(`document.querySelector('.faq-ask .wiz-loader') && window.__iv.size === 2`, 'loader mounted on ask');
+  await new Promise(resolve => setTimeout(resolve, 300));
+  fake.release();
+  await waitForAnswers(page, 1, 'the fast answer');
+  assert.equal(await page.evaluate(`window.__iv.size`), 0, 'no interval survives a fast Ask a Wiz answer');
+  await page.ask('Does the loader stop on not_covered?');
+  await page.until(`document.querySelector('.faq-ask .wiz-loader') && window.__iv.size === 2`, 'loader mounted on not_covered');
+  await new Promise(resolve => setTimeout(resolve, 300));
+  fake.release();
+  await waitForAnswers(page, 2, 'the fast not_covered answer');
+  assert.equal(await page.evaluate(`window.__iv.size`), 0, 'no interval survives a fast not_covered answer');
+  await page.close();
 });

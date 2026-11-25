@@ -35,6 +35,7 @@
   }
 
   function waitScreen(text) {
+    if (!window.WizLoader) return screen(h('h1', {}, text));
     built = null;
     OW.palette.close();
     let box = root.querySelector(':scope > .wiz-loader');
@@ -138,7 +139,7 @@
   }
   function repoSwitch(picked) {
     const list = h('div', { class: 'repo-list', hidden: true, id: `repos-${Math.random().toString(36).slice(2)}` });
-    const close = () => { list.hidden = true; button.setAttribute('aria-expanded', 'false'); };
+    const close = () => { list.hidden = true; list.replaceChildren(); button.setAttribute('aria-expanded', 'false'); };
     const fill = async () => {
       const session = data.auth.session();
       list.replaceChildren(reading('Reading your repositories…'));

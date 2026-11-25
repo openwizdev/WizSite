@@ -24,8 +24,8 @@
 .wl-cast-a .wl-wiz,.wl-cast-b .wl-wiz{animation:wl-big 2s both}
 .wl-cast-b .wl-wiz{animation-delay:calc(var(--k,2)*.12s)}
 .wl-cast-c .wl-wiz{animation:wl-spin 2s both}
-.wiz-loader-line{margin:0;height:1.5em;line-height:1.5;font-size:17px;white-space:nowrap;transition:.3s}
-[data-wiz-loader=compact] .wiz-loader-line{font-size:13px;color:#aaa194}
+.wiz-loader .wiz-loader-line{margin:0;height:1.5em;line-height:1.5;font-size:17px;white-space:nowrap;transition:.3s}
+.wiz-loader[data-wiz-loader=compact] .wiz-loader-line{font-size:13px;color:#aaa194}
 .wl-out{opacity:0;transform:translateY(4px)}
 .wl-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
 @keyframes wl-bob{25%{transform:none}12%,37%{transform:translateY(-4%)}50%{transform:scale(1.06,.93)}63%{transform:translateY(-24%) scale(.97,1.04)}76%{transform:scale(1.05,.95)}88%{transform:none}}
@@ -41,5 +41,5 @@
 @keyframes wl-spin{16%{transform:scale(1.08,.9)}36%{transform:translateY(-30%) scale(-1,1.04)}56%{transform:translateY(-14%) scale(1)}72%{transform:scale(1.06,.94)}}
 @keyframes wl-show{from{opacity:0}}
 @keyframes wl-fade{to{opacity:.45}}
-@media (min-width:700px){.wiz-loader{--w:124px;--g:116px;gap:28px}.wiz-loader-line{font-size:19px}}
-@media (prefers-reduced-motion:reduce){.wiz-loader *{animation:none!important}.wl-slot{transform:translateX(calc(var(--w)*.1))}.wl-slot~.wl-slot,.wl-shower{display:none}.wiz-loader .wl-wiz{animation:wl-fade 2.4s infinite alternate!important}}
+@media (min-width:700px){.wiz-loader{--w:124px;--g:116px;gap:28px}.wiz-loader .wiz-loader-line{font-size:19px}}
+@media (prefers-reduced-motion:reduce){.wiz-loader *{animation:none!important}.wl-slot{transform:translateX(calc(var(--w)*.1))}.wl-slot~.wl-slot,.wl-shower{display:none}.wiz-loader .wl-wiz{animation:wl-fade 2.4s infinite alternate!important}.wl-out{transform:none}}

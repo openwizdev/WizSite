@@ -529,6 +529,7 @@ async function askAWiz() {
       let question = '', controller = null, wait = null;
       const waiting = on => {
         if (!on) {
+          wait?._wl?.stop();
           wait?.remove();
           wait = null;
         }
@@ -554,6 +555,7 @@ async function askAWiz() {
         if (focus && inside) (state === 'idle' ? input : state === 'asking' ? buttons.Stop : retry ? buttons.Retry : buttons.Edit).focus();
       };
       const finish = (paragraphs, links = []) => {
+        waiting(false);
         const done = el('div', 'faq-row faq-asked'), h = el(level, 'faq-q'), button = el('button'), a = el('div', 'faq-a');
         button.append(el('span', 'faq-ask-label', question));
         Object.assign(button, { type: 'button', id: `faq-ask-q${n}`, disabled: !faq.hasAttribute('data-ready') });

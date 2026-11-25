@@ -24,15 +24,14 @@
     const stage = box.querySelector('.wl-stage'), leader = stage.querySelector('.wl-slot');
     const line = box.querySelector('.wiz-loader-line');
     const most = box.getAttribute('data-wiz-loader') === 'compact' ? 2 : innerWidth < 700 ? 3 : 4;
-    let size = 1, beat = 0, casts = 0, next = 0, seen = false, swap;
+    let size = 1, beat = 0, casts = 0, next = 0, swap;
     ownMask(leader.querySelector('svg'));
     if (options.lines) line.textContent = lines[next++];
     box.setAttribute('role', 'status');
     if (!box.querySelector('.wl-sr')) box.append(Object.assign(make('span', 'wl-sr'), { textContent: line.textContent }));
     line.setAttribute('aria-hidden', 'true');
     function alive() {
-      if (box.isConnected) seen = true;
-      else if (seen) return stop(), false;
+      if (!box.isConnected) return stop(), false;
       return true;
     }
     function join() {
