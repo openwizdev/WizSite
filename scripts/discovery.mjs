@@ -15,6 +15,7 @@ const schema = 'https://schema.org';
 
 export const aboutPage = 'what-is-openwiz/index.html';
 export const faqPage = 'faq/index.html';
+export const guidePage = 'guides/run-many-coding-agents/index.html';
 export const pages = {
   'index.html': [
     'OpenWiz: the open source agent factory for coding agents',
@@ -23,6 +24,10 @@ export const pages = {
   [aboutPage]: [
     'What is OpenWiz?',
     'Learn how OpenWiz runs fleets of coding agents, where the agents run, how work is tracked on GitHub, and how to install it.',
+  ],
+  [guidePage]: [
+    'How to run many coding agents at once: OpenWiz agent factory',
+    'How to run a fleet of coding agents like Claude Code and Codex: what an agent factory does and how to run one with OpenWiz 0.01, step by step.',
   ],
   [faqPage]: [
     'FAQ — OpenWiz',
@@ -61,7 +66,15 @@ function faqEntries(html) {
   return entries;
 }
 
-function structuredData(page, faq) {
+export function guideSteps(html) {
+  const list = html.match(/<ol class="guide-steps">([\s\S]*?)<\/ol>/);
+  if (!list) throw new Error('The guide needs its steps');
+  const steps = [...list[1].matchAll(/<li><strong>([^<]+)\.<\/strong>([\s\S]*?)<\/li>/g)].map(([, name, text]) => [plain(name), plain(text)]);
+  if (steps.length === 0 || steps.length !== list[1].split('<li>').length - 1) throw new Error('Every guide step needs a name and its text');
+  return steps;
+}
+
+function structuredData(page, faq, html) {
   if (page === 'index.html') {
     return {
       '@context': schema,
@@ -86,6 +99,13 @@ function structuredData(page, faq) {
       })),
     };
   }
+  if (page === guidePage) {
+    return {
+      '@context': schema, '@type': 'HowTo', url: urlFor(page), name: plain(html.match(/<h1>([\s\S]*?)<\/h1>/)[1]),
+      description: pages[page][1], about: { '@id': software },
+      step: guideSteps(html).map(([name, text], index) => ({ '@type': 'HowToStep', position: index + 1, name, text })),
+    };
+  }
   if (page === aboutPage) {
     return { '@context': schema, '@type': 'AboutPage', url: urlFor(page), about: { '@id': software } };
   }
@@ -104,7 +124,7 @@ export function withMetadata(page, html, faq) {
     for (const [key, value] of Object.entries({ site: '@openwiz', title, description })) {
       tags.push(`<meta name="twitter:${key}" content="${escape(value)}">`);
     }
-    const data = structuredData(page, faq);
+    const data = structuredData(page, faq, html);
     if (data) {
       tags.push(`<script type="application/ld+json">\n${JSON.stringify(data, null, 2).replaceAll('<', '\\u003c')}\n</script>`);
     }
@@ -114,13 +134,24 @@ export function withMetadata(page, html, faq) {
   return html.replace(slot, () => `<!-- metadata:start -->\n${tags.join('\n')}\n<!-- metadata:end -->`);
 }
 
+function guideText(html) {
+  const main = html.match(/<main\b[^>]*>([\s\S]*?)<\/main>/)[1];
+  const markdown = text => plain(text.replace(/<a href="([^"]+)">([^<]+)<\/a>/g, (_, url, label) => `[${label}](${new URL(url, site)})`));
+  return [...main.matchAll(/<(h1|h2|p|ul|ol)\b[^>]*>([\s\S]*?)<\/\1>/g)].map(([, tag, inner]) => {
+    if (tag === 'h1') return '## Guide: ' + plain(inner);
+    if (tag === 'h2') return '### ' + plain(inner);
+    if (tag === 'p') return markdown(inner);
+    return [...inner.matchAll(/<li>([\s\S]*?)<\/li>/g)].map(([, item], index) => `${tag === 'ol' ? `${index + 1}.` : '-'} ${markdown(item)}`).join('\n');
+  });
+}
+
 const crawlers = [
   '*', 'GPTBot', 'OAI-SearchBot', 'ChatGPT-User', 'ClaudeBot', 'Claude-SearchBot', 'Claude-User',
   'anthropic-ai', 'PerplexityBot', 'Perplexity-User', 'Google-Extended', 'Googlebot', 'Bingbot',
   'Applebot', 'Applebot-Extended', 'DuckDuckBot', 'CCBot', 'meta-externalagent', 'Amazonbot', 'cohere-ai', 'YouBot',
 ];
 
-export function crawlerFiles(about, faq) {
+export function crawlerFiles(about, faq, guide) {
   const main = about.match(/<main\b[^>]*>([\s\S]*?)<\/main>/)[1];
   const [intro, ...body] = [...main.matchAll(/<(h1|h2|p|li)\b[^>]*>([\s\S]*?)<\/\1>/g)];
   const link = /<a href="([^"]+)">([^<]+)<\/a>/g;
@@ -141,8 +172,9 @@ export function crawlerFiles(about, faq) {
     ].join('\n'),
     '## Docs', [
       `- [${plain(intro[2])}](${urlFor(aboutPage)}): What it does, where agents run, and how to install it.`,
+      `- [${plain(guide.match(/<h1>([\s\S]*?)<\/h1>/)[1])}](${urlFor(guidePage)}): What an agent factory is, and how to run a fleet of coding agents with OpenWiz 0.01, step by step.`,
       links.find(line => line.startsWith('- [FAQ]')),
-      `- [Full OpenWiz text](${site}llms-full.txt): The overview and FAQ in one file.`,
+      `- [Full OpenWiz text](${site}llms-full.txt): The overview, FAQ and guide in one file.`,
       `- [README](${repo}/blob/main/README.md): what OpenWiz is and how the kernel fits together`,
       `- [Your first hour](${repo}/blob/main/docs/first-hour.md): from install to your first merged pull request`,
       `- [Records v1](${repo}/blob/main/kernel/records.v1.md): the rules for specs, tickets and status notes on GitHub`,
@@ -172,6 +204,7 @@ export function crawlerFiles(about, faq) {
     ...body.filter(([, tag]) => tag !== 'li').map(([, tag, html]) => tag === 'h2' ? '## ' + plain(html) : markdown(html)),
     links.join('\n'), '## FAQ',
     ...faqEntries(faq).map(([question, answer]) => `### ${question}\n\n${answer}`),
+    ...guideText(guide),
   ].join('\n\n') + '\n';
 
   const fallbackDate = new Date().toISOString().slice(0, 10);
