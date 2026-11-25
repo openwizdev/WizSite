@@ -601,10 +601,12 @@ export async function fetchGitHubTruth({ owner, name, token, githubFetch = fetch
     }
   }
 
+  const needsYou = canvasYouTickets.size + openDecisions;
+
   return {
     specs,
-    youNeedsYou: needsInfoNumbers.size + openDecisions,
-    canvasNeedsYou: canvasYouTickets.size + openDecisions + unreadableDecisions,
+    needsYou,
+    canvasNeedsYou: needsYou + unreadableDecisions,
     building,
     review,
     merged,
@@ -627,9 +629,9 @@ async function waitForFeeds(page, waitMs) {
   throw new Error('timed out waiting for app feeds to finish loading');
 }
 
-async function checkYou(page, truth) {
+async function checkYou(page, truth, pageWaitMs) {
   await page.go(`${SITE}/app/#/you`);
-  await page.until(`document.querySelector('main h1')?.textContent.trim() === 'You' && document.querySelectorAll('main .tile').length === 4`, 'You page');
+  await page.until(`document.querySelector('main h1')?.textContent.trim() === 'You' && document.querySelectorAll('main .tile').length === 4`, 'You page', pageWaitMs);
   const data = await page.run(`(() => {
     const tiles = Object.fromEntries([...document.querySelectorAll('main .tile')].map(t => [
       t.querySelector('.k')?.textContent.trim() || '',
@@ -640,7 +642,7 @@ async function checkYou(page, truth) {
   const reasons = [];
   const parseTile = raw => Number(String(raw || '').replace(/\+$/, ''));
   const expected = {
-    'Needs you': truth.youNeedsYou,
+    'Needs you': truth.needsYou,
     Building: truth.building,
     'In review': truth.review,
     Merged: truth.merged,
@@ -655,14 +657,14 @@ async function checkYou(page, truth) {
     pass: reasons.length === 0,
     detail: reasons.length
       ? reasons.join('; ')
-      : `Needs you=${truth.youNeedsYou}, Building=${truth.building}, In review=${truth.review}, Merged=${truth.merged}`,
+      : `Needs you=${truth.needsYou}, Building=${truth.building}, In review=${truth.review}, Merged=${truth.merged}`,
     reasons,
   };
 }
 
-async function checkSpecs(page, truth) {
+async function checkSpecs(page, truth, pageWaitMs) {
   await page.go(`${SITE}/app/#/specs`);
-  await page.until(`document.querySelector('main h1')?.textContent.trim() === 'Specs'`, 'Specs page');
+  await page.until(`document.querySelector('main h1')?.textContent.trim() === 'Specs'`, 'Specs page', pageWaitMs);
   const cards = await page.run(`[...document.querySelectorAll('main .cards a.card[href^="#/specs/"]')].map(a => ({
     number: Number(a.getAttribute('href').replace('#/specs/', '')),
     text: a.innerText,
@@ -693,9 +695,9 @@ async function checkSpecs(page, truth) {
   };
 }
 
-async function checkAgents(page, truth) {
+async function checkAgents(page, truth, pageWaitMs) {
   await page.go(`${SITE}/app/#/agents`);
-  await page.until(`document.querySelector('main h1')?.textContent.trim() === 'Agents' && document.querySelectorAll('main h2').length >= 2`, 'Agents page');
+  await page.until(`document.querySelector('main h1')?.textContent.trim() === 'Agents' && document.querySelectorAll('main h2').length >= 2`, 'Agents page', pageWaitMs);
   const sections = await page.run(`(() => {
     const out = {};
     for (const h2 of document.querySelectorAll('main h2')) {
@@ -719,9 +721,9 @@ async function checkAgents(page, truth) {
   };
 }
 
-async function checkCanvas(page, truth) {
+async function checkCanvas(page, truth, pageWaitMs) {
   await page.go(`${SITE}/app/#/canvas`);
-  await page.until(`document.querySelector('main h1')?.textContent.trim() === 'Canvas' && document.querySelector('main .cv')`, 'Canvas page');
+  await page.until(`document.querySelector('main h1')?.textContent.trim() === 'Canvas' && document.querySelector('main .cv')`, 'Canvas page', pageWaitMs);
   const hasQuiet = await page.run(`Boolean(document.querySelector('.cv-rail button.cv-quiet'))`);
   if (hasQuiet) {
     await page.run(`document.querySelector('.cv-rail button.cv-quiet').click()`);
@@ -763,7 +765,7 @@ async function checkCanvas(page, truth) {
   }
   for (const spec of truth.specs.filter(s => s.total > 0).slice(0, 5)) {
     await page.go(`${SITE}/app/#/canvas/${spec.number}`);
-    await page.until(`document.querySelector('.cv-title')?.innerText.includes('#${spec.number}')`, `Canvas sheet #${spec.number}`);
+    await page.until(`document.querySelector('.cv-title')?.innerText.includes('#${spec.number}')`, `Canvas sheet #${spec.number}`, pageWaitMs);
     const stage = await page.run(`(() => ({
       text: document.querySelector('.cv-stage')?.innerText || '',
       stacks: document.querySelectorAll('.cv-board .cv-stack:not(.outside)').length,
@@ -782,9 +784,9 @@ async function checkCanvas(page, truth) {
   };
 }
 
-async function checkModels(page, truth) {
+async function checkModels(page, truth, pageWaitMs) {
   await page.go(`${SITE}/app/#/models`);
-  await page.until(`document.querySelector('main h1')?.textContent.trim() === 'Models' && !document.querySelector('main')?.innerText.includes('Reading GitHub')`, 'Models page');
+  await page.until(`document.querySelector('main h1')?.textContent.trim() === 'Models' && !document.querySelector('main')?.innerText.includes('Reading GitHub')`, 'Models page', pageWaitMs);
   const view = await page.run(`(() => ({
     text: document.querySelector('main')?.innerText || '',
     roles: Object.fromEntries([...document.querySelectorAll('.models .cards .card')].map(card => {
@@ -820,6 +822,7 @@ export async function runLiveCheck({
   token,
   prod = false,
   waitMs = 45000,
+  pageWaitMs = 8000,
   githubFetch = fetch,
   siteTransform = null,
   onPage = null,
@@ -849,8 +852,15 @@ export async function runLiveCheck({
       ['Models', checkModels],
     ];
     for (const [pageName, fn] of checkers) {
-      const res = await fn(run.page, truth);
-      if (onPage) await onPage(run.page, pageName, res);
+      let res;
+      try {
+        res = await fn(run.page, truth, pageWaitMs);
+        if (onPage) await onPage(run.page, pageName, res);
+      } catch (error) {
+        const raw = error instanceof Error ? error.message : String(error);
+        const detail = raw.split('\n')[0].trim();
+        res = { page: pageName, pass: false, detail, reasons: [detail] };
+      }
       pages.push(res);
     }
 
