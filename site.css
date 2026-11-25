@@ -106,9 +106,13 @@ code,.v{font-family:var(--ow-font-mono)}
 .install-version { margin-bottom: 6px; color: var(--ink); font: 650 15px var(--ow-font-sans); }
 .install-version small { margin-left: 6px; color: var(--grey); font: 400 12px var(--ow-font-mono); }
 .install-box[data-install="coming-soon"] .install-version { display: none; }
-.install-note { max-width: 46ch; margin-top: 8px; color: var(--grey2); font-size: 13px; }
-.install-note a { color: var(--ink); text-decoration: underline; text-underline-offset: 2px; }
-.install-box[data-install="coming-soon"] .install-note { display: none; }
+.install-new, .install-help, .install-note { max-width: 46ch; margin-top: 8px; color: var(--grey2); font-size: 13px; }
+.install-new a, .install-help a, .install-note a { color: var(--ink); text-decoration: underline; text-underline-offset: 2px; }
+.install-note summary { width: fit-content; color: var(--grey2); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; list-style: none; }
+.install-note summary::-webkit-details-marker { display: none; }
+.install-note summary:hover { color: var(--ink); }
+.install-note p { margin-top: 6px; }
+.install-box[data-install="coming-soon"] :is(.install-new, .install-help, .install-note) { display: none; }
 .install-row { display: flex; align-items: center; gap: 12px; padding: 5px 6px 5px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); color: var(--grey); font: 13px var(--ow-font-mono); }
 .install-line { min-width: 0; overflow-wrap: anywhere; color: #e1d7cb; font: inherit; user-select: all; }
 .install-box[data-install="coming-soon"] .install-line { color: var(--grey); }
@@ -620,7 +624,9 @@ body.landing > main { flex: 1 0 auto; }
   .faq-a p { padding-right: 0; }
 }
 .faq-ask [hidden] { display: none; }
-.faq-ask-form { display: flex; align-items: center; gap: 12px; min-height: 64px; }
+.faq-ask-form { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; min-height: 64px; }
+.faq-ask-human { flex: 1 0 100%; }
+.faq-ask-human:empty { display: none; }
 .faq-ask-form input { flex: 1; min-width: 0; min-height: 44px; padding: 10px 0; border: 0; background: none; color: var(--ink); font: 560 clamp(17px, 1.5vw, 19px)/1.35 var(--ow-font-sans); letter-spacing: -.015em; }
 .faq-ask-form input::placeholder { color: var(--grey); opacity: 1; }
 .faq-ask-form input:focus { outline: none; }
@@ -655,3 +661,12 @@ body.landing > main { flex: 1 0 auto; }
 .launch figcaption { display: flex; justify-content: flex-end; }
 .launch-post { display: inline-flex; align-items: center; min-height: 44px; color: var(--grey2); font-size: 14px; text-decoration: underline 1px; text-decoration-color: var(--edge); text-underline-offset: .3em; }
 .launch-post:hover { color: var(--ink); text-decoration-color: currentColor; }
+
+.plain-page{max-width:720px;padding-block:clamp(40px,6vw,84px);overflow-wrap:anywhere}
+.plain-page h1{font-size:clamp(36px,5vw,64px);line-height:1.05}
+.plain-page h2{margin-top:1.5em}
+.plain-page p{margin-top:.75em}
+.plain-page ul,.plain-page ol{margin-top:.75em}
+.plain-page li+li{margin-top:.5em}
+.plain-page a,.about-link a{text-decoration:underline;text-underline-offset:.2em}
+.about-link{margin-block:1rem 2rem}
