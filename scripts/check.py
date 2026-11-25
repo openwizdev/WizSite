@@ -15,8 +15,8 @@ TODO_RUN = (
 )
 TODO_APP = '/art/todo-app.webp'
 ART_HASHES = {
-    'app/art/sea-tall.webp': '27db3044c44f18f64b269c8572c4f24be8942b30823e08c1046aa10e15c6b9ae',
-    'app/art/sea-wide.webp': '8ce61c962c6ea77fed8865455f079aecacd96a15c90fba94a023b6bb5a7a9f7d',
+    'app/art/sea-tall.webp': '639da3c2f4a86ae00636ac96fd5bad9d2093340f31eb386d867830370640aa73',
+    'app/art/sea-wide.webp': 'c18c45462732248356ae283b241d3bea99515ba5c786d5abba25348002001546',
     'art/era-2-grill.webp': 'efaf213c3f389c8feb2f9d0436e94b1f9241d0ecf3cc3e793385d34f11cd11dd',
     'art/family-01.webp': '14532efb522eb7129ced9e1093f4b0321b1f00459301f059f2d9b5a8c2a7161f',
     'art/family-02.webp': '0c64fa6a32853b694b7c2b09c2f8a2d296ca878c464b57ba9d0aae101aed81d2',
