@@ -7,7 +7,7 @@
 
 **[openwiz.dev](https://openwiz.dev) and [the app](https://openwiz.dev/app/): where you meet [OpenWiz](https://github.com/openwizdev/OpenWiz) and watch your factory ship.** The app signs in with GitHub, read only, and shows your specs, tickets and agents straight from your repo's records. It is a static site; its only server piece is a small sign-in helper that keeps nothing.
 
-**Status:** live at openwiz.dev, before OpenWiz 0.1.0. The landing page's install button says "coming soon" until 0.1.0 ships.
+**Status:** live at openwiz.dev. OpenWiz 0.1.0 ("OpenWiz 0.01") is out, and the landing page's install box is switched on.
 
 ## Quick start
 

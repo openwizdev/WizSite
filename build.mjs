@@ -29,10 +29,11 @@ const withFaq = html => html.replace('<template data-slot="faq"></template>\n', 
 const appFolder = async folder => (await readdir(new URL(`${folder}/`, root)).catch(() => [])).filter(name => /\.(js|css)$/.test(name)).sort().map(name => `${folder}/${name}`);
 const app = ['app/ember.css', 'app/data.js', 'app/records.js', 'app/ui.js', ...await appFolder('app/pages'), ...await appFolder('app/cards'), 'app/palette.js', 'app/shell.js'];
 const npmVendor = { 'app/vendor/dagre-3.1.3.min.js': 'node_modules/@dagrejs/dagre/dist/dagre.min.js', 'app/vendor/dagre-LICENSE.txt': 'node_modules/@dagrejs/dagre/LICENSE' };
+const fonts = ['fonts/Geist-var.woff2', 'fonts/GeistMono-var.woff2'];
 const hashed = ['tokens.css', 'site.css', 'changelog/changelog.css', 'market/market.css', 'site.js', 'faq.js', vendor[0], ...app];
 const brand = ['favicon.ico', 'favicon.svg', 'apple-touch-icon.png', 'brand/openwiz-lockup.svg', 'brand/og.png'];
 const appBrand = ['app/mark.svg', 'app/icon.svg', 'app/icon.ico', 'app/icon-180.png', 'app/wiz-reviewer.svg'];
-const files = ['_headers', '.well-known/security.txt', 'robots.txt', 'app/manifest.webmanifest', ...appBrand, ...art, ...driverLogos, 'art/todo-spec.mp4', 'art/todo-spec.vtt', 'art/spec-video.mp4', 'art/spec-video.vtt', 'art/launch-video.mp4', 'art/launch-video.vtt', ...vendor.slice(1), ...brand, 'fonts/Geist-var.woff2', 'fonts/GeistMono-var.woff2', 'fonts/OFL.txt'];
+const files = ['_headers', '.well-known/security.txt', 'robots.txt', 'app/manifest.webmanifest', ...appBrand, ...art, ...driverLogos, 'art/todo-spec.mp4', 'art/todo-spec.vtt', 'art/spec-video.mp4', 'art/spec-video.vtt', 'art/launch-video.mp4', 'art/launch-video.vtt', ...vendor.slice(1), ...brand, 'fonts/OFL.txt'];
 const releases = await readReleases();
 const live = installSwitch(await readFile(new URL('index.html', root), 'utf8')) === 'live';
 console.log(`Changelog releases: ${summary(releases, live)}`);
@@ -47,8 +48,19 @@ const put = async (name, data) => {
   await writeFile(target, data);
 };
 const names = {};
-for (const file of hashed) {
+for (const file of fonts) {
   const data = await readFile(new URL(file, root));
+  const hash = createHash('sha256').update(data).digest('hex').slice(0, 10);
+  names[file] = file.replace(/\.woff2$/, `.${hash}.woff2`);
+  await put(names[file], data);
+}
+for (const file of hashed) {
+  let data = await readFile(new URL(file, root));
+  if (file.endsWith('.css')) {
+    let text = data.toString('utf8');
+    for (const font of fonts) text = text.replaceAll(`'/${font}'`, `'/${names[font]}'`).replaceAll(`"/${font}"`, `"/${names[font]}"`);
+    data = Buffer.from(text, 'utf8');
+  }
   const hash = createHash('sha256').update(data).digest('hex').slice(0, 10);
   names[file] = file.replace(/\.(css|js)$/, `.${hash}.$1`);
   await put(names[file], data);
@@ -69,4 +81,4 @@ for (const file of files) {
   await mkdir(new URL('./', new URL(file, output)), { recursive: true });
   await copyFile(new URL(file, root), new URL(file, output));
 }
-console.log(`Static site: ${pages.length + hashed.length + files.length + Object.keys(npmVendor).length} public files in dist/ (${Object.values(names).join(', ')})`);
+console.log(`Static site: ${pages.length + fonts.length + hashed.length + files.length + Object.keys(npmVendor).length} public files in dist/ (${Object.values(names).join(', ')})`);
