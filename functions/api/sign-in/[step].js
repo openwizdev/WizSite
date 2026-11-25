@@ -6,6 +6,7 @@ const COOKIE_PREFIX = '__Host-openwiz-sign-in-';
 const ATTEMPTS = 4;
 const COOKIE_RULES = 'Path=/; Max-Age=%s; Secure; HttpOnly; SameSite=Lax';
 const STATE = /^[A-Za-z0-9_-]{43}$/;
+const VERIFIER = /^[A-Za-z0-9_-]{43}$/;
 const VALUE = /^[A-Za-z0-9_.-]{1,512}$/;
 const MAX_BODY = 4096;
 const GRANT = { access_token: 'string', token_type: 'string', expires_in: 'number', refresh_token: 'string', refresh_token_expires_in: 'number' };
@@ -16,7 +17,16 @@ function answer(status, body, headers = {}, cookies = []) {
   return new Response(body === null ? null : JSON.stringify(body), { status, headers: all });
 }
 const refuse = (status, error, headers) => answer(status, { error }, headers);
-const cookie = (state, maxAge) => `${COOKIE_PREFIX}${state}=${maxAge ? '1' : ''}; ${COOKIE_RULES.replace('%s', maxAge)}`;
+const cookie = (state, maxAge, verifier = '') => `${COOKIE_PREFIX}${state}=${maxAge ? verifier : ''}; ${COOKIE_RULES.replace('%s', maxAge)}`;
+
+function base64url(bytes) {
+  return btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+const randomToken = () => base64url(crypto.getRandomValues(new Uint8Array(32)));
+async function challenge(verifier) {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
+  return base64url(new Uint8Array(digest));
+}
 
 function settings(env) {
   const id = env.GITHUB_CLIENT_ID;
@@ -38,9 +48,17 @@ async function readBody(request, keys) {
 }
 
 function attempts(request) {
-  return (request.headers.get('Cookie') || '').split(';').map(part => part.trim())
-    .filter(part => part.startsWith(COOKIE_PREFIX)).map(part => part.slice(COOKIE_PREFIX.length).split('=')[0])
-    .filter(state => STATE.test(state));
+  const out = [];
+  for (const raw of (request.headers.get('Cookie') || '').split(';')) {
+    const part = raw.trim();
+    if (!part.startsWith(COOKIE_PREFIX)) continue;
+    const rest = part.slice(COOKIE_PREFIX.length);
+    const eq = rest.indexOf('=');
+    const state = eq === -1 ? rest : rest.slice(0, eq);
+    const verifier = eq === -1 ? '' : rest.slice(eq + 1);
+    if (STATE.test(state)) out.push({ state, verifier });
+  }
+  return out;
 }
 
 async function exchange(fields, headers) {
@@ -70,24 +88,37 @@ async function exchange(fields, headers) {
   return answer(200, out, headers);
 }
 
-function start(request, app) {
-  const bytes = crypto.getRandomValues(new Uint8Array(32));
-  const state = btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+async function start(request, app) {
+  const state = randomToken();
+  const verifier = randomToken();
   const to = new URL(AUTHORIZE);
-  to.search = new URLSearchParams({ client_id: app.id, redirect_uri: CALLBACK, state }).toString();
-  const dropped = attempts(request).slice(0, -(ATTEMPTS - 1)).map(old => cookie(old, 0));
-  return answer(302, null, { Location: to.toString() }, [...dropped, cookie(state, 600)]);
+  to.search = new URLSearchParams({
+    client_id: app.id,
+    redirect_uri: CALLBACK,
+    state,
+    code_challenge: await challenge(verifier),
+    code_challenge_method: 'S256',
+  }).toString();
+  const dropped = attempts(request).slice(0, -(ATTEMPTS - 1)).map(old => cookie(old.state, 0));
+  return answer(302, null, { Location: to.toString() }, [...dropped, cookie(state, 600, verifier)]);
 }
 
 async function token(request, app) {
   const body = await readBody(request, ['code', 'state']);
   if (body === 'type') return refuse(415, 'bad_request');
   if (!body) return refuse(400, 'bad_request');
-  if (!STATE.test(body.state) || attempts(request).filter(state => state === body.state).length !== 1) {
+  const matched = STATE.test(body.state) ? attempts(request).filter(attempt => attempt.state === body.state) : [];
+  if (matched.length !== 1 || !VERIFIER.test(matched[0].verifier)) {
     return refuse(403, 'bad_state');
   }
   const clear = { 'Set-Cookie': cookie(body.state, 0) };
-  return exchange({ client_id: app.id, client_secret: app.secret, code: body.code, redirect_uri: CALLBACK }, clear);
+  return exchange({
+    client_id: app.id,
+    client_secret: app.secret,
+    code: body.code,
+    redirect_uri: CALLBACK,
+    code_verifier: matched[0].verifier,
+  }, clear);
 }
 
 async function refresh(request, app) {

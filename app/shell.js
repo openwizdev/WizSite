@@ -37,8 +37,8 @@
   function signedOut(note) {
     data.stop();
     screen(
-      h('h1', {}, 'Your factory, at a glance'),
-      h('p', {}, 'See what needs you, every spec and the agents at work. Sign in to pick a repository.'),
+      h('h1', {}, 'See your idea being built'),
+      h('p', {}, 'Watch your AI helpers at work: what needs your answer, the plan, and each helper\'s progress. Sign in with GitHub (the free website where your project is kept) to pick your project.'),
       note ? h('div', { class: 'notices' }, h('div', { class: 'notice bad', role: 'alert' }, icon('warn'), h('span', {}, note))) : null,
       h('a', { class: 'btn primary', href: '/api/sign-in/start' }, 'Sign in with GitHub'),
       h('p', { class: 'small' }, v2

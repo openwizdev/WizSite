@@ -1,16 +1,21 @@
+import { execFileSync } from 'node:child_process';
 import { copyFile, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { installSwitch, readReleases, render, summary, withReleases } from './scripts/changelog.mjs';
 import { readRegistry, render as renderMarket, summary as marketSummary, withMarket } from './scripts/market.mjs';
 import { withDrivers } from './scripts/drivers.mjs';
 import { readSupporters, render as renderSupporters, summary as supportersSummary, withSupporters } from './scripts/supporters.mjs';
+import { aboutPage, crawlerFiles, guidePage, pages, withMetadata } from './scripts/discovery.mjs';
 
 const root = new URL('./', import.meta.url);
 const output = new URL('dist/', root);
 const vendor = ['vendor/gsap-3.15.1.min.js', 'vendor/GSAP-LICENSE.txt', 'vendor/LOBE-ICONS-LICENSE.txt', 'vendor/LUCIDE-LICENSE.txt'];
 const art = (await readdir(new URL('art/', root))).filter(name => name.endsWith('.webp')).sort().map(name => `art/${name}`);
 const driverLogos = ['drivers/logos/boat-dev.svg', 'drivers/logos/cloudroom.png', 'drivers/logos/monitor.svg', 'drivers/logos/amp.svg', 'drivers/logos/antigravity.svg', 'drivers/logos/augment.svg', 'drivers/logos/capy.svg', 'drivers/logos/cline.svg', 'drivers/logos/conductor.svg', 'drivers/logos/crush.png', 'drivers/logos/cursor.svg', 'drivers/logos/devin.svg', 'drivers/logos/factory.svg', 'drivers/logos/gemini-cli.svg', 'drivers/logos/goose.png', 'drivers/logos/hermes.png', 'drivers/logos/kilo-code.svg', 'drivers/logos/kimi-code.svg', 'drivers/logos/kiro.svg', 'drivers/logos/ona.svg', 'drivers/logos/openclaw.svg', 'drivers/logos/opencode.svg', 'drivers/logos/openhands.svg', 'drivers/logos/pane.svg', 'drivers/logos/pi.svg', 'drivers/logos/qwen-code.svg', 'drivers/logos/sculptor.svg', 'drivers/logos/tembo.svg', 'drivers/logos/warp.svg'];
-const pages = ['index.html', 'changelog/index.html', 'drivers/index.html', 'team/index.html', 'faq/index.html', 'market/index.html', 'pro/index.html', 'supporters/index.html', 'app/index.html'];
+const landing = await readFile(new URL('index.html', root), 'utf8');
+const topBar = landing.match(/<header class="landing-nav [^"]*">[\s\S]*?<\/header>/)[0];
+const live = installSwitch(landing) === 'live';
+const install = live ? 'Paste this line into your coding agent.' : 'Public installation is coming soon. This is the line to paste into your coding agent when it is available.';
 const cta = await readFile(new URL('header-cta.html', root), 'utf8');
 const withCta = html => {
   const bar = '  </nav>\n</header>';
@@ -28,14 +33,14 @@ const faqTop = faq.replace(/<(\/?)h2\b/g, '<$1h1').replace(/<(\/?)h3\b/g, '<$1h2
 const withFaq = html => html.replace('<template data-slot="faq"></template>\n', faq).replace('<template data-slot="faq-h1"></template>\n', faqTop);
 const appFolder = async folder => (await readdir(new URL(`${folder}/`, root)).catch(() => [])).filter(name => /\.(js|css)$/.test(name)).sort().map(name => `${folder}/${name}`);
 const app = ['app/ember.css', 'app/data.js', 'app/records.js', 'app/ui.js', ...await appFolder('app/pages'), ...await appFolder('app/cards'), 'app/palette.js', 'app/shell.js'];
+const npmHashed = { 'vendor/gsap-3.15.1.min.js': 'node_modules/gsap/dist/gsap.min.js' };
 const npmVendor = { 'app/vendor/dagre-3.1.3.min.js': 'node_modules/@dagrejs/dagre/dist/dagre.min.js', 'app/vendor/dagre-LICENSE.txt': 'node_modules/@dagrejs/dagre/LICENSE' };
 const fonts = ['fonts/Geist-var.woff2', 'fonts/GeistMono-var.woff2'];
 const hashed = ['tokens.css', 'site.css', 'changelog/changelog.css', 'market/market.css', 'site.js', 'faq.js', vendor[0], ...app];
 const brand = ['favicon.ico', 'favicon.svg', 'apple-touch-icon.png', 'brand/openwiz-lockup.svg', 'brand/og.png'];
 const appBrand = ['app/mark.svg', 'app/icon.svg', 'app/icon.ico', 'app/icon-180.png', 'app/wiz-reviewer.svg'];
-const files = ['_headers', '.well-known/security.txt', 'robots.txt', 'app/manifest.webmanifest', ...appBrand, ...art, ...driverLogos, 'art/todo-spec.mp4', 'art/todo-spec.vtt', 'art/spec-video.mp4', 'art/spec-video.vtt', 'art/launch-video.mp4', 'art/launch-video.vtt', ...vendor.slice(1), ...brand, 'fonts/OFL.txt'];
+const files = ['_headers', '.well-known/security.txt', 'SKILL.md', 'c76a1a01e62d088edd3789d30d6a4d29.txt', 'app/manifest.webmanifest', ...appBrand, ...art, ...driverLogos, 'art/todo-spec.mp4', 'art/todo-spec.vtt', 'art/spec-video.mp4', 'art/spec-video.vtt', 'art/launch-video.mp4', 'art/launch-video.vtt', ...vendor.slice(1), ...brand, 'fonts/OFL.txt'];
 const releases = await readReleases();
-const live = installSwitch(await readFile(new URL('index.html', root), 'utf8')) === 'live';
 console.log(`Changelog releases: ${summary(releases, live)}`);
 const registry = await readRegistry();
 console.log(`Market: ${marketSummary(registry)}`);
@@ -55,7 +60,7 @@ for (const file of fonts) {
   await put(names[file], data);
 }
 for (const file of hashed) {
-  let data = await readFile(new URL(file, root));
+  let data = await readFile(new URL(npmHashed[file] ?? file, root));
   if (file.endsWith('.css')) {
     let text = data.toString('utf8');
     for (const font of fonts) text = text.replaceAll(`'/${font}'`, `'/${names[font]}'`).replaceAll(`"/${font}"`, `"/${names[font]}"`);
@@ -65,8 +70,18 @@ for (const file of hashed) {
   names[file] = file.replace(/\.(css|js)$/, `.${hash}.$1`);
   await put(names[file], data);
 }
-for (const page of pages) {
+let about, guide;
+for (const page of Object.keys(pages)) {
   let html = await readFile(new URL(page, root), 'utf8');
+  if (page === aboutPage || page === guidePage || page === '404.html') {
+    html = html.replace('<template data-slot="top-bar"></template>', () => topBar);
+  }
+  if (page === guidePage) guide = html;
+  if (page === aboutPage) {
+    html = html.replace('<template data-slot="install-instructions"></template>', `<p>${install}</p>`);
+    about = html;
+  }
+  html = withMetadata(page, html, faq);
   for (const [file, name] of Object.entries(names)) html = html.replaceAll(`"/${file}"`, `"/${name}"`);
   if (page !== 'app/index.html') html = withFaq(withFooter(withCta(html)));
   if (page === 'changelog/index.html') html = withReleases(html, render(releases, live));
@@ -75,10 +90,13 @@ for (const page of pages) {
   if (page === 'supporters/index.html') html = withSupporters(html, renderSupporters(supporters));
   await put(page, html);
 }
+const discovery = crawlerFiles(about, faq, guide);
+for (const [file, data] of Object.entries(discovery)) await put(file, data);
 await put('ask-index.json', await (await import('./scripts/ask-index.mjs')).snapshotIndex(output, new URL('ask-docs/', root)));
 for (const [file, source] of Object.entries(npmVendor)) await put(file, await readFile(new URL(source, root)));
 for (const file of files) {
   await mkdir(new URL('./', new URL(file, output)), { recursive: true });
   await copyFile(new URL(file, root), new URL(file, output));
 }
-console.log(`Static site: ${pages.length + fonts.length + hashed.length + files.length + Object.keys(npmVendor).length} public files in dist/ (${Object.values(names).join(', ')})`);
+execFileSync('python3', ['-B', 'scripts/check.py', '--discovery-only'], { cwd: root, stdio: 'inherit' });
+console.log(`Static site: ${Object.keys(pages).length + fonts.length + hashed.length + files.length + Object.keys(npmVendor).length + Object.keys(discovery).length + 1} public files in dist/ (${Object.values(names).join(', ')})`);

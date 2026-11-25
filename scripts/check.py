@@ -6,7 +6,9 @@ from pathlib import Path
 import json
 import re
 import subprocess
-from urllib.parse import unquote, urlsplit
+import sys
+from xml.etree import ElementTree
+from urllib.parse import unquote, urljoin, urlsplit
 import font_chars
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -62,8 +64,6 @@ ICON_HASHES = {
     'app/icon-180.png': 'deb93ec39812c224c1470e2f1730f7f4ead7be3d27428a20a2a83284b77fbc2f',
 }
 DOC_HASHES = {
-    'docs/map.png': '19fc57ff3f588b36e2ca412f5656483eaf873718d0d19a39aceb83e007333e6b',
-    'docs/map-phone.png': 'cdd21a74a880d3adab68ce794de1b18060d916d6df5d00ceb54eb06736cf3fd2',
     'docs/evidence/pro/home-390.png': 'b0140c348121e276a5e0602aaaad4a5f2ee658a04ca3fc27f0ba8f59d89b2594',
     'docs/evidence/pro/home-1280.png': '3fff03b87be3ecb9d3ef11cd9131d3b2bcfbd556ccaed115446a9e4ef4e54b61',
     'docs/evidence/pro/pro-390.png': 'cd18c70822ce55987607e8d22e83304d7184a44fc99ea8723bab706422c03893',
@@ -87,6 +87,37 @@ DOC_HASHES = {
     'docs/evidence/speed/fonts/market-390x844.png': 'a183102af047c3fff12ad64437419255f0e3699e7545ca140d4c1b94f427b12e',
     'docs/evidence/speed/fonts/team-1280x800.png': '39341122e3a7f63eb6edc82f7be689f406fad216bf23d3e5fcff0eaa9e08cafd',
     'docs/evidence/speed/fonts/team-390x844.png': 'c1ba52e547ef48d4134271b1648bc8e67b6adf1ea6820165b90bc56e51d1267b',
+    'docs/evidence/speed/speed-gsap-after-load/after-changelog-1280x800.png': 'df00b6386ab36c2919b583345fb218a2182526ae4fea93db5bd336f853e14851',
+    'docs/evidence/speed/speed-gsap-after-load/after-changelog-390x844.png': 'a5418e5887e19336e540f579a538be4ca3a5262dbac0d0ba9a44e1c95d7c7318',
+    'docs/evidence/speed/speed-gsap-after-load/after-drivers-1280x800.png': '6737672f20f0cda9b279e8356272e44a1b003ade2b7042f2f9117589f4b79be6',
+    'docs/evidence/speed/speed-gsap-after-load/after-drivers-390x844.png': 'd674cc5a4f35f9668a35e13d3ed4f975208baa8d8455438179848817c19751a2',
+    'docs/evidence/speed/speed-gsap-after-load/after-faq-1280x800.png': '011896b855c625e370688da3cfc3660c8813d98e9c58098ce4948bb3398d5783',
+    'docs/evidence/speed/speed-gsap-after-load/after-faq-390x844.png': '78bfc111ae0b6a8620fe4d55ccb6c578a8bead6d5c5e9067a83ea91dda8f9817',
+    'docs/evidence/speed/speed-gsap-after-load/after-landing-1280x800.png': 'b94a9e5b459786ea69641b97eec3a8c96cd17d2cdb41bf17fb7ba250ba00bc3c',
+    'docs/evidence/speed/speed-gsap-after-load/after-landing-390x844.png': 'a31c02061e1665a0f7e153622a7b0ae870e3bd51daccc3092d98424db6f4c0e9',
+    'docs/evidence/speed/speed-gsap-after-load/after-landing-footer-1280x800.png': 'b998f2b0129c4a654c305a522b718f290082ac37189f9e4e8fbafb20620acdcb',
+    'docs/evidence/speed/speed-gsap-after-load/after-landing-footer-390x844.png': '8aa65f6a2504242122a3f31fc18f72a997e5a7565841c52d564990f39fdd8df8',
+    'docs/evidence/speed/speed-gsap-after-load/after-market-1280x800.png': '43e471c6622425f860e9d132d96df2331110c79182368595bf97df59ac27f06c',
+    'docs/evidence/speed/speed-gsap-after-load/after-market-390x844.png': '56d39c45cee590e6df6cf9bc729fe6166d5bb1801f8d028d669ce5534efce4a9',
+    'docs/evidence/speed/speed-gsap-after-load/after-team-1280x800.png': 'deeca3ce6b20ca9afd723d4e0a9ef8f4672740c3ef830b79fb95f7d7dae2e7d7',
+    'docs/evidence/speed/speed-gsap-after-load/after-team-390x844.png': '9ea9f03ac9bd2f344d6d10cc0296673ec18146c6226611bea79d0dff8340a5c3',
+    'docs/evidence/speed/speed-gsap-after-load/before-changelog-1280x800.png': 'df00b6386ab36c2919b583345fb218a2182526ae4fea93db5bd336f853e14851',
+    'docs/evidence/speed/speed-gsap-after-load/before-changelog-390x844.png': 'a5418e5887e19336e540f579a538be4ca3a5262dbac0d0ba9a44e1c95d7c7318',
+    'docs/evidence/speed/speed-gsap-after-load/before-drivers-1280x800.png': '6737672f20f0cda9b279e8356272e44a1b003ade2b7042f2f9117589f4b79be6',
+    'docs/evidence/speed/speed-gsap-after-load/before-drivers-390x844.png': 'd674cc5a4f35f9668a35e13d3ed4f975208baa8d8455438179848817c19751a2',
+    'docs/evidence/speed/speed-gsap-after-load/before-faq-1280x800.png': '011896b855c625e370688da3cfc3660c8813d98e9c58098ce4948bb3398d5783',
+    'docs/evidence/speed/speed-gsap-after-load/before-faq-390x844.png': '78bfc111ae0b6a8620fe4d55ccb6c578a8bead6d5c5e9067a83ea91dda8f9817',
+    'docs/evidence/speed/speed-gsap-after-load/before-landing-1280x800.png': 'b94a9e5b459786ea69641b97eec3a8c96cd17d2cdb41bf17fb7ba250ba00bc3c',
+    'docs/evidence/speed/speed-gsap-after-load/before-landing-390x844.png': 'a31c02061e1665a0f7e153622a7b0ae870e3bd51daccc3092d98424db6f4c0e9',
+    'docs/evidence/speed/speed-gsap-after-load/before-landing-footer-1280x800.png': 'b998f2b0129c4a654c305a522b718f290082ac37189f9e4e8fbafb20620acdcb',
+    'docs/evidence/speed/speed-gsap-after-load/before-landing-footer-390x844.png': '8aa65f6a2504242122a3f31fc18f72a997e5a7565841c52d564990f39fdd8df8',
+    'docs/evidence/speed/speed-gsap-after-load/before-market-1280x800.png': '43e471c6622425f860e9d132d96df2331110c79182368595bf97df59ac27f06c',
+    'docs/evidence/speed/speed-gsap-after-load/before-market-390x844.png': '56d39c45cee590e6df6cf9bc729fe6166d5bb1801f8d028d669ce5534efce4a9',
+    'docs/evidence/speed/speed-gsap-after-load/before-team-1280x800.png': 'deeca3ce6b20ca9afd723d4e0a9ef8f4672740c3ef830b79fb95f7d7dae2e7d7',
+    'docs/evidence/speed/speed-gsap-after-load/before-team-390x844.png': '9ea9f03ac9bd2f344d6d10cc0296673ec18146c6226611bea79d0dff8340a5c3',
+    'docs/evidence/speed/speed-gsap-after-load/motion-footer-wave-390.png': '5d8f76138de2f6f68e7656c0cf15544ce494fb141f9b2f2c1b6bc5ad5eaed6c7',
+    'docs/evidence/speed/speed-gsap-after-load/motion-hero-390.png': '07fc459d518ed9fe82187a32b4325779594672f208e10cabd83e9b45f151bf85',
+    'docs/evidence/speed/speed-gsap-after-load/waterfall-390.png': 'd0a02240a419ea61e38eeb59ee76b29ee2d5624ecf97e8834e49c6131d2cc2b9',
 }
 VECTORS = ('favicon.svg', 'brand/openwiz-lockup.svg', 'app/mark.svg', 'app/icon.svg', 'app/wiz-reviewer.svg')
 MARK, OLD_MARK = '#cfc6b8', '#2b2bff'
@@ -102,6 +133,7 @@ LAUNCH_LABEL = 'Watch OpenWiz in two minutes'
 LAUNCH_POST = 'https://x.com/openwiz/status/2124709517665657224'
 LAUNCH_POST_TEXT = 'See the launch post'
 GSAP = 'vendor/gsap-3.15.1.min.js'
+NPM_HASHED = {GSAP: 'node_modules/gsap/dist/gsap.min.js'}
 VENDOR_HASHES = {
     'vendor/GSAP-LICENSE.txt': '791e7d34e6718aad2bd3e20fa5240a4c0e47d73ee3ca31424652cca52fe9acf0',
     'vendor/LOBE-ICONS-LICENSE.txt': 'add9d7531d1b21646317a8958e38fc727506fa39d24bdecb44154d943c82753a',
@@ -169,6 +201,10 @@ SITE_HEADERS = (
     'X-Content-Type-Options: nosniff',
     'Referrer-Policy: strict-origin-when-cross-origin',
 )
+TURNSTILE_ORIGIN = 'https://challenges.cloudflare.com'
+ASK_CSP = re.sub(r"(script-src [^;]*);", rf"\1 {TURNSTILE_ORIGIN};", SITE_CSP, count=1).replace("frame-src 'none';", f"frame-src {TURNSTILE_ORIGIN};")
+assert ASK_CSP.count(TURNSTILE_ORIGIN) == 2, 'the Ask a Wiz CSP must add Turnstile to script-src and frame-src'
+ASK_PATHS = ('/', '/faq/*')
 APP_CSP = ("default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; media-src 'self'; font-src 'self'; "
            "connect-src 'self' https://api.github.com; manifest-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
 CACHE_HTML = 'public, max-age=0, must-revalidate'
@@ -247,7 +283,7 @@ def fingerprint(name, data):
 
 
 def built_asset_bytes(name, font_names=None):
-    data = (ROOT / name).read_bytes()
+    data = (ROOT / NPM_HASHED.get(name, name)).read_bytes()
     if name.endswith('.css') and font_names:
         text = data.decode('utf-8')
         for font, hashed in font_names.items():
@@ -259,6 +295,12 @@ def built_asset_bytes(name, font_names=None):
 def fingerprinted_page(html, cta=False):
     for name, hashed in FINGERPRINTS.items():
         html = html.replace(f'"/{name}"', f'"/{hashed}"')
+    html = html.replace('<template data-slot="top-bar"></template>', top_bar((ROOT / 'index.html').read_text()))
+    if '<template data-slot="install-instructions"></template>' in html:
+        live = install_switch((ROOT / 'index.html').read_text()) == 'live'
+        copy = ('Paste this line into your coding agent.' if live else
+                'Public installation is coming soon. This is the line to paste into your coding agent when it is available.')
+        html = html.replace('<template data-slot="install-instructions"></template>', f'<p>{copy}</p>')
     return with_faq(with_footer(with_cta(html))) if cta else html
 
 
@@ -282,8 +324,7 @@ TEAM_FACTS = ('OpenWiz 0.01 is out: open source, Apache-2.0.',
               'It never touches a login and runs no server of ours.',
               'Which drivers passed their live check: the Drivers page.',
               'One person built it, with fleets of agents.')
-TEAM_DESCRIPTION = ('A 30-minute call with Jake, who built OpenWiz. Bring your repository; leave with a pull request '
-                    'your agents built and reviewed.')
+TEAM_DESCRIPTION = 'Book a 30-minute call to set up OpenWiz with your team and run a fleet on your own repository.'
 TEAM_NEVER = re.compile(r'\binstall|\bguarantee|\bpric(?:e|es|ing)\b|\bcost|\bfree\b|\bcheckout|[$€£]\s*\d|\bper (?:month|seat|user)\b'
                         r'|\bcustomers?\b|\btrusted\b|\btestimonial|\bresults?\b|\bcloudroom\b|\bships on\b|\bminute \d'
                         r'|\b(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten) (?:drivers|hosts)\b|\b\d+ of \d+\b', re.I)
@@ -315,7 +356,7 @@ SUPPORTERS_EMPTY = 'No supporters yet. Be the first.'
 REPORT_LINK = 'https://github.com/openwizdev/openwiz/issues/new?template=feedback.yml'
 FOOTER = (ROOT / 'footer.html').read_text()
 FOOTER_SLOT = '<template data-slot="footer"></template>\n'
-FOOTER_LINKS = (('/drivers/', 'Drivers'), ('/market/', 'Market'), ('/changelog/', 'Changelog'), ('https://github.com/openwizdev/openwiz#readme', 'Docs'),
+FOOTER_LINKS = (('/what-is-openwiz/', 'What is OpenWiz?'), ('/guides/run-many-coding-agents/', 'Guide'), ('/drivers/', 'Drivers'), ('/market/', 'Market'), ('/changelog/', 'Changelog'), ('https://github.com/openwizdev/openwiz#readme', 'Docs'),
                 ('/faq/', 'FAQ'), ('/app/', 'The app'), (REPORT_LINK, 'Report a problem'), ('/team/', 'For teams'), ('/pro/', 'Pro'),
                 ('https://github.com/openwizdev/openwiz', 'GitHub'), ('https://x.com/openwiz', 'X @openwiz'))
 FOOTER_LINE = 'Apache-2.0. Owned by no one.'
@@ -323,21 +364,33 @@ COUNT_NOTICE = ('openwiz.dev counts visits with Cloudflare Web Analytics and sel
                 'without cookies or personal data.')
 X_ACCOUNT = 'https://x.com/openwiz'
 CLOUDROOM_LINK = 'https://cloudroom.dev'
+INSTALL_GUIDE = 'https://github.com/openwizdev/OpenWiz/blob/main/docs/install.md#openwiz-010'
+INSTALL_LINKS = (
+    'https://claude.com/product/claude-code',
+    'https://openai.com/codex/',
+    'https://cal.com/openwiz-jake/setup',
+)
 INSTALL_NOTE = ("No CloudRoom needed to install. In OpenWiz 0.01, you start builders by hand on this computer, with the Claude Code "
                 "or Codex you're signed in to, or on boat.dev; the automatic fleet runs in CloudRoom. "
-                'For an Apple-silicon Mac or x86_64 Linux.')
-INSTALL_NOTE_HTML = ('<p class="install-note">No CloudRoom needed to install. In OpenWiz 0.01, you start builders by hand on this '
+                'For a Mac (Apple silicon or Intel) or x86_64 Linux.')
+INSTALL_PREREQS = 'You need Python 3.9 or later, git, and the GitHub CLI (gh). See the install guide.'
+INSTALL_PREREQS_HTML = f'<p>You need Python 3.9 or later, git, and the GitHub CLI (gh). See <a href="{INSTALL_GUIDE}" rel="noreferrer">the install guide</a>.</p>'
+INSTALL_NOTE_HTML = ('<details class="install-note"><summary>Details for developers</summary><p>No CloudRoom needed to install. In OpenWiz 0.01, you start builders by hand on this '
                      "computer, with the Claude Code or Codex you're signed in to, or on boat.dev; the automatic fleet runs in "
-                     '<a href="https://cloudroom.dev" rel="noreferrer">CloudRoom</a>. For an Apple-silicon Mac or x86_64 Linux.</p>')
+                     '<a href="https://cloudroom.dev" rel="noreferrer">CloudRoom</a>. For a Mac (Apple silicon or Intel) or x86_64 Linux.</p>'
+                     + INSTALL_PREREQS_HTML + '</details>')
 FAQ = (ROOT / 'faq.html').read_text()
 FAQ_TOP = re.sub(r'<(/?)h3\b', r'<\1h2', re.sub(r'<(/?)h2\b', r'<\1h1', FAQ))
 FAQ_SLOTS = {'<template data-slot="faq"></template>\n': FAQ, '<template data-slot="faq-h1"></template>\n': FAQ_TOP}
 FAQ_PAGE = 'faq/index.html'
 FAQ_ON = {'index.html': FAQ, FAQ_PAGE: FAQ_TOP}
+FAQ_ROWS = re.compile(r'<div class="faq-row">\s*<h3 class="faq-q"><button ([^>]*)>([\s\S]*?)</button></h3>\s*<div class="faq-a" id="([^"]*)"><div>([\s\S]*?)</div></div>\s*</div>')
 FAQ_TITLE = ('Questions', 'The short ones are here.')
-FAQ_QUESTIONS = ('What is OpenWiz?', 'What is a kernel?', 'What do I need to run it?', 'Where do my agents run?',
-                 'Does OpenWiz see my code or my logins?', 'What does it cost?', 'Can you set it up for my team?',
-                 'How does openwiz.dev count visits and clicks?')
+FAQ_QUESTIONS = ('What is OpenWiz?', 'What is a kernel?', 'What do I need to run it?', 'What do I need before installing?',
+                 'Where do my agents run?', 'Does OpenWiz see my code or my logins?', 'What does it cost?',
+                 'Can you set it up for my team?', 'How does openwiz.dev count visits and clicks?')
+FAQ_PREREQS = ('A Mac (Apple silicon or Intel) or x86_64 Linux, with Python 3.9 or later, git, and the GitHub CLI (gh). '
+               'See the install guide for every step and command.')
 FAQ_TEAM = 'Yes. Book a 30-minute call. Your first fleet ships on it.'
 FAQ_WHERE = ("Builders run where you choose: this computer, with the Claude Code or Codex you're signed in to, boat.dev, "
              'or CloudRoom. Each is a driver that passed the same five-check test. In OpenWiz 0.01, you start builders by '
@@ -365,10 +418,19 @@ def with_cta(html):
 FONT_FINGERPRINTS = {name: fingerprint(name, (ROOT / name).read_bytes()) for name in FONT_FILES}
 FINGERPRINTS = {name: fingerprint(name, built_asset_bytes(name, FONT_FINGERPRINTS)) for name in HASHED}
 ASK_INDEX = 'ask-index.json'
+DISCOVERY_FILES = {ROBOTS_TXT, 'sitemap.xml', 'llms.txt', 'llms-full.txt'}
+ABOUT_PAGE = 'what-is-openwiz/index.html'
+GUIDE_PAGE = 'guides/run-many-coding-agents/index.html'
+GUIDE_H1 = 'How to run many coding agents at once'
+GUIDE_STEPS = re.compile(r'<li><strong>([^<]+)\.</strong>([\s\S]*?)</li>')
+GUIDE_NEVER = re.compile(r'\b0\.1\.[1-9]|\b0\.0[2-9]\b')
+NOT_FOUND = '404.html'
+ABOUT_LINK = '<p class="wrap about-link"><a href="/what-is-openwiz/">What is OpenWiz?</a></p>\n'
 STATIC = {
-    'index.html', 'changelog/index.html', 'drivers/index.html', 'team/index.html', 'faq/index.html', 'market/index.html', PRO_PAGE, SUPPORTERS_PAGE, '_headers', SECURITY_TXT, ROBOTS_TXT, APP_PAGE, 'app/manifest.webmanifest',
-    'fonts/OFL.txt',
-} | ART | set(ICON_HASHES) | set(VECTORS) | (set(VENDOR_HASHES) - {GSAP}) | set(APP_VENDOR) | set(DRIVER_LOGOS) | {ASK_INDEX}
+    'index.html', 'changelog/index.html', 'drivers/index.html', 'team/index.html', 'faq/index.html', 'market/index.html', PRO_PAGE, SUPPORTERS_PAGE, '_headers', SECURITY_TXT, APP_PAGE, 'app/manifest.webmanifest',
+    'SKILL.md', 'fonts/OFL.txt',
+    'c76a1a01e62d088edd3789d30d6a4d29.txt',
+} | ART | set(ICON_HASHES) | set(VECTORS) | (set(VENDOR_HASHES) - {GSAP}) | set(APP_VENDOR) | set(DRIVER_LOGOS) | {ASK_INDEX, ABOUT_PAGE, GUIDE_PAGE, NOT_FOUND} | DISCOVERY_FILES
 RUNTIME = STATIC | set(FINGERPRINTS.values())
 
 
@@ -391,8 +453,9 @@ FONT_HASHES = {
     'fonts/GeistMono-var.woff2': '9e8aaba5adee50826485cff3187dc86d45f7dd4799a80371af0f369bbd999989',
     'fonts/OFL.txt': 'c683bfbcc7e087f5d37a54ef628f10387c451a83ddc459b151403a164ac46c90',
 }
-PAGES = ('index.html', 'changelog/index.html', 'drivers/index.html', TEAM_PAGE, FAQ_PAGE, 'market/index.html', PRO_PAGE, SUPPORTERS_PAGE)
-ALL_PAGES = PAGES + (APP_PAGE,)
+PAGES = ('index.html', 'changelog/index.html', 'drivers/index.html', TEAM_PAGE, FAQ_PAGE, 'market/index.html', PRO_PAGE, SUPPORTERS_PAGE, ABOUT_PAGE, GUIDE_PAGE)
+SITE_PAGES = PAGES + (NOT_FOUND,)
+ALL_PAGES = SITE_PAGES + (APP_PAGE,)
 STORY_COPY = ('Build a to-do app', 'Bring any agent', 'Sign in with GitHub', 'Put the app on your phone')
 OLD_EXAMPLE = ('dark mode', 'dark-mode')
 MOTION_OK = '@media (prefers-reduced-motion:no-preference)'
@@ -453,7 +516,6 @@ DRIVER_RESULT = re.compile(r'\ball five checks\b|\bfive passed checks\b|\bfive o
 DRIVER_RESULT_MAX = 2
 DRIVER_EXPLAINER_WORDS = ('driver', 'agents', 'tickets', 'four commands, plus its schema', 'five-check test')
 DRIVER_COMMANDS = 'answers four commands, plus its schema.'
-DRIVER_DESCRIPTION_COMMANDS = 'Drivers answer the same four commands, plus their schema,'
 PROOF_LINES = (
     ('version', 'It names the kernel\'s records version, and prints its schema unchanged.'),
     ('start', 'It answered a run id, and the agent\'s status note appeared on a throwaway ticket.'),
@@ -468,7 +530,7 @@ DRIVER_MIN_FONT = 12
 DRIVER_LABEL_TRACKING = 0.06
 OWN_DRIVER = 'Write your own driver'
 OPENWIZ_REPO = 'https://github.com/openwizdev/OpenWiz'
-DRIVER_DESCRIPTION = 'boat.dev, Cloudroom and your own computer or VPS passed all five checks and ship today; every other host and harness shows its true state'
+DRIVER_DESCRIPTION = 'OpenWiz drivers use four commands and one test kit. See results for the shipped drivers: boat.dev, CloudRoom and your own computer or VPS.'
 DRIVER_ART_BUDGET = 400_000
 PR, ISSUE = OPENWIZ_REPO + '/pull/', OPENWIZ_REPO + '/issues/'
 DRIVER_WALL = (
@@ -556,19 +618,42 @@ class Page(HTMLParser):
         self.open_video = None
         self.links = []
         self.inline_scripts = 0
+        self.in_head = False
+        self.head_fields = {}
+        self.title = None
+        self.json_ld = []
+        self.json_data = None
         self.books = []
         self.checkouts = []
         self.x_links = 0
         self.launch_posts = 0
         self.report_links = 0
         self.cloudroom_links = 0
-        self.stylesheets, self.scripts = [], []
+        self.install_links = {url: 0 for url in INSTALL_LINKS}
+        self.stylesheets, self.scripts, self.gsap = [], [], []
         self.feed(text)
 
     def tracks_of(self, video):
         return next((tracks for clip, tracks in zip(self.videos, self.video_tracks) if clip is video), [])
 
+    def handle_data(self, text):
+        if self.title is not None:
+            self.title += text
+        if self.json_data is not None:
+            self.json_data += text
+
+    def head_field(self, name, value):
+        self.head_fields.setdefault(name, []).append(value or '')
+
     def handle_endtag(self, tag):
+        if tag == 'head':
+            self.in_head = False
+        if tag == 'title' and self.title is not None:
+            self.head_field('title', self.title.strip())
+            self.title = None
+        if tag == 'script' and self.json_data is not None:
+            self.json_ld.append(self.json_data)
+            self.json_data = None
         if tag == 'video':
             self.open_video = None
 
@@ -577,6 +662,17 @@ class Page(HTMLParser):
         duplicates = sorted({name for name in names if names.count(name) > 1})
         assert not duplicates, f'duplicate HTML attribute on <{tag}>: {", ".join(duplicates)}'
         attrs = dict(attrs)
+        if tag == 'head':
+            self.in_head = True
+        elif tag == 'script' and attrs.get('type') == 'application/ld+json' and self.in_head and 'src' not in attrs:
+            self.json_data = ''
+        elif self.in_head and tag == 'title':
+            self.title = ''
+        elif self.in_head and tag == 'meta':
+            self.head_field(attrs.get('name') or attrs.get('property'), attrs.get('content'))
+        elif self.in_head and tag == 'link' and attrs.get('rel') == 'canonical':
+            self.head_field('canonical', attrs.get('href'))
+            return
         if 'id' in attrs:
             assert attrs['id'] not in self.ids, 'duplicate HTML id'
             self.ids.add(attrs['id'])
@@ -594,6 +690,11 @@ class Page(HTMLParser):
             attrs = {key: value for key, value in attrs.items() if key != 'href'}
         elif tag == 'a' and attrs.get('href') == CLOUDROOM_LINK:
             self.cloudroom_links += 1
+            attrs = {key: value for key, value in attrs.items() if key != 'href'}
+        elif tag == 'a' and attrs.get('href') in self.install_links:
+            assert 'noreferrer' in (attrs.get('rel') or '').lower().split() and 'referrerpolicy' not in attrs, \
+                'install link needs rel="noreferrer"'
+            self.install_links[attrs['href']] += 1
             attrs = {key: value for key, value in attrs.items() if key != 'href'}
         elif tag == 'a' and attrs.get('href') == REPORT_LINK:
             assert 'noreferrer' in (attrs.get('rel') or '').lower().split() and 'referrerpolicy' not in attrs, \
@@ -617,7 +718,7 @@ class Page(HTMLParser):
                 self.video_tracks[self.open_video].append(attrs)
         if tag == 'a':
             self.links.append(attrs)
-        if tag == 'script' and not attrs.get('src'):
+        if tag == 'script' and not attrs.get('src') and self.json_data is None:
             self.inline_scripts += 1
         if (tag == 'link' and attrs.get('rel') == 'stylesheet' and attrs.get('href') and 'disabled' not in attrs
                 and attrs.get('media', 'all') in ('all', 'screen')):
@@ -625,6 +726,9 @@ class Page(HTMLParser):
         if (tag == 'script' and attrs.get('src') and attrs.get('type', 'text/javascript') in ('text/javascript', 'module')
                 and 'nomodule' not in attrs):
             self.scripts.append(attrs['src'])
+        if tag == 'script' and 'data-gsap' in attrs:
+            self.gsap.append(attrs['data-gsap'])
+            self.refs.append(attrs['data-gsap'])
         if tag == 'link' and attrs.get('rel') == 'icon':
             self.favicons.add(attrs.get('href'))
         if tag == 'meta' and (attrs.get('property') == 'og:image' or attrs.get('name') == 'twitter:image'):
@@ -885,6 +989,125 @@ def check_drivers_export(built):
     assert expected == built, f'export differs: {DRIVERS_PAGE}'
 
 
+def check_discovery(root, pages):
+    for name in DISCOVERY_FILES | {NOT_FOUND}:
+        assert (root / name).is_file(), f'missing discovery file: {name}'
+    titles = set()
+    descriptions = set()
+    structured = {}
+    expected_types = {'index.html': 'graph', ABOUT_PAGE: 'AboutPage', FAQ_PAGE: 'FAQPage', GUIDE_PAGE: 'HowTo'}
+    for name, page in pages.items():
+        fields = page.head_fields
+        indexable = name in PAGES
+        for key, limit, seen in (('title', 60, titles), ('description', 160, descriptions)):
+            values = fields.get(key, [])
+            assert len(values) == 1 and 0 < len(values[0].strip()) <= limit, f'{name}: missing or invalid {key}'
+            assert values[0] not in seen, f'{name}: duplicate {key}'
+            seen.add(values[0])
+        title, description = fields['title'][0], fields['description'][0]
+        assert 'OpenWiz' in title, f'{name}: title must include OpenWiz'
+        canonical = SITE_URL + name.removesuffix('index.html')
+        if name != NOT_FOUND:
+            assert fields.get('canonical') == [canonical], f'{name}: missing or invalid canonical'
+        if indexable:
+            for key, value in {
+                'og:type': 'website', 'og:site_name': 'OpenWiz', 'og:title': title, 'og:description': description,
+                'og:url': canonical, 'twitter:site': '@openwiz', 'twitter:title': title, 'twitter:description': description,
+            }.items():
+                assert fields.get(key) == [value], f'{name}: missing or invalid {key}'
+            image = fields.get('og:image', [])
+            assert len(image) == 1 and image[0].startswith(SITE_URL) and (root / urlsplit(image[0]).path.lstrip('/')).is_file(), \
+                f'{name}: missing or invalid og:image'
+            assert not any('noindex' in rule.lower() for rule in fields.get('robots', [])), f'{name}: must be indexable'
+        else:
+            assert fields.get('robots') == ['noindex'], f'{name}: needs a noindex robots tag'
+            if name == APP_PAGE:
+                assert not page.inline_scripts, 'the app allows no inline script'
+        assert len(page.json_ld) == int(name in expected_types), f'{name}: unexpected number of JSON-LD blocks'
+        if page.json_ld:
+            try:
+                data = json.loads(page.json_ld[0])
+            except ValueError as error:
+                raise AssertionError(f'{name}: invalid JSON-LD') from error
+            assert isinstance(data, dict) and data.get('@context') == 'https://schema.org', f'{name}: invalid JSON-LD context'
+            if name == 'index.html':
+                assert isinstance(data.get('@graph'), list), f'{name}: invalid JSON-LD graph'
+            else:
+                assert data.get('@type') == expected_types[name] and data.get('url') == canonical, f'{name}: invalid JSON-LD type or URL'
+            structured[name] = data
+
+    graph = structured['index.html']['@graph']
+    assert all(isinstance(item, dict) for item in graph), 'invalid JSON-LD graph entries'
+    assert {item.get('@type') for item in graph} == {'Organization', 'WebSite', 'SoftwareApplication'} and len(graph) == 3, \
+        'the JSON-LD graph needs an organization, website and application'
+    entities = {item['@type']: item for item in graph}
+    org, software = entities['Organization'], entities['SoftwareApplication']
+    assert all(entity.get('name') == 'OpenWiz' and entity.get('url') == SITE_URL for entity in graph), \
+        'JSON-LD entities must name OpenWiz and use the homepage URL'
+    logo = urlsplit(org.get('logo', ''))
+    assert logo.scheme == 'https' and logo.netloc == 'openwiz.dev' and (root / logo.path.lstrip('/')).is_file(), \
+        'JSON-LD organization logo must be a built site asset'
+    assert software.get('description') == pages['index.html'].head_fields['description'][0], \
+        'JSON-LD application description must match the homepage'
+    assert org.get('@id') and software.get('publisher') == {'@id': org['@id']}, 'JSON-LD publisher must link to the organization'
+    assert software.get('@id') and structured[ABOUT_PAGE].get('about') == {'@id': software['@id']}, \
+        'the overview JSON-LD must link to the application'
+    expected_faq = [
+        {'@type': 'Question', 'name': plain(question), 'acceptedAnswer': {'@type': 'Answer', 'text': plain(answer)}}
+        for _, question, _, answer in FAQ_ROWS.findall(FAQ)
+    ]
+    assert structured[FAQ_PAGE].get('mainEntity') == expected_faq, 'FAQ JSON-LD must match the visible questions and answers'
+    guide = (root / GUIDE_PAGE).read_text()
+    guide_main = re.search(r'<main\b[^>]*>([\s\S]*?)</main>', guide)[1]
+    steps = re.search(r'<ol class="guide-steps">([\s\S]*?)</ol>', guide_main)
+    visible = GUIDE_STEPS.findall(steps[1]) if steps else []
+    assert visible and len(visible) == steps[1].count('<li>'), 'the guide needs its numbered steps, each a name and its text'
+    expected_steps = [{'@type': 'HowToStep', 'position': i, 'name': plain(name), 'text': plain(text)}
+                      for i, (name, text) in enumerate(visible, 1)]
+    how_to = structured[GUIDE_PAGE]
+    assert how_to.get('step') == expected_steps, 'HowTo JSON-LD must match the visible steps'
+    assert how_to.get('name') == GUIDE_H1 and re.findall(r'<h1>([\s\S]*?)</h1>', guide_main) == [GUIDE_H1], 'the guide h1 and HowTo name'
+    assert how_to.get('description') == pages[GUIDE_PAGE].head_fields['description'][0] and how_to.get('about') == {'@id': software['@id']}, \
+        'the guide JSON-LD must match its description and link to the application'
+    assert not GUIDE_NEVER.search(plain(guide_main)), 'the guide names only OpenWiz 0.01'
+    assert 'href="/guides/run-many-coding-agents/">Guide: run many coding agents</a>' in (root / ABOUT_PAGE).read_text(), \
+        'the overview links the guide'
+
+    ns = '{http://www.sitemaps.org/schemas/sitemap/0.9}'
+    try:
+        sitemap = ElementTree.parse(root / 'sitemap.xml').getroot()
+    except ElementTree.ParseError as error:
+        raise AssertionError('invalid sitemap XML') from error
+    entries = sitemap.findall(ns + 'url')
+    urls = [entry.findtext(ns + 'loc') for entry in entries]
+    assert sitemap.tag == ns + 'urlset' and set(urls) == {SITE_URL + name.removesuffix('index.html') for name in PAGES} and len(urls) == len(PAGES), \
+        'sitemap must list every public page exactly once'
+    for entry in entries:
+        lastmod = entry.findtext(ns + 'lastmod') or ''
+        assert re.fullmatch(r'\d{4}-\d{2}-\d{2}', lastmod) and date.fromisoformat(lastmod), 'invalid sitemap lastmod'
+
+    robots = (root / 'robots.txt').read_text()
+    groups = robots.strip().split('\n\n')
+    assert groups[0] == 'User-agent: *\nAllow: /\nDisallow: /api/' and groups[-1] == f'Sitemap: {SITE_URL}sitemap.xml', \
+        'robots.txt needs a default crawler policy and sitemap'
+    assert all(re.fullmatch(r'User-agent: .+\nAllow: /\nDisallow: /api/', group) for group in groups[:-1]), \
+        'robots.txt must allow public pages and exclude the API for every group'
+    brief = (root / 'llms.txt').read_text()
+    full = (root / 'llms-full.txt').read_text()
+    skill = (root / 'SKILL.md').read_text()
+    assert brief.startswith('# OpenWiz\n\n> ') and all(
+        f'\n## {section}\n' in brief for section in ('Install', 'Docs', 'Drivers', 'Skills', 'Changelog', 'Feedback', 'Links')
+    ) and f'{SITE_URL}SKILL.md' in brief and f'[{GUIDE_H1}]({SITE_URL}guides/run-many-coding-agents/)' in brief.split('\n## Docs\n')[-1].split('\n## ')[0], \
+        'invalid llms.txt'
+    assert skill.startswith('---\nname: install-openwiz\n'), 'invalid SKILL.md'
+    assert full.startswith('# What is OpenWiz?\n') and all(
+        f"### {item['name']}\n\n{item['acceptedAnswer']['text']}\n" in full for item in expected_faq), 'invalid llms-full.txt'
+    first = re.search(r'<p>([\s\S]*?)</p>', guide_main)[1]
+    md = lambda html: plain(re.sub(r'<a href="([^"]+)">([^<]+)</a>', lambda m: f'[{m[2]}]({urljoin(SITE_URL, m[1])})', html))
+    assert f'\n## Guide: {GUIDE_H1}\n\n{md(first)}\n' in full and all(
+        f'\n{i}. {plain(name)}. {md(text)}' in full for i, (name, text) in enumerate(visible, 1)), 'llms-full.txt needs the guide'
+
+
 def check_security_txt(text, now=None):
     lines = text.splitlines()
     for line in (
@@ -922,7 +1145,10 @@ def check_site(root, registry=ROOT / 'market/registry.json', supporters_file=SUP
     files = {p.relative_to(root).as_posix() for p in root.rglob('*') if p.is_file()}
     names = built_fingerprints(root)
     assert files == STATIC | set(names.values()), 'unexpected or missing build output'
-    pages = {root / f: Page((root / f).read_text()) for f in PAGES}
+    docs = {name: (root / name).read_text() for name in ALL_PAGES}
+    parsed = {name: Page(html) for name, html in docs.items()}
+    check_discovery(root, parsed)
+    pages = {root / name: parsed[name] for name in SITE_PAGES}
     drivers_html = (root / DRIVERS_PAGE).read_text()
     supporters_entries = read_supporters(supporters_file)
     for path, page in pages.items():
@@ -931,8 +1157,13 @@ def check_site(root, registry=ROOT / 'market/registry.json', supporters_file=SUP
         expected = [f'/{names["tokens.css"]}', f'/{names["site.css"]}'] + ([f'/{names[PAGE_STYLES[rel]]}'] if rel in PAGE_STYLES else [])
         assert page.stylesheets == expected, f'{rel} must apply exactly {expected}, got {page.stylesheets}'
         assert not Outline(path.read_text()).styles, f'{rel} must not use inline <style> blocks'
+        assert page.gsap == [f'/{names[GSAP]}'] and page.refs.count(f'/{names[GSAP]}') == 1, \
+            f'{rel} must name the pinned GSAP once, as site.js\'s data-gsap (site.js loads it after the load event), never as a <script> or preload'
+    site_js = (root / names['site.js']).read_text()
+    assert "dataset.gsap" in site_js and "addEventListener('load', loadMotion" in site_js, \
+        'site.js loads GSAP from data-gsap after the load event'
     page = pages[root / 'index.html']
-    assert page.scripts == [f'/{names[GSAP]}', f'/{names["site.js"]}', f'/{names["faq.js"]}'], 'load the pinned GSAP before site.js, then faq.js'
+    assert page.scripts == [f'/{names["site.js"]}', f'/{names["faq.js"]}'], 'the landing loads site.js, then faq.js; GSAP comes after the load event'
     assert not page.inline_scripts, 'landing motion must wait for both external scripts'
     assert len(page.videos) == 2, 'expected the launch video and one spec recording'
     check_launch((root / 'index.html').read_text(), page)
@@ -959,7 +1190,7 @@ def check_site(root, registry=ROOT / 'market/registry.json', supporters_file=SUP
             market = market_urls(registry)
             assert not section.books, f'a booking link outside the team page: {path.name}'
             assert not section.checkouts, f'a checkout link outside the pro page: {path.name}'
-            for count, href in ((section.x_links, X_ACCOUNT), (section.cloudroom_links, CLOUDROOM_LINK), (section.report_links, REPORT_LINK)):
+            for count, href in ((section.x_links, X_ACCOUNT), (section.cloudroom_links, CLOUDROOM_LINK), (section.report_links, REPORT_LINK), *[(n, u) for u, n in section.install_links.items()]):
                 assert not count or href in market, 'unexpected external URL'
             check_market_refs(root, path, section, pages, market)
             check_market_markup(split_market(path.read_text())[1])
@@ -985,7 +1216,7 @@ def check_site(root, registry=ROOT / 'market/registry.json', supporters_file=SUP
                     slot = DriverSlot(markup, listing_urls)
                     assert not slot.books, 'a booking link outside the team page'
                     assert not slot.checkouts, 'a checkout link outside the pro page'
-                    assert not (slot.x_links or slot.cloudroom_links or slot.report_links or slot.launch_posts), \
+                    assert not (slot.x_links or slot.cloudroom_links or slot.report_links or slot.launch_posts or any(slot.install_links.values())), \
                         'unexpected external URL'
                     for ref in slot.refs:
                         check_ref(root, path, ref, pages, slot.favicons)
@@ -993,7 +1224,7 @@ def check_site(root, registry=ROOT / 'market/registry.json', supporters_file=SUP
         assert page.social and all(s.startswith(SITE_URL) and s.removeprefix(SITE_URL).split('?')[0] in STATIC for s in page.social), 'social image must be a built file on the site'
         assert path == root / TEAM_PAGE or not page.books, f'a booking link outside the team page: {path.name}'
         assert path == root / PRO_PAGE or not page.checkouts, f'a checkout link outside the pro page: {path.name}'
-        assert page.x_links == 1, f'one X link per page, the footer\'s: {path.relative_to(root)} has {page.x_links}'
+        assert page.x_links == (2 if path == root / ABOUT_PAGE else 1), f'one X link per page, the footer\'s: {path.relative_to(root)} has {page.x_links}'
         if path == root / MARKET_PAGE:
             check_market_refs(root, path, page, pages, frozenset())
         else:
@@ -1001,6 +1232,8 @@ def check_site(root, registry=ROOT / 'market/registry.json', supporters_file=SUP
                 check_ref(root, path, ref, pages, page.favicons)
         assert page.cloudroom_links == (1 if path == root / 'index.html' else 0), \
             f'CloudRoom link, the landing install box\'s only: {path.relative_to(root)} has {page.cloudroom_links}'
+        assert all(n == (1 if path == root / 'index.html' else 0) for n in page.install_links.values()), \
+            f'install helper/setup links, the landing install box\'s only: {path.relative_to(root)} has {page.install_links}'
         assert page.report_links == 1, f'Report a problem link: {path.relative_to(root)} has {page.report_links}, not 1'
         assert page.launch_posts == (1 if path == root / 'index.html' else 0), \
             f'the launch post link, the landing launch video\'s only: {path.relative_to(root)} has {page.launch_posts}'
@@ -1033,9 +1266,17 @@ def check_site(root, registry=ROOT / 'market/registry.json', supporters_file=SUP
     site_lines = site_rule[1].splitlines()
     for header in SITE_HEADERS:
         assert f'  {header}' in site_lines, f'_headers /* must include {header}'
+    for path in ASK_PATHS:
+        rule = re.search(rf'^{re.escape(path)}\n((?:  .*\n?)*)', headers, re.M)
+        lines = rule[1].splitlines() if rule else []
+        assert lines == ['  ! Content-Security-Policy', f'  Content-Security-Policy: {ASK_CSP}'], \
+            f'_headers must detach the site CSP for {path} and allow only Turnstile on top of it'
+    assert headers.count(TURNSTILE_ORIGIN) == 2 * len(ASK_PATHS), 'only the Ask a Wiz pages may allow Turnstile'
     sec_rule = re.search(r'^/\.well-known/security\.txt\n((?:  .*\n?)*)', headers, re.M)
     assert sec_rule and '  Content-Type: text/plain; charset=utf-8' in sec_rule[1].splitlines(), \
         '_headers must serve /.well-known/security.txt as text/plain; charset=utf-8'
+    for name in ('llms.txt', 'llms-full.txt', 'SKILL.md', 'c76a1a01e62d088edd3789d30d6a4d29.txt'):
+        assert f'/{name}\n  Content-Type: text/plain; charset=utf-8\n' in headers, f'{name} needs a plain-text content type'
     rules = parse_headers(headers)
     site_header_pairs = [(h.split(':', 1)[0].strip().lower(), h.split(':', 1)[1].strip()) for h in SITE_HEADERS]
     for file_path in sorted(p for p in root.rglob('*') if p.is_file() and p.name != '_headers'):
@@ -1050,6 +1291,8 @@ def check_site(root, registry=ROOT / 'market/registry.json', supporters_file=SUP
                 assert merged.get(name) == [APP_CSP], f'_headers {name} mismatch for {url_path}: {merged.get(name)}'
             elif url_path.startswith('/app/') and name == 'referrer-policy':
                 assert merged.get(name) == ['no-referrer'], f'_headers {name} mismatch for {url_path}: {merged.get(name)}'
+            elif url_path in ('/', '/faq/') and name == 'content-security-policy':
+                assert merged.get(name) == [ASK_CSP], f'_headers {name} mismatch for {url_path}: {merged.get(name)}'
             else:
                 assert merged.get(name) == [value], f'_headers {name} mismatch for {url_path}: {merged.get(name)}'
     for unhashed in ('/site.js', '/tokens.css', '/app/shell.js', '/app/ember.css'):
@@ -1082,8 +1325,12 @@ def check_site(root, registry=ROOT / 'market/registry.json', supporters_file=SUP
     sub = re.search(r'<p class="sub">([\s\S]*?)</p>', landing)
     assert sub and re.sub(r'\s+', ' ', unescape(re.sub(r'<[^>]*>', ' ', sub[1]))).strip() == 'You make the decisions. The agents run the factory.', 'hero subline changed'
     assert 'You make the decisions. The agents run the factory.' in flat, 'hero subline changed'
+    for name, html in docs.items():
+        reader = Text(html)
+        assert not any(re.search(r'\b(?:Openwiz|openWiz|Open Wiz|OPENWIZ)\b', text)
+                       for text in [reader.joined(), reader.spaced(), *reader.shown]), f'OpenWiz spelling in {name}'
     for path in pages:
-        reader = Text(path.read_text())
+        reader = Text(docs[path.relative_to(root).as_posix()])
         readings = [reader.joined(), reader.spaced()] + reader.attrs
         for reading in readings:
             low = re.sub(r'\s+', ' ', reading).lower()
@@ -1158,14 +1405,21 @@ def check_site(root, registry=ROOT / 'market/registry.json', supporters_file=SUP
     assert not unused, f'unused drivers art: {unused}'
     check_driver_logo_files(root)
     check_drivers(landing, changelog, drivers_html, pages[root / DRIVERS_PAGE])
-    check_drivers_nav((root / names['site.css']).read_text(), {name: (root / name).read_text() for name in PAGES})
+    site_html = {name: docs[name] for name in SITE_PAGES}
+    check_drivers_nav((root / names['site.css']).read_text(), site_html)
     check_changelog(landing, changelog)
     check_releases(releases, read_releases(), install_switch(landing) == 'live')
-    check_team({name: (root / name).read_text() for name in PAGES}, {name: pages[root / name] for name in PAGES})
-    check_pro({name: (root / name).read_text() for name in PAGES}, {name: pages[root / name] for name in PAGES})
+    check_team(site_html, {name: parsed[name] for name in SITE_PAGES})
+    check_pro(site_html, {name: parsed[name] for name in SITE_PAGES})
     check_supporters(*split_supporters((root / SUPPORTERS_PAGE).read_text()), supporters_entries)
-    check_footer({name: (root / name).read_text() for name in PAGES})
-    check_faq({name: (root / name).read_text() for name in PAGES}, {name: pages[root / name] for name in PAGES}, names)
+    check_footer(site_html)
+    check_faq(site_html, {name: parsed[name] for name in SITE_PAGES}, names)
+    for page in pages.values():
+        for img in page.images:
+            src = img.get('src', '')
+            assert all(re.fullmatch(r'[1-9]\d*', img.get(dim) or '') for dim in ('width', 'height')), f'image needs dimensions: {src}'
+            if img.get('class') not in ('landscape', 'hero-wiz', 'voyage-sea', 'voyage-ship'):
+                assert img.get('loading') == 'lazy', f'image needs lazy loading: {src}'
     main = re.search(r'<main\b[^>]*>[\s\S]*?</main>', changelog)
     assert main and sha256(main[0].encode()).hexdigest() == CHANGELOG_MAIN, 'changelog content changed; review explicitly before updating its snapshot'
 
@@ -1227,7 +1481,7 @@ def sentences(text):
 
 
 INSTALL_LINE = 'Install OpenWiz from github.com/openwizdev/OpenWiz'
-INSTALL_HINT = 'Paste this into your agent'
+INSTALL_HINT = 'Paste this into your AI helper'
 INSTALL_BUTTON = {'coming-soon': 'Copy · coming soon', 'live': 'Copy'}
 INSTALL_SWITCH = ('coming-soon', 'live')
 INSTALL_VERSION = 'OpenWiz 0.01 0.1.0'
@@ -1245,7 +1499,7 @@ def check_install(landing, page):
     label = re.search(r'<div class="install-box"[^>]*>\s*(<p class="install-version">([^<]*<small>[^<]*</small>)</p>)', landing)
     assert label and landing.count('install-version') == 1 and flat(label[2]) == INSTALL_VERSION, f'the install box must show {INSTALL_VERSION}'
     assert re.search(re.escape(INSTALL_NOTE_HTML) + r'\s*$', box) and landing.count('install-note') == 1 \
-        and flat(INSTALL_NOTE_HTML) == INSTALL_NOTE, f'the install box must end with: {INSTALL_NOTE}'
+        and flat(INSTALL_NOTE_HTML) == f'Details for developers{INSTALL_NOTE}{INSTALL_PREREQS}', f'the install box must end with: {INSTALL_NOTE} {INSTALL_PREREQS}'
     hints = re.findall(r'<p class="install-hint">([\s\S]*?)</p>', box)
     assert [flat(h) for h in hints] == [INSTALL_HINT], f'the install box must say: {INSTALL_HINT}'
     labels = re.findall(r'<button class="btn install"[^>]*>([\s\S]*?)</button>', landing)
@@ -1257,7 +1511,10 @@ def check_install(landing, page):
     rest = landing.replace(box, ' ', 1)
     reader = Text(rest)
     for reading in [reader.joined(), reader.spaced()] + reader.shown:
-        assert not re.search(r'install|coming soon|paid plans|works today', re.sub(r'\s+', ' ', reading), re.I), 'unsettled landing claim or a second install mention'
+        assert not re.search(r'coming soon|paid plans|works today', re.sub(r'\s+', ' ', reading), re.I), 'unsettled landing claim or a second install mention'
+    no_faq = Text(rest.replace(FAQ, ' ', 1))
+    for reading in [no_faq.joined(), no_faq.spaced()] + no_faq.shown:
+        assert not re.search(r'install', re.sub(r'\s+', ' ', reading), re.I), 'unsettled landing claim or a second install mention'
     return landing[:label.start(1)] + landing[label.end(1):]
 
 
@@ -1385,15 +1642,14 @@ def check_drivers(landing, changelog, drivers, page):
         assert links == ['Drivers'], f'the {name} top bar needs one Drivers nav link: {links}'
     assert re.search(r'<body class="[^"]*\bdrivers-page\b', drivers), 'the drivers page body is scoped .drivers-page'
     description = re.findall(r'<meta name="description" content="([^"]*)"', drivers)
-    assert len(description) == 1 and DRIVER_DESCRIPTION in description[0], \
-        f'the drivers description must say {DRIVER_DESCRIPTION}: {description}'
+    assert len(description) == 1, 'the drivers page needs one description'
     assert not re.search(r'\b(each|every)\b[^.]*\bpass', description[0], re.I), \
         f'the drivers description must not say every driver passes: {description[0]}'
     assert not DRIVER_JARGON.search(description[0]), f'a jargon count in the drivers description: {description[0]}'
     assert not re.search(r'grok bot[^.;]*\bpass', description[0], re.I), f'Grok Bot has not passed: {description[0]}'
-    assert DRIVER_DESCRIPTION_COMMANDS in description[0], f'the drivers description says {DRIVER_DESCRIPTION_COMMANDS!r}: {description[0]}'
+    assert description == [DRIVER_DESCRIPTION], f'the drivers description must say {DRIVER_DESCRIPTION}: {description}'
     assert page.scripts == [s for s in Page(landing).scripts if not s.startswith('/faq.')] and not page.inline_scripts, \
-        'the drivers page loads only the site\'s footer scripts (GSAP, site.js), never its own'
+        'the drivers page loads only the site\'s footer script (site.js, which loads GSAP), never its own'
     main = re.search(r'<main\b[^>]*>[\s\S]*?</main>', drivers)
     assert main, 'the drivers page needs its main'
     main = main[0]
@@ -1757,8 +2013,8 @@ def check_team(htmls, pages):
     assert re.search(r'<a class="team-book" id="book" data-book href="[^"]*" data-count="book-call">', team), 'the first Book a call is #book, where the Questions link'
     description = re.search(r'<meta name="description" content="([^"]*)">', team)
     assert description and unescape(description[1]) == TEAM_DESCRIPTION, f'the team page description: {TEAM_DESCRIPTION}'
-    assert not re.search(r'<(?:iframe|embed|object|form|details)\b', team) and team.count('<script') == 2, \
-        'the team page adds no embed, form or script beyond GSAP and site.js, and folds nothing away'
+    assert not re.search(r'<(?:iframe|embed|object|form|details)\b', team) and team.count('<script') == 1, \
+        'the team page adds no embed, form or script beyond site.js (which loads GSAP), and folds nothing away'
     main = team.split('<main', 1)[1].split('</main>', 1)[0]
     shown = re.sub(r'\s+', ' ', unescape(re.sub(r'<[^>]*>', ' ', main)))
     assert not TEAM_NEVER.search(shown), f'a word the team page never uses: {TEAM_NEVER.search(shown)[0]}'
@@ -1826,7 +2082,7 @@ def check_pro(htmls, pages):
     pro = htmls[PRO_PAGE]
     title = re.findall(r'<title>([^<]*)</title>', pro)
     assert title == [PRO_TITLE], f'the pro page title: {PRO_TITLE}'
-    assert not re.search(r'<(?:iframe|embed|object|form|details)\b', pro) and pro.count('<script') == 2, \
+    assert not re.search(r'<(?:iframe|embed|object|form|details)\b', pro) and pro.count('<script') == 1, \
         'the pro page adds no embed, form or script beyond GSAP and site.js, and folds nothing away'
     main = pro.split('<main', 1)[1].split('</main>', 1)[0]
     shown = re.sub(r'\s+', ' ', unescape(re.sub(r'<[^>]*>', ' ', main))).strip()
@@ -1990,12 +2246,12 @@ def check_faq(htmls, pages, names):
             f'the {name} page needs the one Questions section from faq.html' if want else f'the {name} page shows no Questions'
         assert (f'/{names["faq.js"]}' in pages[name].scripts) == bool(want), \
             f'the {name} page needs faq.js for its Questions' if want else f'the {name} page loads faq.js without Questions'
-    assert re.search(r'</section>\n' + re.escape(FAQ) + '</main>', htmls['index.html']), 'the landing Questions close its main'
-    assert (FAQ_TOP + '</main>') in htmls[FAQ_PAGE], 'the /faq page is its Questions'
+    assert re.search(r'</section>\n' + re.escape(FAQ + ABOUT_LINK) + '</main>', htmls['index.html']), 'the landing Questions close its main'
+    assert (FAQ_TOP + ABOUT_LINK + '</main>') in htmls[FAQ_PAGE], 'the /faq page is its Questions'
     Page(FAQ)
     title = [plain(h) for h in re.findall(r'<h2\b[^>]*>([\s\S]*?)</h2>', FAQ)] + [plain(p) for p in re.findall(r'<p class="faq-lead">([\s\S]*?)</p>', FAQ)]
     assert tuple(title) == FAQ_TITLE, f'the Questions heading and its line: {title}'
-    rows = re.findall(r'<div class="faq-row">\s*<h3 class="faq-q"><button ([^>]*)>([\s\S]*?)</button></h3>\s*<div class="faq-a" id="([^"]*)"><div>([\s\S]*?)</div></div>\s*</div>', FAQ)
+    rows = FAQ_ROWS.findall(FAQ)
     assert tuple(plain(q) for _, q, _, _ in rows) == FAQ_QUESTIONS and FAQ.count('class="faq-row"') == len(FAQ_QUESTIONS), \
         f'the Questions rows, in order: {[plain(q) for _, q, _, _ in rows]}'
     for attrs, question, answer_id, answer in rows:
@@ -2005,7 +2261,9 @@ def check_faq(htmls, pages, names):
             f'each question ships open and disabled until faq.js runs: {plain(question)}'
         assert plain(answer), f'a question without its answer: {plain(question)}'
         for href in re.findall(r'href="([^"]*)"', answer):
-            assert href.startswith('/'), f'an answer links off the site: {href}'
+            assert href.startswith('/') or href == INSTALL_GUIDE, f'an answer links off the site: {href}'
+    prereqs = [plain(a) for _, q, _, a in rows if plain(q) == 'What do I need before installing?']
+    assert prereqs == [FAQ_PREREQS], f'the Questions\u2019 answer to What do I need before installing?: {FAQ_PREREQS}'
     where = [plain(a) for _, q, _, a in rows if plain(q) == 'Where do my agents run?']
     assert where == [FAQ_WHERE], f'the Questions\u2019 answer to Where do my agents run?: {FAQ_WHERE}'
     cost = [(plain(a), a) for _, q, _, a in rows if plain(q) == 'What does it cost?']
@@ -2275,14 +2533,15 @@ def check_privacy(path, data):
 def main():
     output = ROOT / 'dist'
     check_site(output)
-    for name in RUNTIME - set(FINGERPRINTS.values()) - set(ALL_PAGES) - {ASK_INDEX}:
+    for name in RUNTIME - set(FINGERPRINTS.values()) - set(ALL_PAGES) - {ASK_INDEX} - DISCOVERY_FILES:
         source = APP_VENDOR[name][0] if name in APP_VENDOR else name
         assert (ROOT / source).read_bytes() == (output / name).read_bytes(), f'export differs: {name}'
     assert built_fingerprints(output) == FINGERPRINTS, 'build is stale: rebuild the site'
     for name, hashed in FINGERPRINTS.items():
         assert built_asset_bytes(name, FONT_FINGERPRINTS) == (output / hashed).read_bytes(), f'export differs: {name}'
     for name in ALL_PAGES:
-        built = (output / name).read_text()
+        built = re.sub(r'<!-- metadata:start -->[\s\S]*?<!-- metadata:end -->', '<template data-slot="page-metadata"></template>',
+                       (output / name).read_text(), count=1)
         if name == 'changelog/index.html':
             built = split_releases(built)[0]
         if name == SUPPORTERS_PAGE:
@@ -2302,9 +2561,14 @@ def main():
         check_privacy('dist/' + name, (output / name).read_bytes())
     print('PASS: pinned WebP artwork and spec recording within budget; the launch video within its own budget')
     print('PASS: exact export, local links/fragments, CSS resources, fonts/licences, copy and privacy')
+    print('PASS: page metadata, JSON-LD, sitemap, robots, crawler text and 404')
     print('GAP: the landing page has no automated browser test (layout, keyboard, accessibility, animation); the app has npm run test:app')
     print('LIMIT: external URL destinations are constrained; remote availability is not checked')
 
 
 if __name__ == '__main__':
-    main()
+    if sys.argv[1:] == ['--discovery-only']:
+        output = ROOT / 'dist'
+        check_discovery(output, {name: Page((output / name).read_text()) for name in ALL_PAGES})
+    else:
+        main()
