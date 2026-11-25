@@ -802,7 +802,7 @@ def check_market_refs(root, path, page, pages, market):
 
 
 MARKET_TAGS = {'section', 'nav', 'h2', 'h3', 'p', 'code', 'ul', 'li', 'div', 'article', 'dl', 'dt', 'dd', 'span', 'a'}
-MARKET_ATTRS = {'class', 'id', 'aria-label', 'aria-labelledby', 'data-listing', 'data-status', 'data-stage'}
+MARKET_ATTRS = {'class', 'id', 'aria-label', 'aria-labelledby', 'data-listing', 'data-kind', 'data-status', 'data-stage'}
 
 
 class MarketMarkup(HTMLParser):
