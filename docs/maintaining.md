@@ -122,4 +122,4 @@ This denylist is a tripwire, not comprehensive detection of private names or sec
 
 ## Sign-in
 
-openwiz.dev/app signs in through the read-only [OpenWiz Viewer](https://github.com/apps/openwiz-viewer) GitHub App (issues, pull requests and metadata, read only). Its client ID and secret live only in the Cloudflare Pages project settings.
+openwiz.dev/app signs in through the read-only [OpenWiz Viewer](https://github.com/apps/openwiz-viewer) GitHub App (issues, pull requests and metadata, read only). Its client ID and secret live only in the Cloudflare Pages project settings. Each sign-in attempt uses PKCE (`S256`), binding a per-attempt `code_verifier` to its `__Host-` state cookie.
