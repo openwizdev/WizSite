@@ -134,7 +134,6 @@ export function withMetadata(page, html, faq) {
   return html.replace(slot, () => `<!-- metadata:start -->\n${tags.join('\n')}\n<!-- metadata:end -->`);
 }
 
-// The guide as Markdown for llms-full.txt: its h1 becomes a section, its h2s subsections, its lists Markdown lists.
 function guideText(html) {
   const main = html.match(/<main\b[^>]*>([\s\S]*?)<\/main>/)[1];
   const markdown = text => plain(text.replace(/<a href="([^"]+)">([^<]+)<\/a>/g, (_, url, label) => `[${label}](${new URL(url, site)})`));

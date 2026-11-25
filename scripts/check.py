@@ -8,7 +8,7 @@ import re
 import subprocess
 import sys
 from xml.etree import ElementTree
-from urllib.parse import unquote, urlsplit
+from urllib.parse import unquote, urljoin, urlsplit
 import font_chars
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -342,7 +342,6 @@ ABOUT_PAGE = 'what-is-openwiz/index.html'
 GUIDE_PAGE = 'guides/run-many-coding-agents/index.html'
 GUIDE_H1 = 'How to run many coding agents at once'
 GUIDE_STEPS = re.compile(r'<li><strong>([^<]+)\.</strong>([\s\S]*?)</li>')
-# The guide describes OpenWiz 0.01 only: it never names a later version as out.
 GUIDE_NEVER = re.compile(r'\b0\.1\.[1-9]|\b0\.0[2-9]\b')
 NOT_FOUND = '404.html'
 ABOUT_LINK = '<p class="wrap about-link"><a href="/what-is-openwiz/">What is OpenWiz?</a></p>\n'
@@ -1009,8 +1008,9 @@ def check_discovery(root, pages):
     assert full.startswith('# What is OpenWiz?\n') and all(
         f"### {item['name']}\n\n{item['acceptedAnswer']['text']}\n" in full for item in expected_faq), 'invalid llms-full.txt'
     first = re.search(r'<p>([\s\S]*?)</p>', guide_main)[1]
-    assert f'\n## Guide: {GUIDE_H1}\n\n{plain(first)}\n' in full and all(
-        f"\n{item['position']}. {item['name']}. {item['text']}" in full for item in expected_steps), 'llms-full.txt needs the guide'
+    md = lambda html: plain(re.sub(r'<a href="([^"]+)">([^<]+)</a>', lambda m: f'[{m[2]}]({urljoin(SITE_URL, m[1])})', html))
+    assert f'\n## Guide: {GUIDE_H1}\n\n{md(first)}\n' in full and all(
+        f'\n{i}. {plain(name)}. {md(text)}' in full for i, (name, text) in enumerate(visible, 1)), 'llms-full.txt needs the guide'
 
 
 def check_security_txt(text, now=None):
