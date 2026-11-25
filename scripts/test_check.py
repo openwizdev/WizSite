@@ -898,6 +898,8 @@ class Checks(unittest.TestCase):
             'never mention Ultra': (P, lambda t: t.replace('public Pro label.', 'public Pro and Ultra label.', 1)),
             'never mention Ultra ': ('index.html', lambda t: t.replace('</main>', '<p>Ultra tier</p></main>', 1)),
             'offers only the checkout button': (P, lambda t: t.replace('</section>', '<a href="/faq/">FAQ</a></section>', 1)),
+            'quiet Pro link to /pro/': ('team/index.html', lambda t: t.replace('<a class="nav-pro" href="/pro/">Pro</a>', '<a class="nav-pro" href="/">Pro</a>', 1)),
+            'copy and structure are pinned': (P, lambda t: t.replace('data-checkout href="#checkout"', 'data-checkout href="#checkout" target="_blank"', 1)),
         }
         for message, (page, change) in refused.items():
             temp, root = planted(page, change)

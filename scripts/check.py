@@ -64,10 +64,14 @@ ICON_HASHES = {
 DOC_HASHES = {
     'docs/map.png': '19fc57ff3f588b36e2ca412f5656483eaf873718d0d19a39aceb83e007333e6b',
     'docs/map-phone.png': 'cdd21a74a880d3adab68ce794de1b18060d916d6df5d00ceb54eb06736cf3fd2',
+    'docs/evidence/pro/home-390.png': 'b0140c348121e276a5e0602aaaad4a5f2ee658a04ca3fc27f0ba8f59d89b2594',
+    'docs/evidence/pro/home-1280.png': '3fff03b87be3ecb9d3ef11cd9131d3b2bcfbd556ccaed115446a9e4ef4e54b61',
     'docs/evidence/pro/pro-390.png': 'cd18c70822ce55987607e8d22e83304d7184a44fc99ea8723bab706422c03893',
     'docs/evidence/pro/pro-1280.png': 'cbbd21b5355c3cdb59e5712990a69e2ccd3e367479865bbb91b42a6d181a4560',
     'docs/evidence/pro/supporters-390.png': 'dfd238dbcf41f54fcb47da0c89d3e21e69c6d8b83128e98bf59ff44f850aa41d',
     'docs/evidence/pro/supporters-1280.png': 'f1ca88c9d8e27ba509879b6aeb412062f6ba41a49a8bed255c1bacb241d1836a',
+    'docs/evidence/pro/team-390.png': '1b1c066e5654e68ed5014d323f3c75f46a73c172e044c010e6cb696d3886cead',
+    'docs/evidence/pro/team-1280.png': 'f3ee5ee0f5aa96c8ea2e321041ed0aeedaa4293c657c617e1d177fa9e9a8a891',
     'docs/evidence/speed/fonts/app-1280x800.png': 'db6128e1d62daf1112ca41246fd04665bcc0b3060b99192bbc66927ef6fb66cf',
     'docs/evidence/speed/fonts/app-390x844.png': 'c7f5f4c1ef45cb111f74bce6014f79aa07eb58c54c9a4a632a55847f5863d679',
     'docs/evidence/speed/fonts/changelog-1280x800.png': 'd88654b912dbd9c1320d6503e8ad165bf23b5a3a4c5d0d13e60586ba944735c3',
@@ -260,6 +264,7 @@ def fingerprinted_page(html, cta=False):
 
 CTA = (ROOT / 'header-cta.html').read_text()
 CTA_LINK = '<a class="nav-team" href="/team/">'
+CTA_PRO_LINK = '<a class="nav-pro" href="/pro/">Pro</a>'
 TOP_BAR_END = '  </nav>\n</header>'
 TEAM_PAGE = 'team/index.html'
 BOOK_PLACEHOLDER = '#book'
@@ -1804,6 +1809,10 @@ def check_team(htmls, pages):
 
 
 def check_pro(htmls, pages):
+    for name, html in htmls.items():
+        bar = top_bar(html)
+        assert bar.count('class="nav-pro"') == 1 and bar.count(CTA_PRO_LINK) == 1, f'the {name} top bar needs its one quiet Pro link to /pro/'
+        assert html.count('class="nav-pro"') == 1, f'the {name} page needs exactly one top-bar Pro link'
     checkouts = [(name, href) for name, page in pages.items() for href in page.checkouts]
     assert len(checkouts) == 1 and checkouts[0][0] == PRO_PAGE, \
         f'the site needs exactly one checkout link, on the pro page: {checkouts}'

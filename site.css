@@ -92,6 +92,8 @@ code,.v{font-family:var(--ow-font-mono)}
 .github-star { gap: 8px; min-height: 40px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; }
 .github-star span { border-left: 1px solid var(--line); padding-left: 8px; font-variant-numeric: tabular-nums; }
 .sign-in { padding: 8px 14px; border-radius: 8px; background: #cfc6b8; color: var(--ground); font-weight: 650; white-space: nowrap; }
+.nav-pro { display: inline-flex; align-items: center; min-height: 40px; white-space: nowrap; }
+.pro-page .nav-pro { color: var(--ink); }
 .nav-team { padding: 8px 14px; border-radius: 8px; background: var(--brass); color: var(--on-brass); font-weight: 650; white-space: nowrap; }
 .landing-nav .nav-team:hover { background: var(--brass-hi); text-decoration: none; }
 .nav-team-short { display: none; }
@@ -362,11 +364,13 @@ body.landing > main { flex: 1 0 auto; }
 
 @media (min-width: 961px) and (max-width: 1279px) { :root { --m: 48px; } }
 @media (max-width: 480px) {
+  .landing-nav { gap: 8px; }
   .landing-brand { gap: 4px; font-size: 19px; }
   .landing-brand svg { width: 28px; height: 28px; }
-  .landing-nav nav { gap: 8px; }
-  .landing-nav .sign-in { padding-inline: 10px; }
-  .landing-nav .nav-team { padding-inline: 10px; }
+  .landing-nav nav { gap: 7px; font-size: 13px; }
+  .landing-nav .github-star { min-height: 36px; padding-inline: 8px; }
+  .landing-nav .sign-in { padding: 7px 9px; }
+  .landing-nav .nav-team { padding: 7px 9px; }
   .hero-copy h1 { font-size: clamp(44px, 13vw, 52px); }
   .ember-ticket { overflow-wrap: anywhere; }
 }
@@ -377,9 +381,9 @@ body.landing > main { flex: 1 0 auto; }
   .nav-team-short { display: inline; }
 }
 @media (max-width: 360px) {
-  .landing-nav nav { gap: 6px; }
-  .landing-nav .sign-in, .landing-nav .nav-team { padding-inline: 8px; }
-  .landing-nav .github-star { padding-inline: 8px; }
+  .landing-nav nav { gap: 5px; font-size: 12px; }
+  .landing-nav .sign-in, .landing-nav .nav-team { padding-inline: 7px; }
+  .landing-nav .github-star { padding-inline: 6px; }
 }
 
 .drivers-page { --gold: #f2c27b; --night: #0f0d0b; }
