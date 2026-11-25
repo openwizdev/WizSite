@@ -82,6 +82,7 @@
   function graph(detail, home, authors, now) {
     if (!detail?.subIssues) return null;
     const nodes = detail.subIssues.nodes || [];
+    if ((detail.subIssues.totalCount ?? 0) > 0 && !nodes.some(Boolean)) return null;
     const tickets = new Map();
     const outside = new Map();
     let unknown = 0;
@@ -209,29 +210,40 @@
     const details = data.specs;
     const gaps = [];
     if (partialList(data.specIssues)) gaps.push('specs');
-    if (partialList(data.youIssues)) gaps.push('tickets marked for you');
+    if (partialList(data.youIssues)) gaps.push('tickets waiting on you');
+    const stale = data.specsStale || {};
+    const unread = [];
     const specs = (data.specIssues.nodes || []).filter(Boolean).map(issue => {
       const detail = details?.[`s${issue.number}`] || null;
-      if (!detail) gaps.push(`#${issue.number}'s decision records`);
+      if (!detail) unread.push(issue.number);
       else if (partialList(detail.comments)) gaps.push(`#${issue.number}'s older comments`);
+      const graphed = graph(detail, home, authors, now);
+      if (detail && !graphed && detail.subIssues) unread.push(issue.number);
       return {
         number: issue.number,
         title: issue.title,
         url: issue.url,
         total: issue.subIssuesSummary?.total ?? null,
         done: issue.subIssuesSummary?.completed ?? null,
-        graph: graph(detail, home, authors, now),
+        graph: graphed,
         detail,
+        staleAt: stale[`s${issue.number}`] ?? null,
       };
     });
-    const later = issue => !names(issue).includes('needs-info') && (issue.issueDependenciesSummary?.blockedBy ?? 0) > 0;
+    if (unread.length) gaps.push(unread.length === 1 ? `#${unread[0]}'s tickets` : `the tickets of ${unread.length} specs`);
+    const label = (issue, name) => names(issue).includes(name);
+    const person = issue => label(issue, 'ready-for-human') && !label(issue, 'needs-info');
+    const later = issue => !label(issue, 'needs-info') && (issue.issueDependenciesSummary?.blockedBy ?? 0) > 0;
     const ticket = issue => ({ kind: 'ticket', title: issue.title, number: issue.number, url: issue.url, at: Date.parse(issue.updatedAt) || 0 });
-    const marked = (data.youIssues.nodes || []).filter(Boolean);
+    const marked = (data.youIssues.nodes || []).filter(Boolean).filter(issue => !person(issue));
     const you = [
       ...specs.flatMap(spec => decisions(spec, spec.detail, authors)),
       ...marked.filter(issue => !later(issue)).map(ticket),
     ].sort((a, b) => b.at - a.at);
     const yoursLater = marked.filter(later).map(ticket).sort((a, b) => b.at - a.at);
+    const people = (data.peopleIssues?.nodes || []).filter(Boolean).filter(person)
+      .map(issue => ({ ...ticket(issue), kind: 'person', later: (issue.issueDependenciesSummary?.blockedBy ?? 0) > 0 }))
+      .sort((a, b) => a.later - b.later || b.at - a.at);
     const running = specs.filter(spec => spec.total > 0);
     const read = running.filter(spec => spec.graph);
     const bound = (n, partial) => (partial ? `${n}+` : n);
@@ -243,6 +255,10 @@
       specs,
       you,
       later: yoursLater,
+      people,
+      peopleTotal: data.peopleIssues?.totalCount ?? people.length,
+      unread,
+      why: data.specsWhy || null,
       gaps,
       partialSpecs: gaps.includes('specs'),
       counts: {

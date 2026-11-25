@@ -440,27 +440,42 @@ function enableFamily(gsap) {
 
 function enableCopy() {
   const box = document.querySelector('.install-box[data-install="live"]');
-  if (!box || !navigator.clipboard) return;
+  if (!box) return;
   const button = box.querySelector('button.install');
-  const line = box.querySelector('.install-line').textContent;
+  const code = box.querySelector('.install-line');
+  const line = code.textContent;
   let timer;
+  const selectLine = () => {
+    const range = document.createRange();
+    range.selectNodeContents(code);
+    const selection = window.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
+  };
+  const fallback = () => {
+    selectLine();
+    try { return document.execCommand('copy'); } catch { return false; }
+  };
   button.textContent = 'Copy';
   button.disabled = false;
   button.addEventListener('click', async () => {
+    let copied = false;
     try {
       await navigator.clipboard.writeText(line);
-      button.textContent = 'Copied';
+      copied = true;
     } catch {
-      button.textContent = 'Select the line to copy';
+      copied = fallback();
     }
+    button.textContent = copied ? 'Copied' : 'Line selected: copy it';
     clearTimeout(timer);
-    timer = setTimeout(() => { button.textContent = 'Copy'; }, 2000);
+    timer = setTimeout(() => { button.textContent = 'Copy'; }, copied ? 2000 : 3000);
   });
 }
 
 const ASK_KEYS = { text: 'text,type', sources: 'sources,type', done: 'type', not_covered: 'links,text,type', refused: 'message,reason,type' };
 const ASK_REFUSALS = {
   bad_request: [400, 'That question couldn\'t be read. Try again.'],
+  not_human: [403, 'Please confirm you\'re human and try again.'],
   too_long: [413, 'That question is too long. Keep it to 300 characters or fewer.'],
   rate_limited: [429, 'That\'s a lot of questions at once. Try again in a few minutes.'],
   daily_cap: [429, 'Ask a Wiz has answered all it can for today. Try again tomorrow.'],
@@ -490,6 +505,42 @@ function askEvent(line, text, sources) {
   if (!ok) throw new Error('not the contract\'s stream');
   return e;
 }
+let turnstileScript = null;
+const loadTurnstile = () => turnstileScript ??= new Promise(resolve => {
+  const script = Object.assign(document.createElement('script'), { src: 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit', async: true });
+  script.onload = () => resolve(window.turnstile ?? null);
+  script.onerror = () => resolve(null);
+  document.head.append(script);
+});
+function askGate(sitekey, container) {
+  let widget = null, ready = null, waiting = [];
+  const settle = value => { const all = waiting; waiting = []; all.forEach(resolve => resolve(value)); };
+  const start = () => ready ??= loadTurnstile().then(turnstile => {
+    if (!turnstile || !container.isConnected) return null;
+    try {
+      widget = turnstile.render(container, {
+        sitekey, action: 'ask', appearance: 'interaction-only', size: 'flexible',
+        callback: token => settle(token), 'error-callback': () => { settle(''); return true; },
+      });
+    } catch {
+      widget = null;
+    }
+    return widget === null || widget === undefined ? null : turnstile;
+  });
+  return {
+    start,
+    async token() {
+      const turnstile = await start();
+      if (!turnstile) return '';
+      const now = turnstile.getResponse(widget);
+      if (now && !turnstile.isExpired(widget)) return now;
+      return new Promise(resolve => waiting.push(resolve));
+    },
+    has: () => !!widget && !!window.turnstile?.getResponse(widget),
+    used() { if (widget !== null) window.turnstile?.reset(widget); },
+    remove() { settle(''); if (widget !== null) window.turnstile?.remove(widget); widget = null; },
+  };
+}
 async function askAWiz() {
   const lists = document.querySelectorAll('.faq .faq-rows');
   if (!lists.length) return;
@@ -498,8 +549,11 @@ async function askAWiz() {
     lists.forEach(list => near.observe(list));
   });
   const probe = await fetch('/api/ask', { cache: 'no-store' }).then(r => r.status === 200 ? r.json() : null).catch(() => null);
-  if (askKeys(probe) !== 'enabled,max_question_chars,schema' || probe.schema !== 'openwiz.ask-a-wiz.v1' || probe.enabled !== true
-    || probe.max_question_chars !== 300) return;
+  const keys = askKeys(probe);
+  if ((keys !== 'enabled,max_question_chars,schema' && keys !== 'enabled,max_question_chars,schema,turnstile_site_key')
+    || probe.schema !== 'openwiz.ask-a-wiz.v1' || probe.enabled !== true || probe.max_question_chars !== 300
+    || (keys.endsWith('turnstile_site_key') && (typeof probe.turnstile_site_key !== 'string' || !/^[0-9A-Za-z_-]{1,100}$/.test(probe.turnstile_site_key)))) return;
+  const sitekey = probe.turnstile_site_key;
   let made = 0;
   const el = (tag, className, text) => {
     const node = document.createElement(tag);
@@ -519,6 +573,12 @@ async function askAWiz() {
       Object.assign(input, { id: `faq-ask-${n}`, type: 'text', name: 'question', placeholder: 'Ask a Wiz...', autocomplete: 'off', enterKeyHint: 'send' });
       label.htmlFor = input.id;
       form.append(label, input, el('button', 'faq-ask-go', 'Ask'));
+      const human = sitekey ? el('div', 'faq-ask-human') : null;
+      const gate = human && askGate(sitekey, human);
+      if (human) {
+        form.append(human);
+        for (const type of ['focusin', 'pointerdown', 'input']) form.addEventListener(type, gate.start, { once: true });
+      }
       const heading = el(level, 'faq-q'), answer = el('p', 'faq-ask-answer'), body = el('div', 'faq-a'), actions = el('div', 'faq-ask-actions');
       body.append(el('div'));
       body.firstChild.append(answer);
@@ -577,17 +637,28 @@ async function askAWiz() {
         }
         done.append(h, a);
         const inside = row.contains(document.activeElement);
+        gate?.remove();
         row.replaceWith(done);
         status.textContent = paragraphs[0][0];
         const input = addRow();
         if (inside) input.focus({ preventScroll: true });
       };
+      let asking = false;
       const ask = async () => {
+        if (asking) return;
+        asking = true;
+        let token = '';
+        if (gate) {
+          if (!gate.has() && row.dataset.state !== 'idle') { show('idle'); input.value = question; }
+          token = await gate.token();
+          gate.used();
+        }
+        asking = false;
         controller = new AbortController();
         show('asking');
         let text = '', sources = null, end = null;
         try {
-          const response = await fetch('/api/ask', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          const response = await fetch('/api/ask', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(gate ? { 'CF-Turnstile-Response': token } : {}) },
             body: JSON.stringify({ question }), cache: 'no-store', signal: controller.signal });
           if (!/^application\/x-ndjson\s*(;|$)/i.test(response.headers.get('content-type') || '')) throw new Error('not a stream');
           const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
@@ -638,5 +709,17 @@ showStars().catch(() => {});
 launchVideo();
 specVideo();
 oneVoiceAtATime();
-enableFamily(window.gsap);
-if (window.gsap) enableMotion(window.gsap);
+const GSAP = document.currentScript?.dataset.gsap;
+const startMotion = () => {
+  enableFamily(window.gsap);
+  if (window.gsap) enableMotion(window.gsap);
+};
+const loadMotion = () => {
+  const script = document.createElement('script');
+  script.src = GSAP;
+  script.onload = script.onerror = startMotion;
+  document.head.append(script);
+};
+if (!GSAP) startMotion();
+else if (document.readyState === 'complete') loadMotion();
+else addEventListener('load', loadMotion, { once: true });

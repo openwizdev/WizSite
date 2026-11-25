@@ -1,0 +1,249 @@
+{
+ "path": "/",
+ "width": 390,
+ "load": 2018,
+ "page": {
+  "lcp": {
+   "t": 1852,
+   "url": "http://127.0.0.1:8812/art/era-2-grill.webp",
+   "el": "landscape"
+  },
+  "nav": 1795546501254,
+  "gsap": true,
+  "load": 2015.3999999761581
+ },
+ "rows": [
+  {
+   "url": "/",
+   "start": 0,
+   "priority": "VeryHigh",
+   "type": "Document",
+   "status": 200,
+   "end": 193,
+   "bytes": 8502
+  },
+  {
+   "url": "/fonts/Geist-var.048e449054.woff2",
+   "start": 176,
+   "priority": "High",
+   "type": "Font",
+   "status": 200,
+   "end": 1086,
+   "bytes": 31618
+  },
+  {
+   "url": "/fonts/GeistMono-var.9e8aaba5ad.woff2",
+   "start": 178,
+   "priority": "High",
+   "type": "Font",
+   "status": 200,
+   "end": 936,
+   "bytes": 24902
+  },
+  {
+   "url": "/tokens.9eafe1d3ee.css",
+   "start": 178,
+   "priority": "VeryHigh",
+   "type": "Stylesheet",
+   "status": 200,
+   "end": 351,
+   "bytes": 1099
+  },
+  {
+   "url": "/site.fd216611ec.css",
+   "start": 178,
+   "priority": "VeryHigh",
+   "type": "Stylesheet",
+   "status": 200,
+   "end": 601,
+   "bytes": 10338
+  },
+  {
+   "url": "/site.a0a2d73520.js",
+   "start": 179,
+   "priority": "Low",
+   "type": "Script",
+   "status": 200,
+   "end": 965,
+   "bytes": 7689
+  },
+  {
+   "url": "/faq.76dd33c1b6.js",
+   "start": 179,
+   "priority": "Low",
+   "type": "Script",
+   "status": 200,
+   "end": 794,
+   "bytes": 425
+  },
+  {
+   "url": "/art/era-2-grill.webp",
+   "start": 179,
+   "priority": "High",
+   "type": "Image",
+   "status": 200,
+   "end": 1815,
+   "bytes": 77641
+  },
+  {
+   "url": "/art/hero-cave.webp",
+   "start": 179,
+   "priority": "Medium",
+   "type": "Image",
+   "status": 200,
+   "end": 585,
+   "bytes": 8900
+  },
+  {
+   "url": "/art/launch-poster.webp",
+   "start": 180,
+   "priority": "Medium",
+   "type": "Image",
+   "status": 200,
+   "end": 2009,
+   "bytes": 108437
+  },
+  {
+   "url": "/art/todo-spec-poster.webp",
+   "start": 217,
+   "priority": "Low",
+   "type": "Image",
+   "status": 200,
+   "end": 1281,
+   "bytes": 15692
+  },
+  {
+   "url": "/art/todo-spec.vtt",
+   "start": 223,
+   "priority": "Low",
+   "type": "TextTrack",
+   "status": 200,
+   "end": 1116,
+   "bytes": 625
+  },
+  {
+   "url": "data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz4KPCEtLSBHZW5lcmF0b3I6IEFkb2JlIElsbHVzdHJhdG9yIDE5LjIuMSwgU1ZHIEV4cG9ydCBQbHVnLUluIC4gU1ZHIFZlcnNpb246IDYuMDAgQnVpbGQgMCkgIC0tPgo8c3ZnIGZpbGw9IiNmZmZmZmYiIHZlcnNpb249IjEuMSIgaWQ9IkxheWVyXzEiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgeG1sbnM6eGxpbms9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkveGxpbmsiIHg9IjBweCIgeT0iMHB4IgoJIHZpZXdCb3g9IjAgMCAxOTYgMTk2IiBzdHlsZT0iZW5hYmxlLWJhY2tncm91bmQ6bmV3IDAgMCAxOTYgMTk2OyIgeG1sOnNwYWNlPSJwcmVzZXJ2ZSI+CjxwYXRoIGNsYXNzPSJzdDAiIGQ9Ik05OCw0OXY0Yy0yNC45LDAtNDUsMjAuMS00NSw0NQoJYzAsMTgsMTAuNiwzMy42LDI1LjksNDAuOGwtMS43LDMuNmMwLjEsMCwwLjIsMC4xLDAuMywwLjFjLTAuMSwwLTAuMi0wLjEtMC4zLTAuMWwwLDBDNjAuNSwxMzQuNSw0OSwxMTcuNiw0OSw5OAoJQzQ5LDcwLjksNzAuOSw0OSw5OCw0OXoiLz4KPC9zdmc+Cg==",
+   "start": 764,
+   "priority": "Low",
+   "type": "Image",
+   "status": 200,
+   "end": 764,
+   "bytes": 0
+  },
+  {
+   "url": "data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz4KPCEtLSBHZW5lcmF0b3I6IEFkb2JlIElsbHVzdHJhdG9yIDE5LjIuMSwgU1ZHIEV4cG9ydCBQbHVnLUluIC4gU1ZHIFZlcnNpb246IDYuMDAgQnVpbGQgMCkgIC0tPgo8c3ZnIGZpbGw9IiNmZmZmZmYiIHZlcnNpb249IjEuMSIgaWQ9IkxheWVyXzEiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgeG1sbnM6eGxpbms9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkveGxpbmsiIHg9IjBweCIgeT0iMHB4IgoJIHZpZXdCb3g9IjAgMCAxOTYgMTk2IiBzdHlsZT0iZW5hYmxlLWJhY2tncm91bmQ6bmV3IDAgMCAxOTYgMTk2OyIgeG1sOnNwYWNlPSJwcmVzZXJ2ZSI+CjxwYXRoIGNsYXNzPSJzdDAiIGQ9Ik0xNDcsOThjMCwxOS42LTExLjUsMzYuNS0yOC4yLDQ0LjRsMCwwYy0wLjEsMC0wLjIsMC4xLTAuMywwLjEKCWMwLjEsMCwwLjItMC4xLDAuMy0wLjFsLTEuNy0zLjZDMTMyLjQsMTMxLjYsMTQzLDExNiwxNDMsOThjMC0yNC45LTIwLjEtNDUtNDUtNDV2LTRDMTI1LjEsNDksMTQ3LDcwLjksMTQ3LDk4eiIvPgo8L3N2Zz4K",
+   "start": 771,
+   "priority": "Low",
+   "type": "Image",
+   "status": 200,
+   "end": 771,
+   "bytes": 0
+  },
+  {
+   "url": "data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz4KPHN2ZyB2ZXJzaW9uPSIxLjEiIGlkPSJMYXllcl8xIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB4PSIwcHgiIHk9IjBweCIKCSB2aWV3Qm94PSIwIDAgMjQgMjQiIHN0eWxlPSJlbmFibGUtYmFja2dyb3VuZDpuZXcgMCAwIDI1NSAyNTU7IiB4bWw6c3BhY2U9InByZXNlcnZlIiBmaWxsPSJXaW5kb3ciPgo8Zz4KCTxjaXJjbGUgY3g9IjEyIiBjeT0iNiIgcj0iMiIvPgoJPGNpcmNsZSBjeD0iMTIiIGN5PSIxMiIgcj0iMiIvPgoJPGNpcmNsZSBjeD0iMTIiIGN5PSIxOCIgcj0iMiIvPgo8L2c+Cjwvc3ZnPgo=",
+   "start": 778,
+   "priority": "Low",
+   "type": "Image",
+   "status": 200,
+   "end": 779,
+   "bytes": 0
+  },
+  {
+   "url": "/art/moments-sea.webp",
+   "start": 977,
+   "priority": "Low",
+   "type": "Image",
+   "status": 200,
+   "end": 1777,
+   "bytes": 40426
+  },
+  {
+   "url": "https://api.github.com/repos/openwizdev/OpenWiz",
+   "start": 1000,
+   "priority": "High",
+   "type": "Fetch",
+   "end": null
+  },
+  {
+   "url": "/vendor/gsap-3.15.1.min.3d1bea374a.js",
+   "start": 2017,
+   "priority": "Low",
+   "type": "Script",
+   "status": 200,
+   "end": 2309,
+   "bytes": 26039
+  },
+  {
+   "url": "/favicon.svg",
+   "start": 2021,
+   "priority": "High",
+   "type": "Other",
+   "status": 200,
+   "end": 2182,
+   "bytes": 855
+  },
+  {
+   "url": "/favicon.ico",
+   "start": 2199,
+   "priority": "High",
+   "type": "Other",
+   "status": 200,
+   "end": 2371,
+   "bytes": 4028
+  },
+  {
+   "url": "/art/hero-cave-frames.webp",
+   "start": 2338,
+   "priority": "Low",
+   "type": "Image",
+   "status": 200,
+   "end": 4201,
+   "bytes": 58286
+  },
+  {
+   "url": "/art/hero-renaissance-frames.webp",
+   "start": 2339,
+   "priority": "Low",
+   "type": "Image",
+   "status": 200,
+   "end": 4298,
+   "bytes": 64124
+  },
+  {
+   "url": "/art/hero-samurai-frames.webp",
+   "start": 2339,
+   "priority": "Low",
+   "type": "Image",
+   "status": 200,
+   "end": 4265,
+   "bytes": 60598
+  },
+  {
+   "url": "/art/hero-steam-frames.webp",
+   "start": 2339,
+   "priority": "Low",
+   "type": "Image",
+   "status": 200,
+   "end": 4223,
+   "bytes": 58394
+  },
+  {
+   "url": "/art/hero-astronaut-frames.webp",
+   "start": 2339,
+   "priority": "Low",
+   "type": "Image",
+   "status": 200,
+   "end": 4192,
+   "bytes": 56906
+  },
+  {
+   "url": "/art/fleet-frames.webp",
+   "start": 2342,
+   "priority": "Low",
+   "type": "Image",
+   "status": 200,
+   "end": 4521,
+   "bytes": 105147
+  }
+ ]
+}
