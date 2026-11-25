@@ -96,6 +96,44 @@ class Checks(unittest.TestCase):
                     finally:
                         path.write_bytes(original)
 
+    def test_guide_page_discovery_and_rules(self):
+        guide = 'guides/run-many-coding-agents/index.html'
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / 'dist'
+            shutil.copytree(ROOT / 'dist', root)
+            failures = [
+                (guide, r'<title>.*?</title>', '', 'title'),
+                (guide, r'<meta name="description"[^>]*>', '', 'description'),
+                (guide, r'<link rel="canonical"[^>]*>', '', 'canonical'),
+                (guide, r'"name": "Install OpenWiz"', '"name": "Setup OpenWiz"', 'HowTo JSON-LD'),
+                (guide, r'<h1>How to run many coding agents at once</h1>', '<h1>Run coding agents</h1>', 'guide h1 and HowTo name'),
+                (guide, r'OpenWiz 0\.01 \(version 0\.1\.0\)', 'OpenWiz 0.02 (version 0.1.1)', 'names only OpenWiz 0.01'),
+                ('what-is-openwiz/index.html', r'href="/guides/run-many-coding-agents/">Guide: run many coding agents</a>', 'href="/faq/">Guide</a>', 'overview links the guide'),
+                ('sitemap.xml', r'<url><loc>https://openwiz\.dev/guides/run-many-coding-agents/</loc>.*?</url>', '', 'sitemap must list'),
+                ('llms.txt', r'- \[How to run many coding agents at once\]\(https://openwiz\.dev/guides/run-many-coding-agents/\)[^\n]*\n', '', 'invalid llms.txt'),
+                ('llms-full.txt', r'\n6\. Watch it ship\.[^\n]*', '', 'llms-full.txt needs the guide'),
+            ]
+            for name, pattern, replacement, error in failures:
+                with self.subTest(file=name, error=error):
+                    path = root / name
+                    original = path.read_text()
+                    changed, count = re.subn(pattern, replacement, original, count=1)
+                    self.assertEqual(count, 1)
+                    path.write_text(changed)
+                    try:
+                        with self.assertRaisesRegex(AssertionError, error):
+                            check_site(root)
+                    finally:
+                        path.write_text(original)
+            path = root / guide
+            original = path.read_bytes()
+            path.unlink()
+            try:
+                with self.assertRaisesRegex(AssertionError, 'missing build output'):
+                    check_site(root)
+            finally:
+                path.write_bytes(original)
+
     def test_broken_targets_fragments_and_schemes(self):
         root = ROOT / 'dist'
         page = root / 'index.html'
