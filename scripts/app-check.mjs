@@ -368,7 +368,8 @@ async function main() {
     const servedAs = (world, state) => {
       assert(shipped.length === 1 && ['data-install="coming-soon"', 'data-install="live"'].includes(shipped[0]),
         `the landing has no single install switch: ${JSON.stringify(shipped)}`);
-      world.site['/'] = async () => ({ status: 200, raw: Buffer.from(landing.replace(shipped[0], `data-install="${state}"`)), type: 'html' });
+      const html = landing.replace(shipped[0], `data-install="${state}"`).replace(/(data-count="install-copy">)[^<]*</, `$1${state === 'live' ? 'Copy' : 'Copy · coming soon'}<`);
+      world.site['/'] = async () => ({ status: 200, raw: Buffer.from(html), type: 'html' });
     };
     const installBox = page => page.run(`(() => { ${LABEL} const box = document.querySelector('.install-box'); const b = box.querySelector('button.install');
       const line = box.querySelector('.install-line'); const hint = box.querySelector('.install-hint');
@@ -386,7 +387,7 @@ async function main() {
       await settle(page);
       const box = await installBox(page);
       assert(box.line === LINE && box.lineShown, `the install line is not shown exactly: ${JSON.stringify(box.line)}`);
-      assert(box.hint === 'Paste this into your agent', `the instruction is missing: ${box.hint}`);
+      assert(box.hint === 'Paste this into your AI helper', `the instruction is missing: ${box.hint}`);
       assert(box.shown && box.disabled && box.label === 'Copy · coming soon', `Copy is not shown disabled as coming soon: ${JSON.stringify(box)}`);
       await page.run(`document.querySelector('.install-box button.install').click()`);
       await settle(page);
@@ -405,12 +406,36 @@ async function main() {
       await page.run(`navigator.clipboard.writeText('untouched')`);
       await page.until(`!document.querySelector('.install-box button.install').disabled`, 'Copy to be enabled');
       const box = await installBox(page);
-      assert(box.line === LINE && box.lineShown && box.hint === 'Paste this into your agent', `the box changed when switched on: ${JSON.stringify(box)}`);
+      assert(box.line === LINE && box.lineShown && box.hint === 'Paste this into your AI helper', `the box changed when switched on: ${JSON.stringify(box)}`);
       assert(box.shown && box.label === 'Copy', `the switched-on button does not read Copy: ${JSON.stringify(box)}`);
       await page.click('Copy');
       await page.until(`document.querySelector('.install-box button.install').innerText.trim() === 'Copied'`, 'Copied');
       const copied = await page.clipboard();
       assert(copied === LINE, `the clipboard does not hold exactly the install line: ${JSON.stringify(copied)}`);
+      await waitFor(() => world.answered('/api/count'), 'the install Copy count request');
+      checkRequestLog(world, { installCount: true });
+      await page.close();
+    });
+
+    await check('install box switched on without the Clipboard API: Copy still copies the line through the fallback', async () => {
+      const world = new World();
+      servedAs(world, 'live');
+      world.site['/api/count'] = async () => ({ status: 204, raw: Buffer.alloc(0) });
+      const page = await open(browser, world);
+      await page.go(`${SITE}/`);
+      await landed(page);
+      await page.run(`navigator.clipboard.writeText('untouched')`);
+      await page.until(`!document.querySelector('.install-box button.install').disabled`, 'Copy to be enabled');
+      await page.run(`(() => { window.__clip = navigator.clipboard; Object.defineProperty(Navigator.prototype, 'clipboard', { get: () => undefined, configurable: true }); })()`);
+      await page.click('Copy');
+      await page.until(`['Copied', 'Line selected: copy it'].includes(document.querySelector('.install-box button.install').innerText.trim())`, 'a fallback result');
+      const selected = await page.run(`String(window.getSelection())`);
+      assert(selected === LINE, `the fallback did not select exactly the install line: ${JSON.stringify(selected)}`);
+      const label = await page.run(`document.querySelector('.install-box button.install').innerText.trim()`);
+      if (label === 'Copied') {
+        const copied = await page.run(`window.__clip.readText()`);
+        assert(copied === LINE, `the fallback said Copied but the clipboard holds ${JSON.stringify(copied)}`);
+      }
       await waitFor(() => world.answered('/api/count'), 'the install Copy count request');
       checkRequestLog(world, { installCount: true });
       await page.close();
@@ -435,6 +460,10 @@ async function main() {
       const page = await open(browser, world);
       await page.go(`${SITE}/app/`);
       await page.until(`[...document.querySelectorAll('a')].some(a => a.textContent.trim() === 'Sign in with GitHub')`, 'the sign-in link');
+      const signedOutCopy = await page.run(`({ h1: document.querySelector('h1')?.textContent?.trim(), p: document.querySelector('.panel > p')?.textContent?.trim() })`);
+      assert(signedOutCopy.h1 === 'See your idea being built', `signed-out heading mismatch: ${JSON.stringify(signedOutCopy.h1)}`);
+      assert(signedOutCopy.p === "Watch your AI helpers at work: what needs your answer, the plan, and each helper's progress. Sign in with GitHub (the free website where your project is kept) to pick your project.",
+        `signed-out copy mismatch: ${JSON.stringify(signedOutCopy.p)}`);
       const href = await page.run(`[...document.querySelectorAll('a')].find(a => a.textContent.trim() === 'Sign in with GitHub').getAttribute('href')`);
       assert(href === '/api/sign-in/start', `sign-in goes to ${href}, not the helper`);
       assert(graphqlCount(world) === 0, 'GitHub was read before sign-in');
@@ -1803,7 +1832,7 @@ async function main() {
     const LAYOUT = {
       laptop: { brand: [12, 20, 239, 34], mark: [22, 23, 28, 28], nav: [12, 142, 239, 256], title: [312, 40] },
       phone: { top: [0, 0, 390, 65], brand: [14, 18, 28, 28], mark: [14, 18, 28, 28], title: [16, 87] },
-      panel: { brand: [490, 307, 460, 30], mark: [490, 308, 28, 28], title: [490, 360] },
+      panel: { brand: [490, 280, 460, 30], mark: [490, 281, 28, 28], title: [490, 332] },
     };
     const box = selector => `(() => { const el = [...document.querySelectorAll(${JSON.stringify(selector)})].find(e => e.getClientRects().length);
       if (!el) return null; const r = el.getBoundingClientRect(); return [r.x, r.y, r.width, r.height].map(Math.round); })()`;

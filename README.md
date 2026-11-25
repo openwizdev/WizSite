@@ -1,45 +1,18 @@
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/openwizdev/.github/main/profile/art/wiz.png">
-  <img alt="The OpenWiz Wiz" src="https://raw.githubusercontent.com/openwizdev/.github/main/profile/art/wiz.png" width="56">
-</picture>
-
 # WizSite
 
-**[openwiz.dev](https://openwiz.dev) and [the app](https://openwiz.dev/app/): where you meet [OpenWiz](https://github.com/openwizdev/OpenWiz) and watch your factory ship.** The app signs in with GitHub, read only, and shows your specs, tickets and agents straight from your repo's records. It is a static site; its only server piece is a small sign-in helper that keeps nothing.
+**[openwiz.dev](https://openwiz.dev) and [its app](https://openwiz.dev/app/) for [OpenWiz](https://github.com/openwizdev/OpenWiz), the open source agent factory that runs fleets of coding agents.** The app signs in with GitHub, reads only, and shows your specs, tickets and agents from your repo. It is a static site plus a sign-in helper that stores nothing.
 
-**Status:** live at openwiz.dev, before OpenWiz 0.1.0. The landing page's install button says "coming soon" until 0.1.0 ships.
+To install OpenWiz ([v0.1.0](https://github.com/openwizdev/OpenWiz/releases/tag/v0.1.0)), paste this into your coding agent: `Install OpenWiz from github.com/openwizdev/OpenWiz`
 
-## Quick start
+## Develop
 
-Node.js 24, Python 3.11+ and Git:
+Node.js 24, Python 3.11+, Git:
 
 ```sh
 npm ci
-npm run build    # writes the site to dist/
-npm run check    # links, fonts, copy, privacy markers
+npm run build    # writes dist/
+npm run check
 npm test
-python3 -m http.server 8800 --bind 127.0.0.1 --directory dist
 ```
 
-Then open http://127.0.0.1:8800.
-
-## How it works
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/openwizdev/.github/main/profile/art/map-dark.png">
-  <img alt="How the repos fit: OpenWiz writes records to GitHub, and WizSite's app reads them." src="https://raw.githubusercontent.com/openwizdev/.github/main/profile/art/map-light.png" width="560">
-</picture>
-
-- **The landing page** (`index.html`) shows one build, start to finish, with the Wiz crew.
-- **The app** (`app/`) reads GitHub's API from your browser through the read-only [OpenWiz Viewer](https://github.com/apps/openwiz-viewer) GitHub App. It never writes. The sign-in helper (`functions/`) swaps GitHub's code for your token and hands it straight back.
-- **The Changelog** (`changelog/`) lists what each public release lets you do, newest first, from one data file per release in `changelog/releases/`.
-- **The repositories:** how they fit together and what each one does is in [docs/repos.md](docs/repos.md).
-- **Deploy:** Cloudflare Pages builds `main`. Changes merge after green CI and a review from another model family.
-
-The full build, check and deploy notes are in [docs/maintaining.md](docs/maintaining.md).
-
-## Links
-
-- [openwiz.dev](https://openwiz.dev) · [the app](https://openwiz.dev/app/) · [Changelog](https://openwiz.dev/changelog/)
-- [OpenWiz](https://github.com/openwizdev/OpenWiz) · [all repos](https://github.com/openwizdev)
-- [Apache License 2.0](LICENSE). Fonts, GSAP and icon licences ship in `fonts/` and `vendor/`.
+Preview, deploy and checks: [docs/maintaining.md](docs/maintaining.md). How the repos fit: [docs/repos.md](docs/repos.md). [Changelog](https://openwiz.dev/changelog/) · [Apache 2.0](LICENSE)

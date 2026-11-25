@@ -137,7 +137,8 @@ test('Canvas: a strip item opens its sheet and marks its stack; Space spreads a 
     const text = await run.page.text();
     assert.match(text, /Reviewer · Codex, Sol 6\.1 High/);
     assert.match(text, /Builder · Claude Code, Opus 5\.5 Medium/);
-    assert.match(text, /Waits for\s+#42 Cart contract \(merged\)/);
+    assert.match(text, /Waits for\s+nothing/);
+    assert.match(text, /Done\s+#42 Cart contract \(merged\)/);
     assert.match(text, /Blocks\s+#46 Order summary \(waiting\)/);
     assert.match(text, /#114: open, changes requested, checks pass/);
     await run.page.key('Escape');
@@ -413,6 +414,113 @@ test('Canvas real data: a read skipped while GitHub\'s limit is paused says it w
     await run.page.until(`document.body.innerText.includes('Agents: waits for GitHub\\'s limit')`, 'the waiting line', 8000);
     assert.doesNotMatch(await run.page.text(), /reading…/);
     assert.match(await run.page.text(), /hourly read limit for your account is nearly used up/);
+  } finally {
+    await run.close();
+  }
+});
+
+test('Canvas real data: a spec chunk answered RATE_LIMIT with no limit data pauses reads, so the later chunks never fire', async () => {
+  const run = await start();
+  try {
+    world(run);
+    wrap(run, 'Specs', reply => {
+      const json = structuredClone(reply.json);
+      for (const spec of json.data.specSearch.nodes) spec.subIssuesSummary.total = 50;
+      return { ...reply, json };
+    });
+    const sizes = [];
+    wrap(run, 'SpecTickets', (reply, entry) => {
+      sizes.push(aliases(entry).length);
+      return { status: 200, json: { data: null, errors: [{ type: 'RATE_LIMIT', message: 'API rate limit already exceeded for user ID 1.' }] } };
+    });
+    await signIn(run.page);
+    await run.page.click('acme/factory');
+    await run.page.until('OW.data.feeds.specs.readAt || OW.data.feeds.specs.failedAt', 'the spec read');
+    assert.deepEqual(sizes, [1], `one chunk asked, the next one held: ${sizes}`);
+    assert.equal(await run.page.run('OW.data.paused()'), true);
+    assert.ok(await run.page.run('OW.data.limit.pausedUntil > Date.now() + 60 * 1000'), 'a default back-off, not an instant retry');
+  } finally {
+    await run.close();
+  }
+});
+
+test('Canvas real data: reading a spec\'s extra comments leaves the kept board\'s detail as it was', async () => {
+  const run = await start();
+  try {
+    world(run);
+    wrap(run, 'SpecTickets', reply => {
+      const repository = structuredClone(reply.json.data.repository);
+      repository.s48.comments.totalCount = 2;
+      return { status: 200, json: { data: { ...reply.json.data, repository } } };
+    });
+    const at = ago(1);
+    run.world.github['GET /repos/acme/factory/issues/48/comments'] = () => ({ status: 200, json: [9480, 9481].map(id => ({ id, body: `note ${id}`,
+      html_url: `${URL_OF(48)}#issuecomment-${id}`, created_at: at, updated_at: at, user: BOT })) });
+    await openCanvas(run);
+    assert.equal(await run.page.run('OW.data.feeds.specs.data.specs.s48.comments.nodes.length'), 2, 'the board shows every comment');
+    assert.equal(await run.page.run('OW.data.feeds.specs.details.specs.get(48).detail.comments.nodes.length'), 1, 'the kept detail is unchanged');
+    assert.equal(await run.page.run('OW.data.feeds.specs.details.specs.get(48).detail.comments.totalCount'), 2);
+  } finally {
+    await run.close();
+  }
+});
+
+test('Canvas: Waits for lists only open blockers, says Waits for nothing when all have merged, and keeps unreadable blockers', async () => {
+  const run = await start();
+  try {
+    world(run, {
+      tickets: list => {
+        const t44 = list.find(t => t.n === 44);
+        t44.state = 'CLOSED';
+        t44.reason = 'COMPLETED';
+        t44.labels = ['ready-for-agent'];
+        t44.pulls = [pull(114, { state: 'MERGED', review: 'APPROVED', checks: 'SUCCESS' })];
+        t44.notes = [];
+        const t47 = list.find(t => t.n === 47);
+        t47.blockers = [42];
+        t47.notes = [];
+      },
+    });
+    wrap(run, 'SpecTickets', reply => {
+      const repository = structuredClone(reply.json.data.repository);
+      const t45 = repository.s41.subIssues.nodes.find(n => n.number === 45);
+      t45.blockedBy.totalCount = 2;
+      return { status: 200, json: { data: { ...reply.json.data, repository } } };
+    });
+    await openCanvas(run);
+
+    assert.equal(await run.page.run(`document.querySelector('.cv-stack[data-ticket$="#46"] .cv-step').textContent`), 'Waits for #43');
+    assert.equal(await run.page.run(`document.querySelector('.cv-stack[data-ticket$="#47"] .cv-step').textContent`), 'Waits for nothing');
+    assert.equal(await run.page.run(`document.querySelector('.cv-stack[data-ticket$="#45"] .cv-behind .cv-card:last-child .cv-step').textContent`),
+      'Waits for 1 ticket GitHub couldn\'t read');
+    assert.ok(await run.page.run(`Boolean(document.querySelector('.cv-line[data-from$="#44"][data-to$="#46"]'))`), 'merged blocker edge stays on the board');
+
+    await run.page.run(`document.querySelector('.cv-stack[data-ticket$="#46"]').focus()`);
+    await run.page.key('Enter');
+    await run.page.until(`document.querySelector('.cv-focus')`, 'focused #46');
+    const focus46 = await run.page.text();
+    assert.match(focus46, /Waits for\s+#43 Price the basket \(in review\)/);
+    assert.doesNotMatch(focus46, /Waits for[^\n]*#44/);
+    assert.match(focus46, /Done\s+#44 Shipping options \(merged\)/);
+    await run.page.key('Escape');
+    await run.page.until(`!document.querySelector('.cv-focus')`, 'board back');
+
+    await run.page.run(`document.querySelector('.cv-stack[data-ticket$="#47"]').focus()`);
+    await run.page.key('Enter');
+    await run.page.until(`document.querySelector('.cv-focus')`, 'focused #47');
+    const focus47 = await run.page.text();
+    assert.match(focus47, /Waits for\s+nothing/);
+    assert.match(focus47, /Done\s+#42 Cart contract \(merged\)/);
+    await run.page.key('Escape');
+    await run.page.until(`!document.querySelector('.cv-focus')`, 'board back');
+
+    await run.page.run(`document.querySelector('.cv-stack[data-ticket$="#45"]').focus()`);
+    await run.page.key('Enter');
+    await run.page.until(`document.querySelector('.cv-focus')`, 'focused #45');
+    const focus45 = await run.page.text();
+    assert.match(focus45, /Waits for\s+1 ticket GitHub couldn't read/);
+    assert.match(focus45, /Done\s+#42 Cart contract \(merged\)/);
+    assert.deepEqual(run.world.violations, []);
   } finally {
     await run.close();
   }

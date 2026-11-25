@@ -14,7 +14,7 @@ const HTML_TAG = /<\/?(?:a|b|i|u|s|em|strong|br|hr|img|picture|source|p|div|span
 const PRIVATE = /\[private record\]\(|private record: *https?:/i;
 
 const ENTITIES = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', mdash: '—', ndash: '–', middot: '·', hellip: '…', rsquo: '’', lsquo: '‘', rdquo: '”', ldquo: '“' };
-const decode = text => text.replace(/&(#x[0-9a-f]+|#[0-9]+|[a-z]+);/gi, (all, name) =>
+export const decode = text => text.replace(/&(#x[0-9a-f]+|#[0-9]+|[a-z]+);/gi, (all, name) =>
   name[0] === '#' ? point(Number(name.slice(1).replace(/^x/i, '0x')), all) : ENTITIES[name.toLowerCase()] ?? all);
 const point = (code, all) => code <= 0x10ffff ? String.fromCodePoint(code) : all;
 const squash = text => text.replace(/\s+/g, ' ').trim();
