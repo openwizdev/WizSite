@@ -215,7 +215,7 @@ code,.v{font-family:var(--ow-font-mono)}
   .sign-in { order: 2; margin-bottom: 8px; padding-inline: 13px; border: 1px solid var(--nav-edge); border-radius: 8px; font-weight: 600; }
   .github-star + .sign-in::before { content: none; }
   .sign-in:hover, .nav-toggle:hover { background: var(--panel); color: var(--ink); }
-  .nav-links .sign-in { margin: 0; border: 0; color: inherit; font-weight: inherit; }
+  .nav-links .sign-in { order: 0; margin: 0; border: 0; color: inherit; font-weight: inherit; }
 
   .landing-nav:has(.nav-toggle[aria-expanded="true"])::before {
     content: "";
@@ -227,18 +227,32 @@ code,.v{font-family:var(--ow-font-mono)}
   .nav-row:has(.nav-toggle:not([hidden])) .nav-links {
     position: absolute;
     inset: 100% 0 auto;
-    display: block;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
     max-height: calc(100dvh - var(--nav-height));
     overflow: auto;
     overscroll-behavior: contain;
-    padding: 10px 0 0;
+    padding: 12px 0 0;
     background: var(--panel);
     box-shadow: 0 12px 24px rgb(0 0 0 / 25%);
   }
+  .nav-row:has(.nav-toggle:not([hidden])) .nav-links:focus { outline: none; }
   .nav-row:has(.nav-toggle:not([hidden])) .nav-links[hidden] { display: none; }
-  .nav-row:has(.nav-toggle:not([hidden])) .nav-links a { min-height: 42px; padding-inline: 24px; }
-  .nav-row:has(.nav-toggle:not([hidden])) .nav-links [aria-current]::after { inset-inline-start: 24px; }
-  .nav-row:has(.nav-toggle:not([hidden])) .nav-links::after { display: block; position: sticky; bottom: 0; margin-top: 10px; }
+  .nav-row:has(.nav-toggle:not([hidden])) .nav-links a { min-height: 44px; padding-inline: 24px; color: var(--grey2); }
+  .nav-row:has(.nav-toggle:not([hidden])) .nav-links a:is(:hover, :focus-visible),
+  .nav-row:has(.nav-toggle:not([hidden])) .nav-links [aria-current] { color: var(--ink); }
+  .nav-row:has(.nav-toggle:not([hidden])) .nav-links [aria-current] { font-weight: 500; }
+  .nav-row:has(.nav-toggle:not([hidden])) .nav-links a:focus-visible { outline-offset: -3px; }
+  .nav-row:has(.nav-toggle:not([hidden])) .nav-links [aria-current]::after {
+    inset: 0 auto 0 12px;
+    margin-block: auto;
+    width: 2px;
+    height: 18px;
+    border-radius: 1px;
+    background: var(--nav-blue);
+  }
+  .nav-row:has(.nav-toggle:not([hidden])) .nav-links::after { display: block; flex: none; position: sticky; bottom: 0; margin-top: 12px; }
   html:has(.nav-toggle[aria-expanded="true"]) { overflow: hidden; scrollbar-gutter: stable; }
 }
 @media (max-width: 360px) {
