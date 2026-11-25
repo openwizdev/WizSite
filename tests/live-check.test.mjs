@@ -65,11 +65,32 @@ function decisionBody({ spec, kind, status, id }) {
   ].join('\n');
 }
 
-function makeFakeGitHub() {
+function makeFakeGitHub({ askHasNeedsInfo = true } = {}) {
   const now = new Date();
   const fiveMinAgo = new Date(now.getTime() - 5 * 60 * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z');
   const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z');
   const upstreamLog = [];
+
+  const youIssueNodes = [
+    {
+      number: 46,
+      title: 'Pick the release name',
+      url: 'https://github.com/acme/factory/issues/46',
+      updatedAt: fiveMinAgo,
+      labels: { nodes: [{ name: 'needs-info' }] },
+      issueDependenciesSummary: { blockedBy: 0 },
+    },
+    ...(askHasNeedsInfo
+      ? [{
+        number: 54,
+        title: 'Search ranking',
+        url: 'https://github.com/acme/factory/issues/54',
+        updatedAt: fiveMinAgo,
+        labels: { nodes: [{ name: 'needs-info' }, { name: 'ready-for-agent' }] },
+        issueDependenciesSummary: { blockedBy: 0 },
+      }]
+      : []),
+  ];
 
   const specsData = {
     rateLimit: { limit: 5000, remaining: 4900, resetAt: '2099-01-01T00:00:00Z' },
@@ -100,17 +121,8 @@ function makeFakeGitHub() {
         nodes: [],
       },
       youIssues: {
-        totalCount: 1,
-        nodes: [
-          {
-            number: 46,
-            title: 'Pick the release name',
-            url: 'https://github.com/acme/factory/issues/46',
-            updatedAt: fiveMinAgo,
-            labels: { nodes: [{ name: 'needs-info' }] },
-            issueDependenciesSummary: { blockedBy: 0 },
-          },
-        ],
+        totalCount: youIssueNodes.length,
+        nodes: youIssueNodes,
       },
       peopleIssues: {
         totalCount: 2,
@@ -440,8 +452,8 @@ test('consistent repository passes all 5 pages, keeps real token out of browser,
   });
 
   assert.equal(result.ok, true, `expected all pages to pass, got:\n${formatResults(result)}`);
+  assert.equal(result.truth.needsYou, 3);
   assert.equal(result.truth.canvasNeedsYou, 3);
-  assert.equal(result.truth.youNeedsYou, 2);
   assert.deepEqual(result.pages.map(p => p.page), PAGES);
   assert.equal(result.pages.every(p => p.pass), true);
   assert.equal(result.tokenLeaked, false);
@@ -596,3 +608,47 @@ test('P4 seeded contradiction: Models showing a wrong role model fails Models', 
   assert.equal(models.pass, false);
   assert.match(formatResults(result), /FAIL Models:.*builder/i);
 });
+
+test('R1: a page that fails to render gets a FAIL line and the other four pages still run', async () => {
+  const { githubFetch } = makeFakeGitHub();
+  const result = await runLiveCheck({
+    repo: 'acme/factory',
+    token: REAL_TOKEN,
+    githubFetch,
+    pageWaitMs: 600,
+    siteTransform(pathname, reply) {
+      if (!/^\/app\/pages\/specs(?:\.[0-9a-f]{10})?\.js$/.test(pathname)) return reply;
+      const source = reply.raw.toString('utf8').replace("title: 'Specs',", "title: 'Broken',");
+      return { ...reply, raw: Buffer.from(source) };
+    },
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.tokenLeaked, false);
+  assert.deepEqual(result.pages.map(p => p.page), PAGES);
+  const lines = formatResults(result).split('\n');
+  assert.equal(lines.length, 5);
+  assert.equal(result.pages.find(p => p.page === 'Specs').pass, false);
+  assert.match(lines[1], /^FAIL Specs: .*Specs page/);
+  for (const name of ['You', 'Agents', 'Canvas', 'Models']) {
+    assert.equal(result.pages.find(p => p.page === name).pass, true, `${name} should still pass`);
+  }
+});
+
+test('R2: live ask without needs-info label fails You when You omits live asks from Needs you', async () => {
+  const { githubFetch } = makeFakeGitHub({ askHasNeedsInfo: false });
+  const result = await runLiveCheck({
+    repo: 'acme/factory',
+    token: REAL_TOKEN,
+    githubFetch,
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.truth.needsYou, 3);
+  const you = result.pages.find(p => p.page === 'You');
+  const canvas = result.pages.find(p => p.page === 'Canvas');
+  assert.equal(you.pass, false);
+  assert.match(formatResults(result), /FAIL You:.*Needs you shows 2 \(GitHub expects 3\)/);
+  assert.equal(canvas.pass, true);
+});
+
