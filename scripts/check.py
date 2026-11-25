@@ -300,6 +300,10 @@ CTA = (ROOT / 'header-cta.html').read_text()
 CTA_LINK = '<a class="nav-team" href="/team/">'
 TOP_BAR_END = '  </nav>\n</header>'
 TEAM_PAGE = 'team/index.html'
+HELP_PAGE = 'help/index.html'
+HELP_DOOR = 'Stuck installing? I’ll set it up with you: free 15 min'
+HELP_DOOR_SHORT = 'Stuck installing? Free 15-min setup help'
+TEAM_DOOR = 'Want it for your team? Book a call'
 BOOK_PLACEHOLDER = '#book'
 TEAM_KICKER = 'For teams who use Claude Code or Codex'
 TEAM_HEADLINE = 'Leave the call with a reviewed pull request.'
@@ -323,7 +327,7 @@ REPORT_LINK = 'https://github.com/openwizdev/openwiz/issues/new?template=feedbac
 FOOTER = (ROOT / 'footer.html').read_text()
 FOOTER_SLOT = '<template data-slot="footer"></template>\n'
 FOOTER_LINKS = (('/what-is-openwiz/', 'What is OpenWiz?'), ('/guides/run-many-coding-agents/', 'Guide'), ('/drivers/', 'Drivers'), ('/market/', 'Market'), ('/changelog/', 'Changelog'), ('https://github.com/openwizdev/openwiz#readme', 'Docs'),
-                ('/faq/', 'FAQ'), ('/app/', 'The app'), (REPORT_LINK, 'Report a problem'), ('/team/', 'For teams'),
+                ('/faq/', 'FAQ'), ('/help/', 'Help'), ('/app/', 'The app'), (REPORT_LINK, 'Report a problem'), ('/team/', 'For teams'),
                 ('https://github.com/openwizdev/openwiz', 'GitHub'), ('https://x.com/openwiz', 'X @openwiz'))
 FOOTER_LINE = 'Apache-2.0. Owned by no one.'
 COUNT_NOTICE = ('openwiz.dev counts visits with Cloudflare Web Analytics and selected clicks with Cloudflare Analytics Engine, '
@@ -354,10 +358,10 @@ FAQ_ROWS = re.compile(r'<div class="faq-row">\s*<h3 class="faq-q"><button ([^>]*
 FAQ_TITLE = ('Questions', 'The short ones are here.')
 FAQ_QUESTIONS = ('What is OpenWiz?', 'What is a kernel?', 'What do I need to run it?', 'What do I need before installing?',
                  'Where do my agents run?', 'Does OpenWiz see my code or my logins?', 'What does it cost?',
-                 'Can you set it up for my team?', 'How does openwiz.dev count visits and clicks?')
+                 'Can you help me set it up?', 'How does openwiz.dev count visits and clicks?')
 FAQ_PREREQS = ('A Mac (Apple silicon or Intel) or x86_64 Linux, with Python 3.9 or later, git, and the GitHub CLI (gh). '
                'See the install guide for every step and command.')
-FAQ_TEAM = 'Yes. Book a 30-minute call. Your first fleet ships on it.'
+FAQ_TEAM = f'Yes. {HELP_DOOR}. {TEAM_DOOR}.'
 FAQ_WHERE = ("Builders run where you choose: this computer, with the Claude Code or Codex you're signed in to, boat.dev, "
              'or CloudRoom. Each is a driver that passed the same five-check test. In OpenWiz 0.01, you start builders by '
              'hand on this computer or boat.dev, and the automatic fleet runs in CloudRoom.')
@@ -391,7 +395,7 @@ GUIDE_NEVER = re.compile(r'\b0\.1\.[1-9]|\b0\.0[2-9]\b')
 NOT_FOUND = '404.html'
 ABOUT_LINK = '<p class="wrap about-link"><a href="/what-is-openwiz/">What is OpenWiz?</a></p>\n'
 STATIC = {
-    'index.html', 'changelog/index.html', 'drivers/index.html', 'team/index.html', 'faq/index.html', 'market/index.html', '_headers', SECURITY_TXT, APP_PAGE, 'app/manifest.webmanifest',
+    'index.html', 'changelog/index.html', 'drivers/index.html', 'team/index.html', 'help/index.html', 'faq/index.html', 'market/index.html', '_headers', SECURITY_TXT, APP_PAGE, 'app/manifest.webmanifest',
     'SKILL.md', 'fonts/OFL.txt',
     'c76a1a01e62d088edd3789d30d6a4d29.txt',
 } | ART | set(ICON_HASHES) | set(VECTORS) | (set(VENDOR_HASHES) - {GSAP}) | set(APP_VENDOR) | set(DRIVER_LOGOS) | {ASK_INDEX, ABOUT_PAGE, GUIDE_PAGE, NOT_FOUND} | DISCOVERY_FILES
@@ -417,7 +421,7 @@ FONT_HASHES = {
     'fonts/GeistMono-var.woff2': '9e8aaba5adee50826485cff3187dc86d45f7dd4799a80371af0f369bbd999989',
     'fonts/OFL.txt': 'c683bfbcc7e087f5d37a54ef628f10387c451a83ddc459b151403a164ac46c90',
 }
-PAGES = ('index.html', 'changelog/index.html', 'drivers/index.html', TEAM_PAGE, FAQ_PAGE, 'market/index.html', ABOUT_PAGE, GUIDE_PAGE)
+PAGES = ('index.html', 'changelog/index.html', 'drivers/index.html', TEAM_PAGE, HELP_PAGE, FAQ_PAGE, 'market/index.html', ABOUT_PAGE, GUIDE_PAGE)
 SITE_PAGES = PAGES + (NOT_FOUND,)
 ALL_PAGES = SITE_PAGES + (APP_PAGE,)
 STORY_COPY = ('Build a to-do app', 'Bring any agent', 'Sign in with GitHub', 'Put the app on your phone')
@@ -1165,7 +1169,7 @@ def check_site(root, registry=ROOT / 'market/registry.json', now=None):
                         check_ref(root, path, ref, pages, slot.favicons)
                 page = Page(fixed)
         assert page.social and all(s.startswith(SITE_URL) and s.removeprefix(SITE_URL).split('?')[0] in STATIC for s in page.social), 'social image must be a built file on the site'
-        assert path == root / TEAM_PAGE or not page.books, f'a booking link outside the team page: {path.name}'
+        assert path in (root / TEAM_PAGE, root / HELP_PAGE) or not page.books, f'a booking link outside the team page: {path.name}'
         assert page.x_links == (2 if path == root / ABOUT_PAGE else 1), f'one X link per page, the footer\'s: {path.relative_to(root)} has {page.x_links}'
         if path == root / MARKET_PAGE:
             check_market_refs(root, path, page, pages, frozenset())
@@ -1351,6 +1355,7 @@ def check_site(root, registry=ROOT / 'market/registry.json', now=None):
     check_changelog(landing, changelog)
     check_releases(releases, read_releases(), install_switch(landing) == 'live')
     check_team(site_html, {name: parsed[name] for name in SITE_PAGES})
+    check_help(site_html, {name: parsed[name] for name in SITE_PAGES})
     check_footer(site_html)
     check_faq(site_html, {name: parsed[name] for name in SITE_PAGES}, names)
     for page in pages.values():
@@ -1936,8 +1941,11 @@ def check_team(htmls, pages):
         assert bar.count('class="nav-team"') == 1 and bar.count(CTA_LINK) == 1, f'the {name} top bar needs its one buy button to /team/'
         assert html.count('class="nav-team"') == 1, f'the {name} page needs exactly one buy button'
     books = [(name, href) for name, page in pages.items() for href in page.books]
-    assert len(books) == 2 and all(name == TEAM_PAGE for name, _ in books), f'the site needs its two booking links, both on the team page: {books}'
-    assert books[0][1] == books[1][1], f'both booking links share the one booking value: {books}'
+    team_books = [href for name, href in books if name == TEAM_PAGE]
+    help_books = [href for name, href in books if name == HELP_PAGE]
+    assert len(books) == 5 and len(team_books) == 3 and len(help_books) == 2, \
+        f'the site needs its booking links on /team/ (3) and /help/ (2): {books}'
+    assert len({href for _, href in books}) == 1, f'all booking links share the one booking value: {books}'
     href = books[0][1]
     if href == BOOK_PLACEHOLDER:
         assert 'book' in pages[TEAM_PAGE].ids, 'the booking placeholder needs its id on the team page'
@@ -1948,15 +1956,17 @@ def check_team(htmls, pages):
     flat = re.sub(r'\s+', ' ', unescape(re.sub(r'<[^>]*>', ' ', team)))
     assert not re.search(r'[$€£]\s*\d|\bper (?:month|seat|user)\b|\bpricing\b', flat, re.I), 'the team page shows no price'
     labels = re.findall(r'<a [^>]*data-book[^>]*>([^<]*)</a>', team)
-    assert labels == ['Book a call', 'Book a call'], f'team page copy: both booking links read Book a call: {labels}'
+    assert labels == [TEAM_DOOR, HELP_DOOR, 'Book a call'], f'team page copy: booking doors on /team/: {labels}'
     assert re.search(r'<a class="team-book" id="book" data-book href="[^"]*" data-count="book-call">', team), 'the first Book a call is #book, where the Questions link'
+    assert re.search(r'<a class="team-help" data-book href="[^"]*" data-count="help-setup">', team), 'the team hero includes the setup help door'
     description = re.search(r'<meta name="description" content="([^"]*)">', team)
     assert description and unescape(description[1]) == TEAM_DESCRIPTION, f'the team page description: {TEAM_DESCRIPTION}'
     assert not re.search(r'<(?:iframe|embed|object|form|details)\b', team) and team.count('<script') == 1, \
         'the team page adds no embed, form or script beyond site.js (which loads GSAP), and folds nothing away'
     main = team.split('<main', 1)[1].split('</main>', 1)[0]
     shown = re.sub(r'\s+', ' ', unescape(re.sub(r'<[^>]*>', ' ', main)))
-    assert not TEAM_NEVER.search(shown), f'a word the team page never uses: {TEAM_NEVER.search(shown)[0]}'
+    shown_without_help_door = shown.replace(HELP_DOOR, '', 1)
+    assert not TEAM_NEVER.search(shown_without_help_door), f'a word the team page never uses: {TEAM_NEVER.search(shown_without_help_door)[0]}'
     assert "'" not in shown and "'" not in ' '.join(re.findall(r'aria-label="([^"]*)"', main)), \
         'the team page uses curly apostrophes'
     assert not re.search(r'\bhidden\b|aria-hidden', re.sub(r'<button class="launch-play" type="button" hidden><span aria-hidden="true">', '', main)), 'the team page hides none of its copy'
@@ -1968,9 +1978,10 @@ def check_team(htmls, pages):
     assert hero, 'the team page needs its hero'
     hero = hero[1]
     copy = re.search(r'<div class="team-copy">\s*<p class="team-kicker">([^<]*)</p>\s*<h1>[^<]*</h1>\s*<p class="team-lead">([^<]*)</p>\s*'
-                     r'<a class="team-book" id="book" data-book [^>]*>Book a call</a>\s*<p class="team-needs">([^<]*)</p>\s*</div>', hero)
+                     r'<div class="team-doors">\s*<a class="team-book" id="book" data-book [^>]*>' + re.escape(TEAM_DOOR) + r'</a>\s*'
+                     r'<a class="team-help" data-book [^>]*>' + re.escape(HELP_DOOR) + r'</a>\s*</div>\s*<p class="team-needs">([^<]*)</p>\s*</div>', hero)
     assert copy and tuple(map(unescape, copy.groups())) == (TEAM_KICKER, TEAM_LEAD, TEAM_NEEDS), \
-        f'the hero, in order: who it is for, the headline, what happens on the call, Book a call, what to bring: {TEAM_KICKER} / {TEAM_LEAD} / {TEAM_NEEDS}'
+        f'the hero, in order: who it is for, the headline, what happens on the call, two doors, what to bring: {TEAM_KICKER} / {TEAM_LEAD} / {TEAM_NEEDS}'
     page = Page(main)
     assert len(page.videos) == 1, 'the team page has one video: the launch film'
     clip = page.videos[0]
@@ -1999,7 +2010,23 @@ def check_team(htmls, pages):
     close = re.search(r'<section class="team-part team-close wrap" aria-labelledby="team-call">\s*<h2 id="team-call">[^<]*</h2>\s*'
                       r'<a class="team-book" data-book href="[^"]*" data-count="book-call">Book a call</a>\s*</section>\s*$', main)
     assert close, 'the page closes on its second Book a call'
-    assert main.count('<a ') == 3 and main.count('<button') == 1, 'the team page offers Book a call twice, the Drivers link and the play button; nothing else'
+    assert main.count('<a ') == 4 and main.count('<button') == 1, 'the team page offers the two doors, the Drivers link, closing Book a call and the play button; nothing else'
+
+
+def check_help(htmls, pages):
+    help_html = htmls[HELP_PAGE]
+    assert not re.search(r'<(?:iframe|embed|object|form|details)\b', help_html) and help_html.count('<script') == 1, \
+        'the help page adds no embed, form or script beyond site.js (which loads GSAP)'
+    main = help_html.split('<main', 1)[1].split('</main>', 1)[0]
+    shown = re.sub(r'\s+', ' ', unescape(re.sub(r'<[^>]*>', ' ', main)))
+    assert "'" not in shown, 'the help page uses curly apostrophes'
+    assert {'setup', 'team'} <= pages[HELP_PAGE].ids, 'the help page needs #setup and #team anchors'
+    headings = [plain(h) for h in re.findall(r'<h2\b[^>]*>([\s\S]*?)</h2>', main)]
+    assert headings == [HELP_DOOR, TEAM_DOOR], f'the help page doors, in order: {headings}'
+    assert re.search(r'<a [^>]*data-book href="[^"]*" data-count="help-setup">' + re.escape(HELP_DOOR_SHORT) + r'</a>', main), \
+        'the help door uses data-count="help-setup"'
+    assert re.search(r'<a [^>]*data-book href="[^"]*" data-count="book-call">' + re.escape(TEAM_DOOR) + r'</a>', main), \
+        'the team door uses data-count="book-call"'
 
 
 

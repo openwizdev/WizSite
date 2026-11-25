@@ -3,7 +3,7 @@ import test from 'node:test';
 import { onRequest } from '../functions/api/count.js';
 
 const url = 'https://example.test/api/count';
-const actions = ['install-copy', 'github', 'star', 'book-call', 'market', 'drivers', 'docs', 'x'];
+const actions = ['install-copy', 'github', 'star', 'book-call', 'help-setup', 'market', 'drivers', 'docs', 'x'];
 const request = (body, init = {}) => new Request(url, { method: 'POST', body, ...init });
 
 function emptyResponse(response) {

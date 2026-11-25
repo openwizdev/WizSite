@@ -18,8 +18,8 @@ const ANSWER = ['Synthetic answer: OpenWiz ', 'runs a fleet of coding agents ', 
   .concat(line({ type: 'sources', sources: [{ title: 'Questions', url: 'https://openwiz.dev/faq/' }, { title: 'OpenWiz README', url: 'https://github.com/openwizdev/openwiz#readme' }] }), line({ type: 'done' }));
 const ESCAPED = [line({ type: 'text', text: 'Synthetic answer: a row like <b>bold</b> ' }), line({ type: 'text', text: 'shows as text, & stays text.' }),
   line({ type: 'sources', sources: [{ title: 'Questions', url: 'https://openwiz.dev/faq/' }] }), line({ type: 'done' })];
-const NOT_COVERED_TEXT = "The OpenWiz docs don't cover that yet, so I won't guess. Book a call or open a GitHub issue, and we'll answer it.";
-const LINKS = [{ label: 'Book a call', href: 'https://openwiz.dev/team/#book' }, { label: 'GitHub issues', href: 'https://github.com/openwizdev/openwiz/issues' }];
+const NOT_COVERED_TEXT = "The OpenWiz docs don't cover that yet, so I won't guess. Stuck installing? I'll set it up with you: free 15 min. Want it for your team? Book a call, or open a GitHub issue.";
+const LINKS = [{ label: 'Free 15-min setup help', href: 'https://openwiz.dev/help/' }, { label: 'Book a team call', href: 'https://openwiz.dev/help/#team' }, { label: 'GitHub issues', href: 'https://github.com/openwizdev/openwiz/issues' }];
 const NOT_COVERED = [line({ type: 'not_covered', text: NOT_COVERED_TEXT, links: LINKS })];
 const TOO_LONG = refused('too_long', 'That question is too long. Keep it to 300 characters or fewer.');
 const MIDSTREAM = [line({ type: 'text', text: 'Synthetic part one. ' }), refused('upstream_error', "Ask a Wiz couldn't answer just now. Try again.")];
@@ -347,7 +347,7 @@ test('a stream that breaks the contract\'s shape is never shown as an answer', a
   const text = line({ type: 'text', text: 'Synthetic text. ' }), sources = ANSWER[3], done = ANSWER[4];
   const bad = [[line({ type: 'text', text: 'Synthetic text. ', html: '<b>x</b>' }), sources, done], [text, line({ type: 'note' }), sources, done],
     [text, done], [text, sources, text, done], [text, line({ type: 'sources', sources: [] }), done],
-    [line({ type: 'not_covered', text: NOT_COVERED_TEXT, links: [LINKS[0], { label: 'GitHub issues', href: 'https://example.com/' }] })],
+    [line({ type: 'not_covered', text: NOT_COVERED_TEXT, links: [LINKS[0], LINKS[1], { label: 'GitHub issues', href: 'https://example.com/' }] })],
     [line({ type: 'not_covered', text: 'Synthetic other text.', links: LINKS })], [text, refused('too_long', 'Synthetic.')], ['not json\n'],
     [ANSWER.join('') + text], [ANSWER.join(''), 'x'], [ANSWER.join('') + done], [NOT_COVERED[0] + NOT_COVERED[0]], [ANSWER.join('').slice(0, -1)],
   ].map(lines => ({ lines })).concat({ status: 503, lines: ANSWER }, { status: 200, lines: [TOO_LONG] }, { type: 'text/html', lines: ANSWER },

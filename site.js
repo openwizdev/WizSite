@@ -1,5 +1,5 @@
 if (typeof navigator.sendBeacon === 'function') {
-  const countActions = new Set(['install-copy', 'github', 'star', 'book-call', 'market', 'drivers', 'docs', 'x']);
+  const countActions = new Set(['install-copy', 'github', 'star', 'book-call', 'help-setup', 'market', 'drivers', 'docs', 'x']);
   document.addEventListener('click', event => {
     const action = event.target.closest?.('[data-count]')?.dataset.count;
     if (countActions.has(action)) navigator.sendBeacon('/api/count', action);
@@ -484,8 +484,8 @@ const ASK_REFUSALS = {
   store_error: [503, 'Ask a Wiz couldn\'t keep count just now. Try again.'],
   no_private_route: [503, 'Ask a Wiz can\'t answer privately just now. Try again later.'],
 };
-const ASK_NOT_COVERED = 'The OpenWiz docs don\'t cover that yet, so I won\'t guess. Book a call or open a GitHub issue, and we\'ll answer it.';
-const ASK_LINKS = [['Book a call', 'https://openwiz.dev/team/#book'], ['GitHub issues', 'https://github.com/openwizdev/openwiz/issues']];
+const ASK_NOT_COVERED = 'The OpenWiz docs don\'t cover that yet, so I won\'t guess. Stuck installing? I\'ll set it up with you: free 15 min. Want it for your team? Book a call, or open a GitHub issue.';
+const ASK_LINKS = [['Free 15-min setup help', 'https://openwiz.dev/help/'], ['Book a team call', 'https://openwiz.dev/help/#team'], ['GitHub issues', 'https://github.com/openwizdev/openwiz/issues']];
 const askKeys = value => value && typeof value === 'object' && !Array.isArray(value) ? Object.keys(value).sort().join() : '';
 const askText = value => typeof value === 'string' && value.length > 0;
 function askEvent(line, text, sources) {

@@ -559,9 +559,14 @@ body.landing > main { flex: 1 0 auto; }
 .team-kicker { color: var(--grey2); font: 600 13px/1.3 var(--ow-font-sans); letter-spacing: .06em; text-transform: uppercase; }
 .team h1 { margin-top: 14px; max-width: 13ch; font-size: clamp(34px, 4.2vw, 56px); font-weight: 760; line-height: 1.04; letter-spacing: -.045em; text-wrap: balance; }
 .team-lead { margin-top: 18px; max-width: 42ch; color: #e1d7cb; font-size: clamp(17px, 1.5vw, 19px); line-height: 1.45; letter-spacing: -.01em; }
-.team-book { display: inline-flex; align-items: center; justify-content: center; min-height: 48px; margin-top: 26px; padding: 0 24px; border-radius: 10px; background: var(--brass); color: var(--on-brass); font-size: 16px; font-weight: 650; }
+.team-doors { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; margin-top: 26px; }
+.team-doors .team-book { margin-top: 0; }
+.team-book { display: inline-flex; align-items: center; justify-content: center; min-height: 48px; margin-top: 26px; padding: 10px 24px; border-radius: 10px; background: var(--brass); color: var(--on-brass); font-size: 16px; font-weight: 650; text-align: center; }
 .team-book:hover { background: var(--brass-hi); text-decoration: none; }
 .team-book:focus-visible { outline: 2px solid var(--orchid); outline-offset: 3px; }
+.team-help { display: inline-flex; align-items: center; justify-content: center; min-height: 46px; padding: 10px 18px; border: 1px solid var(--edge); border-radius: 10px; color: var(--ink); font-size: 15px; font-weight: 560; text-align: center; }
+.team-help:hover { border-color: var(--brass); color: var(--brass-hi); text-decoration: none; }
+.team-help:focus-visible { outline: 2px solid var(--orchid); outline-offset: 3px; }
 .team-needs { margin-top: 14px; max-width: 42ch; color: var(--grey2); font-size: 15px; line-height: 1.45; }
 .team-film { margin: 0; }
 .team-part { padding-block: clamp(48px, 7vw, 104px); border-top: 1px solid var(--line); }
@@ -587,8 +592,10 @@ body.landing > main { flex: 1 0 auto; }
 @media (max-width: 560px) {
   .team h1 { font-size: clamp(28px, 8vw, 36px); }
   .team-lead { margin-top: 12px; font-size: 16px; }
+  .team-doors { margin-top: 18px; align-items: stretch; }
   .team-book { margin-top: 18px; }
-  .team-book, .team-close .team-book { display: flex; width: 100%; min-height: 52px; }
+  .team-doors .team-book { margin-top: 0; }
+  .team-book, .team-help, .team-close .team-book { display: flex; width: 100%; min-height: 52px; }
   .team-needs { font-size: 14px; }
   .team-facts { grid-template-columns: 1fr; gap: 14px; }
   .team-facts li { font-size: 15px; }
@@ -668,3 +675,27 @@ body.landing > main { flex: 1 0 auto; }
 .plain-page li+li{margin-top:.5em}
 .plain-page a,.about-link a{text-decoration:underline;text-underline-offset:.2em}
 .about-link{margin-block:1rem 2rem}
+
+.help { padding-block: clamp(32px, 6vw, 84px); }
+.help-kicker { color: var(--grey2); font: 600 13px/1.3 var(--ow-font-sans); letter-spacing: .06em; text-transform: uppercase; }
+.help h1 { margin-top: 14px; font-size: clamp(36px, 4.8vw, 60px); font-weight: 760; line-height: 1.04; letter-spacing: -.045em; text-wrap: balance; }
+.help-lead { margin-top: 16px; max-width: 52ch; color: #e1d7cb; font-size: clamp(17px, 1.5vw, 19px); line-height: 1.45; letter-spacing: -.01em; }
+.help-doors { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: clamp(20px, 3vw, 32px); margin-top: clamp(28px, 4vw, 48px); }
+.help-door { display: flex; flex-direction: column; padding: clamp(24px, 3vw, 36px); border: 1px solid var(--edge); border-radius: var(--round); background: rgba(255, 248, 238, .025); }
+.help-door:target { border-color: var(--brass); }
+.help-tag { color: var(--brass); font: 600 13px/1.3 var(--ow-font-mono); letter-spacing: .04em; text-transform: uppercase; }
+.help-door h2 { margin-top: 12px; color: var(--ink); font-size: clamp(22px, 2.2vw, 28px); font-weight: 720; line-height: 1.18; letter-spacing: -.03em; text-wrap: balance; }
+.help-desc { margin-top: 12px; color: var(--grey2); font-size: 16px; line-height: 1.55; flex: 1; }
+.help-cta { margin-top: 24px; width: 100%; }
+.help-cta-team { background: transparent; border: 1px solid var(--brass); color: var(--ink); }
+.help-cta-team:hover { background: var(--brass); color: var(--on-brass); }
+.help-more { margin-top: 14px; font-size: 14px; color: var(--grey2); }
+.help-more a { color: var(--ink); text-decoration: underline; text-decoration-color: var(--brass); text-underline-offset: 4px; }
+.help-more a:hover { color: var(--brass-hi); }
+@media (max-width: 760px) {
+  .help-doors { grid-template-columns: 1fr; }
+}
+@media (max-width: 560px) {
+  .help h1 { font-size: clamp(30px, 8.5vw, 40px); }
+  .help-lead { font-size: 16px; }
+}

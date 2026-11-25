@@ -27,12 +27,13 @@ const TURNSTILE_KEY = /^[0-9A-Za-z_-]{1,100}$/;
 const MAX_TOKEN = 2048;
 const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
 
-const SYSTEM = "You answer questions about OpenWiz for visitors to openwiz.dev. Answer only from the passages in the user's message, in plain text, in at most three short paragraphs. If the passages do not answer the question, reply with exactly NOT_COVERED and nothing else.";
+const SYSTEM = "You answer questions about OpenWiz for visitors to openwiz.dev. Answer only from the passages in the user's message, in plain text, in at most three short paragraphs. If the visitor is stuck installing or troubleshooting setup, end with: Stuck installing? I'll set it up with you: free 15 min (https://openwiz.dev/help/). If the visitor asks about team setup or pricing, end with: Want it for your team? Book a call (https://openwiz.dev/help/#team). If the passages do not answer the question, reply with exactly NOT_COVERED and nothing else.";
 const NOT_COVERED = {
   type: 'not_covered',
-  text: "The OpenWiz docs don't cover that yet, so I won't guess. Book a call or open a GitHub issue, and we'll answer it.",
+  text: "The OpenWiz docs don't cover that yet, so I won't guess. Stuck installing? I'll set it up with you: free 15 min. Want it for your team? Book a call, or open a GitHub issue.",
   links: [
-    { label: 'Book a call', href: 'https://openwiz.dev/team/#book' },
+    { label: 'Free 15-min setup help', href: 'https://openwiz.dev/help/' },
+    { label: 'Book a team call', href: 'https://openwiz.dev/help/#team' },
     { label: 'GitHub issues', href: 'https://github.com/openwizdev/openwiz/issues' },
   ],
 };

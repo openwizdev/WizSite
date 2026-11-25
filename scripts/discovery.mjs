@@ -16,6 +16,7 @@ const schema = 'https://schema.org';
 export const aboutPage = 'what-is-openwiz/index.html';
 export const faqPage = 'faq/index.html';
 export const guidePage = 'guides/run-many-coding-agents/index.html';
+export const helpPage = 'help/index.html';
 export const pages = {
   'index.html': [
     'OpenWiz: the open source agent factory for coding agents',
@@ -48,6 +49,10 @@ export const pages = {
   'team/index.html': [
     'For your team — OpenWiz',
     'Book a 30-minute call to set up OpenWiz with your team and run a fleet on your own repository.',
+  ],
+  [helpPage]: [
+    'Help — OpenWiz',
+    'Stuck installing OpenWiz? Get free 15-min setup help, or book a call to set it up for your team.',
   ],
   'app/index.html': ['The app — OpenWiz', 'Sign in with GitHub to see your OpenWiz specs, tickets and agents.', 'noindex'],
   '404.html': ['Page not found — OpenWiz', 'Find the OpenWiz homepage, overview and frequently asked questions.', 'noindex'],

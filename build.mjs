@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import { installSwitch, readReleases, render, summary, withReleases } from './scripts/changelog.mjs';
 import { readRegistry, render as renderMarket, summary as marketSummary, withMarket } from './scripts/market.mjs';
 import { withDrivers } from './scripts/drivers.mjs';
-import { aboutPage, crawlerFiles, guidePage, pages, withMetadata } from './scripts/discovery.mjs';
+import { aboutPage, crawlerFiles, guidePage, helpPage, pages, withMetadata } from './scripts/discovery.mjs';
 
 const root = new URL('./', import.meta.url);
 const output = new URL('dist/', root);
@@ -70,7 +70,7 @@ for (const file of hashed) {
 let about, guide;
 for (const page of Object.keys(pages)) {
   let html = await readFile(new URL(page, root), 'utf8');
-  if (page === aboutPage || page === guidePage || page === '404.html') {
+  if (page === aboutPage || page === guidePage || page === helpPage || page === '404.html') {
     html = html.replace('<template data-slot="top-bar"></template>', () => topBar);
   }
   if (page === guidePage) guide = html;

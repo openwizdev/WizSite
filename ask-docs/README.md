@@ -19,7 +19,7 @@ To try today's pre-release (0.0.12, Cloudroom only), paste this line into your c
 
 > Install OpenWiz from github.com/openwizdev/OpenWiz
 
-Your agent follows the [install skill](https://github.com/openwizdev/WizSkills/blob/v0.1.2/skills/install/SKILL.md). Nothing starts until you approve a plan. People: see the [install guide](docs/install.md). OpenWiz is free. Your model and host charges are your own.
+Your agent follows the [install skill](https://github.com/openwizdev/WizSkills/blob/v0.1.2/skills/install/SKILL.md). Nothing starts until you approve a plan. People: see the [install guide](docs/install.md). OpenWiz is free. Your model and host charges are your own. Stuck installing? I'll set it up with you: free 15 min at https://openwiz.dev/help/. Want it for your team? Book a call at https://openwiz.dev/help/#team.
 
 ## How it works
 

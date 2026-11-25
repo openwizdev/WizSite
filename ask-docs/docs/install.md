@@ -30,13 +30,15 @@ Using Grok Bot? See [Grok Bot + OpenWiz](grok-bot.md).
 - **Your files.** The install writes only to its own folder (by default `~/.local/lib/openwiz`) and its private state inside it. Existing settings and credentials are never replaced.
 - **GitHub.** Your own OpenWiz App is private to your account and installed only on repositories you select, with read access to metadata, checks and actions and write access to contents, issues and pull requests. Your personal login acts only if you explicitly skip the App; an App that fails or is removed never switches to it on its own.
 - **Credentials.** Keys stay in owner-only storage: OpenWiz's private state on this computer, or CloudRoom's own secret store. If setup asks you for the App's key, paste it only into CloudRoom's secret prompt. Never paste a key or token into the chat.
-- **Cost.** OpenWiz is free now. Paid plans come later. CloudRoom and model charges are separate and not included. Cloud agents, including each fleet thread, use your CloudRoom Cloud Credits, and your model provider bills you directly. More credits are CloudRoom's own plan, bought from [CloudRoom](https://cloudroom.dev/pricing), not from OpenWiz. Referral verification is unavailable. No referral is applied.
+- **Cost.** OpenWiz is free now. Paid plans come later. CloudRoom and model charges are separate and not included. Cloud agents, including each fleet thread, use your CloudRoom Cloud Credits, and your model provider bills you directly. More credits are CloudRoom's own plan, bought from [CloudRoom](https://cloudroom.dev/pricing), not from OpenWiz. Referral verification is unavailable. No referral is applied. Want it for your team? Book a call at https://openwiz.dev/help/#team.
 
 ## If it is interrupted or fails
 
 Ask the agent to continue: every step checks what is already done before doing anything. A repeated install reuses the verified build. A refused install or update leaves the last good build in use. Setup, sign-in, App and brain steps remember their operation, so an interrupted step is finished or replaced, never done twice; an unclear result is checked before anything is retried.
 
 If the setup page does not open, ask the agent to check the install's status and open setup again. If a connection shows refused or unknown, follow its next step, then check again.
+
+Stuck installing? I'll set it up with you: free 15 min at https://openwiz.dev/help/.
 
 ## Remove it
 
