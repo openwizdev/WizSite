@@ -167,14 +167,10 @@ DRIVER_LOGOS = {
 
 FONT_FILES = ('fonts/Geist-var.woff2', 'fonts/GeistMono-var.woff2')
 PAGE_STYLES = {'changelog/index.html': 'changelog/changelog.css', 'market/index.html': 'market/market.css'}
-<<<<<<< HEAD
 LOADER_STYLE, LOADER_SCRIPT = 'wiz-loader/wiz-loader.css', 'wiz-loader/wiz-loader.js'
 LOADER_PAGES = ('index.html', 'faq/index.html')
 LOADER_BUDGET = 10_240
-HASHED = ('tokens.css', 'site.css', *PAGE_STYLES.values(), LOADER_STYLE, LOADER_SCRIPT, GSAP, 'site.js', 'faq.js')
-=======
-HASHED = FONT_FILES + ('tokens.css', 'site.css', *PAGE_STYLES.values(), GSAP, 'site.js', 'faq.js')
->>>>>>> origin/main
+HASHED = FONT_FILES + ('tokens.css', 'site.css', *PAGE_STYLES.values(), LOADER_STYLE, LOADER_SCRIPT, GSAP, 'site.js', 'faq.js')
 APP_PAGE = 'app/index.html'
 APP_STYLE = 'app/ember.css'
 APP_FOUND = {(folder, ext): tuple(sorted(p.relative_to(ROOT).as_posix() for p in (ROOT / folder).glob(f'*.{ext}')))
