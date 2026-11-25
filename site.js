@@ -636,5 +636,17 @@ showStars().catch(() => {});
 launchVideo();
 specVideo();
 oneVoiceAtATime();
-enableFamily(window.gsap);
-if (window.gsap) enableMotion(window.gsap);
+const GSAP = document.currentScript?.dataset.gsap;
+const startMotion = () => {
+  enableFamily(window.gsap);
+  if (window.gsap) enableMotion(window.gsap);
+};
+const loadMotion = () => {
+  const script = document.createElement('script');
+  script.src = GSAP;
+  script.onload = script.onerror = startMotion;
+  document.head.append(script);
+};
+if (!GSAP) startMotion();
+else if (document.readyState === 'complete') loadMotion();
+else addEventListener('load', loadMotion, { once: true });

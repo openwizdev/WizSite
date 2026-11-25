@@ -247,7 +247,7 @@ class Checks(unittest.TestCase):
 
     def test_hero_names_no_approval_step(self):
         for name, old, new in (
-                ('index.html', 'Turn an idea into a spec and reviewed code.', 'Turn an idea into an approved plan and reviewed code.'),
+                ('index.html', 'Tell it your idea in plain words.', 'Tell it your idea in plain words and an approved plan.'),
                 ('index.html', '<p class="demo-status">', '<p class="demo-status">Approve the plan · '),
                 ('site.js', "label: 'Writing the spec'", "label: 'Approving the plan'")):
             with self.subTest(new=new), tempfile.TemporaryDirectory() as temp:
@@ -530,8 +530,8 @@ class Checks(unittest.TestCase):
                          (f'<link rel="stylesheet" href="/{css}">', f'<a href="/{css}">styles</a>'),
                          (f'<link rel="stylesheet" href="/{css}">', f'<link rel="stylesheet" href="/{css}" disabled>'),
                          (f'<link rel="stylesheet" href="/{css}">', f'<link rel="stylesheet" href="/{css}" media="print">'),
-                         (f'<script src="/{FINGERPRINTS["site.js"]}" defer>', f'<script type="text/plain" src="/{FINGERPRINTS["site.js"]}" defer>'),
-                         (f'<script src="/{FINGERPRINTS["site.js"]}" defer>', f'<script nomodule src="/{FINGERPRINTS["site.js"]}" defer>')):
+                         (f'<script src="/{FINGERPRINTS["site.js"]}" ', f'<script type="text/plain" src="/{FINGERPRINTS["site.js"]}" '),
+                         (f'<script src="/{FINGERPRINTS["site.js"]}" ', f'<script nomodule src="/{FINGERPRINTS["site.js"]}" ')):
             with self.subTest(new=new), tempfile.TemporaryDirectory() as temp:
                 root = Path(temp) / 'dist'
                 shutil.copytree(ROOT / 'dist', root)
@@ -541,6 +541,29 @@ class Checks(unittest.TestCase):
                 page.write_text(text.replace(old, new))
                 with self.assertRaises(AssertionError):
                     check_site(root)
+
+    def test_gsap_loads_after_the_page(self):
+        site, gsap = FINGERPRINTS['site.js'], FINGERPRINTS['vendor/gsap-3.15.1.min.js']
+        tag = f'<script src="/{site}" data-gsap="/{gsap}" defer></script>'
+        for page_name, new in (('index.html', f'<script src="/{gsap}" defer></script>{tag}'),
+                               ('team/index.html', f'<script src="/{site}" defer></script>'),
+                               ('drivers/index.html', f'<link rel="preload" href="/{gsap}" as="script">{tag}'),
+                               ('market/index.html', f'<script src="/{site}" data-gsap="/vendor/gsap-3.15.1.min.js" defer></script>')):
+            with self.subTest(page=page_name, new=new), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp) / 'dist'
+                shutil.copytree(ROOT / 'dist', root)
+                page = root / page_name
+                text = page.read_text()
+                self.assertIn(tag, text)
+                page.write_text(text.replace(tag, new))
+                with self.assertRaises(AssertionError):
+                    check_site(root)
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / 'dist'
+            shutil.copytree(ROOT / 'dist', root)
+            edit_built(root, 'site.js', lambda js: js.replace("addEventListener('load', loadMotion, { once: true });", 'loadMotion();'))
+            with self.assertRaises(AssertionError):
+                check_site(root)
 
     def test_headers_revalidate(self):
         cases = {
@@ -669,7 +692,7 @@ class Checks(unittest.TestCase):
 
     def test_install_line_and_its_switch(self):
         line = '<code class="install-line">Install OpenWiz from github.com/openwizdev/OpenWiz</code>'
-        hint = '<p class="install-hint">Paste this into your agent</p>'
+        hint = '<p class="install-hint">Paste this into your AI helper</p>'
         text = (ROOT / 'dist/index.html').read_text()
         shipped = re.findall(r'data-install="([^"]*)"', text)
         labels = {'coming-soon': 'Copy · coming soon', 'live': 'Copy'}
@@ -698,7 +721,7 @@ class Checks(unittest.TestCase):
                 (line, ''),
                 (line, line + line),
                 (hint, ''),
-                (hint, hint.replace('your agent', 'your terminal')),
+                (hint, hint.replace('your AI helper', 'your terminal')),
                 (switch, ''),
                 (switch, 'data-install="on"'),
                 (button_here, button_here.replace(' disabled', '')),
@@ -1410,12 +1433,9 @@ class Checks(unittest.TestCase):
                     logo.replace(b'<path ', b'<path onload ="x" ', 1)):
             with self.subTest(bad=bad[-60:]), self.assertRaises(AssertionError):
                 check_vector(bad)
-        check_privacy('docs/map.png', (ROOT / 'docs/map.png').read_bytes())
-        for path in ('favicon.ico', 'brand/new.png', 'docs/map.png', 'docs/new.png'):
+        for path in ('favicon.ico', 'brand/new.png', 'docs/new.png'):
             with self.subTest(path=path), self.assertRaises(AssertionError):
                 check_privacy(path, b'\x89PNG tampered')
-        with self.assertRaises(AssertionError):
-            check_privacy('dist/docs/map.png', (ROOT / 'docs/map.png').read_bytes())
         for new in ('https://example.com/brand/og.png', 'https://openwiz.dev/brand/missing.png'):
             with self.subTest(new=new), tempfile.TemporaryDirectory() as temp:
                 root = Path(temp) / 'dist'
