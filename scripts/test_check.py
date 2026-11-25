@@ -14,7 +14,6 @@ from check import ALL_PAGES, CTA, FAQ, FAQ_WHERE, FOOTER, INSTALL_NOTE_HTML, FIN
 
 
 def drivers_as_checked(html):
-    # The checker puts registry-filled driver slots back to the source fallback before it judges the page.
     from check import DRIVERS_PAGE, drivers_fallback
     return drivers_fallback(html, (ROOT / DRIVERS_PAGE).read_text())[0]
 
@@ -842,8 +841,6 @@ class Checks(unittest.TestCase):
                     check_site(root)
 
     def broken(self, name, old, new, error, css=None):
-        # A filled registry rewrites the drivers slots in the export. The checker judges the source fallback,
-        # so a drivers edit has to land in that source or the restored page hides it.
         source_path = ROOT / name if name == 'drivers/index.html' else None
         original = source_path.read_text() if source_path else None
         try:
