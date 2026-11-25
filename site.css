@@ -2,7 +2,7 @@
 *{box-sizing:border-box}
 body{margin:0;background:var(--ground);color:var(--ink);font:400 17px/1.55 var(--ow-font-sans);-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;overflow-x:clip}
 h1,h2,p,ol{margin:0}
-picture{display:contents}
+picture{display:contents;border-radius:inherit}
 a{color:inherit;text-decoration:none}
 :is(a,button,summary):focus-visible{outline:2px solid var(--orchid);outline-offset:3px;border-radius:8px}
 .wrap{width:min(100% - 2 * var(--m),1240px);margin-inline:auto}

@@ -10,7 +10,7 @@ from unittest import mock
 
 import re
 
-from check import CTA, FAQ, FAQ_WHERE, FOOTER, INSTALL_NOTE_HTML, FINGERPRINTS, HASHED, INSTALL_SWITCH, ROOT, Page, check_changelog, check_release_data, check_releases, read_releases, split_releases, check_motion, check_privacy, check_ref, check_security_txt, check_site, check_vector, check_webp, check_avif, check_png, fingerprint
+from check import CTA, FAQ, FAQ_WHERE, FOOTER, INSTALL_NOTE_HTML, FINGERPRINTS, HASHED, INSTALL_SWITCH, ROOT, Page, check_changelog, check_image_preloads, check_release_data, check_releases, read_releases, split_releases, check_motion, check_privacy, check_ref, check_security_txt, check_site, check_vector, check_webp, check_avif, check_png, fingerprint
 
 
 def edit_built(root, name, change):
@@ -183,6 +183,44 @@ class Checks(unittest.TestCase):
             edit_built(root, 'site.css', lambda css: css.replace('.hero-fleet span { display: block;', '.hero-fleet span { background-image: url(/art/fleet-frames.webp); display: block;', 1))
             with self.assertRaisesRegex(AssertionError, 'sprite sheet'):
                 check_site(root)
+
+    def test_image_preloads_match_active_sources(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / 'dist'
+            shutil.copytree(ROOT / 'dist', root)
+            drivers = root / 'drivers/index.html'
+            old = '<link rel="preload" href="/art/drivers-d-sea-1536.avif" as="image" type="image/avif" fetchpriority="high">'
+            new = '<link rel="preload" href="/art/drivers-d-sea.webp" as="image" type="image/webp">'
+            text = drivers.read_text()
+            self.assertIn(old, text)
+            drivers.write_text(text.replace(old, new, 1))
+            with self.assertRaisesRegex(AssertionError, 'does not match an active'):
+                check_site(root)
+        check_image_preloads(
+            'plain.html',
+            '<html><head><link rel="preload" href="/art/hero-cave.webp" as="image" type="image/webp"></head>'
+            '<body><img src="/art/hero-cave.webp" alt=""></body></html>',
+        )
+        check_image_preloads(
+            'picture.html',
+            '<html><head><link rel="preload" as="image" type="image/avif" imagesrcset="/art/a-800.avif 800w" imagesizes="100vw"></head>'
+            '<body><picture><source type="image/avif" srcset="/art/a-800.avif 800w" sizes="100vw"><img src="/art/a.webp" alt=""></picture></body></html>',
+        )
+        for bad, error in (
+            ('<html><head><link rel="preload" href="/art/a.webp" as="image" type="image/webp"></head>'
+             '<body><picture><source type="image/avif" srcset="/art/a-800.avif"><img src="/art/a.webp" alt=""></picture></body></html>',
+             'does not match an active'),
+            ('<html><head><link rel="preload" as="image" type="image/avif" imagesrcset="/art/a-800.avif 800w" imagesizes="50vw"></head>'
+             '<body><picture><source type="image/avif" srcset="/art/a-800.avif 800w" sizes="100vw"><img src="/art/a.webp" alt=""></picture></body></html>',
+             'does not match an active'),
+            ('<html><head><link rel="preload" href="/art/unused.webp" as="image" type="image/webp"></head>'
+             '<body><img src="/art/other.webp" alt=""></body></html>',
+             'does not match an active'),
+            ('<html><head></head><body><link rel="preload" href="/art/a.webp" as="image" type="image/webp"><img src="/art/a.webp" alt=""></body></html>',
+             'must live in <head>'),
+        ):
+            with self.subTest(bad=bad[:80]), self.assertRaisesRegex(AssertionError, error):
+                check_image_preloads('bad.html', bad)
 
     def test_css_escapes_and_unreadable_urls(self):
         for bad in ('\np { background: url(https://exa\\\nmple.com/x.png) }\n',

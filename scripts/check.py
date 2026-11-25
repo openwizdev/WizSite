@@ -745,6 +745,47 @@ def guards_motion(rule):
         condition == preference or PHONE_QUERY.fullmatch(condition) for condition in conditions)
 
 
+IMAGE_MIMES = {'.avif': 'image/avif', '.webp': 'image/webp', '.png': 'image/png', '.svg': 'image/svg+xml'}
+
+
+def check_image_preloads(name, html):
+    page = Page(html)
+    if not page.image_preloads:
+        return
+    head = Page(html.split('</head>', 1)[0])
+    assert len(head.image_preloads) == len(page.image_preloads), f'{name}: image preloads must live in <head>'
+    candidates = []
+    for pic_html in re.findall(r'<picture>(.*?)</picture>', html, re.S):
+        pic = Page(pic_html)
+        if pic.sources:
+            avif = [source for source in pic.sources if source.get('type') == 'image/avif']
+            active = avif or pic.sources
+            has_media = any(source.get('media') for source in pic.sources)
+            for source in active:
+                candidates.append((source.get('type'), source.get('media'), source.get('srcset'), source.get('sizes'), has_media))
+        else:
+            for img in pic.images:
+                candidates.append((None, None, img.get('srcset') or img.get('src'), img.get('sizes'), False))
+    outside = re.sub(r'<picture>.*?</picture>', '', html, flags=re.S)
+    for img in Page(outside).images:
+        candidates.append((None, None, img.get('srcset') or img.get('src'), img.get('sizes'), False))
+    for preload in head.image_preloads:
+        srcset = preload.get('imagesrcset') or preload.get('href')
+        sizes = preload.get('imagesizes')
+        kind = preload.get('type')
+        media = preload.get('media')
+        first_url = srcset_urls(srcset)[0] if srcset else ''
+        ext_mime = IMAGE_MIMES.get(Path(first_url).suffix.lower())
+        matched = any(
+            srcset == c_srcset
+            and sizes == c_sizes
+            and (kind == c_type if c_type is not None else (kind is None or kind == ext_mime))
+            and (media == c_media if c_media is not None else (media is None or has_media))
+            for c_type, c_media, c_srcset, c_sizes, has_media in candidates
+        )
+        assert matched, f'{name}: image preload does not match an active <picture> source or <img>: {srcset}'
+
+
 def check_images(root, landing, page, site_css, htmls):
     for name, base in VARIANTS.items():
         assert (root / name).stat().st_size < (root / base).stat().st_size, f'{name} is not smaller than {base}'
@@ -773,6 +814,8 @@ def check_images(root, landing, page, site_css, htmls):
                 f'a landing image below the first phone viewport must be loading="lazy" decoding="async": {attrs.get("src")}'
     for selector, body in re.findall(r'([^{}]+)\{([^{}]*)\}', site_css):
         assert '-frames.webp' not in body or '.is-playing' in selector, f'a sprite sheet that loads before its demo plays: {selector.strip()}'
+    for name in ALL_PAGES:
+        check_image_preloads(name, (root / name).read_text())
 
 
 def check_motion(css):
