@@ -8,6 +8,8 @@
     "test": "python3 -B -m unittest discover -s scripts -p 'test_*.py'",
     "test:functions": "node --test tests/sign-in.test.mjs tests/drivers.test.mjs tests/ask-index.test.mjs tests/ask.test.mjs tests/ask-a-wiz.test.mjs tests/market.test.mjs tests/count.test.mjs",
     "test:v2": "node --test 'tests/v2/*.test.mjs'",
+    "test:models": "node --test tests/models-page.test.mjs",
+    "test:comments": "python3 -I tools/comment-check/check.py diff --base HEAD^1",
     "test:app": "node scripts/app-check.mjs"
   },
   "dependencies": {
