@@ -275,18 +275,36 @@ function stage(listing) {
   return `<p class="market-stage" data-stage="being-built">Being built: ${link(work.url, work.label)}</p>`;
 }
 
+const KIND_ORDER = ['driver', 'harness', 'skill'];
+const KIND_ICON = {
+  driver: 'M2.2 12.6h11.6M4.4 12.6 8 3.2l3.6 9.4',
+  harness: 'M6.3 5.4a2.3 2.3 0 1 0 .1 4.6 2.3 2.3 0 1 0-.1-4.6M9.7 5.4a2.3 2.3 0 1 0 .1 4.6 2.3 2.3 0 1 0-.1-4.6',
+  skill: 'M3.8 3.2h5.1L12.4 6.4v6.4H3.8zM8.8 3.4V6.5h3.2',
+  other: 'M8 2.2 9.4 6.4 13.8 8 9.4 9.6 8 13.8 6.6 9.6 2.2 8 6.6 6.4z',
+};
+const kindOf = listing => KIND_ORDER.find(kind => listing.tags.includes(kind)) ?? 'other';
+const kindWord = listing => {
+  const word = kindOf(listing) === 'other' ? listing.tags[0] : kindOf(listing);
+  return word.charAt(0).toUpperCase() + word.slice(1);
+};
+const kindIcon = kind => `<svg class="market-kind-icon" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="${KIND_ICON[kind]}" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
 function card(listing) {
+  const kind = kindOf(listing);
   const tags = listing.tags.map(tag => `<li>${link(`#tag-${tag}`, tag)}</li>`).join('');
   const extra = (listing.links ?? []).slice(listing.stage === 'being-built' ? 1 : 0);
-  return `<article class="market-card" id="listing-${listing.id}" data-listing="${listing.id}" aria-labelledby="name-${listing.id}">`
+  return `<article class="market-card" id="listing-${listing.id}" data-listing="${listing.id}" data-kind="${kind}" aria-labelledby="name-${listing.id}">`
+    + '<div class="market-card-top">'
+    + `<p class="market-kicker">${kindIcon(kind)}${esc(kindWord(listing))}</p>`
     + `<h3 id="name-${listing.id}">${esc(listing.name)}</h3>`
+    + '</div>'
     + `<p class="market-summary">${esc(listing.summary)}</p>`
-    + status(listing) + stage(listing)
+    + `<div class="market-flags">${status(listing)}${stage(listing)}</div>`
     + `<dl><dt>Plugs into</dt><dd>${esc(listing.plugs_into)}</dd>`
     + (listing.login ? `<dt>Login</dt><dd>${esc(listing.login)}</dd>` : '')
     + `<dt>Publisher</dt><dd>${esc(listing.publisher)}</dd></dl>`
     + `<ul class="market-tags" aria-label="Tags">${tags}</ul>`
-    + `<p class="market-links">${[link(listing.url, 'Get it'), ...extra.map(l => link(l.url, l.label))].join(' · ')}</p>`
+    + `<p class="market-links">${[link(listing.url, 'Get it'), ...extra.map(l => link(l.url, l.label))].join('')}</p>`
     + '</article>';
 }
 
@@ -299,14 +317,26 @@ export function render(index) {
   const tags = tagsOf(index);
   const count = tag => index.listings.filter(listing => listing.tags.includes(tag)).length;
   const verified = index.listings.filter(listing => listing.status === 'verified').length;
+  const ofKind = kind => index.listings.filter(listing => kindOf(listing) === kind).length;
+  const pill = (href, n, label, cls = '') => n
+    ? `<li${cls ? ` class="${cls}"` : ''}>${href ? `<a href="${esc(href)}">` : ''}<span class="market-stat">${n}</span> ${esc(label)}${href ? '</a>' : ''}</li>`
+    : '';
+  const stats = `<ul class="market-stats" aria-label="Catalog">${pill('#all-listings', index.listings.length, index.listings.length === 1 ? 'listing' : 'listings')}`
+    + pill('', verified, 'verified', 'is-verified')
+    + pill('#tag-driver', ofKind('driver'), ofKind('driver') === 1 ? 'driver' : 'drivers')
+    + pill('#tag-harness', ofKind('harness'), ofKind('harness') === 1 ? 'harness' : 'harnesses')
+    + pill('#tag-skill', ofKind('skill'), ofKind('skill') === 1 ? 'skill' : 'skills')
+    + pill('#by-tag', ofKind('other'), 'more')
+    + '</ul>';
   const browse = `<nav class="market-browse" aria-label="Browse by tag"><h2>Browse by tag</h2><ul>${tags.map(tag => `<li>${link(`#tag-${tag}`, `${tag} (${count(tag)})`)}</li>`).join('')}</ul></nav>`;
   const all = `<section class="market-all" aria-labelledby="all-listings"><h2 id="all-listings">Every listing</h2>`
-    + `<p class="market-count">${index.listings.length} listing${index.listings.length === 1 ? '' : 's'}, ${verified} verified, from WizMarket at commit <code>${index.commit.slice(0, 12)}</code>.</p>`
+    + stats
+    + `<p class="market-count">From WizMarket at commit <code>${index.commit.slice(0, 12)}</code>.</p>`
     + `<div class="market-cards">${index.listings.map(card).join('')}</div></section>`;
   const byTag = `<section class="market-by-tag" aria-labelledby="by-tag"><h2 id="by-tag">By tag</h2>${tags.map(tag => `<section class="market-tag" id="tag-${tag}" aria-labelledby="heading-tag-${tag}"><h3 id="heading-tag-${tag}">${esc(tag)}</h3><ul>`
     + index.listings.filter(listing => listing.tags.includes(tag)).map(listing => `<li>${link(`#listing-${listing.id}`, listing.name)} <span>${listing.status === 'verified' ? 'Verified' : 'Listed'}</span></li>`).join('')
     + '</ul></section>').join('')}</section>`;
-  return browse + all + byTag;
+  return all + browse + byTag;
 }
 
 export function withMarket(page, section) {

@@ -687,7 +687,96 @@ async function askAWiz() {
   }
 }
 
+function browseMarket() {
+  const root = document.querySelector('main.market');
+  const tools = root?.querySelector('.market-tools');
+  if (!tools) return;
+  const cards = [...root.querySelectorAll('.market-card')];
+  if (!cards.length) return;
+  root.classList.add('has-browse');
+  const search = tools.querySelector('#market-q');
+  const live = tools.querySelector('.market-live');
+  const clear = tools.querySelector('#market-clear-tag');
+  let tag = '';
+  const kind = () => tools.querySelector('input[name="market-kind"]:checked')?.id.replace('market-kind-', '') ?? 'all';
+  const sortMode = () => tools.querySelector('input[name="market-sort"]:checked')?.id ?? 'market-sort-name';
+  const nameOf = card => card.querySelector('h3')?.textContent ?? '';
+  const byName = (a, b) => nameOf(a).localeCompare(nameOf(b), undefined, { numeric: true, sensitivity: 'base' });
+
+  const apply = () => {
+    const query = search.value.trim().toLowerCase();
+    const selected = kind();
+    const onlyVerified = tools.querySelector('#market-verified-only').checked;
+    let shown = 0;
+    for (const card of cards) {
+      const tagOk = !tag || card.querySelector(`a[href="#tag-${tag}"]`);
+      const kindOk = selected === 'all' || card.dataset.kind === selected;
+      const statusOk = !onlyVerified || card.querySelector('[data-status="verified"]');
+      const textOk = !query || card.textContent.toLowerCase().includes(query);
+      const on = Boolean(tagOk && kindOk && statusOk && textOk);
+      card.classList.toggle('is-out', !on);
+      if (on) shown += 1;
+    }
+    const mode = sortMode();
+    const rank = { driver: 0, harness: 1, skill: 2, other: 3 };
+    const sorted = cards.slice().sort((a, b) => {
+      if (mode === 'market-sort-verified') {
+        const delta = Number(Boolean(b.querySelector('[data-status="verified"]'))) - Number(Boolean(a.querySelector('[data-status="verified"]')));
+        if (delta) return delta;
+      } else if (mode === 'market-sort-kind') {
+        const delta = (rank[a.dataset.kind] ?? 9) - (rank[b.dataset.kind] ?? 9);
+        if (delta) return delta;
+      }
+      return byName(a, b);
+    });
+    root.querySelector('.market-cards').append(...sorted);
+    const filtering = Boolean(query || tag || selected !== 'all' || onlyVerified);
+    root.classList.toggle('is-empty', shown === 0);
+    root.classList.toggle('is-filtered', filtering);
+    root.classList.toggle('is-tagged', Boolean(tag));
+    clear.textContent = tag ? `Clear tag ${tag}` : 'Clear tag';
+    live.textContent = filtering || mode !== 'market-sort-name' ? `Showing ${shown} of ${cards.length}` : '';
+  };
+
+  search.addEventListener('input', apply);
+  tools.addEventListener('change', apply);
+  clear.addEventListener('click', () => {
+    tag = '';
+    if (location.hash.startsWith('#tag-')) history.replaceState(null, '', location.pathname + location.search);
+    apply();
+  });
+  const kindOfPill = { '#tag-driver': 'driver', '#tag-harness': 'harness', '#tag-skill': 'skill', '#by-tag': 'other' };
+  root.addEventListener('click', event => {
+    const anchor = event.target.closest('a');
+    if (!anchor || !root.contains(anchor)) return;
+    if (anchor.closest('.market-stats')) {
+      event.preventDefault();
+      const href = anchor.getAttribute('href');
+      tag = '';
+      if (location.hash.startsWith('#tag-')) history.replaceState(null, '', location.pathname + location.search);
+      if (href === '#all-listings') {
+        search.value = '';
+        tools.querySelector('#market-kind-all').checked = true;
+        tools.querySelector('#market-verified-only').checked = false;
+      } else if (kindOfPill[href]) {
+        tools.querySelector(`#market-kind-${kindOfPill[href]}`).checked = true;
+      }
+      apply();
+      return;
+    }
+    if (!anchor.getAttribute('href')?.startsWith('#tag-')) return;
+    event.preventDefault();
+    tag = anchor.getAttribute('href').slice('#tag-'.length);
+    apply();
+    document.getElementById('all-listings')?.scrollIntoView({ block: 'nearest' });
+  });
+  const initial = location.hash.match(/^#tag-([a-z0-9-]+)$/);
+  if (initial) tag = initial[1];
+  apply();
+}
+
 enableCopy();
+browseMarket();
 askAWiz();
 showStars().catch(() => {});
 launchVideo();

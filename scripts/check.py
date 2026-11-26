@@ -818,8 +818,8 @@ def check_market_refs(root, path, page, pages, market):
         check_ref(root, path, ref, pages, page.favicons)
 
 
-MARKET_TAGS = {'section', 'nav', 'h2', 'h3', 'p', 'code', 'ul', 'li', 'div', 'article', 'dl', 'dt', 'dd', 'span', 'a'}
-MARKET_ATTRS = {'class', 'id', 'aria-label', 'aria-labelledby', 'data-listing', 'data-status', 'data-stage'}
+MARKET_TAGS = {'section', 'nav', 'h2', 'h3', 'p', 'code', 'ul', 'li', 'div', 'article', 'dl', 'dt', 'dd', 'span', 'a', 'svg', 'path'}
+MARKET_ATTRS = {'class', 'id', 'aria-label', 'aria-labelledby', 'aria-hidden', 'data-listing', 'data-kind', 'data-status', 'data-stage', 'viewbox', 'width', 'height', 'fill', 'stroke', 'stroke-width', 'stroke-linecap', 'stroke-linejoin', 'd'}
 
 
 class MarketMarkup(HTMLParser):
