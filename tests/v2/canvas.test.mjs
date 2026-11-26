@@ -63,7 +63,20 @@ function world(run, change = {}) {
   const s33 = { number: 33, comments: { totalCount: 0, nodes: [] }, subIssues: { totalCount: 2, nodes: [
     { ...sub({ n: 31, title: 'Catalog list', state: 'CLOSED', reason: 'COMPLETED', labels: [], blockers: [], pulls: [], notes: [] }) },
     { ...sub({ n: 32, title: 'Catalog page', state: 'CLOSED', reason: 'COMPLETED', labels: [], blockers: [], pulls: [], notes: [] }) }] } };
-  run.world.graphql.SpecTickets = async () => ({ status: 200, json: { data: { rateLimit: RATE, repository: { s41, s48, s33 } } } });
+  run.world.graphql.SpecTickets = async entry => {
+    const asks = /statusCheckRollup/.test(String(JSON.parse(entry?.body || '{}').query || ''));
+    const fill = detail => {
+      if (!asks || !detail?.subIssues?.nodes) return detail;
+      const nodes = detail.subIssues.nodes.map(node => {
+        if (!node) return node;
+        const ticket = tickets.find(t => t.n === node.number);
+        if (!ticket) return node;
+        return { ...node, closedByPullRequestsReferences: { totalCount: ticket.pulls.length, nodes: structuredClone(ticket.pulls) } };
+      });
+      return { ...detail, subIssues: { ...detail.subIssues, nodes } };
+    };
+    return { status: 200, json: { data: { rateLimit: RATE, repository: { s41: fill(s41), s48, s33: fill(s33) } } } };
+  };
   const live = tickets.filter(t => t.notes.length && t.state !== 'CLOSED');
   run.world.graphql.Agents = async () => ({ status: 200, json: { data: { rateLimit: RATE, repository: {
     issues: { totalCount: live.length, pageInfo: { hasNextPage: false, endCursor: null }, nodes: live.map(t => ({ number: t.n, title: t.title, url: URL_OF(t.n), state: 'OPEN',
@@ -520,6 +533,37 @@ test('Canvas: Waits for lists only open blockers, says Waits for nothing when al
     const focus45 = await run.page.text();
     assert.match(focus45, /Waits for\s+1 ticket GitHub couldn't read/);
     assert.match(focus45, /Done\s+#42 Cart contract \(merged\)/);
+    assert.deepEqual(run.world.violations, []);
+  } finally {
+    await run.close();
+  }
+});
+
+test('Canvas: an open pull request on a ticket quiet for over a day still shows its check rollup', async () => {
+  const run = await start();
+  try {
+    world(run, {
+      tickets: list => {
+        const ticket = list.find(t => t.n === 46);
+        ticket.pulls = [pull(146, { draft: true, review: null, checks: 'SUCCESS' })];
+        ticket.notes = [note(8461, { agent: 'builder', state: 'done', step: 'opened the draft yesterday', min: 60 * 30, pr: 146 })];
+      },
+    });
+    const agents = run.world.graphql.Agents;
+    run.world.graphql.Agents = async body => {
+      const reply = await agents(body);
+      const node = reply.json.data.repository.issues.nodes.find(issue => issue.number === 46);
+      node.updatedAt = ago(60 * 30);
+      return reply;
+    };
+    await openCanvas(run, '#/canvas/41');
+    assert.equal(await run.page.run(`(OW.data.feeds.agents.data.issues.nodes || []).some(issue => issue && issue.number === 46)`), false,
+      'a ticket quiet for 30 hours is outside the day-long agents read');
+    assert.equal(await run.page.run(`document.querySelector('.cv-stack[data-ticket$="#46"] .cv-front .cv-step').textContent`), 'draft, checks pass');
+    await run.page.run(`document.querySelector('.cv-stack[data-ticket$="#46"]').focus()`);
+    await run.page.key('Enter');
+    await run.page.until(`document.querySelector('.cv-focus')`, 'focused #46');
+    assert.match(await run.page.text(), /#146: draft, checks pass/);
     assert.deepEqual(run.world.violations, []);
   } finally {
     await run.close();
