@@ -39,10 +39,7 @@ export function checkoutControl(url) {
 }
 
 export function withCheckout(html, url = readCheckout()) {
-  const start = '<!-- checkout:start -->';
-  const end = '<!-- checkout:end -->';
-  const parts = html.split(start);
-  if (parts.length !== 2 || parts[1].split(end).length !== 2) throw new Error('the pricing page needs one checkout slot');
-  const [, after] = parts[1].split(end);
-  return parts[0] + start + checkoutControl(url) + end + after;
+  const slot = '<template data-slot="checkout"></template>';
+  if (html.split(slot).length !== 2) throw new Error('the pricing page needs one checkout slot');
+  return html.replace(slot, checkoutControl(url));
 }

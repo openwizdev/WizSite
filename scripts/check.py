@@ -288,7 +288,7 @@ def built_asset_bytes(name, font_names=None):
 
 
 def fill_checkout(html):
-    if '<!-- checkout:start -->' not in html:
+    if 'data-slot="checkout"' not in html:
         return html
     return subprocess.run(
         ['node', '--input-type=module', '-e',
@@ -1987,9 +1987,8 @@ def check_pricing(htmls, pages):
         assert pages[name].checkout == ([url or ''] if name == PRICING_PAGE else []), \
             f'the checkout control is the pricing page\'s only: {name} {pages[name].checkout}'
     page = htmls[PRICING_PAGE]
-    start, end = '<!-- checkout:start -->', '<!-- checkout:end -->'
-    assert page.count(start) == 1 and page.count(end) == 1, 'the pricing page needs one checkout slot'
-    assert page.split(start, 1)[1].split(end, 1)[0] == control, 'the pricing page checkout control comes from pricing/checkout.json'
+    assert '<template data-slot="checkout">' not in page, 'the pricing page needs its checkout slot filled'
+    assert page.count(control) == 1, 'the pricing page checkout control comes from pricing/checkout.json'
     assert not re.search(r'<(?:form|input|textarea|select)\b', page), 'the pricing page collects no payment details'
     main = re.search(r'<main\b[^>]*>([\s\S]*?)</main>', page)[1]
     assert plain(re.search(r'<p class="pricing-lead">([\s\S]*?)</p>', main)[1]) == PRICING_LEAD, 'the pricing lead'
