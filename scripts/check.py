@@ -287,6 +287,16 @@ def built_asset_bytes(name, font_names=None):
     return data
 
 
+def fill_checkout(html):
+    if '<!-- checkout:start -->' not in html:
+        return html
+    return subprocess.run(
+        ['node', '--input-type=module', '-e',
+         "import { readFileSync } from 'node:fs'; import { withCheckout } from './scripts/pricing.mjs';"
+         "process.stdout.write(withCheckout(readFileSync(0, 'utf8')));"],
+        cwd=ROOT, input=html, text=True, stdout=subprocess.PIPE, check=True).stdout
+
+
 def fingerprinted_page(html, cta=False):
     for name, hashed in FINGERPRINTS.items():
         html = html.replace(f'"/{name}"', f'"/{hashed}"')
@@ -296,6 +306,7 @@ def fingerprinted_page(html, cta=False):
         copy = ('Paste this line into your coding agent.' if live else
                 'Public installation is coming soon. This is the line to paste into your coding agent when it is available.')
         html = html.replace('<template data-slot="install-instructions"></template>', f'<p>{copy}</p>')
+    html = fill_checkout(html)
     return with_faq(with_footer(with_cta(html))) if cta else html
 
 
@@ -325,7 +336,7 @@ TEAM_NEVER = re.compile(r'\binstall|\bguarantee|\bpric(?:e|es|ing)\b|\bcost|\bfr
 REPORT_LINK = 'https://github.com/openwizdev/openwiz/issues/new?template=feedback.yml'
 FOOTER = (ROOT / 'footer.html').read_text()
 FOOTER_SLOT = '<template data-slot="footer"></template>\n'
-FOOTER_LINKS = (('/what-is-openwiz/', 'What is OpenWiz?'), ('/guides/run-many-coding-agents/', 'Guide'), ('/drivers/', 'Drivers'), ('/market/', 'Market'), ('/changelog/', 'Changelog'), ('https://github.com/openwizdev/openwiz#readme', 'Docs'),
+FOOTER_LINKS = (('/what-is-openwiz/', 'What is OpenWiz?'), ('/guides/run-many-coding-agents/', 'Guide'), ('/drivers/', 'Drivers'), ('/market/', 'Market'), ('/changelog/', 'Changelog'), ('/pricing/', 'Pricing'), ('https://github.com/openwizdev/openwiz#readme', 'Docs'),
                 ('/faq/', 'FAQ'), ('/app/', 'The app'), (REPORT_LINK, 'Report a problem'), ('/team/', 'For teams'),
                 ('https://github.com/openwizdev/openwiz', 'GitHub'), ('https://x.com/openwiz', 'X @openwiz'))
 FOOTER_LINE = 'Apache-2.0. Owned by no one.'
@@ -361,6 +372,8 @@ FAQ_QUESTIONS = ('What is OpenWiz?', 'What is a kernel?', 'What do I need to run
 FAQ_PREREQS = ('A Mac (Apple silicon or Intel) or x86_64 Linux, with Python 3.9 or later, git, and the GitHub CLI (gh). '
                'See the install guide for every step and command.')
 FAQ_TEAM = 'Yes. Book a 30-minute call. Your first fleet ships on it.'
+FAQ_COST = ('OpenWiz is free and open source (Apache-2.0). Supporter is $5 per month for priority support and to support the project, '
+            'and it adds nothing else. See Pricing. You still pay only for the models and machines you already use.')
 FAQ_WHERE = ("Builders run where you choose: this computer, with the Claude Code or Codex you're signed in to, boat.dev, "
              'or CloudRoom. Each is a driver that passed the same five-check test. In OpenWiz 0.01, you start builders by '
              'hand on this computer or boat.dev, and the automatic fleet runs in CloudRoom.')
@@ -394,7 +407,7 @@ GUIDE_NEVER = re.compile(r'\b0\.1\.[1-9]|\b0\.0[2-9]\b')
 NOT_FOUND = '404.html'
 ABOUT_LINK = '<p class="wrap about-link"><a href="/what-is-openwiz/">What is OpenWiz?</a></p>\n'
 STATIC = {
-    'index.html', 'changelog/index.html', 'drivers/index.html', 'team/index.html', 'faq/index.html', 'market/index.html', '_headers', SECURITY_TXT, APP_PAGE, 'app/manifest.webmanifest',
+    'index.html', 'changelog/index.html', 'drivers/index.html', 'team/index.html', 'faq/index.html', 'market/index.html', 'pricing/index.html', '_headers', SECURITY_TXT, APP_PAGE, 'app/manifest.webmanifest',
     'SKILL.md', 'fonts/OFL.txt',
     'c76a1a01e62d088edd3789d30d6a4d29.txt',
 } | ART | set(ICON_HASHES) | set(VECTORS) | (set(VENDOR_HASHES) - {GSAP}) | set(APP_VENDOR) | set(DRIVER_LOGOS) | {ASK_INDEX, ABOUT_PAGE, GUIDE_PAGE, NOT_FOUND} | DISCOVERY_FILES
@@ -420,7 +433,19 @@ FONT_HASHES = {
     'fonts/GeistMono-var.woff2': '9e8aaba5adee50826485cff3187dc86d45f7dd4799a80371af0f369bbd999989',
     'fonts/OFL.txt': 'c683bfbcc7e087f5d37a54ef628f10387c451a83ddc459b151403a164ac46c90',
 }
-PAGES = ('index.html', 'changelog/index.html', 'drivers/index.html', TEAM_PAGE, FAQ_PAGE, 'market/index.html', ABOUT_PAGE, GUIDE_PAGE)
+PRICING_PAGE = 'pricing/index.html'
+PRICING_LEAD = ('OpenWiz stays free and open source. Supporter is $5 per month: priority support, and you support the project. '
+                'The software is the same either way.')
+PRICING_FREE = ('The whole product, open source under Apache-2.0.', 'Install it, run fleets, and use the app.',
+                'You pay your own model and machine bills.')
+PRICING_SUPPORTER = ('Priority support.', 'You support the project.', 'Nothing else. The same OpenWiz as Free.')
+PRICING_NOTE = 'Claude, Codex, CloudRoom and boat.dev bill you themselves. Neither plan includes those charges.'
+ABOUT_COST = ('OpenWiz is free and released under the Apache License 2.0. Supporter is $5 per month for priority support and to support the project. '
+              'It adds nothing else to the software. See Pricing. You pay for the models and machines you use.')
+GUIDE_COST = ('OpenWiz is free and released under the Apache License 2.0. Supporter is $5 per month for priority support and to support the project, '
+              'and the software stays the same. See Pricing. You pay only for the models and machines you use: your Claude Code or Codex plan, '
+              'and any host you pick. boat.dev bills per second while a sandbox runs, and CloudRoom\u2019s charges are its own, on your plan with it.')
+PAGES = ('index.html', 'changelog/index.html', 'drivers/index.html', TEAM_PAGE, FAQ_PAGE, 'market/index.html', ABOUT_PAGE, GUIDE_PAGE, PRICING_PAGE)
 SITE_PAGES = PAGES + (NOT_FOUND,)
 ALL_PAGES = SITE_PAGES + (APP_PAGE,)
 STORY_COPY = ('Build a to-do app', 'Bring any agent', 'Sign in with GitHub', 'Put the app on your phone')
@@ -591,6 +616,7 @@ class Page(HTMLParser):
         self.json_ld = []
         self.json_data = None
         self.books = []
+        self.checkout = []
         self.x_links = 0
         self.launch_posts = 0
         self.report_links = 0
@@ -642,7 +668,12 @@ class Page(HTMLParser):
         if 'id' in attrs:
             assert attrs['id'] not in self.ids, 'duplicate HTML id'
             self.ids.add(attrs['id'])
-        if tag == 'a' and 'data-book' in attrs:
+        if tag == 'a' and 'data-checkout' in attrs:
+            assert 'noreferrer' in (attrs.get('rel') or '').lower().split() and 'referrerpolicy' not in attrs, \
+                'the checkout link needs rel="noreferrer"'
+            self.checkout.append(attrs.get('href') or '')
+            attrs = {key: value for key, value in attrs.items() if key != 'href'}
+        elif tag == 'a' and 'data-book' in attrs:
             self.books.append(attrs.get('href') or '')
             attrs = {key: value for key, value in attrs.items() if key != 'href'}
         elif tag == 'a' and attrs.get('href') == X_ACCOUNT:
@@ -669,6 +700,10 @@ class Page(HTMLParser):
                 self.refs.append(attrs[key])
         if tag == 'button':
             self.buttons.append(attrs)
+            if 'data-checkout' in attrs:
+                assert attrs.get('type') == 'button' and 'disabled' in attrs and not attrs.get('formaction'), \
+                    'a checkout button ships disabled and posts nothing'
+                self.checkout.append('')
         if tag == 'img':
             self.images.append(attrs)
         if tag == 'video':
@@ -1354,6 +1389,7 @@ def check_site(root, registry=ROOT / 'market/registry.json', now=None):
     check_changelog(landing, changelog)
     check_releases(releases, read_releases(), install_switch(landing) == 'live')
     check_team(site_html, {name: parsed[name] for name in SITE_PAGES})
+    check_pricing(site_html, {name: parsed[name] for name in SITE_PAGES})
     check_footer(site_html)
     check_faq(site_html, {name: parsed[name] for name in SITE_PAGES}, names)
     for page in pages.values():
@@ -1933,6 +1969,50 @@ def check_driver_token(drivers, main):
     assert not broad, f'a broader token claim than the run inspected: {broad[0]!r}'
 
 
+def check_pricing(htmls, pages):
+    bundle = json.loads(subprocess.run(
+        ['node', '--input-type=module', '-e',
+         "import { readCheckout, checkoutControl } from './scripts/pricing.mjs';"
+         "process.stdout.write(JSON.stringify({url: readCheckout(), control: checkoutControl(readCheckout())}));"],
+        cwd=ROOT, text=True, stdout=subprocess.PIPE, check=True).stdout)
+    url, control = bundle['url'], bundle['control']
+    landing = top_bar(htmls['index.html']).replace(' aria-current="page"', '')
+    current_for = {'drivers/index.html': ['Drivers'], 'changelog/index.html': ['Changelog'], PRICING_PAGE: ['Pricing']}
+    for name, html in htmls.items():
+        bar = top_bar(html)
+        assert bar.replace(' aria-current="page"', '') == landing, f'the {name} top bar must match the landing'
+        current = re.findall(r'<a [^>]*aria-current="page"[^>]*>([^<]*)</a>', bar)
+        assert current == current_for.get(name, []), f'the {name} top bar marks the current page: {current}'
+        assert html.count('data-checkout') == (1 if name == PRICING_PAGE else 0), f'one checkout control, on the pricing page: {name}'
+        assert pages[name].checkout == ([url or ''] if name == PRICING_PAGE else []), \
+            f'the checkout control is the pricing page\'s only: {name} {pages[name].checkout}'
+    page = htmls[PRICING_PAGE]
+    start, end = '<!-- checkout:start -->', '<!-- checkout:end -->'
+    assert page.count(start) == 1 and page.count(end) == 1, 'the pricing page needs one checkout slot'
+    assert page.split(start, 1)[1].split(end, 1)[0] == control, 'the pricing page checkout control comes from pricing/checkout.json'
+    assert not re.search(r'<(?:form|input|textarea|select)\b', page), 'the pricing page collects no payment details'
+    main = re.search(r'<main\b[^>]*>([\s\S]*?)</main>', page)[1]
+    assert plain(re.search(r'<p class="pricing-lead">([\s\S]*?)</p>', main)[1]) == PRICING_LEAD, 'the pricing lead'
+    cards = re.findall(r'<article class="price-card(?: price-supporter)?"[\s\S]*?</article>', main)
+    assert len(cards) == 2 and 'price-supporter' in cards[1], 'the pricing page has Free, then Supporter'
+    lists = [tuple(plain(item) for item in re.findall(r'<li>([\s\S]*?)</li>', card)) for card in cards]
+    assert lists == [PRICING_FREE, PRICING_SUPPORTER], f'the two plans: {lists}'
+    amounts = [plain(re.search(r'<p class="price-amount">([\s\S]*?)</p>', card)[1]) for card in cards]
+    assert amounts == ['$0', '$5 per month'] and [plain(re.search(r'<h2[^>]*>([\s\S]*?)</h2>', card)[1]) for card in cards] == ['Free', 'Supporter'], \
+        f'the plan names and prices: {amounts}'
+    assert re.search(r'<a class="price-get" href="/">Get OpenWiz</a>', cards[0]), 'Free links to the homepage'
+    assert plain(re.search(r'<p class="price-note">([\s\S]*?)</p>', main)[1]) == PRICING_NOTE, 'the pricing note keeps model and host bills separate'
+
+    def cost_paragraph(html):
+        body = re.search(r'<main\b[^>]*>([\s\S]*?)</main>', html)[1]
+        found = re.search(r'<h2>What it costs</h2>\s*<p>([\s\S]*?)</p>', body)
+        assert found, 'What it costs'
+        return plain(found[1])
+
+    assert cost_paragraph(htmls[ABOUT_PAGE]) == ABOUT_COST, 'the overview says what it costs'
+    assert cost_paragraph(htmls[GUIDE_PAGE]) == GUIDE_COST, 'the guide says what it costs'
+
+
 def check_team(htmls, pages):
     for name, html in htmls.items():
         bar = top_bar(html)
@@ -1948,7 +2028,8 @@ def check_team(htmls, pages):
         url = urlsplit(href)
         assert url.scheme == 'https' and url.netloc and not url.username and not url.password, f'the booking link must be https: {href}'
     team = htmls[TEAM_PAGE]
-    flat = re.sub(r'\s+', ' ', unescape(re.sub(r'<[^>]*>', ' ', team)))
+    main_html = team.split('<main', 1)[1].split('</main>', 1)[0]
+    flat = re.sub(r'\s+', ' ', unescape(re.sub(r'<[^>]*>', ' ', main_html)))
     assert not re.search(r'[$€£]\s*\d|\bper (?:month|seat|user)\b|\bpricing\b', flat, re.I), 'the team page shows no price'
     labels = re.findall(r'<a [^>]*data-book[^>]*>([^<]*)</a>', team)
     assert labels == ['Book a call', 'Book a call'], f'team page copy: both booking links read Book a call: {labels}'
@@ -2047,6 +2128,8 @@ def check_faq(htmls, pages, names):
     assert prereqs == [FAQ_PREREQS], f'the Questions\u2019 answer to What do I need before installing?: {FAQ_PREREQS}'
     where = [plain(a) for _, q, _, a in rows if plain(q) == 'Where do my agents run?']
     assert where == [FAQ_WHERE], f'the Questions\u2019 answer to Where do my agents run?: {FAQ_WHERE}'
+    cost = [plain(a) for _, q, _, a in rows if plain(q) == 'What does it cost?']
+    assert cost == [FAQ_COST], f'the Questions\u2019 answer to What does it cost?: {FAQ_COST}'
     assert plain(rows[-2][3]) == FAQ_TEAM, f'the Questions’ team answer: {FAQ_TEAM}'
     assert plain(rows[-1][3]) == COUNT_NOTICE, 'the Questions use the same visit and click notice as the footer'
     assert not re.search(r'<(?:form|input|textarea)\b', FAQ), 'part 1 asks nothing: no form or input in the Questions'

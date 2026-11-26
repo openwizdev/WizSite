@@ -1158,7 +1158,7 @@ class Checks(unittest.TestCase):
         for message, (page, change) in {
             'the index.html page needs the one Questions': ('index.html', lambda t: t.replace(FAQ, '', 1)),
             'the faq/index.html page needs the one Questions': ('faq/index.html', lambda t: t.replace('>What is a kernel?<', '>What is a core?<', 1)),
-            'the team/index.html page shows no Questions|never uses: (?:CloudRoom|install)': ('team/index.html', lambda t: t.replace('</main>', FAQ + '</main>', 1)),
+            'the team/index.html page shows no Questions|never uses: (?:CloudRoom|install)|the team page shows no price': ('team/index.html', lambda t: t.replace('</main>', FAQ + '</main>', 1)),
             'needs faq.js': ('faq/index.html', lambda t: re.sub(r'<script src="/faq\.[0-9a-f]+\.js" defer></script>', '', t)),
         }.items():
             temp, root = planted(page, change)

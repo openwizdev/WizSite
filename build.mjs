@@ -5,6 +5,7 @@ import { installSwitch, readReleases, render, summary, withReleases } from './sc
 import { readRegistry, render as renderMarket, summary as marketSummary, withMarket } from './scripts/market.mjs';
 import { withDrivers } from './scripts/drivers.mjs';
 import { aboutPage, crawlerFiles, guidePage, pages, withMetadata } from './scripts/discovery.mjs';
+import { withCheckout } from './scripts/pricing.mjs';
 
 const root = new URL('./', import.meta.url);
 const output = new URL('dist/', root);
@@ -84,6 +85,7 @@ for (const page of Object.keys(pages)) {
   if (page === 'changelog/index.html') html = withReleases(html, render(releases, live));
   if (page === 'market/index.html') html = withMarket(html, renderMarket(registry));
   if (page === 'drivers/index.html') html = withDrivers(html, registry);
+  if (page === 'pricing/index.html') html = withCheckout(html);
   await put(page, html);
 }
 const discovery = crawlerFiles(about, faq, guide);
