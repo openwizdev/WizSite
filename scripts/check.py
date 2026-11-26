@@ -2299,7 +2299,8 @@ def check_privacy(path, data):
     binary = path.endswith(('.webp', '.mp4', '.png', '.ico')) or (font in FONT_HASHES and font.endswith('.woff2'))
     text = path + '\n' + ('' if binary else data.decode('utf-8'))
     assert not any(word in text.lower() for word in BANNED_COPY), f'banned word in {path}'
-    # PRIVACY: the documented rule definition must name its own markers. No other exemption.
+    # PRIVACY: this file may name its denylist. The Ask snapshot may quote the GitHub App
+    # guide's one public placeholder home directory. Every other home path still fails.
     if path == 'scripts/check.py':
         text = re.sub(r'DENYLIST = \([^)]*\)', '', text)
     if path.startswith('ask-docs/') or path in ('ask-index.json', 'dist/ask-index.json'):

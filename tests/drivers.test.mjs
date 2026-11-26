@@ -68,6 +68,26 @@ test('a registry refresh shows one host tile per driver, on the page id, with th
   }
 });
 
+test('a shipped aliased driver keeps its page id, logo, and a single card', async () => {
+  const page = await readFile(join(ROOT, 'drivers/index.html'), 'utf8');
+  const receipt = { receipt: { url: 'https://example.invalid/receipt', date: '2026-11-01' } };
+  const shipped = (id, name) => ({ ...driverListing(id, name), stage: 'available', status: 'verified', proof: receipt });
+  const html = withDrivers(page, { listings: [shipped('cursor-cloud-agents', 'Cursor Cloud Agents'), shipped('openhands-cloud', 'OpenHands Cloud')] });
+  const ids = [...html.matchAll(/\sid="([^"]+)"/g)].map(match => match[1]);
+  assert.equal(new Set(ids).size, ids.length, `duplicate ids: ${ids.filter((id, i) => ids.indexOf(id) !== i)}`);
+  for (const [pageId, listing, logo] of [['cursor', 'cursor-cloud-agents', 'cursor.svg'], ['openhands', 'openhands-cloud', 'openhands.svg']]) {
+    assert.equal(ids.includes(pageId), true, `${listing} dropped #${pageId}`);
+    assert.equal(ids.includes(listing), false, `${listing} painted a second id`);
+    const card = html.match(new RegExp(`<article class="driver" id="${pageId}"[\\s\\S]*?<\\/article>`));
+    assert.ok(card, `${pageId} shipped card`);
+    assert.match(card[0], new RegExp(`data-listing="${listing}"`));
+    assert.match(card[0], new RegExp(`src="/drivers/logos/${logo}"`));
+    assert.match(html, new RegExp(`data-host="${pageId}"`));
+    const wall = html.match(/<template data-slot="drivers-hosts-start"><\/template>([\s\S]*?)<template data-slot="drivers-hosts-end"><\/template>/);
+    assert.equal(wall[1].includes(`id="${pageId}"`), false, `${pageId} stayed on the wall and on a shipped card`);
+  }
+});
+
 async function serve() {
   const server = createServer(async (req, res) => {
     let path = normalize(decodeURIComponent(new URL(req.url, 'http://x').pathname));

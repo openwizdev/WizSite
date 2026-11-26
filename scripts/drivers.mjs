@@ -150,6 +150,7 @@ export function withDrivers(page, registry) {
 
   const hosts = byPageId(drivers, hostIds);
   const existing = new Set([...page.matchAll(/\sid="([^"]+)"/g)].map(([, id]) => id));
+  const hostTileIds = new Set([...slot(page, 'hosts').fallback.matchAll(/<li class="tile[^"]*" id="([^"]+)"/g)].map(([, id]) => id));
   const generatedIds = new Map();
   const idFor = listing => {
     if (!generatedIds.has(listing.id)) {
@@ -160,6 +161,7 @@ export function withDrivers(page, registry) {
     }
     return generatedIds.get(listing.id);
   };
+  const shippedId = (pageId, listing) => (!existing.has(pageId) || hostTileIds.has(pageId) ? pageId : idFor(listing));
   const marks = slot(page, 'marks');
   const knownShipped = new Set();
   const marksHtml = marks.fallback.replace(/<li data-host="([^"]+)"[^>]*>.*?<\/li>/g, (html, id) => {
@@ -168,14 +170,14 @@ export function withDrivers(page, registry) {
     return !listing ? html : shipped(listing) ? hostMark(listing, id, html) : '';
   });
   const extraShipped = [...hosts].filter(([id, listing]) => !knownShipped.has(id) && shipped(listing));
-  page = marks.fill(marksHtml + extraShipped.map(([, listing]) => hostMark(listing, idFor(listing))).join(''));
+  page = marks.fill(marksHtml + extraShipped.map(([id, listing]) => hostMark(listing, shippedId(id, listing))).join(''));
 
   const compact = slot(page, 'shipped');
   const cards = compact.fallback.replace(/<li>\s*<article class="driver" id="([^"]+)"[\s\S]*?<\/article>\s*<\/li>/g, (html, id) => {
     const listing = hosts.get(id);
     return !listing ? html : shipped(listing) ? shippedCard(listing, id, html) : '';
   });
-  page = compact.fill(cards + extraShipped.map(([, listing]) => shippedCard(listing, idFor(listing))).join(''));
+  page = compact.fill(cards + extraShipped.map(([id, listing]) => shippedCard(listing, shippedId(id, listing))).join(''));
   const hero = slot(page, 'spotlight');
   page = hero.fill(spotlight(hosts.get('boat-dev'), hero.fallback));
 
