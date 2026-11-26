@@ -30,6 +30,41 @@ const FLEET_MD = `# Fleet settings
 | Fixer | follows Builder | | | |
 `;
 
+const FOUR_TABLE_FLEET = `# Fleet settings
+
+## Builder
+
+| Setting | Value | \`room-cli thread spawn\` flag |
+| --- | --- | --- |
+| Harness | Claude Code | \`--provider claude-code\` |
+| Model | Opus 5.5 | \`--model claude-opus-5-5\` |
+| Effort | Medium | \`--reasoning-level medium\` |
+
+## Builder for small tickets
+
+| Setting | Value | \`room-cli thread spawn\` flag |
+| --- | --- | --- |
+| Harness | Claude Code | \`--provider claude-code\` |
+| Model | Opus 5.5 | \`--model claude-opus-5-5\` |
+| Effort | Medium | \`--reasoning-level medium\` |
+
+## Reviewer for Claude-built
+
+| Setting | Value | \`room-cli thread spawn\` flag |
+| --- | --- | --- |
+| Harness | Codex | \`--provider codex\` |
+| Model | Sol 6.2 | \`--model gpt-6.2-sol\` |
+| Effort | Medium | \`--reasoning-level medium\` |
+
+## Reviewer for GPT-built
+
+| Setting | Value | \`room-cli thread spawn\` flag |
+| --- | --- | --- |
+| Harness | Claude Code | \`--provider claude-code\` |
+| Model | Opus 5.5 | \`--model claude-opus-5-5\` |
+| Effort | Medium | \`--reasoning-level medium\` |
+`;
+
 function statusNote({ agent, state, step, time, pr }) {
   return [
     '<!-- openwiz:status v1 -->',
@@ -65,7 +100,7 @@ function decisionBody({ spec, kind, status, id }) {
   ].join('\n');
 }
 
-function makeFakeGitHub({ askHasNeedsInfo = true } = {}) {
+function makeFakeGitHub({ askHasNeedsInfo = true, fleet = FLEET_MD } = {}) {
   const now = new Date();
   const fiveMinAgo = new Date(now.getTime() - 5 * 60 * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z');
   const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z');
@@ -145,7 +180,7 @@ function makeFakeGitHub({ askHasNeedsInfo = true } = {}) {
           },
         ],
       },
-      fleet: { text: FLEET_MD },
+      fleet: { text: fleet },
     },
   };
 
@@ -341,14 +376,14 @@ function makeFakeGitHub({ askHasNeedsInfo = true } = {}) {
           },
         ],
       },
-      fleet: { text: FLEET_MD },
+      fleet: { text: fleet },
     },
   };
 
   const modelsData = {
     rateLimit: { limit: 5000, remaining: 4880, resetAt: '2099-01-01T00:00:00Z' },
     repository: {
-      fleet: { text: FLEET_MD },
+      fleet: { text: fleet },
       offered: null,
     },
   };
@@ -596,8 +631,8 @@ test('P4 seeded contradiction: Models showing a wrong role model fails Models', 
     siteTransform(pathname, reply) {
       if (!/^\/app\/pages\/models(?:\.[0-9a-f]{10})?\.js$/.test(pathname)) return reply;
       const source = reply.raw.toString('utf8').replace(
-        'const ids = `${role.choice.provider} ${role.choice.model} ${role.choice.effort}`;',
-        'const ids = key === "builder" ? "wrong-provider wrong-model low" : `${role.choice.provider} ${role.choice.model} ${role.choice.effort}`;',
+        'const ids = role.choice ? `${role.choice.provider} ${role.choice.model} ${role.choice.effort}` : null;',
+        'const ids = role.choice ? (key === "builder" ? "wrong-provider wrong-model low" : `${role.choice.provider} ${role.choice.model} ${role.choice.effort}`) : null;',
       );
       return { ...reply, raw: Buffer.from(source) };
     },
@@ -607,6 +642,20 @@ test('P4 seeded contradiction: Models showing a wrong role model fails Models', 
   const models = result.pages.find(p => p.page === 'Models');
   assert.equal(models.pass, false);
   assert.match(formatResults(result), /FAIL Models:.*builder/i);
+});
+
+test('four-table fleet without ## Fixer passes Models', async () => {
+  const { githubFetch } = makeFakeGitHub({ fleet: FOUR_TABLE_FLEET });
+  const result = await runLiveCheck({
+    repo: 'acme/factory',
+    token: REAL_TOKEN,
+    githubFetch,
+  });
+
+  const models = result.pages.find(p => p.page === 'Models');
+  assert.equal(models.pass, true, models.detail);
+  assert.doesNotMatch(models.detail, /couldn't be read|unreadable/i);
+  assert.match(formatResults(result), /PASS Models:/);
 });
 
 test('R1: a page that fails to render gets a FAIL line and the other four pages still run', async () => {

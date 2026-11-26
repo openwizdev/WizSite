@@ -325,27 +325,32 @@ function parseFleetModels(text) {
     return { provider: ids[0], model: ids[1], effort: ids[2], family: FAMILY[ids[0]] ?? null };
   };
   const tables = OLDER_TABLES.slice(0, 4).map(name => settingTable(findSection(name)));
-  const fixerSec = findSection('Fixer');
-  if (tables.some(t => !t) || !fixerSec) return { hasFleet: true, roles: null };
-  const fixerRows = fixerSec.map(cells).filter(Boolean);
-  const fixers = ['Claude', 'GPT'].map(family => {
-    const r = fixerRows.find(c => c.length === 5 && c[0] === family);
-    return r ? parseFlags(r[4]) : null;
-  });
-  if (fixers.some(f => !f)) return { hasFleet: true, roles: null };
+  if (tables.some(t => !t)) return { hasFleet: true, roles: null };
   const builder = tables[0];
   const at = { claude: 0, gpt: 1 }[builder.family];
   if (at === undefined) return { hasFleet: true, roles: null };
+  const fixerHeads = lines.filter(line => line === '## Fixer').length;
+  if (fixerHeads > 1) return { hasFleet: true, roles: null };
+  let fixer = null;
+  if (fixerHeads === 1) {
+    const fixerRows = findSection('Fixer').map(cells).filter(Boolean);
+    const fixers = ['Claude', 'GPT'].map(family => {
+      const r = fixerRows.find(c => c.length === 5 && c[0] === family);
+      return r ? parseFlags(r[4]) : null;
+    });
+    if (fixers.some(f => !f)) return { hasFleet: true, roles: null };
+    fixer = fixers[at];
+  }
   const chosen = {
     orchestrator: builder,
     builder,
     reviewer: tables[2 + at],
     small_builder: tables[1],
-    fixer: fixers[at],
+    fixer,
   };
   return {
     hasFleet: true,
-    roles: Object.fromEntries(Object.entries(chosen).map(([k, v]) => [k, `${v.provider} ${v.model} ${v.effort}`])),
+    roles: Object.fromEntries(Object.entries(chosen).map(([k, v]) => [k, v ? `${v.provider} ${v.model} ${v.effort}` : ''])),
   };
 }
 
