@@ -11,15 +11,18 @@ const labels = {
   listed: 'Listed',
 };
 
-const hostIds = { local: 'vps', 'fly-sprites': 'sprites', 'github-codespaces': 'codespaces' };
+const hostIds = {
+  local: 'vps', 'fly-sprites': 'sprites', 'cursor-cloud-agents': 'cursor', 'openhands-cloud': 'openhands',
+};
 const harnessIds = {
   'cline-cli': 'cline', 'copilot-cli': 'copilot', 'gemini-cli': 'gemini', 'junie-cli': 'junie',
   'kilo-code': 'kilo', 'kimi-code': 'kimi', 'kiro-cli': 'kiro', 'mistral-vibe': 'vibe', 'qwen-code': 'qwen',
 };
 const logos = {
   local: 'monitor.svg', 'boat-dev': 'boat-dev.svg', cloudroom: 'cloudroom.png', openclaw: 'openclaw.svg',
-  hermes: 'hermes.png', conductor: 'conductor.svg', cursor: 'cursor.svg', factory: 'factory.svg', pane: 'pane.svg',
-  openhands: 'openhands.svg', 'warp-oz': 'warp.svg', tembo: 'tembo.svg', capy: 'capy.svg', ona: 'ona.svg',
+  hermes: 'hermes.png', conductor: 'conductor.svg', cursor: 'cursor.svg', 'cursor-cloud-agents': 'cursor.svg',
+  factory: 'factory.svg', pane: 'pane.svg', openhands: 'openhands.svg', 'openhands-cloud': 'openhands.svg',
+  'warp-oz': 'warp.svg', tembo: 'tembo.svg', capy: 'capy.svg', ona: 'ona.svg',
   amp: 'amp.svg', antigravity: 'antigravity.svg', auggie: 'augment.svg', crush: 'crush.png',
   'cursor-cli': 'cursor.svg', 'gemini-cli': 'gemini-cli.svg', goose: 'goose.png', 'kilo-code': 'kilo-code.svg',
   'kimi-code': 'kimi-code.svg', 'kiro-cli': 'kiro.svg', opencode: 'opencode.svg', pi: 'pi.svg',

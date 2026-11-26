@@ -177,6 +177,13 @@ class Checks(unittest.TestCase):
                 with self.assertRaises(AssertionError):
                     check_privacy('scripts/check.py', marker.encode())
         check_privacy('index.html', b'<p>Building in public</p>')
+        placeholder = b'{"state_dir": "/' + b'home/' + b'someone/.local/state/openwiz-agents"}'
+        check_privacy('ask-docs/docs/github-app.md', placeholder)
+        check_privacy('dist/ask-index.json', placeholder)
+        with self.assertRaises(AssertionError):
+            check_privacy('index.html', placeholder)
+        with self.assertRaises(AssertionError):
+            check_privacy('ask-docs/docs/github-app.md', b'{"state_dir": "/' + b'home/' + b'owner/.local"}')
         with self.assertRaises(AssertionError):
             check_privacy('fonts/unreviewed.woff2', b'wOF2')
         with self.assertRaises(AssertionError):
