@@ -2291,6 +2291,18 @@ def ask_index_without_market(body):
     return json.dumps(kept)
 
 
+def site_voice(path, body):
+    if path == 'market/registry.json':
+        return ''
+    if path.removeprefix('dist/') == ASK_INDEX:
+        return ask_index_without_market(body)
+    if path.endswith('market/index.html') and MARKET[0] in body:
+        return split_market(body)[0]
+    if path.endswith('drivers/index.html') and driver_listing_urls(ROOT / 'market/registry.json') and tuple(match[2] for match in DRIVER_SLOT.finditer(body)) == DRIVER_SLOTS:
+        return drivers_fallback(body, (ROOT / DRIVERS_PAGE).read_text())[0]
+    return body
+
+
 def check_privacy(path, data):
     # PRIVACY: font binaries contain author metadata, so the fonts and legal attributions need review.
     # Every other tracked file must be UTF-8. Scan paths too; do not follow symlinks.
@@ -2313,18 +2325,7 @@ def check_privacy(path, data):
         assert sha256(data).hexdigest() == DRIVER_LOGOS[font][0], f'a drivers logo changed bytes: {path}'
     binary = path.endswith(('.webp', '.mp4', '.png', '.ico')) or (font in FONT_HASHES and font.endswith('.woff2'))
     body = '' if binary else data.decode('utf-8')
-    # Listing copy is the registry's, not the site's voice. The banned-word
-    # rule still covers the Market chrome, the Drivers source slots, and every other page.
-    if path == 'market/registry.json':
-        voiced = ''
-    elif path.removeprefix('dist/') == ASK_INDEX:
-        voiced = ask_index_without_market(body)
-    elif path.endswith('market/index.html') and MARKET[0] in body:
-        voiced = split_market(body)[0]
-    elif path.endswith('drivers/index.html') and driver_listing_urls(ROOT / 'market/registry.json') and tuple(match[2] for match in DRIVER_SLOT.finditer(body)) == DRIVER_SLOTS:
-        voiced = drivers_fallback(body, (ROOT / DRIVERS_PAGE).read_text())[0]
-    else:
-        voiced = body
+    voiced = site_voice(path, body)
     text = path + '\n' + body
     assert not any(word in (path + '\n' + voiced).lower() for word in BANNED_COPY), f'banned word in {path}'
     # PRIVACY: the documented rule definition must name its own markers. No other exemption.
