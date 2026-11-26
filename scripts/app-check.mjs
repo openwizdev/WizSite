@@ -1864,13 +1864,13 @@ async function main() {
       return file.body;
     };
 
-    await check('AP14: the new mark, cream on charcoal, is the favicon and the home-screen icon', async () => {
+    await check('AP14: the new mark, cream on charcoal, is the favicon, and the install icon is that mark in light mode', async () => {
       const world = new World();
       const page = await open(browser, world);
       await page.go(`${SITE}/app/`);
       await page.until(`document.querySelector('.panel')`, 'the sign-in screen');
       const icons = await page.run(`[...document.querySelectorAll('link[rel~="icon"], link[rel="apple-touch-icon"]')].map(l => [l.rel, l.getAttribute('href')])`);
-      assert(JSON.stringify(icons) === JSON.stringify([['icon', '/app/icon.svg'], ['icon', '/app/icon.ico'], ['apple-touch-icon', '/app/icon-180.png']]),
+      assert(JSON.stringify(icons) === JSON.stringify([['icon', '/app/icon.svg'], ['icon', '/app/icon.ico'], ['apple-touch-icon', '/app/icon-light-180.png']]),
         `the app's icons are ${JSON.stringify(icons)}, not the new mark's`);
       const svg = String(await served('/app/icon.svg')).toLowerCase();
       assert(svg.includes(`fill="${CHARCOAL}"`) && svg.includes(`fill="${CREAM}"`), 'the favicon is not the cream mark on charcoal');
@@ -1879,13 +1879,26 @@ async function main() {
       assert(ico.readUInt16LE(0) === 0 && ico.readUInt16LE(2) === 1, 'icon.ico is not an icon file');
       const sizes = [...Array(ico.readUInt16LE(4)).keys()].map(i => ico[6 + 16 * i] || 256);
       assert(JSON.stringify(sizes) === '[16,32,48]', `icon.ico holds ${JSON.stringify(sizes)}, not 16, 32 and 48`);
-      const png = await served('/app/icon-180.png');
+      const light = String(await served('/app/icon-light.svg')).toLowerCase();
+      assert(light.includes(`fill="${CREAM}"`) && light.includes(`fill="${CHARCOAL}"`), 'the install icon is not the charcoal mark on cream');
+      assert(light.replaceAll(CREAM, 'color').replaceAll(CHARCOAL, 'color') === svg.replaceAll(CREAM, 'color').replaceAll(CHARCOAL, 'color'),
+        'the install icon does not keep the favicon mark, padding and corner radius');
+      const manifest = JSON.parse(String(await served('/app/manifest.webmanifest')));
+      assert(manifest.background_color === CREAM, `the install splash is ${manifest.background_color}, not the light tile`);
+      assert(manifest.theme_color === '#161412', 'the manifest theme colour changed');
+      assert(JSON.stringify(manifest.icons.map(icon => [icon.src, icon.sizes, icon.purpose])) === JSON.stringify([
+        ['/app/icon-light.svg', 'any', 'any'],
+        ['/app/icon-light-192.png', '192x192', 'any'],
+        ['/app/icon-light-512.png', '512x512', 'any'],
+        ['/app/icon-light-180.png', '180x180', 'any'],
+      ]), `the manifest icons are ${JSON.stringify(manifest.icons)}`);
+      const png = await served('/app/icon-light-180.png');
       assert(png.readUInt32BE(16) === 180 && png.readUInt32BE(20) === 180, 'the home-screen icon is not 180 x 180');
       const pixels = await page.run(`new Promise(resolve => { const img = new Image(); img.onload = () => {
         const c = document.createElement('canvas'); c.width = c.height = 180; const g = c.getContext('2d'); g.drawImage(img, 0, 0);
         const at = (x, y) => '#' + [...g.getImageData(x, y, 1, 1).data.slice(0, 3)].map(v => v.toString(16).padStart(2, '0')).join('');
-        resolve([at(90, 8), at(60, 100)]); }; img.src = '/app/icon-180.png'; })`);
-      assert(JSON.stringify(pixels) === JSON.stringify([CHARCOAL, CREAM]), `the home-screen icon reads ${JSON.stringify(pixels)}, not charcoal around a cream mark`);
+        resolve([at(90, 8), at(60, 100)]); }; img.src = '/app/icon-light-180.png'; })`);
+      assert(JSON.stringify(pixels) === JSON.stringify([CREAM, CHARCOAL]), `the home-screen icon reads ${JSON.stringify(pixels)}, not cream around a charcoal mark`);
       checkRequestLog(world);
       await page.close();
     });

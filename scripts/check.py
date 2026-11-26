@@ -62,6 +62,9 @@ ICON_HASHES = {
     'brand/og.png': '4e976988aed9f9d5a37e4254165f6267aeb376d8749e05c0a280520c10df0c5a',
     'app/icon.ico': '33a21c61aa051f91475b46678bc0c4f537ab507273c088c4ed016d5ddce2b9cd',
     'app/icon-180.png': 'deb93ec39812c224c1470e2f1730f7f4ead7be3d27428a20a2a83284b77fbc2f',
+    'app/icon-light-180.png': 'c5fd63e77a201a4d99ecabdf510104f38de66efa88404107e97945f7ee6b7a99',
+    'app/icon-light-192.png': 'ead65f72e280345dda721269b1bfdb5bdd1cec676fce9073b51fc04d2c25f21f',
+    'app/icon-light-512.png': 'cc6e0310da3b973b6a9e07f85311f1d556a395733dfae85de255c9bc1d708047',
 }
 DOC_HASHES = {
     'docs/evidence/speed/fonts/app-1280x800.png': 'db6128e1d62daf1112ca41246fd04665bcc0b3060b99192bbc66927ef6fb66cf',
@@ -111,7 +114,7 @@ DOC_HASHES = {
     'docs/evidence/speed/speed-gsap-after-load/motion-hero-390.png': '07fc459d518ed9fe82187a32b4325779594672f208e10cabd83e9b45f151bf85',
     'docs/evidence/speed/speed-gsap-after-load/waterfall-390.png': 'd0a02240a419ea61e38eeb59ee76b29ee2d5624ecf97e8834e49c6131d2cc2b9',
 }
-VECTORS = ('favicon.svg', 'brand/openwiz-lockup.svg', 'app/mark.svg', 'app/icon.svg', 'app/wiz-reviewer.svg')
+VECTORS = ('favicon.svg', 'brand/openwiz-lockup.svg', 'app/mark.svg', 'app/icon.svg', 'app/icon-light.svg', 'app/wiz-reviewer.svg')
 MARK, OLD_MARK = '#cfc6b8', '#2b2bff'
 SITE_URL = 'https://openwiz.dev/'
 ART_BUDGET = 2_000_000
