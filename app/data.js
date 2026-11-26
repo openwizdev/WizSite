@@ -287,7 +287,8 @@
       comments(first: 50, ${RECENT}) { totalCount nodes { databaseId body url createdAt updatedAt author { login } } }
       subIssues(first: 50) { totalCount nodes { ${TICKET} labels(first: 20) { nodes { name } }
         blockedBy(first: 10) { totalCount nodes { ${TICKET} } }
-        closedByPullRequestsReferences(first: 5) { totalCount nodes { url state isDraft reviewDecision } }
+        closedByPullRequestsReferences(first: 5) { totalCount nodes { url state isDraft reviewDecision
+          commits(last: 1) { nodes { commit { statusCheckRollup { state } } } } } }
         comments(first: 20, ${RECENT}) { totalCount nodes { databaseId body createdAt updatedAt author { login } } } } } }`).join('')}
   }
 }`;

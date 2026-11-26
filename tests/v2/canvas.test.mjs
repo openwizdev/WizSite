@@ -525,3 +525,32 @@ test('Canvas: Waits for lists only open blockers, says Waits for nothing when al
     await run.close();
   }
 });
+
+test('Canvas: a stale open pull request, missing from the day read, shows its check rollup from the spec read', async () => {
+  const run = await start();
+  try {
+    world(run, {
+      tickets: list => {
+        list.find(t => t.n === 46).pulls = [pull(186, { draft: true, review: null, checks: 'SUCCESS' })];
+      },
+    });
+    const queries = [];
+    wrap(run, 'SpecTickets', (reply, entry) => {
+      const query = JSON.parse(entry.body).query;
+      queries.push(query);
+      const repository = structuredClone(reply.json.data.repository);
+      const pr = repository.s41.subIssues.nodes.find(n => n.number === 46).closedByPullRequestsReferences.nodes[0];
+      if (/statusCheckRollup\s*\{\s*state\s*\}/.test(query)) pr.commits = { nodes: [{ commit: { statusCheckRollup: { state: 'SUCCESS' } } }] };
+      return { status: 200, json: { data: { ...reply.json.data, repository } } };
+    });
+    await openCanvas(run, '#/canvas/41');
+    assert.ok(queries.some(query => /statusCheckRollup\s*\{\s*state\s*\}/.test(query)), 'the spec read asks for the head commit\'s check rollup');
+    assert.equal(await run.page.run(`(OW.data.feeds.agents.data.issues.nodes || []).some(n => n && n.number === 46)`), false,
+      'the day read does not include the stale ticket');
+    assert.equal(await run.page.run(`document.querySelector('.cv-stack[data-ticket$="#46"] .cv-front .cv-step').textContent`), 'draft, checks pass');
+    assert.doesNotMatch(await run.page.run(`document.querySelector('.cv-stack[data-ticket$="#46"]').textContent`), /checks unknown/);
+    assert.deepEqual(run.world.violations, []);
+  } finally {
+    await run.close();
+  }
+});
