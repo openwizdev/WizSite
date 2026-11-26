@@ -32,31 +32,41 @@ const FLEET_MD = `# Fleet settings
 
 const FOUR_TABLE_FLEET = `# Fleet settings
 
+Every fleet in this project starts from these settings.
+
 ## Builder
+
+One per ticket. It builds its ticket on its own branch, and never reviews or merges.
 
 | Setting | Value | \`room-cli thread spawn\` flag |
 | --- | --- | --- |
-| Harness | Claude Code | \`--provider claude-code\` |
-| Model | Opus 5.5 | \`--model claude-opus-5-5\` |
+| Harness | Antigravity | \`--provider antigravity\` |
+| Model | Gemini Neon | \`--model gemini-4-neon\` |
 | Effort | Medium | \`--reasoning-level medium\` |
 
 ## Builder for small tickets
 
+Tickets with an exact \`polish\`, \`huntr\` or \`proposal\` label use this table; every other ticket uses \`## Builder\`.
+
 | Setting | Value | \`room-cli thread spawn\` flag |
 | --- | --- | --- |
-| Harness | Claude Code | \`--provider claude-code\` |
-| Model | Opus 5.5 | \`--model claude-opus-5-5\` |
+| Harness | Antigravity | \`--provider antigravity\` |
+| Model | Gemini Neon | \`--model gemini-4-neon\` |
 | Effort | Medium | \`--reasoning-level medium\` |
 
 ## Reviewer for Claude-built
 
+One per pull request, from a different model family than the builder.
+
 | Setting | Value | \`room-cli thread spawn\` flag |
 | --- | --- | --- |
 | Harness | Codex | \`--provider codex\` |
-| Model | Sol 6.2 | \`--model gpt-6.2-sol\` |
-| Effort | Medium | \`--reasoning-level medium\` |
+| Model | Sol 6.1 | \`--model gpt-6.1-sol\` |
+| Effort | High | \`--reasoning-level high\` |
 
 ## Reviewer for GPT-built
+
+Use the verified builder's provider.
 
 | Setting | Value | \`room-cli thread spawn\` flag |
 | --- | --- | --- |

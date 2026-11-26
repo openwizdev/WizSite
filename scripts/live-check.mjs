@@ -328,7 +328,6 @@ function parseFleetModels(text) {
   if (tables.some(t => !t)) return { hasFleet: true, roles: null };
   const builder = tables[0];
   const at = { claude: 0, gpt: 1 }[builder.family];
-  if (at === undefined) return { hasFleet: true, roles: null };
   const fixerHeads = lines.filter(line => line === '## Fixer').length;
   if (fixerHeads > 1) return { hasFleet: true, roles: null };
   let fixer = null;
@@ -339,12 +338,23 @@ function parseFleetModels(text) {
       return r ? parseFlags(r[4]) : null;
     });
     if (fixers.some(f => !f)) return { hasFleet: true, roles: null };
-    fixer = fixers[at];
+    fixer = at != null ? fixers[at] : null;
   }
+  let reviewer = at != null ? tables[2 + at] : null;
+  if (reviewer == null && (builder.provider === 'antigravity' || builder.provider === 'gemini-cli')) {
+    const geminiHeads = lines.filter(line => line === '## Reviewer for Gemini-built').length;
+    if (geminiHeads > 1) return { hasFleet: true, roles: null };
+    if (geminiHeads === 1) {
+      reviewer = settingTable(findSection('Reviewer for Gemini-built'));
+      if (!reviewer) return { hasFleet: true, roles: null };
+    }
+  }
+  if (reviewer == null) reviewer = [tables[3], tables[2]].find(r => r.provider !== builder.provider) ?? null;
+  if (!reviewer) return { hasFleet: true, roles: null };
   const chosen = {
     orchestrator: builder,
     builder,
-    reviewer: tables[2 + at],
+    reviewer,
     small_builder: tables[1],
     fixer,
   };
