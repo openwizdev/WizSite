@@ -1275,7 +1275,13 @@ def check_site(root, registry=ROOT / 'market/registry.json', now=None):
         assert not any(re.search(r'\b(?:Openwiz|openWiz|Open Wiz|OPENWIZ)\b', text)
                        for text in [reader.joined(), reader.spaced(), *reader.shown]), f'OpenWiz spelling in {name}'
     for path in pages:
-        reader = Text(docs[path.relative_to(root).as_posix()])
+        rel = path.relative_to(root).as_posix()
+        html = docs[rel]
+        if rel == MARKET_PAGE:
+            html = split_market(html)[0]
+        if rel == DRIVERS_PAGE and driver_listing_urls(registry) and tuple(match[2] for match in DRIVER_SLOT.finditer(html)) == DRIVER_SLOTS:
+            html = drivers_fallback(html, (ROOT / DRIVERS_PAGE).read_text())[0]
+        reader = Text(html)
         readings = [reader.joined(), reader.spaced()] + reader.attrs
         for reading in readings:
             low = re.sub(r'\s+', ' ', reading).lower()
@@ -2278,6 +2284,13 @@ def check_art(name, data):
     assert not any(marker.encode() in data.lower() for marker in DENYLIST), f'private marker in {name}'
 
 
+def ask_index_without_market(body):
+    data = json.loads(body)
+    market = {i for i, source in enumerate(data.get('sources', ())) if source.get('url', '').rstrip('/').endswith('/market')}
+    kept = [passage for passage in data.get('passages', ()) if passage.get('source') not in market]
+    return json.dumps(kept)
+
+
 def check_privacy(path, data):
     # PRIVACY: font binaries contain author metadata, so the fonts and legal attributions need review.
     # Every other tracked file must be UTF-8. Scan paths too; do not follow symlinks.
@@ -2299,8 +2312,21 @@ def check_privacy(path, data):
     if font in DRIVER_LOGOS:
         assert sha256(data).hexdigest() == DRIVER_LOGOS[font][0], f'a drivers logo changed bytes: {path}'
     binary = path.endswith(('.webp', '.mp4', '.png', '.ico')) or (font in FONT_HASHES and font.endswith('.woff2'))
-    text = path + '\n' + ('' if binary else data.decode('utf-8'))
-    assert not any(word in text.lower() for word in BANNED_COPY), f'banned word in {path}'
+    body = '' if binary else data.decode('utf-8')
+    # Listing copy is the registry's, not the site's voice. The banned-word
+    # rule still covers the Market chrome, the Drivers source slots, and every other page.
+    if path == 'market/registry.json':
+        voiced = ''
+    elif path.removeprefix('dist/') == ASK_INDEX:
+        voiced = ask_index_without_market(body)
+    elif path.endswith('market/index.html') and MARKET[0] in body:
+        voiced = split_market(body)[0]
+    elif path.endswith('drivers/index.html') and driver_listing_urls(ROOT / 'market/registry.json') and tuple(match[2] for match in DRIVER_SLOT.finditer(body)) == DRIVER_SLOTS:
+        voiced = drivers_fallback(body, (ROOT / DRIVERS_PAGE).read_text())[0]
+    else:
+        voiced = body
+    text = path + '\n' + body
+    assert not any(word in (path + '\n' + voiced).lower() for word in BANNED_COPY), f'banned word in {path}'
     # PRIVACY: the documented rule definition must name its own markers. No other exemption.
     if path == 'scripts/check.py':
         text = re.sub(r'DENYLIST = \([^)]*\)', '', text)
