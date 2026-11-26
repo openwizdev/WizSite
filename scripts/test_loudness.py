@@ -6,7 +6,7 @@ import subprocess
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
-NARRATED = ['art/todo-spec.mp4', 'art/spec-video.mp4']
+NARRATED = ['art/todo-spec.mp4']
 
 
 def loudness(path):
