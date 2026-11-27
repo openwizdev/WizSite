@@ -8,7 +8,7 @@
 .release h2 small{margin-left:10px;font:400 14px/1.4 var(--ow-font-mono);letter-spacing:0;color:var(--grey);white-space:nowrap}
 .release .facts{margin-top:12px;font:400 13px/1.7 var(--ow-font-mono);font-variant-numeric:tabular-nums;color:var(--grey)}
 .release .headline,.release li{overflow-wrap:anywhere}
-.release .headline{margin-top:clamp(24px,3vw,32px);max-width:640px;font-size:clamp(23px,2.5vw,29px);font-weight:660;line-height:1.22;letter-spacing:-.03em;color:var(--ink)}
+.release .headline{margin-top:clamp(24px,3vw,32px);max-width:640px;font-size:clamp(23px,2.5vw,29px);font-weight:660;line-height:1.22;letter-spacing:-.03em;text-wrap:balance;color:var(--ink)}
 .release .picked{margin-top:28px;font:600 12px/1 var(--ow-font-sans);letter-spacing:.08em;text-transform:uppercase;color:var(--grey)}
 .release ul{margin:16px 0 0;padding:0;list-style:none;counter-reset:item;color:#e1d7cb;font-size:17px;line-height:1.55}
 .release li{display:grid;grid-template-columns:40px 1fr;align-items:baseline;counter-increment:item}
