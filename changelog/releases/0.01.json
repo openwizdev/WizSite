@@ -2,11 +2,14 @@
   "name": "0.01",
   "semver": "0.1.0",
   "date": "2026-11-21",
-  "headline": "Run builders where you choose.",
+  "headline": "See your factory in the app, and run builders where you choose.",
   "bullets": [
-    "Three drivers: your own computer (Claude Code or Codex), boat.dev and CloudRoom.",
-    "Start builders by hand on this computer or boat.dev; the automatic fleet runs in CloudRoom.",
-    "Watch every spec and agent at openwiz.dev/app."
+    "Sign in with GitHub at openwiz.dev/app to see what needs you, every spec's ticket graph and your agents at work.",
+    "Run builders by hand on your own computer (Claude Code or Codex) or boat.dev, or as an automatic fleet in CloudRoom.",
+    "Install OpenWiz's skills into the coding agents you already use; your own skills stay untouched.",
+    "Plug in any place that runs agents with a small driver, a template to copy and a five-check test kit.",
+    "Keep your CloudRoom loops as files that openwiz loop checks, plans and applies, with no always-on engine.",
+    "Removed: the local web view and the send, new and attachment commands; the app now lives on the web."
   ],
   "notes": "https://github.com/openwizdev/OpenWiz/releases/tag/v0.1.0"
 }
