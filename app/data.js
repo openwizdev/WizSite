@@ -353,6 +353,24 @@
     }
     return loose;
   }
+  function placeSpec(errors, repository) {
+    const loose = [];
+    for (const error of Array.isArray(errors) ? errors : []) {
+      const path = Array.isArray(error?.path) ? error.path : [];
+      const detail = path[0] === 'repository' && typeof path[1] === 'string' && /^s\d+$/.test(path[1]) && Object.hasOwn(repository, path[1])
+        ? repository[path[1]] : undefined;
+      const nodes = detail?.subIssues?.nodes;
+      const issue = path[2] === 'subIssues' && path[3] === 'nodes' && Number.isSafeInteger(path[4]) && Array.isArray(nodes)
+        ? nodes[path[4]] : undefined;
+      if (issue === null) continue;
+      const prs = issue?.closedByPullRequestsReferences?.nodes;
+      const pr = path[5] === 'closedByPullRequestsReferences' && path[6] === 'nodes' && Number.isSafeInteger(path[7]) && Array.isArray(prs)
+        ? prs[path[7]] : undefined;
+      if (pr && path[8] === 'commits') (issue.errors ||= []).push(path.slice(5));
+      else loose.push(error);
+    }
+    return loose;
+  }
   async function agentsRead(feed, picked, mine) {
     const now = Date.now();
     const kept = feed.kept?.repo === picked.full ? feed.kept : null;
@@ -573,6 +591,7 @@
             if (limited(extra)) { why = 'limit'; if (!paused()) limit.pausedUntil = Date.now() + PAUSE_DEFAULT; }
             const heavy = (extra?.errors || []).some(e => e?.type === 'RESOURCE_LIMITS_EXCEEDED');
             if (heavy && chunk.length > 1) { queue.unshift(...chunk.map(n => [n])); continue; }
+            if (got) errors.push(...placeSpec(extra?.errors, got));
             for (const n of chunk) {
               const detail = got?.[`s${n}`];
               if (whole(detail)) fresh.set(n, detail);
