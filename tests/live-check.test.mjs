@@ -431,7 +431,7 @@ function makeFakeGitHub({ askHasNeedsInfo = true, fleet = FLEET_MD } = {}) {
     return jsonResponse(404, { message: 'Not Found' });
   }
 
-  return { githubFetch, upstreamLog };
+  return { githubFetch, upstreamLog, data: { specsData, specDetails, agentsData, modelsData } };
 }
 
 function jsonResponse(status, json) {
@@ -504,7 +504,8 @@ test('consistent repository passes all 5 pages, keeps real token out of browser,
 
   assert.equal(result.ok, true, `expected all pages to pass, got:\n${formatResults(result)}`);
   assert.equal(result.truth.needsYou, 3);
-  assert.equal(result.truth.canvasNeedsYou, 3);
+  assert.equal(result.truth.unreadableDecisions, 0);
+  assert.equal(result.auditError, null);
   assert.deepEqual(result.pages.map(p => p.page), PAGES);
   assert.equal(result.pages.every(p => p.pass), true);
   assert.equal(result.tokenLeaked, false);
@@ -857,6 +858,195 @@ test('partial upstream GitHub 429 fails only the affected page while other pages
   assert.equal(agents.pass, false);
   assert.match(agents.detail, /429/);
   for (const name of ['You', 'Specs', 'Canvas', 'Models']) {
+    assert.equal(result.pages.find(p => p.page === name).pass, true, `${name} should still pass`);
+  }
+});
+
+function malformedDecision(spec) {
+  return {
+    databaseId: 9002,
+    body: ['Decision request.', '```json', JSON.stringify({ schema: 'openwiz.decisions.v1', kind: 'spec_confirmation', spec }), '```'].join('\n'),
+    url: `https://github.com/acme/factory/issues/${spec}#issuecomment-9002`,
+    createdAt: new Date().toISOString().replace(/\.\d{3}Z$/, 'Z'),
+    updatedAt: new Date().toISOString().replace(/\.\d{3}Z$/, 'Z'),
+    author: { login: 'factory-bot[bot]' },
+  };
+}
+
+function seeded(pattern, edits, applied) {
+  return (pathname, reply) => {
+    if (!pattern.test(pathname)) return reply;
+    let source = reply.raw.toString('utf8');
+    for (const [from, to] of edits) {
+      if (source.includes(from)) applied.add(from);
+      source = source.replace(from, to);
+    }
+    return { ...reply, raw: Buffer.from(source) };
+  };
+}
+
+test('a rejected browser read fails its page and the CLI still prints all five verdicts', async () => {
+  const { data } = makeFakeGitHub();
+  const source = `const D = ${JSON.stringify(data)};
+const reply = (status, json) => new Response(JSON.stringify(json), { status, headers: { 'content-type': 'application/json' } });
+globalThis.fetch = async (url, init = {}) => {
+  const body = String(init.body || '');
+  const query = body ? String(JSON.parse(body).query || '') : '';
+  const op = (query.match(/^\\s*query\\s+(\\w+)/) || [])[1];
+  if (op === 'Models') throw new TypeError('fetch failed: synthetic connection reset');
+  if (op === 'Specs') return reply(200, { data: D.specsData });
+  if (op === 'SpecTickets') {
+    const repository = {};
+    for (const key of Object.keys(D.specDetails)) if (query.includes(key + ':')) repository[key] = D.specDetails[key];
+    return reply(200, { data: { repository } });
+  }
+  if (op === 'Agents') return reply(200, { data: D.agentsData });
+  return reply(404, { message: 'Not Found' });
+};`;
+  let exitCode = 0;
+  let stdout = '';
+  let stderr = '';
+  try {
+    const out = await execFileAsync(process.execPath, ['--import', `data:text/javascript,${encodeURIComponent(source)}`, 'scripts/live-check.mjs', '--repo', 'acme/factory'], {
+      env: { ...process.env, GH_TOKEN: REAL_TOKEN },
+    });
+    stdout = out.stdout;
+    stderr = out.stderr;
+  } catch (err) {
+    exitCode = err.code;
+    stdout = err.stdout || '';
+    stderr = err.stderr || '';
+  }
+
+  assert.equal(exitCode, 1, `expected exit 1, stderr: ${stderr}`);
+  const lines = stdout.trim().split('\n').filter(Boolean);
+  assert.equal(lines.length, 5, `expected 5 verdict lines on stdout, got:\n${stdout}\nstderr:\n${stderr}`);
+  for (let i = 0; i < PAGES.length; i += 1) {
+    assert.match(lines[i], new RegExp(`^(PASS|FAIL) ${PAGES[i]}: `));
+  }
+  assert.match(lines[4], /^FAIL Models: .*a GitHub read from the browser failed \(Models\): fetch failed: synthetic connection reset/);
+  assert.doesNotMatch(stderr, /Unhandled|Uncaught|TypeError/);
+});
+
+test('a Specs answer with a GraphQL error and an unreadable spec leaves You, Specs and Canvas unconfirmed', async () => {
+  const { githubFetch: baseFetch, data } = makeFakeGitHub();
+  const githubFetch = async (url, init = {}) => {
+    if (String(init.body || '').includes('query Specs(')) {
+      const specSearch = { ...data.specsData.specSearch, nodes: [data.specsData.specSearch.nodes[0], null] };
+      return jsonResponse(200, {
+        data: { ...data.specsData, specSearch },
+        errors: [{ message: 'Something went wrong while executing your query.', path: ['specSearch', 'nodes', 1] }],
+      });
+    }
+    return baseFetch(url, init);
+  };
+  const result = await runLiveCheck({ repo: 'acme/factory', token: REAL_TOKEN, githubFetch });
+
+  assert.equal(result.ok, false);
+  assert.deepEqual(result.pages.map(p => p.page), PAGES);
+  for (const name of ['You', 'Specs', 'Canvas']) {
+    const page = result.pages.find(p => p.page === name);
+    assert.equal(page.pass, false, `${name} should be unconfirmed`);
+    assert.match(page.detail, /GitHub baseline is incomplete: Something went wrong/);
+  }
+  for (const name of ['Agents', 'Models']) {
+    assert.equal(result.pages.find(p => p.page === name).pass, true, `${name} should still pass`);
+  }
+});
+
+test('an Agents answer with a GraphQL error and an unreadable issue leaves Agents unconfirmed', async () => {
+  const { githubFetch: baseFetch, data } = makeFakeGitHub();
+  const githubFetch = async (url, init = {}) => {
+    if (String(init.body || '').includes('query Agents(')) {
+      const issues = { ...data.agentsData.repository.issues, nodes: [null, data.agentsData.repository.issues.nodes[1]] };
+      return jsonResponse(200, {
+        data: { ...data.agentsData, repository: { ...data.agentsData.repository, issues } },
+        errors: [{ message: 'Something went wrong while executing your query.', path: ['repository', 'issues', 'nodes', 0] }],
+      });
+    }
+    return baseFetch(url, init);
+  };
+  const result = await runLiveCheck({ repo: 'acme/factory', token: REAL_TOKEN, githubFetch });
+
+  assert.equal(result.ok, false);
+  const agents = result.pages.find(p => p.page === 'Agents');
+  assert.equal(agents.pass, false);
+  assert.match(agents.detail, /GitHub baseline is incomplete: Something went wrong/);
+  for (const name of ['Specs', 'Models']) {
+    assert.equal(result.pages.find(p => p.page === name).pass, true, `${name} should still pass`);
+  }
+});
+
+test('a zero-ticket spec that shows a completed ticket fails Specs and Canvas', async () => {
+  const { githubFetch } = makeFakeGitHub();
+  const applied = new Set();
+  const edits = [
+    ['total: issue.subIssuesSummary?.total ?? null,', 'total: issue.number === 60 ? 1 : issue.subIssuesSummary?.total ?? null,'],
+    ['done: issue.subIssuesSummary?.completed ?? null,', 'done: issue.number === 60 ? 1 : issue.subIssuesSummary?.completed ?? null,'],
+  ];
+  const result = await runLiveCheck({
+    repo: 'acme/factory',
+    token: REAL_TOKEN,
+    githubFetch,
+    siteTransform: seeded(/^\/app\/pages\/specs(?:\.[0-9a-f]{10})?\.js$/, edits, applied),
+  });
+
+  assert.equal(applied.size, edits.length, 'the seeded contradiction must reach the app');
+  assert.equal(result.ok, false);
+  assert.match(result.pages.find(p => p.page === 'Specs').detail, /spec #60 shows "1 of 1 tickets done" while GitHub counts no tickets/);
+  assert.match(result.pages.find(p => p.page === 'Canvas').detail, /rail sheet #60 line ".*1 of 1 done.*" while GitHub counts no tickets/);
+});
+
+test('an unreadable decision record leaves Needs you unconfirmed on You and Canvas', async () => {
+  const fake = makeFakeGitHub();
+  fake.data.specDetails.s60.comments.nodes.push(malformedDecision(60));
+  fake.data.specDetails.s60.comments.totalCount = 2;
+  const result = await runLiveCheck({ repo: 'acme/factory', token: REAL_TOKEN, githubFetch: fake.githubFetch });
+
+  assert.equal(result.ok, false);
+  for (const name of ['You', 'Canvas']) {
+    const page = result.pages.find(p => p.page === name);
+    assert.equal(page.pass, false, `${name} should be unconfirmed`);
+    assert.match(page.detail, /Needs you can't be confirmed: 1 decision record on GitHub couldn't be read/);
+  }
+  for (const name of ['Specs', 'Agents', 'Models']) {
+    assert.equal(result.pages.find(p => p.page === name).pass, true, `${name} should still pass`);
+  }
+});
+
+test('a token audit that cannot finish fails the run with its reason', async () => {
+  const { githubFetch } = makeFakeGitHub();
+  const result = await runLiveCheck({
+    repo: 'acme/factory',
+    token: REAL_TOKEN,
+    githubFetch,
+    async onPage(page, pageName) {
+      if (pageName !== 'Models') return;
+      await page.run(`Object.defineProperty(window, 'sessionStorage', { configurable: true, get() { throw new Error('synthetic storage block'); } }) && true`);
+    },
+  });
+
+  assert.equal(result.pages.every(p => p.pass), true, formatResults(result));
+  assert.equal(result.ok, false);
+  assert.equal(result.tokenLeaked, null);
+  assert.match(result.auditError, /^the token audit could not finish: .*synthetic storage block/);
+});
+
+test('a lower-bound tile like 3+ fails You when GitHub has exactly 3', async () => {
+  const { githubFetch } = makeFakeGitHub();
+  const applied = new Set();
+  const edits = [["{ label: 'Needs you', value: c?.you, state: 'you' },", "{ label: 'Needs you', value: c ? `${c.you}+` : c?.you, state: 'you' },"]];
+  const result = await runLiveCheck({
+    repo: 'acme/factory',
+    token: REAL_TOKEN,
+    githubFetch,
+    siteTransform: seeded(/^\/app\/pages\/you(?:\.[0-9a-f]{10})?\.js$/, edits, applied),
+  });
+
+  assert.equal(applied.size, edits.length, 'the seeded contradiction must reach the app');
+  assert.equal(result.ok, false);
+  assert.match(result.pages.find(p => p.page === 'You').detail, /Needs you shows 3\+ \(GitHub expects exactly 3\)/);
+  for (const name of ['Specs', 'Agents', 'Canvas', 'Models']) {
     assert.equal(result.pages.find(p => p.page === name).pass, true, `${name} should still pass`);
   }
 });

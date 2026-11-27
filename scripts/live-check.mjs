@@ -32,6 +32,40 @@ export function browserEnv(token = '', source = process.env, profile = '') {
 
 const errorLine = error => (error instanceof Error ? error.message : String(error)).split('\n')[0].trim();
 const failPage = (page, detail) => ({ page, pass: false, detail, reasons: [detail] });
+const READ_PAGES = {
+  Specs: ['You', 'Specs', 'Canvas'],
+  SpecTickets: ['You', 'Canvas'],
+  Agents: ['Agents'],
+  AgentPulls: ['Agents'],
+  Models: ['Models'],
+};
+
+function failedRead(request, error) {
+  let url = null;
+  try {
+    url = new URL(request.url);
+  } catch {
+    return { pages: PAGES, reason: `a browser request failed: ${errorLine(error)}` };
+  }
+  if (url.origin === SITE) return { pages: PAGES, reason: `the app file ${url.pathname} could not be served: ${errorLine(error)}` };
+  let op = null;
+  try {
+    op = String(JSON.parse(request.postData || '{}').query || '').match(/^\s*query\s+(\w+)/)?.[1] || null;
+  } catch {
+    op = null;
+  }
+  const name = op || `${(request.method || 'GET').toUpperCase()} ${url.pathname}`;
+  return { pages: READ_PAGES[op] || PAGES, reason: `a GitHub read from the browser failed (${name}): ${errorLine(error)}` };
+}
+
+function withReadFailures(pages, failures) {
+  return pages.map(page => {
+    const extra = [...new Set(failures.filter(f => f.pages.includes(page.page)).map(f => f.reason))];
+    if (!extra.length) return page;
+    const reasons = [...(page.pass ? [] : page.reasons || [page.detail]), ...extra.filter(r => !(page.reasons || []).includes(r))];
+    return { ...page, pass: false, reasons, detail: reasons.join('; ') };
+  });
+}
 
 const LAPSE_MS = 30 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -119,6 +153,7 @@ export class LiveWorld extends World {
     this.githubFetch = githubFetch;
     this.siteTransform = siteTransform;
     this.refusedWrites = [];
+    this.readFailures = [];
     this.browserSawRealToken = false;
   }
 
@@ -133,6 +168,15 @@ export class LiveWorld extends World {
 
   async answer(request) {
     this.checkTokenLeak(request);
+    try {
+      return await this.relay(request);
+    } catch (error) {
+      this.readFailures.push(failedRead(request, error));
+      return { abort: true };
+    }
+  }
+
+  async relay(request) {
     const url = new URL(request.url);
     const method = (request.method || 'GET').toUpperCase();
 
@@ -458,6 +502,7 @@ function chunksOf(specs) {
 }
 
 const recent = (at, now) => at - now <= CLOCK_SKEW_MS && now - at < LAPSE_MS;
+const partialList = list => !list || !Array.isArray(list.nodes) || list.nodes.some(node => !node) || (list.totalCount ?? 0) > list.nodes.length;
 const labelNames = issue => (issue?.labels?.nodes || []).filter(Boolean).map(l => l.name);
 
 function issueClaims(issue, authors, now) {
@@ -542,7 +587,7 @@ function emptyTruth(pageErrors = {}) {
   return {
     specs: [],
     needsYou: 0,
-    canvasNeedsYou: 0,
+    unreadableDecisions: 0,
     building: 0,
     review: 0,
     merged: 0,
@@ -557,12 +602,14 @@ export async function fetchGitHubTruth({ owner, name, token, githubFetch = fetch
   const full = `${owner}/${name}`;
   const specSearchQuery = `repo:${full} is:issue state:open (has:sub-issue OR label:spec OR in:title spec) -label:wayfind:map sort:updated-desc`;
   const pageErrors = {};
-  const setPageErrors = (names, error) => {
-    const reason = `GitHub baseline could not be read: ${errorLine(error)}`;
+  const mark = (names, reason) => {
     for (const pageName of names) {
       if (!pageErrors[pageName]) pageErrors[pageName] = reason;
     }
   };
+  const setPageErrors = (names, error) => mark(names, `GitHub baseline could not be read: ${errorLine(error)}`);
+  const incomplete = (names, why) => mark(names, `GitHub baseline is incomplete: ${errorLine(why)}`);
+  const firstError = answer => answer?.errors?.[0]?.message || 'GitHub GraphQL error';
 
   let specsAnswer = null;
   try {
@@ -579,6 +626,14 @@ export async function fetchGitHubTruth({ owner, name, token, githubFetch = fetch
   }
 
   const repo = specsAnswer?.data?.repository || {};
+  if (specsAnswer) {
+    if (specsAnswer.errors?.length) {
+      const fleetToo = specsAnswer.errors.some(e => !Array.isArray(e?.path) || (e.path[0] === 'repository' && e.path[1] === 'fleet'));
+      incomplete(['You', 'Specs', 'Canvas', ...(fleetToo ? ['Models'] : [])], firstError(specsAnswer));
+    }
+    if (partialList(specsAnswer.data?.specSearch)) incomplete(['You', 'Specs', 'Canvas'], 'GitHub gave only part of the list of specs');
+    if (partialList(repo.youIssues)) incomplete(['You', 'Canvas'], 'GitHub gave only part of the tickets waiting on you');
+  }
   let fleetText = repo.fleet?.text ?? null;
   let authors = recordAuthors(fleetText);
   const rawSpecs = specsAnswer
@@ -593,6 +648,7 @@ export async function fetchGitHubTruth({ owner, name, token, githubFetch = fetch
 
   const details = {};
   if (specsAnswer) {
+    if (rawSpecs.length > SPEC_DETAILS) incomplete(['You', 'Canvas'], `only the first ${SPEC_DETAILS} specs' tickets are read`);
     const queue = chunksOf(rawSpecs.slice(0, SPEC_DETAILS).map(s => ({ n: s.number, tickets: Math.min(50, s.subIssuesSummary?.total ?? 50) })));
     try {
       while (queue.length) {
@@ -606,9 +662,14 @@ export async function fetchGitHubTruth({ owner, name, token, githubFetch = fetch
         if (!ans.data?.repository && ans.errors?.length) {
           throw new Error(ans.errors[0]?.message || 'GitHub GraphQL error');
         }
+        if (ans.errors?.length) incomplete(['You', 'Canvas'], firstError(ans));
         const got = ans.data?.repository || {};
         for (const n of chunk) {
-          if (got[`s${n}`]) details[`s${n}`] = got[`s${n}`];
+          const detail = got[`s${n}`];
+          if (!detail) incomplete(['You', 'Canvas'], `#${n}'s tickets couldn't be read`);
+          else if (partialList(detail.comments)) incomplete(['You', 'Canvas'], `GitHub gave only part of #${n}'s comments`);
+          else if (partialList(detail.subIssues)) incomplete(['You', 'Canvas'], `GitHub gave only part of #${n}'s tickets`);
+          if (detail) details[`s${n}`] = detail;
         }
       }
     } catch (error) {
@@ -671,24 +732,33 @@ export async function fetchGitHubTruth({ owner, name, token, githubFetch = fetch
   const since = new Date(now - DAY_MS - CLOCK_SKEW_MS).toISOString();
   const agentIssues = [];
   let after = null;
+  const agentPages = specsAnswer ? ['Agents'] : ['Agents', 'Models'];
   try {
+    let more = false;
     for (let page = 0; page < 40; page += 1) {
       const ans = await gql(githubFetch, token, AGENTS_QUERY, { owner, name, since, after });
       if (!ans.data?.repository && ans.errors?.length) {
         throw new Error(ans.errors[0]?.message || 'GitHub GraphQL error');
       }
+      if (ans.errors?.length) incomplete(agentPages, firstError(ans));
       if (!specsAnswer && ans.data?.repository?.fleet?.text !== undefined) {
         fleetText = ans.data.repository.fleet?.text ?? null;
         authors = recordAuthors(fleetText);
       }
       const list = ans.data?.repository?.issues;
-      if (!Array.isArray(list?.nodes)) break;
+      if (!Array.isArray(list?.nodes)) {
+        incomplete(agentPages, 'GitHub gave no list of recent issues');
+        break;
+      }
+      if (list.nodes.some(issue => !issue)) incomplete(agentPages, 'GitHub gave only part of the recent issues');
       for (const issue of list.nodes) if (issue) agentIssues.push(issue);
-      if (!list.pageInfo?.hasNextPage || typeof list.pageInfo.endCursor !== 'string') break;
+      more = Boolean(list.pageInfo?.hasNextPage);
+      if (!more || typeof list.pageInfo.endCursor !== 'string') break;
       after = list.pageInfo.endCursor;
     }
+    if (more) incomplete(agentPages, 'GitHub has more recent issues than the checker reads');
   } catch (error) {
-    setPageErrors(specsAnswer ? ['Agents'] : ['Agents', 'Models'], error);
+    setPageErrors(agentPages, error);
   }
 
   let agentsWorkingNow = 0;
@@ -725,7 +795,7 @@ export async function fetchGitHubTruth({ owner, name, token, githubFetch = fetch
   return {
     specs,
     needsYou,
-    canvasNeedsYou: needsYou + unreadableDecisions,
+    unreadableDecisions,
     building,
     review,
     merged,
@@ -749,6 +819,8 @@ async function waitForFeeds(page, waitMs) {
   throw new Error('timed out waiting for app feeds to finish loading');
 }
 
+const unconfirmedNeedsYou = n => `Needs you can't be confirmed: ${n} decision record${n === 1 ? '' : 's'} on GitHub couldn't be read`;
+
 async function checkYou(page, truth, pageWaitMs) {
   await page.go(`${SITE}/app/#/you`);
   await page.until(`document.querySelector('main h1')?.textContent.trim() === 'You' && document.querySelectorAll('main .tile').length === 4`, 'You page', pageWaitMs);
@@ -761,18 +833,20 @@ async function checkYou(page, truth, pageWaitMs) {
   })()`);
   const reasons = [];
   const parseTile = raw => {
-    const m = String(raw || '').trim().match(/^(\d+)\+?$/);
-    return m ? Number(m[1]) : NaN;
+    const m = String(raw || '').trim().match(/^(\d+)(\+?)$/);
+    return m ? { count: Number(m[1]), lowerBound: m[2] === '+' } : null;
   };
+  if (truth.unreadableDecisions > 0) reasons.push(unconfirmedNeedsYou(truth.unreadableDecisions));
   const expected = {
-    'Needs you': truth.needsYou,
+    ...(truth.unreadableDecisions > 0 ? {} : { 'Needs you': truth.needsYou }),
     Building: truth.building,
     'In review': truth.review,
     Merged: truth.merged,
   };
   for (const [label, want] of Object.entries(expected)) {
     const got = parseTile(data.tiles[label]);
-    if (got !== want) reasons.push(`${label} shows ${data.tiles[label]} (GitHub expects ${want})`);
+    if (!got || got.count !== want) reasons.push(`${label} shows ${data.tiles[label]} (GitHub expects ${want})`);
+    else if (got.lowerBound) reasons.push(`${label} shows ${data.tiles[label]} (GitHub expects exactly ${want})`);
   }
   if (/\b(undefined|NaN)\b/.test(data.text)) reasons.push('page leaks undefined or NaN');
   return {
@@ -803,12 +877,15 @@ async function checkSpecs(page, truth, pageWaitMs) {
       reasons.push(`spec #${spec.number} is missing`);
       continue;
     }
+    const doneMatch = text.match(/\b(\d+) of (\d+) tickets done\b/);
+    const differs = doneMatch && (Number(doneMatch[1]) !== spec.done || Number(doneMatch[2]) !== spec.total);
     if (spec.total > 0) {
-      const doneMatch = text.match(/\b(\d+) of (\d+) tickets done\b/);
       if (/no tickets yet/i.test(text)) reasons.push(`spec #${spec.number} shows "No tickets yet" while GitHub counts ${spec.total} tickets`);
-      else if (!doneMatch || Number(doneMatch[1]) !== spec.done || Number(doneMatch[2]) !== spec.total) {
+      else if (!doneMatch || differs) {
         reasons.push(`spec #${spec.number} does not show "${spec.done} of ${spec.total} tickets done"`);
       }
+    } else if (differs) {
+      reasons.push(`spec #${spec.number} shows "${doneMatch[0]}" while GitHub counts no tickets`);
     }
   }
   return {
@@ -864,9 +941,11 @@ async function checkCanvas(page, truth, pageWaitMs) {
   const reasons = [];
   const inboxMatch = overview.inboxLabel.match(/^Needs you\s*·\s*(\d+)$/);
   const inboxCount = inboxMatch ? Number(inboxMatch[1]) : null;
-  if (truth.canvasNeedsYou > 0) {
-    if (inboxCount !== truth.canvasNeedsYou) {
-      reasons.push(`Needs you strip shows "${overview.inboxLabel || overview.inboxText}" (GitHub expects "Needs you · ${truth.canvasNeedsYou}")`);
+  if (truth.unreadableDecisions > 0) {
+    reasons.push(unconfirmedNeedsYou(truth.unreadableDecisions));
+  } else if (truth.needsYou > 0) {
+    if (inboxCount !== truth.needsYou) {
+      reasons.push(`Needs you strip shows "${overview.inboxLabel || overview.inboxText}" (GitHub expects "Needs you · ${truth.needsYou}")`);
     }
   } else if (overview.inboxLabel) {
     reasons.push(`Needs you strip shows "${overview.inboxLabel}" (GitHub expects 0)`);
@@ -881,12 +960,15 @@ async function checkCanvas(page, truth, pageWaitMs) {
       reasons.push(`sheet #${spec.number} is missing from rail`);
       continue;
     }
+    const doneMatch = line.match(/\b(\d+) of (\d+) done\b/);
+    const differs = doneMatch && (Number(doneMatch[1]) !== spec.done || Number(doneMatch[2]) !== spec.total);
     if (spec.total > 0) {
-      const doneMatch = line.match(/\b(\d+) of (\d+) done\b/);
       if (/no tickets/i.test(line)) reasons.push(`rail sheet #${spec.number} says "${line}" while GitHub counts ${spec.total} tickets`);
-      else if (!doneMatch || Number(doneMatch[1]) !== spec.done || Number(doneMatch[2]) !== spec.total) {
+      else if (!doneMatch || differs) {
         reasons.push(`rail sheet #${spec.number} line "${line}" disagrees with "${spec.done} of ${spec.total} done"`);
       }
+    } else if (differs) {
+      reasons.push(`rail sheet #${spec.number} line "${line}" while GitHub counts no tickets`);
     }
   }
   for (const spec of truth.specs.filter(s => s.total > 0).slice(0, 5)) {
@@ -905,7 +987,7 @@ async function checkCanvas(page, truth, pageWaitMs) {
   return {
     page: 'Canvas',
     pass: reasons.length === 0,
-    detail: reasons.length ? reasons.join('; ') : `${truth.specs.length} sheets, Needs you=${truth.canvasNeedsYou}, boards match GitHub`,
+    detail: reasons.length ? reasons.join('; ') : `${truth.specs.length} sheets, Needs you=${truth.needsYou}, boards match GitHub`,
     reasons,
   };
 }
@@ -1058,15 +1140,18 @@ export async function runLiveCheck({
       repo: `${owner}/${name}`,
       pages: PAGES.map(pageName => failPage(pageName, pageErrors[pageName])),
       refusedWrites: [],
+      readFailures: [],
       violations: [],
       tokenLeaked: false,
+      auditError: null,
       truth,
     };
   }
 
   const world = new LiveWorld({ owner, name, token, prod, githubFetch, siteTransform });
-  const pages = [];
+  let pages = [];
   let tokenLeaked = false;
+  let auditError = 'the token audit did not run';
   let run = null;
 
   try {
@@ -1099,15 +1184,21 @@ export async function runLiveCheck({
       pages.push(res);
     }
 
-    const storageDump = await run.page.run(`JSON.stringify({
-      local: Object.entries(localStorage),
-      session: Object.entries(sessionStorage),
-      cookie: document.cookie,
-    })`);
-    const procEnv = run.browser.pid
-      ? await readFile(`/proc/${run.browser.pid}/environ`, 'utf8').catch(() => '')
-      : '';
-    if (storageDump.includes(token) || world.browserSawRealToken || procEnv.includes(token)) tokenLeaked = true;
+    try {
+      const storageDump = await run.page.run(`JSON.stringify({
+        local: Object.entries(localStorage),
+        session: Object.entries(sessionStorage),
+        cookie: document.cookie,
+      })`);
+      if (typeof storageDump !== 'string') throw new Error('browser storage could not be read');
+      const procEnv = run.browser.pid
+        ? await readFile(`/proc/${run.browser.pid}/environ`, 'utf8').catch(() => '')
+        : '';
+      if (storageDump.includes(token) || procEnv.includes(token)) tokenLeaked = true;
+      auditError = null;
+    } catch (error) {
+      auditError = `the token audit could not finish: ${errorLine(error)}`;
+    }
   } catch (error) {
     const reason = errorLine(error);
     const done = new Set(pages.map(p => p.page));
@@ -1118,14 +1209,19 @@ export async function runLiveCheck({
     if (run) await run.close();
   }
 
-  const ok = pages.every(p => p.pass) && !tokenLeaked && world.violations.length === 0;
+  pages = withReadFailures(pages, world.readFailures);
+  if (world.browserSawRealToken) tokenLeaked = true;
+  else if (auditError && tokenLeaked !== true) tokenLeaked = null;
+  const ok = pages.every(p => p.pass) && tokenLeaked === false && !auditError && world.violations.length === 0;
   return {
     ok,
     repo: `${owner}/${name}`,
     pages,
     refusedWrites: world.refusedWrites,
+    readFailures: world.readFailures,
     violations: world.violations,
     tokenLeaked,
+    auditError,
     truth,
   };
 }
@@ -1155,6 +1251,7 @@ if (isMain) {
   if (opts.json) console.log(JSON.stringify(result, null, 2));
   else console.log(formatResults(result));
   if (result.tokenLeaked) console.error('FAIL security: real token leaked to browser');
+  if (result.auditError) console.error(`FAIL security: ${result.auditError}`);
   if (result.violations.length) console.error(`FAIL violations: ${result.violations.join(' | ')}`);
   process.exit(result.ok ? 0 : 1);
 }
