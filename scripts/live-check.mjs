@@ -764,8 +764,16 @@ export async function fetchGitHubTruth({ owner, name, token, githubFetch = fetch
   let agentsWorkingNow = 0;
   let agentsInLastDay = 0;
   for (const issue of agentIssues) {
+    const comments = issue.comments;
+    const hasNodes = Array.isArray(comments?.nodes);
+    const nodes = hasNodes ? comments.nodes : [];
+    const oldest = Date.parse(nodes.at(-1)?.updatedAt);
+    const truncated = (comments?.totalCount ?? 0) > nodes.length;
+    if (!hasNodes || nodes.some(node => !node) || (truncated && (!Number.isFinite(oldest) || now - oldest < DAY_MS))) {
+      incomplete(['Agents'], `GitHub gave only part of #${issue.number}'s recent comments`);
+    }
     const notes = [];
-    for (const comment of issue.comments?.nodes || []) {
+    for (const comment of nodes) {
       if (!comment) continue;
       const note = readStatusNote(comment.body);
       if (!note) continue;
@@ -971,7 +979,7 @@ async function checkCanvas(page, truth, pageWaitMs) {
       reasons.push(`rail sheet #${spec.number} line "${line}" while GitHub counts no tickets`);
     }
   }
-  for (const spec of truth.specs.filter(s => s.total > 0).slice(0, 5)) {
+  for (const spec of truth.specs.filter(s => s.total > 0)) {
     await page.go(`${SITE}/app/#/canvas/${spec.number}`);
     await page.until(`/#${spec.number}(?!\\d)/.test(document.querySelector('.cv-title')?.innerText || '')`, `Canvas sheet #${spec.number}`, pageWaitMs);
     const stage = await page.run(`(() => ({
