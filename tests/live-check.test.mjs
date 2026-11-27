@@ -977,6 +977,84 @@ test('an Agents answer with a GraphQL error and an unreadable issue leaves Agent
   }
 });
 
+test('truncated recent issue comments leave Agents unconfirmed', async () => {
+  const { githubFetch, data } = makeFakeGitHub();
+  const issue = data.agentsData.repository.issues.nodes[0];
+  const updatedAt = new Date(Date.now() - 60_000).toISOString();
+  issue.comments = {
+    totalCount: 21,
+    nodes: Array.from({ length: 20 }, (_, index) => ({
+      databaseId: 9500 + index,
+      body: 'Synthetic discussion comment',
+      createdAt: updatedAt,
+      updatedAt,
+      author: { login: 'acme-owner' },
+    })),
+  };
+
+  const result = await runLiveCheck({ repo: 'acme/factory', token: REAL_TOKEN, githubFetch });
+
+  assert.equal(result.ok, false, formatResults(result));
+  assert.deepEqual(result.pages.map(p => p.page), PAGES);
+  assert.match(result.pages.find(p => p.page === 'Agents').detail,
+    /GitHub baseline is incomplete: GitHub gave only part of #52's recent comments/);
+  assert.equal(result.pages.filter(p => p.pass).length, 4);
+});
+
+test('truncation outside the Agents time window still allows an exact count', async () => {
+  const { githubFetch, data } = makeFakeGitHub();
+  const { comments } = data.agentsData.repository.issues.nodes[0];
+  const oldest = new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString();
+  comments.nodes.push(...Array.from({ length: 19 }, (_, index) => ({
+    databaseId: 9500 + index, body: 'Older discussion', createdAt: oldest, updatedAt: oldest,
+  })));
+  comments.totalCount = 21;
+
+  const result = await runLiveCheck({ repo: 'acme/factory', token: REAL_TOKEN, githubFetch });
+
+  assert.equal(result.ok, true, formatResults(result));
+  assert.match(result.pages.find(p => p.page === 'Agents').detail, /^1 working now, 1 in the last day$/);
+});
+
+test('a contradiction on the sixth nonempty Canvas board fails Canvas', async () => {
+  const { githubFetch, data } = makeFakeGitHub();
+  const search = data.specsData.specSearch;
+  const populatedSpec = search.nodes.find(spec => spec.number === 50);
+  const ticket = data.specDetails.s50.subIssues.nodes[0];
+  const issueUrl = 'https://github.com/acme/factory/issues/';
+  for (const number of [70, 80, 90, 100, 110]) {
+    search.nodes.push({
+      ...populatedSpec, number, title: `Spec: sheet ${number}`, url: issueUrl + number,
+      subIssuesSummary: { total: 1, completed: 1 },
+    });
+    data.specDetails[`s${number}`] = {
+      number,
+      comments: { totalCount: 0, nodes: [] },
+      subIssues: { totalCount: 1, nodes: [{ ...ticket, number: number + 1, url: issueUrl + (number + 1) }] },
+    };
+  }
+  search.totalCount = search.nodes.length;
+
+  const applied = new Set();
+  const edits = [
+    ['else if (!sheet.read || !sheet.tickets.length) {', 'else if (sheet.number === 110 || !sheet.read || !sheet.tickets.length) {'],
+    ['OW.ui.placeholder(!sheet.read || sheet.total', 'OW.ui.placeholder(sheet.number !== 110 && (!sheet.read || sheet.total)'],
+  ];
+  const result = await runLiveCheck({
+    repo: 'acme/factory',
+    token: REAL_TOKEN,
+    githubFetch,
+    siteTransform: seeded(/^\/app\/pages\/canvas(?:\.[0-9a-f]{10})?\.js$/, edits, applied),
+  });
+
+  assert.equal(applied.size, edits.length, 'the seeded contradiction must reach the app');
+  assert.equal(result.ok, false, formatResults(result));
+  assert.deepEqual(result.pages.map(p => p.page), PAGES);
+  assert.match(result.pages.find(p => p.page === 'Canvas').detail,
+    /spec #110 shows "No tickets yet" while GitHub counts 1 tickets/);
+  assert.equal(result.pages.filter(p => p.pass).length, 4);
+});
+
 test('a zero-ticket spec that shows a completed ticket fails Specs and Canvas', async () => {
   const { githubFetch } = makeFakeGitHub();
   const applied = new Set();
