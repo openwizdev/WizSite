@@ -15,14 +15,12 @@ Written from the merged code in each public repository. Nothing here is a plan.
 OpenWiz is the factory’s command and kernel. It reads and drives your coding agents’ threads in Cloudroom, and reads your fleets’ specs and tickets on GitHub. It pins a WizSkills release and reads WizLoops’ loop files.
 
 - `openwiz ls` and `openwiz show` list and open your Cloudroom threads, and only read.
-- `openwiz send` sends one message to a thread, queued or as a steer. `openwiz new` starts one new thread, and only with `--yes`. Both can attach files.
+- `openwiz init` saves your project's harness, model and effort and makes its private brain. `openwiz models` shows the models your fleet uses and sets them.
 - `openwiz fleets` and `openwiz fleet` show your fleets and each spec’s progress, read from GitHub.
 - `openwiz loop` checks loop files, shows what would change, creates or updates one Cloudroom loop, and writes your live loops back to files.
 - `openwiz help --agent` lists every command for scripts and agents, and most commands give one clean result with `--json`.
-- `openwiz-server` serves a web view on your own computer: your threads, fleets, the plan, decisions waiting on you, and loops.
-- `openwiz-service` keeps that web view running on a PC and runs its registered jobs on a schedule.
 
-Prebuilt pre-releases for macOS and Linux are on [OpenWiz’s GitHub releases](https://github.com/openwizdev/OpenWiz/releases), and trail main. Most of this is tested on synthetic fixtures only.
+OpenWiz 0.1.0 (Nov 21, 2026) and the earlier pre-releases are prebuilt for macOS and Linux on [OpenWiz’s GitHub releases](https://github.com/openwizdev/OpenWiz/releases), and trail main. Most of this is tested on synthetic fixtures only.
 
 ### [WizSkills](https://github.com/openwizdev/WizSkills#readme)
 
@@ -36,7 +34,7 @@ Each release has its own notes on [WizSkills’ GitHub releases](https://github.
 
 ### [WizLoops](https://github.com/openwizdev/WizLoops#readme)
 
-WizLoops keeps an agent’s loops as files: one Markdown file per loop, saying when it wakes, what it checks first and what the agent is told. It holds the format, a starter catalog and the rules for Cloudroom, and no code. OpenWiz’s `openwiz loop` commands read these files.
+WizLoops keeps an agent’s loops as files: one Markdown file per loop, saying when it wakes, what it checks first and what the agent is told. It holds the format, a starter catalog with each loop's check script, and the rules for Cloudroom. OpenWiz’s `openwiz loop` commands read these files.
 
 - The loop file format, with its JSON schema and fixtures.
 - Five starter loops: `fleet-check`, `hourly-status`, `morning-digest`, `stall-sweep` and `workflow-kick`.
@@ -50,17 +48,17 @@ Cloudroom is the only adapter so far.
 WizPlugins holds plugins that show the factory inside Cloudroom. Its one plugin so far, WizBar, is a sidebar of your agents’ threads with their issues, pull requests and child threads.
 
 - WizBar’s cards link each thread’s issue or pull request and count its child threads; hover to list them.
-- A running count with a stats panel, and drag to pin.
+- A running card with a live count of every running thread, and drag to pin.
 - Every WizBar action is also a `room-cli wizbar` command with JSON.
 
-Not in the plugin marketplace yet: [install it from source](https://github.com/openwizdev/WizPlugins). Fixture tests prove it; its check on a real Cloudroom is still open.
+Install it from the BB Marketplace or [from source](https://github.com/openwizdev/WizPlugins). Fixture tests prove it; 0.5.0 was run on a real Cloudroom for its live check, and later versions have not had one yet.
 
 ### [WizSite](https://github.com/openwizdev/WizSite#readme)
 
-WizSite is openwiz.dev: the landing page, this changelog and the app. It is a static site on Cloudflare Pages with one small sign-in helper, and the app reads GitHub from your browser.
+WizSite is openwiz.dev: the landing page, the changelog and the app. It is a static site on Cloudflare Pages with three small functions (a sign-in helper, Ask a Wiz and a click counter), and the app reads GitHub from your browser.
 
-- [The landing page](https://openwiz.dev/) walks through a sample to-do build and the agents OpenWiz works with. Its Install button says coming soon.
-- [openwiz.dev/app](https://openwiz.dev/app/): sign in with GitHub through the read-only OpenWiz Viewer app, pick a repository, and put the app on your phone’s home screen.
+- [The landing page](https://openwiz.dev/) walks through a sample to-do build and the agents OpenWiz works with. Its install box copies the one line to paste into your coding agent.
+- [openwiz.dev/app](https://openwiz.dev/app/): sign in with GitHub through the OpenWiz Viewer app, pick a repository, and put the app on your phone’s home screen.
 - You shows what needs you: counts of work needing you, building, in review and merged, then the specs to confirm, plans to approve and tickets waiting on you, each linked to GitHub.
 - Specs shows each open spec’s progress, and each spec’s page draws its ticket graph.
-- The Agents page is a placeholder for now.
+- Agents lists the agents working now and those that finished or stopped in the last day, from their status notes.

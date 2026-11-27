@@ -66,7 +66,7 @@ Source: the fleet skills, `to-tickets` and `launch-fleet`, which put it on and t
 
 ## Test commands
 
-The full set, in this order, from the repository root. Use Node.js 24, Python 3.11+ and Git; command 6 also needs Chrome or Chromium (`CHROME=/path/to/chrome` picks one). A builder runs the red/green proof and every command its change can affect, then opens the ready pull request.
+The full set, in this order, from the repository root. Use Node.js 24, Python 3.11+ and Git; commands 4 to 8 also need Chrome or Chromium (`CHROME=/path/to/chrome` picks one). A builder runs the red/green proof and every command its change can affect, then opens the ready pull request.
 
 | # | Folder | Command | CI check |
 | --- | --- | --- | --- |
@@ -76,16 +76,18 @@ The full set, in this order, from the repository root. Use Node.js 24, Python 3.
 | 4 | root | `npm test` | `Build, links, resources and privacy` |
 | 5 | root | `npm run test:functions` | `Build, links, resources and privacy` |
 | 6 | root | `npm run test:app` | `Build, links, resources and privacy` |
+| 7 | root | `npm run test:v2` | `Build, links, resources and privacy` |
+| 8 | root | `node --test tests/models-page.test.mjs` | `Build, links, resources and privacy` |
 
-Commands 3 to 6 need command 2's `dist/` first.
+Commands 3 to 8 need command 2's `dist/` first.
 
-Source: [`README.md`](../../README.md#build-and-check), [`package.json`](../../package.json) scripts and [`.github/workflows/site.yml`](../../.github/workflows/site.yml).
+Source: [`docs/maintaining.md`](../maintaining.md#build-and-check), [`package.json`](../../package.json) scripts and [`.github/workflows/site.yml`](../../.github/workflows/site.yml).
 
 ## CI checks
 
 | Check | Runs | Required on |
 | --- | --- | --- |
-| `Build, links, resources and privacy` | Workflow `Site`, job `site`: test commands 1 to 6, in order | `main`, by this project's merge rule below; no ruleset requires it |
+| `Build, links, resources and privacy` | Workflow `Site`, job `site`: on pull requests the added-comment check (`tools/comment-check/check.py`) first, then test commands 1 to 8, in order | `main`, by this project's merge rule below; no ruleset requires it |
 
 The workflow runs for every pull request against `main` and every push to `main`, without path filters, so docs-only changes run it too. Cloudflare Pages also reports a `Cloudflare Pages` check from its own Git integration; it is the deploy preview, not one of these checks. The ruleset "protect" refuses branch deletion and force-pushes on the default branch and requires no status check.
 
@@ -98,7 +100,7 @@ Source: [`.github/workflows/site.yml`](../../.github/workflows/site.yml), and th
 | A ticket in an approved plan graph | The reviewer above, from the other model family, on its exact head | The loop, once the reviewer's APPROVE names that exact commit, `Build, links, resources and privacy` is green on it and it has no conflict with `main`; no per-change maintainer approval. Then the merge is read back |
 | Anything else, and every release or publication | None by rule | Jake only |
 
-Source: [`README.md`](../../README.md#cloudflare-pages): changes merge after green CI and one review from the other model family, with no per-change maintainer approval; merging deploys through Cloudflare Pages.
+Source: [`docs/maintaining.md`](../maintaining.md#cloudflare-pages): changes merge after green CI and one review from the other model family, with no per-change maintainer approval; merging deploys through Cloudflare Pages.
 
 ## GitHub identity
 

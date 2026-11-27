@@ -4,7 +4,7 @@ Where WizSite keeps its words and its decisions.
 
 ## Before exploring, read these
 
-- **`README.md`**: what the site is, how it builds and checks, and how it deploys.
+- **`README.md`** and **`docs/maintaining.md`**: what the site is, how it builds and checks, and how it deploys.
 - **`GLOSSARY.md`** and **`docs/adr/`** at the root, when they exist. There are none yet; carry on without them. The `grill` skill creates them as terms and decisions get settled.
 - **Grills** are private: they live in the private records repository, where [OpenWiz's domain docs](https://github.com/openwizdev/OpenWiz/blob/main/docs/agents/domain.md) say, never in this repository. Read the grill that fed the spec; never copy it here.
 

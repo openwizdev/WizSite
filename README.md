@@ -1,6 +1,6 @@
 # WizSite
 
-**[openwiz.dev](https://openwiz.dev) and [its app](https://openwiz.dev/app/) for [OpenWiz](https://github.com/openwizdev/OpenWiz), the open source agent factory that runs fleets of coding agents.** The app signs in with GitHub, reads only, and shows your specs, tickets and agents from your repo. It is a static site plus a sign-in helper that stores nothing.
+**[openwiz.dev](https://openwiz.dev) and [its app](https://openwiz.dev/app/) for [OpenWiz](https://github.com/openwizdev/OpenWiz), the open source agent factory that runs fleets of coding agents.** The app signs in with GitHub and shows your specs, tickets and agents from your repo. It only reads unless you turn on its v2 switch (`?v2=on`); then it posts only the answer and steer comments you confirm. It is a static site plus three small functions: a sign-in helper that stores nothing, Ask a Wiz and a click counter.
 
 To install OpenWiz ([v0.1.0](https://github.com/openwizdev/OpenWiz/releases/tag/v0.1.0)), paste this into your coding agent: `Install OpenWiz from github.com/openwizdev/OpenWiz`
 
