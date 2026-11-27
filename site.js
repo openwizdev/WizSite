@@ -701,7 +701,7 @@ function browseMarket() {
   const kind = () => tools.querySelector('input[name="market-kind"]:checked')?.id.replace('market-kind-', '') ?? 'all';
   const sortMode = () => tools.querySelector('input[name="market-sort"]:checked')?.id ?? 'market-sort-name';
   const nameOf = card => card.querySelector('h3')?.textContent ?? '';
-  const byName = (a, b) => nameOf(a).localeCompare(nameOf(b), undefined, { numeric: true, sensitivity: 'base' });
+  const byName = (a, b) => nameOf(a).localeCompare(nameOf(b), 'en', { numeric: true, sensitivity: 'base' }) || (a.dataset.listing < b.dataset.listing ? -1 : 1);
 
   const apply = () => {
     const query = search.value.trim().toLowerCase();

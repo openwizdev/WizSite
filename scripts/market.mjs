@@ -308,6 +308,8 @@ function card(listing) {
     + '</article>';
 }
 
+export const byName = listings => listings.slice().sort((a, b) => a.name.localeCompare(b.name, 'en', { numeric: true, sensitivity: 'base' }) || (a.id < b.id ? -1 : 1));
+
 export function render(index) {
   if (!index.listings.length) {
     return '<section class="market-all" aria-labelledby="all-listings"><h2 id="all-listings">Every listing</h2>'
@@ -332,7 +334,7 @@ export function render(index) {
   const all = `<section class="market-all" aria-labelledby="all-listings"><h2 id="all-listings">Every listing</h2>`
     + stats
     + `<p class="market-count">From WizMarket at commit <code>${index.commit.slice(0, 12)}</code>.</p>`
-    + `<div class="market-cards">${index.listings.map(card).join('')}</div></section>`;
+    + `<div class="market-cards">${byName(index.listings).map(card).join('')}</div></section>`;
   const byTag = `<section class="market-by-tag" aria-labelledby="by-tag"><h2 id="by-tag">By tag</h2>${tags.map(tag => `<section class="market-tag" id="tag-${tag}" aria-labelledby="heading-tag-${tag}"><h3 id="heading-tag-${tag}">${esc(tag)}</h3><ul>`
     + index.listings.filter(listing => listing.tags.includes(tag)).map(listing => `<li>${link(`#listing-${listing.id}`, listing.name)} <span>${listing.status === 'verified' ? 'Verified' : 'Listed'}</span></li>`).join('')
     + '</ul></section>').join('')}</section>`;

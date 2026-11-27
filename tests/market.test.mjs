@@ -72,7 +72,7 @@ test('every listing of the fixture snapshot renders with its status, tags and li
   const { code, stderr, html } = build(fixture('contract-index.json'));
   assert.equal(code, 0, stderr);
   const found = cards(html);
-  assert.deepEqual(Object.keys(found), Object.keys(CONTRACT_LISTINGS), 'one card per listing, sorted by id');
+  assert.deepEqual(Object.keys(found), Object.keys(CONTRACT_LISTINGS), 'one card per listing, in name order');
   for (const [id, want] of Object.entries(CONTRACT_LISTINGS)) {
     const card = found[id];
     const links = hrefs(card);
@@ -235,7 +235,8 @@ test('the site builds its market page from the real snapshot', () => {
   const { code, stderr, html } = build(registry);
   assert.equal(code, 0, stderr);
   const index = JSON.parse(registry);
-  assert.deepEqual(Object.keys(cards(html)), index.listings.map(listing => listing.id), 'one card for every listing in market/registry.json');
+  const byName = index.listings.slice().sort((a, b) => a.name.localeCompare(b.name, 'en', { numeric: true, sensitivity: 'base' }) || (a.id < b.id ? -1 : 1));
+  assert.deepEqual(Object.keys(cards(html)), byName.map(listing => listing.id), 'one card for every listing in market/registry.json, in name order');
   assert.notEqual(registry, fixture('contract-index.json'), 'the deployed snapshot is not the synthetic fixture');
   assert.notEqual(index.commit, C, 'the deployed snapshot is not at the synthetic commit');
 });
