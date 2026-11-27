@@ -12,7 +12,7 @@ One per ticket. It builds its ticket on its own branch, and never reviews or mer
 | --- | --- | --- |
 | Harness | Claude Code | `--provider claude-code` |
 | Model | Opus 5.5 | `--model claude-opus-5-5` |
-| Effort | High | `--reasoning-level high` |
+| Effort | Medium | `--reasoning-level medium` |
 
 Source: [OpenWiz's Builder](https://github.com/openwizdev/OpenWiz/blob/main/docs/agents/fleet.md#builder).
 
@@ -22,9 +22,9 @@ Tickets with an exact `polish`, `huntr` or `proposal` label use this table; ever
 
 | Setting | Value | `room-cli thread spawn` flag |
 | --- | --- | --- |
-| Harness | Codex | `--provider codex` |
-| Model | Sol 6.1 | `--model gpt-6.1-sol` |
-| Effort | High | `--reasoning-level high` |
+| Harness | Claude Code | `--provider claude-code` |
+| Model | Opus 5.5 | `--model claude-opus-5-5` |
+| Effort | Medium | `--reasoning-level medium` |
 
 Source: [OpenWiz's Builder for small tickets](https://github.com/openwizdev/OpenWiz/blob/main/docs/agents/fleet.md#builder-for-small-tickets).
 
@@ -35,8 +35,8 @@ One per pull request, from a different model family than the builder. It reviews
 | Setting | Value | `room-cli thread spawn` flag |
 | --- | --- | --- |
 | Harness | Codex | `--provider codex` |
-| Model | Sol 6.1 | `--model gpt-6.1-sol` |
-| Effort | High | `--reasoning-level high` |
+| Model | Sol 6.2 | `--model gpt-6.2-sol` |
+| Effort | Medium | `--reasoning-level medium` |
 
 Source: [OpenWiz's Reviewer for Claude-built](https://github.com/openwizdev/OpenWiz/blob/main/docs/agents/fleet.md#reviewer-for-claude-built).
 
@@ -48,7 +48,7 @@ Use the verified builder's provider, from its branch-matching `start checked` re
 | --- | --- | --- |
 | Harness | Claude Code | `--provider claude-code` |
 | Model | Opus 5.5 | `--model claude-opus-5-5` |
-| Effort | High | `--reasoning-level high` |
+| Effort | Medium | `--reasoning-level medium` |
 
 Source: [OpenWiz's Reviewer for GPT-built](https://github.com/openwizdev/OpenWiz/blob/main/docs/agents/fleet.md#reviewer-for-gpt-built).
 
