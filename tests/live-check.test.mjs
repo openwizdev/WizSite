@@ -1,12 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { execFile } from 'node:child_process';
+import { readdir, readFile } from 'node:fs/promises';
+import { promisify } from 'node:util';
 import {
   PAGES,
   DUMMY_TOKEN,
+  browserEnv,
   isReadOnlyRequest,
   formatResults,
   runLiveCheck,
 } from '../scripts/live-check.mjs';
+
+const execFileAsync = promisify(execFile);
 
 const REAL_TOKEN = 'ghu_SYNTHETIC_REAL_SECRET_99999999999999';
 
@@ -711,3 +717,146 @@ test('R2: live ask without needs-info label fails You when You omits live asks f
   assert.equal(canvas.pass, true);
 });
 
+async function childChromiumEnvs(parentPid) {
+  const envs = [];
+  const entries = await readdir('/proc').catch(() => []);
+  for (const name of entries) {
+    if (!/^\d+$/.test(name)) continue;
+    const status = await readFile(`/proc/${name}/status`, 'utf8').catch(() => '');
+    const ppid = status.match(/^PPid:\s+(\d+)/m)?.[1];
+    if (Number(ppid) !== parentPid) continue;
+    const cmdline = await readFile(`/proc/${name}/cmdline`, 'utf8').catch(() => '');
+    if (!cmdline.includes('--remote-debugging-port=')) continue;
+    const environ = await readFile(`/proc/${name}/environ`, 'utf8').catch(() => '');
+    envs.push(environ);
+  }
+  return envs;
+}
+
+test('Chromium child process inherits no GH_TOKEN, GITHUB_TOKEN, or real credential', async () => {
+  const scrubbed = browserEnv(
+    REAL_TOKEN,
+    {
+      PATH: '/usr/bin',
+      GH_TOKEN: REAL_TOKEN,
+      GITHUB_TOKEN: REAL_TOKEN,
+      AWS_SECRET_ACCESS_KEY: 'synthetic-secret',
+      TMPDIR: `/tmp/${REAL_TOKEN}`,
+    },
+    '/tmp/live-check-profile',
+  );
+  assert.equal(scrubbed.PATH, '/usr/bin');
+  assert.equal(scrubbed.HOME, '/tmp/live-check-profile');
+  assert.equal(scrubbed.GH_TOKEN, undefined);
+  assert.equal(scrubbed.GITHUB_TOKEN, undefined);
+  assert.equal(scrubbed.AWS_SECRET_ACCESS_KEY, undefined);
+  assert.equal(scrubbed.TMPDIR, undefined);
+
+  const prevGh = process.env.GH_TOKEN;
+  const prevGithub = process.env.GITHUB_TOKEN;
+  process.env.GH_TOKEN = REAL_TOKEN;
+  process.env.GITHUB_TOKEN = REAL_TOKEN;
+  const { githubFetch } = makeFakeGitHub();
+  let seenEnvs = [];
+  try {
+    const result = await runLiveCheck({
+      repo: 'acme/factory',
+      token: REAL_TOKEN,
+      githubFetch,
+      async onPage(_page, pageName) {
+        if (pageName !== 'You') return;
+        seenEnvs = await childChromiumEnvs(process.pid);
+      },
+    });
+    assert.equal(result.ok, true, formatResults(result));
+    assert.equal(result.tokenLeaked, false);
+    if (process.platform === 'linux') {
+      assert.ok(seenEnvs.length > 0, 'expected to inspect the running Chromium child process');
+      for (const environ of seenEnvs) {
+        assert.equal(environ.includes(REAL_TOKEN), false, 'Chromium process environment must not contain real token');
+        assert.equal(environ.includes('GH_TOKEN='), false, 'Chromium process environment must not inherit GH_TOKEN');
+        assert.equal(environ.includes('GITHUB_TOKEN='), false, 'Chromium process environment must not inherit GITHUB_TOKEN');
+      }
+    }
+  } finally {
+    if (prevGh === undefined) delete process.env.GH_TOKEN;
+    else process.env.GH_TOKEN = prevGh;
+    if (prevGithub === undefined) delete process.env.GITHUB_TOKEN;
+    else process.env.GITHUB_TOKEN = prevGithub;
+  }
+});
+
+test('Canvas Needs you count compares the complete number so 30 fails when GitHub expects 3', async () => {
+  const { githubFetch } = makeFakeGitHub();
+  const result = await runLiveCheck({
+    repo: 'acme/factory',
+    token: REAL_TOKEN,
+    githubFetch,
+    siteTransform(pathname, reply) {
+      if (!/^\/app\/pages\/canvas(?:\.[0-9a-f]{10})?\.js$/.test(pathname)) return reply;
+      const source = reply.raw.toString('utf8').replace(
+        '`Needs you · ${m.inbox.length}`',
+        '`Needs you · ${m.inbox.length}0`',
+      );
+      return { ...reply, raw: Buffer.from(source) };
+    },
+  });
+
+  assert.equal(result.ok, false);
+  const canvas = result.pages.find(p => p.page === 'Canvas');
+  assert.equal(canvas.pass, false);
+  assert.match(formatResults(result), /FAIL Canvas:.*Needs you · 30/);
+  for (const name of ['You', 'Specs', 'Agents', 'Models']) {
+    assert.equal(result.pages.find(p => p.page === name).pass, true, `${name} should still pass`);
+  }
+});
+
+test('upstream GitHub 429 emits FAIL verdicts for all five pages in the CLI', async () => {
+  const preload = 'data:text/javascript,' + encodeURIComponent(
+    'globalThis.fetch = async () => new Response(JSON.stringify({ message: "API rate limit exceeded" }), { status: 429, headers: { "content-type": "application/json" } });',
+  );
+  let exitCode = 0;
+  let stdout = '';
+  let stderr = '';
+  try {
+    const out = await execFileAsync(process.execPath, ['--import', preload, 'scripts/live-check.mjs', '--repo', 'acme/factory'], {
+      env: { ...process.env, GH_TOKEN: REAL_TOKEN },
+    });
+    stdout = out.stdout;
+    stderr = out.stderr;
+  } catch (err) {
+    exitCode = err.code;
+    stdout = err.stdout || '';
+    stderr = err.stderr || '';
+  }
+
+  assert.equal(exitCode, 1, `expected exit 1, stderr: ${stderr}`);
+  const lines = stdout.trim().split('\n').filter(Boolean);
+  assert.equal(lines.length, 5, `expected 5 FAIL lines on stdout, got:\n${stdout}\nstderr:\n${stderr}`);
+  for (let i = 0; i < PAGES.length; i += 1) {
+    assert.match(lines[i], new RegExp(`^FAIL ${PAGES[i]}: .*429`));
+  }
+});
+
+test('partial upstream GitHub 429 fails only the affected page while other pages still emit verdicts', async () => {
+  const { githubFetch: baseFetch } = makeFakeGitHub();
+  const githubFetch = async (url, init = {}) => {
+    const body = String(init.body || '');
+    if (body.includes('query Agents(')) return jsonResponse(429, { message: 'API rate limit exceeded' });
+    return baseFetch(url, init);
+  };
+  const result = await runLiveCheck({
+    repo: 'acme/factory',
+    token: REAL_TOKEN,
+    githubFetch,
+  });
+
+  assert.equal(result.ok, false);
+  assert.deepEqual(result.pages.map(p => p.page), PAGES);
+  const agents = result.pages.find(p => p.page === 'Agents');
+  assert.equal(agents.pass, false);
+  assert.match(agents.detail, /429/);
+  for (const name of ['You', 'Specs', 'Canvas', 'Models']) {
+    assert.equal(result.pages.find(p => p.page === name).pass, true, `${name} should still pass`);
+  }
+});

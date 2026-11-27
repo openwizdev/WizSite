@@ -1,9 +1,37 @@
+import { spawn } from 'node:child_process';
+import { existsSync } from 'node:fs';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { resolve } from 'node:path';
-import { World, start, signIn, SITE, API } from '../tests/v2/browser.mjs';
+import { World, chromePath, open, signIn, SITE, API } from '../tests/v2/browser.mjs';
 
 export const PAGES = ['You', 'Specs', 'Agents', 'Canvas', 'Models'];
 export const DUMMY_TOKEN = 'ghu_LIVECHECK_DUMMY_000000000000000000000';
+
+const DIST = new URL('../dist/', import.meta.url);
+const BROWSER_ENV_ALLOW = [
+  'PATH', 'LANG', 'LC_ALL', 'TZ', 'TMPDIR', 'TEMP', 'TMP',
+  'DISPLAY', 'XDG_RUNTIME_DIR', 'DBUS_SESSION_BUS_ADDRESS',
+  'FONTCONFIG_FILE', 'FONTCONFIG_PATH', 'SSL_CERT_FILE', 'SSL_CERT_DIR',
+];
+
+export function browserEnv(token = '', source = process.env, profile = '') {
+  const env = {};
+  for (const key of BROWSER_ENV_ALLOW) {
+    const value = source[key];
+    if (typeof value === 'string' && (!token || !value.includes(token))) env[key] = value;
+  }
+  if (profile) {
+    env.HOME = profile;
+    env.XDG_CONFIG_HOME = profile;
+    env.XDG_CACHE_HOME = profile;
+  }
+  return env;
+}
+
+const errorLine = error => (error instanceof Error ? error.message : String(error)).split('\n')[0].trim();
+const failPage = (page, detail) => ({ page, pass: false, detail, reasons: [detail] });
 
 const LAPSE_MS = 30 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -487,39 +515,104 @@ async function gql(githubFetch, token, query, variables) {
       'Content-Type': 'application/json',
     },
   });
-  const json = await res.json();
-  if (!res.ok) throw new Error(`GitHub GraphQL answered ${res.status}`);
+  let json = null;
+  try {
+    if (typeof res.text === 'function') {
+      const text = await res.text();
+      json = text ? JSON.parse(text) : null;
+    } else if (typeof res.json === 'function') {
+      json = await res.json();
+    }
+  } catch {
+    json = null;
+  }
+  if (!res.ok) {
+    const msg = json?.message || (Array.isArray(json?.errors) && json.errors[0]?.message) || '';
+    const err = new Error(`GitHub GraphQL answered ${res.status}${msg ? `: ${msg}` : ''}`);
+    err.status = res.status;
+    throw err;
+  }
+  if (!json || typeof json !== 'object') {
+    throw new Error('GitHub GraphQL returned unreadable JSON');
+  }
   return json;
+}
+
+function emptyTruth(pageErrors = {}) {
+  return {
+    specs: [],
+    needsYou: 0,
+    canvasNeedsYou: 0,
+    building: 0,
+    review: 0,
+    merged: 0,
+    agentsWorkingNow: 0,
+    agentsInLastDay: 0,
+    models: { hasFleet: false, roles: null },
+    pageErrors,
+  };
 }
 
 export async function fetchGitHubTruth({ owner, name, token, githubFetch = fetch, now = Date.now() }) {
   const full = `${owner}/${name}`;
   const specSearchQuery = `repo:${full} is:issue state:open (has:sub-issue OR label:spec OR in:title spec) -label:wayfind:map sort:updated-desc`;
-  const specsAnswer = await gql(githubFetch, token, SPECS_QUERY, { owner, name, specs: specSearchQuery });
-  const repo = specsAnswer.data?.repository || {};
-  const fleetText = repo.fleet?.text ?? null;
-  const authors = recordAuthors(fleetText);
-  const rawSpecs = (specsAnswer.data?.specSearch?.nodes || [])
-    .filter(issue => Number.isSafeInteger(issue?.number))
-    .filter(issue => {
-      const labels = labelNames(issue);
-      return !labels.includes('wayfind:map')
-        && (issue.subIssuesSummary?.total > 0 || labels.includes('spec') || SPEC_TITLE.test(issue.title || ''));
-    });
+  const pageErrors = {};
+  const setPageErrors = (names, error) => {
+    const reason = `GitHub baseline could not be read: ${errorLine(error)}`;
+    for (const pageName of names) {
+      if (!pageErrors[pageName]) pageErrors[pageName] = reason;
+    }
+  };
+
+  let specsAnswer = null;
+  try {
+    specsAnswer = await gql(githubFetch, token, SPECS_QUERY, { owner, name, specs: specSearchQuery });
+    if (!specsAnswer.data?.repository && specsAnswer.errors?.length) {
+      throw new Error(specsAnswer.errors[0]?.message || 'GitHub GraphQL error');
+    }
+  } catch (error) {
+    if (error?.status === 429 || error?.status === 401 || error?.status === 403) {
+      setPageErrors(PAGES, error);
+      return emptyTruth(pageErrors);
+    }
+    setPageErrors(['You', 'Specs', 'Canvas'], error);
+  }
+
+  const repo = specsAnswer?.data?.repository || {};
+  let fleetText = repo.fleet?.text ?? null;
+  let authors = recordAuthors(fleetText);
+  const rawSpecs = specsAnswer
+    ? (specsAnswer.data?.specSearch?.nodes || [])
+      .filter(issue => Number.isSafeInteger(issue?.number))
+      .filter(issue => {
+        const labels = labelNames(issue);
+        return !labels.includes('wayfind:map')
+          && (issue.subIssuesSummary?.total > 0 || labels.includes('spec') || SPEC_TITLE.test(issue.title || ''));
+      })
+    : [];
 
   const details = {};
-  const queue = chunksOf(rawSpecs.slice(0, SPEC_DETAILS).map(s => ({ n: s.number, tickets: Math.min(50, s.subIssuesSummary?.total ?? 50) })));
-  while (queue.length) {
-    const chunk = queue.shift();
-    const ans = await gql(githubFetch, token, specTicketsQuery(chunk), { owner, name });
-    const heavy = (ans.errors || []).some(e => e?.type === 'RESOURCE_LIMITS_EXCEEDED');
-    if (heavy && chunk.length > 1) {
-      queue.unshift(...chunk.map(n => [n]));
-      continue;
-    }
-    const got = ans.data?.repository || {};
-    for (const n of chunk) {
-      if (got[`s${n}`]) details[`s${n}`] = got[`s${n}`];
+  if (specsAnswer) {
+    const queue = chunksOf(rawSpecs.slice(0, SPEC_DETAILS).map(s => ({ n: s.number, tickets: Math.min(50, s.subIssuesSummary?.total ?? 50) })));
+    try {
+      while (queue.length) {
+        const chunk = queue.shift();
+        const ans = await gql(githubFetch, token, specTicketsQuery(chunk), { owner, name });
+        const heavy = (ans.errors || []).some(e => e?.type === 'RESOURCE_LIMITS_EXCEEDED');
+        if (heavy && chunk.length > 1) {
+          queue.unshift(...chunk.map(n => [n]));
+          continue;
+        }
+        if (!ans.data?.repository && ans.errors?.length) {
+          throw new Error(ans.errors[0]?.message || 'GitHub GraphQL error');
+        }
+        const got = ans.data?.repository || {};
+        for (const n of chunk) {
+          if (got[`s${n}`]) details[`s${n}`] = got[`s${n}`];
+        }
+      }
+    } catch (error) {
+      setPageErrors(['You', 'Canvas'], error);
     }
   }
 
@@ -578,13 +671,24 @@ export async function fetchGitHubTruth({ owner, name, token, githubFetch = fetch
   const since = new Date(now - DAY_MS - CLOCK_SKEW_MS).toISOString();
   const agentIssues = [];
   let after = null;
-  for (let page = 0; page < 40; page += 1) {
-    const ans = await gql(githubFetch, token, AGENTS_QUERY, { owner, name, since, after });
-    const list = ans.data?.repository?.issues;
-    if (!Array.isArray(list?.nodes)) break;
-    for (const issue of list.nodes) if (issue) agentIssues.push(issue);
-    if (!list.pageInfo?.hasNextPage || typeof list.pageInfo.endCursor !== 'string') break;
-    after = list.pageInfo.endCursor;
+  try {
+    for (let page = 0; page < 40; page += 1) {
+      const ans = await gql(githubFetch, token, AGENTS_QUERY, { owner, name, since, after });
+      if (!ans.data?.repository && ans.errors?.length) {
+        throw new Error(ans.errors[0]?.message || 'GitHub GraphQL error');
+      }
+      if (!specsAnswer && ans.data?.repository?.fleet?.text !== undefined) {
+        fleetText = ans.data.repository.fleet?.text ?? null;
+        authors = recordAuthors(fleetText);
+      }
+      const list = ans.data?.repository?.issues;
+      if (!Array.isArray(list?.nodes)) break;
+      for (const issue of list.nodes) if (issue) agentIssues.push(issue);
+      if (!list.pageInfo?.hasNextPage || typeof list.pageInfo.endCursor !== 'string') break;
+      after = list.pageInfo.endCursor;
+    }
+  } catch (error) {
+    setPageErrors(specsAnswer ? ['Agents'] : ['Agents', 'Models'], error);
   }
 
   let agentsWorkingNow = 0;
@@ -628,6 +732,7 @@ export async function fetchGitHubTruth({ owner, name, token, githubFetch = fetch
     agentsWorkingNow,
     agentsInLastDay,
     models: parseFleetModels(fleetText),
+    pageErrors,
   };
 }
 
@@ -655,7 +760,10 @@ async function checkYou(page, truth, pageWaitMs) {
     return { tiles, text: document.querySelector('main')?.innerText || '' };
   })()`);
   const reasons = [];
-  const parseTile = raw => Number(String(raw || '').replace(/\+$/, ''));
+  const parseTile = raw => {
+    const m = String(raw || '').trim().match(/^(\d+)\+?$/);
+    return m ? Number(m[1]) : NaN;
+  };
   const expected = {
     'Needs you': truth.needsYou,
     Building: truth.building,
@@ -696,8 +804,9 @@ async function checkSpecs(page, truth, pageWaitMs) {
       continue;
     }
     if (spec.total > 0) {
+      const doneMatch = text.match(/\b(\d+) of (\d+) tickets done\b/);
       if (/no tickets yet/i.test(text)) reasons.push(`spec #${spec.number} shows "No tickets yet" while GitHub counts ${spec.total} tickets`);
-      else if (!text.includes(`${spec.done} of ${spec.total} tickets done`)) {
+      else if (!doneMatch || Number(doneMatch[1]) !== spec.done || Number(doneMatch[2]) !== spec.total) {
         reasons.push(`spec #${spec.number} does not show "${spec.done} of ${spec.total} tickets done"`);
       }
     }
@@ -753,12 +862,13 @@ async function checkCanvas(page, truth, pageWaitMs) {
     return { inboxText: inboxEl?.innerText.trim() || '', inboxLabel, sheets };
   })()`);
   const reasons = [];
+  const inboxMatch = overview.inboxLabel.match(/^Needs you\s*·\s*(\d+)$/);
+  const inboxCount = inboxMatch ? Number(inboxMatch[1]) : null;
   if (truth.canvasNeedsYou > 0) {
-    const want = `Needs you · ${truth.canvasNeedsYou}`;
-    if (!overview.inboxLabel.includes(want)) {
-      reasons.push(`Needs you strip shows "${overview.inboxLabel || overview.inboxText}" (GitHub expects "${want}")`);
+    if (inboxCount !== truth.canvasNeedsYou) {
+      reasons.push(`Needs you strip shows "${overview.inboxLabel || overview.inboxText}" (GitHub expects "Needs you · ${truth.canvasNeedsYou}")`);
     }
-  } else if (/Needs you\s*·\s*[1-9]/.test(overview.inboxLabel)) {
+  } else if (overview.inboxLabel) {
     reasons.push(`Needs you strip shows "${overview.inboxLabel}" (GitHub expects 0)`);
   }
   if (overview.sheets.length !== truth.specs.length) {
@@ -772,15 +882,16 @@ async function checkCanvas(page, truth, pageWaitMs) {
       continue;
     }
     if (spec.total > 0) {
+      const doneMatch = line.match(/\b(\d+) of (\d+) done\b/);
       if (/no tickets/i.test(line)) reasons.push(`rail sheet #${spec.number} says "${line}" while GitHub counts ${spec.total} tickets`);
-      else if (!line.includes(`${spec.done} of ${spec.total} done`)) {
+      else if (!doneMatch || Number(doneMatch[1]) !== spec.done || Number(doneMatch[2]) !== spec.total) {
         reasons.push(`rail sheet #${spec.number} line "${line}" disagrees with "${spec.done} of ${spec.total} done"`);
       }
     }
   }
   for (const spec of truth.specs.filter(s => s.total > 0).slice(0, 5)) {
     await page.go(`${SITE}/app/#/canvas/${spec.number}`);
-    await page.until(`document.querySelector('.cv-title')?.innerText.includes('#${spec.number}')`, `Canvas sheet #${spec.number}`, pageWaitMs);
+    await page.until(`/#${spec.number}(?!\\d)/.test(document.querySelector('.cv-title')?.innerText || '')`, `Canvas sheet #${spec.number}`, pageWaitMs);
     const stage = await page.run(`(() => ({
       text: document.querySelector('.cv-stage')?.innerText || '',
       stacks: document.querySelectorAll('.cv-board .cv-stack:not(.outside)').length,
@@ -832,6 +943,92 @@ export function formatResults(result) {
   return result.pages.map(p => `${p.pass ? 'PASS' : 'FAIL'} ${p.page}: ${p.detail}`).join('\n');
 }
 
+async function launchIsolated(token) {
+  const profile = await mkdtemp(join(tmpdir(), 'live-check-'));
+  const child = spawn(chromePath(), [
+    '--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`,
+    '--no-first-run', '--no-default-browser-check', '--disable-background-networking', '--disable-component-update',
+    '--disable-sync', '--no-sandbox', 'about:blank',
+  ], { stdio: ['ignore', 'ignore', 'pipe'], env: browserEnv(token, process.env, profile) });
+  let socket = null;
+  const close = async () => {
+    if (socket && socket.readyState < 2) socket.close();
+    if (child.exitCode === null && child.signalCode === null) {
+      child.kill();
+      await new Promise(done => child.once('exit', done));
+    }
+    await rm(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }).catch(() => {});
+  };
+  try {
+    const url = await new Promise((done, reject) => {
+      let text = '';
+      child.stderr.on('data', chunk => {
+        text += chunk;
+        const match = text.match(/DevTools listening on (ws:\/\/\S+)/);
+        if (match) done(match[1]);
+      });
+      child.on('error', reject);
+      child.on('exit', code => reject(new Error(`browser exited (${code}): ${text.slice(-400)}`)));
+    });
+    socket = new WebSocket(url);
+    await new Promise((done, reject) => { socket.onopen = done; socket.onerror = reject; });
+    let next = 0;
+    const waiting = new Map();
+    const listeners = [];
+    socket.onmessage = ({ data }) => {
+      const message = JSON.parse(data);
+      if (message.id && waiting.has(message.id)) {
+        const { resolve: ok, reject } = waiting.get(message.id);
+        waiting.delete(message.id);
+        message.error ? reject(new Error(JSON.stringify(message.error))) : ok(message.result);
+      } else if (message.method) {
+        for (const listener of listeners) listener(message);
+      }
+    };
+    const send = (method, params = {}, sessionId) => new Promise((done, reject) => {
+      const id = ++next;
+      waiting.set(id, { resolve: done, reject });
+      socket.send(JSON.stringify({ id, method, params, ...(sessionId ? { sessionId } : {}) }));
+    });
+    const popups = new Map();
+    const opened = new Map();
+    listeners.push(async message => {
+      if (message.method === 'Target.attachedToTarget' && !message.sessionId) {
+        const { sessionId, targetInfo } = message.params;
+        if (targetInfo.openerId) {
+          opened.set(sessionId, targetInfo.openerId);
+          await send('Fetch.enable', { patterns: [{ urlPattern: '*', requestStage: 'Request' }] }, sessionId).catch(() => {});
+        }
+        await send('Runtime.runIfWaitingForDebugger', {}, sessionId).catch(() => {});
+      }
+      if (message.method === 'Fetch.requestPaused' && opened.has(message.sessionId)) {
+        popups.get(opened.get(message.sessionId))?.(message.params.request);
+        await send('Fetch.failRequest', { requestId: message.params.requestId, errorReason: 'BlockedByClient' }, message.sessionId).catch(() => {});
+        await send('Target.closeTarget', { targetId: message.params.frameId }).catch(() => {});
+      }
+    });
+    await send('Target.setAutoAttach', { autoAttach: true, waitForDebuggerOnStart: true, flatten: true });
+    return { pid: child.pid, send, on: listener => listeners.push(listener), popups, close };
+  } catch (error) {
+    await close();
+    throw error;
+  }
+}
+
+async function startIsolated(world, token) {
+  if (!world.prod && !existsSync(new URL('app/index.html', DIST))) {
+    throw new Error('no dist/app: run npm run build first');
+  }
+  const browser = await launchIsolated(token);
+  try {
+    const page = await open(browser, world);
+    return { browser, page, world, close: async () => { await page.close().catch(() => {}); await browser.close(); } };
+  } catch (error) {
+    await browser.close();
+    throw error;
+  }
+}
+
 export async function runLiveCheck({
   repo,
   token,
@@ -846,13 +1043,34 @@ export async function runLiveCheck({
   if (!owner || !name) throw new Error('repo must be owner/name');
   if (!token) throw new Error('token is required (set GH_TOKEN or GITHUB_TOKEN)');
 
-  const truth = await fetchGitHubTruth({ owner, name, token, githubFetch });
+  let truth;
+  try {
+    truth = await fetchGitHubTruth({ owner, name, token, githubFetch });
+  } catch (error) {
+    const reason = `GitHub baseline could not be read: ${errorLine(error)}`;
+    truth = emptyTruth(Object.fromEntries(PAGES.map(pageName => [pageName, reason])));
+  }
+
+  const pageErrors = truth.pageErrors || {};
+  if (PAGES.every(pageName => pageErrors[pageName])) {
+    return {
+      ok: false,
+      repo: `${owner}/${name}`,
+      pages: PAGES.map(pageName => failPage(pageName, pageErrors[pageName])),
+      refusedWrites: [],
+      violations: [],
+      tokenLeaked: false,
+      truth,
+    };
+  }
+
   const world = new LiveWorld({ owner, name, token, prod, githubFetch, siteTransform });
-  const run = await start(world);
   const pages = [];
   let tokenLeaked = false;
+  let run = null;
 
   try {
+    run = await startIsolated(world, token);
     await signIn(run.page).catch(() => {});
     await run.page.until(`document.body.innerText.includes(${JSON.stringify(`${owner}/${name}`)})`, 'repository picker', 15000);
     await run.page.click(`${owner}/${name}`);
@@ -867,14 +1085,16 @@ export async function runLiveCheck({
       ['Models', checkModels],
     ];
     for (const [pageName, fn] of checkers) {
+      if (pageErrors[pageName]) {
+        pages.push(failPage(pageName, pageErrors[pageName]));
+        continue;
+      }
       let res;
       try {
         res = await fn(run.page, truth, pageWaitMs);
         if (onPage) await onPage(run.page, pageName, res);
       } catch (error) {
-        const raw = error instanceof Error ? error.message : String(error);
-        const detail = raw.split('\n')[0].trim();
-        res = { page: pageName, pass: false, detail, reasons: [detail] };
+        res = failPage(pageName, errorLine(error));
       }
       pages.push(res);
     }
@@ -884,9 +1104,18 @@ export async function runLiveCheck({
       session: Object.entries(sessionStorage),
       cookie: document.cookie,
     })`);
-    if (storageDump.includes(token) || world.browserSawRealToken) tokenLeaked = true;
+    const procEnv = run.browser.pid
+      ? await readFile(`/proc/${run.browser.pid}/environ`, 'utf8').catch(() => '')
+      : '';
+    if (storageDump.includes(token) || world.browserSawRealToken || procEnv.includes(token)) tokenLeaked = true;
+  } catch (error) {
+    const reason = errorLine(error);
+    const done = new Set(pages.map(p => p.page));
+    for (const pageName of PAGES) {
+      if (!done.has(pageName)) pages.push(failPage(pageName, pageErrors[pageName] || reason));
+    }
   } finally {
-    await run.close();
+    if (run) await run.close();
   }
 
   const ok = pages.every(p => p.pass) && !tokenLeaked && world.violations.length === 0;
