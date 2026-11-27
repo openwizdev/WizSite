@@ -58,6 +58,7 @@ export async function readReleases(dir = RELEASE_DIR, statsFile = String(dir) ==
   const names = (await readdir(dir)).filter(name => name.endsWith('.json')).sort();
   const list = await Promise.all(names.map(async name => JSON.parse(await readFile(new URL(name, dir), 'utf8'))));
   const stats = await readStats(statsFile);
+  if (!stats || typeof stats !== 'object' || Array.isArray(stats)) throw new Error('changelog stats: one object, keyed by release tag');
   const byTag = new Map(list.map(release => [tag(release), release]));
   for (const [key, value] of Object.entries(stats)) checkStats(key, value, byTag.get(key));
   return list.map(release => ({ ...release, stats: stats[tag(release)] || {} })).sort(newer);

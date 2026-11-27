@@ -191,7 +191,9 @@ class Stats(unittest.TestCase):
                 ({'v0.1.10': {**good, 'published': '2031-02-03 17:05'}}, 'published is a UTC time'),
                 ({'v0.1.10': {**good, 'previous': 'main'}}, 'previous is a tag'),
                 ({'v0.1.10': {'added': 4}}, 'added and removed come together'),
-                ({'v0.1.10': [1]}, 'one object per tag')):
+                ({'v0.1.10': [1]}, 'one object per tag'),
+                (None, 'one object, keyed by release tag'),
+                ([], 'one object, keyed by release tag')):
             with self.subTest(error=error):
                 self.bad(stats, error)
 
