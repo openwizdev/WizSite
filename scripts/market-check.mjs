@@ -109,7 +109,7 @@ const SHOWN = `const shown = el => !!el && getComputedStyle(el).display !== 'non
 async function layout(page, where, width, mode) {
   const facts = await page.evaluate(`(() => { ${SHOWN}
     const small = [];
-    const targets = '.market-chip, .market-select, .market-copy, .market-links a:first-child, .market-publish-jump, .market-publish-start';
+    const targets = '.market-chip, .market-select, .market-copy, .market-reset, .market-links a:first-child, .market-publish-jump, .market-publish-start';
     if (innerWidth <= 960) for (const el of document.querySelectorAll(targets)) if (shown(el) && el.getBoundingClientRect().height < 44) small.push(el.className || el.textContent.trim());
     const spill = cards().slice(0, 12).flatMap(card => [...card.querySelectorAll('*')].filter(el => shown(el) && el.getBoundingClientRect().right > card.getBoundingClientRect().right + 1).map(el => card.dataset.listing + ' ' + el.tagName));
     const chip = document.querySelector('.market-chip');

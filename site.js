@@ -698,7 +698,7 @@ function browseMarket() {
     return {
       el, at, name, nameLow: name.toLowerCase(), words: name.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean),
       id: el.dataset.listing, kind: el.dataset.kind, verified: el.dataset.status === 'verified', publisher: el.dataset.publisher,
-      tags: text('.market-tags a'), people: text('dd').join(' ') + ' ' + el.dataset.listing, words2: text('.market-summary').join(' '), out: false,
+      tags: text('.market-tags a'), meta: text('dd').join(' ') + ' ' + el.dataset.listing, summary: text('.market-summary').join(' '), out: false,
     };
   });
   if (!cards.length) return;
@@ -727,7 +727,7 @@ function browseMarket() {
   sort.value = 'match';
   const reset = document.createElement('button');
   reset.type = 'button';
-  reset.className = 'market-copy';
+  reset.className = 'market-reset';
   reset.textContent = 'Clear all filters';
   none.after(reset);
 
@@ -740,8 +740,8 @@ function browseMarket() {
       else if (card.nameLow.includes(token)) best = 4;
       if (best < 4 && card.tags.some(tag => tag === token)) best = 4;
       else if (best < 3 && card.tags.some(tag => tag.includes(token))) best = 3;
-      if (!best && card.people.includes(token)) best = 2;
-      if (!best && card.words2.includes(token)) best = 1;
+      if (!best && card.meta.includes(token)) best = 2;
+      if (!best && card.summary.includes(token)) best = 1;
       if (!best) return 0;
       total += best;
     }
@@ -760,7 +760,12 @@ function browseMarket() {
     clearTimeout(announce);
     announce = setTimeout(() => { live.textContent = text; }, 350);
   };
+  let saving;
   const remember = () => {
+    clearTimeout(saving);
+    saving = setTimeout(save, 350);
+  };
+  const save = () => {
     const params = new URLSearchParams();
     const kind = kindOf(kinds.find(input => input.checked) ?? kinds[0]);
     if (state.q) params.set('q', state.q);
@@ -770,7 +775,7 @@ function browseMarket() {
     if (sort.value !== 'match') params.set('sort', sort.value);
     if (state.tag) params.set('tag', state.tag);
     const query = params.toString();
-    history.replaceState(null, '', location.pathname + (query ? `?${query}` : ''));
+    try { history.replaceState(null, '', location.pathname + (query ? `?${query}` : '')); } catch {}
   };
 
   const apply = ({ quiet = false } = {}) => {
