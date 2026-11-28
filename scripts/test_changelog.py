@@ -197,6 +197,33 @@ class Stats(unittest.TestCase):
             with self.subTest(error=error):
                 self.bad(stats, error)
 
+    def test_stats_respect_the_release_switch_and_count_grouped_lines(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            releases = root / 'releases'
+            shutil.copytree(TWO, releases)
+            ship = root / 'release.json'
+            page = ROOT / 'changelog/index.html'
+            args = ('--releases', releases, '--stats', TWO_STATS, '--switch', 'live', '--ship', ship, page)
+            ship.write_text('{"changelog": {"0.1.10": "off"}}')
+            held = generate(*args).split('<!-- releases:start -->')[1].split('<!-- releases:end -->')[0]
+            self.assertEqual([entry['id'] for entry in Entries(held).entries], ['v0-01'])
+            self.assertNotIn('17:05 UTC', held)
+
+            release_file = releases / '0.02.json'
+            release = json.loads(release_file.read_text())
+            first, second, third = release.pop('bullets')
+            release['areas'] = [{'name': 'Sample tools', 'bullets': [first, second]},
+                                {'name': 'Sample docs', 'bullets': [third]}]
+            release_file.write_text(json.dumps(release))
+            ship.write_text('{"changelog": {"0.1.10": "on"}}')
+            shown = generate(*args).split('<!-- releases:start -->')[1].split('<!-- releases:end -->')[0]
+            entry = Entries(shown).entries[0]
+            self.assertEqual(entry['id'], 'v0-02')
+            self.assertEqual(entry['picked'], 'Top 3 of 9 changes')
+            self.assertEqual(entry['areas'], release['areas'])
+            self.assertEqual(entry['security'], 'Also includes security fixes.')
+
     def test_a_missing_stats_file_shows_no_stats(self):
         with tempfile.TemporaryDirectory() as folder:
             out = Entries(generate('--releases', TWO, '--stats', Path(folder) / 'none.json', '--switch', 'live'))
