@@ -16,7 +16,7 @@ OW.page({
         { label: 'In review', value: c?.review, state: 'review' },
         { label: 'Merged', value: c?.merged, state: 'merged' },
       ]);
-      if (!seen) return el.replaceChildren(tiles, OW.ui.placeholder('Reading GitHub…'));
+      if (!seen) return OW.ui.fill(el, tiles, OW.ui.placeholder('Reading GitHub…'));
       const WORDS = {
         spec_confirmation: 'Spec to confirm',
         plan_approval: 'Plan to approve',

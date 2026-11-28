@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Install in Wiz clipboard fixture</title>
+<script defer src="/market/copy.js"></script>
+<main>
+  <button type="button" id="copy-one" data-wiz-copy="line-one" aria-describedby="status-one">Install in Wiz</button>
+  <pre id="line-one"> Wiz, install demo-one  from WizMarket! </pre>
+  <p id="status-one" role="status"></p>
+
+  <button type="button" id="copy-two" data-wiz-copy="line-two" aria-describedby="status-two">Install in Wiz</button>
+  <pre id="line-two">Wiz, install demo:two &amp; 'extras' from WizMarket.</pre>
+  <p id="status-two" role="status"></p>
+
+  <button type="button" id="copy-broken" data-wiz-copy="missing" aria-describedby="status-two">Broken association</button>
+</main>
+</html>

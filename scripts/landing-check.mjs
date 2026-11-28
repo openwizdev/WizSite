@@ -419,7 +419,7 @@ async function footer(page, where, mode) {
   })()`);
   expect(facts.count === 1, where, `one footer (${facts.count})`);
   expect(facts.buttons === (mode === 'no JavaScript' ? 0 : 12), where, `the footer Wizes are not the landing's (${facts.buttons} of 12 respond)`);
-  expect(facts.links === 12 && facts.overview && facts.inside, where, 'the footer link groups are not all shown inside the window');
+  expect(facts.links === 13 && facts.overview && facts.inside, where, 'the footer link groups are not all shown inside the window');
   expect(facts.lines === 2, where, 'the footer must show the license and counting notice');
   expect(facts.whole, where, `the footer wordmark is clipped (ink and box: ${facts.dbg})`);
   expect(facts.gap >= 0 && facts.gap <= 16, where, `a ${facts.gap}px painted gap between the wordmark's ink and the Wizes (0 to 16)`);
@@ -471,7 +471,7 @@ async function faq(page, where, width, mode) {
     };
   })()`);
   const facts = await read();
-  expect(facts.rows === 9, where, `the Questions have ${facts.rows} rows`);
+  expect(facts.rows === 10, where, `the Questions have ${facts.rows} rows`);
   if (width >= 1280) {
     const third = (facts.head.right - facts.head.left) / facts.width;
     expect(facts.list.left > facts.head.right && Math.abs(facts.head.top - facts.list.top) < 2 && third > .25 && third < .4, where,
@@ -529,7 +529,7 @@ async function main() {
         } finally {
           await page.close();
         }
-        for (const path of ['/', '/changelog/', '/drivers/', '/team/', '/faq/']) {
+        for (const path of ['/', '/changelog/', '/drivers/', '/team/', '/faq/', '/pricing/']) {
           const other = await open(browser, origin, width, height, mode, path);
           try {
             await buy(other, `${path} ${where}`, path);
@@ -547,7 +547,7 @@ async function main() {
       }
     }
     for (const width of (process.env.WIDTHS || '481,500,560,640,641,700,760,761,800,900,960,1024').split(',').map(Number)) {
-      for (const path of ['/', '/changelog/', '/drivers/', '/team/', '/faq/']) {
+      for (const path of ['/', '/changelog/', '/drivers/', '/team/', '/faq/', '/pricing/']) {
         const other = await open(browser, origin, width, 800, MODES.motion, path);
         try {
           await buy(other, `${path} ${width}px, motion`, path);

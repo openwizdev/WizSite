@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { decode } from './ask-index.mjs';
+import { mirrorPath } from './mirrors.mjs';
 
 const site = 'https://openwiz.dev/';
 const github = 'https://github.com/openwizdev';
@@ -8,9 +9,12 @@ const repo = github + '/OpenWiz';
 const skillsRepo = github + '/WizSkills';
 const skillsRef = 'maint/0.2';
 const repoRoot = fileURLToPath(new URL('..', import.meta.url));
+export const entityName = 'OpenWiz, the open source agent factory';
+const disambiguation = 'OpenWiz is the open source agent factory for coding agents such as Claude Code and Codex, made by the openwizdev organization on GitHub. It is not the open firmware for the GP2X Wiz handheld or the Windows utility of the same name.';
 const sameAs = [github, repo, 'https://x.com/openwiz'];
 const organization = site + '#organization';
 const software = site + '#software';
+const source = site + '#source';
 const schema = 'https://schema.org';
 
 export const aboutPage = 'what-is-openwiz/index.html';
@@ -18,8 +22,8 @@ export const faqPage = 'faq/index.html';
 export const guidePage = 'guides/run-many-coding-agents/index.html';
 export const pages = {
   'index.html': [
-    'OpenWiz: the open source agent factory for coding agents',
-    'OpenWiz is the open source kernel for agent factories. It runs fleets of coding agents like Claude Code and Codex on your own machines. Free, Apache-2.0.',
+    'OpenWiz, the open source agent factory for coding agents',
+    'OpenWiz, the open source agent factory, runs fleets of coding agents like Claude Code and Codex on your own machines. Free and Apache-2.0.',
   ],
   [aboutPage]: [
     'What is OpenWiz?',
@@ -31,7 +35,7 @@ export const pages = {
   ],
   [faqPage]: [
     'FAQ — OpenWiz',
-    'Questions about OpenWiz, the open source kernel for agent factories: what it is, what you need, where your agents run, what it costs.',
+    'Questions about OpenWiz, the open source agent factory: what it is, what you need, where your agents run and what it costs.',
   ],
   'drivers/index.html': [
     'Drivers — OpenWiz',
@@ -49,11 +53,15 @@ export const pages = {
     'For your team — OpenWiz',
     'Book a 30-minute call to set up OpenWiz with your team and run a fleet on your own repository.',
   ],
+  'pricing/index.html': [
+    'Pricing — OpenWiz',
+    'OpenWiz stays free and open source. Supporter is $5 per month: priority support, and you support the project.',
+  ],
   'app/index.html': ['The app — OpenWiz', 'Sign in with GitHub to see your OpenWiz specs, tickets and agents.', 'noindex'],
   '404.html': ['Page not found — OpenWiz', 'Find the OpenWiz homepage, overview and frequently asked questions.', 'noindex'],
 };
 
-const urlFor = page => site + page.replace(/index\.html$/, '');
+export const urlFor = page => site + page.replace(/index\.html$/, '');
 const escape = text => text.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const plain = html => decode(html.replace(/<svg\b[^>]*>[\s\S]*?<\/svg>/g, '').replace(/<[^>]*>/g, '')).replace(/\s+/g, ' ').trim();
 
@@ -79,14 +87,27 @@ function structuredData(page, faq, html) {
     return {
       '@context': schema,
       '@graph': [
-        { '@type': 'Organization', '@id': organization, name: 'OpenWiz', url: site, logo: site + 'brand/openwiz-lockup.svg', sameAs },
-        { '@type': 'WebSite', '@id': site + '#website', name: 'OpenWiz', url: site },
         {
-          '@type': 'SoftwareApplication', '@id': software, name: 'OpenWiz', description: pages[page][1], url: site,
-          applicationCategory: 'DeveloperApplication', operatingSystem: 'macOS, Linux',
-          offers: { '@type': 'Offer', price: 0, priceCurrency: 'USD' },
-          license: 'https://www.apache.org/licenses/LICENSE-2.0', downloadUrl: repo + '/releases',
-          sameAs, publisher: { '@id': organization },
+          '@type': 'Organization', '@id': organization, name: 'OpenWiz', url: site, logo: site + 'brand/openwiz-lockup.svg',
+          description: entityName, disambiguatingDescription: disambiguation, sameAs,
+        },
+        { '@type': 'WebSite', '@id': site + '#website', name: 'OpenWiz', alternateName: entityName, url: site, publisher: { '@id': organization } },
+        {
+          '@type': 'SoftwareApplication', '@id': software, name: 'OpenWiz', alternateName: 'OpenWiz agent factory', description: pages[page][1],
+          disambiguatingDescription: disambiguation, url: site,
+          applicationCategory: 'DeveloperApplication', applicationSubCategory: 'Agent factory for coding agents', operatingSystem: 'macOS, Linux',
+          isAccessibleForFree: true,
+          offers: [
+            { '@type': 'Offer', price: 0, priceCurrency: 'USD', name: 'Free' },
+            { '@type': 'Offer', price: 5, priceCurrency: 'USD', name: 'Supporter' },
+          ],
+          license: 'https://www.apache.org/licenses/LICENSE-2.0', downloadUrl: repo + '/releases', softwareHelp: { '@type': 'CreativeWork', url: repo + '#readme' },
+          sameAs, publisher: { '@id': organization }, author: { '@id': organization },
+        },
+        {
+          '@type': 'SoftwareSourceCode', '@id': source, name: 'OpenWiz', description: entityName, url: site,
+          codeRepository: repo, programmingLanguage: 'Rust', license: 'https://www.apache.org/licenses/LICENSE-2.0',
+          targetProduct: { '@id': software }, publisher: { '@id': organization },
         },
       ],
     };
@@ -118,6 +139,7 @@ export function withMetadata(page, html, faq) {
   if (page !== '404.html') tags.push(`<link rel="canonical" href="${url}">`);
   if (robots) tags.push(`<meta name="robots" content="${robots}">`);
   else {
+    tags.push(`<link rel="alternate" type="text/markdown" href="/${escape(mirrorPath(page))}">`);
     for (const [key, value] of Object.entries({ type: 'website', site_name: 'OpenWiz', title, description, url })) {
       tags.push(`<meta property="og:${key}" content="${escape(value)}">`);
     }
@@ -134,24 +156,14 @@ export function withMetadata(page, html, faq) {
   return html.replace(slot, () => `<!-- metadata:start -->\n${tags.join('\n')}\n<!-- metadata:end -->`);
 }
 
-function guideText(html) {
-  const main = html.match(/<main\b[^>]*>([\s\S]*?)<\/main>/)[1];
-  const markdown = text => plain(text.replace(/<a href="([^"]+)">([^<]+)<\/a>/g, (_, url, label) => `[${label}](${new URL(url, site)})`));
-  return [...main.matchAll(/<(h1|h2|p|ul|ol)\b[^>]*>([\s\S]*?)<\/\1>/g)].map(([, tag, inner]) => {
-    if (tag === 'h1') return '## Guide: ' + plain(inner);
-    if (tag === 'h2') return '### ' + plain(inner);
-    if (tag === 'p') return markdown(inner);
-    return [...inner.matchAll(/<li>([\s\S]*?)<\/li>/g)].map(([, item], index) => `${tag === 'ol' ? `${index + 1}.` : '-'} ${markdown(item)}`).join('\n');
-  });
-}
-
 const crawlers = [
   '*', 'GPTBot', 'OAI-SearchBot', 'ChatGPT-User', 'ClaudeBot', 'Claude-SearchBot', 'Claude-User',
   'anthropic-ai', 'PerplexityBot', 'Perplexity-User', 'Google-Extended', 'Googlebot', 'Bingbot',
   'Applebot', 'Applebot-Extended', 'DuckDuckBot', 'CCBot', 'meta-externalagent', 'Amazonbot', 'cohere-ai', 'YouBot',
 ];
 
-export function crawlerFiles(about, faq, guide) {
+export function crawlerFiles(about, guide, mirrors) {
+  const indexable = Object.entries(pages).filter(([, [, , robots]]) => !robots);
   const main = about.match(/<main\b[^>]*>([\s\S]*?)<\/main>/)[1];
   const [intro, ...body] = [...main.matchAll(/<(h1|h2|p|li)\b[^>]*>([\s\S]*?)<\/\1>/g)];
   const link = /<a href="([^"]+)">([^<]+)<\/a>/g;
@@ -162,6 +174,7 @@ export function crawlerFiles(about, faq, guide) {
   const llms = [
     '# OpenWiz',
     `> ${plain(summary)}`,
+    'This OpenWiz is the open source agent factory for coding agents. It is not the open firmware for the GP2X Wiz handheld or the Windows utility of the same name.',
     plain(whatItDoes),
     'To install, paste this one line into your coding agent (Claude Code, Codex or another): "Install OpenWiz from github.com/openwizdev/OpenWiz". It shows every change first and waits for your yes.',
     '## Install', [
@@ -174,7 +187,7 @@ export function crawlerFiles(about, faq, guide) {
       `- [${plain(intro[2])}](${urlFor(aboutPage)}): What it does, where agents run, and how to install it.`,
       `- [${plain(guide.match(/<h1>([\s\S]*?)<\/h1>/)[1])}](${urlFor(guidePage)}): What an agent factory is, and how to run a fleet of coding agents with OpenWiz 0.01, step by step.`,
       links.find(line => line.startsWith('- [FAQ]')),
-      `- [Full OpenWiz text](${site}llms-full.txt): The overview, FAQ and guide in one file.`,
+      `- [Full OpenWiz text](${site}llms-full.txt): Every indexable page in one file.`,
       `- [README](${repo}/blob/main/README.md): what OpenWiz is and how the kernel fits together`,
       `- [Your first hour](${repo}/blob/main/docs/first-hour.md): from install to your first merged pull request`,
       `- [Records v1](${repo}/blob/main/kernel/records.v1.md): the rules for specs, tickets and status notes on GitHub`,
@@ -198,14 +211,14 @@ export function crawlerFiles(about, faq, guide) {
       `- [Issues](${repo}/issues): for anything beyond a small fix, open an issue first`,
     ].join('\n'),
     '## Links', links.filter(line => !line.startsWith('- [FAQ]') && !line.startsWith('- [Changelog]')).join('\n'),
+    '## Markdown copies', indexable
+      .map(([page, [title, description]]) => `- [${title}](${site}${mirrorPath(page)}): ${description}`).join('\n'),
   ].join('\n\n') + '\n';
-  const full = [
-    `# ${plain(intro[2])}`,
-    ...body.filter(([, tag]) => tag !== 'li').map(([, tag, html]) => tag === 'h2' ? '## ' + plain(html) : markdown(html)),
-    links.join('\n'), '## FAQ',
-    ...faqEntries(faq).map(([question, answer]) => `### ${question}\n\n${answer}`),
-    ...guideText(guide),
-  ].join('\n\n') + '\n';
+  const full = ['# OpenWiz', ...indexable.map(([page, [title]]) => {
+    const copy = mirrors.get(page);
+    if (!copy) throw new Error(`Missing Markdown copy for ${page}`);
+    return `## ${title}\n\nURL: ${urlFor(page)}\n\n${copy.trimEnd()}`;
+  })].join('\n\n') + '\n';
 
   const fallbackDate = new Date().toISOString().slice(0, 10);
   const lastModified = page => {
@@ -219,7 +232,7 @@ export function crawlerFiles(about, faq, guide) {
     } catch {}
     return fallbackDate;
   };
-  const urls = Object.entries(pages).filter(([, [, , robots]]) => !robots).map(([page]) =>
+  const urls = indexable.map(([page]) =>
     `  <url><loc>${urlFor(page)}</loc><lastmod>${lastModified(page)}</lastmod></url>`);
   return {
     'robots.txt': crawlers.map(agent => `User-agent: ${agent}\nAllow: /\nDisallow: /api/\n\n`).join('') + `Sitemap: ${site}sitemap.xml\n`,

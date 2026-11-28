@@ -184,7 +184,7 @@
   function draw(el, feeds) {
     const now = Date.now();
     const seen = picture(feeds.agents, OW.data.repo.get()?.full, now);
-    if (!seen) return el.replaceChildren(OW.ui.placeholder('Reading GitHub…'));
+    if (!seen) return OW.ui.fill(el, OW.ui.placeholder('Reading GitHub…'));
     if (seen.broken) return el.replaceChildren(OW.ui.unknown('GitHub\'s answer had no tickets in it, so the agents are unknown, not none.'));
     const notes = [];
     if (!seen.authors) notes.push('The record authors (fleet.md) couldn\'t be read, so no status note can be checked: each shows as unknown.');
