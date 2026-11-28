@@ -2,7 +2,7 @@
 
 Part of [OpenWiz](https://openwiz.dev), the open source agent factory.
 
-**[openwiz.dev](https://openwiz.dev) and [its app](https://openwiz.dev/app/) for [OpenWiz](https://github.com/openwizdev/OpenWiz), the open source agent factory that runs fleets of coding agents.** OpenWiz 0.01 ([0.1.0](https://github.com/openwizdev/OpenWiz/releases/tag/v0.1.0)) is the current release. The site is static on Cloudflare Pages. The app signs in with GitHub, reads only, and shows your factory from your repository.
+**[openwiz.dev](https://openwiz.dev) and [its app](https://openwiz.dev/app/) for [OpenWiz](https://github.com/openwizdev/OpenWiz), the open source agent factory that runs fleets of coding agents.** OpenWiz 0.01 ([0.1.0](https://github.com/openwizdev/OpenWiz/releases/tag/v0.1.0)) is the current release. The static site runs on Cloudflare Pages with functions for sign-in, Ask a Wiz and click counting. The app signs in with GitHub and shows your factory from your repository. With `?v2=on`, it can also post the answer and steer comments you confirm.
 
 To install OpenWiz ([v0.1.0](https://github.com/openwizdev/OpenWiz/releases/tag/v0.1.0)), paste this into your coding agent: `Install OpenWiz from github.com/openwizdev/OpenWiz`
 

@@ -12,7 +12,7 @@ One per ticket. It builds its ticket on its own branch, and never reviews or mer
 | --- | --- | --- |
 | Harness | Claude Code | `--provider claude-code` |
 | Model | Opus 5.5 | `--model claude-opus-5-5` |
-| Effort | High | `--reasoning-level high` |
+| Effort | Medium | `--reasoning-level medium` |
 
 Source: [OpenWiz's Builder](https://github.com/openwizdev/OpenWiz/blob/main/docs/agents/fleet.md#builder).
 
@@ -22,9 +22,9 @@ Tickets with an exact `polish`, `huntr` or `proposal` label use this table; ever
 
 | Setting | Value | `room-cli thread spawn` flag |
 | --- | --- | --- |
-| Harness | Codex | `--provider codex` |
-| Model | Sol 6.1 | `--model gpt-6.1-sol` |
-| Effort | High | `--reasoning-level high` |
+| Harness | Claude Code | `--provider claude-code` |
+| Model | Opus 5.5 | `--model claude-opus-5-5` |
+| Effort | Medium | `--reasoning-level medium` |
 
 Source: [OpenWiz's Builder for small tickets](https://github.com/openwizdev/OpenWiz/blob/main/docs/agents/fleet.md#builder-for-small-tickets).
 
@@ -35,8 +35,8 @@ One per pull request, from a different model family than the builder. It reviews
 | Setting | Value | `room-cli thread spawn` flag |
 | --- | --- | --- |
 | Harness | Codex | `--provider codex` |
-| Model | Sol 6.1 | `--model gpt-6.1-sol` |
-| Effort | High | `--reasoning-level high` |
+| Model | Sol 6.2 | `--model gpt-6.2-sol` |
+| Effort | Medium | `--reasoning-level medium` |
 
 Source: [OpenWiz's Reviewer for Claude-built](https://github.com/openwizdev/OpenWiz/blob/main/docs/agents/fleet.md#reviewer-for-claude-built).
 
@@ -48,7 +48,7 @@ Use the verified builder's provider, from its branch-matching `start checked` re
 | --- | --- | --- |
 | Harness | Claude Code | `--provider claude-code` |
 | Model | Opus 5.5 | `--model claude-opus-5-5` |
-| Effort | High | `--reasoning-level high` |
+| Effort | Medium | `--reasoning-level medium` |
 
 Source: [OpenWiz's Reviewer for GPT-built](https://github.com/openwizdev/OpenWiz/blob/main/docs/agents/fleet.md#reviewer-for-gpt-built).
 
@@ -83,7 +83,7 @@ The full set, in this order, from the repository root. Use Node.js 24, Python 3.
 
 Command 1 is the comment check (`npm run test:comments` runs it locally against `origin/main`, the pull-request target; replace `origin/main` with another target branch if needed). CI runs the same checker only on a pull request, using `--base HEAD^1` on the merge checkout after fetching that head. Command 2 checks that the carried `tools/comment-check/check.py` matches its pinned OpenWiz source, and also runs only on a pull request. Commands 5 to 10 need command 4's `dist/` first. `npm run test:v2` is command 9. `npm run test:models` is command 10.
 
-Source: [`README.md`](../../README.md#build-and-check), [`package.json`](../../package.json) scripts and [`.github/workflows/site.yml`](../../.github/workflows/site.yml).
+Source: [`docs/maintaining.md`](../maintaining.md#build-and-check), [`package.json`](../../package.json) scripts and [`.github/workflows/site.yml`](../../.github/workflows/site.yml).
 
 ## CI checks
 
@@ -102,7 +102,7 @@ Source: [`.github/workflows/site.yml`](../../.github/workflows/site.yml), and th
 | A ticket in an approved plan graph | The reviewer above, from the other model family, on its exact head | The loop, once the reviewer's APPROVE names that exact commit, `Build, links, resources and privacy` is green on it and it has no conflict with `main`; no per-change maintainer approval. Then the merge is read back |
 | Anything else, and every release or publication | None by rule | Jake only |
 
-Source: [`README.md`](../../README.md#cloudflare-pages): changes merge after green CI and one review from the other model family, with no per-change maintainer approval; merging deploys through Cloudflare Pages.
+Source: [`docs/maintaining.md`](../maintaining.md#cloudflare-pages): changes merge after green CI and one review from the other model family, with no per-change maintainer approval; merging deploys through Cloudflare Pages.
 
 ## GitHub identity
 
