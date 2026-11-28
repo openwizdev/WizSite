@@ -30,6 +30,11 @@ REMOVED_LOGS = (
 WRONG_POSTER = '/favicon.ico'
 
 
+def drivers_as_checked(html):
+    from check import DRIVERS_PAGE, drivers_fallback
+    return drivers_fallback(html, (ROOT / DRIVERS_PAGE).read_text())[0]
+
+
 def edit_built(root, name, change):
     old = next(p for p in root.glob(name.rsplit('.', 1)[0] + '.*.' + name.rsplit('.', 1)[1]))
     was = old.relative_to(root).as_posix()
@@ -1091,18 +1096,28 @@ echo <name>
                     check_site(root)
 
     def broken(self, name, old, new, error, css=None):
-        with self.subTest(name=name, old=old[:60], error=error), tempfile.TemporaryDirectory() as temp:
-            root = Path(temp) / 'dist'
-            shutil.copytree(ROOT / 'dist', root)
-            if css:
-                edit_built(root, 'site.css', lambda t: t + css)
-            else:
-                page = root / name
-                text = page.read_text()
-                self.assertIn(old, text)
-                page.write_text(text.replace(old, new, 1))
-            with self.assertRaisesRegex(AssertionError, error):
-                check_site(root)
+        source_path = ROOT / name if name == 'drivers/index.html' else None
+        original = source_path.read_text() if source_path else None
+        try:
+            with self.subTest(name=name, old=old[:60], error=error), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp) / 'dist'
+                shutil.copytree(ROOT / 'dist', root)
+                if css:
+                    edit_built(root, 'site.css', lambda t: t + css)
+                else:
+                    page = root / name
+                    text = page.read_text()
+                    if old and old in text:
+                        page.write_text(text.replace(old, new, 1))
+                    elif not (original is not None and old and old in original):
+                        self.assertIn(old, text)
+                    if original is not None and old and old in original:
+                        source_path.write_text(original.replace(old, new, 1))
+                with self.assertRaisesRegex(AssertionError, error):
+                    check_site(root)
+        finally:
+            if original is not None and source_path.read_text() != original:
+                source_path.write_text(original)
 
     def test_team_page_and_buy_button(self):
         def planted(page, change):
@@ -1257,6 +1272,19 @@ echo <name>
             with self.subTest(place=place, html=html), tempfile.TemporaryDirectory() as temp:
                 root = Path(temp) / 'dist'
                 shutil.copytree(ROOT / 'dist', root)
+                driver_path = root / 'drivers/index.html'
+                driver_path.write_text(drivers_as_checked(driver_path.read_text()))
+                market_path = root / 'market/index.html'
+                rendered = subprocess.run(['node', '--input-type=module', '-e', """
+                    import { readFileSync } from 'node:fs';
+                    import { render, withMarket } from './scripts/market.mjs';
+                    const page = readFileSync(process.argv[1], 'utf8');
+                    const index = JSON.parse(readFileSync(process.argv[2], 'utf8'));
+                    const slot = '<template data-slot="market"></template>';
+                    const stripped = page.replace(/<!-- market:start -->[\\s\\S]*<!-- market:end -->/, slot);
+                    process.stdout.write(withMarket(stripped, render(index)));
+                """, str(market_path), str(registry)], cwd=ROOT, check=True, capture_output=True, text=True).stdout
+                market_path.write_text(rendered)
                 path = root / ('drivers/index.html' if place == 'drivers' else 'market/index.html')
                 mark = '<!-- market:end -->' if place == 'generated' else '</main>'
                 path.write_text(path.read_text().replace(mark, html + mark, 1))
@@ -1433,7 +1461,7 @@ echo <name>
 
     def test_drivers_login_lines(self):
         import check
-        main = re.search(r'<main\b[\s\S]*?</main>', (ROOT / 'dist' / check.DRIVERS_PAGE).read_text())[0]
+        main = re.search(r'<main\b[\s\S]*?</main>', drivers_as_checked((ROOT / 'dist' / check.DRIVERS_PAGE).read_text()))[0]
         check.check_driver_logins(main)
         held, local = '<p class="driver-login">Login: held by Cloudroom</p>', '<p class="driver-login">Login: stays on your machine</p>'
         for old, new, error in (
@@ -1450,7 +1478,7 @@ echo <name>
 
     def test_drivers_wall(self):
         import check
-        main = re.search(r'<main\b[\s\S]*?</main>', (ROOT / 'dist' / check.DRIVERS_PAGE).read_text())[0]
+        main = re.search(r'<main\b[\s\S]*?</main>', drivers_as_checked((ROOT / 'dist' / check.DRIVERS_PAGE).read_text()))[0]
         check.check_driver_wall(main)
         grok, vibe = '<h4 class="tile-name">Grok Bot</h4>', '<h4 class="tile-name">Mistral Vibe</h4>'
         for old, new, error in (
@@ -1504,10 +1532,11 @@ echo <name>
             root = Path(temp) / 'dist'
             shutil.copytree(ROOT / 'dist', root)
             path = root / page
-            text = path.read_text()
+            text = drivers_as_checked(path.read_text())
             section = re.search(r'\s*<section class="spotlight[\s\S]*?</section>', text)[0]
             path.write_text(text.replace(section, '').replace('<section class="own-driver', section.strip() + '<section class="own-driver', 1))
-            with self.assertRaisesRegex(AssertionError, 'boat.dev first|right after the hero'):
+            with mock.patch('check.driver_listing_urls', return_value={}), \
+                    self.assertRaisesRegex(AssertionError, 'boat.dev first|right after the hero'):
                 check_site(root)
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp) / 'dist'
@@ -1567,10 +1596,11 @@ echo <name>
             root = Path(temp) / 'dist'
             shutil.copytree(ROOT / 'dist', root)
             path = root / page
-            text = path.read_text()
+            text = drivers_as_checked(path.read_text())
             spot = re.search(r'\s*<section class="spotlight[\s\S]*?</section>', text)[0]
             path.write_text(text.replace(spot, '').replace('<section class="own-driver', spot.strip() + '\n  <section class="own-driver', 1))
-            with self.assertRaisesRegex(AssertionError, 'boat.dev first'):
+            with mock.patch('check.driver_listing_urls', return_value={}), \
+                    self.assertRaisesRegex(AssertionError, 'boat.dev first'):
                 check_site(root)
         for logo in ('drivers/logos/boat-dev.svg', 'drivers/logos/cloudroom.png', 'drivers/logos/monitor.svg', 'drivers/logos/devin.svg', 'drivers/logos/crush.png'):
             with self.subTest(logo=logo), tempfile.TemporaryDirectory() as temp:
@@ -1582,7 +1612,7 @@ echo <name>
                 with self.assertRaisesRegex(AssertionError, 'logo changed bytes|unreviewed picture'):
                     check_privacy(logo, (ROOT / logo).read_bytes().replace(b'</svg>', b'<!-- x --></svg>') if logo.endswith('.svg') else b'\x89PNG tampered')
         from check import check_driver_logos, DriverOutline
-        html = (ROOT / 'dist' / page).read_text()
+        html = drivers_as_checked((ROOT / 'dist' / page).read_text())
         main = re.search(r'<main\b[^>]*>[\s\S]*?</main>', html)[0]
         check_driver_logos(main, DriverOutline(main))
         for extra, error in (('drivers/logos/extra.svg', 'unused drivers logos'), ('drivers/logos/grok.svg', 'unused drivers logos|no Grok logo')):
@@ -1612,10 +1642,11 @@ echo <name>
             root = Path(temp) / 'dist'
             shutil.copytree(ROOT / 'dist', root)
             path = root / page
-            text = path.read_text()
+            text = drivers_as_checked(path.read_text())
             scene = re.search(r'\s*<div class="proof-scene">[\s\S]*?</div>', text)[0]
             path.write_text(text.replace(scene, '').replace('<div class="proof-copy">', scene.strip() + '<div class="proof-copy">', 1))
-            with self.assertRaisesRegex(AssertionError, 'come before its painting'):
+            with mock.patch('check.driver_listing_urls', return_value={}), \
+                    self.assertRaisesRegex(AssertionError, 'come before its painting'):
                 check_site(root)
         for bad, error in (
                 ('\n.drivers-page .host-marks .host-lockup { height: 26px; }\n', 'sized apart from its slot'),

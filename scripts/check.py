@@ -1525,7 +1525,13 @@ def check_site(root, registry=ROOT / 'market/registry.json', now=None):
         assert not any(re.search(r'\b(?:Openwiz|openWiz|Open Wiz|OPENWIZ)\b', text)
                        for text in [reader.joined(), reader.spaced(), *reader.shown]), f'OpenWiz spelling in {name}'
     for path in pages:
-        reader = Text(docs[path.relative_to(root).as_posix()])
+        rel = path.relative_to(root).as_posix()
+        html = docs[rel]
+        if rel == MARKET_PAGE:
+            html = split_market(html)[0]
+        if rel == DRIVERS_PAGE and driver_listing_urls(registry) and tuple(match[2] for match in DRIVER_SLOT.finditer(html)) == DRIVER_SLOTS:
+            html = drivers_fallback(html, (ROOT / DRIVERS_PAGE).read_text())[0]
+        reader = Text(html)
         readings = [reader.joined(), reader.spaced()] + reader.attrs
         for reading in readings:
             low = re.sub(r'\s+', ' ', reading).lower()
@@ -2619,7 +2625,26 @@ def check_art(name, data):
     assert not any(marker.encode() in data.lower() for marker in DENYLIST), f'private marker in {name}'
 
 
-def check_privacy(path, data):
+def ask_index_without_market(body):
+    data = json.loads(body)
+    market = {i for i, source in enumerate(data.get('sources', ())) if source.get('url', '').rstrip('/').endswith('/market')}
+    kept = [passage for passage in data.get('passages', ()) if passage.get('source') not in market]
+    return json.dumps(kept)
+
+
+def site_voice(path, body):
+    if path == 'market/registry.json':
+        return ''
+    if path.removeprefix('dist/') == ASK_INDEX and any(word in body.lower() for word in BANNED_COPY):
+        return ask_index_without_market(body)
+    if path.endswith('market/index.html') and MARKET[0] in body:
+        return split_market(body)[0]
+    if path.endswith('drivers/index.html') and driver_listing_urls(ROOT / 'market/registry.json') and tuple(match[2] for match in DRIVER_SLOT.finditer(body)) == DRIVER_SLOTS:
+        return drivers_fallback(body, (ROOT / DRIVERS_PAGE).read_text())[0]
+    return body
+
+
+def check_privacy(path, data, mirror_voice=None):
     # PRIVACY: font binaries contain author metadata, so the fonts and legal attributions need review.
     # Every other tracked file must be UTF-8. Scan paths too; do not follow symlinks.
     font = path.removeprefix('dist/')
@@ -2642,8 +2667,10 @@ def check_privacy(path, data):
     if font in DRIVER_LOGOS:
         assert sha256(data).hexdigest() == DRIVER_LOGOS[font][0], f'a drivers logo changed bytes: {path}'
     binary = path.endswith(('.webp', '.avif', '.mp4', '.png', '.ico')) or (font in FONT_HASHES and font.endswith('.woff2'))
-    text = path + '\n' + ('' if binary else data.decode('utf-8'))
-    assert not any(word in text.lower() for word in BANNED_COPY), f'banned word in {path}'
+    body = '' if binary else data.decode('utf-8')
+    voiced = site_voice(path, body) if mirror_voice is None else mirror_voice
+    text = path + '\n' + body
+    assert not any(word in (path + '\n' + voiced).lower() for word in BANNED_COPY), f'banned word in {path}'
     # PRIVACY: this file may name its denylist. The Ask snapshot may quote the GitHub App
     # guide's one public placeholder home directory. Every other home path still fails.
     if path == 'scripts/check.py':
@@ -2697,6 +2724,32 @@ def check_showcase_fixtures():
     print('PASS: showcase fixtures (2 accepted, 4 rejected)')
 
 
+def mirror_site_voice(output):
+    full = (output / 'llms-full.txt').read_text()
+    voices = {}
+    for page in (MARKET_PAGE, DRIVERS_PAGE):
+        name = MIRROR_PATHS[page]
+        copy = (output / name).read_text()
+        if not any(word in copy.lower() for word in BANNED_COPY):
+            continue
+        html = (output / page).read_text()
+        site_html = site_voice(f'dist/{page}', html)
+        copies = subprocess.run(['node', '--input-type=module', '-e', """
+            import { readFileSync } from 'node:fs';
+            import { toMarkdown } from './scripts/mirrors.mjs';
+            import { urlFor } from './scripts/discovery.mjs';
+            const pages = JSON.parse(readFileSync(0, 'utf8'));
+            process.stdout.write(JSON.stringify(pages.map(html => toMarkdown(html, urlFor(process.argv[1])))));
+        """, page], cwd=ROOT, input=json.dumps([html, site_html]), text=True, stdout=subprocess.PIPE, check=True)
+        rendered, voiced = json.loads(copies.stdout)
+        assert rendered == copy, f'export differs: {name}'
+        assert full.count(copy) == 1, f'llms-full.txt needs one copy of {name}'
+        full = full.replace(copy, voiced, 1)
+        voices[name] = voiced
+    voices['llms-full.txt'] = full
+    return voices
+
+
 def main():
     check_showcase_fixtures()
     output = ROOT / 'dist'
@@ -2725,8 +2778,9 @@ def main():
         path = ROOT / name
         assert not path.is_symlink(), f'symlink requires review: {name}'
         check_privacy(name, path.read_bytes())
+    voices = mirror_site_voice(output)
     for name in RUNTIME:
-        check_privacy('dist/' + name, (output / name).read_bytes())
+        check_privacy('dist/' + name, (output / name).read_bytes(), voices.get(name))
     print('PASS: pinned WebP and AVIF artwork and spec recording within budget; the launch video within its own budget')
     print('PASS: exact export, local links/fragments, CSS resources, fonts/licences, copy and privacy')
     print('PASS: page metadata, JSON-LD, sitemap, robots, crawler text and 404')

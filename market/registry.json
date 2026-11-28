@@ -1,5 +1,2181 @@
 {
-  "commit": "dfbf9ee685d5941b98da3667e65d01ee5b347da7",
+  "commit": "35ce60ae49a94741049f4790fc5cac0d26273fab",
   "contract": "listing.v1",
-  "listings": []
+  "listings": [
+    {
+      "id": "addyosmani-agent-skills",
+      "links": [
+        {
+          "label": "Website",
+          "url": "https://skills.addy.ie"
+        }
+      ],
+      "name": "Agent Skills (Addy Osmani)",
+      "plugs_into": "The skills an OpenWiz agent runs",
+      "publisher": "jparker2006",
+      "stage": "available",
+      "status": "listed",
+      "summary": "Production engineering skills and lifecycle slash commands covering spec, plan, build, test, review, webperf, and accessibility. MIT.",
+      "tags": [
+        "skill",
+        "skill-pack",
+        "community"
+      ],
+      "url": "https://github.com/addyosmani/agent-skills"
+    },
+    {
+      "id": "agency-agents",
+      "name": "The Agency (agency-agents)",
+      "plugs_into": "The skills an OpenWiz agent runs",
+      "publisher": "jparker2006",
+      "stage": "available",
+      "status": "listed",
+      "summary": "Collection of specialized AI agent personalities with domain workflows and deliverables across engineering, design, and ops. MIT.",
+      "tags": [
+        "skill",
+        "skill-pack",
+        "community"
+      ],
+      "url": "https://github.com/msitarzewski/agency-agents"
+    },
+    {
+      "id": "amp",
+      "links": [
+        {
+          "label": "OpenWiz live check",
+          "url": "https://github.com/openwizdev/OpenWiz/issues/2550"
+        }
+      ],
+      "login": "Run amp login once; Amp keeps the login on this machine.",
+      "name": "Amp",
+      "plugs_into": "OpenWiz local driver",
+      "publisher": "jparker2006",
+      "stage": "being-built",
+      "status": "listed",
+      "summary": "Amp as a harness for the OpenWiz local driver.",
+      "tags": [
+        "harness",
+        "cli"
+      ],
+      "url": "https://ampcode.com"
+    },
+    {
+      "id": "anthropics-skills",
+      "name": "Anthropic Skills",
+      "plugs_into": "The skills an OpenWiz agent runs",
+      "publisher": "jparker2006",
+      "stage": "available",
+      "status": "listed",
+      "summary": "Anthropic's public collection of Agent Skills for creative, technical, document, and enterprise tasks.",
+      "tags": [
+        "skill",
+        "skill-pack"
+      ],
+      "url": "https://github.com/anthropics/skills"
+    },
+    {
+      "id": "antigravity-cli",
+      "links": [
+        {
+          "label": "OpenWiz live check",
+          "url": "https://github.com/openwizdev/OpenWiz/issues/2552"
+        }
+      ],
+      "login": "Sign in once in an interactive agy session; the login is saved in the OS keyring.",
+      "name": "Antigravity CLI",
+      "plugs_into": "OpenWiz local driver",
+      "publisher": "jparker2006",
+      "stage": "being-built",
+      "status": "listed",
+      "summary": "Antigravity CLI as a harness for the OpenWiz local driver.",
+      "tags": [
+        "harness",
+        "cli"
+      ],
+      "url": "https://antigravity.google/docs/cli/headless"
+    },
+    {
+      "id": "apify-mcp-server",
+      "name": "Apify MCP Server",
+      "plugs_into": "The agent's MCP servers",
+      "publisher": "jparker2006",
+      "stage": "available",
+      "status": "listed",
+      "summary": "MCP server connecting AI agents to Apify's web scrapers, crawlers, and browser automation Actors. MIT.",
+      "tags": [
+        "mcp-server",
+        "scraping",
+        "automation"
+      ],
+      "url": "https://github.com/apify/apify-mcp-server"
+    },
+    {
+      "id": "auggie",
+      "links": [
+        {
+          "label": "OpenWiz integration ticket",
+          "url": "https://github.com/openwizdev/OpenWiz/issues/2439"
+        }
+      ],
+      "login": "Run auggie auth login. Auggie stores the login in its local session.json file.",
+      "name": "Augment Auggie CLI",
+      "plugs_into": "OpenWiz local driver",
+      "publisher": "jparker2006",
+      "stage": "being-built",
+      "status": "listed",
+      "summary": "Augment Auggie CLI as a harness for the OpenWiz local driver.",
+      "tags": [
+        "harness",
+        "cli"
+      ],
+      "url": "https://docs.augmentcode.com/cli/reference"
+    },
+    {
+      "id": "aws-mcp",
+      "name": "AWS MCP Servers",
+      "plugs_into": "The agent's MCP servers",
+      "publisher": "jparker2006",
+      "stage": "available",
+      "status": "listed",
+      "summary": "Official open-source MCP servers from AWS for cloud documentation, infrastructure, serverless, and AWS service workflows.",
+      "tags": [
+        "mcp-server",
+        "aws",
+        "cloud",
+        "infrastructure"
+      ],
+      "url": "https://github.com/awslabs/mcp"
+    },
+    {
+      "id": "blender-mcp",
+      "name": "BlenderMCP",
+      "plugs_into": "The agent's MCP servers",
+      "publisher": "jparker2006",
+      "stage": "available",
+      "status": "listed",
+      "summary": "MCP server connecting AI agents directly to Blender for prompt-assisted 3D modeling, scene creation, and manipulation.",
+      "tags": [
+        "mcp-server",
+        "3d",
+        "blender",
+        "design"
+      ],
+      "url": "https://github.com/ahujasid/mcp-for-blender"
+    },
+    {
+      "id": "boat-dev",
+      "links": [
+        {
+          "label": "OpenWiz PR #1444",
+          "url": "https://github.com/openwizdev/OpenWiz/pull/1444"
+        },
+        {
+          "label": "Kit run, 5 of 5",
+          "url": "https://github.com/openwizdev/OpenWiz/pull/1444#issuecomment-7031553819"
+        }
+      ],
+      "login": "held by boat.dev",
+      "name": "boat.dev",
+      "plugs_into": "OpenWiz's driver v1: it starts, wakes and stops builders",
+      "proof": {
+        "receipt": {
+          "date": "2026-11-20",
+          "path": "receipts/boat-dev/2026-11-20-e22d6dd9da0d.txt",
+          "url": "https://github.com/openwizdev/WizMarket/blob/35ce60ae49a94741049f4790fc5cac0d26273fab/receipts/boat-dev/2026-11-20-e22d6dd9da0d.txt"
+        }
+      },
+      "publisher": "openwizdev",
+      "stage": "available",
+      "status": "verified",
+      "summary": "Runs each OpenWiz builder in its own boat.dev sandbox through your own signed-in boat CLI.",
+      "tags": [
+        "driver",
+        "sandbox",
+        "cloud"
+      ],
+      "url": "https://boat.dev"
+    },
+    {
+      "id": "brightdata-mcp",
+      "name": "Bright Data MCP",
+      "plugs_into": "The agent's MCP servers",
+      "publisher": "jparker2006",
+      "stage": "available",
+      "status": "listed",
+      "summary": "Bright Data MCP server for public web search, scraping, and browser automation across geo-restricted sites. MIT.",
+      "tags": [
+        "mcp-server",
+        "scraping",
+        "search"
+      ],
+      "url": "https://github.com/brightdata/brightdata-mcp"
+    },
+    {
+      "id": "browser-mcp",
+      "name": "Browser MCP",
+      "plugs_into": "The agent's MCP servers",
+      "publisher": "jparker2006",
+      "stage": "available",
+      "status": "listed",
+      "summary": "MCP server and browser extension that lets AI agents control your local browser with your existing sessions. Apache-2.0.",
+      "tags": [
+        "mcp-server",
+        "browser",
+        "automation"
+      ],
+      "url": "https://github.com/BrowserMCP/mcp"
+    },
+    {
+      "id": "browser-tools-mcp",
+      "name": "BrowserTools MCP",
+      "plugs_into": "The agent's MCP servers",
+      "publisher": "jparker2006",
+      "stage": "available",
+      "status": "listed",
+      "summary": "MCP server that captures browser console logs, network requests, screenshots, and audits for coding agents. MIT.",
+      "tags": [
+        "mcp-server",
+        "browser",
+        "automation"
+      ],
+      "url": "https://github.com/AgentDeskAI/browser-tools-mcp"
+    },
+    {
+      "id": "chrome-devtools-mcp",
+      "name": "Chrome DevTools MCP",
+      "plugs_into": "The agent's MCP servers",
+      "publisher": "jparker2006",
+      "stage": "available",
+      "status": "listed",
+      "summary": "Official Chrome DevTools MCP server letting coding agents inspect, debug, and automate a live Chrome browser. Apache-2.0.",
+      "tags": [
+        "mcp-server",
+        "browser",
+        "automation"
+      ],
+      "url": "https://github.com/ChromeDevTools/chrome-devtools-mcp"
+    },
+    {
+      "id": "cline-cli",
+      "links": [
+        {
+          "label": "OpenWiz harness row",
+          "url": "https://github.com/openwizdev/OpenWiz/issues/2530"
+        }
+      ],
+      "login": "Run cline auth. Cline saves it in the settings folder inside data in .cline under your home directory.",
+      "name": "Cline CLI",
+      "plugs_into": "OpenWiz local driver",
+      "publisher": "jparker2006",
+      "stage": "being-built",
+      "status": "listed",
+      "summary": "The Cline CLI harness row for OpenWiz's local driver.",
+      "tags": [
+        "harness",
+        "cli"
+      ],
+      "url": "https://github.com/cline/cline"
+    },
+    {
+      "id": "cloudroom",
+      "links": [
+        {
+          "label": "OpenWiz PR #1458",
+          "url": "https://github.com/openwizdev/OpenWiz/pull/1458"
+        },
+        {
+          "label": "Kit run, 5 of 5",
+          "url": "https://github.com/openwizdev/OpenWiz/pull/1458#issuecomment-7034556153"
+        }
+      ],
+      "login": "held by Cloudroom",
+      "name": "Cloudroom",
+      "plugs_into": "OpenWiz's driver v1: it starts, wakes and stops builders",
+      "publisher": "openwizdev",
+      "stage": "available",
+      "status": "listed",
+      "summary": "Runs each OpenWiz builder as a Cloudroom cloud thread through your own signed-in room-cli.",
+      "tags": [
+        "driver",
+        "cloud"
+      ],
+      "url": "https://cloudroom.dev"
+    },
+    {
+      "id": "code-review-graph",
+      "name": "Code Review Graph",
+      "plugs_into": "The agent's MCP servers",
+      "publisher": "jparker2006",
+      "stage": "available",
+      "status": "listed",
+      "summary": "Local-first MCP server that builds a persistent codebase graph so coding agents read only the context needed for reviews.",
+      "tags": [
+        "mcp-server",
+        "coding",
+        "code-review"
+      ],
+      "url": "https://github.com/tirth8205/code-review-graph"
+    },
+    {
+      "id": "codebase-memory-mcp",
+      "name": "Codebase Memory MCP",
+      "plugs_into": "The agent's MCP servers",
+      "publisher": "jparker2006",
+      "stage": "available",
+      "status": "listed",
+      "summary": "Local MCP server that indexes code, docs, and infrastructure into a persistent knowledge graph for coding agents.",
+      "tags": [
+        "mcp-server",
+        "coding",
+        "code-intelligence"
+      ],
+      "url": "https://github.com/DeusData/codebase-memory-mcp"
+    },
+    {
+      "id": "codespaces",
+      "links": [
+        {
+          "label": "OpenWiz PR #2559",
+          "url": "https://github.com/openwizdev/OpenWiz/pull/2559"
+        }
+      ],
+      "login": "Held by GitHub",
+      "name": "GitHub Codespaces",
+      "plugs_into": "OpenWiz driver v1",
+      "publisher": "jparker2006",
+      "stage": "being-built",
+      "status": "listed",
+      "summary": "Runs each OpenWiz builder in its own GitHub Codespace through the user's gh login.",
+      "tags": [
+        "driver",
+        "cloud"
+      ],
+      "url": "https://github.com/features/codespaces"
+    },
+    {
+      "id": "composio-awesome-claude-skills",
+      "name": "Awesome Claude Skills (Composio)",
+      "plugs_into": "The skills an OpenWiz agent runs",
+      "publisher": "jparker2006",
+      "stage": "available",
+      "status": "listed",
+      "summary": "Curated collection of Claude Skills, resources and workflow tools for customizing AI agent tasks. Apache-2.0.",
+      "tags": [
+        "skill",
+        "skill-pack",
+        "community"
+      ],
+      "url": "https://github.com/ComposioHQ/awesome-claude-skills"
+    },
+    {
+      "id": "conductor",
+      "links": [
+        {
+          "label": "OpenWiz PR #2020",
+          "url": "https://github.com/openwizdev/OpenWiz/pull/2020"
+        }
+      ],
+      "login": "Held by Conductor",
+      "name": "Conductor",
+      "plugs_into": "OpenWiz driver v1",
+      "publisher": "jparker2006",
+      "stage": "being-built",
+      "status": "listed",
+      "summary": "Runs OpenWiz builders in Conductor cloud workspaces through its REST API.",
+      "tags": [
+        "driver",
+        "cloud"
+      ],
+      "url": "https://www.conductor.build/"
+    },
+    {
+      "id": "context7",
+      "name": "Context7",
+      "plugs_into": "The agent's MCP servers",
+      "publisher": "jparker2006",
+      "stage": "available",
+      "status": "listed",
+      "summary": "MCP server that fetches up-to-date, version-specific library documentation and code examples for coding agents.",
+      "tags": [
+        "mcp-server",
+        "coding",
+        "docs"
+      ],
+      "url": "https://github.com/upstash/context7"
+    },
+    {
+      "id": "copilot-cli",
+      "links": [
+        {
+          "label": "OpenWiz harness row",
+          "url": "https://github.com/openwizdev/OpenWiz/issues/2467"
+        }
+      ],
+      "login": "Run copilot login. Copilot saves it in the system credential store or the .copilot directory under your home directory.",
+      "name": "GitHub Copilot CLI",
+      "plugs_into": "OpenWiz local driver",
+      "publisher": "jparker2006",
+      "stage": "being-built",
+      "status": "listed",
+      "summary": "The GitHub Copilot CLI harness row for OpenWiz's local driver.",
+      "tags": [
+        "harness",
+        "cli"
+      ],
+      "url": "https://github.com/github/copilot-cli"
+    },
+    {
+      "id": "crush",
+      "links": [
+        {
+          "label": "OpenWiz integration ticket",
+          "url": "https://github.com/openwizdev/OpenWiz/issues/2436"
+        }
+      ],
+      "login": "Run crush login.",
+      "name": "Crush",
+      "plugs_into": "OpenWiz local driver",
+      "publisher": "jparker2006",
+      "stage": "being-built",
+      "status": "listed",
+      "summary": "Crush as a harness for the OpenWiz local driver.",
+      "tags": [
+        "harness",
+        "cli"
+      ],
+      "url": "https://github.com/charmbracelet/crush"
+    },
+    {
+      "id": "cursor-cli",
+      "links": [
+        {
+          "label": "OpenWiz harness row",
+          "url": "https://github.com/openwizdev/OpenWiz/issues/2473"
+        }
+      ],
+      "login": "Run agent login to sign in locally, or set CURSOR_API_KEY for the CLI yourself. The driver never reads or passes it.",
+      "name": "Cursor CLI",
+      "plugs_into": "OpenWiz local driver",
+      "publisher": "jparker2006",
+      "stage": "being-built",
+      "status": "listed",
+      "summary": "The Cursor CLI harness row for OpenWiz's local driver.",
+      "tags": [
+        "harness",
+        "cli"
+      ],
+      "url": "https://cursor.com/cli"
+    },
+    {
+      "id": "cursor-cloud-agents",
+      "links": [
+        {
+          "label": "OpenWiz PR #2021",
+          "url": "https://github.com/openwizdev/OpenWiz/pull/2021"
+        }
+      ],
+      "login": "Held by Cursor",
+      "name": "Cursor Cloud Agents",
+      "plugs_into": "OpenWiz driver v1",
+      "publisher": "jparker2006",
+      "stage": "being-built",
+      "status": "listed",
+      "summary": "Starts, follows up with, and stops Cursor cloud agents from OpenWiz.",
+      "tags": [
+        "driver",
+        "cloud"
+      ],
+      "url": "https://cursor.com/docs/cloud-agent"
+    },
+    {
+      "id": "cursor-talk-to-figma-mcp",
+      "name": "Cursor Talk To Figma MCP",
+      "plugs_into": "The agent's MCP servers",
+      "publisher": "jparker2006",
+      "stage": "available",
+      "status": "listed",
+      "summary": "MCP server enabling AI agents to read Figma designs and modify them programmatically through a Figma plugin.",
+      "tags": [
+        "mcp-server",
+        "design",
+        "figma"
+      ],
+      "url": "https://github.com/grab/cursor-talk-to-figma-mcp"
+    },
+    {
+      "id": "dbhub",
+      "name": "DBHub",
+      "plugs_into": "The agent's MCP servers",
+      "publisher": "jparker2006",
+      "stage": "available",
+      "status": "listed",
+      "summary": "Universal database MCP server supporting Postgres, MySQL, SQL Server, Oracle, MariaDB, SQLite, and ClickHouse.",
+      "tags": [
+        "mcp-server",
+        "database",
+        "sql",
+        "postgres"
+      ],
+      "url": "https://github.com/bytebase/dbhub"
+    },
+    {
+      "id": "devin",
+      "links": [
+        {
+          "label": "OpenWiz PR #2490",
+          "url": "https://github.com/openwizdev/OpenWiz/pull/2490"
+        }
+      ],
+      "login": "Held by Devin",
+      "name": "Devin",
+      "plugs_into": "OpenWiz driver v1",
+      "publisher": "jparker2006",
+      "stage": "being-built",
+      "status": "listed",
+      "summary": "Runs OpenWiz builders in Devin sessions through the OpenWiz key helper. Merged, waiting on its live check, not in a release yet.",
+      "tags": [
+        "driver",
+        "cloud"
+      ],
+      "url": "https://devin.ai"
+    },
+    {
+      "id": "ecc",
+      "name": "ECC",
+      "plugs_into": "The skills an OpenWiz agent runs",
+      "publisher": "jparker2006",
+      "stage": "available",
+      "status": "listed",
+      "summary": "Agent harness skills, instincts, memory, security, and research-first workflows for coding agents. MIT.",
+      "tags": [
+        "skill",
+        "skill-pack"
+      ],
+      "url": "https://github.com/affaan-m/ECC"
+    },
+    {
+      "id": "exa-mcp-server",
+      "name": "Exa MCP Server",
+      "plugs_into": "The agent's MCP servers",
+      "publisher": "jparker2006",
+      "stage": "available",
+      "status": "listed",
+      "summary": "Official Exa MCP server providing real-time neural web search and web crawling for AI agents. MIT.",
+      "tags": [
+        "mcp-server",
+        "search",
+        "scraping"
+      ],
+      "url": "https://github.com/exa-labs/exa-mcp-server"
+    },
+    {
+      "id": "factory",
+      "links": [
+        {
+          "label": "OpenWiz PR #2022",
+          "url": "https://github.com/openwizdev/OpenWiz/pull/2022"
+        }
+      ],
+      "login": "Held by Factory",
+      "name": "Factory",
+      "plugs_into": "OpenWiz driver v1",
+      "publisher": "jparker2006",
+      "stage": "being-built",
+      "status": "listed",
+      "summary": "Runs OpenWiz builders locally through the Factory Droid CLI.",
+      "tags": [
+        "driver",
+        "local"
+      ],
+      "url": "https://docs.factory.com/droid-cli/overview"
+    },
+    {
+      "id": "figma-context-mcp",
+      "name": "Figma Context MCP",
+      "plugs_into": "The agent's MCP servers",
+      "publisher": "jparker2006",
+      "stage": "available",
+      "status": "listed",
+      "summary": "MCP server that serves Figma layout and design context to AI coding agents for accurate UI implementation.",
+      "tags": [
+        "mcp-server",
+        "design",
+        "figma"
+      ],
+      "url": "https://github.com/GLips/Figma-Context-MCP"
+    },
+    {
+      "id": "firecrawl-mcp-server",
+      "name": "Firecrawl MCP Server",
+      "plugs_into": "The agent's MCP servers",
+      "publisher": "jparker2006",
+      "stage": "available",
+      "status": "listed",
+      "summary": "Official Firecrawl MCP server for web scraping, crawling, site mapping, and live web search from any MCP client. MIT.",
+      "tags": [
+        "mcp-server",
+        "scraping",
+        "search"
+      ],
+      "url": "https://github.com/firecrawl/firecrawl-mcp-server"
+    },
+    {
+      "id": "fly-sprites",
+      "links": [
+        {
+          "label": "OpenWiz driver ticket",
+          "url": "https://github.com/openwizdev/OpenWiz/issues/2543"
+        }
+      ],
+      "login": "held by Fly.io",
+      "name": "Fly Sprites",
+      "plugs_into": "OpenWiz's driver v1: it starts, wakes and stops builders",
+      "publisher": "openwizdev",
+      "stage": "being-built",
+      "status": "listed",
+      "summary": "Runs each OpenWiz builder in its own Fly Sprite through your own signed-in sprite CLI.",
+      "tags": [
+        "driver",
+        "sandbox",
+        "cloud"
+      ],
+      "url": "https://docs.fly.io/sprites"
+    },
+    {
+      "id": "gemini-cli",
+      "links": [
+        {
+          "label": "OpenWiz harness row",
+          "url": "https://github.com/openwizdev/OpenWiz/issues/2506"
+        }
+      ],
+      "login": "Gemini CLI uses the cached Google sign-in or GEMINI_API_KEY you set. The driver never reads or passes it.",
+      "name": "Gemini CLI",
+      "plugs_into": "OpenWiz local driver",
+      "publisher": "jparker2006",
+      "stage": "being-built",
+      "status": "listed",
+      "summary": "The Gemini CLI harness row for OpenWiz's local driver.",
+      "tags": [
+        "harness",
+        "cli"
+      ],
+      "url": "https://github.com/google-gemini/gemini-cli"
+    },
+    {
+      "id": "github-mcp-server",
+      "name": "GitHub MCP Server",
+      "plugs_into": "The agent's MCP servers",
+      "publisher": "jparker2006",
+      "stage": "available",
+      "status": "listed",
+      "summary": "GitHub's official MCP server for reading repositories, managing issues and pull requests, and automating GitHub workflows.",
+      "tags": [
+        "mcp-server",
+        "coding",
+        "github"
+      ],
+      "url": "https://github.com/github/github-mcp-server"
+    },
+    {
+      "id": "google-workspace-mcp",
+      "links": [
+        {
+          "label": "Free tier quotas",
+          "url": "https://developers.google.com/workspace/guides/quota-usage-tiers"
+        }
+      ],
+      "name": "Google Workspace MCP",
+      "plugs_into": "The agent's MCP servers",
+      "publisher": "jparker2006",
+      "stage": "available",
+      "status": "listed",
+      "summary": "Free Standard Tier for Workspace MCP servers: 5,000 requests a day per project per product, no billing account.",
+      "tags": [
+        "mcp-server",
+        "google"
+      ],
+      "url": "https://developers.google.com/workspace/guides/configure-mcp-servers"
+    },
+    {
+      "id": "goose",
+      "links": [
+        {
+          "label": "OpenWiz harness row",
+          "url": "https://github.com/openwizdev/OpenWiz/issues/2483"
+        }
+      ],
+      "login": "Run goose configure. Goose saves the login in the system keyring.",
+      "name": "Goose",
+      "plugs_into": "OpenWiz local driver",
+      "publisher": "jparker2006",
+      "stage": "being-built",
+      "status": "listed",
+      "summary": "The Goose harness row for OpenWiz's local driver.",
+      "tags": [
+        "harness",
+        "cli"
+      ],
+      "url": "https://github.com/aaif-goose/goose"
+    },
+    {
+      "id": "gstack",
+      "name": "gstack",
+      "plugs_into": "The skills an OpenWiz agent runs",
+      "publisher": "jparker2006",
+      "stage": "available",
+      "status": "listed",
+      "summary": "Markdown slash-command skills turning coding agents into product, design, review, QA, security, and release roles. MIT.",
+      "tags": [
+        "skill",
+        "skill-pack"
+      ],
+      "url": "https://github.com/garrytan/gstack"
+    },
+    {
+      "id": "hermes",
+      "links": [
+        {
+          "label": "OpenWiz PR #2017",
+          "url": "https://github.com/openwizdev/OpenWiz/pull/2017"
+        }
+      ],
+      "login": "Stays on your machine",
+      "name": "Hermes",
+      "plugs_into": "OpenWiz driver v1",
+      "publisher": "jparker2006",
+      "stage": "being-built",
+      "status": "listed",
+      "summary": "Runs OpenWiz builders through the Hermes CLI and resumes the saved Hermes session on wake.",
+      "tags": [
+        "driver",
+        "local"
+      ],
+      "url": "https://hermes-agent.nousresearch.com/docs"
+    },
+    {
+      "id": "impeccable",
+      "links": [
+        {
+          "label": "Docs",
+          "url": "https://impeccable.style/docs"
+        }
+      ],
+      "name": "Impeccable",
+      "plugs_into": "The skills an OpenWiz agent runs",
+      "publisher": "jparker2006",
+      "stage": "available",
+      "status": "listed",
+      "summary": "Design vocabulary, critique and audit playbooks, and deterministic slop detection rules for steering coding agents on UI work. Apache-2.0.",
+      "tags": [
+        "skill",
+        "skill-pack",
+        "design",
+        "community"
+      ],
+      "url": "https://github.com/pbakaus/impeccable"
+    },
+    {
+      "id": "junie-cli",
+      "links": [
+        {
+          "label": "OpenWiz integration ticket",
+          "url": "https://github.com/openwizdev/OpenWiz/issues/2442"
+        }
+      ],
+      "login": "Sign in with JetBrains, or set JUNIE_API_KEY yourself.",
+      "name": "JetBrains Junie CLI",
+      "plugs_into": "OpenWiz local driver",
+      "publisher": "jparker2006",
+      "stage": "being-built",
+      "status": "listed",
+      "summary": "JetBrains Junie CLI as a harness for the OpenWiz local driver.",
+      "tags": [
+        "harness",
+        "cli"
+      ],
+      "url": "https://junie.jetbrains.com/docs/junie-cli.html"
+    },
+    {
+      "id": "kilo-code",
+      "links": [
+        {
+          "label": "OpenWiz integration ticket",
+          "url": "https://github.com/openwizdev/OpenWiz/issues/2434"
+        }
+      ],
+      "login": "Run kilo auth login. Kilo stores the login in its local user data directory.",
+      "name": "Kilo Code CLI",
+      "plugs_into": "OpenWiz local driver",
+      "publisher": "jparker2006",
+      "stage": "being-built",
+      "status": "listed",
+      "summary": "Kilo Code CLI as a harness for the OpenWiz local driver.",
+      "tags": [
+        "harness",
+        "cli"
+      ],
+      "url": "https://github.com/Kilo-Org/kilocode"
+    },
+    {
+      "id": "kimi-code",
+      "links": [
+        {
+          "label": "OpenWiz harness row",
+          "url": "https://github.com/openwizdev/OpenWiz/issues/2515"
+        }
+      ],
+      "login": "Run kimi login. Kimi saves it in the credentials folder in .kimi-code under your home directory.",
+      "name": "Kimi Code",
+      "plugs_into": "OpenWiz local driver",
+      "publisher": "jparker2006",
+      "stage": "being-built",
+      "status": "listed",
+      "summary": "The Kimi Code harness row for OpenWiz's local driver.",
+      "tags": [
+        "harness",
+        "cli"
+      ],
+      "url": "https://github.com/MoonshotAI/kimi-code"
+    },
+    {
+      "id": "kiro-cli",
+      "links": [
+        {
+          "label": "OpenWiz integration ticket",
+          "url": "https://github.com/openwizdev/OpenWiz/issues/2440"
+        }
+      ],
+      "login": "Set KIRO_API_KEY in your own environment (paid tiers), or use browser sign-in if headless runs accept it.",
+      "name": "Kiro CLI (local)",
+      "plugs_into": "OpenWiz local driver",
+      "publisher": "jparker2006",
+      "stage": "being-built",
+      "status": "listed",
+      "summary": "Kiro CLI (local) as a harness for the OpenWiz local driver.",
+      "tags": [
+        "harness",
+        "cli"
+      ],
+      "url": "https://kiro.dev/docs/cli/"
+    },
+    {
+      "id": "kubernetes-mcp-server",
+      "name": "Kubernetes MCP Server",
+      "plugs_into": "The agent's MCP servers",
+      "publisher": "jparker2006",
+      "stage": "available",
+      "status": "listed",
+      "summary": "MCP server for Kubernetes and OpenShift clusters that inspects pods, logs, and resources without requiring local kubectl.",
+      "tags": [
+        "mcp-server",
+        "kubernetes",
+        "cloud",
+        "infrastructure"
+      ],
+      "url": "https://github.com/containers/kubernetes-mcp-server"
+    },
+    {
+      "id": "local",
+      "links": [
+        {
+          "label": "OpenWiz PR #1455",
+          "url": "https://github.com/openwizdev/OpenWiz/pull/1455"
+        },
+        {
+          "label": "Kit run, 5 of 5",
+          "url": "https://github.com/openwizdev/OpenWiz/pull/1455#issuecomment-7034588211"
+        }
+      ],
+      "login": "stays on your machine",
+      "name": "Your own computer or VPS",
+      "plugs_into": "OpenWiz's driver v1: it starts, wakes and stops builders",
+      "proof": {
+        "receipt": {
+          "date": "2026-11-20",
+          "path": "receipts/local/2026-11-20-857d107ecdc5.txt",
+          "url": "https://github.com/openwizdev/WizMarket/blob/35ce60ae49a94741049f4790fc5cac0d26273fab/receipts/local/2026-11-20-857d107ecdc5.txt"
+        }
+      },
+      "publisher": "openwizdev",
+      "stage": "available",
+      "status": "verified",
+      "summary": "Runs OpenWiz builders with your own signed-in claude or codex harness on your own computer or VPS.",
+      "tags": [
+        "driver",
+        "local",
+        "vps"
+      ],
+      "url": "https://github.com/openwizdev/OpenWiz"
+    },
+    {
+      "id": "marketingskills",
+      "name": "Marketing Skills (Corey Haines)",
+      "plugs_into": "The skills an OpenWiz agent runs",
+      "publisher": "jparker2006",
+      "stage": "available",
+      "status": "listed",
+      "summary": "AI agent skills for conversion optimization, copywriting, SEO, analytics and growth engineering. MIT.",
+      "tags": [
+        "skill",
+        "skill-pack",
+        "marketing"
+      ],
+      "url": "https://github.com/coreyhaines31/marketingskills"
+    },
+    {
+      "id": "mattpocock-skills",
+      "links": [
+        {
+          "label": "Install guide",
+          "url": "https://skills.sh/mattpocock/skills"
+        },
+        {
+          "label": "WizSkills notice crediting it",
+          "url": "https://github.com/openwizdev/WizSkills/blob/main/NOTICE"
+        }
+      ],
+      "name": "Skills For Real Engineers (Matt Pocock)",
+      "plugs_into": "The skills an OpenWiz agent runs; WizSkills adapts several of them",
+      "publisher": "jparker2006",
+      "stage": "available",
+      "status": "listed",
+      "summary": "Small, composable engineering skills (grill-me, tdd and more) for any agent and model. MIT.",
+      "tags": [
+        "skill",
+        "skill-pack",
+        "community"
+      ],
+      "url": "https://github.com/mattpocock/skills"
+    },
+    {
+      "id": "mcp-chrome",
+      "name": "Chrome MCP Server",
+      "plugs_into": "The agent's MCP servers",
+      "publisher": "jparker2006",
+      "stage": "available",
+      "status": "listed",
+      "summary": "Chrome extension-based MCP server exposing your existing Chrome browser for automation, content analysis, and search. MIT.",
+      "tags": [
+        "mcp-server",
+        "browser",
+        "automation"
+      ],
+      "url": "https://github.com/hangwin/mcp-chrome"
+    },
+    {
+      "id": "mcp-playwright",
+      "name": "Playwright MCP Server (ExecuteAutomation)",
+      "plugs_into": "The agent's MCP servers",
+      "publisher": "jparker2006",
+      "stage": "available",
+      "status": "listed",
+      "summary": "Playwright MCP server enabling AI agents to automate browsers, take screenshots, and test web APIs. MIT.",
+      "tags": [
+        "mcp-server",
+        "browser",
+        "automation"
+      ],
+      "url": "https://github.com/executeautomation/mcp-playwright"
+    },
+    {
+      "id": "mcp-reference-everything",
+      "name": "MCP Everything Reference Server",
+      "plugs_into": "The agent's MCP servers",
+      "publisher": "jparker2006",
+      "stage": "available",
+      "status": "listed",
+      "summary": "Official MCP reference and test server exercising prompts, resources, tools, logging, and sampling.",
+      "tags": [
+        "mcp-server",
+        "reference",
+        "testing"
+      ],
+      "url": "https://github.com/modelcontextprotocol/servers/tree/main/src/everything"
+    },
+    {
+      "id": "mcp-reference-fetch",
+      "name": "MCP Fetch Reference Server",
+      "plugs_into": "The agent's MCP servers",
+      "publisher": "jparker2006",
+      "stage": "available",
+      "status": "listed",
+      "summary": "Official MCP reference server that fetches web pages and converts HTML content into markdown for agents.",
+      "tags": [
+        "mcp-server",
+        "reference",
+        "web"
+      ],
+      "url": "https://github.com/modelcontextprotocol/servers/tree/main/src/fetch"
+    },
+    {
+      "id": "mcp-reference-filesystem",
+      "name": "MCP Filesystem Reference Server",
+      "plugs_into": "The agent's MCP servers",
+      "publisher": "jparker2006",
+      "stage": "available",
+      "status": "listed",
+      "summary": "Official MCP reference server for reading, writing, searching, and managing local files within allowed directories.",
+      "tags": [
+        "mcp-server",
+        "reference",
+        "filesystem"
+      ],
+      "url": "https://github.com/modelcontextprotocol/servers/tree/main/src/filesystem"
+    },
+    {
+      "id": "mcp-reference-git",
+      "name": "MCP Git Reference Server",
+      "plugs_into": "The agent's MCP servers",
+      "publisher": "jparker2006",
+      "stage": "available",
+      "status": "listed",
+      "summary": "Official MCP reference server with tools to inspect, search, diff, and update local Git repositories.",
+      "tags": [
+        "mcp-server",
+        "reference",
+        "git"
+      ],
+      "url": "https://github.com/modelcontextprotocol/servers/tree/main/src/git"
+    },
+    {
+      "id": "mcp-reference-memory",
+      "name": "MCP Memory Reference Server",
+      "plugs_into": "The agent's MCP servers",
+      "publisher": "jparker2006",
+      "stage": "available",
+      "status": "listed",
+      "summary": "Official MCP reference server providing persistent agent memory backed by a local knowledge graph.",
+      "tags": [
+        "mcp-server",
+        "reference",
+        "memory"
+      ],
+      "url": "https://github.com/modelcontextprotocol/servers/tree/main/src/memory"
+    },
+    {
+      "id": "mcp-reference-sequential-thinking",
+      "name": "MCP Sequential Thinking Reference Server",
+      "plugs_into": "The agent's MCP servers",
+      "publisher": "jparker2006",
+      "stage": "available",
+      "status": "listed",
+      "summary": "Official MCP reference server for structured, step-by-step problem solving through dynamic thought sequences.",
+      "tags": [
+        "mcp-server",
+        "reference",
+        "reasoning"
+      ],
+      "url": "https://github.com/modelcontextprotocol/servers/tree/main/src/sequentialthinking"
+    },
+    {
+      "id": "mcp-reference-time",
+      "name": "MCP Time Reference Server",
+      "plugs_into": "The agent's MCP servers",
+      "publisher": "jparker2006",
+      "stage": "available",
+      "status": "listed",
+      "summary": "Official MCP reference server for querying current times and converting timestamps across IANA timezones.",
+      "tags": [
+        "mcp-server",
+        "reference",
+        "time"
+      ],
+      "url": "https://github.com/modelcontextprotocol/servers/tree/main/src/time"
+    },
+    {
+      "id": "mcp-server-cloudflare",
+      "name": "Cloudflare MCP Server",
+      "plugs_into": "The agent's MCP servers",
+      "publisher": "jparker2006",
+      "stage": "available",
+      "status": "listed",
+      "summary": "Official Cloudflare MCP servers for managing Workers, KV, R2, D1, observability, and other Cloudflare developer services.",
+      "tags": [
+        "mcp-server",
+        "cloudflare",
+        "cloud",
+        "infrastructure"
+      ],
+      "url": "https://github.com/cloudflare/mcp-server-cloudflare"
+    },
+    {
+      "id": "mcp-server-kubernetes",
+      "name": "MCP Server Kubernetes",
+      "plugs_into": "The agent's MCP servers",
+      "publisher": "jparker2006",
+      "stage": "available",
+      "status": "listed",
+      "summary": "MCP server for managing Kubernetes clusters, pods, deployments, services, and Helm charts through kubectl.",
+      "tags": [
+        "mcp-server",
+        "kubernetes",
+        "cloud",
+        "infrastructure"
+      ],
+      "url": "https://github.com/Flux159/mcp-server-kubernetes"
+    },
+    {
+      "id": "mcp-server-mysql",
+      "name": "MySQL MCP Server",
+      "plugs_into": "The agent's MCP servers",
+      "publisher": "jparker2006",
+      "stage": "available",
+      "status": "listed",
+      "summary": "MCP server for MySQL that lets agents inspect database schemas and run read-only SQL queries safely.",
+      "tags": [
+        "mcp-server",
+        "mysql",
+        "database",
+        "sql"
+      ],
+      "url": "https://github.com/benborla/mcp-server-mysql"
+    },
+    {
+      "id": "mcp-server-qdrant",
+      "name": "Qdrant MCP Server",
+      "plugs_into": "The agent's MCP servers",
+      "publisher": "jparker2006",
+      "stage": "available",
+      "status": "listed",
+      "summary": "Official Qdrant MCP server for storing and retrieving semantic memories in a Qdrant vector database.",
+      "tags": [
+        "mcp-server",
+        "qdrant",
+        "vector-database",
+        "data"
+      ],
+      "url": "https://github.com/qdrant/mcp-server-qdrant"
+    },
+    {
+      "id": "mcp-toolbox",
+      "name": "MCP Toolbox for Databases",
+      "plugs_into": "The agent's MCP servers",
+      "publisher": "jparker2006",
+      "stage": "available",
+      "status": "listed",
+      "summary": "Open-source MCP server for databases that lets AI agents query and manage SQL and NoSQL data sources with connection pooling.",
+      "tags": [
+        "mcp-server",
+        "database",
+        "sql",
+        "data"
+      ],
+      "url": "https://github.com/googleapis/mcp-toolbox"
+    },
+    {
+      "id": "mellum2-1-instruct",
+      "links": [
+        {
+          "label": "Release announcement",
+          "url": "https://blog.jetbrains.com/ai/2026/11/mellum2-1-instruct-is-out-bringing-faster-answers-for-coding-agents/"
+        }
+      ],
+      "name": "Mellum2.1 Instruct",
+      "plugs_into": "A coding-agent harness that calls a local or self-hosted model",
+      "publisher": "jparker2006",
+      "stage": "available",
+      "status": "listed",
+      "summary": "Free Apache 2.0 coding model for agents: 12B total, 2.5B active, answers without a chain of thought.",
+      "tags": [
+        "model",
+        "coding",
+        "local"
+      ],
+      "url": "https://huggingface.co/JetBrains/Mellum2.1-12B-A2.5B-Instruct"
+    },
+    {
+      "id": "mistral-vibe",
+      "links": [
+        {
+          "label": "OpenWiz integration ticket",
+          "url": "https://github.com/openwizdev/OpenWiz/issues/2438"
+        }
+      ],
+      "login": "Sign in with a Mistral account, or keep your key in the OS keyring or your environment.",
+      "name": "Mistral Vibe",
+      "plugs_into": "OpenWiz local driver",
+      "publisher": "jparker2006",
+      "stage": "being-built",
+      "status": "listed",
+      "summary": "Mistral Vibe as a harness for the OpenWiz local driver.",
+      "tags": [
+        "harness",
+        "cli"
+      ],
+      "url": "https://github.com/mistralai/mistral-vibe"
+    },
+    {
+      "id": "mobilebuildmcp",
+      "name": "MobileBuildMCP",
+      "plugs_into": "The agent's MCP servers",
+      "publisher": "jparker2006",
+      "stage": "available",
+      "status": "listed",
+      "summary": "MCP server and CLI giving coding agents tools to build, test, and inspect iOS and macOS projects.",
+      "tags": [
+        "mcp-server",
+        "coding",
+        "mobile"
+      ],
+      "url": "https://github.com/getsentry/MobileBuildMCP"
+    },
+    {
+      "id": "obra-superpowers",
+      "name": "Superpowers",
+      "plugs_into": "The skills an OpenWiz agent runs",
+      "publisher": "jparker2006",
+      "stage": "available",
+      "status": "listed",
+      "summary": "Composable agentic skills and software development methodology for coding agents. MIT.",
+      "tags": [
+        "skill",
+        "skill-pack"
+      ],
+      "url": "https://github.com/obra/superpowers"
+    },
+    {
+      "id": "openclaw",
+      "links": [
+        {
+          "label": "OpenWiz PR #2018",
+          "url": "https://github.com/openwizdev/OpenWiz/pull/2018"
+        }
+      ],
+      "login": "Stays on your machine",
+      "name": "OpenClaw",
+      "plugs_into": "OpenWiz driver v1",
+      "proof": {
+        "receipt": {
+          "date": "2026-11-22",
+          "path": "receipts/openclaw/2026-11-22-9cc752319196.txt",
+          "url": "https://github.com/openwizdev/WizMarket/blob/35ce60ae49a94741049f4790fc5cac0d26273fab/receipts/openclaw/2026-11-22-9cc752319196.txt"
+        }
+      },
+      "publisher": "jparker2006",
+      "stage": "being-built",
+      "status": "verified",
+      "summary": "Runs OpenWiz builders locally through OpenClaw's acpx client. Merged for 0.1.2 and not in a release yet.",
+      "tags": [
+        "driver",
+        "local"
+      ],
+      "url": "https://github.com/openclaw/acpx"
+    },
+    {
+      "id": "opencode",
+      "links": [
+        {
+          "label": "OpenWiz harness row",
+          "url": "https://github.com/openwizdev/OpenWiz/issues/2462"
+        }
+      ],
+      "login": "Run opencode auth login. OpenCode saves it in opencode.db in the opencode folder under your home directory's local share directory.",
+      "name": "OpenCode",
+      "plugs_into": "OpenWiz local driver",
+      "publisher": "jparker2006",
+      "stage": "being-built",
+      "status": "listed",
+      "summary": "The OpenCode harness row for OpenWiz's local driver.",
+      "tags": [
+        "harness",
+        "cli"
+      ],
+      "url": "https://github.com/anomalyco/opencode"
+    },
+    {
+      "id": "openhands-cloud",
+      "links": [
+        {
+          "label": "OpenWiz PR #2567",
+          "url": "https://github.com/openwizdev/OpenWiz/pull/2567"
+        }
+      ],
+      "login": "Held by OpenHands Cloud",
+      "name": "OpenHands Cloud",
+      "plugs_into": "OpenWiz driver v1",
+      "publisher": "jparker2006",
+      "stage": "being-built",
+      "status": "listed",
+      "summary": "Runs OpenWiz builders in OpenHands Cloud using their configured Claude Code or Codex agent profiles.",
+      "tags": [
+        "driver",
+        "cloud"
+      ],
+      "url": "https://openhands.dev/"
+    },
+    {
+      "id": "pal-mcp-server",
+      "name": "PAL MCP Server",
+      "plugs_into": "The agent's MCP servers",
+      "publisher": "jparker2006",
+      "stage": "available",
+      "status": "listed",
+      "summary": "MCP server that lets a coding agent consult multiple external AI models for code review, debugging, and planning.",
+      "tags": [
+        "mcp-server",
+        "coding",
+        "dev-tools"
+      ],
+      "url": "https://github.com/BeehiveInnovations/pal-mcp-server"
+    },
+    {
+      "id": "pane",
+      "links": [
+        {
+          "label": "OpenWiz PR #2029",
+          "url": "https://github.com/openwizdev/OpenWiz/pull/2029"
+        }
+      ],
+      "login": "Stays on your machine",
+      "name": "Pane",
+      "plugs_into": "OpenWiz driver v1",
+      "publisher": "jparker2006",
+      "stage": "being-built",
+      "status": "listed",
+      "summary": "Runs each OpenWiz builder in its own Pane worktree and agent tab through the runpane CLI.",
+      "tags": [
+        "driver",
+        "local"
+      ],
+      "url": "https://runpane.com/"
+    },
+    {
+      "id": "pi",
+      "links": [
+        {
+          "label": "OpenWiz harness row",
+          "url": "https://github.com/openwizdev/OpenWiz/issues/2449"
+        }
+      ],
+      "login": "Run pi auth login. Pi saves it in auth.json in the agent folder inside .pi under your home directory. Pi can also use a provider variable you set.",
+      "name": "Pi",
+      "plugs_into": "OpenWiz local driver",
+      "publisher": "jparker2006",
+      "stage": "being-built",
+      "status": "listed",
+      "summary": "The Pi harness row for OpenWiz's local driver.",
+      "tags": [
+        "harness",
+        "cli"
+      ],
+      "url": "https://github.com/earendil-works/pi"
+    },
+    {
+      "id": "playwright-mcp",
+      "name": "Playwright MCP",
+      "plugs_into": "The agent's MCP servers",
+      "publisher": "jparker2006",
+      "stage": "available",
+      "status": "listed",
+      "summary": "Microsoft's Playwright MCP server for fast, structured browser automation using accessibility snapshots. Apache-2.0.",
+      "tags": [
+        "mcp-server",
+        "browser",
+        "automation"
+      ],
+      "url": "https://github.com/microsoft/playwright-mcp"
+    },
+    {
+      "id": "postgres-mcp",
+      "name": "Postgres MCP Pro",
+      "plugs_into": "The agent's MCP servers",
+      "publisher": "jparker2006",
+      "stage": "available",
+      "status": "listed",
+      "summary": "PostgreSQL MCP server offering configurable read/write SQL access, index tuning, explain plans, and database health checks.",
+      "tags": [
+        "mcp-server",
+        "postgres",
+        "database",
+        "sql"
+      ],
+      "url": "https://github.com/crystaldba/postgres-mcp"
+    },
+    {
+      "id": "qwen-code",
+      "links": [
+        {
+          "label": "OpenWiz harness row",
+          "url": "https://github.com/openwizdev/OpenWiz/issues/2523"
+        }
+      ],
+      "login": "Qwen Code uses Qwen OAuth from oauth_creds.json or an API key in settings.json in the .qwen directory under your home directory.",
+      "name": "Qwen Code",
+      "plugs_into": "OpenWiz local driver",
+      "publisher": "jparker2006",
+      "stage": "being-built",
+      "status": "listed",
+      "summary": "The Qwen Code harness row for OpenWiz's local driver.",
+      "tags": [
+        "harness",
+        "cli"
+      ],
+      "url": "https://github.com/QwenLM/qwen-code"
+    },
+    {
+      "id": "scientific-agent-skills",
+      "name": "Scientific Agent Skills (K-Dense)",
+      "plugs_into": "The skills an OpenWiz agent runs",
+      "publisher": "jparker2006",
+      "stage": "available",
+      "status": "listed",
+      "summary": "Scientific and research skills for AI agents covering biology, chemistry, medicine, physics, engineering and data analysis. MIT.",
+      "tags": [
+        "skill",
+        "skill-pack",
+        "science"
+      ],
+      "url": "https://github.com/K-Dense-AI/scientific-agent-skills"
+    },
+    {
+      "id": "semble",
+      "name": "Semble",
+      "plugs_into": "The agent's MCP servers",
+      "publisher": "jparker2006",
+      "stage": "available",
+      "status": "listed",
+      "summary": "Fast local CPU code search MCP server that returns exact code snippets for agents with minimal token overhead.",
+      "tags": [
+        "mcp-server",
+        "coding",
+        "code-search"
+      ],
+      "url": "https://github.com/MinishLab/semble"
+    },
+    {
+      "id": "serena",
+      "name": "Serena",
+      "plugs_into": "The agent's MCP servers",
+      "publisher": "jparker2006",
+      "stage": "available",
+      "status": "listed",
+      "summary": "MCP coding toolkit that gives agents IDE-like semantic code retrieval and symbol-level editing.",
+      "tags": [
+        "mcp-server",
+        "coding",
+        "lsp"
+      ],
+      "url": "https://github.com/oraios/serena"
+    },
+    {
+      "id": "shadcn-ui-mcp-server",
+      "name": "shadcn/ui MCP Server",
+      "plugs_into": "The agent's MCP servers",
+      "publisher": "jparker2006",
+      "stage": "available",
+      "status": "listed",
+      "summary": "MCP server giving coding agents context on shadcn/ui component structure, usage, and installation across web and native frameworks.",
+      "tags": [
+        "mcp-server",
+        "coding",
+        "ui"
+      ],
+      "url": "https://github.com/Jpisnice/shadcn-ui-mcp-server"
+    },
+    {
+      "id": "spec-workflow-mcp",
+      "name": "Spec Workflow MCP",
+      "plugs_into": "The agent's MCP servers",
+      "publisher": "jparker2006",
+      "stage": "available",
+      "status": "listed",
+      "summary": "MCP server providing structured spec-driven development workflow tools and a live progress dashboard for coding agents.",
+      "tags": [
+        "mcp-server",
+        "coding",
+        "workflow"
+      ],
+      "url": "https://github.com/Pimzino/spec-workflow-mcp"
+    },
+    {
+      "id": "supabase-mcp",
+      "name": "Supabase MCP",
+      "plugs_into": "The agent's MCP servers",
+      "publisher": "jparker2006",
+      "stage": "available",
+      "status": "listed",
+      "summary": "Official Supabase MCP server for querying databases, managing tables and migrations, and inspecting Supabase projects.",
+      "tags": [
+        "mcp-server",
+        "supabase",
+        "postgres",
+        "database"
+      ],
+      "url": "https://github.com/supabase/mcp"
+    },
+    {
+      "id": "taste-skill",
+      "links": [
+        {
+          "label": "Website",
+          "url": "https://tasteskill.dev"
+        }
+      ],
+      "name": "Taste Skill",
+      "plugs_into": "The skills an OpenWiz agent runs",
+      "publisher": "jparker2006",
+      "stage": "available",
+      "status": "listed",
+      "summary": "Agent skills for frontend design taste, combining art direction, reference images, and browser checks to avoid generic AI pages. MIT.",
+      "tags": [
+        "skill",
+        "skill-pack",
+        "design",
+        "community"
+      ],
+      "url": "https://github.com/Leonxlnx/taste-skill"
+    },
+    {
+      "id": "ternary-bonsai-2-5",
+      "links": [
+        {
+          "label": "Release announcement",
+          "url": "https://prismml.com/news/bonsai-2-5-27b"
+        }
+      ],
+      "name": "Ternary Bonsai 2.5 27B",
+      "plugs_into": "A local coding-agent harness that loads GGUF weights",
+      "publisher": "jparker2006",
+      "stage": "available",
+      "status": "listed",
+      "summary": "Free Apache 2.0 local coding model: 5.93 GB ternary weights for tool-using agents.",
+      "tags": [
+        "model",
+        "local",
+        "coding"
+      ],
+      "url": "https://huggingface.co/prism-ml/Ternary-Bonsai-2.5-27B-GGUF"
+    },
+    {
+      "id": "ui-ux-pro-max-skill",
+      "name": "UI UX Pro Max",
+      "plugs_into": "The skills an OpenWiz agent runs",
+      "publisher": "jparker2006",
+      "stage": "available",
+      "status": "listed",
+      "summary": "Design intelligence skill with searchable UI styles and reasoning rules for building interfaces across web and mobile platforms. MIT.",
+      "tags": [
+        "skill",
+        "skill-pack",
+        "design"
+      ],
+      "url": "https://github.com/nextlevelbuilder/ui-ux-pro-max-skill"
+    },
+    {
+      "id": "warp-oz",
+      "links": [
+        {
+          "label": "OpenWiz PR #2555",
+          "url": "https://github.com/openwizdev/OpenWiz/pull/2555"
+        }
+      ],
+      "login": "Held by Warp Oz",
+      "name": "Warp Oz",
+      "plugs_into": "OpenWiz driver v1",
+      "publisher": "jparker2006",
+      "stage": "being-built",
+      "status": "listed",
+      "summary": "Runs OpenWiz builders as Claude Code or Codex cloud agents on Warp Oz.",
+      "tags": [
+        "driver",
+        "cloud"
+      ],
+      "url": "https://www.warp.dev/oz"
+    },
+    {
+      "id": "wizbar",
+      "links": [
+        {
+          "label": "Source, WizBar v0.6.0",
+          "url": "https://github.com/openwizdev/WizPlugins/releases/tag/wizbar/v0.6.0"
+        },
+        {
+          "label": "README",
+          "url": "https://github.com/openwizdev/WizPlugins/tree/main/wizbar"
+        }
+      ],
+      "login": "Your own gh login on your computer, read by its specs producer",
+      "name": "WizBar",
+      "plugs_into": "Cloudroom's sidebar, watching an OpenWiz factory's specs and threads",
+      "publisher": "jparker2006",
+      "stage": "available",
+      "status": "listed",
+      "summary": "A Cloudroom sidebar for agent fleets: Pinned, Specs and Unread sections, spec progress dots, and a wizbar CLI with JSON.",
+      "tags": [
+        "plugin",
+        "cloudroom",
+        "sidebar",
+        "wizplugins"
+      ],
+      "url": "https://getbb.app/marketplace/wizbar"
+    },
+    {
+      "id": "wizloops-fleet-check",
+      "links": [
+        {
+          "label": "Check script",
+          "url": "https://github.com/openwizdev/WizLoops/tree/main/catalog/fleet-check"
+        },
+        {
+          "label": "Loop format",
+          "url": "https://github.com/openwizdev/WizLoops/blob/main/format/loop.v1.md"
+        }
+      ],
+      "name": "Fleet check",
+      "plugs_into": "OpenWiz loop commands for loop.v1 files on Cloudroom",
+      "publisher": "jparker2006",
+      "stage": "available",
+      "status": "listed",
+      "summary": "Wakes a fleet's manager when its spec has something due, or to report a failed check.",
+      "tags": [
+        "loop",
+        "wizloops"
+      ],
+      "url": "https://github.com/openwizdev/WizLoops/blob/main/catalog/fleet-check.md"
+    },
+    {
+      "id": "wizloops-hourly-status",
+      "links": [
+        {
+          "label": "Check script",
+          "url": "https://github.com/openwizdev/WizLoops/tree/main/catalog/hourly-status"
+        },
+        {
+          "label": "Loop format",
+          "url": "https://github.com/openwizdev/WizLoops/blob/main/format/loop.v1.md"
+        }
+      ],
+      "name": "Hourly status",
+      "plugs_into": "OpenWiz loop commands for loop.v1 files on Cloudroom",
+      "publisher": "jparker2006",
+      "stage": "available",
+      "status": "listed",
+      "summary": "Posts an hourly status line for a spec, only when something changed.",
+      "tags": [
+        "loop",
+        "wizloops"
+      ],
+      "url": "https://github.com/openwizdev/WizLoops/blob/main/catalog/hourly-status.md"
+    },
+    {
+      "id": "wizloops-morning-digest",
+      "links": [
+        {
+          "label": "Check script",
+          "url": "https://github.com/openwizdev/WizLoops/tree/main/catalog/morning-digest"
+        },
+        {
+          "label": "Loop format",
+          "url": "https://github.com/openwizdev/WizLoops/blob/main/format/loop.v1.md"
+        }
+      ],
+      "name": "Morning digest",
+      "plugs_into": "OpenWiz loop commands for loop.v1 files on Cloudroom",
+      "publisher": "jparker2006",
+      "stage": "available",
+      "status": "listed",
+      "summary": "Sends the owner a daily digest of merged, failing and waiting work at a fixed local time.",
+      "tags": [
+        "loop",
+        "wizloops"
+      ],
+      "url": "https://github.com/openwizdev/WizLoops/blob/main/catalog/morning-digest.md"
+    },
+    {
+      "id": "wizloops-stall-sweep",
+      "links": [
+        {
+          "label": "Check script",
+          "url": "https://github.com/openwizdev/WizLoops/tree/main/catalog/stall-sweep"
+        },
+        {
+          "label": "Loop format",
+          "url": "https://github.com/openwizdev/WizLoops/blob/main/format/loop.v1.md"
+        }
+      ],
+      "name": "Stall sweep",
+      "plugs_into": "OpenWiz loop commands for loop.v1 files on Cloudroom",
+      "publisher": "jparker2006",
+      "stage": "available",
+      "status": "listed",
+      "summary": "Finds open pull requests with no progress, and says why each looks stalled.",
+      "tags": [
+        "loop",
+        "wizloops"
+      ],
+      "url": "https://github.com/openwizdev/WizLoops/blob/main/catalog/stall-sweep.md"
+    },
+    {
+      "id": "wizloops-workflow-kick",
+      "links": [
+        {
+          "label": "Check script",
+          "url": "https://github.com/openwizdev/WizLoops/tree/main/catalog/workflow-kick"
+        },
+        {
+          "label": "Loop format",
+          "url": "https://github.com/openwizdev/WizLoops/blob/main/format/loop.v1.md"
+        }
+      ],
+      "name": "Workflow kick",
+      "plugs_into": "OpenWiz loop commands for loop.v1 files on Cloudroom",
+      "publisher": "jparker2006",
+      "stage": "available",
+      "status": "listed",
+      "summary": "Starts a CI workflow on time from its check alone; no agent ever starts.",
+      "tags": [
+        "loop",
+        "wizloops"
+      ],
+      "url": "https://github.com/openwizdev/WizLoops/blob/main/catalog/workflow-kick.md"
+    },
+    {
+      "id": "wizskills-ask-wiz",
+      "name": "Ask Wiz",
+      "plugs_into": "The skills an OpenWiz agent runs",
+      "proof": {
+        "skill": {
+          "check": "python3 -I skills/ask-wiz/test/test_routes.py",
+          "source": "openwizdev/WizSkills@a040e40f2b28462c47ee0c2845966d27acd06de5",
+          "url": "https://github.com/openwizdev/WizSkills/tree/a040e40f2b28462c47ee0c2845966d27acd06de5"
+        }
+      },
+      "publisher": "openwizdev",
+      "stage": "available",
+      "status": "verified",
+      "summary": "Choose the skill or flow for your question.",
+      "tags": [
+        "skill",
+        "wizskills",
+        "help"
+      ],
+      "url": "https://github.com/openwizdev/WizSkills/tree/v0.4.1/skills/ask-wiz"
+    },
+    {
+      "id": "wizskills-build-ticket",
+      "name": "Build ticket",
+      "plugs_into": "The skills an OpenWiz agent runs",
+      "proof": {
+        "skill": {
+          "check": "python3 -I skills/build-ticket/scripts/test_ticket.py",
+          "source": "openwizdev/WizSkills@a040e40f2b28462c47ee0c2845966d27acd06de5",
+          "url": "https://github.com/openwizdev/WizSkills/tree/a040e40f2b28462c47ee0c2845966d27acd06de5"
+        }
+      },
+      "publisher": "openwizdev",
+      "stage": "available",
+      "status": "verified",
+      "summary": "Build one ticket and hand back a green pull request.",
+      "tags": [
+        "skill",
+        "wizskills",
+        "building"
+      ],
+      "url": "https://github.com/openwizdev/WizSkills/tree/v0.4.1/skills/build-ticket"
+    },
+    {
+      "id": "wizskills-diagnose",
+      "name": "Diagnose",
+      "plugs_into": "The skills an OpenWiz agent runs",
+      "proof": {
+        "skill": {
+          "check": "node --test skills/diagnose/tests/hitl-loop.test.mjs && python3 -I skills/diagnose/scripts/test_loop.py",
+          "source": "openwizdev/WizSkills@a040e40f2b28462c47ee0c2845966d27acd06de5",
+          "url": "https://github.com/openwizdev/WizSkills/tree/a040e40f2b28462c47ee0c2845966d27acd06de5"
+        }
+      },
+      "publisher": "openwizdev",
+      "stage": "available",
+      "status": "verified",
+      "summary": "Diagnose hard bugs, flaky tests and stuck review findings.",
+      "tags": [
+        "skill",
+        "wizskills",
+        "debugging"
+      ],
+      "url": "https://github.com/openwizdev/WizSkills/tree/v0.4.1/skills/diagnose"
+    },
+    {
+      "id": "wizskills-dream-cycle",
+      "links": [
+        {
+          "label": "OpenWiz spec",
+          "url": "https://github.com/openwizdev/OpenWiz/issues/3088"
+        }
+      ],
+      "name": "dream-cycle",
+      "plugs_into": "The skills an OpenWiz agent runs",
+      "publisher": "openwizdev",
+      "stage": "being-built",
+      "status": "listed",
+      "summary": "Review a whole org read-only and turn confirmed wins into tickets.",
+      "tags": [
+        "skill",
+        "wizskills",
+        "maintenance"
+      ],
+      "url": "https://github.com/openwizdev/WizSkills/tree/main/skills/dream-cycle"
+    },
+    {
+      "id": "wizskills-feedback",
+      "name": "Feedback",
+      "plugs_into": "The skills an OpenWiz agent runs",
+      "proof": {
+        "skill": {
+          "check": "python3 -I skills/feedback/test/test_feedback.py",
+          "source": "openwizdev/WizSkills@a040e40f2b28462c47ee0c2845966d27acd06de5",
+          "url": "https://github.com/openwizdev/WizSkills/tree/a040e40f2b28462c47ee0c2845966d27acd06de5"
+        }
+      },
+      "publisher": "openwizdev",
+      "stage": "available",
+      "status": "verified",
+      "summary": "Send chosen public feedback after an exact preview and a yes.",
+      "tags": [
+        "skill",
+        "wizskills",
+        "feedback"
+      ],
+      "url": "https://github.com/openwizdev/WizSkills/tree/v0.4.1/skills/feedback"
+    },
+    {
+      "id": "wizskills-grill",
+      "name": "Grill",
+      "plugs_into": "The skills an OpenWiz agent runs",
+      "proof": {
+        "skill": {
+          "check": "sh skills/grill/scripts/test.sh && python3 skills/grill/scripts/test_records.py",
+          "source": "openwizdev/WizSkills@a040e40f2b28462c47ee0c2845966d27acd06de5",
+          "url": "https://github.com/openwizdev/WizSkills/tree/a040e40f2b28462c47ee0c2845966d27acd06de5"
+        }
+      },
+      "publisher": "openwizdev",
+      "stage": "available",
+      "status": "verified",
+      "summary": "Settle a design in rounds of three plain questions.",
+      "tags": [
+        "skill",
+        "wizskills",
+        "planning"
+      ],
+      "url": "https://github.com/openwizdev/WizSkills/tree/v0.4.1/skills/grill"
+    },
+    {
+      "id": "wizskills-handoff",
+      "name": "Handoff",
+      "plugs_into": "The skills an OpenWiz agent runs",
+      "proof": {
+        "skill": {
+          "check": "python3 -I skills/handoff/test/test_handoff.py",
+          "source": "openwizdev/WizSkills@a040e40f2b28462c47ee0c2845966d27acd06de5",
+          "url": "https://github.com/openwizdev/WizSkills/tree/a040e40f2b28462c47ee0c2845966d27acd06de5"
+        }
+      },
+      "publisher": "openwizdev",
+      "stage": "available",
+      "status": "verified",
+      "summary": "Keep the orchestrator's one-page handoff current.",
+      "tags": [
+        "skill",
+        "wizskills",
+        "orchestration"
+      ],
+      "url": "https://github.com/openwizdev/WizSkills/tree/v0.4.1/skills/handoff"
+    },
+    {
+      "id": "wizskills-hill-climb",
+      "name": "Hill-climb",
+      "plugs_into": "The skills an OpenWiz agent runs",
+      "proof": {
+        "skill": {
+          "check": "python3 -I -m unittest discover -s skills/hill-climb/tests",
+          "source": "openwizdev/WizSkills@a040e40f2b28462c47ee0c2845966d27acd06de5",
+          "url": "https://github.com/openwizdev/WizSkills/tree/a040e40f2b28462c47ee0c2845966d27acd06de5"
+        }
+      },
+      "publisher": "openwizdev",
+      "stage": "available",
+      "status": "verified",
+      "summary": "Improve one thing with fresh branches and a judge council.",
+      "tags": [
+        "skill",
+        "wizskills",
+        "design"
+      ],
+      "url": "https://github.com/openwizdev/WizSkills/tree/v0.4.1/skills/hill-climb"
+    },
+    {
+      "id": "wizskills-huntr",
+      "name": "huntr",
+      "plugs_into": "The skills an OpenWiz agent runs",
+      "publisher": "openwizdev",
+      "stage": "available",
+      "status": "listed",
+      "summary": "Hunt proven small fixes under the approved kinds and gate.",
+      "tags": [
+        "skill",
+        "wizskills",
+        "maintenance"
+      ],
+      "url": "https://github.com/openwizdev/WizSkills/tree/v0.4.1/skills/huntr"
+    },
+    {
+      "id": "wizskills-image",
+      "name": "Image",
+      "plugs_into": "The skills an OpenWiz agent runs",
+      "publisher": "openwizdev",
+      "stage": "available",
+      "status": "listed",
+      "summary": "Generate pictures and capture phone and desktop UI.",
+      "tags": [
+        "skill",
+        "wizskills",
+        "design"
+      ],
+      "url": "https://github.com/openwizdev/WizSkills/tree/v0.4.1/skills/image"
+    },
+    {
+      "id": "wizskills-install",
+      "name": "Install",
+      "plugs_into": "The skills an OpenWiz agent runs",
+      "proof": {
+        "skill": {
+          "check": "python3 -I skills/install/tests/test_first_fleet.py && python3 -I skills/install/tests/test_doctor.py && python3 -I skills/install/tests/test_onboarding.py",
+          "source": "openwizdev/WizSkills@a040e40f2b28462c47ee0c2845966d27acd06de5",
+          "url": "https://github.com/openwizdev/WizSkills/tree/a040e40f2b28462c47ee0c2845966d27acd06de5"
+        }
+      },
+      "publisher": "openwizdev",
+      "stage": "available",
+      "status": "verified",
+      "summary": "Install OpenWiz from its one line and continue to a first fleet.",
+      "tags": [
+        "skill",
+        "wizskills",
+        "setup"
+      ],
+      "url": "https://github.com/openwizdev/WizSkills/tree/v0.4.1/skills/install"
+    },
+    {
+      "id": "wizskills-launch-fleet",
+      "name": "Launch Fleet",
+      "plugs_into": "The skills an OpenWiz agent runs",
+      "publisher": "openwizdev",
+      "stage": "available",
+      "status": "listed",
+      "summary": "Start eligible tickets and keep the fleet moving through build, review and merge.",
+      "tags": [
+        "skill",
+        "wizskills",
+        "orchestration"
+      ],
+      "url": "https://github.com/openwizdev/WizSkills/tree/v0.4.1/skills/launch-fleet"
+    },
+    {
+      "id": "wizskills-research",
+      "name": "Research",
+      "plugs_into": "The skills an OpenWiz agent runs",
+      "proof": {
+        "skill": {
+          "check": "python3 -I skills/research/test/test_workers.py && python3 -I skills/research/test/test_snapshot_commands.py",
+          "source": "openwizdev/WizSkills@a040e40f2b28462c47ee0c2845966d27acd06de5",
+          "url": "https://github.com/openwizdev/WizSkills/tree/a040e40f2b28462c47ee0c2845966d27acd06de5"
+        }
+      },
+      "publisher": "openwizdev",
+      "stage": "available",
+      "status": "verified",
+      "summary": "Research primary sources and land one checked, cited report.",
+      "tags": [
+        "skill",
+        "wizskills",
+        "research"
+      ],
+      "url": "https://github.com/openwizdev/WizSkills/tree/v0.4.1/skills/research"
+    },
+    {
+      "id": "wizskills-review-ticket",
+      "name": "Review Ticket",
+      "plugs_into": "The skills an OpenWiz agent runs",
+      "proof": {
+        "skill": {
+          "check": "python3 -I skills/review-ticket/scripts/test_review.py",
+          "source": "openwizdev/WizSkills@a040e40f2b28462c47ee0c2845966d27acd06de5",
+          "url": "https://github.com/openwizdev/WizSkills/tree/a040e40f2b28462c47ee0c2845966d27acd06de5"
+        }
+      },
+      "publisher": "openwizdev",
+      "stage": "available",
+      "status": "verified",
+      "summary": "Review a pull request and post the verdict on it.",
+      "tags": [
+        "skill",
+        "wizskills",
+        "review"
+      ],
+      "url": "https://github.com/openwizdev/WizSkills/tree/v0.4.1/skills/review-ticket"
+    },
+    {
+      "id": "wizskills-setup",
+      "name": "Setup",
+      "plugs_into": "The skills an OpenWiz agent runs",
+      "proof": {
+        "skill": {
+          "check": "python3 -I skills/setup/scripts/test_settings.py",
+          "source": "openwizdev/WizSkills@a040e40f2b28462c47ee0c2845966d27acd06de5",
+          "url": "https://github.com/openwizdev/WizSkills/tree/a040e40f2b28462c47ee0c2845966d27acd06de5"
+        }
+      },
+      "publisher": "openwizdev",
+      "stage": "available",
+      "status": "verified",
+      "summary": "Write a project's fleet settings once.",
+      "tags": [
+        "skill",
+        "wizskills",
+        "setup"
+      ],
+      "url": "https://github.com/openwizdev/WizSkills/tree/v0.4.1/skills/setup"
+    },
+    {
+      "id": "wizskills-son-of-anton",
+      "links": [
+        {
+          "label": "OpenWiz ticket",
+          "url": "https://github.com/openwizdev/OpenWiz/issues/3077"
+        }
+      ],
+      "name": "son-of-anton",
+      "plugs_into": "The skills an OpenWiz agent runs",
+      "publisher": "openwizdev",
+      "stage": "being-built",
+      "status": "listed",
+      "summary": "Attack your own factory on a schedule and file what is proven.",
+      "tags": [
+        "skill",
+        "wizskills",
+        "maintenance"
+      ],
+      "url": "https://github.com/openwizdev/WizSkills/tree/main/skills/son-of-anton"
+    },
+    {
+      "id": "wizskills-to-spec",
+      "name": "To Spec",
+      "plugs_into": "The skills an OpenWiz agent runs",
+      "proof": {
+        "skill": {
+          "check": "python3 -I skills/to-spec/test/test_video.py",
+          "source": "openwizdev/WizSkills@a040e40f2b28462c47ee0c2845966d27acd06de5",
+          "url": "https://github.com/openwizdev/WizSkills/tree/a040e40f2b28462c47ee0c2845966d27acd06de5"
+        }
+      },
+      "publisher": "openwizdev",
+      "stage": "available",
+      "status": "verified",
+      "summary": "Turn a confirmed grill into a spec, its plan and a steering video.",
+      "tags": [
+        "skill",
+        "wizskills",
+        "planning"
+      ],
+      "url": "https://github.com/openwizdev/WizSkills/tree/v0.4.1/skills/to-spec"
+    },
+    {
+      "id": "wizskills-to-tickets",
+      "name": "To Tickets",
+      "plugs_into": "The skills an OpenWiz agent runs",
+      "publisher": "openwizdev",
+      "stage": "available",
+      "status": "listed",
+      "summary": "Cut a spec into tickets, approved by their own checks.",
+      "tags": [
+        "skill",
+        "wizskills",
+        "planning"
+      ],
+      "url": "https://github.com/openwizdev/WizSkills/tree/v0.4.1/skills/to-tickets"
+    },
+    {
+      "id": "wizskills-triage",
+      "name": "Triage",
+      "plugs_into": "The skills an OpenWiz agent runs",
+      "proof": {
+        "skill": {
+          "check": "python3 -I skills/triage/test/test_find_work.py && python3 -I skills/triage/test/test_public_records.py",
+          "source": "openwizdev/WizSkills@a040e40f2b28462c47ee0c2845966d27acd06de5",
+          "url": "https://github.com/openwizdev/WizSkills/tree/a040e40f2b28462c47ee0c2845966d27acd06de5"
+        }
+      },
+      "publisher": "openwizdev",
+      "stage": "available",
+      "status": "verified",
+      "summary": "Sort new issues with the triage labels; start nothing.",
+      "tags": [
+        "skill",
+        "wizskills",
+        "triage"
+      ],
+      "url": "https://github.com/openwizdev/WizSkills/tree/v0.4.1/skills/triage"
+    },
+    {
+      "id": "wizskills-wayfind",
+      "name": "Wayfind",
+      "plugs_into": "The skills an OpenWiz agent runs",
+      "proof": {
+        "skill": {
+          "check": "python3 -I skills/wayfind/test/test_frontier.py",
+          "source": "openwizdev/WizSkills@a040e40f2b28462c47ee0c2845966d27acd06de5",
+          "url": "https://github.com/openwizdev/WizSkills/tree/a040e40f2b28462c47ee0c2845966d27acd06de5"
+        }
+      },
+      "publisher": "openwizdev",
+      "stage": "available",
+      "status": "verified",
+      "summary": "Chart a big, unclear effort before planning it.",
+      "tags": [
+        "skill",
+        "wizskills",
+        "planning"
+      ],
+      "url": "https://github.com/openwizdev/WizSkills/tree/v0.4.1/skills/wayfind"
+    },
+    {
+      "id": "wizskills-where-are-we",
+      "name": "Where Are We",
+      "plugs_into": "The skills an OpenWiz agent runs",
+      "proof": {
+        "skill": {
+          "check": "python3 -I skills/where-are-we/test/test_read_github.py",
+          "source": "openwizdev/WizSkills@a040e40f2b28462c47ee0c2845966d27acd06de5",
+          "url": "https://github.com/openwizdev/WizSkills/tree/a040e40f2b28462c47ee0c2845966d27acd06de5"
+        }
+      },
+      "publisher": "openwizdev",
+      "stage": "available",
+      "status": "verified",
+      "summary": "Read factory status and recommend one next move.",
+      "tags": [
+        "skill",
+        "wizskills",
+        "status"
+      ],
+      "url": "https://github.com/openwizdev/WizSkills/tree/v0.4.1/skills/where-are-we"
+    },
+    {
+      "id": "wizskills-write-driver",
+      "name": "Write driver",
+      "plugs_into": "The skills an OpenWiz agent runs",
+      "publisher": "openwizdev",
+      "stage": "available",
+      "status": "listed",
+      "summary": "Write and prove an OpenWiz driver for your own host.",
+      "tags": [
+        "skill",
+        "wizskills",
+        "driver-authoring"
+      ],
+      "url": "https://github.com/openwizdev/WizSkills/tree/v0.4.1/skills/write-driver"
+    }
+  ]
 }
