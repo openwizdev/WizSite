@@ -426,11 +426,17 @@ GUIDE_H1 = 'How to run many coding agents at once'
 GUIDE_STEPS = re.compile(r'<li><strong>([^<]+)\.</strong>([\s\S]*?)</li>')
 GUIDE_NEVER = re.compile(r'\b0\.1\.[1-9]|\b0\.0[2-9]\b')
 NOT_FOUND = '404.html'
+NOT_FOUND_LINKS = ('/', '/what-is-openwiz/', '/faq/')
+REDIRECTS = '_redirects'
+REPO_URL = 'https://github.com/openwizdev/OpenWiz'
+REDIRECT_RULE = re.compile(r'(/[^\s*:?#]*) +(\S+) +(\d{3})')
+REDIRECTS_OFFSITE = {REPO_URL, REPO_URL + '#readme'}
+REDIRECTS_NEEDED = {'/faq.html': '/faq/', '/docs': REPO_URL + '#readme', '/install': '/what-is-openwiz/', '/github': REPO_URL}
 ABOUT_LINK = '<p class="wrap about-link"><a href="/what-is-openwiz/">What is OpenWiz?</a></p>\n'
 STATIC = {
     'index.html', 'changelog/index.html', 'drivers/index.html', 'team/index.html', 'faq/index.html', 'market/index.html', 'pricing/index.html', '_headers', SECURITY_TXT, APP_PAGE, 'app/manifest.webmanifest',
     'SKILL.md', 'fonts/OFL.txt',
-    'c76a1a01e62d088edd3789d30d6a4d29.txt',
+    'c76a1a01e62d088edd3789d30d6a4d29.txt', REDIRECTS,
 } | ART | set(ICON_HASHES) | set(VECTORS) | (set(VENDOR_HASHES) - {GSAP}) | set(APP_VENDOR) | set(DRIVER_LOGOS) | {ASK_INDEX, ABOUT_PAGE, GUIDE_PAGE, NOT_FOUND} | DISCOVERY_FILES
 RUNTIME = STATIC | set(FINGERPRINTS.values())
 
@@ -1274,6 +1280,41 @@ def check_discovery(root, pages):
         f'\n{i}. {plain(name)}. {md(text)}' in full for i, (name, text) in enumerate(visible, 1)), 'llms-full.txt needs the guide'
 
 
+def check_redirects(root, pages):
+    built = {p.relative_to(root).as_posix() for p in root.rglob('*') if p.is_file()}
+    served = built | {name.removesuffix('index.html') for name in built if name == 'index.html' or name.endswith('/index.html')}
+    rules = {}
+    for line in (root / REDIRECTS).read_text().splitlines():
+        if not line.strip():
+            continue
+        assert not re.match(r'\s*(?:https?:|//|[^/\s])', line), f'{REDIRECTS}: the host handles www and http, so every rule is one exact path: {line}'
+        rule = REDIRECT_RULE.fullmatch(line)
+        assert rule, f'{REDIRECTS}: every rule is one exact path, a target and a status: {line}'
+        source, target, status = rule.groups()
+        assert status == '301', f'{REDIRECTS}: {source} must be a 301'
+        assert source not in rules, f'{REDIRECTS}: duplicate redirect: {source}'
+        assert source.lstrip('/') not in served and not source.startswith('/api/'), f'{REDIRECTS}: hides a built page: {source}'
+        rules[source] = target
+    for source, target in rules.items():
+        url = urlsplit(target)
+        if url.scheme or url.netloc:
+            assert target in REDIRECTS_OFFSITE, f'{REDIRECTS}: unexpected redirect target: {target}'
+            continue
+        assert url.path not in rules, f'{REDIRECTS}: redirect chain: {source} to {target}'
+        name = url.path.lstrip('/') + ('index.html' if url.path.endswith('/') else '')
+        assert not url.query and name in pages and name != NOT_FOUND and (not url.fragment or url.fragment in pages[name].ids), \
+            f'{REDIRECTS}: {source} target is not a built page: {target}'
+    needed = dict(REDIRECTS_NEEDED)
+    for name in PAGES + (APP_PAGE,):
+        if name != 'index.html':
+            needed['/' + name.removesuffix('/index.html')] = '/' + name.removesuffix('index.html')
+    for source, target in needed.items():
+        assert rules.get(source) == target, f'{REDIRECTS}: missing redirect: {source} to {target}'
+    main = re.search(r'<main\b[\s\S]*?</main>', (root / NOT_FOUND).read_text())
+    links = set(re.findall(r'<a href="([^"]+)"', main[0])) if main else set()
+    assert set(NOT_FOUND_LINKS) <= links, f'404 page must link {", ".join(NOT_FOUND_LINKS)}'
+
+
 def check_security_txt(text, now=None):
     lines = text.splitlines()
     for line in (
@@ -1314,6 +1355,7 @@ def check_site(root, registry=ROOT / 'market/registry.json', now=None):
     docs = {name: (root / name).read_text() for name in ALL_PAGES}
     parsed = {name: Page(html) for name, html in docs.items()}
     check_discovery(root, parsed)
+    check_redirects(root, parsed)
     pages = {root / name: parsed[name] for name in SITE_PAGES}
     drivers_html = (root / DRIVERS_PAGE).read_text()
     for path, page in pages.items():
@@ -2606,7 +2648,7 @@ def main():
         check_privacy('dist/' + name, (output / name).read_bytes())
     print('PASS: pinned WebP and AVIF artwork and spec recording within budget; the launch video within its own budget')
     print('PASS: exact export, local links/fragments, CSS resources, fonts/licences, copy and privacy')
-    print('PASS: page metadata, JSON-LD, sitemap, robots, crawler text and 404')
+    print('PASS: page metadata, JSON-LD, sitemap, robots, crawler text, redirects and 404')
     print('GAP: the landing page has no automated browser test (layout, keyboard, accessibility, animation); the app has npm run test:app')
     print('LIMIT: external URL destinations are constrained; remote availability is not checked')
 
@@ -2614,6 +2656,8 @@ def main():
 if __name__ == '__main__':
     if sys.argv[1:] == ['--discovery-only']:
         output = ROOT / 'dist'
-        check_discovery(output, {name: Page((output / name).read_text()) for name in ALL_PAGES})
+        parsed = {name: Page((output / name).read_text()) for name in ALL_PAGES}
+        check_discovery(output, parsed)
+        check_redirects(output, parsed)
     else:
         main()

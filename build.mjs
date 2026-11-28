@@ -41,7 +41,7 @@ const loader = ['wiz-loader/wiz-loader.css', 'wiz-loader/wiz-loader.js'];
 const hashed = ['tokens.css', 'site.css', 'changelog/changelog.css', 'market/market.css', ...loader, 'site.js', 'faq.js', vendor[0], ...app];
 const brand = ['favicon.ico', 'favicon.svg', 'apple-touch-icon.png', 'brand/openwiz-lockup.svg', 'brand/og.png'];
 const appBrand = ['app/mark.svg', 'app/icon.svg', 'app/icon.ico', 'app/icon-180.png', 'app/icon-light.svg', 'app/icon-light-180.png', 'app/icon-light-192.png', 'app/icon-light-512.png', 'app/wiz-reviewer.svg'];
-const files = ['_headers', '.well-known/security.txt', 'SKILL.md', 'c76a1a01e62d088edd3789d30d6a4d29.txt', 'app/manifest.webmanifest', ...appBrand, ...art, ...driverLogos, 'art/todo-spec.mp4', 'art/todo-spec.vtt', 'art/launch-video.mp4', 'art/launch-video.vtt', ...vendor.slice(1), ...brand, 'fonts/OFL.txt'];
+const files = ['_headers', '_redirects', '.well-known/security.txt', 'SKILL.md', 'c76a1a01e62d088edd3789d30d6a4d29.txt', 'app/manifest.webmanifest', ...appBrand, ...art, ...driverLogos, 'art/todo-spec.mp4', 'art/todo-spec.vtt', 'art/launch-video.mp4', 'art/launch-video.vtt', ...vendor.slice(1), ...brand, 'fonts/OFL.txt'];
 const releases = await readReleases();
 console.log(`Changelog releases: ${summary(releases, live)}`);
 const registry = await readRegistry();
