@@ -1391,6 +1391,11 @@ def check_site(root, registry=ROOT / 'market/registry.json', now=None):
     parsed = {name: Page(html) for name, html in docs.items()}
     check_discovery(root, parsed)
     pages = {root / name: parsed[name] for name in SITE_PAGES}
+    generated = {root / name: Page((root / name).read_text()) for name in sorted(extras) if name.endswith('.html') and (root / name).is_file()}
+    targets = {**pages, **generated}
+    for path, page in generated.items():
+        for ref in page.refs:
+            check_ref(root, path, ref, targets, page.favicons)
     drivers_html = (root / DRIVERS_PAGE).read_text()
     for path, page in pages.items():
         rel = path.relative_to(root).as_posix()
@@ -1452,16 +1457,16 @@ def check_site(root, registry=ROOT / 'market/registry.json', now=None):
                     assert not (slot.x_links or slot.cloudroom_links or slot.report_links or slot.launch_posts or any(slot.install_links.values())), \
                         'unexpected external URL'
                     for ref in slot.refs:
-                        check_ref(root, path, ref, pages, slot.favicons)
+                        check_ref(root, path, ref, targets, slot.favicons)
                 page = Page(fixed)
         assert page.social and all(s.startswith(SITE_URL) and s.removeprefix(SITE_URL).split('?')[0] in STATIC for s in page.social), 'social image must be a built file on the site'
         assert path == root / TEAM_PAGE or not page.books, f'a booking link outside the team page: {path.name}'
         assert page.x_links == (2 if path == root / ABOUT_PAGE else 1), f'one X link per page, the footer\'s: {path.relative_to(root)} has {page.x_links}'
         if path == root / MARKET_PAGE:
-            check_market_refs(root, path, page, pages, frozenset())
+            check_market_refs(root, path, page, targets, frozenset())
         else:
             for ref in page.refs:
-                check_ref(root, path, ref, pages, page.favicons)
+                check_ref(root, path, ref, targets, page.favicons)
         assert page.cloudroom_links == (1 if path == root / 'index.html' else 0), \
             f'CloudRoom link, the landing install box\'s only: {path.relative_to(root)} has {page.cloudroom_links}'
         assert all(n == (1 if path == root / 'index.html' else 0) for n in page.install_links.values()), \

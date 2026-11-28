@@ -160,6 +160,16 @@ class Checks(unittest.TestCase):
             pages_map.write_text(pages_map.read_text().replace('</urlset>', f'  <url><loc>https://openwiz.dev/guides/synthetic/</loc><lastmod>{newest}</lastmod></url>\n</urlset>'))
             check_site(root)
             self.assertIn('guides/synthetic/index.html', registered_extras(root))
+            target_page = page.read_text()
+            page.write_text(target_page.replace('<h1>Synthetic</h1>', '<h1>Synthetic</h1><h2 id="install">Install</h2>'))
+            before_link = extra.read_text()
+            extra.write_text(before_link.replace('<h1>Synthetic</h1>', '<h1>Synthetic</h1><p><a href="/docs/synthetic/#install">Install</a></p>'))
+            check_site(root)
+            extra.write_text(before_link.replace('<h1>Synthetic</h1>', '<h1>Synthetic</h1><p><a href="/docs/missing/">Install</a></p>'))
+            with self.assertRaisesRegex(AssertionError, 'missing local target'):
+                check_site(root)
+            extra.write_text(before_link)
+            page.write_text(target_page)
             clean = extra.read_text()
             extra.write_text(clean.replace('<h1>Synthetic</h1>', '<h1>Synthetic</h1><p>' + '/' + 'home/' + 'someone/notes</p>'))
             with self.assertRaises(AssertionError):
