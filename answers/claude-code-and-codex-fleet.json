@@ -1,0 +1,75 @@
+{
+  "slug": "claude-code-and-codex-fleet",
+  "kind": "answer",
+  "query": "Claude Code vs Codex fleet",
+  "title": "Run Claude Code and Codex in One OpenWiz Fleet",
+  "description": "Use Claude Code and Codex side by side in an OpenWiz fleet, with a reviewer from a different model family for each pull request.",
+  "answer": "You can run Claude Code and Codex in one OpenWiz fleet. Give a ticket to a builder from either tool and have a reviewer from a different model family review the resulting pull request. The two tools share the project's plan, tickets and reviews through GitHub.",
+  "sections": [
+    {
+      "heading": "Use the tools you already have",
+      "body": "Both tools have terminal clients. Follow [Anthropic's Claude Code quickstart](https://code.claude.com/docs/en/quickstart) to install Claude Code, run `claude` and sign in (checked 2026-11-28). Follow [OpenAI's Codex CLI README](https://github.com/openai/codex) to install Codex, run `codex` and sign in (checked 2026-11-28). If your fleet runs on another host, set up access to both tools on that host."
+    },
+    {
+      "heading": "Give each change an independent review",
+      "body": "For example, send a small test change to a Claude Code builder and its pull request to a Codex reviewer. For a change built with Codex, use a Claude Code reviewer. The builder runs the tests and opens the pull request. The reviewer checks the exact commit and leaves findings for the builder. OpenWiz coordinates the handoff. It does not supply either model or sign in to either tool for you. [OpenWiz fleet settings](https://github.com/openwizdev/OpenWiz/blob/09ad084f81023de18f2cd3b9f1967d9abb7f5c89/docs/agents/fleet.md#models)"
+    }
+  ],
+  "steps": [
+    {
+      "name": "Install OpenWiz and connect GitHub",
+      "text": "From either signed-in tool, say `Install OpenWiz`. For the automatic path below on OpenWiz 0.1.0, choose CloudRoom. Make both tools available on the host and follow setup to connect the GitHub repository."
+    },
+    {
+      "name": "Set the builder and reviewer",
+      "text": "In `docs/agents/fleet.md`, choose Claude Code or Codex in the Builder settings and set its model and effort. Set Codex in `Reviewer for Claude-built` and Claude Code in `Reviewer for GPT-built`, with a model and effort for each. Commit the settings to the repository's main branch before starting the fleet."
+    },
+    {
+      "name": "Start with one small change",
+      "text": "Give the agent one idea for the repository, such as a test for an empty input. Confirm the spec, approve the exact plan, and approve the launch preview. Open the pull request on GitHub and check that CI passed and the reviewer from the other family reviewed the latest commit."
+    }
+  ],
+  "faq": [
+    {
+      "question": "Can I run both agents on my computer?",
+      "answer": "Yes. On OpenWiz 0.1.0, you start local builders by hand and handle review and merge yourself. The automatic fleet on that release runs in CloudRoom."
+    },
+    {
+      "question": "Does a different model family replace CI?",
+      "answer": "No. The reviewer checks the change on the exact pull request commit. OpenWiz's fleet also requires green CI before merging."
+    }
+  ],
+  "sources": [
+    {
+      "url": "https://code.claude.com/docs/en/quickstart",
+      "supports": "Anthropic documents installing the Claude Code CLI, starting it with claude, and signing in.",
+      "checked": "2026-11-28"
+    },
+    {
+      "url": "https://github.com/openai/codex",
+      "supports": "OpenAI documents installing the Codex CLI, starting it with codex, and signing in.",
+      "checked": "2026-11-28"
+    },
+    {
+      "url": "https://github.com/openwizdev/OpenWiz/blob/09ad084f81023de18f2cd3b9f1967d9abb7f5c89/docs/agents/fleet.md#models",
+      "supports": "OpenWiz configures each role's harness, model and effort in the project. The Claude-built and GPT-built reviewer settings use the other family and review the exact head.",
+      "checked": "2026-11-28"
+    },
+    {
+      "url": "https://github.com/openwizdev/OpenWiz/blob/09ad084f81023de18f2cd3b9f1967d9abb7f5c89/docs/how-openwiz-works.md",
+      "supports": "GitHub holds the shared plan and work records. The fleet routes pull requests for review, returns findings to builders and merges approved green work. On 0.1.0 CloudRoom runs the automatic fleet and local work is hand-started.",
+      "checked": "2026-11-28"
+    },
+    {
+      "url": "https://github.com/openwizdev/OpenWiz/blob/09ad084f81023de18f2cd3b9f1967d9abb7f5c89/README.md#quick-start",
+      "supports": "The install starts in agent chat. Users choose a host and use their own signed-in tools and model accounts.",
+      "checked": "2026-11-28"
+    },
+    {
+      "url": "https://github.com/openwizdev/OpenWiz/blob/09ad084f81023de18f2cd3b9f1967d9abb7f5c89/docs/first-hour.md#what-happens-in-order",
+      "supports": "First-fleet setup connects GitHub and asks for a confirmed spec, exact-plan approval and launch approval.",
+      "checked": "2026-11-28"
+    }
+  ],
+  "checked": "2026-11-28"
+}

@@ -205,6 +205,8 @@ APP_SCRIPTS = ('app/data.js', 'app/records.js', 'app/ui.js') + APP_PARTS + ('app
 APP_VENDOR = {'app/vendor/dagre-3.1.3.min.js': ('node_modules/@dagrejs/dagre/dist/dagre.min.js', 'app/pages/spec.js'),
               'app/vendor/dagre-LICENSE.txt': ('node_modules/@dagrejs/dagre/LICENSE', None)}
 HASHED += (APP_STYLE,) + APP_PART_STYLES + APP_SCRIPTS
+SHOWCASE_PAGE = 'showcase/index.html'
+HASHED += ('showcase/showcase.css', 'showcase/showcase.js')
 SITE_CSP = ("default-src 'self'; script-src 'self' https://static.cloudflareinsights.com; style-src 'self'; "
             "img-src 'self' data:; media-src 'self'; font-src 'self'; "
             "connect-src 'self' https://api.github.com https://cloudflareinsights.com; frame-src 'none'; object-src 'none'; "
@@ -436,7 +438,7 @@ STATIC = {
     'SKILL.md', 'fonts/OFL.txt',
     'c76a1a01e62d088edd3789d30d6a4d29.txt',
 } | ART | set(ICON_HASHES) | set(VECTORS) | (set(VENDOR_HASHES) - {GSAP}) | set(APP_VENDOR) | set(DRIVER_LOGOS) | {ASK_INDEX, ABOUT_PAGE, GUIDE_PAGE, NOT_FOUND, COUNTERS_PAGE} | DISCOVERY_FILES
-RUNTIME = STATIC | set(FINGERPRINTS.values())
+RUNTIME = STATIC | {SHOWCASE_PAGE} | set(FINGERPRINTS.values())
 
 
 def built_fingerprints(root):
@@ -492,6 +494,11 @@ RELEASE_FIELDS = ('name', 'semver', 'date', 'headline', 'bullets', 'notes')
 RELEASE_BULLETS = (1, 6)
 RELEASE_BULLET_MAX = 120
 RELEASE_HEADLINE_MAX = 80
+RELEASE_AREAS = (2, 12)
+RELEASE_AREA_NAME_MAX = 40
+RELEASE_LINES_MAX = 80
+RELEASE_LINE_MAX = 300
+RELEASE_SWITCH = ROOT / 'release.json'
 PRE_RELEASES = 'https://github.com/openwizdev/OpenWiz/releases'
 MONTHS = ('Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec')
 DRIVERS_PAGE = 'drivers/index.html'
@@ -1355,7 +1362,7 @@ def check_security_txt(text, now=None):
 def check_site(root, registry=ROOT / 'market/registry.json', now=None):
     files = {p.relative_to(root).as_posix() for p in root.rglob('*') if p.is_file()}
     names = built_fingerprints(root)
-    assert files == STATIC | set(names.values()) | set(MIRROR_PATHS.values()), 'unexpected or missing build output'
+    assert files == STATIC | {SHOWCASE_PAGE} | set(names.values()) | set(MIRROR_PATHS.values()), 'unexpected or missing build output'
     docs = {name: (root / name).read_text() for name in ALL_PAGES}
     parsed = {name: Page(html) for name, html in docs.items()}
     check_discovery(root, parsed)
@@ -2451,26 +2458,54 @@ def semver(text):
 
 def check_release_data(file, data):
     assert isinstance(data, dict), f'{file}: one release object'
-    missing = [k for k in RELEASE_FIELDS if k not in data or data[k] in (None, '', [])]
+    lines = 'areas' if 'areas' in data and 'bullets' not in data else 'bullets'
+    fields = tuple(lines if k == 'bullets' else k for k in RELEASE_FIELDS)
+    missing = [k for k in fields if k not in data or data[k] in (None, '', [])]
     assert not missing, f'{file}: missing {", ".join(missing)}'
-    assert sorted(data) == sorted(RELEASE_FIELDS), f'{file}: unexpected fields {sorted(set(data) - set(RELEASE_FIELDS))}'
-    text = [data[k] for k in RELEASE_FIELDS if k != 'bullets']
-    assert all(isinstance(v, str) for v in text) and isinstance(data['bullets'], list), f'{file}: fields are text, bullets a list'
+    assert sorted(data) == sorted(fields), f'{file}: unexpected fields {sorted(set(data) - set(fields))}; an entry has bullets or areas, never both'
+    text = [data[k] for k in fields if k != lines]
+    assert all(isinstance(v, str) for v in text) and isinstance(data[lines], list), f'{file}: fields are text, {lines} a list'
     assert re.fullmatch(r'0\.\d\d|[1-9]\d*\.\d\d', data['name']) and file == f'{data["name"]}.json', \
         f'{file}: the public name is like 0.01 and names the file'
     assert re.fullmatch(r'\d+\.\d+\.\d+', data['semver']) and semver(data['semver']) >= (0, 1, 0), f'{file}: semver from 0.1.0 on'
     assert re.fullmatch(r'20\d\d-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])', data['date']), f'{file}: date as YYYY-MM-DD'
     assert len(data['headline']) <= RELEASE_HEADLINE_MAX and '\n' not in data['headline'], f'{file}: a one-line headline'
-    bullets = data['bullets']
-    low, high = RELEASE_BULLETS
-    assert low <= len(bullets) <= high, f'{file}: {len(bullets)} bullets; a short list of {low} to {high}'
+    names, limit = [], RELEASE_BULLET_MAX
+    if lines == 'areas':
+        low, high = RELEASE_AREAS
+        assert low <= len(data['areas']) <= high, f'{file}: {len(data["areas"])} areas; a long entry groups its lines into {low} to {high} areas'
+        for area in data['areas']:
+            assert isinstance(area, dict) and sorted(area) == ['bullets', 'name'] and isinstance(area['name'], str) \
+                and isinstance(area['bullets'], list) and area['bullets'], f'{file}: an area is a name and its lines'
+            assert area['name'].strip() and len(area['name']) <= RELEASE_AREA_NAME_MAX and '\n' not in area['name'], \
+                f'{file}: a one-line area name of {RELEASE_AREA_NAME_MAX} characters or fewer'
+            names.append(area['name'])
+        slugs = [re.sub(r'[^a-z0-9]+', '-', name.lower()).strip('-') for name in names]
+        assert all(slugs) and len(set(slugs)) == len(slugs), f'{file}: each area once, named in letters or digits'
+        bullets, limit = [b for area in data['areas'] for b in area['bullets']], RELEASE_LINE_MAX
+        assert len(bullets) <= RELEASE_LINES_MAX, f'{file}: {len(bullets)} lines; {RELEASE_LINES_MAX} or fewer'
+    else:
+        bullets = data['bullets']
+        low, high = RELEASE_BULLETS
+        assert low <= len(bullets) <= high, f'{file}: {len(bullets)} bullets; a short list of {low} to {high}, or areas for a long entry'
     for bullet in bullets:
         assert isinstance(bullet, str) and bullet.strip(), f'{file}: an empty bullet'
-        assert len(bullet) <= RELEASE_BULLET_MAX, f'{file}: a bullet over {RELEASE_BULLET_MAX} characters: {bullet[:40]}...'
+        assert len(bullet) <= limit, f'{file}: a bullet over {limit} characters: {bullet[:40]}...'
         assert '\n' not in bullet, f'{file}: one line per bullet'
     assert data['notes'] == f'https://github.com/openwizdev/OpenWiz/releases/tag/v{data["semver"]}', \
         f'{file}: the notes link is the release on GitHub, https://github.com/openwizdev/OpenWiz/releases/tag/v{data["semver"]}'
-    check_public_names(escape(' '.join(text + bullets)))
+    check_public_names(escape(' '.join(text + names + bullets)))
+
+
+def read_ship(path=RELEASE_SWITCH):
+    try:
+        data = json.loads(path.read_text())
+    except (OSError, ValueError) as error:
+        raise AssertionError(f'release.json: not readable as JSON: {error}') from None
+    held = data.get('changelog', {}) if isinstance(data, dict) else None
+    assert isinstance(held, dict) and all(re.fullmatch(r'\d+\.\d+\.\d+', version) and state in ('on', 'off') for version, state in held.items()), \
+        'release.json: changelog maps a semver to on or off'
+    return held
 
 
 class ReleaseOutline(HTMLParser):
@@ -2484,7 +2519,9 @@ class ReleaseOutline(HTMLParser):
         classes = (attrs.get('class') or '').split()
         self.tags.append((tag, attrs))
         if tag == 'article':
-            self.entries.append({'name': '', 'small': '', 'after': '', 'date': None, 'headline': '', 'bullets': [], 'links': []})
+            self.entries.append({'name': '', 'small': '', 'after': '', 'date': None, 'headline': '', 'bullets': [], 'areas': [], 'links': []})
+        elif tag == 'h3' and self.entries:
+            self.entries[-1]['areas'].append({'name': '', 'bullets': []})
         elif tag == 'p' and 'pre' in classes:
             self.pre = {'text': '', 'links': []}
         if tag == 'time' and self.entries:
@@ -2492,25 +2529,32 @@ class ReleaseOutline(HTMLParser):
         if tag == 'a':
             (self.pre or self.entries[-1])['links'].append(attrs.get('href'))
         if tag == 'li':
-            self.entries[-1]['bullets'].append('')
-        self.at = 'small' if tag == 'small' else 'name' if tag == 'h2' else 'headline' if 'headline' in classes else 'li' if tag == 'li' else self.at
+            self.lines().append('')
+        self.at = 'small' if tag == 'small' else 'name' if tag == 'h2' else 'area' if tag == 'h3' else 'headline' if 'headline' in classes else 'li' if tag == 'li' else self.at
+
+    def lines(self):
+        entry = self.entries[-1]
+        return entry['areas'][-1]['bullets'] if entry['areas'] else entry['bullets']
 
     def handle_endtag(self, tag):
-        if tag in ('h2', 'small', 'p', 'li'):
+        if tag in ('h2', 'h3', 'small', 'p', 'li'):
             self.at = 'after' if tag == 'small' else None
 
     def handle_data(self, data):
         if self.pre is not None:
             self.pre['text'] += data
         elif self.at == 'li':
-            self.entries[-1]['bullets'][-1] += data
+            self.lines()[-1] += data
+        elif self.at == 'area':
+            self.entries[-1]['areas'][-1]['name'] += data
         elif self.at:
             self.entries[-1][self.at] += data
 
 
-def check_releases(section, releases, live):
+def check_releases(section, releases, live, ship=None):
+    ship = read_ship() if ship is None else ship
     outline = ReleaseOutline(section)
-    allowed = {'section': {'class', 'aria-label'}, 'article': {'class', 'aria-labelledby'}, 'h2': {'id'}, 'small': {'class'},
+    allowed = {'section': {'class', 'aria-label'}, 'article': {'class', 'aria-labelledby'}, 'h2': {'id'}, 'h3': {'id'}, 'small': {'class'},
                'time': {'datetime'}, 'p': {'class'}, 'ul': set(), 'li': set(), 'a': {'href', 'data-count'}}
     for tag, attrs in outline.tags:
         assert tag in allowed, f'unexpected element in the release entries: {tag}'
@@ -2518,8 +2562,8 @@ def check_releases(section, releases, live):
         if tag == 'small':
             assert attrs.get('class', 'semver') == 'semver', 'the semver small is unlabelled or labelled semver'
     assert outline.tags[:1] == [('section', {'class': 'releases', 'aria-label': 'Releases'})], 'the entries sit in one Releases section'
-    want = sorted(releases.values(), key=lambda d: semver(d['semver']), reverse=True) if live else []
-    assert len(outline.entries) == len(want), f'{len(outline.entries)} entries shown; the data and the install switch say {len(want)}'
+    want = sorted((d for d in releases.values() if ship.get(d['semver']) != 'off'), key=lambda d: semver(d['semver']), reverse=True) if live else []
+    assert len(outline.entries) == len(want), f'{len(outline.entries)} entries shown; the data, the install switch and release.json say {len(want)}'
     for got, data in zip(outline.entries, want):
         flat = lambda t: re.sub(r'\s+', ' ', t).strip()
         y, m, d = map(int, data['date'].split('-'))
@@ -2527,7 +2571,9 @@ def check_releases(section, releases, live):
             f'{data["name"]}: the entry is headed by its whole public name, then its date and semver small, nothing after it, newest first'
         assert got['date'] == data['date'], f'{data["name"]}: the entry\'s date'
         assert flat(got['headline']) == data['headline'], f'{data["name"]}: the entry\'s headline'
-        assert [flat(b) for b in got['bullets']] == data['bullets'], f'{data["name"]}: the entry\'s bullets'
+        assert [flat(b) for b in got['bullets']] == data.get('bullets', []), f'{data["name"]}: the entry\'s bullets'
+        areas = [{'name': flat(area['name']), 'bullets': [flat(b) for b in area['bullets']]} for area in got['areas']]
+        assert areas == data.get('areas', []), f'{data["name"]}: the entry\'s areas, each a heading and its lines'
         assert got['links'] == [data['notes']], f'{data["name"]}: one link, to the full notes on GitHub'
     assert outline.pre and outline.pre['links'] == [PRE_RELEASES], 'the entries end with one line linking the pre-releases on GitHub'
     if not want:
@@ -2666,11 +2712,17 @@ def check_showcase_fixtures():
 
 def main():
     check_showcase_fixtures()
+    subprocess.run(['node', '--test', 'showcase/tests/render.test.mjs'], cwd=ROOT, check=True)
     output = ROOT / 'dist'
     check_site(output)
-    for name in RUNTIME - set(FINGERPRINTS.values()) - set(ALL_PAGES) - {ASK_INDEX} - DISCOVERY_FILES:
+    for name in RUNTIME - set(FINGERPRINTS.values()) - set(ALL_PAGES) - {ASK_INDEX, SHOWCASE_PAGE} - DISCOVERY_FILES:
         source = APP_VENDOR[name][0] if name in APP_VENDOR else name
         assert (ROOT / source).read_bytes() == (output / name).read_bytes(), f'export differs: {name}'
+    showcase = (ROOT / SHOWCASE_PAGE).read_text()
+    for source, hashed in FINGERPRINTS.items():
+        if source.startswith('showcase/'):
+            showcase = showcase.replace(f'"/{source}"', f'"/{hashed}"')
+    assert (output / SHOWCASE_PAGE).read_text() == showcase, f'export differs: {SHOWCASE_PAGE}'
     assert built_fingerprints(output) == FINGERPRINTS, 'build is stale: rebuild the site'
     for name, hashed in FINGERPRINTS.items():
         assert built_asset_bytes(name, FONT_FINGERPRINTS) == (output / hashed).read_bytes(), f'export differs: {name}'

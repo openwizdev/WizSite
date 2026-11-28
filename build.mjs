@@ -112,5 +112,6 @@ for (const file of files) {
   await mkdir(new URL('./', new URL(file, output)), { recursive: true });
   await copyFile(new URL(file, root), new URL(file, output));
 }
+await (await import('./showcase/build.mjs')).buildShowcase(put);
 execFileSync('python3', ['-B', 'scripts/check.py', '--discovery-only'], { cwd: root, stdio: 'inherit' });
 console.log(`Static site: ${Object.keys(pages).length + fonts.length + hashed.length + files.length + Object.keys(npmVendor).length + Object.keys(discovery).length + mirrors.size + 1} public files in dist/ (${Object.values(names).join(', ')})`);
