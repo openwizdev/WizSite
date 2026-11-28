@@ -22,11 +22,11 @@
     },
     {
       "name": "Connect a repository and give the agent one idea",
-      "text": "Follow the first-fleet setup to connect GitHub and choose a repository. Give the agent a small task, such as adding a missing test, and answer its questions about what counts as done."
+      "text": "Connect GitHub and choose a repository. Give your agent a small task, such as adding a missing test, and agree on what counts as done. Follow the steps for your host in the [OpenWiz first-hour guide](https://github.com/openwizdev/OpenWiz/blob/09ad084f81023de18f2cd3b9f1967d9abb7f5c89/docs/first-hour.md#what-happens-in-order)."
     },
     {
       "name": "Approve the plan and follow the work",
-      "text": "Confirm the spec, approve the exact ticket plan, then approve the launch preview after checking the host and costs. Open the tickets and their pull requests on GitHub to follow CI and review."
+      "text": "On OpenWiz 0.1.0 with CloudRoom, confirm the spec, approve the exact ticket plan and approve the launch preview after checking the host and costs. On your computer or boat.dev, review and approve each hand-started builder from its own preview, then review and merge its pull request yourself. Follow the tickets, pull requests and checks on GitHub."
     }
   ],
   "faq": [
@@ -57,7 +57,7 @@
     },
     {
       "url": "https://github.com/openwizdev/OpenWiz/blob/09ad084f81023de18f2cd3b9f1967d9abb7f5c89/docs/first-hour.md#what-happens-in-order",
-      "supports": "First-fleet setup connects GitHub, turns one idea into tickets and asks for approval before starting work. In 0.1.0 the automatic fleet runs in CloudRoom and the other hosts use a manual flow.",
+      "supports": "First-fleet setup connects GitHub and turns one idea into tickets. On 0.1.0, CloudRoom uses a fleet launch preview, while local and boat.dev users approve each hand-started builder and handle review and merge themselves.",
       "checked": "2026-11-28"
     }
   ],

@@ -18,11 +18,11 @@
   "steps": [
     {
       "name": "Install OpenWiz and connect GitHub",
-      "text": "From either signed-in tool, say `Install OpenWiz`. Pick the host for the fleet, make both tools available on it, and follow setup to connect the GitHub repository. For an automatic fleet on OpenWiz 0.1.0, choose CloudRoom."
+      "text": "From either signed-in tool, say `Install OpenWiz`. For the automatic path below on OpenWiz 0.1.0, choose CloudRoom. Make both tools available on the host and follow setup to connect the GitHub repository."
     },
     {
       "name": "Set the builder and reviewer",
-      "text": "In the project's `docs/agents/fleet.md`, set Claude Code for Builder and Codex for Reviewer, or swap the roles. Set a model and effort for each. Start the fleet once the settings are on the repository's main branch."
+      "text": "In `docs/agents/fleet.md`, choose Claude Code or Codex in the Builder settings and set its model and effort. Set Codex in `Reviewer for Claude-built` and Claude Code in `Reviewer for GPT-built`, with a model and effort for each. Commit the settings to the repository's main branch before starting the fleet."
     },
     {
       "name": "Start with one small change",
