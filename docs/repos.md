@@ -52,7 +52,7 @@ WizPlugins holds plugins that show the factory inside Cloudroom. Its one plugin 
 - WizBar’s cards link each thread’s issue or pull request and count its child threads; hover to list them.
 - A running count with a stats panel, and drag to pin.
 - Every WizBar action is also a `room-cli wizbar` command with JSON.
-- Install WizBar from the [BB Marketplace](https://getbb.app/marketplace/wizbar), or [from source](https://github.com/openwizdev/WizPlugins). The marketplace serves 0.6.0 until the `wizbar/v0.7.0` release tag exists. Fixture tests prove the plugin.
+- Install WizBar from the [BB Marketplace](https://getbb.app/marketplace/wizbar) (serving [0.7.0](https://github.com/openwizdev/WizPlugins/releases/tag/wizbar/v0.7.0)), or [from source](https://github.com/openwizdev/WizPlugins). Fixture tests prove the plugin.
 
 ### [WizMarket](https://github.com/openwizdev/WizMarket#readme)
 

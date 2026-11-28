@@ -66,11 +66,11 @@ Source: the fleet skills, `to-tickets` and `launch-fleet`, which put it on and t
 
 ## Test commands
 
-The full set, in this order, from the repository root. Use Node.js 24, Python 3.11+ and Git. Commands 6 to 9 also need Chrome or Chromium (`CHROME=/path/to/chrome` picks one). A builder runs the red/green proof and every command its change can affect, then opens the ready pull request.
+The full set, in this order, from the repository root. Use Node.js 24, Python 3.11+ and Git. Commands 5 to 9 also need Chrome or Chromium (`CHROME=/path/to/chrome` picks one). A builder runs the red/green proof and every command its change can affect, then opens the ready pull request.
 
 | # | Folder | Command | CI check |
 | --- | --- | --- | --- |
-| 1 | root | `python3 -I tools/comment-check/check.py diff --base HEAD^1` | `Build, links, resources and privacy` |
+| 1 | root | `python3 -I tools/comment-check/check.py diff --base origin/main` | `Build, links, resources and privacy` |
 | 2 | root | `npm ci` | `Build, links, resources and privacy` |
 | 3 | root | `npm run build` | `Build, links, resources and privacy` |
 | 4 | root | `npm run check` | `Build, links, resources and privacy` |
@@ -80,7 +80,7 @@ The full set, in this order, from the repository root. Use Node.js 24, Python 3.
 | 8 | root | `npm run test:v2` | `Build, links, resources and privacy` |
 | 9 | root | `node --test tests/models-page.test.mjs` | `Build, links, resources and privacy` |
 
-Command 1 is the comment check. CI runs it only on a pull request, after fetching that head. `npm run test:comments` runs the same command. Commands 4 to 9 need command 3's `dist/` first. `npm run test:v2` is command 8. `npm run test:models` is command 9.
+Command 1 is the comment check (`npm run test:comments` runs it locally against `origin/main`, the pull-request target; replace `origin/main` with another target branch if needed). CI runs the same checker only on a pull request, using `--base HEAD^1` on the merge checkout after fetching that head. Commands 4 to 9 need command 3's `dist/` first. `npm run test:v2` is command 8. `npm run test:models` is command 9.
 
 Source: [`README.md`](../../README.md#build-and-check), [`package.json`](../../package.json) scripts and [`.github/workflows/site.yml`](../../.github/workflows/site.yml).
 
@@ -88,7 +88,7 @@ Source: [`README.md`](../../README.md#build-and-check), [`package.json`](../../p
 
 | Check | Runs | Required on |
 | --- | --- | --- |
-| `Build, links, resources and privacy` | Workflow `Site`, job `site`: test commands 1 to 9, in order. Command 1 runs only on a pull request | `main`, by this project's merge rule below; no ruleset requires it |
+| `Build, links, resources and privacy` | Workflow `Site`, job `site`: test commands 1 to 9, in order. Command 1 runs only on a pull request, against `HEAD^1` on the merge checkout | `main`, by this project's merge rule below; no ruleset requires it |
 
 The workflow runs for every pull request against `main` and every push to `main`, without path filters, so docs-only changes run it too. Cloudflare Pages also reports a `Cloudflare Pages` check from its own Git integration; it is the deploy preview, not one of these checks. The ruleset "protect" refuses branch deletion and force-pushes on the default branch and requires no status check.
 
