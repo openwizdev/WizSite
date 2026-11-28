@@ -8,8 +8,6 @@ const repo = github + '/OpenWiz';
 const skillsRepo = github + '/WizSkills';
 const skillsRef = 'maint/0.2';
 const repoRoot = fileURLToPath(new URL('..', import.meta.url));
-// One name everywhere (contracts: SO2 of spec #3513). sameAs lists only profiles the owner has confirmed;
-// add LinkedIn, TikTok, YouTube, crates.io or npm here only once each exists and is confirmed.
 export const entityName = 'OpenWiz, the open source agent factory';
 const disambiguation = 'OpenWiz is the open source agent factory for coding agents such as Claude Code and Codex, made by the openwizdev organization on GitHub. It is not the open firmware for the GP2X Wiz handheld or the Windows utility of the same name.';
 const sameAs = [github, repo, 'https://x.com/openwiz'];
