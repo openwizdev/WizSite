@@ -1,6 +1,6 @@
 'use strict';
 (() => {
-  const { h, icon } = OW.ui;
+  const { h, icon, time } = OW.ui;
   const CHIPS = ['Simplify the copy', 'Keep the current default', 'Break into smaller steps'];
 
   function showDialog(opener, title, contents) {
@@ -161,11 +161,19 @@
       layout.lastElementChild.append(h('div', { class: 'v2-feed-note', role: 'status' }), h('div', { class: 'v2-real-queue' }));
       el.replaceChildren(layout);
     }
-    layout.querySelector('.v2-refresh').setAttribute('aria-disabled', String(OW.data.paused()));
+    const paused = OW.data.paused();
+    layout.querySelector('.v2-refresh').setAttribute('aria-disabled', String(paused));
     const specs = feeds.specs;
-    const message = specs.state === 'unknown' ? 'Couldn’t read Specs from GitHub. Press Refresh now to try again.'
-      : specs.state === 'stale' ? "Couldn't read Specs from GitHub. Showing the last successful read."
-      : specs.state === 'partial' ? 'Some specs could not be read.' : '';
+    const parts = [];
+    if (paused) parts.push(`GitHub’s limit is low. GitHub reads resume at ${time(OW.data.limit.pausedUntil)}.`);
+    if (specs.state === 'unknown') {
+      parts.push(paused ? 'Couldn’t read Specs from GitHub.' : 'Couldn’t read Specs from GitHub. Press Refresh now to try again.');
+    } else if (specs.state === 'stale') {
+      parts.push("Couldn't read Specs from GitHub. Showing the last successful read.");
+    } else if (specs.state === 'partial') {
+      parts.push('Some specs could not be read.');
+    }
+    const message = parts.join(' ');
     const note = layout.querySelector('.v2-feed-note');
     if (note.textContent !== message) note.textContent = message;
     const slot = layout.querySelector('.v2-real-queue');

@@ -283,7 +283,7 @@
     if (!state.present) for (const card of children) card.hidden = false;
     const controls = state.present?.(deck);
     const oldNote = el.querySelector(':scope > .unknown');
-    const note = message ? (oldNote?.textContent === message ? oldNote : OW.ui.unknown(message)) : null;
+    const note = message ? (oldNote?.textContent === `Unknown. ${message}` ? oldNote : OW.ui.unknown(message)) : null;
     const oldEmpty = el.querySelector(':scope > .placeholder');
     const empty = !items.length && !note ? (oldEmpty?.matches('.v2-queue-clear') ? oldEmpty
       : h('div', { class: 'placeholder v2-queue-clear' }, h('h2', {}, 'All clear'), h('div', {}, `${EMPTY}.`))) : null;

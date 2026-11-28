@@ -65,7 +65,7 @@
         setting('Pause new builds at the cap', s.pauseAtCap, enabled => { s.pauseAtCap = enabled; }),
       ]),
       row('Repository', h('span', {}, `${state.workspace} · ${state.branch}`)),
-      h('a', { class: 'v2-inline-link v2-settings-exit', href: '#/welcome' }, 'Exit sample workspace'),
+      h('a', { class: 'v2-inline-link v2-settings-exit', href: '/app/' }, 'Exit sample workspace'),
     ];
   }
 

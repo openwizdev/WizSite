@@ -8,7 +8,7 @@
   const ROUTES = () => OW.pages.map(page => page.id);
   let built = null;
   const INSTALL = 'https://github.com/apps/openwiz-viewer/installations/new';
-  const v2 = data.v2.get() !== 'off';
+  const v2 = Boolean(OW.records?.enabled?.());
   const isDemo = Boolean(v2 && data.demo?.());
   let queuePage;
 
@@ -61,10 +61,12 @@
           demoPreview
             ? h('a', { class: 'v2-btn v2-btn-primary', href: '#/chat' }, 'Open sample workspace', icon('arrowRight'))
             : h('a', { class: 'v2-btn v2-btn-primary', href: '/api/sign-in/start' }, 'Continue with GitHub'),
-          demoPreview ? null : h('a', {
-            class: 'v2-inline-link',
-            href: `/app/?v2=${data.v2.get()}&demo=1#/welcome`,
-          }, 'See a sample workspace'))));
+          demoPreview
+            ? h('a', { class: 'v2-inline-link', href: '/app/' }, 'Exit sample workspace')
+            : h('a', {
+              class: 'v2-inline-link',
+              href: `/app/?v2=${data.v2.get()}&demo=1#/welcome`,
+            }, 'See a sample workspace'))));
     root.replaceChildren(view);
     document.title = 'OpenWiz';
     return view;
@@ -413,7 +415,8 @@
           document.head.append(asset);
         })));
       } catch {
-        screen(h('h1', {}, 'OpenWiz couldn’t open'), h('a', { class: 'btn', href: location.href }, 'Try again'));
+        screen(h('h1', {}, 'OpenWiz couldn’t open'),
+          h('button', { class: 'btn', type: 'button', onclick: () => location.reload() }, 'Try again'));
         return;
       }
     }

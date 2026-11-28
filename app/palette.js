@@ -5,7 +5,7 @@
   const PALETTE_KEY = MAC ? '⌘ K' : 'Ctrl K';
   const RESULTS_SHOWN = 60;
   const KINDS = { page: 'Page', action: 'Action', spec: 'Spec', ticket: 'Ticket', agent: 'Agent' };
-  const v2 = OW.data.v2.get() !== 'off';
+  const v2 = Boolean(OW.records?.enabled?.());
   const FILTERS = v2 ? { page: 'pages' } : { page: 'pages', spec: 'specs', ticket: 'tickets', agent: 'agents' };
   const css = (el, props) => { for (const [k, v] of Object.entries(props)) el.style.setProperty(k, v); return el; };
   const GITHUB = url => typeof url === 'string' && url.startsWith('https://github.com/');

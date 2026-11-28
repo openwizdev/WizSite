@@ -145,6 +145,9 @@ test('a partial read shows a gap, never the empty line', async () => {
     const text = await run.page.text();
     assert.match(text, /This list may be missing items: GitHub gave only part of the open pull requests\./);
     assert.ok(!text.includes(EMPTY), 'a partial read said the queue is empty');
+    await run.page.run(`window.__unknownNote = document.querySelector('.v2-real-queue > .unknown'); OW.queue.render(document.querySelector('.v2-real-queue'), OW.data.feeds);`);
+    assert.equal(await run.page.run(`document.querySelector('.v2-real-queue > .unknown') === window.__unknownNote`), true,
+      'an unchanged unknown banner was recreated on redraw');
   } finally {
     await run.close();
   }

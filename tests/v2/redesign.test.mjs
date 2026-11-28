@@ -1,6 +1,15 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import { API, SITE, signIn, start } from './browser.mjs';
+
+const DIST = new URL('../../dist/', import.meta.url);
+async function builtAsset(pattern) {
+  const html = await readFile(new URL('app/index.html', DIST), 'utf8');
+  const match = html.match(pattern);
+  assert.ok(match, `missing asset matching ${pattern}`);
+  return match[0];
+}
 
 test('v2 switch off: none of the new v2 UI appears, and ?demo=1 stays signed out', async () => {
   const run = await start();
@@ -161,6 +170,108 @@ test('real Feed can refresh an unavailable read and Settings stays available', a
     await run.page.click('Switch repository');
     await run.page.until(`document.querySelector('h1')?.textContent === 'Pick a repository'`, 'the working repository picker');
     assert.deepEqual(run.world.writes(), []);
+  } finally {
+    await run.close();
+  }
+});
+
+test('exiting the sample workspace clears ?demo=1 from both Settings and sample welcome', async () => {
+  const run = await start();
+  try {
+    await run.page.go(`${SITE}/app/?v2=on`);
+    await run.page.until(`document.body.innerText.includes('See a sample workspace')`, 'the signed-out v2 welcome');
+    await run.page.click('See a sample workspace');
+    await run.page.until(`OW.data.demo() === true && document.body.innerText.includes('Open sample workspace')`, 'the sample welcome');
+    await run.page.click('Exit sample workspace');
+    await run.page.until(`OW.data.demo() === false && document.body.innerText.includes('Continue with GitHub')`, 'leaving sample welcome');
+    assert.equal(await run.page.run('location.pathname + location.search'), '/app/');
+
+    await run.page.click('See a sample workspace');
+    await run.page.until(`OW.data.demo() === true && document.body.innerText.includes('Open sample workspace')`, 'sample welcome again');
+    await run.page.click('Open sample workspace');
+    await run.page.until(`document.querySelector('main h1')?.textContent === 'Chat'`, 'sample Chat');
+    await run.page.click('Settings');
+    await run.page.until(`document.querySelector('main h1')?.textContent === 'Settings'`, 'sample Settings');
+    await run.page.click('Exit sample workspace');
+    await run.page.until(`OW.data.demo() === false && document.body.innerText.includes('Continue with GitHub')`, 'leaving sample Settings');
+    assert.equal(await run.page.run('location.pathname + location.search'), '/app/');
+    assert.deepEqual(run.world.violations, []);
+  } finally {
+    await run.close();
+  }
+});
+
+test('Try again reloads and recovers after a deferred v2 asset failure on a hashed URL', async () => {
+  const feedAsset = await builtAsset(/\/app\/pages\/feed\.[0-9a-f]+\.js/);
+  const run = await start();
+  try {
+    run.world.site[feedAsset] = () => ({ abort: true });
+    await run.page.go(`${SITE}/app/?v2=dry-run&demo=1#/welcome`);
+    await run.page.until(`document.body.innerText.includes('OpenWiz couldn’t open')`, 'the deferred asset failure screen');
+    assert.equal(await run.page.run("document.querySelector('button.btn')?.textContent"), 'Try again');
+    delete run.world.site[feedAsset];
+    const before = run.world.log.length;
+    await run.page.tap('Try again');
+    await run.page.until(`document.body.innerText.includes('Open sample workspace')`, 'recovery after tapping Try again');
+    assert.ok(run.world.log.length > before, 'Try again issued no reload requests');
+    assert.deepEqual(run.world.violations, []);
+  } finally {
+    await run.close();
+  }
+});
+
+test('rate-limited real Feed shows pause and resume notice without telling the user to press Refresh now', async () => {
+  const run = await start();
+  try {
+    run.world.graphql.Specs = async () => ({
+      status: 429,
+      json: { message: 'API rate limit exceeded' },
+      headers: { 'Retry-After': '300', 'X-RateLimit-Remaining': '0' },
+    });
+    await run.page.go(`${SITE}/app/?v2=on`);
+    await run.page.until(`document.querySelector('.v2-welcome-card')`, 'the real welcome screen');
+    await signIn(run.page);
+    await run.page.click('acme/factory');
+    await run.page.until(`OW.data.paused() && OW.data.feeds.specs.state === 'unknown'`, 'the rate-limited Feed');
+    assert.equal(await run.page.run("document.querySelector('.v2-refresh')?.getAttribute('aria-disabled')"), 'true');
+    const note = await run.page.run("document.querySelector('.v2-feed-note')?.textContent || ''");
+    assert.doesNotMatch(note, /Press Refresh now/);
+    assert.match(note, /GitHub reads resume at /);
+    const reads = () => run.world.log.filter(r => r.path === '/graphql' && r.body.includes('query Specs(')).length;
+    const before = reads();
+    await run.page.tap('Refresh now');
+    await new Promise(resolve => setTimeout(resolve, 200));
+    assert.equal(reads(), before, 'paused Refresh now sent a request');
+    assert.deepEqual(run.world.violations, []);
+  } finally {
+    await run.close();
+  }
+});
+
+test('missing navigator.locks makes the v2 switch read as off and stays in v1', async () => {
+  const dataAsset = await builtAsset(/\/app\/data\.[0-9a-f]+\.js/);
+  const dataBody = await readFile(new URL(dataAsset.slice(1), DIST), 'utf8');
+  const run = await start();
+  try {
+    run.world.site[dataAsset] = () => ({
+      status: 200,
+      type: 'js',
+      raw: Buffer.from(`Object.defineProperty(navigator, 'locks', { configurable: true, get: () => undefined });\n${dataBody}`),
+    });
+    await run.page.go(`${SITE}/app/?v2=on`);
+    await run.page.until(`document.body.innerText.includes('Sign in with GitHub')`, 'the v1 signed-out screen without navigator.locks');
+    assert.equal(await run.page.run('OW.records.enabled()'), false);
+    assert.equal(await run.page.run('document.documentElement.dataset.v2 ?? null'), null);
+    assert.ok(!run.world.log.some(r => /\/app\/pages\/(?:v2|v2-demo|chat|feed|settings)\.[a-f0-9]{10}\.(?:css|js)$/.test(r.path)));
+    await signIn(run.page);
+    await run.page.click('acme/factory');
+    await run.page.until(`document.querySelector('main h1')?.textContent === 'You'`, 'v1 You page without navigator.locks');
+    await run.page.key('k', 'Ctrl');
+    await run.page.until(`OW.palette.shown()`, 'the v1 palette');
+    const results = await run.page.run("document.querySelector('#palette-results').textContent");
+    assert.match(results, /Show only specs/);
+    assert.deepEqual(run.world.log.filter(r => r.path === '/repos/acme/factory/pulls'), []);
+    assert.deepEqual(run.world.violations, []);
   } finally {
     await run.close();
   }
