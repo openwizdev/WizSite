@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from hashlib import sha256
 from html import escape
 from pathlib import Path
 import json
@@ -10,7 +11,7 @@ from unittest import mock
 
 import re
 
-from check import ALL_PAGES, ART, CTA, FAQ, FAQ_PREREQS, FAQ_WHERE, FOOTER, INSTALL_NOTE_HTML, INSTALL_PREREQS_HTML, FINGERPRINTS, HASHED, INSTALL_SWITCH, ROOT, Page, check_changelog, check_release_data, check_releases, read_releases, split_releases, check_motion, check_privacy, check_ref, check_security_txt, check_site, check_vector, check_webp, fingerprint
+from check import ALL_PAGES, ART, CTA, DOC_HASHES, FAQ, FAQ_PREREQS, FAQ_WHERE, FOOTER, INSTALL_NOTE_HTML, INSTALL_PREREQS_HTML, FINGERPRINTS, HASHED, INSTALL_SWITCH, ROOT, Page, check_changelog, check_image_preloads, check_release_data, check_releases, read_releases, split_releases, check_motion, check_privacy, check_ref, check_security_txt, check_site, check_vector, check_webp, check_avif, check_png, fingerprint
 
 REMOVED_ART = (
     'art/spec-video.mp4',
@@ -241,6 +242,108 @@ class Checks(unittest.TestCase):
                     "%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cimage href='x'/%3E%3C/svg%3E"):
             with self.subTest(svg=bad), self.assertRaises(AssertionError):
                 check_ref(root, page, 'data:image/svg+xml,' + bad, pages)
+
+    def test_avif_metadata(self):
+        data = (ROOT / 'art/era-2-grill-sq-480.avif').read_bytes()
+        check_avif(data)
+        at = data.index(b'av01', data.index(b'infe'))
+        for bad in (data[:-1], data.replace(b'ftypavif', b'ftypheic', 1), data[:at] + b'Exif' + data[at + 4:], b'GIF89a' + b'\0' * 8):
+            with self.subTest(bad=bad[:16]), self.assertRaises(AssertionError):
+                check_avif(bad)
+        with self.assertRaises(AssertionError):
+            check_privacy('art/new.avif', data)
+        import zlib
+        chunk = lambda kind, body: len(body).to_bytes(4, 'big') + kind + body + zlib.crc32(kind + body).to_bytes(4, 'big')
+        png = lambda *extra: b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', bytes(13)) + b''.join(extra) + chunk(b'IDAT', b'x') + chunk(b'IEND', b'')
+        clean = png()
+        check_png(clean)
+        existing = next(iter(DOC_HASHES))
+        check_privacy(existing, (ROOT / existing).read_bytes())
+        for path in ('docs/evidence/speed/x/home.png', existing, 'docs/new.png'):
+            with self.subTest(unpinned=path), self.assertRaisesRegex(AssertionError, 'unreviewed picture'):
+                check_privacy(path, clean)
+        with mock.patch.dict(DOC_HASHES, {'docs/evidence/speed/x/home.png': sha256(clean).hexdigest()}):
+            check_privacy('docs/evidence/speed/x/home.png', clean)
+        for bad in (png(chunk(b'tEXt', b'Author\0someone')), png(chunk(b'eXIf', b'x')), png(chunk(b'iCCP', b'x')), clean[:-3]):
+            with self.subTest(bad=bad[-24:]), mock.patch.dict(DOC_HASHES, {'docs/evidence/speed/x/home.png': sha256(bad).hexdigest()}):
+                with self.assertRaises(AssertionError):
+                    check_privacy('docs/evidence/speed/x/home.png', bad)
+        marked = b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', bytes(13)) + chunk(b'IDAT', ('cr' + '_sub_x').encode()) + chunk(b'IEND', b'')
+        with mock.patch.dict(DOC_HASHES, {'docs/evidence/speed/x/home.png': sha256(marked).hexdigest()}):
+            with self.assertRaisesRegex(AssertionError, 'private marker'):
+                check_privacy('docs/evidence/speed/x/home.png', marked)
+
+    def test_right_sized_images(self):
+        phone = '<link rel="preload" as="image" type="image/avif" media="(max-width: 480px)"'
+        cases = (
+            ('index.html', phone, '<link rel="preload" as="image" type="image/avif" media="(max-width: 480px)" data-x', None),
+            ('index.html', 'class="landscape"', 'class="landscape" loading="lazy"', 'never lazy'),
+            ('index.html', 'class="moment-art" src="/art/moments-sea.webp" alt="" width="1600" height="705" loading="lazy"',
+             'class="moment-art" src="/art/moments-sea.webp" alt="" width="1600" height="705"', 'loading="lazy" decoding="async"'),
+            ('index.html', 'srcset="/art/moments-sea-1600.avif"', 'srcset="/art/moments-sea-9.avif"', 'missing local target'),
+            ('drivers/index.html', '<source type="image/avif" srcset="/art/drivers-d-sea-1536.avif">', '', 'unused art variants'),
+            ('index.html', 'imagesizes="470px"', 'imagesizes="400px"', 'preload the painting'),
+        )
+        for page, old, new, error in cases:
+            with self.subTest(page=page, new=new), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp) / 'dist'
+                shutil.copytree(ROOT / 'dist', root)
+                path = root / page
+                text = path.read_text()
+                self.assertIn(old, text)
+                if page == 'index.html' and old == phone:
+                    head, rest = text.split('</head>', 1)
+                    text = head.replace(old, '<!--', 1).replace('fetchpriority="high">', 'fetchpriority="high">-->', 1) + '</head>' + rest
+                    path.write_text(text)
+                    error = 'preload'
+                else:
+                    path.write_text(text.replace(old, new, 1))
+                with self.assertRaisesRegex(AssertionError, error or '.'):
+                    check_site(root)
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / 'dist'
+            shutil.copytree(ROOT / 'dist', root)
+            edit_built(root, 'site.css', lambda css: css.replace('.hero-fleet span { display: block;', '.hero-fleet span { background-image: url(/art/fleet-frames.webp); display: block;', 1))
+            with self.assertRaisesRegex(AssertionError, 'sprite sheet'):
+                check_site(root)
+
+    def test_image_preloads_match_active_sources(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / 'dist'
+            shutil.copytree(ROOT / 'dist', root)
+            drivers = root / 'drivers/index.html'
+            old = '<link rel="preload" href="/art/drivers-d-sea-1536.avif" as="image" type="image/avif" fetchpriority="high">'
+            new = '<link rel="preload" href="/art/drivers-d-sea.webp" as="image" type="image/webp">'
+            text = drivers.read_text()
+            self.assertIn(old, text)
+            drivers.write_text(text.replace(old, new, 1))
+            with self.assertRaisesRegex(AssertionError, 'does not match an active'):
+                check_site(root)
+        check_image_preloads(
+            'plain.html',
+            '<html><head><link rel="preload" href="/art/hero-cave.webp" as="image" type="image/webp"></head>'
+            '<body><img src="/art/hero-cave.webp" alt=""></body></html>',
+        )
+        check_image_preloads(
+            'picture.html',
+            '<html><head><link rel="preload" as="image" type="image/avif" imagesrcset="/art/a-800.avif 800w" imagesizes="100vw"></head>'
+            '<body><picture><source type="image/avif" srcset="/art/a-800.avif 800w" sizes="100vw"><img src="/art/a.webp" alt=""></picture></body></html>',
+        )
+        for bad, error in (
+            ('<html><head><link rel="preload" href="/art/a.webp" as="image" type="image/webp"></head>'
+             '<body><picture><source type="image/avif" srcset="/art/a-800.avif"><img src="/art/a.webp" alt=""></picture></body></html>',
+             'does not match an active'),
+            ('<html><head><link rel="preload" as="image" type="image/avif" imagesrcset="/art/a-800.avif 800w" imagesizes="50vw"></head>'
+             '<body><picture><source type="image/avif" srcset="/art/a-800.avif 800w" sizes="100vw"><img src="/art/a.webp" alt=""></picture></body></html>',
+             'does not match an active'),
+            ('<html><head><link rel="preload" href="/art/unused.webp" as="image" type="image/webp"></head>'
+             '<body><img src="/art/other.webp" alt=""></body></html>',
+             'does not match an active'),
+            ('<html><head></head><body><link rel="preload" href="/art/a.webp" as="image" type="image/webp"><img src="/art/a.webp" alt=""></body></html>',
+             'must live in <head>'),
+        ):
+            with self.subTest(bad=bad[:80]), self.assertRaisesRegex(AssertionError, error):
+                check_image_preloads('bad.html', bad)
 
     def test_css_escapes_and_unreadable_urls(self):
         for bad in ('\np { background: url(https://exa\\\nmple.com/x.png) }\n',
@@ -1069,9 +1172,9 @@ class Checks(unittest.TestCase):
                 ('fixed', '<a href="https://github.com/openwizdev/WizMarket/blob/main/contracts/listing.v1.md">x</a>', None),
                 ('generated', f'<img src="{escape(listed)}" alt="x">', 'unexpected external URL'),
                 ('generated', f'<link rel="prefetch" href="{escape(listed)}">', 'unexpected external URL'),
-                ('generated', f'<img srcset="{escape(listed)} 1x" alt="x">', 'unexpected markup in the generated Market section'),
-                ('generated', f'<picture><source srcset="{escape(listed)}"></picture>', 'unexpected markup in the generated Market section'),
-                ('generated', f'<link rel="preload" as="image" imagesrcset="{escape(listed)} 1x">', 'unexpected markup in the generated Market section'),
+                ('generated', f'<img srcset="{escape(listed)} 1x" alt="x">', 'unexpected external URL'),
+                ('generated', f'<picture><source srcset="{escape(listed)}"></picture>', 'unexpected external URL'),
+                ('generated', f'<link rel="preload" as="image" imagesrcset="{escape(listed)} 1x">', 'unexpected external URL'),
                 ('generated', f'<p style="background:url({escape(listed)})">x</p>', 'unexpected markup in the generated Market section'),
                 ('generated', f'<a href="{escape(listed)}" ping="{escape(listed)}">x</a>', 'unexpected markup in the generated Market section'),
                 ('generated', f'<svg><image xlink:href="{escape(listed)}"></image></svg>', 'unexpected markup in the generated Market section'),

@@ -2,6 +2,7 @@
 *{box-sizing:border-box}
 body{margin:0;background:var(--ground);color:var(--ink);font:400 17px/1.55 var(--ow-font-sans);-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;overflow-x:clip}
 h1,h2,p,ol{margin:0}
+picture{display:contents;border-radius:inherit}
 a{color:inherit;text-decoration:none}
 :is(a,button,summary):focus-visible{outline:2px solid var(--orchid);outline-offset:3px;border-radius:8px}
 .wrap{width:min(100% - 2 * var(--m),1240px);margin-inline:auto}
@@ -342,7 +343,8 @@ body.landing > main { flex: 1 0 auto; }
 .product-window.is-playing .demo-steps i:not(.active) { background: #594b40; }
 .hero-sprite, .hero-smoke { position: absolute; width: clamp(80px, 10vw, 143px); aspect-ratio: 1; right: 0; bottom: 0; background-size: 900% 100%; pointer-events: none; }
 .hero-fleet { position: absolute; display: flex; right: clamp(70px, 8vw, 113px); bottom: 2px; pointer-events: none; }
-.hero-fleet span { display: block; width: clamp(27px, 3.6vw, 54px); aspect-ratio: 1; background: url(/art/fleet-frames.webp); background-size: 400% 1000%; }
+.hero-fleet span { display: block; width: clamp(27px, 3.6vw, 54px); aspect-ratio: 1; background-size: 400% 1000%; }
+.product-window.is-playing .hero-fleet span { background-image: url(/art/fleet-frames.webp); }
 .hero-sprite, .hero-smoke, .hero-fleet { display: none; }
 .product-window.is-playing :is(.hero-sprite,.hero-smoke) { display: block; }
 .product-window.is-playing .hero-fleet { display: flex; }
