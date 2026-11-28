@@ -1,4 +1,5 @@
 from datetime import date, datetime, timedelta, timezone
+from functools import cache
 from hashlib import sha256
 from html import escape, unescape
 from html.parser import HTMLParser
@@ -641,6 +642,7 @@ class Page(HTMLParser):
         self.head_fields = {}
         self.title = None
         self.json_ld = []
+        self.breadcrumb_data = []
         self.json_data = None
         self.books = []
         self.checkout = []
@@ -692,6 +694,8 @@ class Page(HTMLParser):
         elif self.in_head and tag == 'link' and attrs.get('rel') == 'canonical':
             self.head_field('canonical', attrs.get('href'))
             return
+        if self.in_head and tag in ('link', 'meta') and (attrs.get('about') or '').startswith('[_:breadcrumb'):
+            self.breadcrumb_data.append(attrs)
         if 'id' in attrs:
             assert attrs['id'] not in self.ids, 'duplicate HTML id'
             self.ids.add(attrs['id'])
@@ -1155,16 +1159,92 @@ def check_drivers_export(built):
     assert expected == built, f'export differs: {DRIVERS_PAGE}'
 
 
+@cache
+def discovery_registry():
+    return json.loads(subprocess.check_output(['node', '--input-type=module', '-e', """
+        import { pageFile, siteRegistry } from './scripts/registry.mjs';
+        console.log(JSON.stringify(Object.fromEntries(
+            Array.from(siteRegistry().values(), entry => [pageFile(entry.path), entry])
+        )));
+    """], cwd=ROOT, text=True))
+
+
+def section_sitemap_urls(registry):
+    sitemaps = {}
+    for entry in registry.values():
+        if entry['indexable']:
+            sitemaps.setdefault(f"sitemaps/{entry['section']}.xml", set()).add(urljoin(SITE_URL, entry['path']))
+    return sitemaps
+
+
+def check_sitemaps(root, registry):
+    ns = '{http://www.sitemaps.org/schemas/sitemap/0.9}'
+    expected = section_sitemap_urls(registry)
+
+    def entries(file, root_tag, child_tag):
+        try:
+            xml = ElementTree.parse(root / file).getroot()
+        except (ElementTree.ParseError, OSError) as error:
+            raise AssertionError(f'{file}: missing or invalid sitemap XML') from error
+        assert xml.tag == ns + root_tag and all(child.tag == ns + child_tag for child in xml), \
+            f'{file}: invalid sitemap index or section sitemap'
+        return xml
+
+    index = entries('sitemap.xml', 'sitemapindex', 'sitemap')
+    locations = [item.findtext(ns + 'loc') for item in index]
+    assert len(locations) == len(expected) and set(locations) == {SITE_URL + file for file in expected}, \
+        'sitemap index must list each nonempty section exactly once'
+    assert all(len(item.findall(ns + 'loc')) == 1 for item in index), 'sitemap index needs one loc per section'
+
+    for file, urls in expected.items():
+        section = entries(file, 'urlset', 'url')
+        locations = [item.findtext(ns + 'loc') for item in section]
+        assert len(locations) == len(urls) and set(locations) == urls, f'{file}: sitemap must list every section page exactly once'
+        for item in section:
+            assert len(item.findall(ns + 'loc')) == 1, f'{file}: sitemap URL needs one loc'
+            lastmod = item.findtext(ns + 'lastmod') or ''
+            assert len(item.findall(ns + 'lastmod')) == 1 and re.fullmatch(r'[0-9]{4}-[0-9]{2}-[0-9]{2}', lastmod), \
+                f'{file}: invalid sitemap lastmod'
+            try:
+                date.fromisoformat(lastmod)
+            except ValueError as error:
+                raise AssertionError(f'{file}: invalid sitemap lastmod') from error
+        check_privacy('dist/' + file, (root / file).read_bytes())
+
+
+def check_breadcrumbs(name, page, entry):
+    schema = 'https://schema.org/'
+    type_iri = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type'
+    subject = '[_:breadcrumb]'
+    expected = []
+    if entry['indexable'] and entry['path'] != '/':
+        expected.append({'about': subject, 'rel': type_iri, 'resource': schema + 'BreadcrumbList'})
+        for position, crumb in enumerate(entry['breadcrumbs'], 1):
+            item = f'[_:breadcrumb-{position}]'
+            expected.extend((
+                {'about': subject, 'property': schema + 'itemListElement', 'resource': item},
+                {'about': item, 'rel': type_iri, 'resource': schema + 'ListItem'},
+                {'about': item, 'property': schema + 'item', 'resource': urljoin(SITE_URL, crumb['path'])},
+                {'about': item, 'property': schema + 'name', 'content': crumb['name']},
+                {'about': item, 'property': schema + 'position', 'content': str(position),
+                 'datatype': 'http://www.w3.org/2001/XMLSchema#integer'},
+            ))
+    assert page.breadcrumb_data == expected, f'{name}: BreadcrumbList must match the registry trail'
+
+
 def check_discovery(root, pages):
     for name in DISCOVERY_FILES | {NOT_FOUND}:
         assert (root / name).is_file(), f'missing discovery file: {name}'
+    registry = discovery_registry()
+    assert set(pages) == set(registry), 'discovery registry must cover every built page'
     titles = set()
     descriptions = set()
     structured = {}
     expected_types = {'index.html': 'graph', ABOUT_PAGE: 'AboutPage', FAQ_PAGE: 'FAQPage', GUIDE_PAGE: 'HowTo'}
     for name, page in pages.items():
         fields = page.head_fields
-        indexable = name in PAGES
+        entry = registry[name]
+        indexable = entry['indexable']
         for key, limit, seen in (('title', 60, titles), ('description', 160, descriptions)):
             values = fields.get(key, [])
             assert len(values) == 1 and 0 < len(values[0].strip()) <= limit, f'{name}: missing or invalid {key}'
@@ -1172,7 +1252,7 @@ def check_discovery(root, pages):
             seen.add(values[0])
         title, description = fields['title'][0], fields['description'][0]
         assert 'OpenWiz' in title, f'{name}: title must include OpenWiz'
-        canonical = SITE_URL + name.removesuffix('index.html')
+        canonical = urljoin(SITE_URL, entry['path'])
         if name != NOT_FOUND:
             assert fields.get('canonical') == [canonical], f'{name}: missing or invalid canonical'
         if indexable:
@@ -1189,6 +1269,7 @@ def check_discovery(root, pages):
             assert fields.get('robots') == ['noindex'], f'{name}: needs a noindex robots tag'
             if name == APP_PAGE:
                 assert not page.inline_scripts, 'the app allows no inline script'
+        check_breadcrumbs(name, page, entry)
         assert len(page.json_ld) == int(name in expected_types), f'{name}: unexpected number of JSON-LD blocks'
         if page.json_ld:
             try:
@@ -1239,18 +1320,7 @@ def check_discovery(root, pages):
     assert 'href="/guides/run-many-coding-agents/">Guide: run many coding agents</a>' in (root / ABOUT_PAGE).read_text(), \
         'the overview links the guide'
 
-    ns = '{http://www.sitemaps.org/schemas/sitemap/0.9}'
-    try:
-        sitemap = ElementTree.parse(root / 'sitemap.xml').getroot()
-    except ElementTree.ParseError as error:
-        raise AssertionError('invalid sitemap XML') from error
-    entries = sitemap.findall(ns + 'url')
-    urls = [entry.findtext(ns + 'loc') for entry in entries]
-    assert sitemap.tag == ns + 'urlset' and set(urls) == {SITE_URL + name.removesuffix('index.html') for name in PAGES} and len(urls) == len(PAGES), \
-        'sitemap must list every public page exactly once'
-    for entry in entries:
-        lastmod = entry.findtext(ns + 'lastmod') or ''
-        assert re.fullmatch(r'\d{4}-\d{2}-\d{2}', lastmod) and date.fromisoformat(lastmod), 'invalid sitemap lastmod'
+    check_sitemaps(root, registry)
 
     robots = (root / 'robots.txt').read_text()
     groups = robots.strip().split('\n\n')
@@ -1310,7 +1380,8 @@ def check_security_txt(text, now=None):
 def check_site(root, registry=ROOT / 'market/registry.json', now=None):
     files = {p.relative_to(root).as_posix() for p in root.rglob('*') if p.is_file()}
     names = built_fingerprints(root)
-    assert files == STATIC | set(names.values()), 'unexpected or missing build output'
+    sitemap_files = set(section_sitemap_urls(discovery_registry()))
+    assert files == STATIC | set(names.values()) | sitemap_files, 'unexpected or missing build output'
     docs = {name: (root / name).read_text() for name in ALL_PAGES}
     parsed = {name: Page(html) for name, html in docs.items()}
     check_discovery(root, parsed)
@@ -2614,6 +2685,6 @@ def main():
 if __name__ == '__main__':
     if sys.argv[1:] == ['--discovery-only']:
         output = ROOT / 'dist'
-        check_discovery(output, {name: Page((output / name).read_text()) for name in ALL_PAGES})
+        check_discovery(output, {name: Page((output / name).read_text()) for name in discovery_registry()})
     else:
         main()

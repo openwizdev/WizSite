@@ -140,7 +140,9 @@ class Checks(unittest.TestCase):
         self.assertEqual([entry.text for entry in market.findall('s:url/s:loc', ns)], ['https://openwiz.dev/market/'])
 
     def test_discovery_contract_fields(self):
-        contract = (ROOT / 'contracts/discovery.v1.md').read_text()
+        path = ROOT / 'contracts/discovery.v1.md'
+        self.assertTrue(path.is_file(), 'the discovery contract is missing')
+        contract = path.read_text()
         for field in ('path', 'title', 'description', 'breadcrumbs', 'section', 'lastmod', 'indexable'):
             self.assertIn(f'`{field}`', contract)
         for section in ('pages', 'market', 'docs', 'answers'):
@@ -152,14 +154,16 @@ class Checks(unittest.TestCase):
     def test_breadcrumbs_end_at_each_canonical_page(self):
         for name in ALL_PAGES:
             with self.subTest(page=name):
-                page = Page((ROOT / 'dist' / name).read_text())
-                trail = [data for block in page.json_ld if (data := json.loads(block)).get('@type') == 'BreadcrumbList']
+                html = (ROOT / 'dist' / name).read_text()
+                head = html.split('</head>', 1)[0]
+                count = head.count('resource="https://schema.org/BreadcrumbList"')
                 if name in ('index.html', '404.html', 'app/index.html'):
-                    self.assertEqual(trail, [])
+                    self.assertEqual(count, 0)
                     continue
-                self.assertEqual(len(trail), 1)
-                self.assertEqual(trail[0]['itemListElement'][0]['item'], 'https://openwiz.dev/')
-                self.assertEqual(trail[0]['itemListElement'][-1]['item'], page.head_fields['canonical'][0])
+                self.assertEqual(count, 1)
+                urls = re.findall(r'property="https://schema.org/item" resource="([^"]+)"', head)
+                self.assertEqual(urls[0], 'https://openwiz.dev/')
+                self.assertEqual(urls[-1], Page(html).head_fields['canonical'][0])
 
     def test_discovery_rejects_bad_section_sitemaps_and_breadcrumbs(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -168,7 +172,7 @@ class Checks(unittest.TestCase):
             market = 'sitemaps/market.xml'
             market_url = r'(<url><loc>https://openwiz\.dev/market/</loc>.*?</url>)'
             market_sitemap = r'(<sitemap><loc>https://openwiz\.dev/sitemaps/market\.xml</loc></sitemap>)'
-            breadcrumb = r'(<script type="application/ld\+json">\s*\{\s*"@context": "https://schema.org",\s*"@type": "BreadcrumbList".*?</script>)'
+            breadcrumb = r'(<link about="\[_:breadcrumb\]" rel="[^"]*" resource="https://schema.org/BreadcrumbList">)'
             cases = [
                 ('sitemap.xml', market_sitemap, '', 'sitemap index'),
                 ('sitemap.xml', market_sitemap, r'\1\1', 'sitemap index'),
@@ -176,7 +180,8 @@ class Checks(unittest.TestCase):
                 (market, r'<lastmod>[^<]*</lastmod>', '<lastmod>2026-02-30</lastmod>', 'lastmod'),
                 ('market/index.html', breadcrumb, '', 'BreadcrumbList'),
                 ('market/index.html', breadcrumb, r'\1\1', 'BreadcrumbList'),
-                ('market/index.html', r'"item": "https://openwiz\.dev/market/"', '"item": "https://openwiz.dev/faq/"', 'BreadcrumbList'),
+                ('market/index.html', r'property="https://schema.org/item" resource="https://openwiz\.dev/market/"',
+                 'property="https://schema.org/item" resource="https://openwiz.dev/faq/"', 'BreadcrumbList'),
             ]
             for name, pattern, replacement, error in cases:
                 with self.subTest(file=name, replacement=replacement):
@@ -196,6 +201,7 @@ class Checks(unittest.TestCase):
         subprocess.run(['node', '--input-type=module', '-e', """
             import assert from 'node:assert/strict';
             import { createRegistry } from './scripts/registry.mjs';
+            import { sitemapFiles } from './scripts/sitemap.mjs';
             const fixture = {
               path: '/docs/example/', title: 'Example — OpenWiz', description: 'A docs example.',
               breadcrumbs: [{ name: 'Home', path: '/' }, { name: 'Example', path: '/docs/example/' }],
@@ -219,9 +225,24 @@ class Checks(unittest.TestCase):
               assert.throws(() => createRegistry().register([{ ...fixture, [field]: value }]), new RegExp(field));
             }
             const registry = createRegistry();
+            const alias = '/docs/example/index.html';
+            assert.throws(() => registry.register([{
+              ...another, path: alias, breadcrumbs: [fixture.breadcrumbs[0], { name: 'Alias', path: alias }],
+            }]), /path/);
             assert.throws(() => registry.register([fixture, { ...another, title: fixture.title }]), /duplicate title/);
-            registry.register([fixture, another]);
+            registry.register([fixture, { ...another, indexable: false }]);
+            const answer = {
+              path: '/answer/', title: 'Answer — OpenWiz', description: 'An answer example.',
+              breadcrumbs: [fixture.breadcrumbs[0], { name: 'Answer', path: '/answer/' }],
+              section: 'answers', lastmod: '2026-11-28', indexable: true,
+            };
+            registry.register([answer]);
+            const files = sitemapFiles(registry);
             assert.equal(registry.get(fixture.path).lastmod, fixture.lastmod);
+            assert.deepEqual(Object.keys(files).sort(), ['sitemap.xml', 'sitemaps/answers.xml', 'sitemaps/docs.xml']);
+            assert.match(files['sitemaps/docs.xml'], /<lastmod>2024-02-29/);
+            assert.ok(!files['sitemaps/docs.xml'].includes(another.path));
+            assert.ok(files['sitemaps/answers.xml'].includes(answer.path));
         """], cwd=ROOT, check=True)
 
     def test_guide_page_discovery_and_rules(self):
