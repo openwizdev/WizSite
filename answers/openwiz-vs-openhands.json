@@ -1,0 +1,85 @@
+{
+  "slug": "openwiz-vs-openhands",
+  "kind": "compare",
+  "query": "OpenWiz vs OpenHands",
+  "title": "OpenWiz vs OpenHands",
+  "description": "Compare OpenWiz’s GitHub-based factory with OpenHands Agent Canvas and SDK on licensing, runtimes, tracking, review and pricing.",
+  "answer": "OpenWiz is an open source agent factory that coordinates coding agents around specs and tickets in GitHub. OpenHands offers Agent Canvas for running coding agents in conversations and a Software Agent SDK for building agents into your own tools.",
+  "sections": [
+    {
+      "heading": "At a glance",
+      "body": "| | OpenWiz | OpenHands |\n| --- | --- | --- |\n| Open source and licence | Open source under Apache-2.0. [OpenWiz README](https://github.com/openwizdev/OpenWiz/blob/09ad084f81023de18f2cd3b9f1967d9abb7f5c89/README.md). | Agent Canvas is open source under MIT. The pricing page lists separate Teams and Enterprise plans. [OpenHands pricing](https://www.openhands.dev/pricing), checked 2026-11-28. |\n| Where agents run | On your computer or VPS, in a boat.dev sandbox, or in a CloudRoom thread. [OpenWiz 0.1.0 changelog](https://github.com/openwizdev/OpenWiz/blob/09ad084f81023de18f2cd3b9f1967d9abb7f5c89/CHANGELOG.md#010--2026-11-21). | Agent Canvas can use a local backend, Docker, a VM or an OpenHands Cloud sandbox. [Agent Canvas overview](https://docs.openhands.dev/openhands/usage/agent-canvas/overview), checked 2026-11-28. |\n| Which agents | The local driver runs Claude Code or Codex using your existing sign-in. [OpenWiz 0.1.0 changelog](https://github.com/openwizdev/OpenWiz/blob/09ad084f81023de18f2cd3b9f1967d9abb7f5c89/CHANGELOG.md#010--2026-11-21). | OpenHands runs agents built with its Software Agent SDK. Agent Canvas can also connect Claude Code or Codex via the Agent Client Protocol. [OpenHands introduction](https://docs.openhands.dev/overview/introduction), checked 2026-11-28. |\n| How work is tracked | GitHub issues hold specs, tickets and agent status. Pull requests and reviews stay on GitHub. [How OpenWiz works](https://github.com/openwizdev/OpenWiz/blob/09ad084f81023de18f2cd3b9f1967d9abb7f5c89/docs/how-openwiz-works.md). | Agent Canvas tracks each session as a conversation with message history, tool calls and file changes. It can also start work from GitHub Issues, Jira or Linear. [Agent Canvas conversations](https://docs.openhands.dev/openhands/usage/agent-canvas/conversations), checked 2026-11-28. [Issue to Pull Request Automation](https://docs.openhands.dev/openhands/usage/agent-canvas/prebuilt/issue-to-pr), checked 2026-11-28. |\n| Review | In 0.1.0 the CloudRoom fleet routes green pull requests to a separate reviewer when available. With local or boat.dev builders, you review pull requests yourself. [How OpenWiz works](https://github.com/openwizdev/OpenWiz/blob/09ad084f81023de18f2cd3b9f1967d9abb7f5c89/docs/how-openwiz-works.md). | Agent Canvas offers a prebuilt automation that watches GitHub pull requests and has an OpenHands agent review them. [GitHub PR Review Assistant](https://docs.openhands.dev/openhands/usage/agent-canvas/prebuilt/github-pr-review), checked 2026-11-28. |\n| Price | The software is free. You pay your own model and host charges. [OpenWiz README](https://github.com/openwizdev/OpenWiz/blob/09ad084f81023de18f2cd3b9f1967d9abb7f5c89/README.md). | The open source edition is free to self-host and uses your own model key. OpenHands Cloud is free with conversation limits. Self-hosted Teams starts at $500/month and Enterprise pricing is custom. [OpenHands pricing](https://www.openhands.dev/pricing), checked 2026-11-28. [OpenHands Cloud overview](https://docs.openhands.dev/overview/introduction), checked 2026-11-28. |"
+    },
+    {
+      "heading": "Where OpenHands fits better",
+      "body": "Choose OpenHands if you want a workspace that keeps each agent session’s messages and file changes together, or a Python SDK for embedding coding agents in your own software. [Agent Canvas conversations](https://docs.openhands.dev/openhands/usage/agent-canvas/conversations), checked 2026-11-28. [Software Agent SDK overview](https://docs.openhands.dev/overview/introduction), checked 2026-11-28."
+    },
+    {
+      "heading": "Where OpenWiz fits better",
+      "body": "Choose OpenWiz when you want to organize a fleet around an approved spec and its tickets, with decisions, agent status, pull requests and reviews recorded in GitHub. [How OpenWiz works](https://github.com/openwizdev/OpenWiz/blob/09ad084f81023de18f2cd3b9f1967d9abb7f5c89/docs/how-openwiz-works.md)."
+    }
+  ],
+  "faq": [
+    {
+      "question": "Can both tools use Claude Code or Codex?",
+      "answer": "Yes. OpenWiz’s local driver runs the Claude Code or Codex you already sign in to. Agent Canvas connects them through the Agent Client Protocol."
+    },
+    {
+      "question": "Can I try OpenHands without installing Agent Canvas?",
+      "answer": "Yes. OpenHands Cloud provides a hosted version of Agent Canvas with limits on how many conversations you can run."
+    }
+  ],
+  "sources": [
+    {
+      "url": "https://github.com/openwizdev/OpenWiz/blob/09ad084f81023de18f2cd3b9f1967d9abb7f5c89/README.md",
+      "supports": "OpenWiz is an open source agent factory under Apache-2.0. The software is free, and users cover their own model and host charges.",
+      "checked": "2026-11-28"
+    },
+    {
+      "url": "https://github.com/openwizdev/OpenWiz/blob/09ad084f81023de18f2cd3b9f1967d9abb7f5c89/docs/how-openwiz-works.md",
+      "supports": "GitHub records specs, tickets, pull requests and reviews. In OpenWiz 0.1.0 the CloudRoom fleet can route pull requests to separate reviewers. Local and boat.dev pull requests are reviewed by hand.",
+      "checked": "2026-11-28"
+    },
+    {
+      "url": "https://github.com/openwizdev/OpenWiz/blob/09ad084f81023de18f2cd3b9f1967d9abb7f5c89/CHANGELOG.md#010--2026-11-21",
+      "supports": "OpenWiz 0.1.0 offers builders on your computer or VPS, on boat.dev, or in CloudRoom. The local driver uses Claude Code or Codex with your own sign-in.",
+      "checked": "2026-11-28"
+    },
+    {
+      "url": "https://docs.openhands.dev/overview/introduction",
+      "supports": "OpenHands provides Agent Canvas for agent conversations and a Python SDK for building or embedding agents. Canvas connects Claude Code and Codex through ACP. OpenHands Cloud is free with conversation limits.",
+      "checked": "2026-11-28"
+    },
+    {
+      "url": "https://www.openhands.dev/pricing",
+      "supports": "OpenHands lists MIT licensing for its free self-hosted edition, a bring-your-own model key, and prices for Teams and Enterprise.",
+      "checked": "2026-11-28"
+    },
+    {
+      "url": "https://docs.openhands.dev/openhands/usage/agent-canvas/overview",
+      "supports": "Agent Canvas can run agents through a local backend, Docker, a VM or OpenHands Cloud.",
+      "checked": "2026-11-28"
+    },
+    {
+      "url": "https://docs.openhands.dev/openhands/usage/agent-canvas/conversations",
+      "supports": "An Agent Canvas conversation records its own message history, tool calls and file changes.",
+      "checked": "2026-11-28"
+    },
+    {
+      "url": "https://docs.openhands.dev/openhands/usage/agent-canvas/prebuilt/github-pr-review",
+      "supports": "The GitHub PR Review Assistant lets Agent Canvas monitor pull requests and ask an OpenHands agent to review them.",
+      "checked": "2026-11-28"
+    },
+    {
+      "url": "https://docs.openhands.dev/openhands/usage/agent-canvas/prebuilt/issue-to-pr",
+      "supports": "OpenHands can start agent work from ready issues in GitHub Issues, Jira or Linear.",
+      "checked": "2026-11-28"
+    }
+  ],
+  "checked": "2026-11-28",
+  "other": {
+    "name": "OpenHands",
+    "homepage": "https://www.openhands.dev/"
+  },
+  "better_fit": "Choose OpenHands if you want a workspace that keeps each agent session’s messages and file changes together, or a Python SDK for embedding coding agents in your own software."
+}
