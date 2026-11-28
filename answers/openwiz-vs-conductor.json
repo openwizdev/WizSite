@@ -1,0 +1,82 @@
+{
+  "slug": "openwiz-vs-conductor",
+  "kind": "compare",
+  "query": "OpenWiz vs Conductor",
+  "title": "OpenWiz vs Conductor",
+  "description": "Compare OpenWiz's GitHub-tracked agent fleet with Conductor's parallel coding workspaces on Mac and in the cloud.",
+  "answer": "OpenWiz is an open source agent factory that coordinates specs, tickets, builders and reviewers through GitHub. Conductor is a Mac app for running coding agents in parallel workspaces on your Mac or in Conductor Cloud.",
+  "sections": [
+    {
+      "heading": "Side by side",
+      "body": "| | OpenWiz | Conductor |\n| --- | --- | --- |\n| Open source and license | Open source under [Apache 2.0](https://github.com/openwizdev/OpenWiz#links). | Conductor grants access under its [customer terms](https://www.conductor.build/terms). An open source license for the app is unknown. |\n| Where agents run | [Your computer or VPS, Cloudroom, or Boat sandboxes](https://github.com/openwizdev/OpenWiz/blob/main/CHANGELOG.md#010--2026-11-21), depending on the driver. In [0.1.0](https://github.com/openwizdev/OpenWiz#quick-start), the automatic fleet runs in Cloudroom. Local and Boat builders can be started by hand. | [On your Mac or in Conductor Cloud](https://www.conductor.build/docs/cloud/faq). |\n| Which agents | [Claude Code and Codex](https://github.com/openwizdev/OpenWiz/blob/main/CHANGELOG.md#010--2026-11-21) are documented builder options. | [Claude Code, Codex, Cursor and OpenCode](https://www.conductor.build/docs/reference/harnesses). |\n| How work is tracked | [GitHub issues](https://github.com/openwizdev/OpenWiz#how-it-works) hold specs, tickets and agent status notes. | [A workspace and branch per stream of work](https://www.conductor.build/docs/concepts/workflow). A workspace can start from a GitHub or Linear issue. |\n| Review | A separate [reviewer from a different model family](https://github.com/openwizdev/OpenWiz/blob/main/docs/agents/fleet.md#reviewer-for-claude-built) reviews the exact pull request commit. | [Diff viewer, inline comments, agent review and pull request checks](https://www.conductor.build/docs/concepts/workflow). |\n| Price | [Free to use](https://github.com/openwizdev/OpenWiz#quick-start). You pay your own model and hosting costs. | [Local workspaces are free and agent usage is billed by the provider](https://www.conductor.build/docs/reference/harnesses). [Cloud workspaces require Pro, Teams or Enterprise](https://www.conductor.build/docs/cloud/faq). Current cloud plan prices are unknown. |"
+    },
+    {
+      "heading": "Where OpenWiz fits better",
+      "body": "Choose OpenWiz when a spec has several tickets and you want the [work and agent status recorded in GitHub issues](https://github.com/openwizdev/OpenWiz#how-it-works), with a [separate reviewer](https://github.com/openwizdev/OpenWiz/blob/main/docs/agents/fleet.md#reviewer-for-claude-built) for each pull request."
+    }
+  ],
+  "faq": [
+    {
+      "question": "Can I use Claude Code and Codex in either tool?",
+      "answer": "Yes. Both OpenWiz and Conductor document Claude Code and Codex as options."
+    }
+  ],
+  "sources": [
+    {
+      "url": "https://github.com/openwizdev/OpenWiz#readme",
+      "supports": "OpenWiz is an open source agent factory that coordinates agents from planning through review.",
+      "checked": "2026-11-28"
+    },
+    {
+      "url": "https://github.com/openwizdev/OpenWiz#links",
+      "supports": "The OpenWiz source is licensed under Apache 2.0.",
+      "checked": "2026-11-28"
+    },
+    {
+      "url": "https://github.com/openwizdev/OpenWiz#quick-start",
+      "supports": "OpenWiz is free, with separate model and host costs. In version 0.1.0, the automatic fleet runs in Cloudroom and local or Boat builders can be started by hand.",
+      "checked": "2026-11-28"
+    },
+    {
+      "url": "https://github.com/openwizdev/OpenWiz#how-it-works",
+      "supports": "GitHub issues hold specs, tickets and agent status notes. Drivers connect the factory to different hosts, including a computer or VPS you control.",
+      "checked": "2026-11-28"
+    },
+    {
+      "url": "https://github.com/openwizdev/OpenWiz/blob/main/docs/agents/fleet.md#reviewer-for-claude-built",
+      "supports": "A separate reviewer from another model family reviews the exact pull request commit.",
+      "checked": "2026-11-28"
+    },
+    {
+      "url": "https://github.com/openwizdev/OpenWiz/blob/main/CHANGELOG.md#010--2026-11-21",
+      "supports": "The 0.1.0 release documents builders on your computer or VPS, Cloudroom and Boat, and names Claude Code and Codex.",
+      "checked": "2026-11-28"
+    },
+    {
+      "url": "https://www.conductor.build/docs/reference/harnesses",
+      "supports": "Conductor supports Claude Code, Codex, Cursor and OpenCode. Its local app is free and agent use is billed through the provider.",
+      "checked": "2026-11-28"
+    },
+    {
+      "url": "https://www.conductor.build/docs/concepts/workflow",
+      "supports": "Conductor's Mac workflow runs coding agents in parallel workspaces with separate branches. It supports starting from GitHub or Linear issues and reviewing diffs, leaving inline comments, requesting agent review and following pull request checks inside the app.",
+      "checked": "2026-11-28"
+    },
+    {
+      "url": "https://www.conductor.build/docs/cloud/faq",
+      "supports": "Conductor runs sessions on the Mac or in managed cloud sandboxes. Cloud access requires Pro, Teams or Enterprise. The Cloud FAQ names the plans without listing their prices.",
+      "checked": "2026-11-28"
+    },
+    {
+      "url": "https://www.conductor.build/terms",
+      "supports": "Conductor publishes customer access terms. Those terms do not identify an open source license for the app.",
+      "checked": "2026-11-28"
+    }
+  ],
+  "checked": "2026-11-28",
+  "other": {
+    "name": "Conductor",
+    "homepage": "https://www.conductor.build/"
+  },
+  "better_fit": "Conductor fits better when you want to delegate several coding tasks from a Mac app and inspect each branch, diff and pull request in the same workspace."
+}
