@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { changedUrls, findKey, main, payload, sitemapUrls, submit } from '../scripts/indexnow.mjs';
 
 const fixtures = fileURLToPath(new URL('./indexnow-fixtures/', import.meta.url));
-const dist = join(fixtures, 'dist');
+const dist = join(fixtures, 'built-site');
 const key = '0123456789abcdef0123456789abcdef';
 const fakeFetch = status => {
   const calls = [];
