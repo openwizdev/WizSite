@@ -36,6 +36,7 @@ export function pageMarkdown(html) {
     .replace(/(<h[1-6]\b[^>]*>)\s*<button\b[^>]*>([\s\S]*?)<\/button>\s*(<\/h[1-6]>)/g, '$1$2$3')
     .replace(/<button\b[^>]*>([\s\S]*?)<\/button>/g, '')
     .replace(/<code\b[^>]*class="[^"]*install-line[^"]*"[^>]*>([\s\S]*?)<\/code>/g, '<p><code>$1</code></p>');
+  body = body.replace(/<(li|blockquote|dd|td|th)\b[^>]*>([\s\S]*?)<\/\1>/g, (whole, tag, inner) => /<(p|h[1-6]|ul|ol)\b/.test(inner) ? inner : whole);
   const blocks = [];
   const pre = [];
   body = body.replace(/<pre\b[^>]*>([\s\S]*?)<\/pre>/g, (_, code) => {

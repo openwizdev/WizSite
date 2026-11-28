@@ -1277,6 +1277,13 @@ def check_discovery(root, pages):
         assert f'{SITE_URL}{copy}' in brief.split('\n## Markdown copies\n')[-1], f'llms.txt must list {copy}'
         assert url in full_text, f'llms-full.txt must hold {name}'
     assert '`Install OpenWiz from github.com/openwizdev/OpenWiz`' in (root / 'index.md').read_text(), 'the home copy needs the install line'
+    for name in PAGES:
+        main_html = re.search(r'<main\b[^>]*>([\s\S]*?)</main>', (root / name).read_text())[1]
+        main_html = re.sub(r'<(template|script|svg|noscript|form|dialog)\b[\s\S]*?</\1>', '', main_html)
+        main_html = re.sub(r'<(\w+)\b[^>]*\b(hidden|aria-hidden="true")[^>]*>[\s\S]*?</\1>', '', main_html)
+        copy_text = (root / mirror_path(name)).read_text()
+        for href in re.findall(r'<p\b[^>]*>[^<]*(?:<(?!/p>)[^<]*)*?<a\b[^>]*\bhref="(https://github\.com/[^"]+)"', main_html):
+            assert unescape(href) in copy_text, f'{mirror_path(name)} must keep the link {unescape(href)}'
     faq_copy = (root / mirror_path(FAQ_PAGE)).read_text()
     for _, question, _, answer in FAQ_ROWS.findall(FAQ):
         assert f'{plain(question)}\n\n' in faq_copy, f'the FAQ copy needs the question: {plain(question)}'
@@ -1462,6 +1469,8 @@ def check_site(root, registry=ROOT / 'market/registry.json', now=None):
         '_headers must serve /.well-known/security.txt as text/plain; charset=utf-8'
     for name in ('llms.txt', 'llms-full.txt', 'SKILL.md', 'c76a1a01e62d088edd3789d30d6a4d29.txt'):
         assert f'/{name}\n  Content-Type: text/plain; charset=utf-8\n' in headers, f'{name} needs a plain-text content type'
+    for name in sorted(MIRRORS):
+        assert f'/{name}\n  Content-Type: text/markdown; charset=utf-8\n' in headers, f'{name} needs a Markdown content type'
     rules = parse_headers(headers)
     site_header_pairs = [(h.split(':', 1)[0].strip().lower(), h.split(':', 1)[1].strip()) for h in SITE_HEADERS]
     for file_path in sorted(p for p in root.rglob('*') if p.is_file() and p.name != '_headers'):
