@@ -628,7 +628,7 @@ echo <name>
         for change, error in (
                 (lambda t: t.replace('</head>', '<script>document.body.dataset.x = 1</script></head>', 1),
                  'wait for both external scripts'),
-                (lambda t: t.replace('aria-pressed="false" hidden', 'aria-pressed="false"', 1),
+                (lambda t: t.replace('class="spec-play" type="button" hidden', 'class="spec-play" type="button"', 1),
                  'motion controls must wait'),
                 (lambda t: t.replace('preload="none"', 'preload="none" autoplay', 1),
                  'recording must be opt-in')):
