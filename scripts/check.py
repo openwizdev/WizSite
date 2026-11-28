@@ -9,6 +9,7 @@ import json
 import re
 import subprocess
 import sys
+import urllib.parse
 from xml.etree import ElementTree
 from urllib.parse import unquote, urljoin, urlsplit
 import font_chars
@@ -1094,7 +1095,7 @@ def check_page_delivery(root, name, *, indexable, page=None, report=False):
     styles = set()
     root = root.resolve()
     for ref in page.render_stylesheets:
-        url = urlsplit(urljoin(SITE_URL + name, ref))
+        url = urlsplit(urllib.parse.urljoin(SITE_URL + name, ref))
         path = (root / unquote(url.path).lstrip('/')).resolve()
         assert url.scheme == 'https' and url.netloc == 'openwiz.dev' and path.is_relative_to(root) and path.is_file(), \
             f'{name}: cannot measure render-blocking CSS: {ref}'
