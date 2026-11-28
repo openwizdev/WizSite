@@ -109,7 +109,7 @@ const SHOWN = `const shown = el => !!el && getComputedStyle(el).display !== 'non
 async function layout(page, where, width, mode) {
   const facts = await page.evaluate(`(() => { ${SHOWN}
     const small = [];
-    const targets = '.market-chip, .market-select, .market-copy, .market-reset, .market-links a:first-child, .market-publish-jump, .market-publish-start';
+    const targets = '.market-chip, .market-select, .market-copy, .market-reset, .market-links a:first-child, .market-publish-jump, .market-publish-start, .market-featured-link, .market-featured-dismiss';
     if (innerWidth <= 960) for (const el of document.querySelectorAll(targets)) if (shown(el) && el.getBoundingClientRect().height < 44) small.push(el.className || el.textContent.trim());
     const spill = cards().slice(0, 12).flatMap(card => [...card.querySelectorAll('*')].filter(el => shown(el) && el.getBoundingClientRect().right > card.getBoundingClientRect().right + 1).map(el => card.dataset.listing + ' ' + el.tagName));
     const chip = document.querySelector('.market-chip');
@@ -119,6 +119,8 @@ async function layout(page, where, width, mode) {
       motion: chip ? getComputedStyle(chip).transitionDuration : 'no chips',
       credit: cards().filter(card => { const dd = card.querySelector('dd.market-publisher'); const dt = dd?.previousElementSibling;
         return !shown(dd) || dd.textContent !== card.dataset.publisher || Math.abs(dd.getBoundingClientRect().top - dt.getBoundingClientRect().top) > 2; }).map(card => card.dataset.listing).slice(0, 3), publish: shown(document.querySelector('.market-publish')), cards: cards().length,
+      featured: shown(document.querySelector('.market-featured')), disclosure: document.querySelector('.market-featured-disclosure')?.textContent.trim(), rel: document.querySelector('.market-featured-link')?.getAttribute('rel'),
+      featuredTop: document.querySelector('.market-featured')?.getBoundingClientRect().top, toolsTop: document.querySelector('.market-tools')?.getBoundingClientRect().top,
     };
   })()`);
   expect(facts.cards > 0, where, 'the market has no cards');
@@ -126,6 +128,10 @@ async function layout(page, where, width, mode) {
   expect(!facts.small.length, where, `touch targets under 44px: ${facts.small.join(', ')}`);
   expect(!facts.spill.length, where, `card content spills out of its card: ${facts.spill.join(', ')}`);
   expect(facts.publish, where, 'Publish your own is not shown');
+  expect(facts.featured, where, 'the Featured partner is not at the top of the market');
+  expect(facts.disclosure === 'Sponsored · referral link', where, `the Featured partner does not disclose its referral link (${facts.disclosure})`);
+  expect(facts.rel === 'sponsored noopener', where, `the Featured partner link has the wrong rel (${facts.rel})`);
+  expect(facts.featuredTop < facts.toolsTop, where, 'the Featured partner is not above the market filters');
   expect(!facts.credit.length, where, `a card does not show who listed it beside Listed by: ${facts.credit.join(', ')}`);
   const scripted = !mode.noScript;
   expect(facts.search === scripted && facts.by === scripted && facts.sort === scripted, where,
@@ -215,6 +221,28 @@ async function scripted(page, where) {
   expect(['Copied', 'Selected'].includes(facts.label), where, `Copy gives no feedback (${facts.label})`);
 }
 
+async function sponsored(browser, origin, where) {
+  const key = 'openwiz.market.featured.dismissed.v1';
+  const first = await open(browser, `${origin}/market/`, 390, 844, {});
+  try {
+    const before = await first.evaluate(`(() => { ${SHOWN} const featured = document.querySelector('.market-featured'); const button = document.querySelector('[data-market-featured-dismiss]'); return { shown: shown(featured), cookie: document.cookie, button: shown(button) }; })()`);
+    expect(before.shown && before.button && before.cookie === '', where, 'the partner is not shown without cookies before dismissal');
+    await first.evaluate(`document.querySelector('[data-market-featured-dismiss]').click()`);
+    const after = await first.evaluate(`(() => { ${SHOWN} return { shown: shown(document.querySelector('.market-featured')), stored: localStorage.getItem(${JSON.stringify(key)}) }; })()`);
+    expect(!after.shown && after.stored === '1', where, 'Dismiss does not hide the partner and keep only a local preference');
+  } finally {
+    await first.close();
+  }
+  const revisit = await open(browser, `${origin}/market/`, 390, 844, {});
+  try {
+    const hidden = await revisit.evaluate(`(() => { ${SHOWN} return { shown: shown(document.querySelector('.market-featured')), cookie: document.cookie }; })()`);
+    expect(!hidden.shown && hidden.cookie === '', where, 'a dismissed partner returns, or dismissal uses a cookie');
+    await revisit.evaluate(`localStorage.removeItem(${JSON.stringify(key)})`);
+  } finally {
+    await revisit.close();
+  }
+}
+
 async function restored(browser, origin, where) {
   const page = await open(browser, `${origin}/market/?type=driver&verified=1&sort=kind`, 390, 844, {});
   try {
@@ -250,6 +278,7 @@ async function main() {
       }
     }
     await restored(browser, origin, '/market/ 390px, shared address').catch(error => expect(false, '/market/ 390px, shared address', `the check could not finish: ${error.message.split('\n')[0]}`));
+    await sponsored(browser, origin, '/market/ 390px, sponsor dismissal').catch(error => expect(false, '/market/ 390px, sponsor dismissal', `the check could not finish: ${error.message.split('\n')[0]}`));
   } finally {
     await browser.close();
     server.close();

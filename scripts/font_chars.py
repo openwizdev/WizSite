@@ -154,6 +154,10 @@ def scan_sources(root=ROOT):
     if registry.exists():
         data = json.loads(registry.read_text('utf-8'))
         _collect_chars(chars, ''.join(extract_json_strings(data)), 'market/registry.json')
+    featured = root / 'market/featured.json'
+    if featured.exists():
+        data = json.loads(featured.read_text('utf-8'))
+        _collect_chars(chars, ''.join(extract_json_strings(data)), 'market/featured.json')
     return chars
 
 
@@ -183,6 +187,10 @@ def scan_built(dist_root, src_root=ROOT):
     if registry.exists():
         data = json.loads(registry.read_text('utf-8'))
         _collect_chars(chars, ''.join(extract_json_strings(data)), 'market/registry.json')
+    featured = src_root / 'market/featured.json'
+    if featured.exists():
+        data = json.loads(featured.read_text('utf-8'))
+        _collect_chars(chars, ''.join(extract_json_strings(data)), 'market/featured.json')
     return chars
 
 

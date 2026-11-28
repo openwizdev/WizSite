@@ -4,8 +4,12 @@ import { pathToFileURL } from 'node:url';
 
 const ROOT = new URL('../', import.meta.url);
 export const REGISTRY = new URL('market/registry.json', ROOT);
+export const FEATURED = new URL('market/featured.json', ROOT);
 export const START = '<!-- market:start -->';
 export const END = '<!-- market:end -->';
+export const FEATURED_START = '<!-- market-featured:start -->';
+export const FEATURED_END = '<!-- market-featured:end -->';
+export const FEATURED_SLOT = '<template data-slot="market-featured"></template>';
 export const WIZMARKET = 'https://github.com/openwizdev/WizMarket';
 export const CONTRACT = `${WIZMARKET}/blob/main/contracts/listing.v1.md`;
 
@@ -254,6 +258,49 @@ export async function readRegistry(file = REGISTRY) {
   return parse(decode(await readFile(file)));
 }
 
+const featuredFail = (where, why) => { throw new Error(`market/featured.json: ${where}: ${why}`); };
+const featuredOneLine = (value, where) => {
+  if (typeof value !== 'string' || !value.length || /[\u0000-\u001f\u007f-\u009f\u2028\u2029]/.test(value)) featuredFail(where, 'not one line');
+  return value;
+};
+const featuredExactKeys = (value, keys, where) => {
+  if (!isObject(value)) featuredFail(where, 'not an object');
+  const extra = Object.keys(value).filter(key => !keys.includes(key));
+  if (extra.length) featuredFail(where, `unknown field ${extra.join(', ')}`);
+};
+const featuredLogo = value => typeof value === 'string' && /^\/(?:[a-z0-9][a-z0-9.-]*\/)*[a-z0-9][a-z0-9.-]*\.(?:png|svg|webp)$/.test(value);
+
+export function validateFeatured(featured) {
+  featuredExactKeys(featured, ['name', 'pitch', 'url', 'label', 'logo', 'todo'], 'the partner');
+  for (const [field, limit] of [['name', 80], ['pitch', 140], ['label', 80]]) {
+    const value = featuredOneLine(featured[field], `the partner.${field}`);
+    if ([...value].length > limit) featuredFail(`the partner.${field}`, `over ${limit} characters`);
+  }
+  if (!isUrl(featured.url)) featuredFail('the partner.url', 'not an https URL');
+  if ('logo' in featured && !featuredLogo(featured.logo)) featuredFail('the partner.logo', 'not a site-local PNG, SVG or WebP path');
+  if ('todo' in featured) featuredOneLine(featured.todo, 'the partner.todo');
+  for (const [where, text] of strings(featured, 'the partner')) {
+    if (!text.isWellFormed()) featuredFail(where, 'holds an unpaired surrogate, which is not UTF-8 text');
+    const found = privateKind(text);
+    if (found) featuredFail(where, `holds what looks like ${found}`);
+  }
+  return featured;
+}
+
+export function parseFeatured(text) {
+  let featured;
+  try { featured = JSON.parse(text); } catch { featuredFail('the partner', 'not JSON'); }
+  const key = repeatedKey(text);
+  if (key !== null) featuredFail('the partner', `has the key ${key} twice in one object`);
+  return validateFeatured(featured);
+}
+
+export async function readFeatured(file = FEATURED) {
+  let text;
+  try { text = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(await readFile(file)); } catch { featuredFail('the partner', 'not UTF-8 text'); }
+  return parseFeatured(text);
+}
+
 const esc = text => String(text).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const link = (href, text) => `<a href="${esc(href)}"${clickLinkAttribute(href)}${href.startsWith('#') ? '' : ' rel="noreferrer"'}>${esc(text)}</a>`;
 export const tagsOf = index => [...new Set(index.listings.flatMap(listing => listing.tags))].sort();
@@ -331,6 +378,11 @@ function card(listing, commit) {
 
 export const byName = listings => listings.slice().sort((a, b) => a.name.localeCompare(b.name, 'en', { numeric: true, sensitivity: 'base' }) || (a.id < b.id ? -1 : 1));
 
+export function renderFeatured(featured) {
+  const logo = featured.logo ? `<img class="market-featured-logo" src="${esc(featured.logo)}" width="48" height="48" alt="" loading="lazy" decoding="async">` : '';
+  return `<section class="market-featured${featured.logo ? ' has-logo' : ''}" aria-labelledby="market-featured-name">${logo}<div class="market-featured-copy"><p class="market-featured-kicker">Featured</p><h2 id="market-featured-name">${esc(featured.name)}</h2><p class="market-featured-pitch">${esc(featured.pitch)}</p><p class="market-featured-disclosure">Sponsored · referral link</p></div><a class="market-featured-link" href="${esc(featured.url)}" rel="sponsored noopener">${esc(featured.label)}</a><button class="market-featured-dismiss" type="button" data-market-featured-dismiss aria-label="Dismiss featured partner">Dismiss</button></section>`;
+}
+
 export function render(index) {
   const at = index.commit.slice(0, 12);
   if (!index.listings.length) {
@@ -353,6 +405,11 @@ export function render(index) {
   return all + browse + byTag;
 }
 
+export function withFeatured(page, section) {
+  if (page.includes(FEATURED_START) || page.split(FEATURED_SLOT).length !== 2) throw new Error('market page: expected one featured slot and no generated partner');
+  return page.replace(FEATURED_SLOT, () => `${FEATURED_START}${section}${FEATURED_END}`);
+}
+
 export function withMarket(page, section) {
   if (page.includes(START) || page.split('<template data-slot="market"></template>').length !== 2) throw new Error('market page: expected one market slot and no generated section');
   return page.replace('<template data-slot="market"></template>', () => `${START}${section}${END}`);
@@ -362,6 +419,7 @@ export const summary = index => `${index.listings.length} listing${index.listing
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const [file, page] = process.argv.slice(2);
+  const featured = await readFeatured();
   const section = render(await readRegistry(file ? pathToFileURL(file) : REGISTRY));
-  process.stdout.write(page ? withMarket(await readFile(page, 'utf8'), section) : section);
+  process.stdout.write(page ? withMarket(withFeatured(await readFile(page, 'utf8'), renderFeatured(featured)), section) : renderFeatured(featured) + section);
 }

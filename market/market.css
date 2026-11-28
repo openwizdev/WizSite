@@ -186,3 +186,28 @@
   .market-chip,.market-copy,.market-reset{transition:background-color var(--ow-motion-fast),border-color var(--ow-motion-fast),color var(--ow-motion-fast)}
   .market-card{transition:border-color var(--ow-motion-fast)}
 }
+
+.market-featured[hidden]{display:none}
+.market-featured{display:grid;grid-template-columns:48px minmax(0,1fr) auto auto;align-items:center;gap:14px;margin-top:clamp(24px,3vw,36px);padding:16px 18px;border:1px solid var(--line);border-radius:var(--round);background:rgb(255 143 128 / 4%)}
+.market-featured:not(.has-logo){grid-template-columns:minmax(0,1fr) auto auto}
+.market-featured-logo{display:block;width:48px;height:48px;border-radius:12px;object-fit:contain;background:var(--ground)}
+.market-featured-copy{min-width:0}
+.market-featured-kicker,.market-featured-disclosure{margin:0;font:600 11px/1.25 var(--ow-font-mono);letter-spacing:.06em;text-transform:uppercase}
+.market-featured-kicker{color:var(--brass-hi)}
+.market-featured h2{margin:3px 0 0;font:680 18px/1.2 var(--ow-font-sans);letter-spacing:-.025em}
+.market-featured-pitch{margin:4px 0 0;color:var(--grey2);font-size:14px;line-height:1.45}
+.market-featured-disclosure{margin-top:8px;color:var(--grey)}
+.market a.market-featured-link{display:inline-flex;align-items:center;justify-content:center;min-height:38px;padding:0 14px;border:1px solid var(--brass);border-radius:999px;color:var(--ink);font:600 13px/1 var(--ow-font-sans);text-decoration:none;white-space:nowrap;overflow-wrap:normal}
+.market a.market-featured-link:hover{background:var(--brass);color:var(--on-brass)}
+.market-featured-dismiss{display:inline-flex;align-items:center;justify-content:center;min-height:38px;padding:0 8px;border:0;background:transparent;color:var(--grey);font:500 13px/1 var(--ow-font-sans);cursor:pointer;text-decoration:underline;text-decoration-color:transparent;text-underline-offset:3px}
+.market-featured-dismiss:hover{color:var(--ink);text-decoration-color:var(--edge)}
+.market-featured-dismiss:focus-visible{outline:2px solid var(--orchid);outline-offset:3px;border-radius:6px}
+
+@media (max-width:960px){
+  .market a.market-featured-link,.market-featured-dismiss{min-height:44px}
+}
+@media (max-width:640px){
+  .market-featured{grid-template-columns:48px minmax(0,1fr);gap:12px;padding:16px}
+  .market-featured-link{grid-column:1;justify-self:start}
+  .market-featured-dismiss{grid-column:2;justify-self:end}
+}

@@ -1072,12 +1072,13 @@ class Checks(unittest.TestCase):
                 market_path = root / 'market/index.html'
                 rendered = subprocess.run(['node', '--input-type=module', '-e', """
                     import { readFileSync } from 'node:fs';
-                    import { render, withMarket } from './scripts/market.mjs';
+                    import { readFeatured, render, renderFeatured, withFeatured, withMarket } from './scripts/market.mjs';
                     const page = readFileSync(process.argv[1], 'utf8');
                     const index = JSON.parse(readFileSync(process.argv[2], 'utf8'));
-                    const slot = '<template data-slot="market"></template>';
-                    const stripped = page.replace(/<!-- market:start -->[\\s\\S]*<!-- market:end -->/, slot);
-                    process.stdout.write(withMarket(stripped, render(index)));
+                    const marketSlot = '<template data-slot="market"></template>';
+                    const featuredSlot = '<template data-slot="market-featured"></template>';
+                    const stripped = page.replace(/<!-- market-featured:start -->[\\s\\S]*<!-- market-featured:end -->/, featuredSlot).replace(/<!-- market:start -->[\\s\\S]*<!-- market:end -->/, marketSlot);
+                    process.stdout.write(withMarket(withFeatured(stripped, renderFeatured(await readFeatured())), render(index)));
                 """, str(market_path), str(registry)], cwd=ROOT, check=True, capture_output=True, text=True).stdout
                 market_path.write_text(rendered)
                 path = root / ('drivers/index.html' if place == 'drivers' else 'market/index.html')
@@ -1114,12 +1115,13 @@ class Checks(unittest.TestCase):
             exports = subprocess.run(['node', '--input-type=module', '-e', """
                 import { readFileSync } from 'node:fs';
                 import { withDrivers } from './scripts/drivers.mjs';
-                import { readRegistry, render, withMarket } from './scripts/market.mjs';
+                import { readFeatured, readRegistry, render, renderFeatured, withFeatured, withMarket } from './scripts/market.mjs';
                 const pages = JSON.parse(readFileSync(0, 'utf8'));
                 const registry = await readRegistry(process.argv[1]);
+                const featured = await readFeatured();
                 process.stdout.write(JSON.stringify({
                   drivers: withDrivers(pages['drivers/index.html'], registry),
-                  market: withMarket(pages['market/index.html'], render(registry)),
+                  market: withMarket(withFeatured(pages['market/index.html'], renderFeatured(featured)), render(registry)),
                 }));
             """, str(registry)], cwd=ROOT, input=json.dumps(source), check=True, capture_output=True, text=True).stdout
             pages = json.loads(exports)

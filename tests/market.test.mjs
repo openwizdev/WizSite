@@ -97,6 +97,30 @@ test('every listing of the fixture snapshot renders with its status, tags and li
   assert.ok(text(found['example-skill']).includes(`Its check passed at example-owner/example-skills@${'c'.repeat(12)}`), 'a skill names its pinned source');
 });
 
+test('the one featured partner comes from its small data file and is unambiguously sponsored', async () => {
+  const { parseFeatured, readFeatured, renderFeatured } = await import('../scripts/market.mjs');
+  const featured = await readFeatured();
+  assert.equal(featured.name, 'Cloudroom');
+  assert.equal(featured.pitch, 'Cloud agent threads for long-running work.');
+  assert.equal(featured.label, 'Visit Cloudroom');
+  assert.equal(featured.logo, '/drivers/logos/cloudroom.png');
+  assert.match(featured.url, /^https:\/\//, 'the data file owns the HTTPS destination');
+  assert.match(featured.todo, /^TODO:/, 'the placeholder URL comes with its replacement note');
+  const section = renderFeatured(featured);
+  const partner = section.match(/<section class="market-featured[^"]*"[\s\S]*?<\/section>/)?.[0] ?? '';
+  assert.match(partner, /<p class="market-featured-kicker">Featured<\/p>/, 'the slot says what it is');
+  assert.match(partner, /Sponsored · referral link/, 'the referral disclosure is visible');
+  assert.match(partner, new RegExp(`href="${featured.url.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}" rel="sponsored noopener"`), 'the partner link has the required relationship');
+  assert.match(partner, /data-market-featured-dismiss/, 'the slot can be dismissed locally');
+  assert.doesNotMatch(partner, /data-count/, 'following the partner is not a tracked click');
+  assert.doesNotMatch(partner, /\bdefault\b/i, 'a featured partner is never presented as a default');
+  const { logo, ...withoutLogo } = featured;
+  assert.doesNotMatch(renderFeatured(parseFeatured(JSON.stringify(withoutLogo))), /market-featured-logo/, 'a logo is optional');
+  const swapped = parseFeatured(JSON.stringify({ ...featured, url: 'https://cloudroom.dev/jake-referral' }));
+  assert.match(renderFeatured(swapped), /href="https:\/\/cloudroom\.dev\/jake-referral"/, 'swapping the referral URL only changes the data file');
+  assert.throws(() => parseFeatured(JSON.stringify({ ...featured, url: 'http://cloudroom.dev' })), /not an https URL/, 'the partner link stays HTTPS');
+});
+
 test('an install line pins the release a listing names, or else the listing at the snapshot commit', async () => {
   const { install } = await import('../scripts/market.mjs');
   const pin = url => install({ id: 'x', name: 'X', url }, C);

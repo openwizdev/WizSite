@@ -687,6 +687,19 @@ async function askAWiz() {
   }
 }
 
+function dismissMarketFeatured() {
+  const featured = document.querySelector('.market-featured');
+  const dismiss = featured?.querySelector('[data-market-featured-dismiss]');
+  if (!featured || !dismiss) return;
+  const key = 'openwiz.market.featured.dismissed.v1';
+  try { if (localStorage.getItem(key) === '1') featured.hidden = true; } catch {}
+  dismiss.addEventListener('click', () => {
+    featured.hidden = true;
+    try { localStorage.setItem(key, '1'); } catch {}
+    featured.nextElementSibling?.querySelector('input, select, button, a')?.focus();
+  });
+}
+
 function browseMarket() {
   const root = document.querySelector('main.market');
   const tools = root?.querySelector('.market-tools');
@@ -893,6 +906,7 @@ function browseMarket() {
 }
 
 enableCopy();
+dismissMarketFeatured();
 browseMarket();
 askAWiz();
 showStars().catch(() => {});
