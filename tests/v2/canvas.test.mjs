@@ -17,7 +17,7 @@ function note(id, { agent, state, step, min, pr, model = 'Opus 5.5 Medium', harn
 }
 const ref = (n, state = 'OPEN', reason = null) => ({ number: n, title: `Synthetic ${n}`, url: URL_OF(n), state, stateReason: reason, repository: { nameWithOwner: 'acme/factory' } });
 const pull = (n, { state = 'OPEN', draft = false, review = 'REVIEW_REQUIRED', checks = 'PENDING' } = {}) => ({ url: `https://github.com/acme/factory/pull/${n}`,
-  state, isDraft: draft, reviewDecision: review, commits: { nodes: [{ commit: { statusCheckRollup: { state: checks } } }] } });
+  state, isDraft: draft, reviewDecision: review, commits: { nodes: [{ commit: { statusCheckRollup: checks === null ? null : { state: checks } } }] } });
 
 const TICKETS = [
   { n: 42, title: 'Cart contract', state: 'CLOSED', reason: 'COMPLETED', labels: ['ready-for-agent'], blockers: [], pulls: [pull(101, { state: 'MERGED', review: 'APPROVED', checks: 'SUCCESS' })],
@@ -63,11 +63,24 @@ function world(run, change = {}) {
   const s33 = { number: 33, comments: { totalCount: 0, nodes: [] }, subIssues: { totalCount: 2, nodes: [
     { ...sub({ n: 31, title: 'Catalog list', state: 'CLOSED', reason: 'COMPLETED', labels: [], blockers: [], pulls: [], notes: [] }) },
     { ...sub({ n: 32, title: 'Catalog page', state: 'CLOSED', reason: 'COMPLETED', labels: [], blockers: [], pulls: [], notes: [] }) }] } };
-  run.world.graphql.SpecTickets = async () => ({ status: 200, json: { data: { rateLimit: RATE, repository: { s41, s48, s33 } } } });
+  run.world.graphql.SpecTickets = async entry => {
+    const asks = /statusCheckRollup/.test(String(JSON.parse(entry?.body || '{}').query || ''));
+    const fill = detail => {
+      if (!asks || !detail?.subIssues?.nodes) return detail;
+      const nodes = detail.subIssues.nodes.map(node => {
+        if (!node) return node;
+        const ticket = tickets.find(t => t.n === node.number);
+        if (!ticket) return node;
+        return { ...node, closedByPullRequestsReferences: { totalCount: ticket.pulls.length, nodes: structuredClone(ticket.pulls) } };
+      });
+      return { ...detail, subIssues: { ...detail.subIssues, nodes } };
+    };
+    return { status: 200, json: { data: { rateLimit: RATE, repository: { s41: fill(s41), s48, s33: fill(s33) } } } };
+  };
   const live = tickets.filter(t => t.notes.length && t.state !== 'CLOSED');
   run.world.graphql.Agents = async () => ({ status: 200, json: { data: { rateLimit: RATE, repository: {
     issues: { totalCount: live.length, pageInfo: { hasNextPage: false, endCursor: null }, nodes: live.map(t => ({ number: t.n, title: t.title, url: URL_OF(t.n), state: 'OPEN',
-      updatedAt: ago(1), comments: { totalCount: t.notes.length, nodes: t.notes }, closedByPullRequestsReferences: { totalCount: t.pulls.length, nodes: t.pulls } })) },
+      updatedAt: t.updatedAt ?? ago(1), comments: { totalCount: t.notes.length, nodes: t.notes }, closedByPullRequestsReferences: { totalCount: t.pulls.length, nodes: t.pulls } })) },
     fleet: { text: FLEET } } } } });
 }
 
@@ -531,7 +544,10 @@ test('Canvas: a stale open pull request, missing from the day read, shows its ch
   try {
     world(run, {
       tickets: list => {
-        list.find(t => t.n === 46).pulls = [pull(186, { draft: true, review: null, checks: 'SUCCESS' })];
+        const ticket = list.find(t => t.n === 46);
+        ticket.pulls = [pull(186, { draft: true, review: null, checks: 'SUCCESS' })];
+        ticket.notes = [note(8461, { agent: 'builder', state: 'done', step: 'opened the draft yesterday', min: 60 * 30, pr: 186 })];
+        ticket.updatedAt = ago(60 * 30);
       },
     });
     const queries = [];
@@ -549,6 +565,10 @@ test('Canvas: a stale open pull request, missing from the day read, shows its ch
       'the day read does not include the stale ticket');
     assert.equal(await run.page.run(`document.querySelector('.cv-stack[data-ticket$="#46"] .cv-front .cv-step').textContent`), 'draft, checks pass');
     assert.doesNotMatch(await run.page.run(`document.querySelector('.cv-stack[data-ticket$="#46"]').textContent`), /checks unknown/);
+    await run.page.run(`document.querySelector('.cv-stack[data-ticket$="#46"]').focus()`);
+    await run.page.key('Enter');
+    await run.page.until(`document.querySelector('.cv-focus')`, 'focused #46');
+    assert.match(await run.page.text(), /#186: draft, checks pass/);
     assert.deepEqual(run.world.violations, []);
   } finally {
     await run.close();
@@ -560,10 +580,14 @@ test('Canvas: a stale pull request whose check rollup GitHub refuses shows check
   try {
     world(run, {
       tickets: list => {
-        list.find(t => t.n === 46).pulls = [pull(186, { draft: true, review: null, checks: null })];
+        const t46 = list.find(t => t.n === 46);
+        t46.pulls = [pull(186, { draft: true, review: null, checks: null })];
+        t46.notes = [note(8461, { agent: 'builder', state: 'done', step: 'opened the draft yesterday', min: 60 * 30, pr: 186 })];
+        t46.updatedAt = ago(60 * 30);
         const t47 = list.find(t => t.n === 47);
-        t47.notes = [];
         t47.pulls = [pull(187, { draft: true, review: null, checks: null })];
+        t47.notes = [note(8471, { agent: 'builder', state: 'done', step: 'opened a draft with no checks yesterday', min: 60 * 30, pr: 187 })];
+        t47.updatedAt = ago(60 * 30);
       },
     });
     let mode = 'refused';
@@ -590,6 +614,15 @@ test('Canvas: a stale pull request whose check rollup GitHub refuses shows check
     assert.equal(await run.page.run(`document.querySelector('.cv-stack[data-ticket$="#47"] .cv-front .cv-step').textContent`), 'draft, no checks');
     assert.equal(await run.page.run('OW.data.feeds.specs.state'), 'ok');
     assert.doesNotMatch(await run.page.text(), /Part of this read failed/);
+
+    for (const [ticket, expected] of [[46, /#186: draft, checks unknown/], [47, /#187: draft, no checks/]]) {
+      await run.page.run(`document.querySelector('.cv-stack[data-ticket$="#${ticket}"]').focus()`);
+      await run.page.key('Enter');
+      await run.page.until(`document.querySelector('.cv-focus')`, `focused #${ticket}`);
+      assert.match(await run.page.text(), expected);
+      await run.page.key('Escape');
+      await run.page.until(`!document.querySelector('.cv-focus')`, 'board back');
+    }
 
     mode = 'unplaced';
     const first = await run.page.run('OW.data.feeds.specs.readAt');
