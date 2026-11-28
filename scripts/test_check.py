@@ -1109,34 +1109,36 @@ echo <name>
             temp = tempfile.TemporaryDirectory()
             root = Path(temp.name) / 'dist'
             shutil.copytree(ROOT / 'dist', root)
-            path = root / page
-            path.write_text(change(path.read_text()))
+            for target in (page if isinstance(page, tuple) else (page,)):
+                path = root / target
+                path.write_text(change(path.read_text()))
             return temp, root
         book = re.compile(r'data-book href="[^"]*"')
         T = 'team/index.html'
+        BOTH = ('team/index.html', 'help/index.html')
         refused = {
             'buy button': ('changelog/index.html', lambda t: t.replace(CTA, '', 1)),
             'buy button to /team/': ('team/index.html', lambda t: t.replace('<a class="nav-team" href="/team/">', '<a class="nav-team" href="/">', 1)),
-            'two booking links': ('team/index.html', lambda t: t.replace('</main>', '<a data-book href="https://cal.com/x">Book</a></main>', 1)),
+            'booking links on /team/': ('team/index.html', lambda t: t.replace('</main>', '<a data-book href="https://cal.com/x">Book</a></main>', 1)),
             'one booking value': ('team/index.html', lambda t: book.sub('data-book href="https://cal.com/x"', t, count=1)),
             'outside the team page': ('index.html', lambda t: t.replace('</main>', '<a data-book href="https://cal.com/x">Book</a></main>', 1)),
-            'must be https': ('team/index.html', lambda t: book.sub('data-book href="http://cal.com/x"', t)),
-            'must be https ': ('team/index.html', lambda t: book.sub('data-book href="mailto:someone"', t)),
+            'must be https': (BOTH, lambda t: book.sub('data-book href="http://cal.com/x"', t)),
+            'must be https ': (BOTH, lambda t: book.sub('data-book href="mailto:someone"', t)),
             'outside the team page: the app': ('app/index.html', lambda t: t.replace('</body>', '<a data-book href="https://cal.com/x">Book</a></body>', 1)),
             'unexpected external URL': ('team/index.html', lambda t: t.replace('</main>', '<img src="https://cal.com/openwiz-jake/setup" alt=""></main>', 1)),
-            'two booking links ': ('team/index.html', lambda t: t.replace('</main>', '<a data-book href="https://cal.com/openwiz-jake/setup">Again</a></main>', 1)),
-            'two booking links  ': ('team/index.html', lambda t: re.sub(r'<a class="team-book" data-book[^>]*>Book a call</a>\n</section>', '</section>', t)),
-            'two booking links   ': ('team/index.html', lambda t: re.sub(r'<a class="team-book" id="book" data-book[^>]*>Book a call</a>', '<span id="book"></span>', t)),
+            'booking links on /team/ ': ('team/index.html', lambda t: t.replace('</main>', '<a data-book href="https://cal.com/openwiz-jake/setup">Again</a></main>', 1)),
+            'booking links on /team/  ': ('team/index.html', lambda t: re.sub(r'<a class="team-book" data-book[^>]*>Book a call</a>\n</section>', '</section>', t)),
+            'booking links on /team/   ': ('team/index.html', lambda t: re.sub(r'<a class="team-book" id="book" data-book[^>]*>[^<]*</a>', '<span id="book"></span>', t)),
             'shows no price': (T, lambda t: t.replace('30 minutes.', '30 minutes, $99 per month.', 1)),
             'shows no price ': (T, lambda t: t.replace('30 minutes.', '30 minutes. See pricing.', 1)),
             'team page copy': (T, lambda t: t.replace('>Book a call</a>', '>Talk</a>')),
-            'team page copy ': (T, lambda t: t.replace('>Book a call</a>', '>Talk</a>', 1)),
-            'missing fragment: /team/#book': (T, lambda t: t.replace('<a class="team-book" id="book" data-book', '<a class="team-book" data-book', 1)),
+            'team page copy ': (T, lambda t: t.replace('>Want it for your team? Book a call</a>', '>Talk</a>', 1)),
+            'the first Book a call is #book': (T, lambda t: t.replace('<a class="team-book" id="book" data-book', '<a class="team-book" data-book', 1)),
             'the team page description': (T, lambda t: t.replace('run a fleet on your own repository.', 'see the app.', 3)),
             'the team page headline': (T, lambda t: t.replace('Leave the call with a reviewed pull request.', 'Leave the call with a shipped pull request.', 1)),
             'the hero, in order': (T, lambda t: t.replace('For teams who use Claude Code or Codex', 'For solo builders and small teams', 1)),
             'the hero, in order ': (T, lambda t: t.replace('Merging stays your call.', 'Your first fleet merges it.', 1)),
-            'the hero, in order  ': (T, lambda t: re.sub(r'(<a class="team-book" id="book"[^>]*>Book a call</a>)\s*(<p class="team-needs">[^<]*</p>)', r'\2\1', t)),
+            'the hero, in order  ': (T, lambda t: re.sub(r'(<div class="team-doors">[\s\S]*?</div>)\s*(<p class="team-needs">[^<]*</p>)', r'\2\1', t)),
             'the hero, in order   ': (T, lambda t: t.replace('with working CI and', 'and', 1)),
             'no embed, form or script': (T, lambda t: t.replace('</main>', '<iframe src="/drivers/" title="x"></iframe></main>', 1)),
             'no embed, form or script ': (T, lambda t: t.replace('</main>', '<form></form></main>', 1)),
@@ -1183,8 +1185,28 @@ echo <name>
             with temp, self.subTest(message=message), self.assertRaisesRegex(AssertionError, message.strip()):
                 check_site(root)
         temp, root = planted('team/index.html', lambda t: book.sub('data-book href="https://cal.com/someone/intro"', t))
+        (root / 'help/index.html').write_text(book.sub('data-book href="https://cal.com/someone/intro"', (root / 'help/index.html').read_text()))
         with temp:
             check_site(root)
+
+    def test_help_page(self):
+        H = 'help/index.html'
+        for message, change in {
+            'the help page doors': lambda t: t.replace('Want it for your team? Book a call</h2>', 'Team call</h2>', 1),
+            'help-setup': lambda t: t.replace('data-count="help-setup"', 'data-count="book-call"', 1),
+            'book-call': lambda t: t.replace('data-count="book-call"', 'data-count="help-setup"', 1),
+            'missing fragment: /help/#team': lambda t: t.replace('id="team"', 'id="other"', 1),
+            '#setup and #team': lambda t: t.replace('id="setup"', 'id="other"', 1),
+            'curly apostrophes': lambda t: t.replace('I’ll set it up', "I'll set it up", 1),
+            'no embed, form or script': lambda t: t.replace('</main>', '<form></form></main>', 1),
+        }.items():
+            with tempfile.TemporaryDirectory() as temp, self.subTest(message=message):
+                root = Path(temp) / 'dist'
+                shutil.copytree(ROOT / 'dist', root)
+                path = root / H
+                path.write_text(change(path.read_text()))
+                with self.assertRaisesRegex(AssertionError, message.strip()):
+                    check_site(root)
 
     def test_footer_source(self):
         import check
@@ -1377,12 +1399,12 @@ echo <name>
             'open and disabled until faq.js runs': lambda f: f.replace(' disabled id=', ' id=', 1),
             'open and disabled until faq.js runs ': lambda f: f.replace('aria-expanded="true"', 'aria-expanded="false"', 1),
             'a button that names its answer ': lambda f: f.replace('aria-controls="faq-a2"', 'aria-controls="faq-a1"', 1),
-            'links off the site': lambda f: f.replace('href="/team/#book"', 'href="https://example.com/"', 1),
+            'links off the site': lambda f: f.replace('href="/help/"', 'href="https://example.com/"', 1),
             'answer to What do I need before installing': lambda f: f.replace('Python 3.9 or later', 'Python', 1),
             'answer to Where do my agents run': lambda f: f.replace(FAQ_WHERE, 'Wherever you choose: your own computer or a VPS, Cloudroom, or boat.dev. Each has a driver that passed the same five-check test.', 1),
             'answer to Where do my agents run ': lambda f: f.replace(' In OpenWiz 0.01, you start builders by hand on this computer or boat.dev, and the automatic fleet runs in CloudRoom.', '', 1),
             'answer to Where do my agents run  ': lambda f: f.replace(FAQ_WHERE, 'Anywhere.', 1).replace('OpenWiz is free and open source', FAQ_WHERE + ' OpenWiz is free and open source', 1),
-            'team answer': lambda f: f.replace('Your first fleet ships on it.', 'Your first fleet runs in a day.', 1),
+            'team answer': lambda f: f.replace('Want it for your team? Book a call', 'Book a call with us', 1),
             'the same visit and click notice': lambda f: f.replace(check.COUNT_NOTICE, 'Visits are counted.', 1),
             'heading and its line': lambda f: f.replace('The short ones are here.', 'More.', 1),
             'no form or input': lambda f: f.replace('<p>The open source', '<input><p>The open source', 1),

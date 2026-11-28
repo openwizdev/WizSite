@@ -5,7 +5,7 @@ import { installSwitch, readReleases, render, summary, withReleases } from './sc
 import { readRegistry, render as renderMarket, summary as marketSummary, withMarket } from './scripts/market.mjs';
 import { readReach, render as renderReach, summary as reachSummary, withReach } from './scripts/reach.mjs';
 import { withDrivers } from './scripts/drivers.mjs';
-import { aboutPage, crawlerFiles, guidePage, pages, urlFor, withMetadata } from './scripts/discovery.mjs';
+import { aboutPage, crawlerFiles, guidePage, helpPage, pages, urlFor, withMetadata } from './scripts/discovery.mjs';
 import { mirrorPath, toMarkdown } from './scripts/mirrors.mjs';
 import { withCheckout } from './scripts/pricing.mjs';
 
@@ -77,7 +77,7 @@ let about, guide;
 const mirrors = new Map();
 for (const [page, [, , robots]] of Object.entries(pages)) {
   let html = await readFile(new URL(page, root), 'utf8');
-  if (page === aboutPage || page === guidePage || page === '404.html') {
+  if (page === aboutPage || page === guidePage || page === helpPage || page === '404.html') {
     html = html.replace('<template data-slot="top-bar"></template>', () => topBar);
   }
   if (page === guidePage) guide = html;

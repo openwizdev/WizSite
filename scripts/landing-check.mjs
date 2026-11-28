@@ -370,7 +370,8 @@ async function buy(page, where, path) {
   expect(facts.scroll <= facts.inner, where, `sideways scroll (${facts.scroll}px content in a ${facts.inner}px window)`);
   expect(facts.button, where, 'the top bar lacks the buy button inside the window');
   expect(facts.drivers, where, 'the top bar lacks the Drivers link inside the window');
-  if (path === '/team/') expect(facts.book === 2, where, `the team page needs its two Book a call links (${facts.book})`);
+  if (path === '/team/') expect(facts.book === 3, where, `the team page needs its three booking links (${facts.book})`);
+  if (path === '/help/') expect(facts.book === 2, where, `the help page needs its two booking links (${facts.book})`);
 }
 
 async function footer(page, where, mode) {
@@ -419,7 +420,7 @@ async function footer(page, where, mode) {
   })()`);
   expect(facts.count === 1, where, `one footer (${facts.count})`);
   expect(facts.buttons === (mode === 'no JavaScript' ? 0 : 12), where, `the footer Wizes are not the landing's (${facts.buttons} of 12 respond)`);
-  expect(facts.links === 13 && facts.overview && facts.inside, where, 'the footer link groups are not all shown inside the window');
+  expect(facts.links === 14 && facts.overview && facts.inside, where, 'the footer link groups are not all shown inside the window');
   expect(facts.lines === 2, where, 'the footer must show the license and counting notice');
   expect(facts.whole, where, `the footer wordmark is clipped (ink and box: ${facts.dbg})`);
   expect(facts.gap >= 0 && facts.gap <= 16, where, `a ${facts.gap}px painted gap between the wordmark's ink and the Wizes (0 to 16)`);
@@ -529,7 +530,7 @@ async function main() {
         } finally {
           await page.close();
         }
-        for (const path of ['/', '/changelog/', '/drivers/', '/team/', '/faq/', '/pricing/']) {
+        for (const path of ['/', '/changelog/', '/drivers/', '/team/', '/help/', '/faq/', '/pricing/']) {
           const other = await open(browser, origin, width, height, mode, path);
           try {
             await buy(other, `${path} ${where}`, path);
@@ -547,7 +548,7 @@ async function main() {
       }
     }
     for (const width of (process.env.WIDTHS || '481,500,560,640,641,700,760,761,800,900,960,1024').split(',').map(Number)) {
-      for (const path of ['/', '/changelog/', '/drivers/', '/team/', '/faq/', '/pricing/']) {
+      for (const path of ['/', '/changelog/', '/drivers/', '/team/', '/help/', '/faq/', '/pricing/']) {
         const other = await open(browser, origin, width, 800, MODES.motion, path);
         try {
           await buy(other, `${path} ${width}px, motion`, path);

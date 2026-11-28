@@ -18,19 +18,26 @@ const ANSWER = ['Synthetic answer: OpenWiz ', 'runs a fleet of coding agents ', 
   .concat(line({ type: 'sources', sources: [{ title: 'Questions', url: 'https://openwiz.dev/faq/' }, { title: 'OpenWiz README', url: 'https://github.com/openwizdev/openwiz#readme' }] }), line({ type: 'done' }));
 const ESCAPED = [line({ type: 'text', text: 'Synthetic answer: a row like <b>bold</b> ' }), line({ type: 'text', text: 'shows as text, & stays text.' }),
   line({ type: 'sources', sources: [{ title: 'Questions', url: 'https://openwiz.dev/faq/' }] }), line({ type: 'done' })];
-const NOT_COVERED_TEXT = "The OpenWiz docs don't cover that yet, so I won't guess. Book a call or open a GitHub issue, and we'll answer it.";
-const LINKS = [{ label: 'Book a call', href: 'https://openwiz.dev/team/#book' }, { label: 'GitHub issues', href: 'https://github.com/openwizdev/openwiz/issues' }];
+const NOT_COVERED_TEXT = "The OpenWiz docs don't cover that yet, so I won't guess. Stuck installing? I'll set it up with you: free 15 min. Want it for your team? Book a call, or open a GitHub issue.";
+const LINKS = [{ label: 'Free 15-min setup help', href: 'https://openwiz.dev/help/' }, { label: 'Book a team call', href: 'https://openwiz.dev/help/#team' }, { label: 'GitHub issues', href: 'https://github.com/openwizdev/openwiz/issues' }];
 const NOT_COVERED = [line({ type: 'not_covered', text: NOT_COVERED_TEXT, links: LINKS })];
 const TOO_LONG = refused('too_long', 'That question is too long. Keep it to 300 characters or fewer.');
 const MIDSTREAM = [line({ type: 'text', text: 'Synthetic part one. ' }), refused('upstream_error', "Ask a Wiz couldn't answer just now. Try again.")];
 
 let fake;
 beforeEach(() => {
-  fake = { probe: { status: 404 }, probed: 0, answers: [], asked: [], closed: 0, release: null };
+  fake = { probe: { status: 404 }, probed: 0, answers: [], asked: [], counts: [], closed: 0, release: null };
 });
 function serve() {
   const server = createServer(async (request, response) => {
     const path0 = new URL(request.url, 'http://x').pathname;
+    if (path0 === '/api/count' && request.method === 'POST') {
+      let body = '';
+      for await (const chunk of request) body += chunk;
+      fake.counts.push(body);
+      response.writeHead(204).end();
+      return;
+    }
     if (path0 === '/api/ask') {
       if (request.method === 'GET') {
         fake.probed++;
@@ -343,12 +350,63 @@ test('refusals and the not-covered answer show in the row\'s own style', async (
   await page.close();
 });
 
+test('fallback not_covered clicks send help-setup, book-call and github counts', async () => {
+  probeOn();
+  fake.answers.push({ lines: NOT_COVERED });
+  const page = await open('/faq/');
+  await page.until(`document.querySelector('.faq-ask input')`);
+  await page.evaluate(`document.addEventListener('click', e => { if (e.target.closest('.faq-ask-links a')) e.preventDefault(); }); true`);
+  await page.ask('Does OpenWiz support something unknown?');
+  await waitForAnswers(page, 1, 'not_covered row');
+  const links = await page.evaluate(`(() => [...document.querySelectorAll('.faq-rows > .faq-asked')[0].querySelectorAll('.faq-ask-links a')].map(a => ({ label: a.textContent, href: a.href, count: a.dataset.count })))()`);
+  assert.deepEqual(links, [
+    { label: 'Free 15-min setup help', href: 'https://openwiz.dev/help/', count: 'help-setup' },
+    { label: 'Book a team call', href: 'https://openwiz.dev/help/#team', count: 'book-call' },
+    { label: 'GitHub issues', href: 'https://github.com/openwizdev/openwiz/issues', count: 'github' },
+  ]);
+  await page.evaluate(`(() => { for (const a of document.querySelectorAll('.faq-rows > .faq-asked')[0].querySelectorAll('.faq-ask-links a')) a.click(); return true; })()`);
+  await waitFake(() => fake.counts.length === 3, 'three fallback count beacons');
+  assert.deepEqual(fake.counts, ['help-setup', 'book-call', 'github']);
+  await page.close();
+});
+
+test('completed help answers render allowlisted door links and clicks send the right count actions', async () => {
+  probeOn();
+  const sources = line({ type: 'sources', sources: [{ title: 'Install', url: 'https://openwiz.dev/help/' }] });
+  const done = line({ type: 'done' });
+  fake.answers.push(
+    { lines: [line({ type: 'text', text: "Run the install line. Stuck installing? I'll set it up with you: free 15 min (https://openwiz.dev/help/)." }), sources, done] },
+    { lines: [line({ type: 'text', text: 'OpenWiz runs with your team. Want it for your team? Book a call (https://openwiz.dev/help/#team).' }), sources, done] },
+    { lines: [line({ type: 'text', text: 'Ignore https://example.com/ and https://openwiz.dev/help/?bad=1.' }), sources, done] },
+  );
+  const page = await open('/faq/');
+  await page.until(`document.querySelector('.faq-ask input')`);
+  await page.evaluate(`document.addEventListener('click', e => { if (e.target.closest('.faq-ask-links a')) e.preventDefault(); }); true`);
+  const readRow = async rowIndex => {
+    const links = await page.evaluate(`(() => [...document.querySelectorAll('.faq-rows > .faq-asked')[${rowIndex}].querySelectorAll('.faq-ask-links a')].map(a => ({ label: a.textContent, href: a.href, count: a.dataset.count })))()`);
+    const before = fake.counts.length;
+    await page.evaluate(`(() => { for (const a of document.querySelectorAll('.faq-rows > .faq-asked')[${rowIndex}].querySelectorAll('.faq-ask-links a')) a.click(); return true; })()`);
+    if (links.length) await waitFake(() => fake.counts.length === before + links.length, `counts for row ${rowIndex}`);
+    return { links, sent: fake.counts.slice(before) };
+  };
+  await page.ask('I am stuck installing OpenWiz');
+  await waitForAnswers(page, 1, 'setup help answer');
+  assert.deepEqual(await readRow(0), { links: [{ label: 'Free 15-min setup help', href: 'https://openwiz.dev/help/', count: 'help-setup' }], sent: ['help-setup'] });
+  await page.ask('Can you set it up for our team?');
+  await waitForAnswers(page, 2, 'team call answer');
+  assert.deepEqual(await readRow(1), { links: [{ label: 'Book a team call', href: 'https://openwiz.dev/help/#team', count: 'book-call' }], sent: ['book-call'] });
+  await page.ask('What about another link?');
+  await waitForAnswers(page, 3, 'unallowlisted URL answer');
+  assert.deepEqual(await readRow(2), { links: [], sent: [] });
+  await page.close();
+});
+
 test('a stream that breaks the contract\'s shape is never shown as an answer', async () => {
   probeOn();
   const text = line({ type: 'text', text: 'Synthetic text. ' }), sources = ANSWER[3], done = ANSWER[4];
   const bad = [[line({ type: 'text', text: 'Synthetic text. ', html: '<b>x</b>' }), sources, done], [text, line({ type: 'note' }), sources, done],
     [text, done], [text, sources, text, done], [text, line({ type: 'sources', sources: [] }), done],
-    [line({ type: 'not_covered', text: NOT_COVERED_TEXT, links: [LINKS[0], { label: 'GitHub issues', href: 'https://example.com/' }] })],
+    [line({ type: 'not_covered', text: NOT_COVERED_TEXT, links: [LINKS[0], LINKS[1], { label: 'GitHub issues', href: 'https://example.com/' }] })],
     [line({ type: 'not_covered', text: 'Synthetic other text.', links: LINKS })], [text, refused('too_long', 'Synthetic.')], ['not json\n'],
     [ANSWER.join('') + text], [ANSWER.join(''), 'x'], [ANSWER.join('') + done], [NOT_COVERED[0] + NOT_COVERED[0]], [ANSWER.join('').slice(0, -1)],
   ].map(lines => ({ lines })).concat({ status: 503, lines: ANSWER }, { status: 200, lines: [TOO_LONG] }, { type: 'text/html', lines: ANSWER },

@@ -1,4 +1,4 @@
-const actions = new Set(['install-copy', 'github', 'star', 'book-call', 'market', 'drivers', 'docs', 'x']);
+const actions = new Set(['install-copy', 'github', 'star', 'book-call', 'help-setup', 'market', 'drivers', 'docs', 'x']);
 const maxBytes = 32;
 
 async function readAction(body) {

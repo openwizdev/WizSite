@@ -19,7 +19,7 @@ You need Python 3.9 or later, `git`, and the GitHub CLI (`gh`). Then paste this 
 
 Your agent follows 0.1.0's [install skill](https://github.com/openwizdev/WizSkills/blob/33eef93ba30cd8db256f6fe270e3ed28747a79bd/skills/install/SKILL.md) (WizSkills `maint/0.2`). First it asks where your agents run: **this computer**, with the Claude Code or Codex you're signed in to; **boat.dev**; or **[CloudRoom](https://cloudroom.dev)**. CloudRoom is optional: the install never needs it, and its install and sign-in run only if you pick it. In 0.1.0 the automatic fleet runs in CloudRoom; without CloudRoom you plan, start each builder by hand on this computer or on boat.dev, and review its pull request yourself.
 
-It checks your computer, installs the verified prebuilt 0.1.0 release (no Rust or Node), puts OpenWiz's skills into your agents, and checks each connection. Nothing starts until you approve a plan. People: see the [install guide's 0.1.0 steps](docs/install.md#openwiz-010) for every step and command. OpenWiz is free. Your model and host charges are your own.
+It checks your computer, installs the verified prebuilt 0.1.0 release (no Rust or Node), puts OpenWiz's skills into your agents, and checks each connection. Nothing starts until you approve a plan. People: see the [install guide's 0.1.0 steps](docs/install.md#openwiz-010) for every step and command. OpenWiz is free. Your model and host charges are your own. Stuck installing? I'll set it up with you: free 15 min at https://openwiz.dev/help/. Want it for your team? Book a call at https://openwiz.dev/help/#team.
 
 ### OpenWiz 0.1.1
 

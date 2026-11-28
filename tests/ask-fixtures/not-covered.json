@@ -79,6 +79,6 @@
       "Content-Type": "application/x-ndjson; charset=utf-8",
       "Cache-Control": "no-store"
     },
-    "body": "{\"type\":\"not_covered\",\"text\":\"The OpenWiz docs don't cover that yet, so I won't guess. Book a call or open a GitHub issue, and we'll answer it.\",\"links\":[{\"label\":\"Book a call\",\"href\":\"https://openwiz.dev/team/#book\"},{\"label\":\"GitHub issues\",\"href\":\"https://github.com/openwizdev/openwiz/issues\"}]}\n"
+    "body": "{\"type\":\"not_covered\",\"text\":\"The OpenWiz docs don't cover that yet, so I won't guess. Stuck installing? I'll set it up with you: free 15 min. Want it for your team? Book a call, or open a GitHub issue.\",\"links\":[{\"label\":\"Free 15-min setup help\",\"href\":\"https://openwiz.dev/help/\"},{\"label\":\"Book a team call\",\"href\":\"https://openwiz.dev/help/#team\"},{\"label\":\"GitHub issues\",\"href\":\"https://github.com/openwizdev/openwiz/issues\"}]}\n"
   }
 }

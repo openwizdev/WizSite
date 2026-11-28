@@ -74,9 +74,10 @@ the contract is wrong and must be fixed.
   "max_sources": 6,
   "source_url_prefixes": ["https://openwiz.dev/", "https://github.com/openwizdev/"],
   "not_covered": {
-    "text": "The OpenWiz docs don't cover that yet, so I won't guess. Book a call or open a GitHub issue, and we'll answer it.",
+    "text": "The OpenWiz docs don't cover that yet, so I won't guess. Stuck installing? I'll set it up with you: free 15 min. Want it for your team? Book a call, or open a GitHub issue.",
     "links": [
-      {"label": "Book a call", "href": "https://openwiz.dev/team/#book"},
+      {"label": "Free 15-min setup help", "href": "https://openwiz.dev/help/"},
+      {"label": "Book a team call", "href": "https://openwiz.dev/help/#team"},
       {"label": "GitHub issues", "href": "https://github.com/openwizdev/openwiz/issues"}
     ],
     "sentinel": "NOT_COVERED"
@@ -114,7 +115,7 @@ the contract is wrong and must be fixed.
     "max_answer_bytes": 4000
   },
   "prompt": {
-    "system": "You answer questions about OpenWiz for visitors to openwiz.dev. Answer only from the passages in the user's message, in plain text, in at most three short paragraphs. If the passages do not answer the question, reply with exactly NOT_COVERED and nothing else.",
+    "system": "You answer questions about OpenWiz for visitors to openwiz.dev. Answer only from the passages in the user's message, in plain text, in at most three short paragraphs. If the visitor is stuck installing or troubleshooting setup, end with: Stuck installing? I'll set it up with you: free 15 min (https://openwiz.dev/help/). If the visitor asks about team setup or pricing, end with: Want it for your team? Book a call (https://openwiz.dev/help/#team). If the passages do not answer the question, reply with exactly NOT_COVERED and nothing else.",
     "passage": "Passage {n} from {url}:\n{text}\n\n",
     "question": "Question: {question}"
   },
@@ -248,11 +249,13 @@ from the not-covered event, whose hrefs must equal the pin's.
 
 When the docs don't cover a question the answer says so, and never guesses:
 
-> The OpenWiz docs don't cover that yet, so I won't guess. Book a call or open
-> a GitHub issue, and we'll answer it.
+> The OpenWiz docs don't cover that yet, so I won't guess. Stuck installing?
+> I'll set it up with you: free 15 min. Want it for your team? Book a call, or
+> open a GitHub issue.
 
-with two links, in this order: **Book a call** to
-`https://openwiz.dev/team/#book`, and **GitHub issues** to
+with three links, in this order: **Free 15-min setup help** to
+`https://openwiz.dev/help/`, **Book a team call** to
+`https://openwiz.dev/help/#team`, and **GitHub issues** to
 `https://github.com/openwizdev/openwiz/issues`.
 
 It is given in two cases:

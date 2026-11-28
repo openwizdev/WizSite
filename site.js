@@ -1,5 +1,5 @@
 if (typeof navigator.sendBeacon === 'function') {
-  const countActions = new Set(['install-copy', 'github', 'star', 'book-call', 'market', 'drivers', 'docs', 'x']);
+  const countActions = new Set(['install-copy', 'github', 'star', 'book-call', 'help-setup', 'market', 'drivers', 'docs', 'x']);
   document.addEventListener('click', event => {
     const action = event.target.closest?.('[data-count]')?.dataset.count;
     if (countActions.has(action)) navigator.sendBeacon('/api/count', action);
@@ -500,8 +500,18 @@ const ASK_REFUSALS = {
   store_error: [503, 'Ask a Wiz couldn\'t keep count just now. Try again.'],
   no_private_route: [503, 'Ask a Wiz can\'t answer privately just now. Try again later.'],
 };
-const ASK_NOT_COVERED = 'The OpenWiz docs don\'t cover that yet, so I won\'t guess. Book a call or open a GitHub issue, and we\'ll answer it.';
-const ASK_LINKS = [['Book a call', 'https://openwiz.dev/team/#book'], ['GitHub issues', 'https://github.com/openwizdev/openwiz/issues']];
+const ASK_NOT_COVERED = 'The OpenWiz docs don\'t cover that yet, so I won\'t guess. Stuck installing? I\'ll set it up with you: free 15 min. Want it for your team? Book a call, or open a GitHub issue.';
+const ASK_LINKS = [['Free 15-min setup help', 'https://openwiz.dev/help/'], ['Book a team call', 'https://openwiz.dev/help/#team'], ['GitHub issues', 'https://github.com/openwizdev/openwiz/issues']];
+const ASK_LINK_COUNTS = {
+  'https://openwiz.dev/help/': 'help-setup',
+  'https://openwiz.dev/help/#team': 'book-call',
+  'https://github.com/openwizdev/openwiz/issues': 'github',
+};
+const ASK_ANSWER_DOORS = [
+  [/https:\/\/openwiz\.dev\/help\/?(?=$|[\s).,;:!\]"'])/, ASK_LINKS[0]],
+  [/https:\/\/openwiz\.dev\/help\/?#team(?=$|[\s).,;:!\]"'])/, ASK_LINKS[1]],
+];
+const askAnswerLinks = text => ASK_ANSWER_DOORS.filter(([match]) => match.test(text)).map(([, link]) => link);
 const ASK_LINES = ['A Wiz is reading the docs', 'Flipping through the spellbook', 'Finding the right page',
   'Asking the other Wizes', 'Checking every source', 'Polishing the answer'];
 const askKeys = value => value && typeof value === 'object' && !Array.isArray(value) ? Object.keys(value).sort().join() : '';
@@ -666,7 +676,7 @@ async function askAWiz() {
           const p = el('p', 'faq-ask-links');
           links.forEach(([label, href], i) => {
             const link = Object.assign(el('a', '', label), { href });
-            link.dataset.count = i === 0 ? 'book-call' : 'github';
+            if (Object.hasOwn(ASK_LINK_COUNTS, href)) link.dataset.count = ASK_LINK_COUNTS[href];
             p.append(...(i ? [' · '] : []), link);
           });
           a.firstChild.append(p);
@@ -723,7 +733,7 @@ async function askAWiz() {
         verifying = false;
         current.abort();
         controller = null;
-        if (end?.type === 'done') finish([[text], [`Sources: ${sources.join(', ')}`, 'faq-ask-sources']]);
+        if (end?.type === 'done') finish([[text], [`Sources: ${sources.join(', ')}`, 'faq-ask-sources']], askAnswerLinks(text));
         else if (end?.type === 'not_covered') finish([[end.text]], ASK_LINKS);
         else if (end?.type === 'refused') show('ended', end.message, end.reason !== 'too_long');
         else show('ended', 'stopped' in row.dataset ? 'Stopped.' : 'The answer didn’t finish. Try again.');
