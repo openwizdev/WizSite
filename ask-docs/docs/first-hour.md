@@ -51,6 +51,6 @@ again when you press **Refresh**. It never sends, starts or stops anything.
   **Refresh**. Work already running carries on.
 
 Feedback and sharing are on **Home**. OpenWiz stays free and open source.
-Supporter is $5 per month for priority support and to support the project,
-and it adds nothing else. CloudRoom and model charges are separate and not
-included.
+Every tier gets the same software, features and support; optional monthly
+supporter tiers ($1, $10, and $100 Business) are cosmetic only. CloudRoom and
+model charges are separate and not included.

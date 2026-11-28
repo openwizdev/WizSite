@@ -1,0 +1,51 @@
+[
+  {
+    "id": "free",
+    "name": "Free",
+    "price": 0,
+    "period": null,
+    "checkoutKey": null,
+    "cta": {
+      "label": "Get OpenWiz",
+      "href": "/"
+    },
+    "perks": [
+      "The whole open-source OpenWiz. The default.",
+      "Install it, run fleets, and use the app.",
+      "You pay your own model and machine bills."
+    ]
+  },
+  {
+    "id": "supporter-1",
+    "name": "Supporter",
+    "price": 1,
+    "period": "month",
+    "checkoutKey": "1",
+    "perks": [
+      "Cosmetic only: a badge and flair (app, WizBar, market profile).",
+      "Your name on the supporters wall."
+    ]
+  },
+  {
+    "id": "supporter-10",
+    "name": "Supporter",
+    "price": 10,
+    "period": "month",
+    "checkoutKey": "10",
+    "perks": [
+      "Cosmetic only: more badges, flair and themes.",
+      "Your name on the supporters wall."
+    ]
+  },
+  {
+    "id": "business-100",
+    "name": "Business",
+    "price": 100,
+    "period": "month",
+    "checkoutKey": "100",
+    "perks": [
+      "Cosmetic only: badges, flair, and themes.",
+      "A logo spot on the supporters wall."
+    ]
+  }
+]
