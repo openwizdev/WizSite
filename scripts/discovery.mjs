@@ -1,13 +1,12 @@
-import { execFileSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
 import { decode } from './ask-index.mjs';
+import { site } from './registry.mjs';
 
-const site = 'https://openwiz.dev/';
+export { pages } from './registry.mjs';
+
 const github = 'https://github.com/openwizdev';
 const repo = github + '/OpenWiz';
 const skillsRepo = github + '/WizSkills';
 const skillsRef = 'maint/0.2';
-const repoRoot = fileURLToPath(new URL('..', import.meta.url));
 const sameAs = [github, repo, 'https://x.com/openwiz'];
 const organization = site + '#organization';
 const software = site + '#software';
@@ -16,47 +15,6 @@ const schema = 'https://schema.org';
 export const aboutPage = 'what-is-openwiz/index.html';
 export const faqPage = 'faq/index.html';
 export const guidePage = 'guides/run-many-coding-agents/index.html';
-export const pages = {
-  'index.html': [
-    'OpenWiz: the open source agent factory for coding agents',
-    'OpenWiz is the open source kernel for agent factories. It runs fleets of coding agents like Claude Code and Codex on your own machines. Free, Apache-2.0.',
-  ],
-  [aboutPage]: [
-    'What is OpenWiz?',
-    'Learn how OpenWiz runs fleets of coding agents, where the agents run, how work is tracked on GitHub, and how to install it.',
-  ],
-  [guidePage]: [
-    'How to run many coding agents at once: OpenWiz agent factory',
-    'How to run a fleet of coding agents like Claude Code and Codex: what an agent factory does and how to run one with OpenWiz 0.01, step by step.',
-  ],
-  [faqPage]: [
-    'FAQ — OpenWiz',
-    'Questions about OpenWiz, the open source kernel for agent factories: what it is, what you need, where your agents run, what it costs.',
-  ],
-  'drivers/index.html': [
-    'Drivers — OpenWiz',
-    'OpenWiz drivers use four commands and one test kit. See results for the shipped drivers: boat.dev, CloudRoom and your own computer or VPS.',
-  ],
-  'changelog/index.html': [
-    'Changelog — OpenWiz',
-    'The OpenWiz changelog lists what each public release lets you do, newest first.',
-  ],
-  'market/index.html': [
-    'Market — OpenWiz',
-    'The OpenWiz market: drivers, harnesses, skills and anything else that plugs into OpenWiz, listed by anyone, verified when it passes its test.',
-  ],
-  'team/index.html': [
-    'For your team — OpenWiz',
-    'Book a 30-minute call to set up OpenWiz with your team and run a fleet on your own repository.',
-  ],
-  'pricing/index.html': [
-    'Pricing — OpenWiz',
-    'OpenWiz stays free and open source. Supporter is $5 per month: priority support, and you support the project.',
-  ],
-  'app/index.html': ['The app — OpenWiz', 'Sign in with GitHub to see your OpenWiz specs, tickets and agents.', 'noindex'],
-  '404.html': ['Page not found — OpenWiz', 'Find the OpenWiz homepage, overview and frequently asked questions.', 'noindex'],
-};
-
 const urlFor = page => site + page.replace(/index\.html$/, '');
 const escape = text => text.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const plain = html => decode(html.replace(/<svg\b[^>]*>[\s\S]*?<\/svg>/g, '').replace(/<[^>]*>/g, '')).replace(/\s+/g, ' ').trim();
@@ -78,7 +36,7 @@ export function guideSteps(html) {
   return steps;
 }
 
-function structuredData(page, faq, html) {
+function structuredData(page, { path, description }, faq, html) {
   if (page === 'index.html') {
     return {
       '@context': schema,
@@ -86,7 +44,7 @@ function structuredData(page, faq, html) {
         { '@type': 'Organization', '@id': organization, name: 'OpenWiz', url: site, logo: site + 'brand/openwiz-lockup.svg', sameAs },
         { '@type': 'WebSite', '@id': site + '#website', name: 'OpenWiz', url: site },
         {
-          '@type': 'SoftwareApplication', '@id': software, name: 'OpenWiz', description: pages[page][1], url: site,
+          '@type': 'SoftwareApplication', '@id': software, name: 'OpenWiz', description, url: site,
           applicationCategory: 'DeveloperApplication', operatingSystem: 'macOS, Linux',
           offers: [
             { '@type': 'Offer', price: 0, priceCurrency: 'USD', name: 'Free' },
@@ -100,7 +58,7 @@ function structuredData(page, faq, html) {
   }
   if (page === faqPage) {
     return {
-      '@context': schema, '@type': 'FAQPage', url: urlFor(page),
+      '@context': schema, '@type': 'FAQPage', url: new URL(path, site).href,
       mainEntity: faqEntries(faq).map(([name, text]) => ({
         '@type': 'Question', name, acceptedAnswer: { '@type': 'Answer', text },
       })),
@@ -108,22 +66,40 @@ function structuredData(page, faq, html) {
   }
   if (page === guidePage) {
     return {
-      '@context': schema, '@type': 'HowTo', url: urlFor(page), name: plain(html.match(/<h1>([\s\S]*?)<\/h1>/)[1]),
-      description: pages[page][1], about: { '@id': software },
+      '@context': schema, '@type': 'HowTo', url: new URL(path, site).href, name: plain(html.match(/<h1>([\s\S]*?)<\/h1>/)[1]),
+      description, about: { '@id': software },
       step: guideSteps(html).map(([name, text], index) => ({ '@type': 'HowToStep', position: index + 1, name, text })),
     };
   }
   if (page === aboutPage) {
-    return { '@context': schema, '@type': 'AboutPage', url: urlFor(page), about: { '@id': software } };
+    return { '@context': schema, '@type': 'AboutPage', url: new URL(path, site).href, about: { '@id': software } };
   }
 }
 
-export function withMetadata(page, html, faq) {
-  const [title, description, robots] = pages[page];
-  const url = urlFor(page);
+function breadcrumbTags(trail) {
+  const list = '[_:breadcrumb]';
+  const type = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type';
+  const tags = [`<link about="${list}" rel="${type}" resource="${schema}/BreadcrumbList">`];
+  for (const [index, { name, path }] of trail.entries()) {
+    const position = index + 1;
+    const item = `[_:breadcrumb-${position}]`;
+    tags.push(
+      `<link about="${list}" property="${schema}/itemListElement" resource="${item}">`,
+      `<link about="${item}" rel="${type}" resource="${schema}/ListItem">`,
+      `<link about="${item}" property="${schema}/item" resource="${new URL(path, site).href}">`,
+      `<meta about="${item}" property="${schema}/name" content="${escape(name)}">`,
+      `<meta about="${item}" property="${schema}/position" content="${position}" datatype="http://www.w3.org/2001/XMLSchema#integer">`,
+    );
+  }
+  return tags;
+}
+
+export function withMetadata(page, entry, html, faq) {
+  const { path, title, description, indexable, breadcrumbs } = entry;
+  const url = new URL(path, site).href;
   const tags = [`<title>${escape(title)}</title>`, `<meta name="description" content="${escape(description)}">`];
   if (page !== '404.html') tags.push(`<link rel="canonical" href="${url}">`);
-  if (robots) tags.push(`<meta name="robots" content="${robots}">`);
+  if (!indexable) tags.push('<meta name="robots" content="noindex">');
   else {
     for (const [key, value] of Object.entries({ type: 'website', site_name: 'OpenWiz', title, description, url })) {
       tags.push(`<meta property="og:${key}" content="${escape(value)}">`);
@@ -131,10 +107,11 @@ export function withMetadata(page, html, faq) {
     for (const [key, value] of Object.entries({ site: '@openwiz', title, description })) {
       tags.push(`<meta name="twitter:${key}" content="${escape(value)}">`);
     }
-    const data = structuredData(page, faq, html);
+    const data = structuredData(page, entry, faq, html);
     if (data) {
       tags.push(`<script type="application/ld+json">\n${JSON.stringify(data, null, 2).replaceAll('<', '\\u003c')}\n</script>`);
     }
+    if (path !== '/') tags.push(...breadcrumbTags(breadcrumbs));
   }
   const slot = '<template data-slot="page-metadata"></template>';
   if (html.split(slot).length !== 2) throw new Error(`${page} needs one metadata slot`);
@@ -214,23 +191,8 @@ export function crawlerFiles(about, faq, guide) {
     ...guideText(guide),
   ].join('\n\n') + '\n';
 
-  const fallbackDate = new Date().toISOString().slice(0, 10);
-  const lastModified = page => {
-    try {
-      const committed = execFileSync('git', ['log', '-1', '--format=%cs', '--', page], {
-        cwd: repoRoot,
-        encoding: 'utf8',
-        stdio: ['ignore', 'pipe', 'ignore'],
-      }).trim();
-      if (/^\d{4}-\d{2}-\d{2}$/.test(committed)) return committed;
-    } catch {}
-    return fallbackDate;
-  };
-  const urls = Object.entries(pages).filter(([, [, , robots]]) => !robots).map(([page]) =>
-    `  <url><loc>${urlFor(page)}</loc><lastmod>${lastModified(page)}</lastmod></url>`);
   return {
     'robots.txt': crawlers.map(agent => `User-agent: ${agent}\nAllow: /\nDisallow: /api/\n\n`).join('') + `Sitemap: ${site}sitemap.xml\n`,
-    'sitemap.xml': ['<?xml version="1.0" encoding="UTF-8"?>', '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">', ...urls, '</urlset>', ''].join('\n'),
     'llms.txt': llms,
     'llms-full.txt': full,
   };

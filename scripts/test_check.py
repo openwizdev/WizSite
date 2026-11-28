@@ -8,10 +8,11 @@ import subprocess
 import tempfile
 import unittest
 from unittest import mock
+from xml.etree import ElementTree
 
 import re
 
-from check import ALL_PAGES, ART, CTA, DOC_HASHES, FAQ, FAQ_PREREQS, FAQ_WHERE, FOOTER, INSTALL_NOTE_HTML, INSTALL_PREREQS_HTML, FINGERPRINTS, HASHED, INSTALL_SWITCH, ROOT, Page, check_changelog, check_image_preloads, check_release_data, check_releases, read_releases, split_releases, check_motion, check_privacy, check_ref, check_security_txt, check_site, check_vector, check_webp, check_avif, check_png, fingerprint
+from check import ALL_PAGES, ART, CTA, DOC_HASHES, FAQ, FAQ_PREREQS, FAQ_WHERE, FOOTER, INSTALL_NOTE_HTML, INSTALL_PREREQS_HTML, FINGERPRINTS, HASHED, INSTALL_SWITCH, ROOT, Page, check_changelog, check_discovery, check_image_preloads, check_release_data, check_releases, read_releases, split_releases, check_motion, check_privacy, check_ref, check_security_txt, check_site, check_vector, check_webp, check_avif, check_png, fingerprint
 
 REMOVED_ART = (
     'art/spec-video.mp4',
@@ -101,7 +102,7 @@ class Checks(unittest.TestCase):
                 ('app/index.html', r'<meta name="robots"[^>]*>', '', 'noindex'),
                 ('faq/index.html', r'"mainEntity":', '?', 'invalid JSON-LD'),
                 ('faq/index.html', r'"text": "The open source kernel', '"text": "A kernel', 'FAQ JSON-LD'),
-                ('sitemap.xml', r'<url><loc>https://openwiz.dev/</loc>.*?</url>', '', 'sitemap must list'),
+                ('sitemaps/pages.xml', r'(<url><loc>https://openwiz\.dev/</loc>.*?</url>)', '', 'sitemap must list'),
             ]
             for name, pattern, replacement, error in failures:
                 with self.subTest(file=name, error=error):
@@ -126,6 +127,124 @@ class Checks(unittest.TestCase):
                     finally:
                         path.write_bytes(original)
 
+    def test_sitemap_index_and_sections(self):
+        root = ROOT / 'dist'
+        ns = {'s': 'http://www.sitemaps.org/schemas/sitemap/0.9'}
+        index = ElementTree.parse(root / 'sitemap.xml').getroot()
+        self.assertEqual(index.tag, f'{{{ns["s"]}}}sitemapindex')
+        self.assertEqual(
+            [entry.text for entry in index.findall('s:sitemap/s:loc', ns)],
+            ['https://openwiz.dev/sitemaps/pages.xml', 'https://openwiz.dev/sitemaps/market.xml'],
+        )
+        market = ElementTree.parse(root / 'sitemaps/market.xml').getroot()
+        self.assertEqual([entry.text for entry in market.findall('s:url/s:loc', ns)], ['https://openwiz.dev/market/'])
+
+    def test_discovery_contract_fields(self):
+        path = ROOT / 'contracts/discovery.v1.md'
+        self.assertTrue(path.is_file(), 'the discovery contract is missing')
+        contract = path.read_text()
+        for field in ('path', 'title', 'description', 'breadcrumbs', 'section', 'lastmod', 'indexable'):
+            self.assertIn(f'`{field}`', contract)
+        for section in ('pages', 'market', 'docs', 'answers'):
+            self.assertIn(f'`{section}`', contract)
+        for entity in ('organization', 'software', 'source'):
+            self.assertIn(f'https://openwiz.dev/#{entity}', contract)
+        self.assertIn('/faq.md', contract)
+
+    def test_breadcrumbs_end_at_each_canonical_page(self):
+        for name in ALL_PAGES:
+            with self.subTest(page=name):
+                html = (ROOT / 'dist' / name).read_text()
+                head = html.split('</head>', 1)[0]
+                count = head.count('resource="https://schema.org/BreadcrumbList"')
+                if name in ('index.html', '404.html', 'app/index.html'):
+                    self.assertEqual(count, 0)
+                    continue
+                self.assertEqual(count, 1)
+                urls = re.findall(r'property="https://schema.org/item" resource="([^"]+)"', head)
+                self.assertEqual(urls[0], 'https://openwiz.dev/')
+                self.assertEqual(urls[-1], Page(html).head_fields['canonical'][0])
+
+    def test_discovery_rejects_bad_section_sitemaps_and_breadcrumbs(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / 'dist'
+            shutil.copytree(ROOT / 'dist', root)
+            market = 'sitemaps/market.xml'
+            market_url = r'(<url><loc>https://openwiz\.dev/market/</loc>.*?</url>)'
+            market_sitemap = r'(<sitemap><loc>https://openwiz\.dev/sitemaps/market\.xml</loc></sitemap>)'
+            breadcrumb = r'(<link about="\[_:breadcrumb\]" rel="[^"]*" resource="https://schema.org/BreadcrumbList">)'
+            cases = [
+                ('sitemap.xml', market_sitemap, '', 'sitemap index'),
+                ('sitemap.xml', market_sitemap, r'\1\1', 'sitemap index'),
+                (market, market_url, r'\1\1', 'sitemap must list'),
+                (market, r'<lastmod>[^<]*</lastmod>', '<lastmod>2026-02-30</lastmod>', 'lastmod'),
+                ('market/index.html', breadcrumb, '', 'BreadcrumbList'),
+                ('market/index.html', breadcrumb, r'\1\1', 'BreadcrumbList'),
+                ('market/index.html', r'property="https://schema.org/item" resource="https://openwiz\.dev/market/"',
+                 'property="https://schema.org/item" resource="https://openwiz.dev/faq/"', 'BreadcrumbList'),
+            ]
+            for name, pattern, replacement, error in cases:
+                with self.subTest(file=name, replacement=replacement):
+                    path = root / name
+                    original = path.read_text()
+                    changed, count = re.subn(pattern, replacement, original, count=1, flags=re.S)
+                    self.assertEqual(count, 1)
+                    path.write_text(changed)
+                    try:
+                        parsed = {page: Page((root / page).read_text()) for page in ALL_PAGES}
+                        with self.assertRaisesRegex(AssertionError, error):
+                            check_discovery(root, parsed)
+                    finally:
+                        path.write_text(original)
+
+    def test_page_registry_rejects_duplicate_and_invalid_metadata(self):
+        subprocess.run(['node', '--input-type=module', '-e', """
+            import assert from 'node:assert/strict';
+            import { createRegistry } from './scripts/registry.mjs';
+            import { sitemapFiles } from './scripts/sitemap.mjs';
+            const fixture = {
+              path: '/docs/example/', title: 'Example — OpenWiz', description: 'A docs example.',
+              breadcrumbs: [{ name: 'Home', path: '/' }, { name: 'Example', path: '/docs/example/' }],
+              section: 'docs', lastmod: '2024-02-29', indexable: true,
+            };
+            const another = {
+              ...fixture, path: '/docs/another/', title: 'Another — OpenWiz', description: 'Another example.',
+              breadcrumbs: [{ name: 'Home', path: '/' }, { name: 'Another', path: '/docs/another/' }],
+            };
+            for (const field of ['path', 'title', 'description']) {
+              const registry = createRegistry();
+              registry.register([fixture]);
+              const duplicate = { ...another, [field]: fixture[field] };
+              if (field === 'path') duplicate.breadcrumbs = fixture.breadcrumbs;
+              assert.throws(() => registry.register([duplicate]), new RegExp('duplicate ' + field));
+            }
+            for (const [field, value] of [
+              ['title', 'OpenWiz ' + 'x'.repeat(53)], ['title', 'Example'],
+              ['description', 'x'.repeat(161)], ['lastmod', '2026-02-29'],
+            ]) {
+              assert.throws(() => createRegistry().register([{ ...fixture, [field]: value }]), new RegExp(field));
+            }
+            const registry = createRegistry();
+            const alias = '/docs/example/index.html';
+            assert.throws(() => registry.register([{
+              ...another, path: alias, breadcrumbs: [fixture.breadcrumbs[0], { name: 'Alias', path: alias }],
+            }]), /path/);
+            assert.throws(() => registry.register([fixture, { ...another, title: fixture.title }]), /duplicate title/);
+            registry.register([fixture, { ...another, indexable: false }]);
+            const answer = {
+              path: '/answer/', title: 'Answer — OpenWiz', description: 'An answer example.',
+              breadcrumbs: [fixture.breadcrumbs[0], { name: 'Answer', path: '/answer/' }],
+              section: 'answers', lastmod: '2026-11-28', indexable: true,
+            };
+            registry.register([answer]);
+            const files = sitemapFiles(registry);
+            assert.equal(registry.get(fixture.path).lastmod, fixture.lastmod);
+            assert.deepEqual(Object.keys(files).sort(), ['sitemap.xml', 'sitemaps/answers.xml', 'sitemaps/docs.xml']);
+            assert.match(files['sitemaps/docs.xml'], /<lastmod>2024-02-29/);
+            assert.ok(!files['sitemaps/docs.xml'].includes(another.path));
+            assert.ok(files['sitemaps/answers.xml'].includes(answer.path));
+        """], cwd=ROOT, check=True)
+
     def test_guide_page_discovery_and_rules(self):
         guide = 'guides/run-many-coding-agents/index.html'
         with tempfile.TemporaryDirectory() as temp:
@@ -139,7 +258,7 @@ class Checks(unittest.TestCase):
                 (guide, r'<h1>How to run many coding agents at once</h1>', '<h1>Run coding agents</h1>', 'guide h1 and HowTo name'),
                 (guide, r'OpenWiz 0\.01 \(version 0\.1\.0\)', 'OpenWiz 0.02 (version 0.1.1)', 'names only OpenWiz 0.01'),
                 ('what-is-openwiz/index.html', r'href="/guides/run-many-coding-agents/">Guide: run many coding agents</a>', 'href="/faq/">Guide</a>', 'overview links the guide'),
-                ('sitemap.xml', r'<url><loc>https://openwiz\.dev/guides/run-many-coding-agents/</loc>.*?</url>', '', 'sitemap must list'),
+                ('sitemaps/pages.xml', r'<url><loc>https://openwiz\.dev/guides/run-many-coding-agents/</loc>.*?</url>', '', 'sitemap must list'),
                 ('llms.txt', r'- \[How to run many coding agents at once\]\(https://openwiz\.dev/guides/run-many-coding-agents/\)[^\n]*\n', '', 'invalid llms.txt'),
                 ('llms-full.txt', r'\n6\. Watch it ship\.[^\n]*', '', 'llms-full.txt needs the guide'),
             ]

@@ -5,11 +5,14 @@ import { installSwitch, readReleases, render, summary, withReleases } from './sc
 import { readRegistry, render as renderMarket, summary as marketSummary, withMarket } from './scripts/market.mjs';
 import { readReach, render as renderReach, summary as reachSummary, withReach } from './scripts/reach.mjs';
 import { withDrivers } from './scripts/drivers.mjs';
-import { aboutPage, crawlerFiles, guidePage, pages, withMetadata } from './scripts/discovery.mjs';
+import { aboutPage, crawlerFiles, guidePage, withMetadata } from './scripts/discovery.mjs';
 import { withCheckout } from './scripts/pricing.mjs';
+import { pageFile, siteRegistry } from './scripts/registry.mjs';
+import { sitemapFiles } from './scripts/sitemap.mjs';
 
 const root = new URL('./', import.meta.url);
 const output = new URL('dist/', root);
+const pageRegistry = siteRegistry();
 const vendor = ['vendor/gsap-3.15.1.min.js', 'vendor/GSAP-LICENSE.txt', 'vendor/LOBE-ICONS-LICENSE.txt', 'vendor/LUCIDE-LICENSE.txt'];
 const art = (await readdir(new URL('art/', root))).filter(name => /\.(webp|avif)$/.test(name)).sort().map(name => `art/${name}`);
 const driverLogos = ['drivers/logos/boat-dev.svg', 'drivers/logos/cloudroom.png', 'drivers/logos/monitor.svg', 'drivers/logos/amp.svg', 'drivers/logos/antigravity.svg', 'drivers/logos/augment.svg', 'drivers/logos/capy.svg', 'drivers/logos/cline.svg', 'drivers/logos/conductor.svg', 'drivers/logos/crush.png', 'drivers/logos/cursor.svg', 'drivers/logos/devin.svg', 'drivers/logos/factory.svg', 'drivers/logos/gemini-cli.svg', 'drivers/logos/goose.png', 'drivers/logos/hermes.png', 'drivers/logos/kilo-code.svg', 'drivers/logos/kimi-code.svg', 'drivers/logos/kiro.svg', 'drivers/logos/ona.svg', 'drivers/logos/openclaw.svg', 'drivers/logos/opencode.svg', 'drivers/logos/openhands.svg', 'drivers/logos/pane.svg', 'drivers/logos/pi.svg', 'drivers/logos/qwen-code.svg', 'drivers/logos/sculptor.svg', 'drivers/logos/tembo.svg', 'drivers/logos/warp.svg'];
@@ -73,7 +76,9 @@ for (const file of hashed) {
   await put(names[file], data);
 }
 let about, guide;
-for (const page of Object.keys(pages)) {
+const pages = [...pageRegistry.values()];
+for (const entry of pages) {
+  const page = pageFile(entry.path);
   let html = await readFile(new URL(page, root), 'utf8');
   if (page === aboutPage || page === guidePage || page === '404.html') {
     html = html.replace('<template data-slot="top-bar"></template>', () => topBar);
@@ -83,7 +88,7 @@ for (const page of Object.keys(pages)) {
     html = html.replace('<template data-slot="install-instructions"></template>', `<p>${install}</p>`);
     about = html;
   }
-  html = withMetadata(page, html, faq);
+  html = withMetadata(page, entry, html, faq);
   for (const [file, name] of Object.entries(names)) html = html.replaceAll(`"/${file}"`, `"/${name}"`);
   if (page !== 'app/index.html') html = withFaq(withFooter(withCta(html)));
   if (page === 'index.html') html = withReach(html, renderReach(reach, registry));
@@ -93,7 +98,7 @@ for (const page of Object.keys(pages)) {
   if (page === 'pricing/index.html') html = withCheckout(html);
   await put(page, html);
 }
-const discovery = crawlerFiles(about, faq, guide);
+const discovery = { ...crawlerFiles(about, faq, guide), ...sitemapFiles(pageRegistry) };
 for (const [file, data] of Object.entries(discovery)) await put(file, data);
 await put('ask-index.json', await (await import('./scripts/ask-index.mjs')).snapshotIndex(output, new URL('ask-docs/', root)));
 for (const [file, source] of Object.entries(npmVendor)) await put(file, await readFile(new URL(source, root)));
@@ -102,4 +107,4 @@ for (const file of files) {
   await copyFile(new URL(file, root), new URL(file, output));
 }
 execFileSync('python3', ['-B', 'scripts/check.py', '--discovery-only'], { cwd: root, stdio: 'inherit' });
-console.log(`Static site: ${Object.keys(pages).length + fonts.length + hashed.length + files.length + Object.keys(npmVendor).length + Object.keys(discovery).length + 1} public files in dist/ (${Object.values(names).join(', ')})`);
+console.log(`Static site: ${pages.length + fonts.length + hashed.length + files.length + Object.keys(npmVendor).length + Object.keys(discovery).length + 1} public files in dist/ (${Object.values(names).join(', ')})`);
