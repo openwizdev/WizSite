@@ -2180,7 +2180,7 @@ class ReleaseOutline(HTMLParser):
         classes = (attrs.get('class') or '').split()
         self.tags.append((tag, attrs))
         if tag == 'article':
-            self.entries.append({'name': '', 'small': '', 'date': None, 'headline': '', 'bullets': [], 'links': []})
+            self.entries.append({'name': '', 'small': '', 'after': '', 'date': None, 'headline': '', 'bullets': [], 'links': []})
         elif tag == 'p' and 'pre' in classes:
             self.pre = {'text': '', 'links': []}
         if tag == 'time' and self.entries:
@@ -2193,7 +2193,7 @@ class ReleaseOutline(HTMLParser):
 
     def handle_endtag(self, tag):
         if tag in ('h2', 'small', 'p', 'li'):
-            self.at = 'name' if tag == 'small' else None
+            self.at = 'after' if tag == 'small' else None
 
     def handle_data(self, data):
         if self.pre is not None:
@@ -2206,19 +2206,21 @@ class ReleaseOutline(HTMLParser):
 
 def check_releases(section, releases, live):
     outline = ReleaseOutline(section)
-    allowed = {'section': {'class', 'aria-label'}, 'article': {'class', 'aria-labelledby'}, 'h2': {'id'}, 'small': set(),
+    allowed = {'section': {'class', 'aria-label'}, 'article': {'class', 'aria-labelledby'}, 'h2': {'id'}, 'small': {'class'},
                'time': {'datetime'}, 'p': {'class'}, 'ul': set(), 'li': set(), 'a': {'href', 'data-count'}}
     for tag, attrs in outline.tags:
         assert tag in allowed, f'unexpected element in the release entries: {tag}'
         assert set(attrs) <= allowed[tag], f'unexpected attribute in the release entries: {tag} {sorted(attrs)}'
+        if tag == 'small':
+            assert attrs.get('class', 'semver') == 'semver', 'the semver small is unlabelled or labelled semver'
     assert outline.tags[:1] == [('section', {'class': 'releases', 'aria-label': 'Releases'})], 'the entries sit in one Releases section'
     want = sorted(releases.values(), key=lambda d: semver(d['semver']), reverse=True) if live else []
     assert len(outline.entries) == len(want), f'{len(outline.entries)} entries shown; the data and the install switch say {len(want)}'
     for got, data in zip(outline.entries, want):
         flat = lambda t: re.sub(r'\s+', ' ', t).strip()
         y, m, d = map(int, data['date'].split('-'))
-        assert (flat(got['name']), flat(got['small'])) == (data['name'], f'· {MONTHS[m - 1]} {d}, {y} ({data["semver"]})'), \
-            f'{data["name"]}: the entry is headed by its public name, its date and semver small beside it, newest first'
+        assert (flat(got['name']), flat(got['small']), flat(got['after'])) == (data['name'], f'· {MONTHS[m - 1]} {d}, {y} ({data["semver"]})', ''), \
+            f'{data["name"]}: the entry is headed by its whole public name, then its date and semver small, nothing after it, newest first'
         assert got['date'] == data['date'], f'{data["name"]}: the entry\'s date'
         assert flat(got['headline']) == data['headline'], f'{data["name"]}: the entry\'s headline'
         assert [flat(b) for b in got['bullets']] == data['bullets'], f'{data["name"]}: the entry\'s bullets'

@@ -387,6 +387,7 @@ class Checks(unittest.TestCase):
         page = CHANGELOG.replace('</main>', '<!-- releases:start -->' + LIVE + '<!-- releases:end --></main>')
         self.assertEqual(split_releases(page), (CHANGELOG, LIVE))
         check_releases(LIVE, DATA, True)
+        check_releases(LIVE.replace('<h2 id="v0-02">0.02 <small>', '<h2 id="v0-02">0.02 <small class="semver">'), DATA, True)
         check_releases(SOON, DATA, False)
         check_releases(SOON, {}, True)
         for built in (CHANGELOG, page.replace('</main>', '</main><!-- releases:start --><!-- releases:end -->'),
@@ -403,6 +404,9 @@ class Checks(unittest.TestCase):
                 (LIVE.replace(second + '</article>', second + '</article>' + second + '</article>'), True, 'entries shown'),
                 (LIVE.replace(first + '</article>', '').replace(second + '</article>', second + '</article>' + first + '</article>'), True, 'newest first'),
                 (LIVE.replace('(0.1.10)', '(0.1.11)'), True, 'newest first'),
+                (LIVE.replace('<h2 id="v0-02">0.02 <small>· <time datetime="2031-02-03">Feb 3, 2031</time> (0.1.10)</small></h2>',
+                              '<h2 id="v0-02"><small class="semver">· <time datetime="2031-02-03">Feb 3, 2031</time> (0.1.10)</small> 0.02</h2>'), True, 'public name'),
+                (LIVE.replace('<h2 id="v0-02">0.02 <small>', '<h2 id="v0-02">0.0<small>').replace('(0.1.10)</small></h2>', '(0.1.10)</small>2</h2>'), True, 'public name'),
                 (LIVE.replace('Feb 3, 2031', 'Feb 4, 2031'), True, 'newest first'),
                 (LIVE.replace('datetime="2031-02-03"', 'datetime="2031-02-04"'), True, "entry's date"),
                 (LIVE.replace('Two things.', 'Two things!'), True, "entry's headline"),
