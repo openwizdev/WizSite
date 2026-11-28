@@ -1,4 +1,5 @@
 from datetime import date, datetime, timedelta, timezone
+from decimal import Decimal
 from hashlib import sha256
 from html import escape, unescape
 from html.parser import HTMLParser
@@ -2608,7 +2609,52 @@ def check_privacy(path, data):
     assert not any(marker in text.lower() for marker in DENYLIST), f'private marker in {path}'
 
 
+def showcase_fixture_matches(export, schema):
+    if not isinstance(export, dict) or set(schema['required']) - export.keys():
+        return False
+    properties = schema['properties']
+    if not schema['additionalProperties'] and export.keys() - properties.keys():
+        return False
+    if export['schema'] != properties['schema']['const']:
+        return False
+    read_at = export['read_at']
+    timestamp = properties['read_at']
+    if not isinstance(read_at, str) or len(read_at) > timestamp['maxLength']:
+        return False
+    if not re.search(timestamp['pattern'], read_at):
+        return False
+    try:
+        datetime.fromisoformat(read_at)
+    except ValueError:
+        return False
+    count_fields = properties.keys() - {'schema', 'read_at'}
+    for name in export.keys() & count_fields:
+        value = export[name]
+        rule = properties[name]
+        if value is None and 'null' in rule['type']:
+            continue
+        integer = type(value) is int or (isinstance(value, Decimal) and value == value.to_integral_value())
+        if 'integer' not in rule['type'] or not integer or value < rule['minimum']:
+            return False
+    return True
+
+
+def check_showcase_fixtures():
+    schema = json.loads((ROOT / 'contracts/showcase.v1.schema.json').read_text(encoding='utf-8'))
+    fixtures = ROOT / 'scripts/showcase-fixtures'
+    for name in ('valid', 'all-null', 'extra-field', 'string-field', 'negative', 'bad-time'):
+        export = json.loads((fixtures / f'{name}.json').read_text(encoding='utf-8'), parse_float=Decimal)
+        expected = name in ('valid', 'all-null')
+        matches = showcase_fixture_matches(export, schema)
+        if matches != expected:
+            outcome = 'accepted' if matches else 'rejected'
+            required = 'accepted' if expected else 'rejected'
+            raise AssertionError(f'showcase fixture {name}.json: {outcome} a fixture that must be {required}')
+    print('PASS: showcase fixtures (2 accepted, 4 rejected)')
+
+
 def main():
+    check_showcase_fixtures()
     output = ROOT / 'dist'
     check_site(output)
     for name in RUNTIME - set(FINGERPRINTS.values()) - set(ALL_PAGES) - {ASK_INDEX} - DISCOVERY_FILES:
