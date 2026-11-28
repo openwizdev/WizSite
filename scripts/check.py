@@ -1077,7 +1077,7 @@ class MainText(HTMLParser):
                 self.words += len(words)
 
 
-def check_page_delivery(root, name, *, indexable, page=None):
+def check_page_delivery(root, name, *, indexable, page=None, report=False):
     raw = (root / name).read_bytes()
     html = raw.decode()
     page = Page(html) if page is None else page
@@ -1092,11 +1092,12 @@ def check_page_delivery(root, name, *, indexable, page=None):
         styles.add(path)
     css = sum(path.stat().st_size for path in styles) + page.inline_style_bytes
     main = MainText(html) if indexable else None
-    exception = f' (over {CSS_BUDGET} B CSS budget)' if css > CSS_BUDGET else ''
-    words = f'{main.words} main words, ' if main is not None else ''
-    print(f'{name}: {words}{compressed} B gzip HTML, {css} B render-blocking CSS{exception}, '
-          f'{len(page.blocking_scripts)} render-blocking scripts, {len(page.images)} images, '
-          f'{len(page.image_preloads)} image preloads')
+    if report:
+        exception = f' (over {CSS_BUDGET} B CSS budget)' if css > CSS_BUDGET else ''
+        words = f'{main.words} main words, ' if main is not None else ''
+        print(f'{name}: {words}{compressed} B gzip HTML, {css} B render-blocking CSS{exception}, '
+              f'{len(page.blocking_scripts)} render-blocking scripts, {len(page.images)} images, '
+              f'{len(page.image_preloads)} image preloads')
     if main is not None:
         assert main.mains == 1 and main.words >= 40, f'{name}: expected one <main> with at least 40 words in built HTML'
         assert not main.empty, f'{name}: empty {", ".join(main.empty)} in <main>'
@@ -1491,7 +1492,7 @@ def check_security_txt(text, now=None):
     )
 
 
-def check_site(root, registry=ROOT / 'market/registry.json', now=None):
+def check_site(root, registry=ROOT / 'market/registry.json', now=None, *, report_delivery=False):
     files = {p.relative_to(root).as_posix() for p in root.rglob('*') if p.is_file()}
     names = built_fingerprints(root)
     assert files == STATIC | set(names.values()), 'unexpected or missing build output'
@@ -1762,7 +1763,7 @@ def check_site(root, registry=ROOT / 'market/registry.json', now=None):
     main = re.search(r'<main\b[^>]*>[\s\S]*?</main>', changelog)
     assert main and sha256(main[0].encode()).hexdigest() == CHANGELOG_MAIN, 'changelog content changed; review explicitly before updating its snapshot'
     for name, page in parsed.items():
-        check_page_delivery(root, name, indexable=name in PAGES, page=page)
+        check_page_delivery(root, name, indexable=name in PAGES, page=page, report=report_delivery)
 
 
 class Outline(HTMLParser):
@@ -2763,7 +2764,7 @@ def check_privacy(path, data):
 
 def main():
     output = ROOT / 'dist'
-    check_site(output)
+    check_site(output, report_delivery=True)
     for name in RUNTIME - set(FINGERPRINTS.values()) - set(ALL_PAGES) - {ASK_INDEX} - DISCOVERY_FILES:
         source = APP_VENDOR[name][0] if name in APP_VENDOR else name
         assert (ROOT / source).read_bytes() == (output / name).read_bytes(), f'export differs: {name}'
@@ -2803,7 +2804,7 @@ if __name__ == '__main__':
         pages = {name: Page((output / name).read_text()) for name in ALL_PAGES}
         check_discovery(output, pages)
         for name, page in pages.items():
-            check_page_delivery(output, name, indexable=name in PAGES, page=page)
+            check_page_delivery(output, name, indexable=name in PAGES, page=page, report=True)
 
     else:
         main()

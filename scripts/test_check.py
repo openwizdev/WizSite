@@ -136,7 +136,7 @@ class Checks(unittest.TestCase):
                 + preload + '</head>' + main + image
             )
             with mock.patch('builtins.print') as output:
-                check_page_delivery(root, path.name, indexable=True)
+                check_page_delivery(root, path.name, indexable=True, report=True)
             self.assertIn('50000 B render-blocking CSS', output.call_args.args[0])
             path.write_text(main + '<!--' + random.Random(4073).randbytes(64_000).hex() + '-->')
             with self.assertRaisesRegex(AssertionError, 'compressed HTML'):
@@ -150,7 +150,7 @@ class Checks(unittest.TestCase):
             css = root / 'style.css'
             css.write_bytes(b'x' * 72_873)
             with mock.patch('builtins.print') as output:
-                check_page_delivery(root, path.name, indexable=False)
+                check_page_delivery(root, path.name, indexable=False, report=True)
             self.assertIn('over 50000 B CSS budget', output.call_args.args[0])
             css.write_bytes(b'x' * 72_874)
             with self.assertRaisesRegex(AssertionError, 'render-blocking CSS'):
