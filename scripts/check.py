@@ -1,13 +1,16 @@
+from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from hashlib import sha256
 from html import escape, unescape
 from html.parser import HTMLParser
 from pathlib import Path
+import gzip
 import json
 import re
 import subprocess
 import sys
+import urllib.parse
 from xml.etree import ElementTree
 from urllib.parse import unquote, urlsplit
 import font_chars
@@ -626,6 +629,22 @@ def srcset_urls(value):
     return [part.split()[0] for part in (value or '').split(',') if part.strip()]
 
 
+def screen_media(value):
+    return any(not re.match(r'^(?:(?:only\s+)?print\b|not\s+all$)', query.strip().lower())
+               for query in (value or 'all').split(','))
+
+
+def blocks_rendering(attrs, in_head):
+    kind = (attrs.get('type') or '').strip().lower().split(';', 1)[0].strip()
+    classic = kind in ('', 'text/javascript', 'application/javascript', 'text/ecmascript', 'application/ecmascript',
+                       'text/jscript', 'text/livescript', 'text/x-javascript', 'text/x-ecmascript',
+                       'application/x-javascript', 'application/x-ecmascript') or re.fullmatch(r'text/javascript1\.[0-5]', kind)
+    if not classic and kind != 'module':
+        return False
+    return (in_head and 'render' in (attrs.get('blocking') or '').split()
+            or classic and (not attrs.get('src') or not {'async', 'defer'} & attrs.keys()))
+
+
 class Page(HTMLParser):
     def __init__(self, text):
         super().__init__(convert_charrefs=True)
@@ -635,7 +654,10 @@ class Page(HTMLParser):
         self.social = []
         self.buttons = []
         self.images = []
-        self.sources, self.image_preloads = [], []
+        self.sources, self.image_preloads, self.head_image_preloads = [], [], []
+        self.picture_sources, self.image_sources = None, []
+        self.render_stylesheets, self.blocking_scripts = [], []
+        self.inline_style_bytes, self.in_screen_style = 0, False
         self.videos = []
         self.tracks = []
         self.video_tracks = []
@@ -661,6 +683,8 @@ class Page(HTMLParser):
         return next((tracks for clip, tracks in zip(self.videos, self.video_tracks) if clip is video), [])
 
     def handle_data(self, text):
+        if self.in_screen_style:
+            self.inline_style_bytes += len(text.encode())
         if self.title is not None:
             self.title += text
         if self.json_data is not None:
@@ -670,6 +694,10 @@ class Page(HTMLParser):
         self.head_fields.setdefault(name, []).append(value or '')
 
     def handle_endtag(self, tag):
+        if tag == 'picture':
+            self.picture_sources = None
+        if tag == 'style':
+            self.in_screen_style = False
         if tag == 'head':
             self.in_head = False
         if tag == 'title' and self.title is not None:
@@ -735,10 +763,16 @@ class Page(HTMLParser):
                 self.refs.append(attrs[key])
         for key in ('srcset', 'imagesrcset'):
             self.refs += srcset_urls(attrs.get(key))
+        if tag == 'picture':
+            self.picture_sources = []
         if tag == 'source':
             self.sources.append(attrs)
+            if self.picture_sources is not None:
+                self.picture_sources.append(attrs)
         if tag == 'link' and attrs.get('rel') == 'preload' and attrs.get('as') == 'image':
             self.image_preloads.append(attrs)
+            if self.in_head:
+                self.head_image_preloads.append(attrs)
         if tag == 'button':
             self.buttons.append(attrs)
             if 'data-checkout' in attrs:
@@ -747,6 +781,7 @@ class Page(HTMLParser):
                 self.checkout.append('')
         if tag == 'img':
             self.images.append(attrs)
+            self.image_sources.append(self.picture_sources or [])
         if tag == 'video':
             self.videos.append(attrs)
             self.video_tracks.append([])
@@ -757,6 +792,14 @@ class Page(HTMLParser):
                 self.video_tracks[self.open_video].append(attrs)
         if tag == 'a':
             self.links.append(attrs)
+        rel = (attrs.get('rel') or '').lower().split()
+        if (tag == 'link' and 'stylesheet' in rel and 'alternate' not in rel and 'disabled' not in attrs
+                and attrs.get('href') and screen_media(attrs.get('media'))):
+            self.render_stylesheets.append(attrs['href'])
+        if tag == 'style':
+            self.in_screen_style = screen_media(attrs.get('media'))
+        if tag == 'script' and blocks_rendering(attrs, self.in_head):
+            self.blocking_scripts.append(attrs.get('src') or 'inline')
         if tag == 'script' and not attrs.get('src') and self.json_data is None:
             self.inline_scripts += 1
         if (tag == 'link' and attrs.get('rel') == 'stylesheet' and attrs.get('href') and 'disabled' not in attrs
@@ -898,42 +941,202 @@ def guards_motion(rule):
 IMAGE_MIMES = {'.avif': 'image/avif', '.webp': 'image/webp', '.png': 'image/png', '.svg': 'image/svg+xml'}
 
 
-def check_image_preloads(name, html):
-    page = Page(html)
-    if not page.image_preloads:
-        return
-    head = Page(html.split('</head>', 1)[0])
-    assert len(head.image_preloads) == len(page.image_preloads), f'{name}: image preloads must live in <head>'
+def check_image_preloads(name, html, page=None, largest=None):
+    page = Page(html) if page is None else page
+    preloads = page.head_image_preloads
+    assert len(preloads) == len(page.image_preloads), f'{name}: image preloads must live in <head>'
     candidates = []
-    for pic_html in re.findall(r'<picture>(.*?)</picture>', html, re.S):
-        pic = Page(pic_html)
-        if pic.sources:
-            avif = [source for source in pic.sources if source.get('type') == 'image/avif']
-            active = avif or pic.sources
-            has_media = any(source.get('media') for source in pic.sources)
+    for i, (img, sources) in enumerate(zip(page.images, page.image_sources)):
+        if sources:
+            active = [source for source in sources if source.get('type') == 'image/avif'] or sources
+            has_media = any(source.get('media') for source in sources)
             for source in active:
-                candidates.append((source.get('type'), source.get('media'), source.get('srcset'), source.get('sizes'), has_media))
+                candidates.append((i, source.get('type'), source.get('media'), source.get('srcset'), source.get('sizes'), has_media))
         else:
-            for img in pic.images:
-                candidates.append((None, None, img.get('srcset') or img.get('src'), img.get('sizes'), False))
-    outside = re.sub(r'<picture>.*?</picture>', '', html, flags=re.S)
-    for img in Page(outside).images:
-        candidates.append((None, None, img.get('srcset') or img.get('src'), img.get('sizes'), False))
-    for preload in head.image_preloads:
+            candidates.append((i, None, None, img.get('srcset') or img.get('src'), img.get('sizes'), False))
+
+    matched_sources = set()
+    for preload in preloads:
         srcset = preload.get('imagesrcset') or preload.get('href')
         sizes = preload.get('imagesizes')
         kind = preload.get('type')
         media = preload.get('media')
-        first_url = srcset_urls(srcset)[0] if srcset else ''
-        ext_mime = IMAGE_MIMES.get(Path(first_url).suffix.lower())
-        matched = any(
-            srcset == c_srcset
+        urls = srcset_urls(srcset)
+        ext_mime = IMAGE_MIMES.get(Path(urls[0]).suffix.lower()) if urls else None
+        matched = {
+            (i, c_media) for i, c_type, c_media, c_srcset, c_sizes, has_media in candidates
+            if srcset and srcset == c_srcset
             and sizes == c_sizes
             and (kind == c_type if c_type is not None else (kind is None or kind == ext_mime))
             and (media == c_media if c_media is not None else (media is None or has_media))
-            for c_type, c_media, c_srcset, c_sizes, has_media in candidates
-        )
+        }
         assert matched, f'{name}: image preload does not match an active <picture> source or <img>: {srcset}'
+        matched_sources.update(matched)
+    if largest is not None:
+        assert all((i, media) in matched_sources for i, _, media, _, _, _ in candidates if i == largest), \
+            f'{name}: largest eager image must be preloaded: {page.images[largest].get("src")}'
+
+
+HTML_BUDGET = 60_000
+CSS_BUDGET = 50_000
+COMING_SOON_CHANGELOG_MAIN = '631b2670cd58b493145bd5fe12dbbe44564cc98b9c7662f62e91c7f7d3a1f0eb'
+EXISTING_CSS_BYTES = {
+    'index.html': 72_873,
+    'changelog/index.html': 69_399,
+    'drivers/index.html': 68_101,
+    'team/index.html': 68_101,
+    'faq/index.html': 72_873,
+    'market/index.html': 71_054,
+    'what-is-openwiz/index.html': 68_101,
+    'guides/run-many-coding-agents/index.html': 68_101,
+    'pricing/index.html': 68_101,
+    '404.html': 68_101,
+}
+VOID_ELEMENTS = frozenset('area base br col embed hr img input link meta param source track wbr'.split())
+NON_TEXT_CONTENT = frozenset(('canvas', 'iframe', 'math', 'svg', 'video', 'audio', 'object'))
+INERT_CONTENT = frozenset(('script', 'style'))
+HEADINGS = frozenset(('h1', 'h2', 'h3', 'h4', 'h5', 'h6'))
+WORD = re.compile(r"[^\W_]+(?:[’'-][^\W_]+)*")
+
+
+@dataclass
+class MainElement:
+    tag: str
+    label: str
+    excluded: bool = False
+    hidden: bool = False
+    window_bar: bool = False
+    needs_text: bool = False
+    has_content: bool = False
+    has_text: bool = False
+
+
+class MainText(HTMLParser):
+    def __init__(self, html):
+        super().__init__()
+        self.stack = []
+        self.mains = self.words = self.headings = self.template_depth = 0
+        self.empty = []
+        self.feed(html)
+        self.close()
+        while self.stack:
+            self.finish_element()
+
+    def handle_starttag(self, tag, attrs):
+        if tag == 'template':
+            self.template_depth += 1
+        if self.template_depth:
+            return
+        attrs = dict(attrs)
+        if tag == 'main':
+            self.mains += 1
+        if not self.stack and tag != 'main':
+            return
+        excluded = bool(self.stack and self.stack[-1].excluded)
+        decorative = attrs.get('aria-hidden') == 'true' or (
+            tag == 'i' and not attrs and self.stack and self.stack[-1].window_bar)
+        hidden = 'hidden' in attrs or bool(self.stack and self.stack[-1].hidden)
+        classes = (attrs.get('class') or '').split()
+        if tag in VOID_ELEMENTS:
+            if not excluded and not decorative and tag in ('img', 'input', 'hr', 'embed'):
+                self.stack[-1].has_content = True
+                if tag == 'img' and not hidden and (attrs.get('alt') or '').strip():
+                    self.stack[-1].has_text = True
+            return
+        if tag in NON_TEXT_CONTENT and self.stack and not excluded and not decorative:
+            self.stack[-1].has_content = True
+        if tag in HEADINGS and not excluded and not decorative and not hidden:
+            self.headings += 1
+        label = f'<{tag}>' + (f' #{attrs["id"]}' if attrs.get('id') else '')
+        self.stack.append(MainElement(
+            tag, label,
+            excluded=excluded or decorative or tag in INERT_CONTENT | NON_TEXT_CONTENT,
+            hidden=hidden,
+            window_bar='window-bar' in classes,
+            needs_text=tag in HEADINGS or 'faq-a' in classes,
+        ))
+
+    def handle_endtag(self, tag):
+        if self.template_depth:
+            if tag == 'template':
+                self.template_depth -= 1
+            return
+        for index in range(len(self.stack) - 1, -1, -1):
+            if self.stack[index].tag == tag:
+                while len(self.stack) > index:
+                    self.finish_element()
+                break
+
+    def finish_element(self):
+        entry = self.stack.pop()
+        if entry.excluded:
+            return
+        if not entry.has_content or (entry.needs_text and (entry.hidden or not entry.has_text)):
+            self.empty.append(entry.label)
+        if self.stack and entry.has_content:
+            self.stack[-1].has_content = True
+            self.stack[-1].has_text |= entry.has_text and not entry.hidden
+
+    def handle_data(self, text):
+        if not self.template_depth and self.stack and not self.stack[-1].excluded and text.strip():
+            entry = self.stack[-1]
+            entry.has_content = True
+            words = WORD.findall(text)
+            entry.has_text |= bool(words)
+            if not entry.hidden:
+                self.words += len(words)
+
+
+def is_coming_soon_changelog(root, name, html):
+    if name != 'changelog/index.html':
+        return False
+    main = re.search(r'<main\b[^>]*>[\s\S]*?</main>', html)
+    return bool(main and sha256(main[0].encode()).hexdigest() == COMING_SOON_CHANGELOG_MAIN
+                and install_switch((root / 'index.html').read_text()) == 'coming-soon')
+
+
+def check_page_delivery(root, name, *, indexable, page=None, report=False):
+    raw = (root / name).read_bytes()
+    html = raw.decode()
+    page = Page(html) if page is None else page
+    compressed = len(gzip.compress(raw, mtime=0))
+    styles = set()
+    root = root.resolve()
+    for ref in page.render_stylesheets:
+        url = urlsplit(urllib.parse.urljoin(SITE_URL + name, ref))
+        path = (root / unquote(url.path).lstrip('/')).resolve()
+        assert url.scheme == 'https' and url.netloc == 'openwiz.dev' and path.is_relative_to(root) and path.is_file(), \
+            f'{name}: cannot measure render-blocking CSS: {ref}'
+        styles.add(path)
+    css = sum(path.stat().st_size for path in styles) + page.inline_style_bytes
+    main = MainText(html) if indexable else None
+    coming_soon = main is not None and main.words < 40 and is_coming_soon_changelog(root, name, html)
+    if report:
+        exception = f' (over {CSS_BUDGET} B CSS budget)' if css > CSS_BUDGET else ''
+        words = f'{main.words} main words' if main is not None else ''
+        if coming_soon:
+            words += ' (pre-release Changelog below 40 words)'
+        if words:
+            words += ', '
+        print(f'{name}: {words}{compressed} B gzip HTML, {css} B render-blocking CSS{exception}, '
+              f'{len(page.blocking_scripts)} render-blocking scripts, {len(page.images)} images, '
+              f'{len(page.image_preloads)} image preloads')
+    if main is not None:
+        assert main.mains == 1 and (main.words >= 40 or coming_soon), \
+            f'{name}: expected one <main> with at least 40 words in built HTML'
+        assert not main.empty, f'{name}: empty {", ".join(main.empty)} in <main>'
+        assert main.headings, f'{name}: <main> needs a heading in built HTML'
+    assert compressed <= HTML_BUDGET, f'{name}: compressed HTML is {compressed} B, over {HTML_BUDGET} B'
+    limit = EXISTING_CSS_BYTES.get(name, CSS_BUDGET)
+    assert css <= limit, f'{name}: render-blocking CSS is {css} B, over {limit} B (budget: {CSS_BUDGET} B)'
+    assert not page.blocking_scripts, f'{name}: render-blocking script: {", ".join(page.blocking_scripts)}'
+    eager = {}
+    for i, img in enumerate(page.images):
+        assert all(re.fullmatch(r'[1-9]\d*', img.get(dim) or '') for dim in ('width', 'height')), \
+            f'{name}: image needs dimensions: {img.get("src")}'
+        if (img.get('loading') or '').lower() != 'lazy':
+            eager[i] = int(img['width']) * int(img['height'])
+    check_image_preloads(name, html, page, max(eager, key=eager.get) if eager else None)
 
 
 def check_images(root, landing, page, site_css, htmls):
@@ -964,8 +1167,6 @@ def check_images(root, landing, page, site_css, htmls):
                 f'a landing image below the first phone viewport must be loading="lazy" decoding="async": {attrs.get("src")}'
     for selector, body in re.findall(r'([^{}]+)\{([^{}]*)\}', site_css):
         assert '-frames.webp' not in body or '.is-playing' in selector, f'a sprite sheet that loads before its demo plays: {selector.strip()}'
-    for name in ALL_PAGES:
-        check_image_preloads(name, (root / name).read_text())
 
 
 def check_motion(css):
@@ -1341,7 +1542,7 @@ def check_security_txt(text, now=None):
     )
 
 
-def check_site(root, registry=ROOT / 'market/registry.json', now=None):
+def check_site(root, registry=ROOT / 'market/registry.json', now=None, *, report_delivery=False):
     files = {p.relative_to(root).as_posix() for p in root.rglob('*') if p.is_file()}
     names = built_fingerprints(root)
     assert files == STATIC | set(names.values()) | set(MIRROR_PATHS.values()), 'unexpected or missing build output'
@@ -1611,6 +1812,8 @@ def check_site(root, registry=ROOT / 'market/registry.json', now=None):
                 assert img.get('loading') == 'lazy', f'image needs lazy loading: {src}'
     main = re.search(r'<main\b[^>]*>[\s\S]*?</main>', changelog)
     assert main and sha256(main[0].encode()).hexdigest() == CHANGELOG_MAIN, 'changelog content changed; review explicitly before updating its snapshot'
+    for name, page in parsed.items():
+        check_page_delivery(root, name, indexable=name in PAGES, page=page, report=report_delivery)
 
 
 class Outline(HTMLParser):
@@ -2656,7 +2859,7 @@ def check_showcase_fixtures():
 def main():
     check_showcase_fixtures()
     output = ROOT / 'dist'
-    check_site(output)
+    check_site(output, report_delivery=True)
     for name in RUNTIME - set(FINGERPRINTS.values()) - set(ALL_PAGES) - {ASK_INDEX} - DISCOVERY_FILES:
         source = APP_VENDOR[name][0] if name in APP_VENDOR else name
         assert (ROOT / source).read_bytes() == (output / name).read_bytes(), f'export differs: {name}'
@@ -2693,6 +2896,10 @@ def main():
 if __name__ == '__main__':
     if sys.argv[1:] == ['--discovery-only']:
         output = ROOT / 'dist'
-        check_discovery(output, {name: Page((output / name).read_text()) for name in ALL_PAGES})
+        pages = {name: Page((output / name).read_text()) for name in ALL_PAGES}
+        check_discovery(output, pages)
+        for name, page in pages.items():
+            check_page_delivery(output, name, indexable=name in PAGES, page=page, report=True)
+
     else:
         main()
