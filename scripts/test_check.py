@@ -11,7 +11,7 @@ from unittest import mock
 
 import re
 
-from check import ALL_PAGES, ART, CTA, DOC_HASHES, FAQ, FAQ_PREREQS, FAQ_WHERE, FOOTER, INSTALL_NOTE_HTML, INSTALL_PREREQS_HTML, FINGERPRINTS, HASHED, INSTALL_SWITCH, ROOT, Page, check_changelog, check_image_preloads, check_release_data, check_releases, read_releases, split_releases, check_motion, check_privacy, check_ref, check_security_txt, check_site, check_vector, check_webp, check_avif, check_png, fingerprint
+from check import ALL_PAGES, ART, CTA, DOC_HASHES, FAQ, FAQ_PREREQS, FAQ_WHERE, FOOTER, INSTALL_NOTE_HTML, INSTALL_PREREQS_HTML, FINGERPRINTS, HASHED, INSTALL_SWITCH, ROOT, Page, check_changelog, check_discovery, check_image_preloads, check_release_data, check_releases, read_releases, split_releases, check_motion, check_privacy, check_ref, check_security_txt, check_site, check_vector, check_webp, check_avif, check_png, fingerprint
 
 REMOVED_ART = (
     'art/spec-video.mp4',
@@ -141,7 +141,6 @@ class Checks(unittest.TestCase):
                 ('what-is-openwiz/index.html', r'href="/guides/run-many-coding-agents/">Guide: run many coding agents</a>', 'href="/faq/">Guide</a>', 'overview links the guide'),
                 ('sitemap.xml', r'<url><loc>https://openwiz\.dev/guides/run-many-coding-agents/</loc>.*?</url>', '', 'sitemap must list'),
                 ('llms.txt', r'- \[How to run many coding agents at once\]\(https://openwiz\.dev/guides/run-many-coding-agents/\)[^\n]*\n', '', 'invalid llms.txt'),
-                ('llms-full.txt', r'\n6\. Watch it ship\.[^\n]*', '', 'llms-full.txt needs the guide'),
             ]
             for name, pattern, replacement, error in failures:
                 with self.subTest(file=name, error=error):
@@ -163,6 +162,69 @@ class Checks(unittest.TestCase):
                     check_site(root)
             finally:
                 path.write_bytes(original)
+
+    def test_discovery_rejects_a_missing_markdown_copy(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / 'dist'
+            shutil.copytree(ROOT / 'dist', root)
+            (root / 'faq.md').unlink(missing_ok=True)
+            with self.assertRaisesRegex(AssertionError, 'missing Markdown copy: faq.md'):
+                check_discovery(root, {name: Page((root / name).read_text()) for name in ALL_PAGES})
+
+    def test_discovery_checks_markdown_links_and_crawler_files(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / 'dist'
+            shutil.copytree(ROOT / 'dist', root)
+            failures = [
+                ('faq/index.html', r'<link rel="alternate" type="text/markdown"[^>]*>', '', 'Markdown alternate'),
+                ('llms.txt', r'^- .*\(https://openwiz\.dev/faq\.md\).*\n', '', 'llms.txt.*faq.md'),
+                ('llms-full.txt', r'(?m)^6\. .*Watch it ship.*\n', '', 'llms-full.txt.*guide'),
+                ('llms-full.txt', r'(?ms)^## FAQ — OpenWiz\n.*?(?=^## Drivers — OpenWiz\n)', '', 'llms-full.txt.*faq.md'),
+                ('_headers', r'^/\*\.md\n  Content-Type: text/markdown; charset=utf-8\n', '', 'Markdown content type'),
+            ]
+            for name, pattern, replacement, error in failures:
+                with self.subTest(file=name, error=error):
+                    path = root / name
+                    original = path.read_text()
+                    changed, count = re.subn(pattern, replacement, original, count=1, flags=re.M)
+                    self.assertEqual(count, 1)
+                    path.write_text(changed)
+                    try:
+                        with self.assertRaisesRegex(AssertionError, error):
+                            check_discovery(root, {page: Page((root / page).read_text()) for page in ALL_PAGES})
+                    finally:
+                        path.write_text(original)
+
+    def test_markdown_conversion_preserves_main_content(self):
+        html = """<head><title>Head noise</title></head>
+        <body><header>Site header</header><main>
+        <nav>Menu noise</nav><script>window.noise = true;</script>
+        <h1>A &amp; B</h1>
+        <p>Read <a title="2 > 1" href='../intro/?x=1&amp;y=2'><strong>the intro</strong></a>
+        and <a href="#commands">commands</a>.</p>
+        <ol start="3"><li>Start<ul><li>Nested</li></ul></li><li>Finish</li></ol>
+        <pre><code class="language-sh">echo &lt;name&gt;
+  printf '%s' '```'
+</code></pre><footer>Footer noise</footer></main><aside>Aside noise</aside></body>"""
+        result = subprocess.run(['node', '--input-type=module', '-e', """
+            import { readFileSync } from 'node:fs';
+            import { toMarkdown } from './scripts/mirrors.mjs';
+            process.stdout.write(toMarkdown(readFileSync(0, 'utf8'), 'https://openwiz.dev/guides/sample/'));
+        """], cwd=ROOT, input=html, text=True, capture_output=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout, """# A & B
+
+Read [**the intro**](https://openwiz.dev/guides/intro/?x=1&y=2) and [commands](https://openwiz.dev/guides/sample/#commands).
+
+3. Start
+   - Nested
+4. Finish
+
+````sh
+echo <name>
+  printf '%s' '```'
+````
+""")
 
     def test_broken_targets_fragments_and_schemes(self):
         root = ROOT / 'dist'

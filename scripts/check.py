@@ -1,4 +1,5 @@
 from datetime import date, datetime, timedelta, timezone
+from decimal import Decimal
 from hashlib import sha256
 from html import escape, unescape
 from html.parser import HTMLParser
@@ -8,7 +9,7 @@ import re
 import subprocess
 import sys
 from xml.etree import ElementTree
-from urllib.parse import unquote, urljoin, urlsplit
+from urllib.parse import unquote, urlsplit
 import font_chars
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -468,6 +469,10 @@ GUIDE_COST = ('OpenWiz is free and released under the Apache License 2.0. Suppor
               'and the software stays the same. See Pricing. You pay only for the models and machines you use: your Claude Code or Codex plan, '
               'and any host you pick. boat.dev bills per second while a sandbox runs, and CloudRoom\u2019s charges are its own, on your plan with it.')
 PAGES = ('index.html', 'changelog/index.html', 'drivers/index.html', TEAM_PAGE, FAQ_PAGE, 'market/index.html', ABOUT_PAGE, GUIDE_PAGE, PRICING_PAGE)
+MIRROR_PATHS = {
+    page: 'index.md' if page == 'index.html' else page.removesuffix('/index.html').removesuffix('.html') + '.md'
+    for page in PAGES
+}
 SITE_PAGES = PAGES + (NOT_FOUND,)
 ALL_PAGES = SITE_PAGES + (APP_PAGE,)
 STORY_COPY = ('Build a to-do app', 'Bring any agent', 'Sign in with GitHub', 'Put the app on your phone')
@@ -692,6 +697,9 @@ class Page(HTMLParser):
         elif self.in_head and tag == 'link' and attrs.get('rel') == 'canonical':
             self.head_field('canonical', attrs.get('href'))
             return
+        elif self.in_head and tag == 'link' and 'alternate' in (attrs.get('rel') or '').lower().split() \
+                and attrs.get('type') == 'text/markdown':
+            self.head_field('markdown alternate', attrs.get('href'))
         if 'id' in attrs:
             assert attrs['id'] not in self.ids, 'duplicate HTML id'
             self.ids.add(attrs['id'])
@@ -1266,12 +1274,38 @@ def check_discovery(root, pages):
     ) and f'{SITE_URL}SKILL.md' in brief and f'[{GUIDE_H1}]({SITE_URL}guides/run-many-coding-agents/)' in brief.split('\n## Docs\n')[-1].split('\n## ')[0], \
         'invalid llms.txt'
     assert skill.startswith('---\nname: install-openwiz\n'), 'invalid SKILL.md'
-    assert full.startswith('# What is OpenWiz?\n') and all(
-        f"### {item['name']}\n\n{item['acceptedAnswer']['text']}\n" in full for item in expected_faq), 'invalid llms-full.txt'
-    first = re.search(r'<p>([\s\S]*?)</p>', guide_main)[1]
-    md = lambda html: plain(re.sub(r'<a href="([^"]+)">([^<]+)</a>', lambda m: f'[{m[2]}]({urljoin(SITE_URL, m[1])})', html))
-    assert f'\n## Guide: {GUIDE_H1}\n\n{md(first)}\n' in full and all(
-        f'\n{i}. {plain(name)}. {md(text)}' in full for i, (name, text) in enumerate(visible, 1)), 'llms-full.txt needs the guide'
+    check_mirrors(root, pages, urls, brief, full)
+
+
+def check_mirrors(root, pages, urls, brief, full):
+    rules = parse_headers((root / '_headers').read_text())
+    for path in (*MIRROR_PATHS.values(), 'SKILL.md'):
+        assert match_headers(rules, f'/{path}').get('content-type') == ['text/markdown; charset=utf-8'], \
+            f'{path}: missing or invalid Markdown content type'
+    brief_lines = brief.splitlines()
+    copies = {}
+    for name, page in pages.items():
+        path = MIRROR_PATHS.get(name)
+        links = page.head_fields.get('markdown alternate', [])
+        if path is None:
+            assert not links, f'{name}: unexpected Markdown alternate'
+            continue
+        assert (root / path).is_file(), f'missing Markdown copy: {path}'
+        copy = (root / path).read_text()
+        assert copy.strip() and copy.endswith('\n'), f'{path}: empty or invalid Markdown copy'
+        assert links == [f'/{path}'], f'{name}: missing or invalid Markdown alternate'
+        title = page.head_fields['title'][0]
+        canonical = page.head_fields['canonical'][0]
+        assert any(line.startswith(f'- [{title}]({SITE_URL}{path})') for line in brief_lines), \
+            f'llms.txt needs a link to {path}'
+        copies[canonical] = (path, f'\n## {title}\n\nURL: {canonical}\n\n{copy}')
+    assert full.startswith('# OpenWiz\n'), 'invalid llms-full.txt heading'
+    offset = len('# OpenWiz\n')
+    for url in urls:
+        path, section = copies[url]
+        assert full.startswith(section, offset), f'llms-full.txt needs the complete copy of {path} in page table order'
+        offset += len(section)
+    assert offset == len(full), 'llms-full.txt has unexpected content after the Markdown copies'
 
 
 def check_security_txt(text, now=None):
@@ -1310,7 +1344,7 @@ def check_security_txt(text, now=None):
 def check_site(root, registry=ROOT / 'market/registry.json', now=None):
     files = {p.relative_to(root).as_posix() for p in root.rglob('*') if p.is_file()}
     names = built_fingerprints(root)
-    assert files == STATIC | set(names.values()), 'unexpected or missing build output'
+    assert files == STATIC | set(names.values()) | set(MIRROR_PATHS.values()), 'unexpected or missing build output'
     docs = {name: (root / name).read_text() for name in ALL_PAGES}
     parsed = {name: Page(html) for name, html in docs.items()}
     check_discovery(root, parsed)
@@ -1431,7 +1465,7 @@ def check_site(root, registry=ROOT / 'market/registry.json', now=None):
     sec_rule = re.search(r'^/\.well-known/security\.txt\n((?:  .*\n?)*)', headers, re.M)
     assert sec_rule and '  Content-Type: text/plain; charset=utf-8' in sec_rule[1].splitlines(), \
         '_headers must serve /.well-known/security.txt as text/plain; charset=utf-8'
-    for name in ('llms.txt', 'llms-full.txt', 'SKILL.md', 'c76a1a01e62d088edd3789d30d6a4d29.txt'):
+    for name in ('llms.txt', 'llms-full.txt', 'c76a1a01e62d088edd3789d30d6a4d29.txt'):
         assert f'/{name}\n  Content-Type: text/plain; charset=utf-8\n' in headers, f'{name} needs a plain-text content type'
     rules = parse_headers(headers)
     site_header_pairs = [(h.split(':', 1)[0].strip().lower(), h.split(':', 1)[1].strip()) for h in SITE_HEADERS]
@@ -2575,7 +2609,52 @@ def check_privacy(path, data):
     assert not any(marker in text.lower() for marker in DENYLIST), f'private marker in {path}'
 
 
+def showcase_fixture_matches(export, schema):
+    if not isinstance(export, dict) or set(schema['required']) - export.keys():
+        return False
+    properties = schema['properties']
+    if not schema['additionalProperties'] and export.keys() - properties.keys():
+        return False
+    if export['schema'] != properties['schema']['const']:
+        return False
+    read_at = export['read_at']
+    timestamp = properties['read_at']
+    if not isinstance(read_at, str) or len(read_at) > timestamp['maxLength']:
+        return False
+    if not re.search(timestamp['pattern'], read_at):
+        return False
+    try:
+        datetime.fromisoformat(read_at)
+    except ValueError:
+        return False
+    count_fields = properties.keys() - {'schema', 'read_at'}
+    for name in export.keys() & count_fields:
+        value = export[name]
+        rule = properties[name]
+        if value is None and 'null' in rule['type']:
+            continue
+        integer = type(value) is int or (isinstance(value, Decimal) and value == value.to_integral_value())
+        if 'integer' not in rule['type'] or not integer or value < rule['minimum']:
+            return False
+    return True
+
+
+def check_showcase_fixtures():
+    schema = json.loads((ROOT / 'contracts/showcase.v1.schema.json').read_text(encoding='utf-8'))
+    fixtures = ROOT / 'scripts/showcase-fixtures'
+    for name in ('valid', 'all-null', 'extra-field', 'string-field', 'negative', 'bad-time'):
+        export = json.loads((fixtures / f'{name}.json').read_text(encoding='utf-8'), parse_float=Decimal)
+        expected = name in ('valid', 'all-null')
+        matches = showcase_fixture_matches(export, schema)
+        if matches != expected:
+            outcome = 'accepted' if matches else 'rejected'
+            required = 'accepted' if expected else 'rejected'
+            raise AssertionError(f'showcase fixture {name}.json: {outcome} a fixture that must be {required}')
+    print('PASS: showcase fixtures (2 accepted, 4 rejected)')
+
+
 def main():
+    check_showcase_fixtures()
     output = ROOT / 'dist'
     check_site(output)
     for name in RUNTIME - set(FINGERPRINTS.values()) - set(ALL_PAGES) - {ASK_INDEX} - DISCOVERY_FILES:
