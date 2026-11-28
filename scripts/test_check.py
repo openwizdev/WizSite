@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from hashlib import sha256
 from html import escape
 from pathlib import Path
 import json
@@ -10,7 +11,7 @@ from unittest import mock
 
 import re
 
-from check import ALL_PAGES, CTA, FAQ, FAQ_PREREQS, FAQ_WHERE, FOOTER, INSTALL_NOTE_HTML, INSTALL_PREREQS_HTML, FINGERPRINTS, HASHED, INSTALL_SWITCH, ROOT, Page, check_changelog, check_image_preloads, check_release_data, check_releases, read_releases, split_releases, check_motion, check_privacy, check_ref, check_security_txt, check_site, check_vector, check_webp, check_avif, check_png, fingerprint
+from check import ALL_PAGES, CTA, DOC_HASHES, FAQ, FAQ_PREREQS, FAQ_WHERE, FOOTER, INSTALL_NOTE_HTML, INSTALL_PREREQS_HTML, FINGERPRINTS, HASHED, INSTALL_SWITCH, ROOT, Page, check_changelog, check_image_preloads, check_release_data, check_releases, read_releases, split_releases, check_motion, check_privacy, check_ref, check_security_txt, check_site, check_vector, check_webp, check_avif, check_png, fingerprint
 
 
 def edit_built(root, name, change):
@@ -218,13 +219,23 @@ class Checks(unittest.TestCase):
         import zlib
         chunk = lambda kind, body: len(body).to_bytes(4, 'big') + kind + body + zlib.crc32(kind + body).to_bytes(4, 'big')
         png = lambda *extra: b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', bytes(13)) + b''.join(extra) + chunk(b'IDAT', b'x') + chunk(b'IEND', b'')
-        check_png(png())
-        check_privacy('docs/evidence/speed/x/home.png', png())
-        for bad in (png(chunk(b'tEXt', b'Author\0someone')), png(chunk(b'eXIf', b'x')), png()[:-3]):
-            with self.subTest(bad=bad[-24:]), self.assertRaises(AssertionError):
-                check_privacy('docs/evidence/speed/x/home.png', bad)
-        with self.assertRaises(AssertionError):
-            check_privacy('docs/new.png', png())
+        clean = png()
+        check_png(clean)
+        existing = next(iter(DOC_HASHES))
+        check_privacy(existing, (ROOT / existing).read_bytes())
+        for path in ('docs/evidence/speed/x/home.png', existing, 'docs/new.png'):
+            with self.subTest(unpinned=path), self.assertRaisesRegex(AssertionError, 'unreviewed picture'):
+                check_privacy(path, clean)
+        with mock.patch.dict(DOC_HASHES, {'docs/evidence/speed/x/home.png': sha256(clean).hexdigest()}):
+            check_privacy('docs/evidence/speed/x/home.png', clean)
+        for bad in (png(chunk(b'tEXt', b'Author\0someone')), png(chunk(b'eXIf', b'x')), png(chunk(b'iCCP', b'x')), clean[:-3]):
+            with self.subTest(bad=bad[-24:]), mock.patch.dict(DOC_HASHES, {'docs/evidence/speed/x/home.png': sha256(bad).hexdigest()}):
+                with self.assertRaises(AssertionError):
+                    check_privacy('docs/evidence/speed/x/home.png', bad)
+        marked = b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', bytes(13)) + chunk(b'IDAT', ('cr' + '_sub_x').encode()) + chunk(b'IEND', b'')
+        with mock.patch.dict(DOC_HASHES, {'docs/evidence/speed/x/home.png': sha256(marked).hexdigest()}):
+            with self.assertRaisesRegex(AssertionError, 'private marker'):
+                check_privacy('docs/evidence/speed/x/home.png', marked)
 
     def test_right_sized_images(self):
         phone = '<link rel="preload" as="image" type="image/avif" media="(max-width: 480px)"'

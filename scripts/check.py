@@ -2447,11 +2447,11 @@ def check_privacy(path, data):
         assert font in FONT_HASHES, 'unreviewed binary font'
     if path.endswith(('.webp', '.avif', '.mp4', '.vtt')):
         check_art(font, data)
-    if path.startswith(EVIDENCE) and path.endswith('.png'):
-        check_png(data)
-    elif path.endswith(('.png', '.ico')):
+    if path.endswith(('.png', '.ico')):
         pinned = DOC_HASHES.get(path) or ICON_HASHES.get(font) or DRIVER_LOGOS.get(font, (None,))[0]
         assert pinned and sha256(data).hexdigest() == pinned, 'unreviewed picture'
+        if path.startswith(EVIDENCE) and path.endswith('.png'):
+            check_png(data)
         assert not any(marker.encode() in data.lower() for marker in DENYLIST), f'private marker in {path}'
     if font in VECTORS:
         check_vector(data)
