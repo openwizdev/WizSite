@@ -294,3 +294,118 @@ test('demo welcome: the quiet GitHub link reopens a saved session instead of res
     await run.close();
   }
 });
+
+test('desktop Feed with the right rail keeps the action grid and Not now inside the card', async () => {
+  const run = await start();
+  try {
+    for (const width of [1040, 1120]) {
+      await run.page.size(width, 900, false);
+      for (const hash of ['#/feed', '#/feed/2', '#/feed/3']) {
+        await run.page.go(`${SITE}/app/?v2=dry-run&demo=1${hash}`);
+        await run.page.until(`Boolean(document.querySelector('.v2-hero-card .v2-card-actions'))`, `feed ${hash} at ${width}`);
+        const layout = await run.page.run(`(() => {
+          const rect = el => { const b = el.getBoundingClientRect(); return { left: b.left, right: b.right, top: b.top, bottom: b.bottom, width: b.width, height: b.height }; };
+          const main = rect(document.querySelector('.v2-feed-main'));
+          const card = rect(document.querySelector('.v2-hero-card'));
+          const aside = rect(document.querySelector('.v2-feed-aside'));
+          const actions = rect(document.querySelector('.v2-card-actions'));
+          const title = rect(document.querySelector('.v2-card-title'));
+          const buttons = [...document.querySelectorAll('.v2-card-actions button')].map(button => {
+            const box = rect(button);
+            const topHit = document.elementFromPoint(box.left + box.width / 2, box.top + Math.min(12, box.height / 2));
+            return {
+              text: button.textContent.trim(),
+              left: box.left, right: box.right, width: box.width, height: box.height,
+              topHitsSelf: topHit === button || button.contains(topHit),
+            };
+          });
+          return { main, card, aside, actions, title, buttons };
+        })()`);
+        assert.ok(layout.aside.left >= layout.main.right - 1, `right rail overlapped main at ${width} (${hash})`);
+        assert.ok(layout.card.right <= layout.main.right + 1 && layout.card.right <= layout.aside.left + 1,
+          `card extended into right rail at ${width} (${hash})`);
+        assert.ok(layout.title.right <= layout.card.right + 1 && layout.title.right <= layout.aside.left + 1,
+          `title extended into right rail at ${width} (${hash})`);
+        assert.ok(layout.actions.right <= layout.card.right + 1,
+          `action grid extended past card at ${width} (${hash})`);
+        for (const button of layout.buttons) {
+          assert.ok(button.left >= layout.card.left - 1 && button.right <= layout.card.right + 1,
+            `button "${button.text}" extended past card at ${width} (${hash})`);
+          assert.ok(button.right <= layout.aside.left + 1,
+            `button "${button.text}" overlapped right rail at ${width} (${hash})`);
+          assert.equal(button.topHitsSelf, true,
+            `button "${button.text}" was covered near its top edge at ${width} (${hash})`);
+        }
+      }
+    }
+
+    await run.page.size(1040, 900, false);
+    await run.page.go(`${SITE}/app/?v2=dry-run&demo=1#/feed/2`);
+    await run.page.until(`document.querySelector('.v2-card-title')?.textContent === 'Keep the free plan?'`, 'feed/2 at 1040');
+    await run.page.run(`(() => {
+      const defer = document.querySelector('.v2-defer');
+      const box = defer.getBoundingClientRect();
+      const hit = document.elementFromPoint(box.left + box.width / 2, box.top + 12);
+      hit.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    })()`);
+    await run.page.until(`location.hash === '#/feed/3' && document.querySelector('.v2-card-title')?.textContent === 'Retention window for deleted projects'`,
+      'clicking Not now at 1040 advances to #/feed/3');
+    assert.deepEqual(run.world.violations, []);
+  } finally {
+    await run.close();
+  }
+});
+
+test('desktop Chat keeps the selected pill check icon and label inside its button at narrow widths', async () => {
+  const run = await start();
+  try {
+    for (const width of [900, 761]) {
+      await run.page.size(width, 900, false);
+      await run.page.go(`${SITE}/app/?v2=dry-run&demo=1#/chat`);
+      await run.page.until(`document.querySelectorAll('.v2-q-pill').length === 6`, `chat at ${width}`);
+      await run.page.tap('Count everyone');
+      await run.page.until(`document.querySelectorAll('.v2-q-pill')[3]?.getAttribute('aria-pressed') === 'true'`, `Count everyone selected at ${width}`);
+      const chat = await run.page.run(`(() => {
+        const pills = [...document.querySelectorAll('.v2-q-pill')];
+        const viewers = pills[2];
+        const vb = viewers.getBoundingClientRect();
+        const rightEdgeHit = document.elementFromPoint(vb.right - 4, vb.top + vb.height / 2);
+        return {
+          rightEdgeHitsViewers: rightEdgeHit === viewers || viewers.contains(rightEdgeHit),
+          pills: pills.map(pill => {
+            const box = pill.getBoundingClientRect();
+            const ic = pill.getAttribute('aria-pressed') === 'true' ? pill.querySelector('.ic')?.getBoundingClientRect() : null;
+            return {
+              text: pill.textContent.trim(),
+              scrollWidth: pill.scrollWidth,
+              clientWidth: pill.clientWidth,
+              left: box.left, right: box.right, top: box.top, bottom: box.bottom,
+              ic: ic ? { left: ic.left, right: ic.right, top: ic.top, bottom: ic.bottom } : null,
+            };
+          }),
+        };
+      })()`);
+      for (const pill of chat.pills) {
+        assert.ok(pill.scrollWidth <= pill.clientWidth + 1,
+          `chat pill "${pill.text}" overflowed horizontally at ${width} (${pill.scrollWidth} > ${pill.clientWidth})`);
+        if (pill.ic) {
+          assert.ok(pill.ic.left >= pill.left - 1 && pill.ic.right <= pill.right + 1 &&
+            pill.ic.top >= pill.top - 1 && pill.ic.bottom <= pill.bottom + 1,
+          `check icon escaped "${pill.text}" at ${width}`);
+        }
+      }
+      assert.equal(chat.rightEdgeHitsViewers, true, `Count everyone check icon intercepted clicks on Viewers free at ${width}`);
+      await run.page.run(`(() => {
+        const viewers = document.querySelectorAll('.v2-q-pill')[2];
+        const vb = viewers.getBoundingClientRect();
+        const hit = document.elementFromPoint(vb.right - 4, vb.top + vb.height / 2);
+        hit.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+      })()`);
+      await run.page.until(`document.querySelectorAll('.v2-q-pill')[2]?.getAttribute('aria-pressed') === 'true' && document.querySelectorAll('.v2-q-pill')[3]?.getAttribute('aria-pressed') === 'false'`,
+        `clicking near the right edge of Viewers free selects it at ${width}`);
+    }
+    assert.deepEqual(run.world.violations, []);
+  } finally {
+    await run.close();
+  }
+});
