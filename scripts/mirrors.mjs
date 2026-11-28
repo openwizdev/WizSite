@@ -33,6 +33,7 @@ export function pageMarkdown(html) {
     .replace(/<!--[\s\S]*?-->/g, '')
     .replace(/<(script|style|template|svg|noscript|form|video|audio|picture|figure|dialog)\b[\s\S]*?<\/\1>/g, '')
     .replace(/<(\w+)\b[^>]*\b(hidden|aria-hidden="true")[^>]*>[\s\S]*?<\/\1>/g, '')
+    .replace(/(<h[1-6]\b[^>]*>)\s*<button\b[^>]*>([\s\S]*?)<\/button>\s*(<\/h[1-6]>)/g, '$1$2$3')
     .replace(/<button\b[^>]*>([\s\S]*?)<\/button>/g, '')
     .replace(/<code\b[^>]*class="[^"]*install-line[^"]*"[^>]*>([\s\S]*?)<\/code>/g, '<p><code>$1</code></p>');
   const blocks = [];

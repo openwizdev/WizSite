@@ -1277,6 +1277,17 @@ def check_discovery(root, pages):
         assert f'{SITE_URL}{copy}' in brief.split('\n## Markdown copies\n')[-1], f'llms.txt must list {copy}'
         assert url in full_text, f'llms-full.txt must hold {name}'
     assert '`Install OpenWiz from github.com/openwizdev/OpenWiz`' in (root / 'index.md').read_text(), 'the home copy needs the install line'
+    faq_copy = (root / mirror_path(FAQ_PAGE)).read_text()
+    for _, question, _, answer in FAQ_ROWS.findall(FAQ):
+        assert f'{plain(question)}\n\n' in faq_copy, f'the FAQ copy needs the question: {plain(question)}'
+    every = full_text.split('\n## Every page\n', 1)
+    assert len(every) == 2, 'llms-full.txt needs its Every page section'
+    for name in PAGES:
+        if name in (ABOUT_PAGE, FAQ_PAGE, GUIDE_PAGE):
+            continue
+        body = (root / mirror_path(name)).read_text().split('\nSource: ')[0]
+        lines = [line for line in body.splitlines() if line.strip() and not line.startswith('#')]
+        assert lines and all(line in every[1] for line in lines), f'llms-full.txt must hold all of {mirror_path(name)}'
     full = (root / 'llms-full.txt').read_text()
     skill = (root / 'SKILL.md').read_text()
     assert brief.startswith('# OpenWiz\n\n> ') and all(
