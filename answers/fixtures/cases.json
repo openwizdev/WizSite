@@ -1,0 +1,337 @@
+[
+  {
+    "rule": "slug is required",
+    "passing": "example-answer",
+    "error": "\\bslug\\b.*required",
+    "changes": {"slug": null}
+  },
+  {
+    "rule": "kind is required",
+    "passing": "example-answer",
+    "error": "\\bkind\\b.*required",
+    "changes": {"kind": null}
+  },
+  {
+    "rule": "query is required",
+    "passing": "example-answer",
+    "error": "\\bquery\\b.*required",
+    "changes": {"query": null}
+  },
+  {
+    "rule": "title is required",
+    "passing": "example-answer",
+    "error": "\\btitle\\b.*required",
+    "changes": {"title": null}
+  },
+  {
+    "rule": "description is required",
+    "passing": "example-answer",
+    "error": "\\bdescription\\b.*required",
+    "changes": {"description": null}
+  },
+  {
+    "rule": "answer is required",
+    "passing": "example-answer",
+    "error": "\\banswer\\b.*required",
+    "changes": {"answer": null}
+  },
+  {
+    "rule": "sections is required",
+    "passing": "example-answer",
+    "error": "\\bsections\\b.*required",
+    "changes": {"sections": null}
+  },
+  {
+    "rule": "faq is required",
+    "passing": "example-answer",
+    "error": "\\bfaq\\b.*required",
+    "changes": {"faq": null}
+  },
+  {
+    "rule": "sources is required",
+    "passing": "example-answer",
+    "error": "\\bsources\\b.*required",
+    "changes": {"sources": null}
+  },
+  {
+    "rule": "checked is required",
+    "passing": "example-answer",
+    "error": "\\bchecked\\b.*required",
+    "changes": {"checked": null}
+  },
+  {
+    "rule": "extra fields are refused",
+    "passing": "example-answer",
+    "error": "unexpected.*unknown field",
+    "changes": {"unexpected": true}
+  },
+  {
+    "rule": "slug is lowercase and URL-safe",
+    "passing": "example-answer",
+    "error": "slug",
+    "changes": {"slug": "Example/Answer"}
+  },
+  {
+    "rule": "slug cannot end with a newline",
+    "passing": "example-answer",
+    "error": "slug.*must match",
+    "changes": {"slug": "example-answer\n"}
+  },
+  {
+    "rule": "file is named for the slug",
+    "passing": "example-answer",
+    "error": "filename.*example-answer.json",
+    "filename": "wrong.json",
+    "changes": {}
+  },
+  {
+    "rule": "kind is answer or compare",
+    "passing": "example-answer",
+    "error": "kind",
+    "changes": {"kind": "guide"}
+  },
+  {
+    "rule": "query is nonblank text",
+    "passing": "example-answer",
+    "error": "query",
+    "changes": {"query": "   "}
+  },
+  {
+    "rule": "title names OpenWiz",
+    "passing": "example-answer",
+    "error": "title.*OpenWiz",
+    "changes": {"title": "A generic page title"}
+  },
+  {
+    "rule": "title has at most 60 characters",
+    "passing": "example-answer",
+    "error": "title.*60",
+    "changes": {"title": "OpenWiz xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"}
+  },
+  {
+    "rule": "description has at most 160 characters",
+    "passing": "example-answer",
+    "error": "description.*160",
+    "changes": {"description": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"}
+  },
+  {
+    "rule": "description is nonblank text",
+    "passing": "example-answer",
+    "error": "description",
+    "changes": {"description": ""}
+  },
+  {
+    "rule": "answer has at least two sentences",
+    "passing": "example-answer",
+    "error": "answer.*two or three",
+    "changes": {"answer": "One sentence only."}
+  },
+  {
+    "rule": "answer has at most three sentences",
+    "passing": "example-answer",
+    "error": "answer.*two or three",
+    "changes": {"answer": "One. Two? Three! Four."}
+  },
+  {
+    "rule": "answer ends with a complete sentence",
+    "passing": "example-answer",
+    "error": "answer.*two or three",
+    "changes": {"answer": "One. Two. A fragment"}
+  },
+  {
+    "rule": "sections is an array",
+    "passing": "example-answer",
+    "error": "sections.*array",
+    "changes": {"sections": "text"}
+  },
+  {
+    "rule": "sections entries require heading",
+    "passing": "example-answer",
+    "error": "sections.*heading.*required",
+    "changes": {"sections.0.heading": null}
+  },
+  {
+    "rule": "sections entries require body",
+    "passing": "example-answer",
+    "error": "sections.*body.*required",
+    "changes": {"sections.0.body": null}
+  },
+  {
+    "rule": "steps is an array",
+    "passing": "example-answer",
+    "error": "steps.*array",
+    "changes": {"steps": "text"}
+  },
+  {
+    "rule": "steps entries require name",
+    "passing": "example-answer",
+    "error": "steps.*name.*required",
+    "changes": {"steps.0.name": null}
+  },
+  {
+    "rule": "steps entries require text",
+    "passing": "example-answer",
+    "error": "steps.*text.*required",
+    "changes": {"steps.0.text": null}
+  },
+  {
+    "rule": "faq is an array",
+    "passing": "example-answer",
+    "error": "faq.*array",
+    "changes": {"faq": "text"}
+  },
+  {
+    "rule": "faq entries require question",
+    "passing": "example-answer",
+    "error": "faq.*question.*required",
+    "changes": {"faq.0.question": null}
+  },
+  {
+    "rule": "faq entries require answer",
+    "passing": "example-answer",
+    "error": "faq.*answer.*required",
+    "changes": {"faq.0.answer": null}
+  },
+  {
+    "rule": "sources is an array",
+    "passing": "example-answer",
+    "error": "sources.*array",
+    "changes": {"sources": "text"}
+  },
+  {
+    "rule": "sources entries require url",
+    "passing": "example-answer",
+    "error": "sources.*url.*required",
+    "changes": {"sources.0.url": null}
+  },
+  {
+    "rule": "sources entries require supports",
+    "passing": "example-answer",
+    "error": "sources.*supports.*required",
+    "changes": {"sources.0.supports": null}
+  },
+  {
+    "rule": "sources entries require checked",
+    "passing": "example-answer",
+    "error": "sources.*checked.*required",
+    "changes": {"sources.0.checked": null}
+  },
+  {
+    "rule": "sections has at least one item when present",
+    "passing": "example-answer",
+    "error": "sections.*item",
+    "changes": {"sections": []}
+  },
+  {
+    "rule": "steps has at least one item when present",
+    "passing": "example-answer",
+    "error": "steps.*item",
+    "changes": {"steps": []}
+  },
+  {
+    "rule": "sources has at least one item when present",
+    "passing": "example-answer",
+    "error": "sources.*item",
+    "changes": {"sources": []}
+  },
+  {
+    "rule": "HowTo or FAQPage has content",
+    "passing": "example-answer",
+    "error": "faq.*item",
+    "changes": {"faq": [], "steps": null}
+  },
+  {
+    "rule": "source requires an absolute HTTP(S) URL",
+    "passing": "example-answer",
+    "error": "sources.*url.*HTTP",
+    "changes": {"sources.0.url": "https:///docs"}
+  },
+  {
+    "rule": "source says what it supports",
+    "passing": "example-answer",
+    "error": "sources.*supports",
+    "changes": {"sources.0.supports": " "}
+  },
+  {
+    "rule": "source checked date is a real calendar date",
+    "passing": "example-answer",
+    "error": "sources.*checked.*date",
+    "changes": {"sources.0.checked": "2026-02-29"}
+  },
+  {
+    "rule": "page checked date uses YYYY-MM-DD",
+    "passing": "example-answer",
+    "error": "checked.*date",
+    "changes": {"checked": "20261128"}
+  },
+  {
+    "rule": "answer pages omit comparison fields",
+    "passing": "example-answer",
+    "error": "better_fit.*compare",
+    "changes": {"better_fit": "A comparison."}
+  },
+  {
+    "rule": "answer pages omit the other tool",
+    "passing": "example-answer",
+    "error": "other.*compare",
+    "changes": {"other": {"name": "Example Tool", "homepage": "https://tool.example/"}}
+  },
+  {
+    "rule": "comparisons require other",
+    "passing": "example-compare",
+    "error": "other.*required",
+    "changes": {"other": null}
+  },
+  {
+    "rule": "comparisons require better_fit",
+    "passing": "example-compare",
+    "error": "better_fit.*required",
+    "changes": {"better_fit": null}
+  },
+  {
+    "rule": "other tool requires name",
+    "passing": "example-compare",
+    "error": "other.*name.*required",
+    "changes": {"other.name": null}
+  },
+  {
+    "rule": "other tool requires homepage",
+    "passing": "example-compare",
+    "error": "other.*homepage.*required",
+    "changes": {"other.homepage": null}
+  },
+  {
+    "rule": "other homepage is a web URL",
+    "passing": "example-compare",
+    "error": "other.*homepage.*HTTP",
+    "changes": {"other.homepage": "mailto:tool@example.com"}
+  },
+  {
+    "rule": "better fit is nonblank",
+    "passing": "example-compare",
+    "error": "better_fit",
+    "changes": {"better_fit": " "}
+  },
+  {
+    "rule": "page copy cannot solicit stars",
+    "passing": "example-answer",
+    "error": "sections.*stars or votes",
+    "changes": {"sections.0.body": "Please give OpenWiz a GitHub star."}
+  },
+  {
+    "rule": "page copy cannot solicit votes",
+    "passing": "example-answer",
+    "error": "faq.*stars or votes",
+    "changes": {"faq.0.answer": "If you like the page, please vote for us on Product Hunt."}
+  },
+  {
+    "rule": "three sentences and HowTo without FAQ content are allowed",
+    "passing": "example-answer",
+    "changes": {"answer": "Read the license in the OpenWiz README. See the Apache 2.0 terms, e.g. the notice requirements. Keep the attribution.", "faq": []}
+  },
+  {
+    "rule": "a neutral description of stars or votes is allowed",
+    "passing": "example-answer",
+    "changes": {"sections.0.body": "GitHub stars are a way to bookmark a repository. Readers can see how users vote for scheduling ideas."}
+  }
+]

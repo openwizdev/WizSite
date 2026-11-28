@@ -207,7 +207,7 @@
     const data = feed.data;
     const repo = OW.data.repo.get()?.full;
     if (shown.repo !== repo) Object.assign(shown, { repo, open: null, picked: {} });
-    if (!data) return el.replaceChildren(OW.ui.placeholder('Reading GitHub…'));
+    if (!data) return OW.ui.fill(el, OW.ui.placeholder('Reading GitHub…'));
     const failed = field => (feed.errors || []).find(e => Array.isArray(e?.path) && e.path[0] === 'repository' && e.path[1] === field);
     const failedText = (field, file) => `GitHub ${failed(field)?.type === 'FORBIDDEN' ? 'refused to read' : 'couldn\'t read'} ${file}, so the app can't show it here; run \`openwiz models show\` in the repository instead.`;
     if (failed('fleet')) return el.replaceChildren(h('div', { class: 'models' }, h('div', { class: 'unknown models-unread' }, failedText('fleet', 'docs/agents/fleet.md'))));

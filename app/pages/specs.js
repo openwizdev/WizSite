@@ -297,7 +297,7 @@
     const left = OW.specPage.shown;
     OW.specPage.shown = null;
     const seen = OW.factory.model(feeds);
-    if (!seen) return el.replaceChildren(OW.ui.placeholder('Reading GitHub…'));
+    if (!seen) return OW.ui.fill(el, OW.ui.placeholder('Reading GitHub…'));
     const missing = seen.partialSpecs
       ? OW.ui.unknown('GitHub gave only part of the list of specs, so some may be missing. The app tries again on its own, or press Refresh now.') : null;
     if (!seen.specs.length) {

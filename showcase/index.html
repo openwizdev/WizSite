@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src data:; connect-src https://api.github.com/repos/openwizdev/WizSite/contents/showcase/data.json; base-uri 'none'; form-action 'none'">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <meta name="description" content="See how many pull requests the OpenWiz factory has merged, how many drivers are verified, and how many agents are running.">
+  <title>Live factory · OpenWiz</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/showcase/showcase.css">
+  <script type="module" src="/showcase/showcase.js"></script>
+</head>
+<body>
+  <main>
+    <header>
+      <a href="/">OpenWiz</a>
+      <h1>Live factory</h1>
+    </header>
+    <section aria-label="Factory activity" aria-live="polite">
+      <dl id="showcase-counts" aria-busy="true">
+        <div>
+          <dt>Pull requests merged <span>All time</span></dt>
+          <dd data-count="prs_merged_total">Unavailable</dd>
+          <dd data-detail>Waiting for the showcase data.</dd>
+        </div>
+        <div>
+          <dt>Pull requests merged <span>Last 7 days</span></dt>
+          <dd data-count="prs_merged_7d">Unavailable</dd>
+          <dd data-detail>Waiting for the showcase data.</dd>
+        </div>
+        <div>
+          <dt>Drivers verified <span>WizMarket</span></dt>
+          <dd data-count="drivers_verified">Unavailable</dd>
+          <dd data-detail>Waiting for the showcase data.</dd>
+        </div>
+        <div>
+          <dt>Agents running <span>At the last read</span></dt>
+          <dd data-count="agents_running">Unavailable</dd>
+          <dd data-detail>Waiting for the showcase data.</dd>
+        </div>
+      </dl>
+    </section>
+  </main>
+</body>
+</html>

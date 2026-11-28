@@ -595,7 +595,7 @@
   function draw(el, feeds, arg) {
     const now = Date.now();
     const seen = OW.factory.model(feeds);
-    if (!seen) return el.replaceChildren(OW.ui.placeholder('Reading GitHub…'));
+    if (!seen) return OW.ui.fill(el, OW.ui.placeholder('Reading GitHub…'));
     const m = model(seen, OW.agents.notes(now), now, home());
     shown = m;
     const asked = arg ? Number(arg) : view.sheet;

@@ -1,0 +1,13 @@
+{
+  "slug": "example-answer",
+  "kind": "answer",
+  "query": "how do I check the OpenWiz license",
+  "title": "How to check the OpenWiz license",
+  "description": "Find the license in the project documentation.",
+  "answer": "OpenWiz uses the Apache 2.0 license. The OpenWiz README links to the license.",
+  "sections": [{"heading": "License", "body": "[Read the license entry](https://github.com/openwizdev/OpenWiz#links)."}],
+  "steps": [{"name": "Open the repository", "text": "Read the license entry in the Links section of the README."}],
+  "faq": [{"question": "Which license applies?", "answer": "Apache 2.0."}],
+  "sources": [{"url": "https://github.com/openwizdev/OpenWiz#links", "supports": "OpenWiz uses the Apache 2.0 license.", "checked": "2026-11-28"}],
+  "checked": "2026-11-28"
+}

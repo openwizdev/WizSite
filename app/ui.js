@@ -80,6 +80,25 @@
   }
   const agentName = (harness, model) => `${HARNESSES[String(harness).toLowerCase()] || harness}, ${modelName(model)}`;
 
+  const stillReading = text => text.endsWith('…');
+  const waiting = new Map();
+  function loading(text) {
+    const known = waiting.get(text);
+    if (known?.isConnected) return known;
+    if (!window.WizLoader) return null;
+    const box = window.WizLoader.markup(true);
+    window.WizLoader.mount(box, { lines: [text, ...window.WizLoader.lines] });
+    waiting.set(text, box);
+    return box;
+  }
+
+  function fill(el, ...kids) {
+    kids = kids.flat().filter(kid => kid !== null && kid !== undefined && kid !== false)
+      .map(kid => (kid instanceof Node ? kid : document.createTextNode(String(kid))));
+    for (const child of [...el.childNodes]) if (!kids.includes(child)) child.remove();
+    kids.forEach((kid, i) => { if (el.childNodes[i] !== kid) el.insertBefore(kid, el.childNodes[i] || null); });
+  }
+
   const ui = {
     h, icon, logo, time, STATES, agentName,
     pill: state => h('span', { class: 'pill', '--c': STATES[state].colour }, STATES[state].word),
@@ -94,7 +113,9 @@
       return el;
     },
     unknown: text => h('div', { class: 'unknown' }, h('b', {}, 'Unknown. '), text),
-    placeholder: text => h('div', { class: 'placeholder' }, text),
+    placeholder: text => (stillReading(text) ? loading(text) : null) || h('div', { class: 'placeholder' }, text),
+    loading,
+    fill,
   };
   const pages = [];
   OW.ui = ui;

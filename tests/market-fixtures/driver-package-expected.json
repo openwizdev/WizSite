@@ -1,0 +1,30 @@
+{
+  "example-driver": {
+    "statusText": "Verified",
+    "driversStatusText": "Kit: passed, 5 of 5",
+    "websiteUrl": "https://example.com/example-driver",
+    "repositoryUrl": null,
+    "releaseUrl": null,
+    "archiveUrl": null,
+    "receiptUrl": "https://github.com/openwizdev/WizMarket/blob/dddddddddddddddddddddddddddddddddddddddd/receipts/example-driver/2026-11-01-aaaaaaaaaaaa.txt",
+    "receiptDate": "2026-11-01"
+  },
+  "pinned-driver": {
+    "statusText": "Listed",
+    "websiteUrl": "https://example.com/pinned-driver",
+    "repositoryUrl": "https://github.com/example-owner/pinned-driver",
+    "releaseUrl": "https://github.com/example-owner/pinned-driver/releases/tag/v0.1.0",
+    "archiveUrl": "https://github.com/example-owner/pinned-driver/releases/download/v0.1.0/driver.tar.gz",
+    "receiptUrl": null,
+    "receiptDate": null
+  },
+  "verified-pinned": {
+    "statusText": "Verified",
+    "websiteUrl": "https://example.com/verified-pinned-driver",
+    "repositoryUrl": "https://github.com/example-owner/verified-pinned",
+    "releaseUrl": "https://github.com/example-owner/verified-pinned/releases/tag/v1.0.0",
+    "archiveUrl": "https://github.com/example-owner/verified-pinned/releases/download/v1.0.0/driver.tar.gz",
+    "receiptUrl": "https://github.com/openwizdev/WizMarket/blob/dddddddddddddddddddddddddddddddddddddddd/receipts/verified-pinned/2026-11-01-aaaaaaaaaaaa.txt",
+    "receiptDate": "2026-11-01"
+  }
+}

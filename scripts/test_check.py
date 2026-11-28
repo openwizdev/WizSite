@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from hashlib import sha256
 from html import escape
 from pathlib import Path
 import json
@@ -10,7 +11,23 @@ from unittest import mock
 
 import re
 
-from check import ALL_PAGES, CTA, FAQ, FAQ_PREREQS, FAQ_WHERE, FOOTER, INSTALL_NOTE_HTML, INSTALL_PREREQS_HTML, FINGERPRINTS, HASHED, INSTALL_SWITCH, ROOT, Page, check_changelog, check_release_data, check_releases, read_releases, split_releases, check_motion, check_privacy, check_ref, check_security_txt, check_site, check_vector, check_webp, fingerprint
+from check import ALL_PAGES, ART, CTA, DOC_HASHES, FAQ, FAQ_PREREQS, FAQ_WHERE, FOOTER, INSTALL_NOTE_HTML, INSTALL_PREREQS_HTML, FINGERPRINTS, HASHED, INSTALL_SWITCH, ROOT, Page, check_changelog, check_discovery, check_image_preloads, check_release_data, check_releases, read_releases, split_releases, check_motion, check_privacy, check_ref, check_security_txt, check_site, check_vector, check_webp, check_avif, check_png, fingerprint
+
+REMOVED_ART = (
+    'art/spec-video.mp4',
+    'art/spec-video.vtt',
+    'art/spec-poster.webp',
+    'art/team-boat-poster.webp',
+)
+REMOVED_LOGS = (
+    'tests/ask-red-run.txt',
+    'tests/ask-green-run.txt',
+    'scripts/changelog-fixtures/red-run-1674.log',
+    'scripts/changelog-fixtures/red-run-1674-install.log',
+    'scripts/changelog-fixtures/red-run-46-r1.log',
+    'scripts/changelog-fixtures/red-run-46-r2.log',
+)
+WRONG_POSTER = '/favicon.ico'
 
 
 def edit_built(root, name, change):
@@ -57,6 +74,19 @@ def with_switch(state):
 class Checks(unittest.TestCase):
     def test_valid_site(self):
         check_site(ROOT / 'dist')
+
+    def test_replaced_art_and_run_logs_are_not_shipped(self):
+        for name in REMOVED_ART:
+            self.assertFalse((ROOT / name).is_file(), name)
+            self.assertNotIn(name, ART)
+        for name in REMOVED_LOGS:
+            self.assertFalse((ROOT / name).is_file(), name)
+        self.assertNotIn(WRONG_POSTER.removeprefix('/'), ART)
+        text = Path(__file__).read_text()
+        self.assertEqual(text.count(f'poster="{WRONG_POSTER}"'), 2)
+        replaced = 'spec-' + 'video'
+        self.assertNotIn(replaced, (ROOT / 'build.mjs').read_text())
+        self.assertNotIn(replaced, (ROOT / 'scripts/test_loudness.py').read_text())
 
     def test_missing_or_invalid_discovery_output(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -111,7 +141,6 @@ class Checks(unittest.TestCase):
                 ('what-is-openwiz/index.html', r'href="/guides/run-many-coding-agents/">Guide: run many coding agents</a>', 'href="/faq/">Guide</a>', 'overview links the guide'),
                 ('sitemap.xml', r'<url><loc>https://openwiz\.dev/guides/run-many-coding-agents/</loc>.*?</url>', '', 'sitemap must list'),
                 ('llms.txt', r'- \[How to run many coding agents at once\]\(https://openwiz\.dev/guides/run-many-coding-agents/\)[^\n]*\n', '', 'invalid llms.txt'),
-                ('llms-full.txt', r'\n6\. Watch it ship\.[^\n]*', '', 'llms-full.txt needs the guide'),
             ]
             for name, pattern, replacement, error in failures:
                 with self.subTest(file=name, error=error):
@@ -133,6 +162,69 @@ class Checks(unittest.TestCase):
                     check_site(root)
             finally:
                 path.write_bytes(original)
+
+    def test_discovery_rejects_a_missing_markdown_copy(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / 'dist'
+            shutil.copytree(ROOT / 'dist', root)
+            (root / 'faq.md').unlink(missing_ok=True)
+            with self.assertRaisesRegex(AssertionError, 'missing Markdown copy: faq.md'):
+                check_discovery(root, {name: Page((root / name).read_text()) for name in ALL_PAGES})
+
+    def test_discovery_checks_markdown_links_and_crawler_files(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / 'dist'
+            shutil.copytree(ROOT / 'dist', root)
+            failures = [
+                ('faq/index.html', r'<link rel="alternate" type="text/markdown"[^>]*>', '', 'Markdown alternate'),
+                ('llms.txt', r'^- .*\(https://openwiz\.dev/faq\.md\).*\n', '', 'llms.txt.*faq.md'),
+                ('llms-full.txt', r'(?m)^6\. .*Watch it ship.*\n', '', 'llms-full.txt.*guide'),
+                ('llms-full.txt', r'(?ms)^## FAQ — OpenWiz\n.*?(?=^## Drivers — OpenWiz\n)', '', 'llms-full.txt.*faq.md'),
+                ('_headers', r'^/\*\.md\n  Content-Type: text/markdown; charset=utf-8\n', '', 'Markdown content type'),
+            ]
+            for name, pattern, replacement, error in failures:
+                with self.subTest(file=name, error=error):
+                    path = root / name
+                    original = path.read_text()
+                    changed, count = re.subn(pattern, replacement, original, count=1, flags=re.M)
+                    self.assertEqual(count, 1)
+                    path.write_text(changed)
+                    try:
+                        with self.assertRaisesRegex(AssertionError, error):
+                            check_discovery(root, {page: Page((root / page).read_text()) for page in ALL_PAGES})
+                    finally:
+                        path.write_text(original)
+
+    def test_markdown_conversion_preserves_main_content(self):
+        html = """<head><title>Head noise</title></head>
+        <body><header>Site header</header><main>
+        <nav>Menu noise</nav><script>window.noise = true;</script>
+        <h1>A &amp; B</h1>
+        <p>Read <a title="2 > 1" href='../intro/?x=1&amp;y=2'><strong>the intro</strong></a>
+        and <a href="#commands">commands</a>.</p>
+        <ol start="3"><li>Start<ul><li>Nested</li></ul></li><li>Finish</li></ol>
+        <pre><code class="language-sh">echo &lt;name&gt;
+  printf '%s' '```'
+</code></pre><footer>Footer noise</footer></main><aside>Aside noise</aside></body>"""
+        result = subprocess.run(['node', '--input-type=module', '-e', """
+            import { readFileSync } from 'node:fs';
+            import { toMarkdown } from './scripts/mirrors.mjs';
+            process.stdout.write(toMarkdown(readFileSync(0, 'utf8'), 'https://openwiz.dev/guides/sample/'));
+        """], cwd=ROOT, input=html, text=True, capture_output=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout, """# A & B
+
+Read [**the intro**](https://openwiz.dev/guides/intro/?x=1&y=2) and [commands](https://openwiz.dev/guides/sample/#commands).
+
+3. Start
+   - Nested
+4. Finish
+
+````sh
+echo <name>
+  printf '%s' '```'
+````
+""")
 
     def test_broken_targets_fragments_and_schemes(self):
         root = ROOT / 'dist'
@@ -212,6 +304,108 @@ class Checks(unittest.TestCase):
                     "%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cimage href='x'/%3E%3C/svg%3E"):
             with self.subTest(svg=bad), self.assertRaises(AssertionError):
                 check_ref(root, page, 'data:image/svg+xml,' + bad, pages)
+
+    def test_avif_metadata(self):
+        data = (ROOT / 'art/era-2-grill-sq-480.avif').read_bytes()
+        check_avif(data)
+        at = data.index(b'av01', data.index(b'infe'))
+        for bad in (data[:-1], data.replace(b'ftypavif', b'ftypheic', 1), data[:at] + b'Exif' + data[at + 4:], b'GIF89a' + b'\0' * 8):
+            with self.subTest(bad=bad[:16]), self.assertRaises(AssertionError):
+                check_avif(bad)
+        with self.assertRaises(AssertionError):
+            check_privacy('art/new.avif', data)
+        import zlib
+        chunk = lambda kind, body: len(body).to_bytes(4, 'big') + kind + body + zlib.crc32(kind + body).to_bytes(4, 'big')
+        png = lambda *extra: b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', bytes(13)) + b''.join(extra) + chunk(b'IDAT', b'x') + chunk(b'IEND', b'')
+        clean = png()
+        check_png(clean)
+        existing = next(iter(DOC_HASHES))
+        check_privacy(existing, (ROOT / existing).read_bytes())
+        for path in ('docs/evidence/speed/x/home.png', existing, 'docs/new.png'):
+            with self.subTest(unpinned=path), self.assertRaisesRegex(AssertionError, 'unreviewed picture'):
+                check_privacy(path, clean)
+        with mock.patch.dict(DOC_HASHES, {'docs/evidence/speed/x/home.png': sha256(clean).hexdigest()}):
+            check_privacy('docs/evidence/speed/x/home.png', clean)
+        for bad in (png(chunk(b'tEXt', b'Author\0someone')), png(chunk(b'eXIf', b'x')), png(chunk(b'iCCP', b'x')), clean[:-3]):
+            with self.subTest(bad=bad[-24:]), mock.patch.dict(DOC_HASHES, {'docs/evidence/speed/x/home.png': sha256(bad).hexdigest()}):
+                with self.assertRaises(AssertionError):
+                    check_privacy('docs/evidence/speed/x/home.png', bad)
+        marked = b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', bytes(13)) + chunk(b'IDAT', ('cr' + '_sub_x').encode()) + chunk(b'IEND', b'')
+        with mock.patch.dict(DOC_HASHES, {'docs/evidence/speed/x/home.png': sha256(marked).hexdigest()}):
+            with self.assertRaisesRegex(AssertionError, 'private marker'):
+                check_privacy('docs/evidence/speed/x/home.png', marked)
+
+    def test_right_sized_images(self):
+        phone = '<link rel="preload" as="image" type="image/avif" media="(max-width: 480px)"'
+        cases = (
+            ('index.html', phone, '<link rel="preload" as="image" type="image/avif" media="(max-width: 480px)" data-x', None),
+            ('index.html', 'class="landscape"', 'class="landscape" loading="lazy"', 'never lazy'),
+            ('index.html', 'class="moment-art" src="/art/moments-sea.webp" alt="" width="1600" height="705" loading="lazy"',
+             'class="moment-art" src="/art/moments-sea.webp" alt="" width="1600" height="705"', 'loading="lazy" decoding="async"'),
+            ('index.html', 'srcset="/art/moments-sea-1600.avif"', 'srcset="/art/moments-sea-9.avif"', 'missing local target'),
+            ('drivers/index.html', '<source type="image/avif" srcset="/art/drivers-d-sea-1536.avif">', '', 'unused art variants'),
+            ('index.html', 'imagesizes="470px"', 'imagesizes="400px"', 'preload the painting'),
+        )
+        for page, old, new, error in cases:
+            with self.subTest(page=page, new=new), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp) / 'dist'
+                shutil.copytree(ROOT / 'dist', root)
+                path = root / page
+                text = path.read_text()
+                self.assertIn(old, text)
+                if page == 'index.html' and old == phone:
+                    head, rest = text.split('</head>', 1)
+                    text = head.replace(old, '<!--', 1).replace('fetchpriority="high">', 'fetchpriority="high">-->', 1) + '</head>' + rest
+                    path.write_text(text)
+                    error = 'preload'
+                else:
+                    path.write_text(text.replace(old, new, 1))
+                with self.assertRaisesRegex(AssertionError, error or '.'):
+                    check_site(root)
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / 'dist'
+            shutil.copytree(ROOT / 'dist', root)
+            edit_built(root, 'site.css', lambda css: css.replace('.hero-fleet span { display: block;', '.hero-fleet span { background-image: url(/art/fleet-frames.webp); display: block;', 1))
+            with self.assertRaisesRegex(AssertionError, 'sprite sheet'):
+                check_site(root)
+
+    def test_image_preloads_match_active_sources(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / 'dist'
+            shutil.copytree(ROOT / 'dist', root)
+            drivers = root / 'drivers/index.html'
+            old = '<link rel="preload" href="/art/drivers-d-sea-1536.avif" as="image" type="image/avif" fetchpriority="high">'
+            new = '<link rel="preload" href="/art/drivers-d-sea.webp" as="image" type="image/webp">'
+            text = drivers.read_text()
+            self.assertIn(old, text)
+            drivers.write_text(text.replace(old, new, 1))
+            with self.assertRaisesRegex(AssertionError, 'does not match an active'):
+                check_site(root)
+        check_image_preloads(
+            'plain.html',
+            '<html><head><link rel="preload" href="/art/hero-cave.webp" as="image" type="image/webp"></head>'
+            '<body><img src="/art/hero-cave.webp" alt=""></body></html>',
+        )
+        check_image_preloads(
+            'picture.html',
+            '<html><head><link rel="preload" as="image" type="image/avif" imagesrcset="/art/a-800.avif 800w" imagesizes="100vw"></head>'
+            '<body><picture><source type="image/avif" srcset="/art/a-800.avif 800w" sizes="100vw"><img src="/art/a.webp" alt=""></picture></body></html>',
+        )
+        for bad, error in (
+            ('<html><head><link rel="preload" href="/art/a.webp" as="image" type="image/webp"></head>'
+             '<body><picture><source type="image/avif" srcset="/art/a-800.avif"><img src="/art/a.webp" alt=""></picture></body></html>',
+             'does not match an active'),
+            ('<html><head><link rel="preload" as="image" type="image/avif" imagesrcset="/art/a-800.avif 800w" imagesizes="50vw"></head>'
+             '<body><picture><source type="image/avif" srcset="/art/a-800.avif 800w" sizes="100vw"><img src="/art/a.webp" alt=""></picture></body></html>',
+             'does not match an active'),
+            ('<html><head><link rel="preload" href="/art/unused.webp" as="image" type="image/webp"></head>'
+             '<body><img src="/art/other.webp" alt=""></body></html>',
+             'does not match an active'),
+            ('<html><head></head><body><link rel="preload" href="/art/a.webp" as="image" type="image/webp"><img src="/art/a.webp" alt=""></body></html>',
+             'must live in <head>'),
+        ):
+            with self.subTest(bad=bad[:80]), self.assertRaisesRegex(AssertionError, error):
+                check_image_preloads('bad.html', bad)
 
     def test_css_escapes_and_unreadable_urls(self):
         for bad in ('\np { background: url(https://exa\\\nmple.com/x.png) }\n',
@@ -394,6 +588,7 @@ class Checks(unittest.TestCase):
         page = CHANGELOG.replace('</main>', '<!-- releases:start -->' + LIVE + '<!-- releases:end --></main>')
         self.assertEqual(split_releases(page), (CHANGELOG, LIVE))
         check_releases(LIVE, DATA, True)
+        check_releases(LIVE.replace('<h2 id="v0-02">0.02 <small>', '<h2 id="v0-02">0.02 <small class="semver">'), DATA, True)
         check_releases(SOON, DATA, False)
         check_releases(SOON, {}, True)
         for built in (CHANGELOG, page.replace('</main>', '</main><!-- releases:start --><!-- releases:end -->'),
@@ -410,6 +605,9 @@ class Checks(unittest.TestCase):
                 (LIVE.replace(second + '</article>', second + '</article>' + second + '</article>'), True, 'entries shown'),
                 (LIVE.replace(first + '</article>', '').replace(second + '</article>', second + '</article>' + first + '</article>'), True, 'newest first'),
                 (LIVE.replace('(0.1.10)', '(0.1.11)'), True, 'newest first'),
+                (LIVE.replace('<h2 id="v0-02">0.02 <small>· <time datetime="2031-02-03">Feb 3, 2031</time> (0.1.10)</small></h2>',
+                              '<h2 id="v0-02"><small class="semver">· <time datetime="2031-02-03">Feb 3, 2031</time> (0.1.10)</small> 0.02</h2>'), True, 'public name'),
+                (LIVE.replace('<h2 id="v0-02">0.02 <small>', '<h2 id="v0-02">0.0<small>').replace('(0.1.10)</small></h2>', '(0.1.10)</small>2</h2>'), True, 'public name'),
                 (LIVE.replace('Feb 3, 2031', 'Feb 4, 2031'), True, 'newest first'),
                 (LIVE.replace('datetime="2031-02-03"', 'datetime="2031-02-04"'), True, "entry's date"),
                 (LIVE.replace('Two things.', 'Two things!'), True, "entry's headline"),
@@ -478,7 +676,7 @@ class Checks(unittest.TestCase):
                 ('index.html', 'preload="none" playsinline controls', 'preload="none" playsinline controls muted', 'plays inline with sound'),
                 ('index.html', 'preload="none" playsinline controls', 'preload="none" controls', 'plays inline with sound'),
                 ('index.html', 'preload="none" playsinline controls', 'preload="none" playsinline', 'keeps native controls'),
-                ('index.html', 'poster="/art/launch-poster.webp"', 'poster="/art/spec-poster.webp"', 'pinned poster'),
+                ('index.html', 'poster="/art/launch-poster.webp"', 'poster="/favicon.ico"', 'pinned poster'),
                 ('index.html', '<track kind="captions" src="/art/launch-video.vtt" srclang="en" label="English">', '', 'needs its own English captions'),
                 ('index.html', ' aria-describedby="launch-about"', '', 'two-sentence text alternative'),
                 ('index.html', 'It then shows how', 'Then it shows. It shows how', 'two-sentence text alternative'),
@@ -943,9 +1141,9 @@ class Checks(unittest.TestCase):
             'no embed, form or script': (T, lambda t: t.replace('</main>', '<iframe src="/drivers/" title="x"></iframe></main>', 1)),
             'no embed, form or script ': (T, lambda t: t.replace('</main>', '<form></form></main>', 1)),
             'folds nothing away': (T, lambda t: t.replace('<ul class="team-facts">', '<details><summary>Facts</summary><ul class="team-facts">', 1).replace('</ul>', '</ul></details>', 1)),
-            'one video': (T, lambda t: t.replace('</main>', '<video src="/art/spec-video.mp4" preload="none"></video></main>', 1)),
+            'one video': (T, lambda t: t.replace('</main>', '<video src="/art/todo-spec.mp4" preload="none"></video></main>', 1)),
             'the launch film sits in the hero': (T, lambda t: re.sub(r'(<div class="team-copy">[\s\S]*?</div>\n)(  <figure class="launch team-film">[\s\S]*?</figure>\n)', r'\2\1', t, count=1)),
-            'over its pinned poster': (T, lambda t: t.replace('poster="/art/launch-poster.webp"', 'poster="/art/spec-poster.webp"', 1)),
+            'over its pinned poster': (T, lambda t: t.replace('poster="/art/launch-poster.webp"', 'poster="/favicon.ico"', 1)),
             'never autoplays': (T, lambda t: t.replace('preload="none" playsinline', 'preload="none" autoplay playsinline', 1)),
             'never autoplays ': (T, lambda t: t.replace('preload="none" playsinline', 'preload="auto" playsinline', 1)),
             'never autoplays  ': (T, lambda t: t.replace('preload="none" playsinline', 'preload="none" muted playsinline', 1)),
@@ -1036,9 +1234,9 @@ class Checks(unittest.TestCase):
                 ('fixed', '<a href="https://github.com/openwizdev/WizMarket/blob/main/contracts/listing.v1.md">x</a>', None),
                 ('generated', f'<img src="{escape(listed)}" alt="x">', 'unexpected external URL'),
                 ('generated', f'<link rel="prefetch" href="{escape(listed)}">', 'unexpected external URL'),
-                ('generated', f'<img srcset="{escape(listed)} 1x" alt="x">', 'unexpected markup in the generated Market section'),
-                ('generated', f'<picture><source srcset="{escape(listed)}"></picture>', 'unexpected markup in the generated Market section'),
-                ('generated', f'<link rel="preload" as="image" imagesrcset="{escape(listed)} 1x">', 'unexpected markup in the generated Market section'),
+                ('generated', f'<img srcset="{escape(listed)} 1x" alt="x">', 'unexpected external URL'),
+                ('generated', f'<picture><source srcset="{escape(listed)}"></picture>', 'unexpected external URL'),
+                ('generated', f'<link rel="preload" as="image" imagesrcset="{escape(listed)} 1x">', 'unexpected external URL'),
                 ('generated', f'<p style="background:url({escape(listed)})">x</p>', 'unexpected markup in the generated Market section'),
                 ('generated', f'<a href="{escape(listed)}" ping="{escape(listed)}">x</a>', 'unexpected markup in the generated Market section'),
                 ('generated', f'<svg><image xlink:href="{escape(listed)}"></image></svg>', 'unexpected markup in the generated Market section'),
@@ -1110,7 +1308,7 @@ class Checks(unittest.TestCase):
         for message, (page, change) in {
             'the index.html page needs the one Questions': ('index.html', lambda t: t.replace(FAQ, '', 1)),
             'the faq/index.html page needs the one Questions': ('faq/index.html', lambda t: t.replace('>What is a kernel?<', '>What is a core?<', 1)),
-            'the team/index.html page shows no Questions|never uses: (?:CloudRoom|install)': ('team/index.html', lambda t: t.replace('</main>', FAQ + '</main>', 1)),
+            'the team/index.html page shows no Questions|never uses: (?:CloudRoom|install)|the team page shows no price': ('team/index.html', lambda t: t.replace('</main>', FAQ + '</main>', 1)),
             'needs faq.js': ('faq/index.html', lambda t: re.sub(r'<script src="/faq\.[0-9a-f]+\.js" defer></script>', '', t)),
         }.items():
             temp, root = planted(page, change)
