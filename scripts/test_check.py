@@ -130,6 +130,23 @@ class Checks(unittest.TestCase):
                     finally:
                         path.write_bytes(original)
 
+    def test_a_registered_section_page_passes_and_an_unbuilt_one_fails(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / 'dist'
+            shutil.copytree(ROOT / 'dist', root)
+            page = root / 'docs/synthetic/index.html'
+            page.parent.mkdir(parents=True)
+            page.write_text('<!doctype html><html lang="en"><head><title>Synthetic: OpenWiz docs</title>'
+                            '<link rel="canonical" href="https://openwiz.dev/docs/synthetic/"></head><body><main><h1>Synthetic</h1></main></body></html>')
+            (root / 'sitemaps/docs.xml').write_text('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+                                                    '  <url><loc>https://openwiz.dev/docs/synthetic/</loc><lastmod>2026-11-28</lastmod></url>\n</urlset>\n')
+            index = root / 'sitemap.xml'
+            index.write_text(index.read_text().replace('</sitemapindex>', '  <sitemap><loc>https://openwiz.dev/sitemaps/docs.xml</loc><lastmod>2026-11-28</lastmod></sitemap>\n</sitemapindex>'))
+            check_site(root)
+            page.unlink()
+            with self.assertRaisesRegex(AssertionError, 'not a built page'):
+                check_site(root)
+
     def test_guide_page_discovery_and_rules(self):
         guide = 'guides/run-many-coding-agents/index.html'
         with tempfile.TemporaryDirectory() as temp:

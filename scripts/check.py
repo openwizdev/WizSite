@@ -1279,8 +1279,14 @@ def check_discovery(root, pages):
         assert entries and all(valid_lastmod(day) for day in dates), f'invalid sitemap lastmod in {rel}'
         assert lastmod == max(dates), f'the sitemap index lastmod of {rel} must be its newest page'
         urls += [entry.findtext(ns + 'loc') for entry in entries]
-    assert set(urls) == {SITE_URL + name.removesuffix('index.html') for name in PAGES} and len(urls) == len(PAGES), \
+    assert len(set(urls)) == len(urls) and {SITE_URL + name.removesuffix('index.html') for name in PAGES} <= set(urls), \
         'the section sitemaps must list every public page exactly once'
+    for url in urls:
+        rel = urlsplit(url).path.lstrip('/') + 'index.html'
+        assert url.startswith(SITE_URL) and url.endswith('/') and (root / rel).is_file(), f'the sitemaps list {url}, which is not a built page'
+        built = (root / rel).read_text()
+        assert f'<link rel="canonical" href="{url}">' in built and '<meta name="robots" content="noindex">' not in built, \
+            f'{rel}: a page in the sitemaps must be indexable with its own canonical link'
 
     robots = (root / 'robots.txt').read_text()
     groups = robots.strip().split('\n\n')
@@ -1337,10 +1343,33 @@ def check_security_txt(text, now=None):
     )
 
 
+def registered_extras(root):
+    ns = '{http://www.sitemaps.org/schemas/sitemap/0.9}'
+    extras = set()
+    try:
+        index = ElementTree.parse(root / 'sitemap.xml').getroot()
+    except (ElementTree.ParseError, OSError):
+        return extras
+    for loc in (entry.findtext(ns + 'loc') or '' for entry in index.findall(ns + 'sitemap')):
+        rel = loc.removeprefix(SITE_URL)
+        if not re.fullmatch(r'sitemaps/(market|docs|answers)\.xml', rel) or not (root / rel).is_file():
+            continue
+        extras.add(rel)
+        try:
+            child = ElementTree.parse(root / rel).getroot()
+        except ElementTree.ParseError:
+            continue
+        for url in (entry.findtext(ns + 'loc') or '' for entry in child.findall(ns + 'url')):
+            page = urlsplit(url).path.lstrip('/') + 'index.html'
+            if page not in PAGES:
+                extras.add(page)
+    return extras
+
+
 def check_site(root, registry=ROOT / 'market/registry.json', now=None):
     files = {p.relative_to(root).as_posix() for p in root.rglob('*') if p.is_file()}
     names = built_fingerprints(root)
-    assert files == STATIC | set(names.values()), 'unexpected or missing build output'
+    assert files - registered_extras(root) == STATIC | set(names.values()), 'unexpected or missing build output'
     docs = {name: (root / name).read_text() for name in ALL_PAGES}
     parsed = {name: Page(html) for name, html in docs.items()}
     check_discovery(root, parsed)

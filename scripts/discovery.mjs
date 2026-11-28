@@ -148,7 +148,10 @@ function structuredData(page, faq, html) {
 }
 
 export function withMetadata(page, html, faq) {
-  const [title, description, robots] = pages[page];
+  const entry = registry.get(page);
+  if (!entry) throw new Error(`${page} is not in the page registry`);
+  const { title, description } = entry;
+  const robots = entry.indexable ? undefined : 'noindex';
   const url = urlFor(page);
   const tags = [`<title>${escape(title)}</title>`, `<meta name="description" content="${escape(description)}">`];
   if (page !== '404.html') tags.push(`<link rel="canonical" href="${url}">`);
@@ -246,7 +249,7 @@ export function crawlerFiles(about, faq, guide) {
 
   return {
     'robots.txt': crawlers.map(agent => `User-agent: ${agent}\nAllow: /\nDisallow: /api/\n\n`).join('') + `Sitemap: ${site}sitemap.xml\n`,
-    ...sitemapFiles(registry.all()),
+    ...sitemapFiles(registry.verified()),
     'llms.txt': llms,
     'llms-full.txt': full,
   };

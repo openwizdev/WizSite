@@ -16,7 +16,7 @@ How a page on openwiz.dev joins search: its registry entry, the sitemaps, its br
 | `lastmod` | `YYYY-MM-DD`: the last commit that touched the page's source (`git log -1 --format=%cs`), or the source data's own date (a listing's `since`, a docs page's pinned commit date, an answer's `checked`), or the build date when neither is known. |
 | `indexable` | `true`, or `false` with `noindex` (the app and the 404). A page that is not indexable is in no sitemap, has no breadcrumb data and no Markdown copy. |
 
-A generator registers its pages with one call, `registry.add(entry)`. The build refuses an entry that breaks a rule above, or a second entry with the same path, title or description.
+A generator registers its pages with one call, `registry.add(entry)`, before the crawler files are written; the page's head metadata (`withMetadata`) then comes from its entry, and a page with no entry fails the build. The build refuses an entry that breaks a rule above (an impossible date included), a second entry with the same path, title or description, and, when the sitemaps are written, a trail step that names an unregistered page. The site check accepts every section sitemap the index lists and every page those sitemaps list, as long as each is a built, indexable page with its own canonical link.
 
 ## Sitemaps
 

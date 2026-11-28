@@ -18,7 +18,9 @@ export function createRegistry() {
       if (titles.has(title)) throw new Error(`${where}: duplicate title`);
       if (descriptions.has(description)) throw new Error(`${where}: duplicate description`);
       if (!SECTIONS.includes(section)) throw new Error(`${where}: unknown section ${section}`);
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(lastmod ?? '')) throw new Error(`${where}: lastmod must be YYYY-MM-DD`);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(lastmod ?? '') || new Date(`${lastmod}T00:00:00Z`).toISOString().slice(0, 10) !== lastmod) {
+        throw new Error(`${where}: lastmod must be a real YYYY-MM-DD date`);
+      }
       if (!Array.isArray(trail) || (path === 'index.html') !== (trail.length === 0)
           || trail.some(step => typeof step?.name !== 'string' || !step.name.trim() || typeof step?.path !== 'string')
           || (trail.length && trail.at(-1).path !== path)) {
@@ -31,6 +33,14 @@ export function createRegistry() {
     get: path => entries.get(path),
     all: () => [...entries.values()],
     indexable: () => [...entries.values()].filter(entry => entry.indexable),
+    verified() {
+      for (const entry of entries.values()) {
+        for (const step of entry.trail) {
+          if (!entries.has(step.path)) throw new Error(`registry entry ${entry.path}: its trail names ${step.path}, which is not registered`);
+        }
+      }
+      return [...entries.values()];
+    },
   };
 }
 
