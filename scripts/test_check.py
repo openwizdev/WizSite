@@ -1,3 +1,6 @@
+from datetime import datetime, timezone
+from hashlib import sha256
+from html import escape
 from pathlib import Path
 import json
 import shutil
@@ -8,7 +11,23 @@ from unittest import mock
 
 import re
 
-from check import CTA, FAQ, FAQ_WHERE, FOOTER, INSTALL_NOTE_HTML, FINGERPRINTS, HASHED, INSTALL_SWITCH, ROOT, Page, check_changelog, check_release_data, check_releases, read_releases, split_releases, check_motion, check_privacy, check_ref, check_site, check_vector, check_webp, fingerprint
+from check import ALL_PAGES, ART, CTA, DOC_HASHES, FAQ, FAQ_PREREQS, FAQ_WHERE, FOOTER, INSTALL_NOTE_HTML, INSTALL_PREREQS_HTML, FINGERPRINTS, HASHED, INSTALL_SWITCH, ROOT, Page, check_changelog, check_discovery, check_image_preloads, check_release_data, check_releases, read_releases, split_releases, check_motion, check_privacy, check_ref, check_security_txt, check_site, check_vector, check_webp, check_avif, check_png, fingerprint
+
+REMOVED_ART = (
+    'art/spec-video.mp4',
+    'art/spec-video.vtt',
+    'art/spec-poster.webp',
+    'art/team-boat-poster.webp',
+)
+REMOVED_LOGS = (
+    'tests/ask-red-run.txt',
+    'tests/ask-green-run.txt',
+    'scripts/changelog-fixtures/red-run-1674.log',
+    'scripts/changelog-fixtures/red-run-1674-install.log',
+    'scripts/changelog-fixtures/red-run-46-r1.log',
+    'scripts/changelog-fixtures/red-run-46-r2.log',
+)
+WRONG_POSTER = '/favicon.ico'
 
 
 def edit_built(root, name, change):
@@ -18,14 +37,14 @@ def edit_built(root, name, change):
     new = fingerprint(name, data)
     old.unlink()
     (root / new).write_bytes(data)
-    for page in ('index.html', 'changelog/index.html', 'drivers/index.html', 'team/index.html', 'faq/index.html', 'app/index.html'):
+    for page in ALL_PAGES:
         path = root / page
         path.write_text(path.read_text().replace(f'"/{was}"', f'"/{new}"'))
 
 
 LANDING = ('<html><head><title>OpenWiz</title></head><body><header><nav><a href="/changelog/">Changelog</a></nav></header>'
            '<main><h1>Bring your own everything.</h1></main><footer><a href="/changelog/">Changelog</a></footer></body></html>')
-CHANGELOG = ('<html><head><title>Changelog — OpenWiz</title><style>.release{color:red}</style></head><body><main id="main">'
+CHANGELOG = ('<html><head><title>Changelog — OpenWiz</title></head><body><main id="main">'
              '<h1>Changelog</h1><p class="lead">What each public release lets you do.</p></main></body></html>')
 DATA = {
     '0.01.json': {'name': '0.01', 'semver': '0.1.2', 'date': '2031-01-02', 'headline': 'One thing.',
@@ -55,6 +74,157 @@ def with_switch(state):
 class Checks(unittest.TestCase):
     def test_valid_site(self):
         check_site(ROOT / 'dist')
+
+    def test_replaced_art_and_run_logs_are_not_shipped(self):
+        for name in REMOVED_ART:
+            self.assertFalse((ROOT / name).is_file(), name)
+            self.assertNotIn(name, ART)
+        for name in REMOVED_LOGS:
+            self.assertFalse((ROOT / name).is_file(), name)
+        self.assertNotIn(WRONG_POSTER.removeprefix('/'), ART)
+        text = Path(__file__).read_text()
+        self.assertEqual(text.count(f'poster="{WRONG_POSTER}"'), 2)
+        replaced = 'spec-' + 'video'
+        self.assertNotIn(replaced, (ROOT / 'build.mjs').read_text())
+        self.assertNotIn(replaced, (ROOT / 'scripts/test_loudness.py').read_text())
+
+    def test_missing_or_invalid_discovery_output(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / 'dist'
+            shutil.copytree(ROOT / 'dist', root)
+            failures = [
+                ('index.html', r'<title>.*?</title>', '', 'title'),
+                ('drivers/index.html', r'<meta name="description"[^>]*>', '', 'description'),
+                ('what-is-openwiz/index.html', r'<link rel="canonical"[^>]*>', '', 'canonical'),
+                ('team/index.html', r'<meta property="og:title"[^>]*>', '', 'og:title'),
+                ('faq/index.html', r'<meta property="og:image"[^>]*>', '', 'og:image'),
+                ('app/index.html', r'<meta name="robots"[^>]*>', '', 'noindex'),
+                ('faq/index.html', r'"mainEntity":', '?', 'invalid JSON-LD'),
+                ('faq/index.html', r'"text": "The open source kernel', '"text": "A kernel', 'FAQ JSON-LD'),
+                ('sitemap.xml', r'<url><loc>https://openwiz.dev/</loc>.*?</url>', '', 'sitemap must list'),
+            ]
+            for name, pattern, replacement, error in failures:
+                with self.subTest(file=name, error=error):
+                    path = root / name
+                    original = path.read_text()
+                    changed, count = re.subn(pattern, replacement, original, count=1)
+                    self.assertEqual(count, 1)
+                    path.write_text(changed)
+                    try:
+                        with self.assertRaisesRegex(AssertionError, error):
+                            check_site(root)
+                    finally:
+                        path.write_text(original)
+            for name in ('robots.txt', 'sitemap.xml', 'llms.txt', 'llms-full.txt', 'SKILL.md', '404.html'):
+                with self.subTest(missing=name):
+                    path = root / name
+                    original = path.read_bytes()
+                    path.unlink()
+                    try:
+                        with self.assertRaisesRegex(AssertionError, 'missing build output'):
+                            check_site(root)
+                    finally:
+                        path.write_bytes(original)
+
+    def test_guide_page_discovery_and_rules(self):
+        guide = 'guides/run-many-coding-agents/index.html'
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / 'dist'
+            shutil.copytree(ROOT / 'dist', root)
+            failures = [
+                (guide, r'<title>.*?</title>', '', 'title'),
+                (guide, r'<meta name="description"[^>]*>', '', 'description'),
+                (guide, r'<link rel="canonical"[^>]*>', '', 'canonical'),
+                (guide, r'"name": "Install OpenWiz"', '"name": "Setup OpenWiz"', 'HowTo JSON-LD'),
+                (guide, r'<h1>How to run many coding agents at once</h1>', '<h1>Run coding agents</h1>', 'guide h1 and HowTo name'),
+                (guide, r'OpenWiz 0\.01 \(version 0\.1\.0\)', 'OpenWiz 0.02 (version 0.1.1)', 'names only OpenWiz 0.01'),
+                ('what-is-openwiz/index.html', r'href="/guides/run-many-coding-agents/">Guide: run many coding agents</a>', 'href="/faq/">Guide</a>', 'overview links the guide'),
+                ('sitemap.xml', r'<url><loc>https://openwiz\.dev/guides/run-many-coding-agents/</loc>.*?</url>', '', 'sitemap must list'),
+                ('llms.txt', r'- \[How to run many coding agents at once\]\(https://openwiz\.dev/guides/run-many-coding-agents/\)[^\n]*\n', '', 'invalid llms.txt'),
+            ]
+            for name, pattern, replacement, error in failures:
+                with self.subTest(file=name, error=error):
+                    path = root / name
+                    original = path.read_text()
+                    changed, count = re.subn(pattern, replacement, original, count=1)
+                    self.assertEqual(count, 1)
+                    path.write_text(changed)
+                    try:
+                        with self.assertRaisesRegex(AssertionError, error):
+                            check_site(root)
+                    finally:
+                        path.write_text(original)
+            path = root / guide
+            original = path.read_bytes()
+            path.unlink()
+            try:
+                with self.assertRaisesRegex(AssertionError, 'missing build output'):
+                    check_site(root)
+            finally:
+                path.write_bytes(original)
+
+    def test_discovery_rejects_a_missing_markdown_copy(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / 'dist'
+            shutil.copytree(ROOT / 'dist', root)
+            (root / 'faq.md').unlink(missing_ok=True)
+            with self.assertRaisesRegex(AssertionError, 'missing Markdown copy: faq.md'):
+                check_discovery(root, {name: Page((root / name).read_text()) for name in ALL_PAGES})
+
+    def test_discovery_checks_markdown_links_and_crawler_files(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / 'dist'
+            shutil.copytree(ROOT / 'dist', root)
+            failures = [
+                ('faq/index.html', r'<link rel="alternate" type="text/markdown"[^>]*>', '', 'Markdown alternate'),
+                ('llms.txt', r'^- .*\(https://openwiz\.dev/faq\.md\).*\n', '', 'llms.txt.*faq.md'),
+                ('llms-full.txt', r'(?m)^6\. .*Watch it ship.*\n', '', 'llms-full.txt.*guide'),
+                ('llms-full.txt', r'(?ms)^## FAQ — OpenWiz\n.*?(?=^## Drivers — OpenWiz\n)', '', 'llms-full.txt.*faq.md'),
+                ('_headers', r'^/\*\.md\n  Content-Type: text/markdown; charset=utf-8\n', '', 'Markdown content type'),
+            ]
+            for name, pattern, replacement, error in failures:
+                with self.subTest(file=name, error=error):
+                    path = root / name
+                    original = path.read_text()
+                    changed, count = re.subn(pattern, replacement, original, count=1, flags=re.M)
+                    self.assertEqual(count, 1)
+                    path.write_text(changed)
+                    try:
+                        with self.assertRaisesRegex(AssertionError, error):
+                            check_discovery(root, {page: Page((root / page).read_text()) for page in ALL_PAGES})
+                    finally:
+                        path.write_text(original)
+
+    def test_markdown_conversion_preserves_main_content(self):
+        html = """<head><title>Head noise</title></head>
+        <body><header>Site header</header><main>
+        <nav>Menu noise</nav><script>window.noise = true;</script>
+        <h1>A &amp; B</h1>
+        <p>Read <a title="2 > 1" href='../intro/?x=1&amp;y=2'><strong>the intro</strong></a>
+        and <a href="#commands">commands</a>.</p>
+        <ol start="3"><li>Start<ul><li>Nested</li></ul></li><li>Finish</li></ol>
+        <pre><code class="language-sh">echo &lt;name&gt;
+  printf '%s' '```'
+</code></pre><footer>Footer noise</footer></main><aside>Aside noise</aside></body>"""
+        result = subprocess.run(['node', '--input-type=module', '-e', """
+            import { readFileSync } from 'node:fs';
+            import { toMarkdown } from './scripts/mirrors.mjs';
+            process.stdout.write(toMarkdown(readFileSync(0, 'utf8'), 'https://openwiz.dev/guides/sample/'));
+        """], cwd=ROOT, input=html, text=True, capture_output=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout, """# A & B
+
+Read [**the intro**](https://openwiz.dev/guides/intro/?x=1&y=2) and [commands](https://openwiz.dev/guides/sample/#commands).
+
+3. Start
+   - Nested
+4. Finish
+
+````sh
+echo <name>
+  printf '%s' '```'
+````
+""")
 
     def test_broken_targets_fragments_and_schemes(self):
         root = ROOT / 'dist'
@@ -99,6 +269,13 @@ class Checks(unittest.TestCase):
                 with self.assertRaises(AssertionError):
                     check_privacy('scripts/check.py', marker.encode())
         check_privacy('index.html', b'<p>Building in public</p>')
+        placeholder = b'{"state_dir": "/' + b'home/' + b'someone/.local/state/openwiz-agents"}'
+        check_privacy('ask-docs/docs/github-app.md', placeholder)
+        check_privacy('dist/ask-index.json', placeholder)
+        with self.assertRaises(AssertionError):
+            check_privacy('index.html', placeholder)
+        with self.assertRaises(AssertionError):
+            check_privacy('ask-docs/docs/github-app.md', b'{"state_dir": "/' + b'home/' + b'owner/.local"}')
         with self.assertRaises(AssertionError):
             check_privacy('fonts/unreviewed.woff2', b'wOF2')
         with self.assertRaises(AssertionError):
@@ -127,6 +304,108 @@ class Checks(unittest.TestCase):
                     "%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cimage href='x'/%3E%3C/svg%3E"):
             with self.subTest(svg=bad), self.assertRaises(AssertionError):
                 check_ref(root, page, 'data:image/svg+xml,' + bad, pages)
+
+    def test_avif_metadata(self):
+        data = (ROOT / 'art/era-2-grill-sq-480.avif').read_bytes()
+        check_avif(data)
+        at = data.index(b'av01', data.index(b'infe'))
+        for bad in (data[:-1], data.replace(b'ftypavif', b'ftypheic', 1), data[:at] + b'Exif' + data[at + 4:], b'GIF89a' + b'\0' * 8):
+            with self.subTest(bad=bad[:16]), self.assertRaises(AssertionError):
+                check_avif(bad)
+        with self.assertRaises(AssertionError):
+            check_privacy('art/new.avif', data)
+        import zlib
+        chunk = lambda kind, body: len(body).to_bytes(4, 'big') + kind + body + zlib.crc32(kind + body).to_bytes(4, 'big')
+        png = lambda *extra: b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', bytes(13)) + b''.join(extra) + chunk(b'IDAT', b'x') + chunk(b'IEND', b'')
+        clean = png()
+        check_png(clean)
+        existing = next(iter(DOC_HASHES))
+        check_privacy(existing, (ROOT / existing).read_bytes())
+        for path in ('docs/evidence/speed/x/home.png', existing, 'docs/new.png'):
+            with self.subTest(unpinned=path), self.assertRaisesRegex(AssertionError, 'unreviewed picture'):
+                check_privacy(path, clean)
+        with mock.patch.dict(DOC_HASHES, {'docs/evidence/speed/x/home.png': sha256(clean).hexdigest()}):
+            check_privacy('docs/evidence/speed/x/home.png', clean)
+        for bad in (png(chunk(b'tEXt', b'Author\0someone')), png(chunk(b'eXIf', b'x')), png(chunk(b'iCCP', b'x')), clean[:-3]):
+            with self.subTest(bad=bad[-24:]), mock.patch.dict(DOC_HASHES, {'docs/evidence/speed/x/home.png': sha256(bad).hexdigest()}):
+                with self.assertRaises(AssertionError):
+                    check_privacy('docs/evidence/speed/x/home.png', bad)
+        marked = b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', bytes(13)) + chunk(b'IDAT', ('cr' + '_sub_x').encode()) + chunk(b'IEND', b'')
+        with mock.patch.dict(DOC_HASHES, {'docs/evidence/speed/x/home.png': sha256(marked).hexdigest()}):
+            with self.assertRaisesRegex(AssertionError, 'private marker'):
+                check_privacy('docs/evidence/speed/x/home.png', marked)
+
+    def test_right_sized_images(self):
+        phone = '<link rel="preload" as="image" type="image/avif" media="(max-width: 480px)"'
+        cases = (
+            ('index.html', phone, '<link rel="preload" as="image" type="image/avif" media="(max-width: 480px)" data-x', None),
+            ('index.html', 'class="landscape"', 'class="landscape" loading="lazy"', 'never lazy'),
+            ('index.html', 'class="moment-art" src="/art/moments-sea.webp" alt="" width="1600" height="705" loading="lazy"',
+             'class="moment-art" src="/art/moments-sea.webp" alt="" width="1600" height="705"', 'loading="lazy" decoding="async"'),
+            ('index.html', 'srcset="/art/moments-sea-1600.avif"', 'srcset="/art/moments-sea-9.avif"', 'missing local target'),
+            ('drivers/index.html', '<source type="image/avif" srcset="/art/drivers-d-sea-1536.avif">', '', 'unused art variants'),
+            ('index.html', 'imagesizes="470px"', 'imagesizes="400px"', 'preload the painting'),
+        )
+        for page, old, new, error in cases:
+            with self.subTest(page=page, new=new), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp) / 'dist'
+                shutil.copytree(ROOT / 'dist', root)
+                path = root / page
+                text = path.read_text()
+                self.assertIn(old, text)
+                if page == 'index.html' and old == phone:
+                    head, rest = text.split('</head>', 1)
+                    text = head.replace(old, '<!--', 1).replace('fetchpriority="high">', 'fetchpriority="high">-->', 1) + '</head>' + rest
+                    path.write_text(text)
+                    error = 'preload'
+                else:
+                    path.write_text(text.replace(old, new, 1))
+                with self.assertRaisesRegex(AssertionError, error or '.'):
+                    check_site(root)
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / 'dist'
+            shutil.copytree(ROOT / 'dist', root)
+            edit_built(root, 'site.css', lambda css: css.replace('.hero-fleet span { display: block;', '.hero-fleet span { background-image: url(/art/fleet-frames.webp); display: block;', 1))
+            with self.assertRaisesRegex(AssertionError, 'sprite sheet'):
+                check_site(root)
+
+    def test_image_preloads_match_active_sources(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / 'dist'
+            shutil.copytree(ROOT / 'dist', root)
+            drivers = root / 'drivers/index.html'
+            old = '<link rel="preload" href="/art/drivers-d-sea-1536.avif" as="image" type="image/avif" fetchpriority="high">'
+            new = '<link rel="preload" href="/art/drivers-d-sea.webp" as="image" type="image/webp">'
+            text = drivers.read_text()
+            self.assertIn(old, text)
+            drivers.write_text(text.replace(old, new, 1))
+            with self.assertRaisesRegex(AssertionError, 'does not match an active'):
+                check_site(root)
+        check_image_preloads(
+            'plain.html',
+            '<html><head><link rel="preload" href="/art/hero-cave.webp" as="image" type="image/webp"></head>'
+            '<body><img src="/art/hero-cave.webp" alt=""></body></html>',
+        )
+        check_image_preloads(
+            'picture.html',
+            '<html><head><link rel="preload" as="image" type="image/avif" imagesrcset="/art/a-800.avif 800w" imagesizes="100vw"></head>'
+            '<body><picture><source type="image/avif" srcset="/art/a-800.avif 800w" sizes="100vw"><img src="/art/a.webp" alt=""></picture></body></html>',
+        )
+        for bad, error in (
+            ('<html><head><link rel="preload" href="/art/a.webp" as="image" type="image/webp"></head>'
+             '<body><picture><source type="image/avif" srcset="/art/a-800.avif"><img src="/art/a.webp" alt=""></picture></body></html>',
+             'does not match an active'),
+            ('<html><head><link rel="preload" as="image" type="image/avif" imagesrcset="/art/a-800.avif 800w" imagesizes="50vw"></head>'
+             '<body><picture><source type="image/avif" srcset="/art/a-800.avif 800w" sizes="100vw"><img src="/art/a.webp" alt=""></picture></body></html>',
+             'does not match an active'),
+            ('<html><head><link rel="preload" href="/art/unused.webp" as="image" type="image/webp"></head>'
+             '<body><img src="/art/other.webp" alt=""></body></html>',
+             'does not match an active'),
+            ('<html><head></head><body><link rel="preload" href="/art/a.webp" as="image" type="image/webp"><img src="/art/a.webp" alt=""></body></html>',
+             'must live in <head>'),
+        ):
+            with self.subTest(bad=bad[:80]), self.assertRaisesRegex(AssertionError, error):
+                check_image_preloads('bad.html', bad)
 
     def test_css_escapes_and_unreadable_urls(self):
         for bad in ('\np { background: url(https://exa\\\nmple.com/x.png) }\n',
@@ -207,7 +486,7 @@ class Checks(unittest.TestCase):
 
     def test_hero_names_no_approval_step(self):
         for name, old, new in (
-                ('index.html', 'Turn an idea into a spec and reviewed code.', 'Turn an idea into an approved plan and reviewed code.'),
+                ('index.html', 'Tell it your idea in plain words.', 'Tell it your idea in plain words and an approved plan.'),
                 ('index.html', '<p class="demo-status">', '<p class="demo-status">Approve the plan · '),
                 ('site.js', "label: 'Writing the spec'", "label: 'Approving the plan'")):
             with self.subTest(new=new), tempfile.TemporaryDirectory() as temp:
@@ -253,7 +532,7 @@ class Checks(unittest.TestCase):
                 (CHANGELOG.replace('lets you do.', 'lets you do in Wiz<b>Room</b>.'), 'private repository is named|nothing else'),
                 (CHANGELOG.replace('lets you do.', 'lets you do, since 0.01.'), 'version number or date'),
                 (CHANGELOG.replace('lets you do.', 'lets you do, since 2026.'), 'version number or date'),
-                (CHANGELOG.replace('.release{color:red}', '.release{transition:opacity .2s}'), 'motion outside')):
+                (CHANGELOG.replace('</title>', '</title><style>.release{color:red}</style>'), 'never inline')):
             with self.subTest(error=error, at=changelog[-120:]), self.assertRaisesRegex(AssertionError, error):
                 check_changelog(LANDING, changelog)
 
@@ -309,6 +588,7 @@ class Checks(unittest.TestCase):
         page = CHANGELOG.replace('</main>', '<!-- releases:start -->' + LIVE + '<!-- releases:end --></main>')
         self.assertEqual(split_releases(page), (CHANGELOG, LIVE))
         check_releases(LIVE, DATA, True)
+        check_releases(LIVE.replace('<h2 id="v0-02">0.02 <small>', '<h2 id="v0-02">0.02 <small class="semver">'), DATA, True)
         check_releases(SOON, DATA, False)
         check_releases(SOON, {}, True)
         for built in (CHANGELOG, page.replace('</main>', '</main><!-- releases:start --><!-- releases:end -->'),
@@ -326,7 +606,7 @@ class Checks(unittest.TestCase):
                 (LIVE.replace(first + '</article>', '').replace(second + '</article>', second + '</article>' + first + '</article>'), True, 'newest first'),
                 (LIVE.replace('(0.1.10)', '(0.1.11)'), True, 'newest first'),
                 (LIVE.replace('<h2 id="v0-02">0.02 <small>· <time datetime="2031-02-03">Feb 3, 2031</time> (0.1.10)</small></h2>',
-                              '<h2 id="v0-02"><small>· <time datetime="2031-02-03">Feb 3, 2031</time> (0.1.10)</small> 0.02</h2>'), True, 'public name'),
+                              '<h2 id="v0-02"><small class="semver">· <time datetime="2031-02-03">Feb 3, 2031</time> (0.1.10)</small> 0.02</h2>'), True, 'public name'),
                 (LIVE.replace('<h2 id="v0-02">0.02 <small>', '<h2 id="v0-02">0.0<small>').replace('(0.1.10)</small></h2>', '(0.1.10)</small>2</h2>'), True, 'public name'),
                 (LIVE.replace('Feb 3, 2031', 'Feb 4, 2031'), True, 'newest first'),
                 (LIVE.replace('datetime="2031-02-03"', 'datetime="2031-02-04"'), True, "entry's date"),
@@ -364,12 +644,16 @@ class Checks(unittest.TestCase):
                     check_site(root)
 
     def test_spec_video_poster_captions_and_link(self):
+        def spec(change):
+            mark = '<li class="spec-moment">'
+            return lambda t: t.split(mark)[0] + mark + change(t.split(mark, 1)[1])
         for change, error in (
-                (lambda t: re.sub(r' poster="[^"]*"', '', t, count=1), 'spec video needs a pinned poster'),
-                (lambda t: re.sub(r'<track [^>]*>', '', t, count=1), 'spec video needs default captions'),
+                (spec(lambda t: re.sub(r' poster="[^"]*"', '', t, count=1)), 'spec video needs a pinned poster'),
+                (spec(lambda t: re.sub(r'<track [^>]*>', '', t, count=1)), 'spec video needs default captions'),
                 (lambda t: t.replace('class="spec-link"', 'class="spec-link" hidden', 1), 'plain link to the spec video'),
-                (lambda t: t.replace(' muted', '', 1), 'spec video must start muted inline'),
-                (lambda t: t.replace('preload="none"', 'preload="auto"', 1), 'recording must be opt-in')):
+                (spec(lambda t: t.replace(' muted', '', 1)), 'spec video must start muted inline'),
+                (spec(lambda t: t.replace('preload="none"', 'preload="auto"', 1)), 'recording must be opt-in'),
+                (spec(lambda t: t.replace(' controls', ' loop controls', 1)), 'recording must be opt-in')):
             with self.subTest(error=error), tempfile.TemporaryDirectory() as temp:
                 root = Path(temp) / 'dist'
                 shutil.copytree(ROOT / 'dist', root)
@@ -380,6 +664,63 @@ class Checks(unittest.TestCase):
                 landing.write_text(changed)
                 with self.assertRaisesRegex(AssertionError, error):
                     check_site(root)
+
+    def test_launch_video_under_the_hero(self):
+        post = 'https://x.com/openwiz/status/2124709517665657224'
+        figure = re.compile(r'    <figure class="launch">[\s\S]*?</figure>\n')
+        for page, old, new, error in (
+                ('index.html', 'preload="none" playsinline controls', 'preload="none" playsinline controls autoplay', 'launch recording must be opt-in'),
+                ('index.html', 'preload="none" playsinline controls', 'preload="auto" preload="none" playsinline controls', 'duplicate HTML attribute on <video>: preload'),
+                ('index.html', '<track kind="captions" src="/art/launch-video.vtt" srclang="en"', '<track kind="captions" src="/art/launch-video.vtt" srclang="fr"', 'its own English captions'),
+                ('index.html', 'preload="none" playsinline controls', 'preload="metadata" playsinline controls', 'launch recording must be opt-in'),
+                ('index.html', 'preload="none" playsinline controls', 'preload="none" playsinline controls muted', 'plays inline with sound'),
+                ('index.html', 'preload="none" playsinline controls', 'preload="none" controls', 'plays inline with sound'),
+                ('index.html', 'preload="none" playsinline controls', 'preload="none" playsinline', 'keeps native controls'),
+                ('index.html', 'poster="/art/launch-poster.webp"', 'poster="/favicon.ico"', 'pinned poster'),
+                ('index.html', '<track kind="captions" src="/art/launch-video.vtt" srclang="en" label="English">', '', 'needs its own English captions'),
+                ('index.html', ' aria-describedby="launch-about"', '', 'two-sentence text alternative'),
+                ('index.html', 'It then shows how', 'Then it shows. It shows how', 'two-sentence text alternative'),
+                ('index.html', 'class="launch-play" type="button" hidden>', 'class="launch-play" type="button">', 'motion controls must wait|hidden until the scripts run'),
+                ('index.html', 'Watch OpenWiz in two minutes</button>', 'Watch the launch video</button>', 'one play button'),
+                ('index.html', '>See the launch post</a>', '>The launch post</a>', 'See the launch post'),
+                ('index.html', post, post.replace('2124709517665657224', '1'), 'unexpected external URL|launch post'),
+                ('team/index.html', '</main>', f'<a href="{post}">See the launch post</a></main>', 'the launch post link, the landing launch video'),
+                ('index.html', '<figure class="launch">', '<figure class="launch" hidden>', 'the launch video sits in the hero'),
+        ):
+            with self.subTest(error=error, new=new), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp) / 'dist'
+                shutil.copytree(ROOT / 'dist', root)
+                path = root / page
+                text = path.read_text()
+                self.assertIn(old, text)
+                path.write_text(text.replace(old, new, 1))
+                with self.assertRaisesRegex(AssertionError, error):
+                    check_site(root)
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / 'dist'
+            shutil.copytree(ROOT / 'dist', root)
+            landing = root / 'index.html'
+            text = landing.read_text()
+            moved = figure.search(text)[0]
+            text = text.replace(moved, '', 1).replace('  <section class="agent-row', moved.replace('    <figure', '  <figure', 1) + '  <section class="agent-row', 1)
+            landing.write_text(text)
+            with self.assertRaisesRegex(AssertionError, 'the launch video sits in the hero'):
+                check_site(root)
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / 'dist'
+            shutil.copytree(ROOT / 'dist', root)
+            landing = root / 'index.html'
+            text = landing.read_text()
+            track = re.search(r'\s*<track kind="captions" src="/art/launch-video.vtt"[^>]*>', text)[0]
+            spec_track = re.search(r'<track kind="captions" src="/art/todo-spec.vtt"[^>]*>', text)[0]
+            landing.write_text(text.replace(track, '', 1).replace(spec_track, spec_track + track, 1))
+            with self.assertRaisesRegex(AssertionError, 'the launch video needs its own English captions'):
+                check_site(root)
+        with tempfile.TemporaryDirectory() as temp, mock.patch('check.LAUNCH_BUDGET', 1_000_000):
+            root = Path(temp) / 'dist'
+            shutil.copytree(ROOT / 'dist', root)
+            with self.assertRaisesRegex(AssertionError, 'over their 1000000 budget'):
+                check_site(root)
 
     def test_transition_duration_respects_reduced_motion(self):
         with self.assertRaisesRegex(AssertionError, 'motion outside'):
@@ -432,8 +773,8 @@ class Checks(unittest.TestCase):
                          (f'<link rel="stylesheet" href="/{css}">', f'<a href="/{css}">styles</a>'),
                          (f'<link rel="stylesheet" href="/{css}">', f'<link rel="stylesheet" href="/{css}" disabled>'),
                          (f'<link rel="stylesheet" href="/{css}">', f'<link rel="stylesheet" href="/{css}" media="print">'),
-                         (f'<script src="/{FINGERPRINTS["site.js"]}" defer>', f'<script type="text/plain" src="/{FINGERPRINTS["site.js"]}" defer>'),
-                         (f'<script src="/{FINGERPRINTS["site.js"]}" defer>', f'<script nomodule src="/{FINGERPRINTS["site.js"]}" defer>')):
+                         (f'<script src="/{FINGERPRINTS["site.js"]}" ', f'<script type="text/plain" src="/{FINGERPRINTS["site.js"]}" '),
+                         (f'<script src="/{FINGERPRINTS["site.js"]}" ', f'<script nomodule src="/{FINGERPRINTS["site.js"]}" ')):
             with self.subTest(new=new), tempfile.TemporaryDirectory() as temp:
                 root = Path(temp) / 'dist'
                 shutil.copytree(ROOT / 'dist', root)
@@ -444,13 +785,152 @@ class Checks(unittest.TestCase):
                 with self.assertRaises(AssertionError):
                     check_site(root)
 
-    def test_headers_revalidate(self):
+    def test_gsap_loads_after_the_page(self):
+        site, gsap = FINGERPRINTS['site.js'], FINGERPRINTS['vendor/gsap-3.15.1.min.js']
+        tag = f'<script src="/{site}" data-gsap="/{gsap}" defer></script>'
+        for page_name, new in (('index.html', f'<script src="/{gsap}" defer></script>{tag}'),
+                               ('team/index.html', f'<script src="/{site}" defer></script>'),
+                               ('drivers/index.html', f'<link rel="preload" href="/{gsap}" as="script">{tag}'),
+                               ('market/index.html', f'<script src="/{site}" data-gsap="/vendor/gsap-3.15.1.min.js" defer></script>')):
+            with self.subTest(page=page_name, new=new), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp) / 'dist'
+                shutil.copytree(ROOT / 'dist', root)
+                page = root / page_name
+                text = page.read_text()
+                self.assertIn(tag, text)
+                page.write_text(text.replace(tag, new))
+                with self.assertRaises(AssertionError):
+                    check_site(root)
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp) / 'dist'
             shutil.copytree(ROOT / 'dist', root)
-            (root / '_headers').write_text('/*.css\n  Cache-Control: public, max-age=14400\n')
+            edit_built(root, 'site.js', lambda js: js.replace("addEventListener('load', loadMotion, { once: true });", 'loadMotion();'))
             with self.assertRaises(AssertionError):
                 check_site(root)
+
+    def test_headers_revalidate(self):
+        cases = {
+            'broken file': lambda text: '/*.css\n  Cache-Control: public, max-age=14400\n',
+            'missing immutable detach': lambda text: text.replace('/*.:hash.css\n  ! Cache-Control\n', '/*.:hash.css\n'),
+            'missing font detach': lambda text: text.replace('/fonts/*.woff2\n  ! Cache-Control\n', '/fonts/*.woff2\n'),
+            'missing mp4 detach': lambda text: text.replace('/*.mp4\n  ! Cache-Control\n', '/*.mp4\n'),
+            'overbroad unhashed js': lambda text: text.replace('/*.:hash.js', '/*.js'),
+            'overbroad unhashed css': lambda text: text.replace('/*.:hash.css', '/*.css'),
+            'html stale-while-revalidate': lambda text: text.replace(
+                '  Cache-Control: public, max-age=0, must-revalidate\n',
+                '  Cache-Control: public, max-age=0, must-revalidate, stale-while-revalidate=60\n'),
+            'double splat pattern': lambda text: text.replace('/*.:hash.css', '/*.*.css'),
+        }
+        for name, spoil in cases.items():
+            with self.subTest(name), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp) / 'dist'
+                shutil.copytree(ROOT / 'dist', root)
+                headers = root / '_headers'
+                headers.write_text(spoil(headers.read_text()))
+                with self.assertRaises(AssertionError):
+                    check_site(root)
+
+    def test_security_headers_and_well_known(self):
+        cases = {
+            'missing HSTS': lambda root: (root / '_headers').write_text(
+                (root / '_headers').read_text().replace('  Strict-Transport-Security: max-age=31536000\n', '')),
+            'missing /app/* CSP detach': lambda root: (root / '_headers').write_text(
+                (root / '_headers').read_text().replace('  ! Content-Security-Policy\n', '')),
+            'missing /app/* Referrer-Policy detach': lambda root: (root / '_headers').write_text(
+                (root / '_headers').read_text().replace('  ! Referrer-Policy\n', '')),
+            'Turnstile allowed site-wide': lambda root: (root / '_headers').write_text(
+                (root / '_headers').read_text().replace("script-src 'self' https://static.cloudflareinsights.com;", "script-src 'self' https://static.cloudflareinsights.com https://challenges.cloudflare.com;", 1)),
+            'Turnstile allowed under /app/': lambda root: (root / '_headers').write_text(
+                (root / '_headers').read_text().replace("default-src 'none'; script-src 'self';", "default-src 'none'; script-src 'self' https://challenges.cloudflare.com;")),
+            'missing /faq/* Turnstile rule': lambda root: (root / '_headers').write_text(
+                re.sub(r'^/faq/\*\n(  .*\n)*', '', (root / '_headers').read_text(), flags=re.M)),
+            'Turnstile frame-src wider than its origin': lambda root: (root / '_headers').write_text(
+                (root / '_headers').read_text().replace('frame-src https://challenges.cloudflare.com;', 'frame-src https:;')),
+            'Ask a Wiz CSP without analytics': lambda root: (root / '_headers').write_text(
+                (root / '_headers').read_text().replace(" https://cloudflareinsights.com; frame-src https://challenges.cloudflare.com", "; frame-src https://challenges.cloudflare.com")),
+            'missing security.txt Expires': lambda root: (root / '.well-known/security.txt').write_text(
+                re.sub(r'^Expires:.*\n', '', (root / '.well-known/security.txt').read_text(), flags=re.M)),
+            'missing robots.txt Disallow': lambda root: (root / 'robots.txt').write_text('User-agent: *\nAllow: /\n'),
+            'inline style on market': lambda root: (root / 'market/index.html').write_text(
+                (root / 'market/index.html').read_text().replace('</head>', '<style>.x{color:red}</style></head>')),
+        }
+        for name, spoil in cases.items():
+            with self.subTest(name), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp) / 'dist'
+                shutil.copytree(ROOT / 'dist', root)
+                spoil(root)
+                with self.assertRaises(AssertionError):
+                    check_site(root)
+
+    def test_font_subset_and_fingerprinting(self):
+        def rewrite_tokens(root, transform):
+            old = FINGERPRINTS['tokens.css']
+            text = transform((root / old).read_text())
+            data = text.encode('utf-8')
+            new = fingerprint('tokens.css', data)
+            (root / old).unlink()
+            (root / new).write_bytes(data)
+            for page in root.rglob('*.html'):
+                page.write_text(page.read_text().replace(f'/{old}', f'/{new}'))
+
+        cases = {
+            'char outside subset in page': (
+                lambda root: (root / 'faq/index.html').write_text(
+                    (root / 'faq/index.html').read_text().replace('</main>', '<p>\u03a9</p></main>')),
+                'character outside font subset',
+            ),
+            'font-display switched to swap': (
+                lambda root: rewrite_tokens(root, lambda t: t.replace('font-display: optional;', 'font-display: swap;', 1)),
+                'font-display: optional',
+            ),
+            'missing unicode-range': (
+                lambda root: rewrite_tokens(root, lambda t: re.sub(r'\s*unicode-range:[^;]+;', '', t, count=1)),
+                'unicode-range',
+            ),
+            'missing font cache header': (
+                lambda root: (root / '_headers').write_text(
+                    (root / '_headers').read_text().replace('/fonts/*.woff2\n  ! Cache-Control\n  Cache-Control: public, max-age=31536000, immutable\n', '')),
+                'Cache-Control mismatch for /fonts/',
+            ),
+            'unfingerprinted font preload': (
+                lambda root: (root / 'index.html').write_text(
+                    (root / 'index.html').read_text().replace(f'/{FINGERPRINTS["fonts/Geist-var.woff2"]}', '/fonts/Geist-var.woff2', 1)),
+                'unfingerprinted',
+            ),
+        }
+        for name, (spoil, pattern) in cases.items():
+            with self.subTest(name), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp) / 'dist'
+                shutil.copytree(ROOT / 'dist', root)
+                spoil(root)
+                with self.assertRaisesRegex(AssertionError, pattern):
+                    check_site(root)
+
+    def test_security_txt_expiry(self):
+        base = (
+            'Contact: https://github.com/openwizdev/OpenWiz/security/advisories/new\n'
+            'Preferred-Languages: en\n'
+            'Canonical: https://openwiz.dev/.well-known/security.txt\n'
+            'Policy: https://github.com/openwizdev/OpenWiz/security/policy\n'
+        )
+        today = datetime(2027, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+        check_security_txt(base + 'Expires: 2028-01-01T00:00:00Z\n', now=today)
+        check_security_txt(base + 'Expires: 2027-03-02T00:00:00Z\n', now=today)
+        check_security_txt(base + 'Expires: 2028-01-01T05:00:00+05:00\n', now=today)
+        bad_cases = (
+            ('59 days out', base + 'Expires: 2027-03-01T00:00:00Z\n', 'within 60 days; move it about a year out'),
+            ('past', base + 'Expires: 2026-12-31T23:59:59Z\n', 'in the past; move it about a year out'),
+            ('missing', base, 'missing Expires'),
+            ('duplicate', base + 'Expires: 2028-01-01T00:00:00Z\nExpires: 2029-01-01T00:00:00Z\n', 'duplicate Expires'),
+            ('garbage', base + 'Expires: not-a-date\n', 'unparsable RFC 3339 Expires'),
+            ('invalid calendar date', base + 'Expires: 2028-02-30T00:00:00Z\n', 'unparsable RFC 3339 Expires'),
+            ('naive timestamp', base + 'Expires: 2028-01-01T00:00:00\n', 'unparsable RFC 3339 Expires'),
+        )
+        for name, text, error in bad_cases:
+            with self.subTest(name), self.assertRaisesRegex(AssertionError, error):
+                check_security_txt(text, now=today)
+        with self.assertRaisesRegex(AssertionError, 'in the past'):
+            check_site(ROOT / 'dist', now=datetime(2099, 1, 1, 0, 0, 0, tzinfo=timezone.utc))
 
     def test_install_wording_only_in_the_install_box(self):
         for extra in ('<a href="/">Copy · coming soon</a>', '<p>Install now</p>', '<p>Inst&#97;ll today</p>',
@@ -465,17 +945,19 @@ class Checks(unittest.TestCase):
 
     def test_install_line_and_its_switch(self):
         line = '<code class="install-line">Install OpenWiz from github.com/openwizdev/OpenWiz</code>'
-        hint = '<p class="install-hint">Paste this into your agent</p>'
-        button = '<button class="btn install" type="button" disabled>Copy · coming soon</button>'
+        hint = '<p class="install-hint">Paste this into your AI helper</p>'
         text = (ROOT / 'dist/index.html').read_text()
         shipped = re.findall(r'data-install="([^"]*)"', text)
+        labels = {'coming-soon': 'Copy · coming soon', 'live': 'Copy'}
+        button = f'<button class="btn install" type="button" disabled data-count="install-copy">{labels[shipped[0]]}</button>'
         self.assertEqual(len(shipped), 1, 'one install switch')
         self.assertIn(shipped[0], INSTALL_SWITCH)
         for part in (line, hint, button):
             self.assertEqual(text.count(part), 1, part)
         for state in INSTALL_SWITCH:
             switch = f'data-install="{state}"'
-            variant = text.replace(f'data-install="{shipped[0]}"', switch)
+            variant = text.replace(f'data-install="{shipped[0]}"', switch).replace(button, button.replace(f'>{labels[shipped[0]]}<', f'>{labels[state]}<'))
+            button_here = button.replace(f'>{labels[shipped[0]]}<', f'>{labels[state]}<')
             changelog = with_switch(state)
             with self.subTest(state=state), tempfile.TemporaryDirectory() as temp:
                 root = Path(temp) / 'dist'
@@ -492,16 +974,16 @@ class Checks(unittest.TestCase):
                 (line, ''),
                 (line, line + line),
                 (hint, ''),
-                (hint, hint.replace('your agent', 'your terminal')),
+                (hint, hint.replace('your AI helper', 'your terminal')),
                 (switch, ''),
                 (switch, 'data-install="on"'),
-                (button, button.replace(' disabled', '')),
-                (button, button.replace(' disabled', ' aria-disabled="true"')),
-                (button, button.replace(' disabled', ' title=" disabled "')),
-                (button, button.replace(' disabled', ' disabled onclick="copy()"')),
-                (button, button.replace(' disabled', ' disabled onclick ="copy()"')),
-                (button, button.replace('Copy · coming soon', 'Copy')),
-                (button, button + button),
+                (button_here, button_here.replace(' disabled', '')),
+                (button_here, button_here.replace(' disabled', ' aria-disabled="true"')),
+                (button_here, button_here.replace(' disabled', ' title=" disabled "')),
+                (button_here, button_here.replace(' disabled', ' disabled onclick="copy()"')),
+                (button_here, button_here.replace(' disabled', ' disabled onclick ="copy()"')),
+                (button_here, button_here.replace(f'>{labels[state]}<', f'>{labels["live" if state == "coming-soon" else "coming-soon"]}<')),
+                (button_here, button_here + button_here),
             ]
             for good, bad in breaks:
                 with self.subTest(state=state, bad=bad), tempfile.TemporaryDirectory() as temp:
@@ -522,14 +1004,16 @@ class Checks(unittest.TestCase):
             ('index.html', note, ''),
             ('index.html', note, note + note),
             ('index.html', note, note.replace('x86_64 Linux', 'Linux')),
-            ('index.html', note, note.replace('Apple-silicon Mac', 'Mac')),
-            ('index.html', note, note.replace('; you sign in.', '.')),
+            ('index.html', note, note.replace('Mac (Apple silicon or Intel)', 'Mac')),
+            ('index.html', note, note.replace('No CloudRoom needed to install. ', '')),
             ('index.html', note, note.replace(link, 'CloudRoom')),
             ('index.html', note, note.replace('https://cloudroom.dev', 'https://cloudroom.dev/x')),
             ('index.html', note, note.replace(' rel="noreferrer"', '')),
             ('index.html', note, ''),
             ('index.html', '</main>', f'<p>{link}</p></main>'),
             ('drivers/index.html', '</main>', f'<p>{link}</p></main>'),
+            ('index.html', INSTALL_PREREQS_HTML, ''),
+            ('index.html', INSTALL_PREREQS_HTML, INSTALL_PREREQS_HTML.replace('Python 3.9 or later', 'Python')),
         ]
         for i, (page, good, bad) in enumerate(breaks):
             with self.subTest(page=page, bad=bad), tempfile.TemporaryDirectory() as temp:
@@ -561,18 +1045,21 @@ class Checks(unittest.TestCase):
         ]
         moved = lambda variant, trace: variant.replace(label, trace, 1).replace('</main>', label + '</main>', 1)
         relocations = ['<!-- OpenWiz 0.01 <small>0.1.0</small>. -->', f'<!-- {label} -->', '']
-        for state in ['live']:
-            variant = text.replace(shipped[0], f'data-install="{state}"')
+        for state in INSTALL_SWITCH:
+            variant = re.sub(r'(data-count="install-copy">)[^<]*<', lambda m: m[1] + ('Copy' if state == 'live' else 'Copy · coming soon') + '<', text.replace(shipped[0], f'data-install="{state}"'), count=1)
+            changelog = with_switch(state)
             with self.subTest(state=state), tempfile.TemporaryDirectory() as temp:
                 root = Path(temp) / 'dist'
                 shutil.copytree(ROOT / 'dist', root)
                 (root / 'index.html').write_text(variant)
+                (root / 'changelog/index.html').write_text(changelog)
                 check_site(root)
             for good, bad in breaks:
                 with self.subTest(state=state, bad=bad), tempfile.TemporaryDirectory() as temp:
                     root = Path(temp) / 'dist'
                     shutil.copytree(ROOT / 'dist', root)
                     (root / 'index.html').write_text(variant.replace(good, bad, 1))
+                    (root / 'changelog/index.html').write_text(changelog)
                     with self.assertRaises(AssertionError):
                         check_site(root)
             for trace in relocations:
@@ -580,6 +1067,7 @@ class Checks(unittest.TestCase):
                     root = Path(temp) / 'dist'
                     shutil.copytree(ROOT / 'dist', root)
                     (root / 'index.html').write_text(moved(variant, trace))
+                    (root / 'changelog/index.html').write_text(changelog)
                     with self.assertRaises(AssertionError):
                         check_site(root)
 
@@ -625,6 +1113,7 @@ class Checks(unittest.TestCase):
             path.write_text(change(path.read_text()))
             return temp, root
         book = re.compile(r'data-book href="[^"]*"')
+        T = 'team/index.html'
         refused = {
             'buy button': ('changelog/index.html', lambda t: t.replace(CTA, '', 1)),
             'buy button to /team/': ('team/index.html', lambda t: t.replace('<a class="nav-team" href="/team/">', '<a class="nav-team" href="/">', 1)),
@@ -638,46 +1127,53 @@ class Checks(unittest.TestCase):
             'two booking links ': ('team/index.html', lambda t: t.replace('</main>', '<a data-book href="https://cal.com/openwiz-jake/setup">Again</a></main>', 1)),
             'two booking links  ': ('team/index.html', lambda t: re.sub(r'<a class="team-book" data-book[^>]*>Book a call</a>\n</section>', '</section>', t)),
             'two booking links   ': ('team/index.html', lambda t: re.sub(r'<a class="team-book" id="book" data-book[^>]*>Book a call</a>', '<span id="book"></span>', t)),
-            'shows no price': ('team/index.html', lambda t: t.replace('Custom pricing.', 'Custom pricing. From $99 per month.', 1)),
-            'team page copy': ('team/index.html', lambda t: t.replace('>Book a call</a>', '>Talk</a>')),
-            'team page copy ': ('team/index.html', lambda t: t.replace('>Book a call</a>', '>Talk</a>', 1)),
-            'missing team page copy': ('team/index.html', lambda t: t.replace(' No checkout.', '', 1)),
-            'the team page headline': ('team/index.html', lambda t: t.replace('Leave with a shipped pull request.', 'Leave with a pull request.', 1)),
-            'the terms': ('team/index.html', lambda t: re.sub(r'<ul class="team-terms"[^>]*>[\s\S]*?</ul>', '', t)),
-            'the terms ': ('team/index.html', lambda t: t.replace('<li>A small, real change of your choice.</li>', '', 1)),
-            'the terms: under the first Book a call': ('team/index.html', lambda t: re.sub(
-                r'(<a class="team-book" id="book"[^>]*>Book a call</a>)\s*(<p class="team-label"[\s\S]*?</ul>)', r'\2\1', t)),
-            'the ships line': ('team/index.html', lambda t: re.sub(r'<p class="team-ships">[\s\S]*?</p>', '', t)),
-            'hides none of its copy': ('team/index.html', lambda t: t.replace('<ul class="team-terms" aria-labelledby="team-how">', '<ul class="team-terms" aria-labelledby="team-how" hidden>', 1)),
-            'folds nothing away': ('team/index.html', lambda t: t.replace('<ol class="team-steps">', '<details><summary>Timeline</summary><ol class="team-steps">', 1).replace('</ol>', '</ol></details>', 1)),
-            'embeds no video': ('team/index.html', lambda t: t.replace('</main>', '<video src="/art/spec-video.mp4" preload="none"></video></main>', 1)),
-            'the boat poster': ('team/index.html', lambda t: t.replace(' loading="lazy"', '', 1)),
-            'the boat poster|one X link per page': ('team/index.html', lambda t: t.replace('href="https://x.com/openwiz" class="team-poster"', 'href="/drivers/" class="team-poster"', 1)),
-            'the boat poster: its label': ('team/index.html', lambda t: t.replace('Watch the fleet build it (49 s, on X)', 'Watch it', 1)),
-            'no Wizes in the team hero': ('team/index.html', lambda t: t.replace('For solo builders and small teams</p>', 'For solo builders and small teams. Wizes!</p>', 1)),
-            'never uses: install': ('team/index.html', lambda t: t.replace('No checkout.', 'No checkout. We install it.', 1)),
-            'never uses: guarantee': ('team/index.html', lambda t: t.replace('No checkout.', 'No checkout. We guarantee it.', 1)),
-            'the team page sections': ('team/index.html', lambda t: t.replace('<h2>Pricing</h2>', '<h2>Prices</h2>', 1)),
-            'the team page sections ': ('team/index.html', lambda t: re.sub(r'<section class="team-when"[\s\S]*?</section>\n', '', t)),
-            'four marks': ('team/index.html', lambda t: t.replace('<li class="team-end"><h3>Minute 30</h3><p>A pull request ships.</p></li>', '', 1)),
-            'four marks ': ('team/index.html', lambda t: t.replace('<h3>Minute 10</h3>', '<h3>Minute 15</h3>', 1)),
-            'the terms: under their label': ('team/index.html', lambda t: re.sub(r'<p class="team-label"[^>]*>How the call works</p>\s*', '', t, count=1)),
-            'the terms: under their label ': ('team/index.html', lambda t: t.replace('>How the call works</p>', '>How it works</p>', 1)),
-            'the timeline: in the hero': ('team/index.html', lambda t: re.sub(r'(\n  <section class="team-when"[\s\S]*?</section>)(\n</div>\n)', r'\2\1\n', t, count=1)),
-            'the hero shows no poster': ('team/index.html', lambda t: t.replace('<p class="team-kicker">', '<img src="/art/team-boat-poster.webp" alt="" width="1280" height="720"><p class="team-kicker">', 1)),
-            'Minute 30 is its one highlighted stop': ('team/index.html', lambda t: t.replace('<li class="team-end">', '<li>', 1)),
-            'Minute 30 is its one highlighted stop ': ('team/index.html', lambda t: t.replace('<li><h3>Minute 0</h3>', '<li class="team-end"><h3>Minute 0</h3>', 1)),
-            'curly apostrophes': ('team/index.html', lambda t: t.replace('No checkout.', "No checkout. It's quick.", 1)),
-            'curly apostrophes ': ('team/index.html', lambda t: t.replace('aria-label="Who it\u2019s for and pricing"', 'aria-label="Who it\'s for and pricing"', 1)),
-            'Proof: three cards': ('team/index.html', lambda t: re.sub(r'<li class="team-card">\s*<p>Our Drivers page[\s\S]*?</li>\n', '', t, count=1)),
-            'Proof: the first card': ('team/index.html', lambda t: t.replace('<small>5 of 5</small>', '', 1)),
-            'Proof: the first card   ': ('team/index.html', lambda t: t.replace('<h3>Three drivers passed all five checks</h3>', '<h3>Three drivers passed</h3>', 1)),
-            'Proof: the first card    ': ('team/index.html', lambda t: t.replace('version, start, wake, stop and token.', 'version and start.', 1)),
-            'the team page sections  ': ('team/index.html', lambda t: t.replace('<section class="team-part team-close', '<section class="team-part wrap"><h2>Where your agents run</h2></section>\n<section class="team-part team-close', 1)),
-            'Proof: the first card ': ('team/index.html', lambda t: t.replace('Grok Bot: coming soon', 'Grok Bot', 1)),
-            'Proof: the first card  ': ('team/index.html', lambda t: t.replace('<a href="/drivers/">See how drivers work</a>', '<a href="/">See how drivers work</a>', 1)),
-            'Proof: the second card': ('team/index.html', lambda t: t.replace('>See the Drivers page</a>', '>Drivers</a>', 1)),
-            'the boat poster: Proof': ('team/index.html', lambda t: re.sub(r'<li class="team-card"><a href="https://x\.com/openwiz"[\s\S]*?</li>\n', '<li class="team-card"><a href="https://x.com/openwiz" class="team-poster">Watch the fleet build it (49 s, on X)</a></li>\n', t, count=1)),
+            'shows no price': (T, lambda t: t.replace('30 minutes.', '30 minutes, $99 per month.', 1)),
+            'shows no price ': (T, lambda t: t.replace('30 minutes.', '30 minutes. See pricing.', 1)),
+            'team page copy': (T, lambda t: t.replace('>Book a call</a>', '>Talk</a>')),
+            'team page copy ': (T, lambda t: t.replace('>Book a call</a>', '>Talk</a>', 1)),
+            'missing fragment: /team/#book': (T, lambda t: t.replace('<a class="team-book" id="book" data-book', '<a class="team-book" data-book', 1)),
+            'the team page description': (T, lambda t: t.replace('run a fleet on your own repository.', 'see the app.', 3)),
+            'the team page headline': (T, lambda t: t.replace('Leave the call with a reviewed pull request.', 'Leave the call with a shipped pull request.', 1)),
+            'the hero, in order': (T, lambda t: t.replace('For teams who use Claude Code or Codex', 'For solo builders and small teams', 1)),
+            'the hero, in order ': (T, lambda t: t.replace('Merging stays your call.', 'Your first fleet merges it.', 1)),
+            'the hero, in order  ': (T, lambda t: re.sub(r'(<a class="team-book" id="book"[^>]*>Book a call</a>)\s*(<p class="team-needs">[^<]*</p>)', r'\2\1', t)),
+            'the hero, in order   ': (T, lambda t: t.replace('with working CI and', 'and', 1)),
+            'no embed, form or script': (T, lambda t: t.replace('</main>', '<iframe src="/drivers/" title="x"></iframe></main>', 1)),
+            'no embed, form or script ': (T, lambda t: t.replace('</main>', '<form></form></main>', 1)),
+            'folds nothing away': (T, lambda t: t.replace('<ul class="team-facts">', '<details><summary>Facts</summary><ul class="team-facts">', 1).replace('</ul>', '</ul></details>', 1)),
+            'one video': (T, lambda t: t.replace('</main>', '<video src="/art/todo-spec.mp4" preload="none"></video></main>', 1)),
+            'the launch film sits in the hero': (T, lambda t: re.sub(r'(<div class="team-copy">[\s\S]*?</div>\n)(  <figure class="launch team-film">[\s\S]*?</figure>\n)', r'\2\1', t, count=1)),
+            'over its pinned poster': (T, lambda t: t.replace('poster="/art/launch-poster.webp"', 'poster="/favicon.ico"', 1)),
+            'never autoplays': (T, lambda t: t.replace('preload="none" playsinline', 'preload="none" autoplay playsinline', 1)),
+            'never autoplays ': (T, lambda t: t.replace('preload="none" playsinline', 'preload="auto" playsinline', 1)),
+            'never autoplays  ': (T, lambda t: t.replace('preload="none" playsinline', 'preload="none" muted playsinline', 1)),
+            'never autoplays   ': (T, lambda t: t.replace('playsinline controls', 'playsinline', 1)),
+            'its accessible name': (T, lambda t: t.replace(' aria-label="OpenWiz in two minutes"', '', 1)),
+            'text alternative': (T, lambda t: t.replace(' aria-describedby="launch-about"', '', 1)),
+            'its English captions': (T, lambda t: t.replace('<track kind="captions" src="/art/launch-video.vtt" srclang="en" label="English">', '', 1)),
+            'its one play button|hides none of its copy': (T, lambda t: t.replace('class="launch-play" type="button" hidden>', 'class="launch-play" type="button">', 1)),
+            'its one play button ': (T, lambda t: t.replace('Watch OpenWiz in two minutes</button>', 'Play</button>', 1)),
+            'the team page sections  ': (T, lambda t: t.replace('>On the call</h2>', '>The call</h2>', 1)),
+            'its three steps': (T, lambda t: re.sub(r'    <li><h3>Ship</h3>[^\n]*</li>\n', '', t, count=1)),
+            'its three steps ': (T, lambda t: t.replace('<h3>Decide</h3>', '<h3>Choose</h3>', 1)),
+            'its three steps  ': (T, lambda t: t.replace('a second agent reviews it, and the pull request opens on your repository', 'and it merges', 1)),
+            'its three steps   ': (T, lambda t: re.sub(r'(    <li><h3>Connect</h3>[^\n]*\n)(    <li><h3>Decide</h3>[^\n]*\n)', r'\2\1', t, count=1)),
+            'its four true lines': (T, lambda t: t.replace('<li>One person built it, with fleets of agents.</li>', '', 1)),
+            'its four true lines ': (T, lambda t: t.replace('open source, Apache-2.0.', 'open source, Apache-2.0, for everyone.', 1)),
+            'restates no count': (T, lambda t: t.replace('<a href="/drivers/" data-count="drivers">the Drivers page</a>', '<a href="/changelog/">the Drivers page</a>', 1)),
+            'closes on its second Book a call': (T, lambda t: t.replace('<h2 id="team-call">', '<p>Soon.</p><h2 id="team-call">', 1).replace('Book a call</a>\n</section>', 'Book a call</a>\n<p>x</p></section>', 1)),
+            'nothing else': (T, lambda t: t.replace('<section class="team-part team-close', '<p><a href="/faq/">FAQ</a></p>\n<section class="team-part team-close', 1)),
+            'never uses: guarantee': (T, lambda t: t.replace('Merging stays your call.</p>', 'Merging stays your call.</p><p>We guarantee it.</p>', 1)),
+            'never uses: customers': (T, lambda t: t.replace('<h2 id="team-call">One small change. One call.', '<h2 id="team-call">Our customers ship.', 1)),
+            'never uses: Cloudroom': (T, lambda t: t.replace('runs no server of ours.', 'runs no server of ours, and Cloudroom is optional.', 1)),
+            'never uses: Three drivers': (T, lambda t: t.replace('Which drivers passed', 'Three drivers passed', 1)),
+            'never uses: 5 of 5': (T, lambda t: t.replace('their live check:', 'their live check, 5 of 5:', 1)),
+            'the team page sections': (T, lambda t: t.replace('One small change. One call.</h2>', 'Questions</h2>', 1)),
+            'the team page sections ': (T, lambda t: t.replace('<section class="team-part team-close', '<section class="team-part wrap"><h2>Proof</h2></section>\n<section class="team-part team-close', 1)),
+            'hides none of its copy': (T, lambda t: t.replace('<ul class="team-facts">', '<ul class="team-facts" hidden>', 1)),
+            'curly apostrophes': (T, lambda t: t.replace('Merging stays your call.', "Merging's your call.", 1)),
+            'curly apostrophes ': (T, lambda t: t.replace('aria-label="OpenWiz in two minutes"', 'aria-label="OpenWiz\'s two minutes"', 1)),
+            'one X link per page': (T, lambda t: t.replace('</main>', '<p><a href="https://x.com/openwiz">X</a></p></main>', 1)),
             'the one site footer|one X link per page': ('drivers/index.html', lambda t: t.replace(FOOTER, '', 1)),
             'the one site footer|one X link per page ': ('changelog/index.html', lambda t: t.replace('</main>', '</main>' + FOOTER, 1)),
             'the one site footer  ': ('index.html', lambda t: t.replace('X @openwiz', 'X', 1)),
@@ -697,6 +1193,7 @@ class Checks(unittest.TestCase):
             'the footer links ': lambda f: f.replace('href="https://x.com/openwiz"', 'href="https://x.com/someone"', 1),
             'link groups': lambda f: f.replace('<h2>Company</h2>', '<h2>More</h2>', 1),
             'Owned by no one': lambda f: f.replace('Owned by no one.', '', 1),
+            'one visit and click notice': lambda f: f.replace(check.COUNT_NOTICE, '', 1),
             'wordmark': lambda f: f.replace('<p class="footer-wordmark">OpenWiz</p>', '', 1),
             'twelve Wizes': lambda f: f.replace('<span class="family-wiz">', '<span>', 1),
         }.items():
@@ -712,7 +1209,7 @@ class Checks(unittest.TestCase):
             'unexpected external URL ': ('index.html', '</head>', '<link rel="preload" href="https://x.com/openwiz" as="image"></head>'),
             'one X link per page': ('changelog/index.html', '</main>', '<a href="https://x.com/openwiz">X</a></main>'),
             'one X link per page, the footer\'s: team': ('team/index.html', '</main>', '<a href="https://x.com/openwiz">X</a></main>'),
-            'one X link per page ': ('drivers/index.html', '<a href="https://x.com/openwiz">X @openwiz</a>', '<a href="/">X @openwiz</a>'),
+            'one X link per page ': ('drivers/index.html', '<a href="https://x.com/openwiz" data-count="x">X @openwiz</a>', '<a href="/">X @openwiz</a>'),
             'one X link per page, the footer\'s: the app': ('app/index.html', '</body>', '<a href="https://x.com/openwiz">X</a></body>'),
         }.items():
             with tempfile.TemporaryDirectory() as temp, self.subTest(message=message):
@@ -725,8 +1222,107 @@ class Checks(unittest.TestCase):
                 with self.assertRaisesRegex(AssertionError, message.strip()):
                     check_site(root)
 
+    def test_market_links_only_the_registry_and_wizmarket(self):
+        registry = ROOT / 'tests/market-fixtures/check-index.json'
+        listed = json.loads(registry.read_text())['listings'][0]['links'][0]['url']
+        prose = json.loads(registry.read_text())['listings'][0]['summary']
+        cloudroom = 'https://cloudroom.dev'
+        for place, html, error in (
+                ('generated', f'<a href="{escape(listed)}">x</a>', None),
+                ('generated', f'<a href="{cloudroom}">x</a>', None),
+                ('generated', '<a href="https://github.com/openwizdev/WizMarket/tree/main/listings">x</a>', None),
+                ('fixed', '<a href="https://github.com/openwizdev/WizMarket/blob/main/contracts/listing.v1.md">x</a>', None),
+                ('generated', f'<img src="{escape(listed)}" alt="x">', 'unexpected external URL'),
+                ('generated', f'<link rel="prefetch" href="{escape(listed)}">', 'unexpected external URL'),
+                ('generated', f'<img srcset="{escape(listed)} 1x" alt="x">', 'unexpected external URL'),
+                ('generated', f'<picture><source srcset="{escape(listed)}"></picture>', 'unexpected external URL'),
+                ('generated', f'<link rel="preload" as="image" imagesrcset="{escape(listed)} 1x">', 'unexpected external URL'),
+                ('generated', f'<p style="background:url({escape(listed)})">x</p>', 'unexpected markup in the generated Market section'),
+                ('generated', f'<a href="{escape(listed)}" ping="{escape(listed)}">x</a>', 'unexpected markup in the generated Market section'),
+                ('generated', f'<svg><image xlink:href="{escape(listed)}"></image></svg>', 'unexpected markup in the generated Market section'),
+                ('generated', f'<a href="{escape(listed)}" rel="noreferrer prefetch">x</a>', 'unexpected markup in the generated Market section'),
+                ('fixed', '<img srcset="/favicon.svg 1x" alt="x" width="32" height="32" loading="lazy">', None),
+                ('generated', f'<a href="{prose}">x</a>', 'unexpected external URL'),
+                ('generated', '<a href="https://x.com/openwiz">x</a>', 'unexpected external URL'),
+                ('generated', '<a href="https://tracker.example.com/example-owner/example-tool/-/issues/1">x</a>', 'unexpected external URL'),
+                ('generated', '<a href="https://github.com/openwizdev/WizMarket/pulls?q=is%3Aopen">x</a>', 'unexpected external URL parts'),
+                ('generated', '<a href="https://github.com/openwizdev/WizMarketing">x</a>', 'unexpected repository link'),
+                ('generated', '<a href="https://github.com/openwizdev/WizMarket/../WizSite">x</a>', 'unexpected repository link'),
+                ('generated', '<a href="https://github.com/openwizdev/WizMarket/%2e%2e/WizSite">x</a>', 'unexpected repository link'),
+                ('generated', '<a href="https://github.com/openwizdev/WizMarket/.&#9;./WizSite">x</a>', 'unexpected repository link'),
+                ('fixed', f'<a href="{escape(listed)}">x</a>', 'unexpected external URL'),
+                ('fixed', f'<a href="{cloudroom}">x</a>', "CloudRoom link, the landing install box's only"),
+                ('drivers', f'<a href="{escape(listed)}">x</a>', 'unexpected external URL'),
+                ('drivers', '<a href="https://github.com/openwizdev/WizMarket">x</a>', 'unexpected repository link')):
+            with self.subTest(place=place, html=html), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp) / 'dist'
+                shutil.copytree(ROOT / 'dist', root)
+                path = root / ('drivers/index.html' if place == 'drivers' else 'market/index.html')
+                mark = '<!-- market:end -->' if place == 'generated' else '</main>'
+                path.write_text(path.read_text().replace(mark, html + mark, 1))
+                if error is None:
+                    check_site(root, registry)
+                else:
+                    with self.assertRaisesRegex(AssertionError, re.escape(error)):
+                        check_site(root, registry)
+
+    def test_drivers_registry_links(self):
+        from check import fingerprinted_page
+
+        fixtures = ROOT / 'tests/market-fixtures'
+        snapshot = json.loads((fixtures / 'contract-index.json').read_text())
+        listed = json.loads((fixtures / 'edge-index.json').read_text())['listings'][0]
+        listings = sorted([*snapshot['listings'], listed], key=lambda item: item['id'])
+        tracker = next(item for item in listings if item['id'] == 'example-tracker-harness')
+        work = tracker['links'][0]['url']
+        receipt = listings[0]['proof']['receipt']['url']
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / 'dist'
+            shutil.copytree(ROOT / 'dist', root)
+            path = root / 'drivers/index.html'
+            registry = Path(temp) / 'registry.json'
+            registry.write_text(json.dumps({**snapshot, 'listings': listings}))
+            source = {name: fingerprinted_page((ROOT / name).read_text(), cta=True)
+                      for name in ('drivers/index.html', 'market/index.html')}
+            for name, html in source.items():
+                built = (root / name).read_text()
+                metadata = re.search(r'<!-- metadata:start -->[\s\S]*?<!-- metadata:end -->', built)[0]
+                source[name] = html.replace('<template data-slot="page-metadata"></template>', metadata)
+            exports = subprocess.run(['node', '--input-type=module', '-e', """
+                import { readFileSync } from 'node:fs';
+                import { withDrivers } from './scripts/drivers.mjs';
+                import { readRegistry, render, withMarket } from './scripts/market.mjs';
+                const pages = JSON.parse(readFileSync(0, 'utf8'));
+                const registry = await readRegistry(process.argv[1]);
+                process.stdout.write(JSON.stringify({
+                  drivers: withDrivers(pages['drivers/index.html'], registry),
+                  market: withMarket(pages['market/index.html'], render(registry)),
+                }));
+            """, str(registry)], cwd=ROOT, input=json.dumps(source), check=True, capture_output=True, text=True).stdout
+            pages = json.loads(exports)
+            rendered = pages['drivers']
+            (root / 'market/index.html').write_text(pages['market'])
+            self.assertIn(f'href="{escape(work)}"', rendered)
+            self.assertIn(f'href="{receipt}"', rendered)
+            self.assertIn(f'href="{escape(listed["url"])}"', rendered)
+            path.write_text(rendered)
+            check_site(root, registry)
+            unexpected = 'https://unrelated.example.com/'
+            for old, new, reason in (
+                    (f'href="{escape(work)}"', f'href="{unexpected}"', 'registry URL'),
+                    (f'href="{escape(work)}"', f'href="{receipt}"', 'registry URL'),
+                    (f'href="{escape(work)}"', 'href="https://github.com/openwizdev/OpenWiz/issues/1"', 'registry URL'),
+                    (f'href="{escape(work)}"', f'href="{escape(work)}" src="{escape(work)}"', 'unexpected external URL'),
+                    ('</main>', f'<a href="{escape(work)}">Another link</a></main>', 'unexpected external URL'),
+                    (f'href="{escape(work)}"', f'href="{escape(work)}" ping="{escape(work)}"', 'resource attributes')):
+                with self.subTest(new=new):
+                    self.assertIn(old, rendered)
+                    path.write_text(rendered.replace(old, new, 1))
+                    with self.assertRaisesRegex(AssertionError, reason):
+                        check_site(root, registry)
+
     def test_report_a_problem_link(self):
-        form = '<a href="https://github.com/openwizdev/openwiz/issues/new?template=feedback.yml" rel="noreferrer">Report a problem</a>'
+        form = '<a href="https://github.com/openwizdev/openwiz/issues/new?template=feedback.yml" rel="noreferrer" data-count="github">Report a problem</a>'
         for page, count in {'index.html': 1, 'drivers/index.html': 1, 'team/index.html': 1, 'faq/index.html': 1, 'changelog/index.html': 1, 'app/index.html': 0}.items():
             with self.subTest(page=page):
                 self.assertEqual((ROOT / 'dist' / page).read_text().count(form), count)
@@ -736,9 +1332,9 @@ class Checks(unittest.TestCase):
             'Report a problem link ': ('team/index.html', form, '<a href="/">Report a problem</a>'),
             'Report a problem link  ': ('drivers/index.html', '</main>', form + '</main>'),
             'Report a problem link, the footer\'s: the app': ('app/index.html', '</body>', form + '</body>'),
-            'Report a problem link needs rel="noreferrer"': ('index.html', ' rel="noreferrer">Report', '>Report'),
-            'Report a problem link needs rel="noreferrer" ': ('changelog/index.html', ' rel="noreferrer">Report', ' rel="noopener">Report'),
-            'Report a problem link needs rel="noreferrer"  ': ('team/index.html', ' rel="noreferrer">Report', ' rel="noreferrer" referrerpolicy="unsafe-url">Report'),
+            'Report a problem link needs rel="noreferrer"': ('index.html', ' rel="noreferrer" data-count="github">Report', '>Report'),
+            'Report a problem link needs rel="noreferrer" ': ('changelog/index.html', ' rel="noreferrer" data-count="github">Report', ' rel="noopener">Report'),
+            'Report a problem link needs rel="noreferrer"  ': ('team/index.html', ' rel="noreferrer" data-count="github">Report', ' rel="noreferrer" referrerpolicy="unsafe-url">Report'),
             'unexpected external URL parts': ('index.html', href, href + '&amp;body=x'),
             'unexpected external URL parts ': ('changelog/index.html', href, href.replace('feedback.yml', 'bug.yml')),
             'unexpected repository link|unexpected external URL parts': ('index.html', href, href.replace('/openwiz/', '/WizSkills/')),
@@ -764,12 +1360,11 @@ class Checks(unittest.TestCase):
             path = root / page
             path.write_text(change(path.read_text()))
             return temp, root
-        close = '<section class="team-part team-close'
         for message, (page, change) in {
             'the index.html page needs the one Questions': ('index.html', lambda t: t.replace(FAQ, '', 1)),
-            'the faq/index.html page needs the one Questions': ('faq/index.html', lambda t: t.replace('What is a kernel?', 'What is a core?', 1)),
-            'the team page sections': ('team/index.html', lambda t: t.replace(FAQ, '', 1).replace('</main>', FAQ + '</main>', 1)),
-            'needs faq.js': ('team/index.html', lambda t: re.sub(r'<script src="/faq\.[0-9a-f]+\.js" defer></script>', '', t)),
+            'the faq/index.html page needs the one Questions': ('faq/index.html', lambda t: t.replace('>What is a kernel?<', '>What is a core?<', 1)),
+            'the team/index.html page shows no Questions|never uses: (?:CloudRoom|install)|the team page shows no price': ('team/index.html', lambda t: t.replace('</main>', FAQ + '</main>', 1)),
+            'needs faq.js': ('faq/index.html', lambda t: re.sub(r'<script src="/faq\.[0-9a-f]+\.js" defer></script>', '', t)),
         }.items():
             temp, root = planted(page, change)
             with temp, self.subTest(message=message), self.assertRaisesRegex(AssertionError, message):
@@ -783,24 +1378,26 @@ class Checks(unittest.TestCase):
             'open and disabled until faq.js runs ': lambda f: f.replace('aria-expanded="true"', 'aria-expanded="false"', 1),
             'a button that names its answer ': lambda f: f.replace('aria-controls="faq-a2"', 'aria-controls="faq-a1"', 1),
             'links off the site': lambda f: f.replace('href="/team/#book"', 'href="https://example.com/"', 1),
+            'answer to What do I need before installing': lambda f: f.replace('Python 3.9 or later', 'Python', 1),
             'answer to Where do my agents run': lambda f: f.replace(FAQ_WHERE, 'Wherever you choose: your own computer or a VPS, Cloudroom, or boat.dev. Each has a driver that passed the same five-check test.', 1),
-            'answer to Where do my agents run ': lambda f: f.replace(' so it comes first.', '', 1),
+            'answer to Where do my agents run ': lambda f: f.replace(' In OpenWiz 0.01, you start builders by hand on this computer or boat.dev, and the automatic fleet runs in CloudRoom.', '', 1),
             'answer to Where do my agents run  ': lambda f: f.replace(FAQ_WHERE, 'Anywhere.', 1).replace('OpenWiz is free and open source', FAQ_WHERE + ' OpenWiz is free and open source', 1),
-            'last answer': lambda f: f.replace('Your first fleet ships on it.', 'Your first fleet runs in a day.', 1),
+            'team answer': lambda f: f.replace('Your first fleet ships on it.', 'Your first fleet runs in a day.', 1),
+            'the same visit and click notice': lambda f: f.replace(check.COUNT_NOTICE, 'Visits are counted.', 1),
             'heading and its line': lambda f: f.replace('The short ones are here.', 'More.', 1),
             'no form or input': lambda f: f.replace('<p>The open source', '<input><p>The open source', 1),
         }.items():
             broken = change(FAQ)
             top = re.sub(r'<(/?)h3\b', r'<\1h2', re.sub(r'<(/?)h2\b', r'<\1h1', broken))
-            htmls = {'index.html': '</section>\n' + broken + '</main>', check.TEAM_PAGE: broken + close, check.FAQ_PAGE: top + '</main>'}
+            htmls = {'index.html': '</section>\n' + broken + check.ABOUT_LINK + '</main>', check.FAQ_PAGE: top + check.ABOUT_LINK + '</main>'}
             pages = {name: mock.Mock(scripts=['/faq.0123456789.js']) for name in htmls}
             with self.subTest(message=message), mock.patch.multiple(check, FAQ=broken, FAQ_TOP=top,
-                    FAQ_ON={'index.html': broken, check.TEAM_PAGE: broken, check.FAQ_PAGE: top}), \
+                    FAQ_ON={'index.html': broken, check.FAQ_PAGE: top}), \
                     self.assertRaisesRegex(AssertionError, message.strip()):
                 check.check_faq(htmls, pages, names)
-        htmls = {'index.html': '</section>\n' + FAQ + '</main>', check.TEAM_PAGE: FAQ + close, check.FAQ_PAGE: check.FAQ_TOP + '</main>',
+        htmls = {'index.html': '</section>\n' + FAQ + check.ABOUT_LINK + '</main>', check.FAQ_PAGE: check.FAQ_TOP + check.ABOUT_LINK + '</main>', check.TEAM_PAGE: '<main></main>',
                  'drivers/index.html': '<main>' + FAQ + '</main>'}
-        pages = {name: mock.Mock(scripts=['/faq.0123456789.js']) for name in htmls}
+        pages = {name: mock.Mock(scripts=[] if name == check.TEAM_PAGE else ['/faq.0123456789.js']) for name in htmls}
         with self.assertRaisesRegex(AssertionError, 'the drivers/index.html page shows no Questions'):
             check.check_faq(htmls, pages, names)
         del htmls['drivers/index.html']
@@ -809,21 +1406,21 @@ class Checks(unittest.TestCase):
     def test_drivers_page(self):
         boat = '<article class="driver hero" id="boat-dev"'
         for name, old, new, error in (
-                ('drivers/index.html', 'id="cloudroom"', 'id="cloud"', 'four driver cards'),
-                ('drivers/index.html', '<span>Grok Bot</span></h3>', '<span>Grok</span></h3>', 'four driver cards'),
+                ('drivers/index.html', 'id="cloudroom"', 'id="cloud"', 'shipped driver cards'),
+                ('drivers/index.html', '<span>Cloudroom</span></h3>', '<span>Cloud</span></h3>', 'shipped driver cards'),
                 ('drivers/index.html', 'Passed the kit on a Linux PC', 'Passed the kit on a Mac', 'driver facts'),
                 ('drivers/index.html', 'Passed the kit, run from a Cloudroom cloud thread', 'Passed the kit, run from a laptop', 'driver facts'),
                 ('drivers/index.html', boat, boat.replace(' hero', ''), 'boat.dev is the hero|spotlight'),
-                ('drivers/index.html', '<article class="driver" id="grok-bot"', '<article class="driver hero" id="grok-bot"', 'boat.dev is the hero'),
+                ('drivers/index.html', '<article class="driver" id="cloudroom"', '<article class="driver hero" id="cloudroom"', 'boat.dev is the hero'),
                 ('drivers/index.html', 'href="https://github.com/openwizdev/OpenWiz/tree/main/adapters/template"', 'href="https://github.com/openwizdev/WizSkills"', 'only to the public OpenWiz'),
                 ('drivers/index.html', '>Changelog</a>', '>Changes</a>', 'identical to the landing'),
-                ('drivers/index.html', ' aria-current="page">Drivers', '>Drivers', 'aria-current'),
+                ('drivers/index.html', ' aria-current="page" data-count="drivers">Drivers', '>Drivers', 'aria-current'),
                 ('drivers/index.html', '</main>', '<p>Used by 300 teams.</p></main>', 'invented number'),
                 ('drivers/index.html', '</main>', '<p hidden>Later.</p></main>', 'without a script|waits for a script'),
                 ('drivers/index.html', '</head>', '<script>1</script></head>', 'never its own'),
-                ('drivers/index.html', '</head>', '<script src="/drivers/logos/bot.svg"></script></head>', 'never its own'),
-                ('index.html', '<a class="nav-drivers" href="/drivers/">Drivers</a>', '', 'identical to the landing|landing top bar needs one Drivers'),
-                ('changelog/index.html', '<a class="nav-drivers" href="/drivers/">Drivers</a>', '', 'Changelog top bar needs one Drivers')):
+                ('drivers/index.html', '</head>', '<script src="/drivers/logos/monitor.svg"></script></head>', 'never its own'),
+                ('index.html', '<a class="nav-drivers" href="/drivers/" data-count="drivers">Drivers</a>', '', 'identical to the landing|landing top bar needs one Drivers'),
+                ('changelog/index.html', '<a class="nav-drivers" href="/drivers/" data-count="drivers">Drivers</a>', '', 'Changelog top bar needs one Drivers')):
             self.broken(name, old, new, error)
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp) / 'dist'
@@ -844,11 +1441,53 @@ class Checks(unittest.TestCase):
                 (held, '<p class="driver-login">Login: stays on your machine</p>', 'Cloudroom: its login line'),
                 ('<p class="driver-login">Login: held by boat.dev</p>', '<p class="driver-login">Login: held by Cloudroom</p>', 'boat.dev: its login line'),
                 (local, '<p class="driver-login">Login: your machine</p>', 'Your own computer or VPS: its login line'),
-                ('<span>Grok Bot</span></h3>', '<span>Grok Bot</span></h3>' + local, 'Grok Bot: its login line'),
+                ('<h4 class="tile-name">Devin</h4>', '<h4 class="tile-name">Devin</h4>' + held, 'Devin: its login line|a login line only on a driver card'),
+                ('<p class="driver-login">Login: held by Conductor</p>', '', 'Conductor: its login line|a login line only on a driver card'),
                 ('</ul>\n  </section>', '</ul>\n' + local + '  </section>', 'only on a driver card')):
             self.broken('drivers/index.html', old, new, error)
         line = '<p class="driver-line">Passed the kit, run from a Cloudroom cloud thread against real Cloudroom</p>'
         self.broken('drivers/index.html', held + '\n        ' + line, line + '\n        ' + held, 'right after its name')
+
+    def test_drivers_wall(self):
+        import check
+        main = re.search(r'<main\b[\s\S]*?</main>', (ROOT / 'dist' / check.DRIVERS_PAGE).read_text())[0]
+        check.check_driver_wall(main)
+        grok, vibe = '<h4 class="tile-name">Grok Bot</h4>', '<h4 class="tile-name">Mistral Vibe</h4>'
+        for old, new, error in (
+                ('<h2 id="harnesses-title">Which agent you already use</h2>', '<h2 id="harnesses-title">Harnesses</h2>', 'is headed'),
+                ('<li class="tile no-mark" id="opencomputer" data-state="held">', '<li class="tile no-mark" id="opencomputer" data-state="building">', 'carries its state|holds only'),
+                ('<p class="tile-state">Held: its key header is unsupported</p>', '<p class="tile-state">Held: its key header is not supported yet</p>', 'reads exactly'),
+                ('<p class="tile-state">Parked: the host has no programmatic wake or stop</p>', '<p class="tile-state">Coming soon</p>', 'reads exactly'),
+                ('<h4 class="tile-name">OpenHands Cloud</h4>\n          <p class="tile-state">In review</p>', '<h4 class="tile-name">OpenHands Cloud</h4>\n          <p class="tile-state">Being built</p>', 'reads exactly'),
+                ('<h4 class="tile-name">Amp</h4>\n          <p class="tile-state">Built, waiting on its live check</p>', '<h4 class="tile-name">Amp</h4>\n          <p class="tile-state">In review</p>', 'reads exactly'),
+                ('/pull/2767" data-count="github">Pull request</a>', '/pull/2767" data-count="github">Draft pull request</a>', 'one link'),
+                ('<h4 class="tile-name">Devin</h4>\n          <p class="tile-state">Built, waiting on its live check</p>', '<h4 class="tile-name">Devin</h4>\n          <p class="tile-state">In review</p>', 'reads exactly'),
+                ('<p class="driver-login">Login: held by GitHub</p>', '', 'its login line|a login line only on a driver card'),
+                ('<a class="tile-link" href="https://github.com/openwizdev/OpenWiz/pull/2490" data-count="github">Pull request</a>', '<a class="tile-link" href="https://github.com/openwizdev/OpenWiz/pull/2490" data-count="github">Pull request</a><p>Available now.</p>', 'nothing more'),
+                ('<div class="wall-group" id="hosts-review"', '<p>Devin is supported.</p><div class="wall-group" id="hosts-review"', 'shows only its kicker'),
+                ('<a class="tile-link" href="https://github.com/openwizdev/OpenWiz/pull/2490" data-count="github">', '<a class="tile-link" style="display:none" href="https://github.com/openwizdev/OpenWiz/pull/2490" data-count="github">', 'hides nothing'),
+                ('<li class="tile" id="devin" data-state="waiting">', '<li class="tile" id="devin" data-state="waiting" hidden>', 'hides nothing|waits for a script'),
+                ('</h2>\n    <p class="wall-lead">Each host', '</h2>\n    <a href="https://github.com/openwizdev/OpenWiz">Try it</a>\n    <p class="wall-lead">Each host', 'shows only its kicker|links only its tiles'),
+                ('/pull/2774" data-count="github">Pull request</a>', '/pull/2773" data-count="github">Pull request</a>', 'one link'),
+                ('/pull/2774" data-count="github">Pull request</a>', '/pull/2774" data-count="github">Pull request, released</a>', 'one link'),
+                ('<a class="tile-link" href="https://github.com/openwizdev/OpenWiz/issues/2540" data-count="github">Ticket</a>', '', 'one link'),
+                ('<b>0</b> being built', '<b>10</b> being built', 'true numbers'),
+                ('<b>12</b> waiting on live checks', '<b>9</b> waiting on live checks', 'true numbers'),
+                ('<b>3</b> shipped', '<b>4</b> shipped', 'true numbers'),
+                ('In review <span class="group-count">6</span>', 'In review <span class="group-count">1</span>', 'true count'),
+                ('In review <span>11</span>', 'In review <span>12</span>', 'jump row'),
+                ('not a partnership, and not what runs today: each tile says its state.', 'and show what OpenWiz can run on.', 'not a partnership'),
+                (grok, grok + '<img src="/drivers/logos/cursor.svg" alt="Cursor logo">', 'no Grok logo'),
+                (vibe, vibe + '<img src="/drivers/logos/cursor.svg" alt="Cursor logo">', 'name only'),
+                ('<img src="/drivers/logos/pi.svg" alt="Pi logo"', '<img src="/drivers/logos/kiro.svg" alt="Pi logo"', 'official logo|alt text naming'),
+                ('<li class="tile" id="sculptor"', '<li class="tile" id="sculptor-x"', 'lists every entry once')):
+            self.broken('drivers/index.html', old, new, error)
+        with mock.patch.dict('check.DRIVER_REASONS', {'cline': 'Held: Cline has no headless wake by session'}):
+            text = main.replace('Held: no headless wake by session', 'Held: Cline has no headless wake by session')
+            with self.assertRaisesRegex(AssertionError, 'five words'):
+                check.check_driver_wall(text)
+        self.broken('drivers/index.html', '', '', 'hidden by a style', css='\n.drivers-page .tile-link { display: none; }\n')
+        self.broken('drivers/index.html', '', '', 'hidden by a style', css='\n.drivers-page .tile .driver-login { visibility: hidden; }\n')
 
     def test_drivers_spotlight(self):
         page = 'drivers/index.html'
@@ -890,23 +1529,24 @@ class Checks(unittest.TestCase):
         page = 'drivers/index.html'
         explainer = '<div class="drivers-explainer">'
         row = '<li class="kit-check" data-check="token" data-state="not yet run">token not yet run</li>'
-        grok = '<h3 class="driver-name" id="grok-bot-name">'
+        grok = '<h4 class="tile-name">Grok Bot</h4>'
         for old, new, error in (
                 (explainer, '<div class="drivers-intro">', 'one explainer of what a driver is'),
-                ('five-check test.</p>', 'five-check test. It is free. It is fast.</p>', 'two sentences at most'),
+                ('five-check test on its real host.</p>', 'five-check test. It is free. It is fast.</p>', 'two sentences at most'),
                 ('every driver answers the same four commands', 'every driver answers the same commands', 'explainer must name'),
+                ('answers four commands, plus its schema. Pass', 'answers four commands. Pass', 'says a driver'),
                 ('build software from tickets', 'build software', 'explainer must name'),
-                ('every driver answers the same four commands', 'every driver answers the same four commands (<code>version</code>, <code>start</code>, <code>wake</code>, <code>stop</code>)', 'stays out of the hero'),
-                ('five-check test.</p>', 'five-check test, token included.</p>', 'stays out of the hero'),
-                ('<span>Kit: not run yet</span></p>', '<span>Kit: not run yet</span></p><ul>' + row + '</ul>', 'no per-check rows'),
-                ('<span>Kit: not run yet</span></p>', '<span>Kit: not run yet</span></p><ol><li class="proof-check" data-check="token">x</li></ol>', 'one kit line, never per-check rows'),
-                ('<span>Kit: not run yet</span>', '<span>Kit: not run yet. Its kit run comes next.</span>', 'one kit line must read'),
+                ('every driver answers the same four commands, plus its schema', 'every driver answers the same four commands, plus its schema (<code>version</code>, <code>start</code>, <code>wake</code>, <code>stop</code>)', 'stays out of the hero'),
+                ('five-check test on its real host.</p>', 'five-check test on its real host, token included.</p>', 'stays out of the hero'),
+                ('must pass the same five-check test', 'passes the same five-check test', 'a requirement, never'),
+                ('<span>Kit: passed, 5 of 5</span></p>', '<span>Kit: passed, 5 of 5</span></p><ul>' + row + '</ul>', 'no per-check rows'),
+                ('<span>Kit: passed, 5 of 5</span></p>', '<span>Kit: passed, 5 of 5</span></p><ol><li class="proof-check" data-check="token">x</li></ol>', 'one kit line, never per-check rows'),
+                ('<span>Kit: passed, 5 of 5</span>', '<span>Kit: passed, 5 of 5. Its next run comes later.</span>', 'one kit line must read'),
                 ('<span>Kit: passed, 5 of 5</span>', '<span>Kit: passed</span>', 'one kit line must read'),
                 ('<p class="driver-kit passed" data-state="passed">', '<p class="driver-kit passed" data-state="not yet run">', 'one kit line must read'),
-                ('<h2 id="more-title">More drivers</h2>', '<h2 id="more-title">More drivers</h2><p>4 words, 5 checks in the kit</p>', 'jargon count'),
-                ('<h2 id="more-title">More drivers</h2>', '<h2 id="more-title">More drivers</h2><p>1 passed, 3 of 5</p>', 'jargon count'),
-                ('Drivers answer the same four commands', 'Drivers answer 4 words', 'jargon count'),
-                ('<h2 id="more-title">More drivers</h2>', '<h2 id="more-title">More drivers</h2><p>boat.dev passed all five checks.</p>', 'at most 2 times'),
+                ('<h2 id="more-title">Also shipped</h2>', '<h2 id="more-title">Also shipped</h2><p>4 words, 5 checks in the kit</p>', 'jargon count'),
+                ('<h2 id="more-title">Also shipped</h2>', '<h2 id="more-title">Also shipped</h2><p>1 passed, 3 of 5</p>', 'jargon count'),
+                ('<h2 id="more-title">Also shipped</h2>', '<h2 id="more-title">Also shipped</h2><p>boat.dev passed all five checks.</p>', 'at most 2 times'),
                 ('<div class="own-token"><dt><code>token</code></dt>', '<div class="own-token"><dt><code>tokens</code></dt>', 'fifth check, token'),
                 ('alt="Cloudroom logo" width="256"', 'alt="" width="256"', 'alt text naming Cloudroom|names its host'),
                 (grok, grok + '<img src="/drivers/logos/cloudroom.png" alt="Grok Bot logo">', 'no Grok logo'),
@@ -919,7 +1559,8 @@ class Checks(unittest.TestCase):
             path = root / page
             text = path.read_text()
             block = re.search(r'<div class="drivers-explainer">[\s\S]*?</div>', text)[0]
-            path.write_text(text.replace(block, '').replace('</ul>\n  </section>\n  <section class="own-driver', '</ul>' + block + '\n  </section>\n  <section class="own-driver', 1))
+            self.assertIn('  <p class="logo-note', text)
+            path.write_text(text.replace(block, '').replace('  <p class="logo-note', block + '\n  <p class="logo-note', 1))
             with self.assertRaisesRegex(AssertionError, 'sits in the hero|above the cards'):
                 check_site(root)
         with tempfile.TemporaryDirectory() as temp:
@@ -931,7 +1572,7 @@ class Checks(unittest.TestCase):
             path.write_text(text.replace(spot, '').replace('<section class="own-driver', spot.strip() + '\n  <section class="own-driver', 1))
             with self.assertRaisesRegex(AssertionError, 'boat.dev first'):
                 check_site(root)
-        for logo in ('drivers/logos/boat-dev.svg', 'drivers/logos/cloudroom.png', 'drivers/logos/monitor.svg', 'drivers/logos/bot.svg'):
+        for logo in ('drivers/logos/boat-dev.svg', 'drivers/logos/cloudroom.png', 'drivers/logos/monitor.svg', 'drivers/logos/devin.svg', 'drivers/logos/crush.png'):
             with self.subTest(logo=logo), tempfile.TemporaryDirectory() as temp:
                 root = Path(temp) / 'dist'
                 shutil.copytree(ROOT / 'dist', root)
@@ -955,16 +1596,13 @@ class Checks(unittest.TestCase):
         for old, new, error in (
                 ('<span class="host-state">passed 5 of 5</span>', '', 'works today in words'),
                 ('<span class="host-state">passed 5 of 5</span>', '<span class="host-state">works</span>', 'passed 5 of 5'),
-                ('<span class="host-state">coming soon</span>', '<span class="host-state">soon</span>', 'coming soon'),
                 ('<li data-host="vps" data-state="passed">', '<li data-host="computer" data-state="passed">', 'host pills, in order'),
                 ('<span class="host-mark"><img class="host-lockup"', '<span class="host-mark"></span><img class="host-lockup"', 'fixed-height slot'),
                 (pill, pill + '<span class="host-mark"><img src="/drivers/logos/boat-dev.svg" alt="boat.dev"></span>', 'fixed-height slot'),
-                ('<span class="host-name">Grok Bot</span>', '<span class="host-name">Grok</span>', 'names its host'),
+                ('<span class="host-name">Cloudroom</span>', '<span class="host-name">Cloud</span>', 'names its host'),
                 ('<p class="driver-date">', '<p class="driver-meta">', 'own date line'),
                 ('<p class="driver-line">Passed all five checks</p>', '<p class="driver-line">Passed all five checks on a real account, 2026-11-19</p>', 'driver facts|own date line'),
                 ('On a real account, <time', 'Real account, <time', 'own date line'),
-                ('src="/drivers/logos/bot.svg" alt="Generic bot icon"', 'src="/drivers/logos/monitor.svg" alt="Generic computer icon"', 'only the generic icon'),
-                ('<img class="driver-logo host-icon" src="/drivers/logos/bot.svg" alt="Generic bot icon" width="24" height="24">', '', 'only the generic icon'),
                 ('<span>Cloudroom</span></h3>', 'Cloudroom</h3>', 'one header structure'),
                 ('No credential appeared in its output', 'No credential showed in its output', 'explains what it proved|token check inspected'),
                 ('appeared in its output, command lines or environment, and it refused a token field</dd>', 'appeared in its output</dd>', 'token check inspected'),
@@ -991,27 +1629,24 @@ class Checks(unittest.TestCase):
 
     def test_drivers_kit_results(self):
         page = 'drivers/index.html'
-        vps, cloud, boat, grok = (f'<li data-host="{k}" data-state="' for k in ('vps', 'cloudroom', 'boat-dev', 'grok-bot'))
+        vps, cloud, boat = (f'<li data-host="{k}" data-state="' for k in ('vps', 'cloudroom', 'boat-dev'))
         for old, new, error in (
                 (vps + 'passed">', vps + 'being fixed">', "pill's state is 'passed'|shown as anything but passed"),
                 (cloud + 'passed">', cloud + 'works today">', "pill's state is 'passed'|shown as anything but passed"),
                 (boat + 'passed">', boat + 'coming soon">', "pill's state is 'passed'|shown as anything but passed"),
-                (grok + 'coming soon">', grok + 'passed">', "pill's state is 'coming soon'|never shown as passed"),
-                ('<span class="host-state">coming soon</span>', '<span class="host-state">passed 5 of 5</span>', 'coming soon'),
-                ('<span>Kit: not run yet</span>', '<span>Kit: passed, 5 of 5</span>', 'one kit line must read|never shown as passed'),
-                ('<p class="driver-kit unrun" data-state="not yet run">', '<p class="driver-kit passed" data-state="passed">', 'one kit line must read|never shown as passed'),
                 ('<p class="driver-kit passed" data-state="passed">', '<p class="driver-kit unrun" data-state="passed">', 'shown as anything but passed in its kit line'),
-                ('Coming soon: listed when its driver lands', 'Coming soon: passed the kit', 'driver facts|never shown as passed'),
+                ('<p class="tile-state">Passed live, not in a release yet</p>', '<p class="tile-state">Passed live, ships next release</p>', 'reads exactly|invented number'),
+                ('<li data-host="boat-dev"', '<li data-host="openclaw" data-state="passed"><span class="host-name">OpenClaw</span> <span class="host-state">passed 5 of 5</span></li>\n        <li data-host="boat-dev"', 'host pills, in order|host pill only'),
                 ('Kit run, <time datetime="2026-11-20">2026-11-20</time>', 'Kit run, <time datetime="2026-11-21">2026-11-21</time>', 'dates its kit run 2026-11-20|invented number'),
-                ('<a href="https://github.com/openwizdev/OpenWiz/pull/1455#issuecomment-7034588211">', '<a href="https://github.com/openwizdev/OpenWiz/pull/1458#issuecomment-7034556153">', 'linked to its public evidence'),
-                ('<a href="https://github.com/openwizdev/OpenWiz/pull/1444">', '<a href="https://github.com/openwizdev/OpenWiz">', 'spotlight date links to its public evidence'),
+                ('<a href="https://github.com/openwizdev/OpenWiz/pull/1455#issuecomment-7034588211" data-count="github">', '<a href="https://github.com/openwizdev/OpenWiz/pull/1458#issuecomment-7034556153">', 'linked to its public evidence'),
+                ('<a href="https://github.com/openwizdev/OpenWiz/pull/1444" data-count="github">', '<a href="https://github.com/openwizdev/OpenWiz">', 'spotlight date links to its public evidence'),
                 ('</ol>\n        <p class="proof-also">', '</ol>\n        <p class="proof-other">', 'boat.dev is one of three'),
                 ('passed the same five checks on <time', 'may pass the same five checks on <time', 'boat.dev is one of three'),
-                ('<h2 id="more-title">More drivers</h2>', '<h2 id="more-title">More drivers</h2><p>Cloudroom is being fixed.</p>', 'stale driver state word'),
-                ('<h2 id="more-title">More drivers</h2>', '<h2 id="more-title">More drivers</h2><p>Kit: in progress</p>', 'stale driver state word'),
-                ('<h2 id="more-title">More drivers</h2>', '<h2 id="more-title">More drivers</h2><p>Its kit run is next; not run yet.</p>', 'stale driver state word'),
+                ('<h2 id="more-title">Also shipped</h2>', '<h2 id="more-title">Also shipped</h2><p>Cloudroom is being fixed.</p>', 'stale driver state word'),
+                ('<h2 id="more-title">Also shipped</h2>', '<h2 id="more-title">Also shipped</h2><p>Kit: in progress</p>', 'stale driver state word'),
+                ('<h2 id="more-title">Also shipped</h2>', '<h2 id="more-title">Also shipped</h2><p>Its kit run is next; not run yet.</p>', 'stale driver state word'),
                 ('Passed the kit on a Linux PC', 'Works today on a Linux PC', 'driver facts|status sentence says so'),
-                ('<h2 id="more-title">More drivers</h2>', '<h2 id="more-title">More drivers</h2><p>Only boat.dev has passed.</p>', 'never the only one')):
+                ('<h2 id="more-title">Also shipped</h2>', '<h2 id="more-title">Also shipped</h2><p>Only boat.dev has passed.</p>', 'never the only one')):
             self.broken(page, old, new, error)
 
     def test_drivers_nav_and_description(self):
@@ -1027,10 +1662,10 @@ class Checks(unittest.TestCase):
                     check_site(root)
         self.broken('', '', '', 'hidden on phones', css='\n@media (max-width: 480px) { .landing-nav .nav-drivers { display: none; } }\n')
         for old, new, error in (
-                ('boat.dev, Cloudroom and your own computer or VPS passed all five checks', 'boat.dev passed all five checks', 'must say boat.dev, Cloudroom and your own computer or VPS passed'),
-                ('Grok Bot is coming soon', 'Grok Bot is coming soon, and Grok Bot passed too', 'Grok Bot has not passed'),
-                ('A driver connects', 'Every driver passes the kit. A driver connects', 'must not say every driver passes'),
-                ('Drivers answer the same four commands', 'Drivers answer 4 words', 'jargon count')):
+                ('boat.dev, CloudRoom and your own computer or VPS', 'boat.dev', 'the drivers description must say'),
+                ('See results for the shipped drivers', 'Every driver passed', 'must not say every driver passes'),
+                ('use four commands', 'use 4 words', 'jargon count'),
+                ('See results for the shipped drivers:', 'Grok Bot passed:', 'Grok Bot has not passed')):
             with self.subTest(error=error), tempfile.TemporaryDirectory() as temp:
                 root = Path(temp) / 'dist'
                 shutil.copytree(ROOT / 'dist', root)
@@ -1038,7 +1673,7 @@ class Checks(unittest.TestCase):
                 text = page.read_text()
                 head = text[:text.index('</head>')]
                 self.assertIn(old, head)
-                page.write_text(text.replace(old, new, 1))
+                page.write_text(text.replace(old, new, 3))
                 with self.assertRaisesRegex(AssertionError, error):
                     check_site(root)
 
@@ -1054,12 +1689,9 @@ class Checks(unittest.TestCase):
                     logo.replace(b'<path ', b'<path onload ="x" ', 1)):
             with self.subTest(bad=bad[-60:]), self.assertRaises(AssertionError):
                 check_vector(bad)
-        check_privacy('docs/map.png', (ROOT / 'docs/map.png').read_bytes())
-        for path in ('favicon.ico', 'brand/new.png', 'docs/map.png', 'docs/new.png'):
+        for path in ('favicon.ico', 'brand/new.png', 'docs/new.png'):
             with self.subTest(path=path), self.assertRaises(AssertionError):
                 check_privacy(path, b'\x89PNG tampered')
-        with self.assertRaises(AssertionError):
-            check_privacy('dist/docs/map.png', (ROOT / 'docs/map.png').read_bytes())
         for new in ('https://example.com/brand/og.png', 'https://openwiz.dev/brand/missing.png'):
             with self.subTest(new=new), tempfile.TemporaryDirectory() as temp:
                 root = Path(temp) / 'dist'

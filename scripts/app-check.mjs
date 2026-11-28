@@ -94,8 +94,17 @@ async function siteHeaders(path) {
       const pattern = new RegExp(`^${line.trim().replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*')}$`);
       match = pattern.test(path);
     } else if (match) {
-      const at = line.indexOf(':');
-      out[line.slice(0, at).trim()] = line.slice(at + 1).trim();
+      const trimmed = line.trim();
+      if (trimmed.startsWith('!')) {
+        const drop = trimmed.slice(1).trim().toLowerCase();
+        for (const key of Object.keys(out)) if (key.toLowerCase() === drop) delete out[key];
+      } else {
+        const at = trimmed.indexOf(':');
+        const name = trimmed.slice(0, at).trim();
+        const value = trimmed.slice(at + 1).trim();
+        const existing = Object.keys(out).find(k => k.toLowerCase() === name.toLowerCase());
+        out[existing || name] = existing ? `${out[existing]}, ${value}` : value;
+      }
     }
   }
   return out;
@@ -164,11 +173,15 @@ class World {
 
 const LABEL = `const label = e => { const c = e.cloneNode(true); c.querySelectorAll('[aria-hidden="true"]').forEach(x => x.remove()); return c.textContent.replace(/\\s+/g, ' ').trim(); };`;
 
-async function open(browser, world) {
-  const { browserContextId } = await browser.send('Target.createBrowserContext');
+async function open(browser, world, sharedContextId, preload) {
+  const browserContextId = sharedContextId ?? (await browser.send('Target.createBrowserContext')).browserContextId;
   const { targetId } = await browser.send('Target.createTarget', { url: 'about:blank', browserContextId });
   const { sessionId } = await browser.send('Target.attachToTarget', { targetId, flatten: true });
   const send = (method, params) => browser.send(method, params, sessionId);
+  if (preload) {
+    await send('Page.enable');
+    await send('Page.addScriptToEvaluateOnNewDocument', { source: preload });
+  }
   browser.on(async message => {
     if (message.sessionId !== sessionId) return;
     if (message.method === 'Fetch.requestPaused') {
@@ -255,7 +268,7 @@ async function open(browser, world) {
     })()`),
     close: async () => {
       await browser.send('Target.closeTarget', { targetId });
-      await browser.send('Target.disposeBrowserContext', { browserContextId });
+      if (!sharedContextId) await browser.send('Target.disposeBrowserContext', { browserContextId });
     },
   };
   return page;
@@ -288,15 +301,18 @@ const graphqlCount = (world, names) => world.log.filter(r => r.origin === API &&
 const settle = (page, ms = 300) => page.run(`new Promise(resolve => setTimeout(resolve, ${ms}))`);
 const ok = name => async () => ({ status: 200, json: await fixture(name) });
 
-function checkRequestLog(world) {
+function checkRequestLog(world, { installCount = false } = {}) {
   assert(world.log.length > 0, 'no requests were logged');
+  const countRequests = world.log.filter(r => r.origin === SITE && r.path === '/api/count');
+  assert(countRequests.length === Number(installCount), `unexpected number of click count requests: ${countRequests.length}`);
   for (const r of world.log) {
     const where = `${r.method} ${r.url}`;
     assert(r.origin === SITE || r.origin === API, `request outside GitHub and the helper: ${where}`);
     if (r.origin === SITE) {
       const helper = r.path === '/api/sign-in/token' || r.path === '/api/sign-in/refresh';
-      assert(r.method === 'GET' || (r.method === 'POST' && helper), `the site was sent a write: ${where}`);
-      assert(!r.path.startsWith('/api/') || helper || r.path === '/api/sign-in/start', `unknown helper route: ${where}`);
+      const count = installCount && r.url === `${SITE}/api/count` && r.method === 'POST' && r.body === 'install-copy';
+      assert(r.method === 'GET' || (r.method === 'POST' && helper) || count, `the site was sent a write: ${where}`);
+      assert(!r.path.startsWith('/api/') || helper || count || r.path === '/api/sign-in/start', `unknown helper route: ${where}`);
       const auth = Object.keys(r.headers).some(key => key.toLowerCase() === 'authorization');
       assert(!auth, `the GitHub token was sent to the site: ${where}`);
     } else {
@@ -356,7 +372,8 @@ async function main() {
     const servedAs = (world, state) => {
       assert(shipped.length === 1 && ['data-install="coming-soon"', 'data-install="live"'].includes(shipped[0]),
         `the landing has no single install switch: ${JSON.stringify(shipped)}`);
-      world.site['/'] = async () => ({ status: 200, raw: Buffer.from(landing.replace(shipped[0], `data-install="${state}"`)), type: 'html' });
+      const html = landing.replace(shipped[0], `data-install="${state}"`).replace(/(data-count="install-copy">)[^<]*</, `$1${state === 'live' ? 'Copy' : 'Copy · coming soon'}<`);
+      world.site['/'] = async () => ({ status: 200, raw: Buffer.from(html), type: 'html' });
     };
     const installBox = page => page.run(`(() => { ${LABEL} const box = document.querySelector('.install-box'); const b = box.querySelector('button.install');
       const line = box.querySelector('.install-line'); const hint = box.querySelector('.install-hint');
@@ -374,7 +391,7 @@ async function main() {
       await settle(page);
       const box = await installBox(page);
       assert(box.line === LINE && box.lineShown, `the install line is not shown exactly: ${JSON.stringify(box.line)}`);
-      assert(box.hint === 'Paste this into your agent', `the instruction is missing: ${box.hint}`);
+      assert(box.hint === 'Paste this into your AI helper', `the instruction is missing: ${box.hint}`);
       assert(box.shown && box.disabled && box.label === 'Copy · coming soon', `Copy is not shown disabled as coming soon: ${JSON.stringify(box)}`);
       await page.run(`document.querySelector('.install-box button.install').click()`);
       await settle(page);
@@ -386,19 +403,45 @@ async function main() {
     await check('#1357 install box switched on: Copy is enabled and puts exactly the install line on the clipboard', async () => {
       const world = new World();
       servedAs(world, 'live');
+      world.site['/api/count'] = async () => ({ status: 204, raw: Buffer.alloc(0) });
       const page = await open(browser, world);
       await page.go(`${SITE}/`);
       await landed(page);
       await page.run(`navigator.clipboard.writeText('untouched')`);
       await page.until(`!document.querySelector('.install-box button.install').disabled`, 'Copy to be enabled');
       const box = await installBox(page);
-      assert(box.line === LINE && box.lineShown && box.hint === 'Paste this into your agent', `the box changed when switched on: ${JSON.stringify(box)}`);
+      assert(box.line === LINE && box.lineShown && box.hint === 'Paste this into your AI helper', `the box changed when switched on: ${JSON.stringify(box)}`);
       assert(box.shown && box.label === 'Copy', `the switched-on button does not read Copy: ${JSON.stringify(box)}`);
       await page.click('Copy');
       await page.until(`document.querySelector('.install-box button.install').innerText.trim() === 'Copied'`, 'Copied');
       const copied = await page.clipboard();
       assert(copied === LINE, `the clipboard does not hold exactly the install line: ${JSON.stringify(copied)}`);
-      checkRequestLog(world);
+      await waitFor(() => world.answered('/api/count'), 'the install Copy count request');
+      checkRequestLog(world, { installCount: true });
+      await page.close();
+    });
+
+    await check('install box switched on without the Clipboard API: Copy still copies the line through the fallback', async () => {
+      const world = new World();
+      servedAs(world, 'live');
+      world.site['/api/count'] = async () => ({ status: 204, raw: Buffer.alloc(0) });
+      const page = await open(browser, world);
+      await page.go(`${SITE}/`);
+      await landed(page);
+      await page.run(`navigator.clipboard.writeText('untouched')`);
+      await page.until(`!document.querySelector('.install-box button.install').disabled`, 'Copy to be enabled');
+      await page.run(`(() => { window.__clip = navigator.clipboard; Object.defineProperty(Navigator.prototype, 'clipboard', { get: () => undefined, configurable: true }); })()`);
+      await page.click('Copy');
+      await page.until(`['Copied', 'Line selected: copy it'].includes(document.querySelector('.install-box button.install').innerText.trim())`, 'a fallback result');
+      const selected = await page.run(`String(window.getSelection())`);
+      assert(selected === LINE, `the fallback did not select exactly the install line: ${JSON.stringify(selected)}`);
+      const label = await page.run(`document.querySelector('.install-box button.install').innerText.trim()`);
+      if (label === 'Copied') {
+        const copied = await page.run(`window.__clip.readText()`);
+        assert(copied === LINE, `the fallback said Copied but the clipboard holds ${JSON.stringify(copied)}`);
+      }
+      await waitFor(() => world.answered('/api/count'), 'the install Copy count request');
+      checkRequestLog(world, { installCount: true });
       await page.close();
     });
 
@@ -421,6 +464,10 @@ async function main() {
       const page = await open(browser, world);
       await page.go(`${SITE}/app/`);
       await page.until(`[...document.querySelectorAll('a')].some(a => a.textContent.trim() === 'Sign in with GitHub')`, 'the sign-in link');
+      const signedOutCopy = await page.run(`({ h1: document.querySelector('h1')?.textContent?.trim(), p: document.querySelector('.panel > p')?.textContent?.trim() })`);
+      assert(signedOutCopy.h1 === 'See your idea being built', `signed-out heading mismatch: ${JSON.stringify(signedOutCopy.h1)}`);
+      assert(signedOutCopy.p === "Watch your AI helpers at work: what needs your answer, the plan, and each helper's progress. Sign in with GitHub (the free website where your project is kept) to pick your project.",
+        `signed-out copy mismatch: ${JSON.stringify(signedOutCopy.p)}`);
       const href = await page.run(`[...document.querySelectorAll('a')].find(a => a.textContent.trim() === 'Sign in with GitHub').getAttribute('href')`);
       assert(href === '/api/sign-in/start', `sign-in goes to ${href}, not the helper`);
       assert(graphqlCount(world) === 0, 'GitHub was read before sign-in');
@@ -447,7 +494,7 @@ async function main() {
       await page.close();
     });
 
-    await check('picker and shell: the picked repository opens the shell with You, Specs and Agents, and is remembered', async () => {
+    await check('picker and shell: the picked repository opens the shell with You, Specs, Agents, Canvas and Models, and is remembered', async () => {
       const world = new World();
       world.graphql.Specs = ok('specs.json');
       world.graphql.Agents = ok('agents.json');
@@ -456,7 +503,7 @@ async function main() {
       await page.click('acme/factory');
       await page.until(`document.querySelector('nav a[aria-current="page"]')`, 'the navigation');
       const nav = await page.run(`(() => { ${LABEL} return [...document.querySelectorAll('nav.main a')].map(label); })()`);
-      assert(JSON.stringify(nav) === JSON.stringify(['You', 'Specs', 'Agents', 'Models']), `navigation is ${JSON.stringify(nav)}`);
+      assert(JSON.stringify(nav) === JSON.stringify(['You', 'Specs', 'Agents', 'Canvas', 'Models']), `navigation is ${JSON.stringify(nav)}`);
       await page.click('Specs');
       await page.until(`location.hash === '#/specs' && document.querySelector('h1').textContent.trim() === 'Specs'`, 'the Specs page');
       await page.go(`${SITE}/app/`);
@@ -543,7 +590,7 @@ async function main() {
       const page = await open(browser, world);
       await signIn(page, world);
       await page.click('acme/factory');
-      await page.until(`/GitHub.s limit is low/.test(document.body.innerText)`, 'the low-limit notice');
+      await page.until(`/GitHub.s hourly read limit for your account is nearly used up/.test(document.body.innerText)`, 'the low-limit notice');
       assert(/paused until/i.test(await page.text()), 'the notice does not say when reads resume');
       if (process.env.SHOTS) await page.shot(join(process.env.SHOTS, 'low-limit-phone.png'), 390, 844, true);
       await settle(page);
@@ -609,13 +656,13 @@ async function main() {
       const page = await ap6Open(world);
       await page.until(`document.querySelectorAll('main .cards a.card').length >= 6`, 'the You items');
       const tiles = await page.run(`[...document.querySelectorAll('main .tile')].map(t => t.querySelector('.k').textContent + '=' + t.querySelector('.v').textContent)`);
-      assert(JSON.stringify(tiles) === JSON.stringify(['Needs you=4', 'Building=1', 'In review=1', 'Merged=3']), `tiles: ${JSON.stringify(tiles)}`);
+      assert(JSON.stringify(tiles) === JSON.stringify(['Needs you=3', 'Building=1', 'In review=1', 'Merged=3']), `tiles: ${JSON.stringify(tiles)}`);
       const items = await youItems(page);
-      const want = ['Ticket marked for you 46', 'Spec to confirm 60#issuecomment-9001', 'Plan to approve 50#issuecomment-9003',
-        'A decision record that couldn\'t be read 50#issuecomment-9005', 'Ticket marked for you 48', 'A decision record that couldn\'t be read 50#issuecomment-9006'];
+      const want = ['Waiting on your answer 46', 'Spec to confirm 60#issuecomment-9001', 'Plan to approve 50#issuecomment-9003',
+        'A decision record that couldn\'t be read 50#issuecomment-9005', 'A decision record that couldn\'t be read 50#issuecomment-9006', 'A task for a person 48'];
       assert(JSON.stringify(items) === JSON.stringify(want), `You items: ${JSON.stringify(items)}`);
       const badge = await page.run(`document.querySelector('nav.main a[href="#/you"] .badge').textContent`);
-      assert(badge === '4', `the You badge is ${badge}`);
+      assert(badge === '3', `the You badge is ${badge}`);
       if (process.env.SHOTS) {
         await page.shot(join(process.env.SHOTS, 'you-laptop.png'), 1440, 900, false);
         await page.shot(join(process.env.SHOTS, 'you-phone.png'), 390, 844, true);
@@ -727,7 +774,7 @@ async function main() {
       await page.until(`[...document.querySelectorAll('main .tile .v')].some(v => /\\d/.test(v.textContent))`, 'the counts');
       await settle(page, 600);
       const tiles = await tileValues(page);
-      assert(JSON.stringify(tiles) === JSON.stringify(['Needs you=4', 'Building=1', 'In review=1', 'Merged=3']), `tiles: ${JSON.stringify(tiles)}`);
+      assert(JSON.stringify(tiles) === JSON.stringify(['Needs you=3', 'Building=1', 'In review=1', 'Merged=3']), `tiles: ${JSON.stringify(tiles)}`);
       assert(world.searched.length > 0, 'the specs were not searched for');
       await page.go(`${SITE}/app/#/specs`);
       await page.until(`document.querySelectorAll('main a.card').length >= 3`, 'the spec cards');
@@ -782,11 +829,11 @@ async function main() {
       await settle(page, 600);
       const items = await youItems(page);
       const unreadable = id => `A decision record that couldn't be read 50#issuecomment-${id}`;
-      const want = ['Ticket marked for you 46', 'Spec to confirm 60#issuecomment-9001', 'Plan to approve 50#issuecomment-9003',
-        unreadable(9005), 'Ticket marked for you 48', unreadable(9006), unreadable(9019), unreadable(9018), unreadable(9017), unreadable(9016)];
+      const want = ['Waiting on your answer 46', 'Spec to confirm 60#issuecomment-9001', 'Plan to approve 50#issuecomment-9003',
+        unreadable(9005), unreadable(9006), unreadable(9019), unreadable(9018), unreadable(9017), unreadable(9016), 'A task for a person 48'];
       assert(JSON.stringify(items) === JSON.stringify(want), `You items: ${JSON.stringify(items)}`);
       const badge = await page.run(`document.querySelector('nav.main a[href="#/you"] .badge')?.textContent`);
-      assert(badge === '4', `the You badge is ${badge}`);
+      assert(badge === '3', `the You badge is ${badge}`);
       await page.go(`${SITE}/app/#/specs`);
       await page.until(`document.querySelectorAll('main a.card').length === 3`, 'the spec cards');
       checkRequestLog(world);
@@ -1292,23 +1339,24 @@ async function main() {
       await page.close();
     });
 
-    await check('AP22 You: a ready-for-human ticket with an open blocker is later: not counted, listed under Later', async () => {
+    await check('AP22 You: ready-for-human tickets are tasks for a person: never counted as needing you, listed under their own heading', async () => {
       const ticket = (number, blockedBy) => ({ number, title: `Synthetic live check ${number}`, url: `https://github.com/acme/factory/issues/${number}`,
         updatedAt: '2030-01-06T00:00:00Z', labels: { nodes: [{ name: 'ready-for-human' }] }, issueDependenciesSummary: { blockedBy } });
       const world = ap6World({ specs: repository => {
-        repository.youIssues.nodes.push(ticket(90, 0), ticket(91, 2));
-        repository.youIssues.totalCount += 2;
+        repository.peopleIssues.nodes.push(ticket(90, 0), ticket(91, 2));
+        repository.peopleIssues.totalCount += 2;
       } });
       const page = await ap6Open(world);
       await page.until(`document.querySelectorAll('main .cards a.card').length >= 8`, 'the You items');
       const tiles = await page.run(`[...document.querySelectorAll('main .tile')].map(t => t.querySelector('.k').textContent + '=' + t.querySelector('.v').textContent)`);
-      assert(tiles[0] === 'Needs you=5', `Needs you counts a later ticket: ${JSON.stringify(tiles)}`);
+      assert(tiles[0] === 'Needs you=3', `Needs you counts a task for a person: ${JSON.stringify(tiles)}`);
       const badge = await page.run(`document.querySelector('nav.main a[href="#/you"] .badge').textContent`);
-      assert(badge === '5', `the You badge is ${badge}`);
+      assert(badge === '3', `the You badge is ${badge}`);
       const groups = await page.run(`[...document.querySelectorAll('main .cards')].map(g => [g.previousElementSibling?.tagName === 'H2' ? g.previousElementSibling.textContent : '',
         [...g.querySelectorAll('a.card')].map(a => a.getAttribute('href').split('/').pop())])`);
-      assert(groups.length === 2 && groups[1][0] === 'Later' && JSON.stringify(groups[1][1]) === '["91"]' && groups[0][1].includes('90') && !groups[0][1].includes('91'),
-        `due now and later: ${JSON.stringify(groups)}`);
+      const people = groups.find(g => g[0].startsWith('Tasks for a person'));
+      assert(people && people[0] === 'Tasks for a person · 3' && JSON.stringify(people[1]) === '["90","48","91"]' && !groups[0][1].some(n => ['48', '90', '91'].includes(n)),
+        `needs you and tasks for a person: ${JSON.stringify(groups)}`);
       checkRequestLog(world);
       await page.close();
     });
@@ -1418,7 +1466,7 @@ async function main() {
       const page = await open(browser, world);
       await signIn(page, world);
       await page.click('acme/factory');
-      await page.until(`/GitHub.s limit is low/.test(document.body.innerText)`, 'the low-limit notice');
+      await page.until(`/GitHub.s hourly read limit for your account is nearly used up/.test(document.body.innerText)`, 'the low-limit notice');
       const before = graphqlCount(world);
       await page.click('acme/factory');
       await page.until(`[...document.querySelectorAll('button')].some(b => b.textContent.trim() === 'acme/site')`, 'the picker');
@@ -1426,7 +1474,7 @@ async function main() {
       await page.until(`document.querySelector('h1') && document.querySelector('h1').textContent.trim() === 'You' && document.body.innerText.includes('acme/site')`, 'the shell on acme/site');
       await page.run(`new Promise(resolve => setTimeout(resolve, 400))`);
       assert(graphqlCount(world) === before, `changing repository read GitHub's GraphQL while paused (${graphqlCount(world) - before} more)`);
-      assert(/GitHub.s limit is low/.test(await page.text()), 'the back-off notice is gone after changing repository');
+      assert(/GitHub.s hourly read limit for your account is nearly used up/.test(await page.text()), 'the back-off notice is gone after changing repository');
       checkRequestLog(world);
       await page.close();
     });
@@ -1633,6 +1681,87 @@ async function main() {
       await page.close();
     });
 
+    await check('#98: a grant GitHub refuses, with a refused refresh, takes the picker to sign-in, not a lasting "Reading"', async () => {
+      const world = new World();
+      world.rest['/user/installations'] = async () => ({ status: 401, json: { message: 'Bad credentials' } });
+      world.helper['/api/sign-in/refresh'] = async () => ({ status: 502, json: { error: 'github_refused' } });
+      const page = await open(browser, world);
+      await page.go(`${SITE}/app/?code=c0de&state=${STATE}`);
+      await page.until(`/Your sign-in ended/.test(document.body.innerText)`, 'the sign-in-ended screen');
+      const text = await page.text();
+      assert(text.includes('Sign in with GitHub'), 'no Sign in with GitHub button');
+      assert(!text.includes('Reading your repositories'), 'the picker still says it is reading');
+      assert(await page.run(`localStorage.getItem('openwiz.app.auth')`) === null, 'the refused sign-in is still kept');
+      assert(world.log.some(r => r.path === '/api/sign-in/refresh'), 'the app never tried a refresh');
+      checkRequestLog(world);
+      await page.close();
+    });
+
+    await check('#98: the sidebar\'s repository list, refused the same way, takes the user to sign-in', async () => {
+      const world = new World();
+      world.graphql.Specs = ok('specs.json');
+      world.graphql.Agents = ok('agents.json');
+      const page = await open(browser, world);
+      await signIn(page, world);
+      await page.click('acme/factory');
+      await page.until(`document.querySelector('nav a[aria-current="page"]')`, 'the shell');
+      world.rest['/user/installations'] = async () => ({ status: 401, json: { message: 'Bad credentials' } });
+      world.helper['/api/sign-in/refresh'] = async () => ({ status: 502, json: { error: 'github_refused' } });
+      await page.click('acme/factory');
+      await page.until(`/Your sign-in ended/.test(document.body.innerText)`, 'the sign-in-ended screen');
+      assert((await page.text()).includes('Sign in with GitHub'), 'no Sign in with GitHub button');
+      assert(await page.run(`localStorage.getItem('openwiz.app.auth')`) === null, 'the refused sign-in is still kept');
+      checkRequestLog(world);
+      await page.close();
+    });
+
+    for (const surface of ['picker', 'sidebar']) {
+      await check(`#98: the ${surface} returns to sign-in when another tab clears the refused grant`, async () => {
+        const { browserContextId } = await browser.send('Target.createBrowserContext');
+        const fast = new World();
+        const slow = new World();
+        for (const world of [fast, slow]) {
+          world.graphql.Specs = ok('specs.json');
+          world.graphql.Agents = ok('agents.json');
+        }
+        const first = await open(browser, fast, browserContextId);
+        const second = await open(browser, slow, browserContextId);
+        const refused = { status: 401, json: { message: 'Bad credentials' } };
+        const held = Promise.withResolvers();
+        try {
+          await signIn(first, fast);
+          if (surface === 'sidebar') {
+            await first.click('acme/factory');
+            await first.until(`document.querySelector('aside.side button.repo')`, 'the first tab’s sidebar');
+          }
+          slow.rest['/user/installations'] = async () => {
+            await held.promise;
+            return refused;
+          };
+          await second.go(`${SITE}/app/`);
+          if (surface === 'sidebar') {
+            await second.until(`document.querySelector('aside.side button.repo')`, 'the second tab’s sidebar');
+            await second.click('acme/factory');
+          }
+          await waitFor(() => slow.log.some(r => r.method === 'GET' && r.path === '/user/installations'), 'the held installations request');
+          fast.rest['/user/installations'] = async () => refused;
+          fast.helper['/api/sign-in/refresh'] = async () => ({ status: 502, json: { error: 'github_refused' } });
+          if (surface === 'sidebar') await first.click('acme/factory');
+          else await first.go(`${SITE}/app/`);
+          await first.until(`/Your sign-in ended/.test(document.body.innerText)`, 'the first tab’s sign-in-ended screen');
+          held.resolve();
+          await second.until(`/Your sign-in ended/.test(document.body.innerText)`, 'the second tab’s sign-in-ended screen', 3000);
+          assert((await second.text()).includes('Sign in with GitHub'), 'the second tab has no sign-in link');
+          assert(!slow.log.some(r => r.path === '/api/sign-in/refresh'), 'the second tab tried to refresh a cleared grant');
+          checkRequestLog(fast);
+          checkRequestLog(slow);
+        } finally {
+          held.resolve();
+          await browser.send('Target.disposeBrowserContext', { browserContextId });
+        }
+      });
+    }
+
     await check('R6: a long repository name fits a phone', async () => {
       const world = new World();
       const long = `acme/${'averylongrepositoryname'.repeat(4)}`;
@@ -1705,9 +1834,9 @@ async function main() {
     const CREAM = '#cfc6b8';
     const CHARCOAL = '#1b1916';
     const LAYOUT = {
-      laptop: { brand: [12, 20, 239, 34], mark: [22, 23, 28, 28], nav: [12, 142, 239, 204], title: [312, 40] },
+      laptop: { brand: [12, 20, 239, 34], mark: [22, 23, 28, 28], nav: [12, 142, 239, 256], title: [312, 40] },
       phone: { top: [0, 0, 390, 65], brand: [14, 18, 28, 28], mark: [14, 18, 28, 28], title: [16, 87] },
-      panel: { brand: [490, 307, 460, 30], mark: [490, 308, 28, 28], title: [490, 360] },
+      panel: { brand: [490, 280, 460, 30], mark: [490, 281, 28, 28], title: [490, 332] },
     };
     const box = selector => `(() => { const el = [...document.querySelectorAll(${JSON.stringify(selector)})].find(e => e.getClientRects().length);
       if (!el) return null; const r = el.getBoundingClientRect(); return [r.x, r.y, r.width, r.height].map(Math.round); })()`;
@@ -1739,13 +1868,13 @@ async function main() {
       return file.body;
     };
 
-    await check('AP14: the new mark, cream on charcoal, is the favicon and the home-screen icon', async () => {
+    await check('AP14: the new mark, cream on charcoal, is the favicon, and the install icon is that mark in light mode', async () => {
       const world = new World();
       const page = await open(browser, world);
       await page.go(`${SITE}/app/`);
       await page.until(`document.querySelector('.panel')`, 'the sign-in screen');
       const icons = await page.run(`[...document.querySelectorAll('link[rel~="icon"], link[rel="apple-touch-icon"]')].map(l => [l.rel, l.getAttribute('href')])`);
-      assert(JSON.stringify(icons) === JSON.stringify([['icon', '/app/icon.svg'], ['icon', '/app/icon.ico'], ['apple-touch-icon', '/app/icon-180.png']]),
+      assert(JSON.stringify(icons) === JSON.stringify([['icon', '/app/icon.svg'], ['icon', '/app/icon.ico'], ['apple-touch-icon', '/app/icon-light-180.png']]),
         `the app's icons are ${JSON.stringify(icons)}, not the new mark's`);
       const svg = String(await served('/app/icon.svg')).toLowerCase();
       assert(svg.includes(`fill="${CHARCOAL}"`) && svg.includes(`fill="${CREAM}"`), 'the favicon is not the cream mark on charcoal');
@@ -1754,13 +1883,26 @@ async function main() {
       assert(ico.readUInt16LE(0) === 0 && ico.readUInt16LE(2) === 1, 'icon.ico is not an icon file');
       const sizes = [...Array(ico.readUInt16LE(4)).keys()].map(i => ico[6 + 16 * i] || 256);
       assert(JSON.stringify(sizes) === '[16,32,48]', `icon.ico holds ${JSON.stringify(sizes)}, not 16, 32 and 48`);
-      const png = await served('/app/icon-180.png');
+      const light = String(await served('/app/icon-light.svg')).toLowerCase();
+      assert(light.includes(`fill="${CREAM}"`) && light.includes(`fill="${CHARCOAL}"`), 'the install icon is not the charcoal mark on cream');
+      assert(light.replaceAll(CREAM, 'color').replaceAll(CHARCOAL, 'color') === svg.replaceAll(CREAM, 'color').replaceAll(CHARCOAL, 'color'),
+        'the install icon does not keep the favicon mark, padding and corner radius');
+      const manifest = JSON.parse(String(await served('/app/manifest.webmanifest')));
+      assert(manifest.background_color === CREAM, `the install splash is ${manifest.background_color}, not the light tile`);
+      assert(manifest.theme_color === '#161412', 'the manifest theme colour changed');
+      assert(JSON.stringify(manifest.icons.map(icon => [icon.src, icon.sizes, icon.purpose])) === JSON.stringify([
+        ['/app/icon-light.svg', 'any', 'any'],
+        ['/app/icon-light-192.png', '192x192', 'any'],
+        ['/app/icon-light-512.png', '512x512', 'any'],
+        ['/app/icon-light-180.png', '180x180', 'any'],
+      ]), `the manifest icons are ${JSON.stringify(manifest.icons)}`);
+      const png = await served('/app/icon-light-180.png');
       assert(png.readUInt32BE(16) === 180 && png.readUInt32BE(20) === 180, 'the home-screen icon is not 180 x 180');
       const pixels = await page.run(`new Promise(resolve => { const img = new Image(); img.onload = () => {
         const c = document.createElement('canvas'); c.width = c.height = 180; const g = c.getContext('2d'); g.drawImage(img, 0, 0);
         const at = (x, y) => '#' + [...g.getImageData(x, y, 1, 1).data.slice(0, 3)].map(v => v.toString(16).padStart(2, '0')).join('');
-        resolve([at(90, 8), at(60, 100)]); }; img.src = '/app/icon-180.png'; })`);
-      assert(JSON.stringify(pixels) === JSON.stringify([CHARCOAL, CREAM]), `the home-screen icon reads ${JSON.stringify(pixels)}, not charcoal around a cream mark`);
+        resolve([at(90, 8), at(60, 100)]); }; img.src = '/app/icon-light-180.png'; })`);
+      assert(JSON.stringify(pixels) === JSON.stringify([CREAM, CHARCOAL]), `the home-screen icon reads ${JSON.stringify(pixels)}, not cream around a charcoal mark`);
       checkRequestLog(world);
       await page.close();
     });
@@ -2104,6 +2246,42 @@ async function main() {
         await page.shot(join(process.env.SHOTS, 'shortcuts-laptop.png'), 1440, 900, false);
         await page.key('Escape');
       }
+      checkRequestLog(world);
+      await page.close();
+    });
+
+    await check('wiz-loader: intervals stop when boot loader or app placeholder leaves the DOM after 300 ms, and stay alive while connected', async () => {
+      const world = new World();
+      const track = `(() => {
+        const iv = new Map(), set = window.setInterval, clear = window.clearInterval;
+        window.__iv = iv;
+        window.__ivTotal = 0;
+        window.setInterval = (...args) => { const id = set(...args); iv.set(id, args[1]); window.__ivTotal++; return id; };
+        window.clearInterval = id => { iv.delete(id); return clear(id); };
+      })()`;
+      const page = await open(browser, world, null, track);
+      await page.go(`${SITE}/app/`);
+      await page.until(`document.querySelector('a[href="/api/sign-in/start"]')`, 'signed-out app screen');
+      assert(await page.run(`window.__ivTotal >= 2`), 'boot loader did not start its intervals');
+      await page.until(`window.__iv.size === 0`, 'boot loader intervals to clear after DOM removal', 5000);
+      await page.run(`(() => {
+        const holder = OW.ui.placeholder('Reading GitHub…');
+        document.body.append(holder);
+        window.__holder = holder;
+      })()`);
+      assert(await page.run(`window.__iv.size === 2`), 'app placeholder did not start two intervals');
+      await new Promise(resolve => setTimeout(resolve, 300));
+      await page.run(`window.__holder.remove()`);
+      await page.until(`window.__iv.size === 0`, 'app placeholder intervals to clear after 300 ms removal', 5000);
+      await page.run(`(() => {
+        const live = OW.ui.placeholder('Reading GitHub…');
+        document.body.append(live);
+        window.__live = live;
+      })()`);
+      await new Promise(resolve => setTimeout(resolve, 2600));
+      assert(await page.run(`window.__iv.size === 2`), 'connected placeholder mounted detached stopped unexpectedly');
+      await page.run(`window.__live.remove()`);
+      await page.until(`window.__iv.size === 0`, 'connected placeholder intervals to clear after removal', 5000);
       checkRequestLog(world);
       await page.close();
     });

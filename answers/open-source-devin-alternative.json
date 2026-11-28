@@ -1,0 +1,65 @@
+{
+  "slug": "open-source-devin-alternative",
+  "kind": "answer",
+  "query": "open source Devin alternative",
+  "title": "OpenWiz as an Open Source Devin Alternative",
+  "description": "Use OpenWiz to coordinate your own coding agents around GitHub tickets, pull requests and review. See when a Devin session is a better fit.",
+  "answer": "OpenWiz is an open source Devin alternative if you want to run a team of coding agents you already use. OpenWiz tracks specs and tickets in GitHub and sends changes through pull requests and independent review. You supply the coding agents and the host they run on.",
+  "sections": [
+    {
+      "heading": "When a Devin session fits better",
+      "body": "Choose Devin if you want to assign a task in a web app, watch it write and test code, and take over in the same session's editor. [Cognition's Devin introduction](https://docs.devin.ai/get-started/devin-intro) describes that workflow (checked 2026-11-28). Choose OpenWiz if you want to run several tickets from one approved plan, keep decisions and reviews on GitHub, and choose where your agents run."
+    },
+    {
+      "heading": "What you bring to OpenWiz",
+      "body": "OpenWiz does not supply a coding model, host your agents on an OpenWiz server, or manage your model logins. Bring a signed-in coding agent, a GitHub repository and a supported host. The OpenWiz kernel is Apache 2.0. Model and hosting charges are separate. [OpenWiz README](https://github.com/openwizdev/OpenWiz/blob/09ad084f81023de18f2cd3b9f1967d9abb7f5c89/README.md)"
+    }
+  ],
+  "steps": [
+    {
+      "name": "Install OpenWiz",
+      "text": "With Python 3.9 or later, Git and the GitHub CLI available, tell your coding agent `Install OpenWiz`. Pick a host when prompted and let the agent check the connections."
+    },
+    {
+      "name": "Connect a repository and give the agent one idea",
+      "text": "Connect GitHub and choose a repository. Give your agent a small task, such as adding a missing test, and agree on what counts as done. Follow the steps for your host in the [OpenWiz first-hour guide](https://github.com/openwizdev/OpenWiz/blob/09ad084f81023de18f2cd3b9f1967d9abb7f5c89/docs/first-hour.md#what-happens-in-order)."
+    },
+    {
+      "name": "Approve the plan and follow the work",
+      "text": "On OpenWiz 0.1.0 with CloudRoom, confirm the spec, approve the exact ticket plan and approve the launch preview after checking the host and costs. On your computer or boat.dev, review and approve each hand-started builder from its own preview, then review and merge its pull request yourself. Follow the tickets, pull requests and checks on GitHub."
+    }
+  ],
+  "faq": [
+    {
+      "question": "Can I run OpenWiz on my own computer?",
+      "answer": "Yes. Choose this computer during setup. With OpenWiz 0.1.0, the automatic fleet runs in CloudRoom. If you choose your computer or boat.dev on that release, you start builders yourself and handle review and merge."
+    },
+    {
+      "question": "Does OpenWiz include model usage?",
+      "answer": "No. OpenWiz is free and uses your signed-in coding tools. You cover your own model and hosting costs."
+    }
+  ],
+  "sources": [
+    {
+      "url": "https://docs.devin.ai/get-started/devin-intro",
+      "supports": "Cognition describes assigning work in the Devin web app, Devin writing and testing code, and taking over in its embedded IDE.",
+      "checked": "2026-11-28"
+    },
+    {
+      "url": "https://github.com/openwizdev/OpenWiz/blob/09ad084f81023de18f2cd3b9f1967d9abb7f5c89/README.md",
+      "supports": "OpenWiz is Apache 2.0, installs from the chat instruction, offers a choice of host, uses existing sign-ins, has no server of its own, and excludes model and host charges.",
+      "checked": "2026-11-28"
+    },
+    {
+      "url": "https://github.com/openwizdev/OpenWiz/blob/09ad084f81023de18f2cd3b9f1967d9abb7f5c89/docs/how-openwiz-works.md",
+      "supports": "GitHub stores fleet records, including specs, tickets, decisions, pull requests, reviews and CI results. The fleet starts builders and routes pull requests for independent review.",
+      "checked": "2026-11-28"
+    },
+    {
+      "url": "https://github.com/openwizdev/OpenWiz/blob/09ad084f81023de18f2cd3b9f1967d9abb7f5c89/docs/first-hour.md#what-happens-in-order",
+      "supports": "First-fleet setup connects GitHub and turns one idea into tickets. On 0.1.0, CloudRoom uses a fleet launch preview, while local and boat.dev users approve each hand-started builder and handle review and merge themselves.",
+      "checked": "2026-11-28"
+    }
+  ],
+  "checked": "2026-11-28"
+}

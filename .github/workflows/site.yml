@@ -4,6 +4,9 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  merge_group:
+    types: [checks_requested]
+    branches: [main]
 permissions:
   contents: read
 jobs:
@@ -20,6 +23,9 @@ jobs:
         run: |
           git fetch --quiet --no-tags --depth=2 origin "$GITHUB_SHA"
           python3 -I tools/comment-check/check.py diff --base HEAD^1
+      - name: Check the carried comment checker matches its source
+        if: github.event_name == 'pull_request'
+        run: python3 -I tools/comment-check/drift.py
       - name: Install the pinned npm dependencies
         run: npm ci
       - name: Build static site
@@ -32,5 +38,7 @@ jobs:
         run: npm run test:functions
       - name: Test the app in a browser against recorded GitHub answers
         run: npm run test:app
+      - name: Test the v2 app records contract and the v2 browser tests
+        run: npm run test:v2
       - name: Test the Models page against the models contract's fixtures
         run: node --test tests/models-page.test.mjs

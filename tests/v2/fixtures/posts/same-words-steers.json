@@ -1,0 +1,66 @@
+{
+  "about": "Not now, Ship it, Not now on one spec: three intents, three ids, three writes.",
+  "account": {
+    "id": 5001,
+    "login": "acme-owner"
+  },
+  "picked": {
+    "full": "acme/factory",
+    "private": true
+  },
+  "github": {},
+  "comments": {},
+  "steps": [
+    {
+      "compose": "spec-not_now",
+      "as": "a"
+    },
+    {
+      "confirm": "a",
+      "tap": 1
+    },
+    {
+      "post": "a",
+      "write": "ok",
+      "expect": {
+        "outcome": "posted"
+      }
+    },
+    {
+      "compose": "spec-ship",
+      "as": "b"
+    },
+    {
+      "confirm": "b",
+      "tap": 2
+    },
+    {
+      "post": "b",
+      "write": "ok",
+      "expect": {
+        "outcome": "posted"
+      }
+    },
+    {
+      "compose": "spec-not_now",
+      "as": "c"
+    },
+    {
+      "confirm": "c",
+      "tap": 3
+    },
+    {
+      "post": "c",
+      "write": "ok",
+      "expect": {
+        "outcome": "posted"
+      }
+    }
+  ],
+  "distinct": [
+    "a",
+    "b",
+    "c"
+  ],
+  "writes": 3
+}

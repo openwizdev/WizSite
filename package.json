@@ -1,12 +1,16 @@
 {
   "name": "wizsite",
   "private": true,
+  "license": "Apache-2.0",
   "type": "module",
   "scripts": {
     "build": "node build.mjs",
-    "check": "node --check site.js && node --check faq.js && for f in app/*.js app/pages/*.js scripts/app-check.mjs; do node --check \"$f\" || exit 1; done && python3 -B scripts/check.py",
+    "check": "node --check site.js && node --check faq.js && node --check wiz-loader/wiz-loader.js && for f in app/*.js app/pages/*.js app/cards/*.js scripts/app-check.mjs; do [ \"$f\" = 'app/cards/*.js' ] && continue; node --check \"$f\" || exit 1; done && python3 -B scripts/check.py",
     "test": "python3 -B -m unittest discover -s scripts -p 'test_*.py'",
-    "test:functions": "node --test tests/sign-in.test.mjs tests/drivers.test.mjs tests/ask-index.test.mjs tests/ask.test.mjs tests/ask-a-wiz.test.mjs",
+    "test:functions": "node --test tests/sign-in.test.mjs tests/drivers.test.mjs tests/ask-index.test.mjs tests/ask.test.mjs tests/ask-a-wiz.test.mjs tests/market.test.mjs tests/count.test.mjs tests/landing-reach.test.mjs tests/indexnow.test.mjs",
+    "test:v2": "node --test 'tests/v2/*.test.mjs'",
+    "test:models": "node --test tests/models-page.test.mjs",
+    "test:comments": "python3 -I tools/comment-check/check.py diff --base origin/main",
     "test:app": "node scripts/app-check.mjs"
   },
   "dependencies": {

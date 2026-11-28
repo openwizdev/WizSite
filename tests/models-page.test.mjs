@@ -17,6 +17,64 @@ const text = async (url) => readFile(url, 'utf8');
 const json = async (url) => JSON.parse(await text(url));
 const CASES = ['one-table', 'five-tables', 'both', 'overridden', 'same-family'];
 const ROLE_KEYS = ['orchestrator', 'builder', 'reviewer', 'small_builder', 'fixer'];
+const SETUP_010_TEMPLATE = `# Fleet settings
+
+Every fleet in this project starts from these settings.
+
+## Builder
+
+One per ticket. It builds its ticket on its own branch, and never reviews or merges.
+
+| Setting | Value | \`room-cli thread spawn\` flag |
+| --- | --- | --- |
+| Harness | Antigravity | \`--provider antigravity\` |
+| Model | Gemini Neon | \`--model gemini-4-neon\` |
+| Effort | Medium | \`--reasoning-level medium\` |
+
+Source: synthetic 0.1.0 setup template fixture.
+
+## Builder for small tickets
+
+Tickets with an exact \`polish\`, \`huntr\` or \`proposal\` label use this table; every other ticket uses \`## Builder\`.
+
+| Setting | Value | \`room-cli thread spawn\` flag |
+| --- | --- | --- |
+| Harness | Antigravity | \`--provider antigravity\` |
+| Model | Gemini Neon | \`--model gemini-4-neon\` |
+| Effort | Medium | \`--reasoning-level medium\` |
+
+Source: synthetic 0.1.0 setup template fixture.
+
+## Reviewer for Claude-built
+
+One per pull request, from a different model family than the builder.
+
+| Setting | Value | \`room-cli thread spawn\` flag |
+| --- | --- | --- |
+| Harness | Codex | \`--provider codex\` |
+| Model | Sol 6.1 | \`--model gpt-6.1-sol\` |
+| Effort | High | \`--reasoning-level high\` |
+
+Source: synthetic 0.1.0 setup template fixture.
+
+## Reviewer for GPT-built
+
+Use the verified builder's provider.
+
+| Setting | Value | \`room-cli thread spawn\` flag |
+| --- | --- | --- |
+| Harness | Claude Code | \`--provider claude-code\` |
+| Model | Opus 5.5 | \`--model claude-opus-5-5\` |
+| Effort | Medium | \`--reasoning-level medium\` |
+
+Source: synthetic 0.1.0 setup template fixture.
+
+## Labels
+
+| Label | Means | Put on by | Taken off by |
+| --- | --- | --- | --- |
+| \`held\` | The ticket is held | \`to-tickets\` | \`to-tickets\` |
+`;
 
 async function loadModels() {
   const file = new URL('app/pages/models.js', ROOT);
@@ -61,7 +119,27 @@ describe('the Models page reader', () => {
     }
     const older = await text(new URL('five-tables/fleet.md', FIX));
     assert.throws(() => models.read(older.replace('## Reviewer for GPT-built', '## Reviewer for others')), models.Refused);
+    assert.throws(() => models.read(older.replace('| GPT | Codex', '| Other | Codex')), models.Refused);
     assert.throws(() => models.read('# Fleet settings\n'), models.Refused);
+  });
+
+  test('0.1.0 setup template without ## Fixer: builder and reviewer read, fixer is unset', async () => {
+    const read = models.read(SETUP_010_TEMPLATE);
+    assert.equal(read.form, 'older_tables');
+    assert.equal(read.roles.builder.choice.provider, 'antigravity');
+    assert.equal(read.roles.builder.choice.model, 'gemini-4-neon');
+    assert.equal(read.roles.reviewer.choice.provider, 'claude-code');
+    assert.equal(read.roles.reviewer.choice.model, 'claude-opus-5-5');
+    assert.equal(read.roles.orchestrator.follows, 'builder');
+    assert.deepEqual(JSON.parse(JSON.stringify(read.roles.fixer)), { follows: null, choice: null });
+
+    const claudeBuilt = SETUP_010_TEMPLATE
+      .replace('| Harness | Antigravity | `--provider antigravity` |', '| Harness | Claude Code | `--provider claude-code` |')
+      .replace('| Model | Gemini Neon | `--model gemini-4-neon` |', '| Model | Opus 5.5 | `--model claude-opus-5-5` |');
+    const claudeRead = models.read(claudeBuilt);
+    assert.equal(claudeRead.roles.builder.choice.provider, 'claude-code');
+    assert.equal(claudeRead.roles.reviewer.choice.provider, 'codex');
+    assert.deepEqual(JSON.parse(JSON.stringify(claudeRead.roles.fixer)), { follows: null, choice: null });
   });
 
   test('every hand-off line is exactly the contract\'s', async () => {
@@ -358,6 +436,23 @@ describe('the Models page in the app', () => {
     assert.match(await card(page, 'Reviewer'), /Sol 6\.1 Medium on Codex/);
     assert.match(await card(page, 'Small builder'), /Opus 5\.5 Medium on Claude Code/);
     assert.match(await card(page, 'Fixer'), /Opus 5\.5 Medium on Claude Code/);
+    readOnly(world);
+    await page.close();
+  });
+
+  test('0.1.0 setup template without ## Fixer: shows builder and reviewer, and says fixer is not set', async () => {
+    const world = new World({ fleet: SETUP_010_TEMPLATE, offered });
+    const page = await modelsPage(browser, world);
+    assert.doesNotMatch(await page.text(), /Unknown/);
+    assert.match(await card(page, 'Orchestrator'), /Follows the Builder: Gemini Neon Medium on Antigravity/);
+    assert.match(await card(page, 'Builder'), /Gemini Neon Medium on Antigravity/);
+    assert.match(await card(page, 'Reviewer'), /Opus 5\.5 Medium on Claude Code/);
+    assert.match(await card(page, 'Small builder'), /Gemini Neon Medium on Antigravity/);
+    assert.match(await card(page, 'Fixer'), /Not set/);
+    await page.click('Change', '.models .card.fixer');
+    await page.click('Follow the Builder', '.models .card.fixer .picker');
+    await page.until(`document.querySelector('.models .card.fixer .handoff')`, 'the fixer line');
+    assert.equal(await page.clipboard(), 'Set the fixer to follow the builder: run `openwiz models set fixer follows-builder` and commit the change.');
     readOnly(world);
     await page.close();
   });

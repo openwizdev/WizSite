@@ -50,5 +50,7 @@ again when you press **Refresh**. It never sends, starts or stops anything.
 - **Failed or unknown:** a read did not answer or answered only in part. Press
   **Refresh**. Work already running carries on.
 
-Feedback and sharing are on **Home**. OpenWiz is free now. Paid plans come
-later. CloudRoom and model charges are separate and not included.
+Feedback and sharing are on **Home**. OpenWiz stays free and open source.
+Supporter is $5 per month for priority support and to support the project,
+and it adds nothing else. CloudRoom and model charges are separate and not
+included.

@@ -34,6 +34,7 @@
     specs: 'M3 5a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2ZM14 5a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2h-3a2 2 0 0 1-2-2ZM3 16a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2ZM14 17.5h7M17.5 14v7',
     agents: 'M3 12h4l3-8 4 16 3-8h4',
     models: 'm12 3 9 5-9 5-9-5ZM3 12l9 5 9-5M3 16l9 5 9-5',
+    canvas: 'M3 4h7v6H3ZM14 4h7v6h-7ZM14 14h7v6h-7ZM10 7h4M17.5 10v4',
     repo: 'M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3ZM5 17a3 3 0 0 1 3-3h11',
     chevron: 'm7 10 5 5 5-5',
     clock: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18ZM12 7v5l3 2',
@@ -79,6 +80,25 @@
   }
   const agentName = (harness, model) => `${HARNESSES[String(harness).toLowerCase()] || harness}, ${modelName(model)}`;
 
+  const stillReading = text => text.endsWith('…');
+  const waiting = new Map();
+  function loading(text) {
+    const known = waiting.get(text);
+    if (known?.isConnected) return known;
+    if (!window.WizLoader) return null;
+    const box = window.WizLoader.markup(true);
+    window.WizLoader.mount(box, { lines: [text, ...window.WizLoader.lines] });
+    waiting.set(text, box);
+    return box;
+  }
+
+  function fill(el, ...kids) {
+    kids = kids.flat().filter(kid => kid !== null && kid !== undefined && kid !== false)
+      .map(kid => (kid instanceof Node ? kid : document.createTextNode(String(kid))));
+    for (const child of [...el.childNodes]) if (!kids.includes(child)) child.remove();
+    kids.forEach((kid, i) => { if (el.childNodes[i] !== kid) el.insertBefore(kid, el.childNodes[i] || null); });
+  }
+
   const ui = {
     h, icon, logo, time, STATES, agentName,
     pill: state => h('span', { class: 'pill', '--c': STATES[state].colour }, STATES[state].word),
@@ -93,7 +113,9 @@
       return el;
     },
     unknown: text => h('div', { class: 'unknown' }, h('b', {}, 'Unknown. '), text),
-    placeholder: text => h('div', { class: 'placeholder' }, text),
+    placeholder: text => (stillReading(text) ? loading(text) : null) || h('div', { class: 'placeholder' }, text),
+    loading,
+    fill,
   };
   const pages = [];
   OW.ui = ui;

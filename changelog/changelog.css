@@ -1,0 +1,21 @@
+.changelog{padding-block:clamp(40px,6vw,84px) clamp(48px,7vw,100px)}
+.changelog h1{font-size:clamp(44px,6vw,80px);font-weight:760;line-height:.98;letter-spacing:-.06em}
+.changelog .lead{margin-top:18px;max-width:720px;font-size:clamp(17px,1.6vw,21px);line-height:1.45;letter-spacing:-.02em;color:#e1d7cb}
+.changelog a{color:var(--ink);text-decoration:underline;text-decoration-color:var(--brass);text-underline-offset:4px}
+.releases{max-width:720px;margin-top:clamp(32px,5vw,56px)}
+.release{padding:28px 0 30px;border-top:1px solid var(--line)}
+.release h2{margin:0;font:720 clamp(28px,3.2vw,36px)/1.1 var(--ow-font-sans);letter-spacing:-.045em}
+.release h2 small{margin-left:6px;font:400 15px/1.4 var(--ow-font-mono);letter-spacing:0;color:var(--grey)}
+.release .headline,.release li{overflow-wrap:anywhere}
+.release .headline{margin-top:12px;font-size:clamp(18px,1.8vw,21px);font-weight:560;line-height:1.4;letter-spacing:-.015em}
+.release ul{margin:12px 0 0;padding-left:20px;color:var(--grey2);font-size:17px;line-height:1.5}
+.release li+li{margin-top:6px}
+.release h3{margin:26px 0 0;padding-top:16px;border-top:1px solid var(--line);font:680 18px/1.25 var(--ow-font-sans);letter-spacing:-.02em;color:var(--ink);overflow-wrap:anywhere}
+.release h3+ul{margin-top:10px}
+.release h3+ul li+li{margin-top:8px}
+.release .notes{margin-top:16px;font-size:15px}
+.releases .pre{padding-top:20px;border-top:1px solid var(--line);font-size:15px;color:var(--grey)}
+@media (max-width:960px){
+  .release{padding:22px 0 24px}
+  .release ul{font-size:16px}
+}

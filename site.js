@@ -1,3 +1,11 @@
+if (typeof navigator.sendBeacon === 'function') {
+  const countActions = new Set(['install-copy', 'github', 'star', 'book-call', 'market', 'drivers', 'docs', 'x']);
+  document.addEventListener('click', event => {
+    const action = event.target.closest?.('[data-count]')?.dataset.count;
+    if (countActions.has(action)) navigator.sendBeacon('/api/count', action);
+  });
+}
+
 async function showStars() {
   const response = await fetch('https://api.github.com/repos/openwizdev/OpenWiz');
   if (!response.ok) return;
@@ -69,7 +77,23 @@ function showHero(gsap, paused, signal) {
     setCrew(index, 0);
   };
 
+  const loaded = new Promise(resolve => {
+    if (document.readyState === 'complete') resolve();
+    else addEventListener('load', resolve, { once: true, signal });
+  });
+  const near = new Promise(resolve => {
+    const watch = new IntersectionObserver(([entry]) => {
+      if (!entry.isIntersecting) return;
+      watch.disconnect();
+      resolve();
+    }, { rootMargin: '400px 0px' });
+    watch.observe(demo);
+    signal.addEventListener('abort', () => watch.disconnect(), { once: true });
+  });
+
   const start = async () => {
+    await Promise.all([loaded, near]);
+    if (signal.aborted) return;
     await Promise.all([...sheets, '/art/fleet-frames.webp'].map(src => {
       const image = new Image();
       image.src = src;
@@ -242,57 +266,57 @@ function enableMotion(gsap) {
   configure();
 }
 
+function oneVoiceAtATime() {
+  const players = [...document.querySelectorAll('.launch-video, .spec-video')];
+  const speaks = video => !video.paused && !video.muted;
+  const silenceOthers = ({ target }) => {
+    if (!speaks(target)) return;
+    for (const other of players) if (other !== target && speaks(other)) other.pause();
+  };
+  for (const video of players) {
+    video.addEventListener('playing', silenceOthers);
+    video.addEventListener('volumechange', silenceOthers);
+  }
+}
+
+function launchVideo() {
+  const video = document.querySelector('.launch-video');
+  const play = document.querySelector('.launch-play');
+  if (!video || !play) return;
+  video.controls = false;
+  play.hidden = false;
+  const start = event => {
+    if (!event.isTrusted) return;
+    play.removeEventListener('click', start);
+    play.hidden = true;
+    video.controls = true;
+    video.muted = false;
+    video.focus();
+    video.play().catch(() => {});
+  };
+  play.addEventListener('click', start);
+}
+
 function specVideo() {
   const video = document.querySelector('.spec-video');
   const sound = document.querySelector('.spec-play');
-  const pause = document.querySelector('.demo-pause');
   if (!video || !sound) return;
-  const calm = matchMedia('(prefers-reduced-motion: reduce)');
-  let inView = false;
-  let visitorDrives = false;
-  let ownPlayEvents = 0;
   const frame = video.closest('.spec-frame');
   const track = video.textTracks[0];
-  const resting = on => {
-    frame?.classList.toggle('is-ambient', on);
-    video.controls = !on;
-    if (track) track.mode = on ? 'hidden' : 'showing';
-  };
-  const takeOver = () => { visitorDrives = true; resting(false); };
-  const update = () => {
-    if (visitorDrives) return;
-    const ambient = inView && !calm.matches && pause.getAttribute('aria-pressed') !== 'true' && !document.hidden;
-    if (ambient && video.paused) {
-      ownPlayEvents += 1;
-      video.muted = true;
-      video.play().catch(() => { ownPlayEvents = 0; });
-    } else if (!ambient && !video.paused) {
-      ownPlayEvents += 1;
-      video.pause();
-    }
-  };
-  const take = () => {
-    if (ownPlayEvents > 0) ownPlayEvents -= 1;
-    else takeOver();
-  };
-  video.addEventListener('play', take);
-  video.addEventListener('pause', take);
-  video.addEventListener('volumechange', () => { if (!video.muted) takeOver(); });
-  new IntersectionObserver(([entry]) => { inView = entry.isIntersecting; update(); }, { threshold: .5 }).observe(video);
-  calm.addEventListener('change', update);
-  document.addEventListener('visibilitychange', update);
-  pause.addEventListener('click', () => setTimeout(update));
-  resting(true);
+  frame?.classList.add('is-resting');
+  video.controls = false;
+  if (track) track.mode = 'hidden';
   sound.hidden = false;
-  const listen = () => {
-    takeOver();
+  const listen = event => {
+    if (!event.isTrusted || video.controls) return;
+    frame?.classList.remove('is-resting');
+    video.controls = true;
+    if (track) track.mode = 'showing';
     video.muted = false;
-    video.loop = false;
-    video.currentTime = 0;
     video.play().then(() => video.focus(), () => {});
   };
   sound.addEventListener('click', listen);
-  video.addEventListener('click', () => { if (!video.controls) listen(); });
+  video.addEventListener('click', listen);
 }
 
 const FAMILY = [
@@ -432,27 +456,42 @@ function enableFamily(gsap) {
 
 function enableCopy() {
   const box = document.querySelector('.install-box[data-install="live"]');
-  if (!box || !navigator.clipboard) return;
+  if (!box) return;
   const button = box.querySelector('button.install');
-  const line = box.querySelector('.install-line').textContent;
+  const code = box.querySelector('.install-line');
+  const line = code.textContent;
   let timer;
+  const selectLine = () => {
+    const range = document.createRange();
+    range.selectNodeContents(code);
+    const selection = window.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
+  };
+  const fallback = () => {
+    selectLine();
+    try { return document.execCommand('copy'); } catch { return false; }
+  };
   button.textContent = 'Copy';
   button.disabled = false;
   button.addEventListener('click', async () => {
+    let copied = false;
     try {
       await navigator.clipboard.writeText(line);
-      button.textContent = 'Copied';
+      copied = true;
     } catch {
-      button.textContent = 'Select the line to copy';
+      copied = fallback();
     }
+    button.textContent = copied ? 'Copied' : 'Line selected: copy it';
     clearTimeout(timer);
-    timer = setTimeout(() => { button.textContent = 'Copy'; }, 2000);
+    timer = setTimeout(() => { button.textContent = 'Copy'; }, copied ? 2000 : 3000);
   });
 }
 
 const ASK_KEYS = { text: 'text,type', sources: 'sources,type', done: 'type', not_covered: 'links,text,type', refused: 'message,reason,type' };
 const ASK_REFUSALS = {
   bad_request: [400, 'That question couldn\'t be read. Try again.'],
+  not_human: [403, 'Please confirm you\'re human and try again.'],
   too_long: [413, 'That question is too long. Keep it to 300 characters or fewer.'],
   rate_limited: [429, 'That\'s a lot of questions at once. Try again in a few minutes.'],
   daily_cap: [429, 'Ask a Wiz has answered all it can for today. Try again tomorrow.'],
@@ -463,6 +502,8 @@ const ASK_REFUSALS = {
 };
 const ASK_NOT_COVERED = 'The OpenWiz docs don\'t cover that yet, so I won\'t guess. Book a call or open a GitHub issue, and we\'ll answer it.';
 const ASK_LINKS = [['Book a call', 'https://openwiz.dev/team/#book'], ['GitHub issues', 'https://github.com/openwizdev/openwiz/issues']];
+const ASK_LINES = ['A Wiz is reading the docs', 'Flipping through the spellbook', 'Finding the right page',
+  'Asking the other Wizes', 'Checking every source', 'Polishing the answer'];
 const askKeys = value => value && typeof value === 'object' && !Array.isArray(value) ? Object.keys(value).sort().join() : '';
 const askText = value => typeof value === 'string' && value.length > 0;
 function askEvent(line, text, sources) {
@@ -480,6 +521,56 @@ function askEvent(line, text, sources) {
   if (!ok) throw new Error('not the contract\'s stream');
   return e;
 }
+let turnstileScript = null;
+const loadTurnstile = () => turnstileScript ??= new Promise(resolve => {
+  const script = Object.assign(document.createElement('script'), { src: 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit', async: true });
+  script.onload = () => resolve(window.turnstile ?? null);
+  script.onerror = () => resolve(null);
+  document.head.append(script);
+});
+function askGate(sitekey, container) {
+  let widget = null, ready = null, waiting = [];
+  const settle = value => { const all = waiting; waiting = []; all.forEach(resolve => resolve(value)); };
+  const start = () => ready ??= loadTurnstile().then(turnstile => {
+    if (!turnstile || !container.isConnected) return null;
+    try {
+      widget = turnstile.render(container, {
+        sitekey, action: 'ask', appearance: 'interaction-only', size: 'flexible',
+        callback: token => settle(token), 'error-callback': () => { settle(''); return true; },
+      });
+    } catch {
+      widget = null;
+    }
+    return widget === null || widget === undefined ? null : turnstile;
+  });
+  return {
+    start,
+    token(signal) {
+      if (signal?.aborted) return Promise.resolve('');
+      return new Promise(resolve => {
+        let settled = false;
+        const done = value => {
+          if (settled) return;
+          settled = true;
+          waiting = waiting.filter(fn => fn !== done);
+          signal?.removeEventListener('abort', onAbort);
+          resolve(value);
+        };
+        const onAbort = () => done('');
+        signal?.addEventListener('abort', onAbort, { once: true });
+        start().then(turnstile => {
+          if (settled) return;
+          if (!turnstile) return done('');
+          const now = turnstile.getResponse(widget);
+          if (now && !turnstile.isExpired(widget)) return done(now);
+          waiting.push(done);
+        });
+      });
+    },
+    used() { if (widget !== null) window.turnstile?.reset(widget); },
+    remove() { settle(''); if (widget !== null) window.turnstile?.remove(widget); widget = null; },
+  };
+}
 async function askAWiz() {
   const lists = document.querySelectorAll('.faq .faq-rows');
   if (!lists.length) return;
@@ -488,8 +579,11 @@ async function askAWiz() {
     lists.forEach(list => near.observe(list));
   });
   const probe = await fetch('/api/ask', { cache: 'no-store' }).then(r => r.status === 200 ? r.json() : null).catch(() => null);
-  if (askKeys(probe) !== 'enabled,max_question_chars,schema' || probe.schema !== 'openwiz.ask-a-wiz.v1' || probe.enabled !== true
-    || probe.max_question_chars !== 300) return;
+  const keys = askKeys(probe);
+  if ((keys !== 'enabled,max_question_chars,schema' && keys !== 'enabled,max_question_chars,schema,turnstile_site_key')
+    || probe.schema !== 'openwiz.ask-a-wiz.v1' || probe.enabled !== true || probe.max_question_chars !== 300
+    || (keys.endsWith('turnstile_site_key') && (typeof probe.turnstile_site_key !== 'string' || !/^[0-9A-Za-z_-]{1,100}$/.test(probe.turnstile_site_key)))) return;
+  const sitekey = probe.turnstile_site_key;
   let made = 0;
   const el = (tag, className, text) => {
     const node = document.createElement(tag);
@@ -508,30 +602,56 @@ async function askAWiz() {
       const label = el('label', 'sr-only', 'Ask a Wiz a question about OpenWiz');
       Object.assign(input, { id: `faq-ask-${n}`, type: 'text', name: 'question', placeholder: 'Ask a Wiz...', autocomplete: 'off', enterKeyHint: 'send' });
       label.htmlFor = input.id;
-      form.append(label, input, el('button', 'faq-ask-go', 'Ask'));
+      const go = el('button', 'faq-ask-go', 'Ask');
+      form.append(label, input, go);
+      const human = sitekey ? el('div', 'faq-ask-human') : null;
+      const gate = human && askGate(sitekey, human);
+      let inHuman = false;
+      if (human) {
+        form.append(human);
+        for (const type of ['focusin', 'pointerdown', 'input']) form.addEventListener(type, gate.start, { once: true });
+        human.addEventListener('focusin', () => { inHuman = true; });
+        human.addEventListener('focusout', event => { if (event.relatedTarget && !human.contains(event.relatedTarget)) inHuman = false; });
+      }
       const heading = el(level, 'faq-q'), answer = el('p', 'faq-ask-answer'), body = el('div', 'faq-a'), actions = el('div', 'faq-ask-actions');
       body.append(el('div'));
       body.firstChild.append(answer);
       const buttons = {};
       for (const name of ['Stop', 'Retry', 'Edit']) actions.append(buttons[name] = Object.assign(el('button', '', name), { type: 'button' }));
-      row.append(form, heading, body, actions);
+      row.append(heading, body, form, actions);
       list.append(row);
-      let question = '', controller = null;
+      let question = '', controller = null, wait = null, verifying = false;
+      const waiting = on => {
+        if (!on) {
+          wait?._wl?.stop();
+          wait?.remove();
+          wait = null;
+        }
+        if (!on || wait || !window.WizLoader) return;
+        wait = window.WizLoader.markup(true);
+        window.WizLoader.mount(wait, { lines: ASK_LINES });
+        wait.setAttribute('aria-hidden', 'true');
+        answer.before(wait);
+      };
       const show = (state, message = '', retry = true, focus = true) => {
         const inside = row.contains(document.activeElement);
         row.dataset.state = state;
-        form.hidden = state !== 'idle';
-        heading.hidden = body.hidden = state === 'idle';
+        const idle = state === 'idle';
+        label.hidden = input.hidden = go.hidden = !idle;
+        form.hidden = !idle && !(state === 'asking' && verifying);
+        heading.hidden = body.hidden = idle;
         heading.textContent = question;
         answer.textContent = message;
+        waiting(state === 'asking');
         buttons.Stop.hidden = state !== 'asking';
         buttons.Retry.hidden = state !== 'ended' || !retry;
         buttons.Edit.hidden = state !== 'ended';
-        actions.hidden = state === 'idle';
-        if (state !== 'idle') status.textContent = state === 'asking' ? 'Ask a Wiz is answering.' : message;
-        if (focus && inside) (state === 'idle' ? input : state === 'asking' ? buttons.Stop : retry ? buttons.Retry : buttons.Edit).focus();
+        actions.hidden = idle;
+        if (!idle) status.textContent = state === 'asking' ? 'Ask a Wiz is answering.' : message;
+        if (focus && inside) (idle ? input : state === 'asking' ? buttons.Stop : retry ? buttons.Retry : buttons.Edit).focus();
       };
       const finish = (paragraphs, links = []) => {
+        waiting(false);
         const done = el('div', 'faq-row faq-asked'), h = el(level, 'faq-q'), button = el('button'), a = el('div', 'faq-a');
         button.append(el('span', 'faq-ask-label', question));
         Object.assign(button, { type: 'button', id: `faq-ask-q${n}`, disabled: !faq.hasAttribute('data-ready') });
@@ -544,23 +664,42 @@ async function askAWiz() {
         for (const [text, className] of paragraphs) a.firstChild.append(el('p', className, text));
         if (links.length) {
           const p = el('p', 'faq-ask-links');
-          links.forEach(([label, href], i) => p.append(...(i ? [' · '] : []), Object.assign(el('a', '', label), { href })));
+          links.forEach(([label, href], i) => {
+            const link = Object.assign(el('a', '', label), { href });
+            link.dataset.count = i === 0 ? 'book-call' : 'github';
+            p.append(...(i ? [' · '] : []), link);
+          });
           a.firstChild.append(p);
         }
         done.append(h, a);
         const inside = row.contains(document.activeElement);
+        gate?.remove();
         row.replaceWith(done);
         status.textContent = paragraphs[0][0];
         const input = addRow();
         if (inside) input.focus({ preventScroll: true });
       };
       const ask = async () => {
-        controller = new AbortController();
+        if (controller) return;
+        const current = controller = new AbortController();
+        inHuman = false;
+        verifying = !!gate;
         show('asking');
         let text = '', sources = null, end = null;
         try {
-          const response = await fetch('/api/ask', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ question }), cache: 'no-store', signal: controller.signal });
+          let token = '';
+          if (gate) {
+            token = await gate.token(current.signal);
+            verifying = false;
+            const keepFocus = form.contains(document.activeElement) || (inHuman && document.activeElement === document.body);
+            inHuman = false;
+            form.hidden = true;
+            if (keepFocus) buttons.Stop.focus();
+            if (current.signal.aborted) throw new Error('stopped');
+            gate.used();
+          }
+          const response = await fetch('/api/ask', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(gate ? { 'CF-Turnstile-Response': token } : {}) },
+            body: JSON.stringify({ question }), cache: 'no-store', signal: current.signal });
           if (!/^application\/x-ndjson\s*(;|$)/i.test(response.headers.get('content-type') || '')) throw new Error('not a stream');
           const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
           let buffer = '';
@@ -571,7 +710,7 @@ async function askAWiz() {
             for (let at; (at = buffer.indexOf('\n')) >= 0; buffer = buffer.slice(at + 1)) {
               if (end) throw new Error('data after the last event');
               const event = askEvent(buffer.slice(0, at), text, sources);
-              if (event.type === 'text') answer.textContent = text += event.text;
+              if (event.type === 'text') waiting(false), answer.textContent = text += event.text;
               else if (event.type === 'sources') sources = event.sources.map(s => s.title);
               else end = event;
             }
@@ -581,7 +720,8 @@ async function askAWiz() {
         } catch {
           end = null;
         }
-        controller.abort();
+        verifying = false;
+        current.abort();
         controller = null;
         if (end?.type === 'done') finish([[text], [`Sources: ${sources.join(', ')}`, 'faq-ask-sources']]);
         else if (end?.type === 'not_covered') finish([[end.text]], ASK_LINKS);
@@ -607,6 +747,20 @@ async function askAWiz() {
 enableCopy();
 askAWiz();
 showStars().catch(() => {});
+launchVideo();
 specVideo();
-enableFamily(window.gsap);
-if (window.gsap) enableMotion(window.gsap);
+oneVoiceAtATime();
+const GSAP = document.currentScript?.dataset.gsap;
+const startMotion = () => {
+  enableFamily(window.gsap);
+  if (window.gsap) enableMotion(window.gsap);
+};
+const loadMotion = () => {
+  const script = document.createElement('script');
+  script.src = GSAP;
+  script.onload = script.onerror = startMotion;
+  document.head.append(script);
+};
+if (!GSAP) startMotion();
+else if (document.readyState === 'complete') loadMotion();
+else addEventListener('load', loadMotion, { once: true });

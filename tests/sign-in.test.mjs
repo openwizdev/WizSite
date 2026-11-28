@@ -1,5 +1,6 @@
 import { test, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { onRequest } from '../functions/api/sign-in/[step].js';
 
@@ -10,6 +11,9 @@ const CODE = 'fakecode0123456789ab';
 const ACCESS = 'ghu_fakeaccesstoken000000000000000000';
 const REFRESH = 'ghr_fakerefreshtoken00000000000000000000000000000000000000000000000000000000000';
 const STATE = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
+const VERIFIER = 'VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV';
+const sha256b64url = value => createHash('sha256').update(value).digest('base64url');
+const CHALLENGE = sha256b64url(VERIFIER);
 const COOKIE_PREFIX = '__Host-openwiz-sign-in-';
 const GITHUB_TOKEN_URL = 'https://github.com/login/oauth/access_token';
 const GRANT = {
@@ -17,14 +21,24 @@ const GRANT = {
   refresh_token_expires_in: 15811200, token_type: 'bearer', scope: '',
 };
 
-let github, logs, envKeys, realFetch;
+let github, logs, envKeys, realFetch, nextCode;
 const realConsole = {};
+function verifyGrant(_url, init) {
+  const sent = JSON.parse(init.body || '{}');
+  if (sent.grant_type === 'refresh_token') return Response.json(GRANT);
+  const expected = github.challenges.get(sent.code);
+  if (!expected || typeof sent.code_verifier !== 'string' || !sent.code_verifier || sha256b64url(sent.code_verifier) !== expected) {
+    return Response.json({ error: 'invalid_grant', error_description: 'PKCE verification failed' });
+  }
+  return Response.json(GRANT);
+}
 beforeEach(() => {
-  github = { calls: [], answer: () => Response.json(GRANT) };
+  nextCode = 0;
+  github = { calls: [], challenges: new Map([[CODE, CHALLENGE]]), answer: null };
   realFetch = globalThis.fetch;
   globalThis.fetch = async function fake(url, init = {}) {
     github.calls.push({ url: String(url), method: init.method, headers: new Headers(init.headers), body: init.body });
-    const response = github.calls.length === 1 ? github.answer() : Response.json(GRANT);
+    const response = github.answer && github.calls.length === 1 ? github.answer(url, init) : verifyGrant(url, init);
     const to = response.headers.get('Location');
     if (to && response.status >= 300 && response.status < 400 && (init.redirect ?? 'follow') === 'follow') return fake(to, init);
     return response;
@@ -47,7 +61,7 @@ const env = (values = { GITHUB_CLIENT_ID: ID, GITHUB_CLIENT_SECRET: SECRET }) =>
   get(target, key) { envKeys.add(String(key)); return target[key]; },
 });
 
-function call(step, { method = 'POST', origin = SITE, host = SITE, cookie = `${COOKIE_PREFIX}${STATE}=1`, body, type = 'application/json', settings } = {}) {
+function call(step, { method = 'POST', origin = SITE, host = SITE, cookie = `${COOKIE_PREFIX}${STATE}=${VERIFIER}`, body, type = 'application/json', settings } = {}) {
   const headers = new Headers();
   if (origin) headers.set('Origin', origin);
   if (cookie) headers.set('Cookie', cookie);
@@ -60,24 +74,34 @@ function call(step, { method = 'POST', origin = SITE, host = SITE, cookie = `${C
 
 const noStore = response => assert.equal(response.headers.get('Cache-Control'), 'no-store');
 
-test('start: a fresh state value goes to GitHub and into a host-only, single-site cookie', async () => {
+test('start: a fresh state and PKCE challenge go to GitHub and the verifier stays in a host-only cookie', async () => {
   const first = await call('start', { method: 'GET', origin: null, cookie: null, type: null });
   const second = await call('start', { method: 'GET', origin: null, cookie: null, type: null });
   assert.equal(first.status, 302);
   noStore(first);
   const to = new URL(first.headers.get('Location'));
   assert.equal(`${to.origin}${to.pathname}`, 'https://github.com/login/oauth/authorize');
-  assert.deepEqual([...to.searchParams.keys()].sort(), ['client_id', 'redirect_uri', 'state']);
+  assert.deepEqual([...to.searchParams.keys()].sort(), ['client_id', 'code_challenge', 'code_challenge_method', 'redirect_uri', 'state']);
   assert.equal(to.searchParams.get('client_id'), ID);
   assert.equal(to.searchParams.get('redirect_uri'), 'https://openwiz.dev/app');
+  assert.equal(to.searchParams.get('code_challenge_method'), 'S256');
   const state = to.searchParams.get('state');
+  const codeChallenge = to.searchParams.get('code_challenge');
   assert.match(state, /^[A-Za-z0-9_-]{43}$/);
-  assert.deepEqual(first.headers.getSetCookie(), [`${COOKIE_PREFIX}${state}=1; Path=/; Max-Age=600; Secure; HttpOnly; SameSite=Lax`]);
-  assert.notEqual(new URL(second.headers.get('Location')).searchParams.get('state'), state);
+  assert.match(codeChallenge, /^[A-Za-z0-9_-]{43}$/);
+  const [setCookie] = first.headers.getSetCookie();
+  const match = setCookie.match(new RegExp(`^${COOKIE_PREFIX}${state}=([A-Za-z0-9_-]{43}); Path=/; Max-Age=600; Secure; HttpOnly; SameSite=Lax$`));
+  assert.ok(match, `unexpected Set-Cookie: ${setCookie}`);
+  const verifier = match[1];
+  assert.notEqual(verifier, state);
+  assert.equal(sha256b64url(verifier), codeChallenge);
+  const secondTo = new URL(second.headers.get('Location'));
+  assert.notEqual(secondTo.searchParams.get('state'), state);
+  assert.notEqual(secondTo.searchParams.get('code_challenge'), codeChallenge);
   assert.equal(github.calls.length, 0);
 });
 
-test('token: the code is exchanged once and only the token fields reach the browser', async () => {
+test('token: the code is exchanged once with the cookie verifier and only the token fields reach the browser', async () => {
   const response = await call('token', { body: { code: CODE, state: STATE } });
   assert.equal(response.status, 200);
   noStore(response);
@@ -90,7 +114,9 @@ test('token: the code is exchanged once and only the token fields reach the brow
   assert.equal(sent.url, GITHUB_TOKEN_URL);
   assert.equal(sent.method, 'POST');
   assert.equal(sent.headers.get('Accept'), 'application/json');
-  assert.deepEqual(JSON.parse(sent.body), { client_id: ID, client_secret: SECRET, code: CODE, redirect_uri: 'https://openwiz.dev/app' });
+  assert.deepEqual(JSON.parse(sent.body), {
+    client_id: ID, client_secret: SECRET, code: CODE, redirect_uri: 'https://openwiz.dev/app', code_verifier: VERIFIER,
+  });
 });
 
 test('refresh: the refresh token is exchanged once for a new pair', async () => {
@@ -106,8 +132,11 @@ test('refresh: the refresh token is exchanged once for a new pair', async () => 
 const REFUSALS = [
   ['token: wrong state value', 'token', { body: { code: CODE, state: 'B'.repeat(43) } }, 403, 'bad_state'],
   ['token: no state cookie', 'token', { cookie: null, body: { code: CODE, state: STATE } }, 403, 'bad_state'],
-  ['token: two cookies for one attempt', 'token', { cookie: `${COOKIE_PREFIX}${STATE}=1; ${COOKIE_PREFIX}${STATE}=1`, body: { code: CODE, state: STATE } }, 403, 'bad_state'],
-  ['token: a cookie for another attempt only', 'token', { cookie: `${COOKIE_PREFIX}${'B'.repeat(43)}=1`, body: { code: CODE, state: STATE } }, 403, 'bad_state'],
+  ['token: empty verifier in state cookie', 'token', { cookie: `${COOKIE_PREFIX}${STATE}=`, body: { code: CODE, state: STATE } }, 403, 'bad_state'],
+  ['token: missing verifier in legacy state cookie', 'token', { cookie: `${COOKIE_PREFIX}${STATE}=1`, body: { code: CODE, state: STATE } }, 403, 'bad_state'],
+  ['token: malformed verifier in state cookie', 'token', { cookie: `${COOKIE_PREFIX}${STATE}=${VERIFIER}=extra`, body: { code: CODE, state: STATE } }, 403, 'bad_state'],
+  ['token: two cookies for one attempt', 'token', { cookie: `${COOKIE_PREFIX}${STATE}=${VERIFIER}; ${COOKIE_PREFIX}${STATE}=${VERIFIER}`, body: { code: CODE, state: STATE } }, 403, 'bad_state'],
+  ['token: a cookie for another attempt only', 'token', { cookie: `${COOKIE_PREFIX}${'B'.repeat(43)}=${VERIFIER}`, body: { code: CODE, state: STATE } }, 403, 'bad_state'],
   ['token: an install-time callback (code, no state)', 'token', { cookie: null, body: { code: CODE } }, 400, 'bad_request'],
   ['token: missing code', 'token', { body: { state: STATE } }, 400, 'bad_request'],
   ['token: empty code', 'token', { body: { code: '', state: STATE } }, 400, 'bad_request'],
@@ -138,7 +167,7 @@ for (const [name, step, options, status, error] of REFUSALS) {
     noStore(response);
     const text = await response.text();
     assert.deepEqual(JSON.parse(text), { error });
-    for (const secret of [CODE, REFRESH, SECRET, STATE]) assert.ok(!text.includes(secret));
+    for (const secret of [CODE, REFRESH, SECRET, STATE, VERIFIER]) assert.ok(!text.includes(secret));
     assert.equal(response.headers.get('Location'), null);
     assert.deepEqual(response.headers.getSetCookie(), []);
     assert.equal(github.calls.length, 0);
@@ -185,20 +214,43 @@ const sent = jar => [...jar].map(([name, value]) => `${name}=${value}`).join('; 
 async function startIn(jar) {
   const response = await call('start', { method: 'GET', origin: null, cookie: sent(jar) || null, type: null });
   keep(jar, response);
-  return new URL(response.headers.get('Location')).searchParams.get('state');
+  const to = new URL(response.headers.get('Location'));
+  const state = to.searchParams.get('state');
+  const code = `fakecode_${++nextCode}`;
+  github.challenges.set(code, to.searchParams.get('code_challenge'));
+  return { state, code };
 }
-async function returnIn(jar, state) {
-  const response = await call('token', { cookie: sent(jar) || null, body: { code: CODE, state } });
+async function returnIn(jar, attempt) {
+  const response = await call('token', { cookie: sent(jar) || null, body: { code: attempt.code, state: attempt.state } });
   keep(jar, response);
   return response.status;
 }
 
+test('PKCE: wrong verifier is refused by GitHub', async () => {
+  const response = await call('token', { cookie: `${COOKIE_PREFIX}${STATE}=${'W'.repeat(43)}`, body: { code: CODE, state: STATE } });
+  assert.equal(response.status, 502);
+  noStore(response);
+  assert.deepEqual(await response.json(), { error: 'github_refused' });
+  assert.equal(github.calls.length, 1);
+  assert.equal(JSON.parse(github.calls[0].body).code_verifier, 'W'.repeat(43));
+});
+
+test('PKCE: another attempt’s verifier cannot exchange a leaked code', async () => {
+  const victim = new Map();
+  const attacker = new Map();
+  const victimAttempt = await startIn(victim);
+  const attackerAttempt = await startIn(attacker);
+  assert.equal(await returnIn(attacker, { state: attackerAttempt.state, code: victimAttempt.code }), 502);
+  assert.equal(await returnIn(victim, victimAttempt), 200);
+  assert.equal(github.calls.length, 2);
+});
+
 test('two tabs: overlapping attempts both sign in, whichever returns from GitHub first', async () => {
   for (const order of [[0, 1], [1, 0]]) {
     const jar = new Map();
-    const states = [await startIn(jar), await startIn(jar)];
-    assert.equal(await returnIn(jar, states[order[0]]), 200);
-    assert.equal(await returnIn(jar, states[order[1]]), 200);
+    const tries = [await startIn(jar), await startIn(jar)];
+    assert.equal(await returnIn(jar, tries[order[0]]), 200);
+    assert.equal(await returnIn(jar, tries[order[1]]), 200);
     assert.equal(jar.size, 0);
   }
   assert.equal(github.calls.length, 4);
@@ -216,16 +268,16 @@ test('a stale or replayed callback leaves the current attempt intact', async () 
 
 test('at most four attempts are kept: a fifth start drops the oldest', async () => {
   const jar = new Map();
-  const states = [];
-  for (let i = 0; i < 5; i++) states.push(await startIn(jar));
-  assert.deepEqual([...jar.keys()], states.slice(1).map(state => `${COOKIE_PREFIX}${state}`));
-  assert.equal(await returnIn(jar, states[0]), 403);
-  assert.equal(await returnIn(jar, states[4]), 200);
+  const tries = [];
+  for (let i = 0; i < 5; i++) tries.push(await startIn(jar));
+  assert.deepEqual([...jar.keys()], tries.slice(1).map(attempt => `${COOKIE_PREFIX}${attempt.state}`));
+  assert.equal(await returnIn(jar, tries[0]), 403);
+  assert.equal(await returnIn(jar, tries[4]), 200);
 });
 
 test('the manifest asks for read-only metadata, issues and pull requests and nothing else', async () => {
   const manifest = JSON.parse(await readFile(new URL('../docs/github-app-manifest.json', import.meta.url), 'utf8'));
-  assert.deepEqual(manifest.default_permissions, { metadata: 'read', issues: 'read', pull_requests: 'read' });
+  assert.deepEqual(manifest.default_permissions, { metadata: 'read', issues: 'write', pull_requests: 'read' });
   assert.deepEqual(manifest.default_events, []);
   assert.deepEqual(manifest.callback_urls, ['https://openwiz.dev/app']);
   assert.deepEqual(manifest.hook_attributes, { url: 'https://openwiz.dev/', active: false });

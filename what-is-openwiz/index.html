@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><template data-slot="page-metadata"></template><link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48"><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><meta property="og:image" content="https://openwiz.dev/brand/og.png?v=2"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="OpenWiz"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="https://openwiz.dev/brand/og.png?v=2"><link rel="preload" href="/fonts/Geist-var.woff2" as="font" type="font/woff2" crossorigin><link rel="stylesheet" href="/tokens.css"><link rel="stylesheet" href="/site.css"><script src="/site.js" data-gsap="/vendor/gsap-3.15.1.min.js" defer></script></head>
+<body class="landing">
+<a class="skip" href="#main">Skip to content</a>
+<template data-slot="top-bar"></template>
+<main id="main" class="wrap plain-page">
+  <h1>What is OpenWiz?</h1>
+  <p>OpenWiz is a free, open source kernel for agent factories. It runs fleets of AI coding agents such as Claude Code and Codex on your own computers or cloud machines, with work tracked in GitHub.</p>
+
+  <h2>What it does</h2>
+  <p>You decide what gets built and approve the plan. Your agents write the spec and tickets, then build, review and merge the work.</p>
+
+  <h2>How it works</h2>
+  <p>Specs, tickets and agent status live in your repository’s GitHub issues. Code and reviews go in pull requests.</p>
+  <p>A driver connects OpenWiz to the machine that runs your agents. Each driver answers four commands: <code>version</code>, <code>start</code>, <code>wake</code> and <code>stop</code>. The driver test kit checks a driver on its real host.</p>
+
+  <h2>Where your agents run</h2>
+  <p>OpenWiz ships drivers for your own computer or VPS, CloudRoom and boat.dev. See the <a href="/drivers/">driver list</a> for test results.</p>
+
+  <h2>What it costs</h2>
+  <p>OpenWiz is free and released under the Apache License 2.0. Supporter is $5 per month for priority support and to support the project. It adds nothing else to the software. See <a href="/pricing/">Pricing</a>. You pay for the models and machines you use.</p>
+
+  <h2>How to install</h2>
+  <template data-slot="install-instructions"></template>
+  <p><code>Install OpenWiz from github.com/openwizdev/OpenWiz</code></p>
+  <p>See the <a href="https://github.com/openwizdev/OpenWiz#readme">GitHub README</a> for requirements and <a href="/changelog/">the Changelog</a> for what has shipped.</p>
+
+  <h2>Not to be confused with</h2>
+  <p>OpenWiz at openwiz.dev is the open source agent factory for coding agents, made by the GitHub organization <a href="https://github.com/openwizdev/OpenWiz">openwizdev</a>. It is not related to the earlier open firmware for the GP2X Wiz handheld game console, which was also called OpenWiz, or to the Windows utility of the same name. Other projects and domains with the same name are unrelated.</p>
+
+  <h2>Links</h2>
+  <ul>
+    <li><a href="/">OpenWiz website</a> — The official site.</li>
+    <li><a href="https://github.com/openwizdev/OpenWiz">OpenWiz on GitHub</a> — Source code and releases.</li>
+    <li><a href="https://x.com/openwiz">OpenWiz on X</a> — Project updates.</li>
+    <li><a href="/guides/run-many-coding-agents/">Guide: run many coding agents</a> — How to run a fleet of coding agents with OpenWiz.</li>
+    <li><a href="/pricing/">Pricing</a> — Free, and Supporter at $5 per month.</li>
+    <li><a href="/faq/">FAQ</a> — Answers to common questions.</li>
+    <li><a href="/changelog/">Changelog</a> — What each public release adds.</li>
+  </ul>
+</main>
+<template data-slot="footer"></template>
+</body></html>

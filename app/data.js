@@ -4,9 +4,19 @@
   const API = 'https://api.github.com';
   const AUTH_KEY = 'openwiz.app.auth';
   const REPO_KEY = 'openwiz.app.repo';
+  const V2_KEY = 'openwiz.app.v2';
+  const V2_VALUES = ['on', 'dry-run', 'off'];
   const LOW = 100;
   const PAUSE_DEFAULT = 5 * 60 * 1000;
-
+  const scriptOf = (() => {
+    try { return Object.getOwnPropertyDescriptor(Document.prototype, 'currentScript')?.get ?? null; } catch { return null; }
+  })();
+  const recordsScript = (() => {
+    const next = scriptOf?.call(document)?.nextElementSibling;
+    return next?.tagName === 'SCRIPT' && /^\/app\/records(?:\.[0-9a-f]{10})?\.js$/.test(next.getAttribute('src') || '') ? next : null;
+  })();
+  const positive = n => Number.isSafeInteger(n) && n > 0;
+  const object = v => v !== null && typeof v === 'object' && !Array.isArray(v);
 
   const store = {
     get(key) {
@@ -19,10 +29,16 @@
     get: () => store.get(AUTH_KEY),
     session: () => store.get(AUTH_KEY)?.session ?? null,
     signedIn: () => Boolean(store.get(AUTH_KEY)?.token),
+    account() {
+      const kept = store.get(AUTH_KEY);
+      return kept?.token && positive(kept.account) ? kept.account : null;
+    },
     keep(grant, session) {
       const now = Date.now();
+      const prior = store.get(AUTH_KEY);
       store.set(AUTH_KEY, {
         session,
+        account: prior?.session === session && positive(prior.account) ? prior.account : null,
         token: grant.access_token,
         expiresAt: grant.expires_in ? now + grant.expires_in * 1000 : null,
         refresh: grant.refresh_token || null,
@@ -32,38 +48,73 @@
     signOut() {
       store.drop(AUTH_KEY);
       store.drop(REPO_KEY);
+      listed.clear();
       refreshing = null;
       stop();
       Object.assign(limit, { remaining: null, limit: null, pausedUntil: null });
     },
   };
+  const listed = new Map();
   const repo = {
     get: () => store.get(REPO_KEY),
     pick(full) {
       const [owner, name] = full.split('/');
-      store.set(REPO_KEY, { owner, name, full });
+      store.set(REPO_KEY, { owner, name, full, ...(listed.has(full) ? { private: listed.get(full) } : {}) });
     },
     forget: () => store.drop(REPO_KEY),
   };
+  const v2 = {
+    get() {
+      const value = store.get(V2_KEY);
+      return value === 'on' || value === 'dry-run' ? value : 'off';
+    },
+  };
+  {
+    const params = new URLSearchParams(location.search);
+    if (params.has('v2')) {
+      if (V2_VALUES.includes(params.get('v2'))) store.set(V2_KEY, params.get('v2'));
+      params.delete('v2');
+      const rest = params.toString();
+      history.replaceState(null, '', `${location.pathname}${rest ? `?${rest}` : ''}${location.hash}`);
+    }
+  }
 
 
   class Refused extends Error {}
-  function allowed(method, url, body) {
-    if (url.startsWith(`${API}/`)) {
-      if (method === 'GET') return true;
-      return method === 'POST' && url === `${API}/graphql` && /^\s*query\s/.test(body.query) && !/\b(mutation|subscription)\b/i.test(body.query);
-    }
-    return method === 'POST' && (url === '/api/sign-in/token' || url === '/api/sign-in/refresh');
+  const WRITE = Symbol('the records layer');
+  const OWNER_NAME = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$/;
+  const REPO_NAME = /^(?!\.\.?$)[A-Za-z0-9._-]{1,100}$/;
+  function oneComment(url, body) {
+    const picked = repo.get();
+    if (!picked || !OWNER_NAME.test(picked.owner) || !REPO_NAME.test(picked.name) || v2.get() !== 'on') return false;
+    const base = `${API}/repos/${picked.owner}/${picked.name}/issues/`;
+    return url.startsWith(base) && /^[1-9][0-9]{0,9}\/comments$/.test(url.slice(base.length))
+      && Object.keys(body).length === 1 && typeof body.body === 'string';
   }
-  async function ask(method, url, body, headers = {}) {
-    if (!allowed(method, url, body || {})) throw new Refused(`the app never sends ${method} ${url}`);
+  const readQuery = body => Object.keys(body).every(key => key === 'query' || key === 'variables') && typeof body.query === 'string'
+    && /^\s*query\s/.test(body.query) && !/\b(mutation|subscription)\b/i.test(body.query) && (body.variables === undefined || object(body.variables));
+  function allowed(method, url, text, key) {
+    let body;
+    try { body = text === undefined ? undefined : JSON.parse(text); } catch { return false; }
+    if (url.startsWith(`${API}/`)) {
+      if (method === 'GET') return body === undefined;
+      if (method !== 'POST' || !object(body)) return false;
+      if (key === WRITE && oneComment(url, body)) return true;
+      return url === `${API}/graphql` && readQuery(body);
+    }
+    return method === 'POST' && object(body) && (url === '/api/sign-in/token' || url === '/api/sign-in/refresh');
+  }
+  async function ask(method, url, body, headers = {}, key, redirect = 'follow') {
+    const text = body === undefined ? undefined : JSON.stringify(body);
+    if (!allowed(method, url, text, key)) throw new Refused(`the app never sends ${method} ${url}`);
     return fetch(url, {
       method,
-      headers: { ...(body ? { 'Content-Type': 'application/json' } : {}), ...headers },
-      body: body ? JSON.stringify(body) : undefined,
+      headers: { ...(text !== undefined ? { 'Content-Type': 'application/json' } : {}), ...headers },
+      body: text,
       credentials: url.startsWith('/') ? 'same-origin' : 'omit',
       cache: 'no-store',
       referrerPolicy: 'no-referrer',
+      redirect,
     });
   }
 
@@ -73,6 +124,7 @@
     const grant = response.ok ? await response.json() : null;
     if (!grant?.access_token) throw new Error('the sign-in did not finish');
     auth.keep(grant, crypto.randomUUID());
+    await resolveAccount();
   }
   let refreshing = null;
   function refresh(session) {
@@ -166,12 +218,18 @@
       try {
         const page = await every(`/user/installations/${install.id}/repositories`, 'repositories');
         complete &&= page.complete;
-        for (const r of page.items) if (typeof r?.full_name === 'string') repos.push({ full: r.full_name, private: Boolean(r.private) });
+        for (const r of page.items) {
+          if (typeof r?.full_name !== 'string') continue;
+          repos.push({ full: r.full_name, private: Boolean(r.private) });
+          listed.set(r.full_name, Boolean(r.private));
+        }
       } catch (error) {
         if (error instanceof Ended || error instanceof SignedOut) throw error;
         complete = false;
       }
     }
+    const picked = repo.get();
+    if (picked && listed.has(picked.full) && picked.private !== listed.get(picked.full)) store.set(REPO_KEY, { ...picked, private: listed.get(picked.full) });
     return { repos: repos.sort((a, b) => a.full.localeCompare(b.full)), complete, installations: installs.items.length };
   }
 
@@ -187,19 +245,41 @@
       totalCount
       nodes { number title url updatedAt labels(first: 20) { nodes { name } } subIssuesSummary { total completed } }
     }
-    youIssues: issues(first: 50, states: OPEN, labels: ["needs-info", "ready-for-human"], orderBy: {field: UPDATED_AT, direction: DESC}) {
+    youIssues: issues(first: 50, states: OPEN, labels: ["needs-info"], orderBy: {field: UPDATED_AT, direction: DESC}) {
+      totalCount
+      nodes { number title url updatedAt labels(first: 20) { nodes { name } } issueDependenciesSummary { blockedBy } }
+    }
+    peopleIssues: issues(first: 50, states: OPEN, labels: ["ready-for-human"], orderBy: {field: UPDATED_AT, direction: DESC}) {
       totalCount
       nodes { number title url updatedAt labels(first: 20) { nodes { name } } issueDependenciesSummary { blockedBy } }
     }
     fleet: object(expression: "HEAD:docs/agents/fleet.md") { ... on Blob { text } }
   }
 }`;
-  const SPEC_DETAILS = 30;
+  const SPEC_DETAILS = 60;
   const RECENT = 'orderBy: {field: UPDATED_AT, direction: DESC}';
   const TICKET = 'number title url state stateReason repository { nameWithOwner }';
-  function specTickets(repository) {
-    const numbers = (repository.specIssues?.nodes || []).map(issue => issue?.number).filter(Number.isSafeInteger).slice(0, SPEC_DETAILS);
-    if (!numbers.length) return null;
+  const SPEC_CHUNK = 6;
+  const STALE_MAX = 60 * 60 * 1000;
+  const CHUNK_TICKETS = 60;
+  function specNumbers(repository) {
+    return (repository.specIssues?.nodes || []).filter(issue => Number.isSafeInteger(issue?.number)).slice(0, SPEC_DETAILS)
+      .map(issue => ({ n: issue.number, tickets: Math.min(50, issue.subIssuesSummary?.total ?? 50) }));
+  }
+  function chunksOf(specs) {
+    const out = [];
+    let chunk = [];
+    let tickets = 0;
+    for (const spec of specs) {
+      if (chunk.length && (chunk.length >= SPEC_CHUNK || tickets + spec.tickets > CHUNK_TICKETS)) { out.push(chunk); chunk = []; tickets = 0; }
+      chunk.push(spec.n);
+      tickets += spec.tickets;
+    }
+    if (chunk.length) out.push(chunk);
+    return out;
+  }
+  const whole = detail => Boolean(detail?.subIssues && detail.comments && (detail.subIssues.nodes || []).every(Boolean));
+  function specTickets(numbers) {
     return `query SpecTickets($owner: String!, $name: String!) {
   rateLimit { limit remaining resetAt }
   repository(owner: $owner, name: $name) {${numbers.map(n => `
@@ -207,11 +287,13 @@
       comments(first: 50, ${RECENT}) { totalCount nodes { databaseId body url createdAt updatedAt author { login } } }
       subIssues(first: 50) { totalCount nodes { ${TICKET} labels(first: 20) { nodes { name } }
         blockedBy(first: 10) { totalCount nodes { ${TICKET} } }
-        closedByPullRequestsReferences(first: 5) { totalCount nodes { url state isDraft reviewDecision } }
+        closedByPullRequestsReferences(first: 5) { totalCount nodes { url state isDraft reviewDecision
+          commits(last: 1) { nodes { commit { statusCheckRollup { state } } } } } }
         comments(first: 20, ${RECENT}) { totalCount nodes { databaseId body createdAt updatedAt author { login } } } } } }`).join('')}
   }
 }`;
   }
+  const limited = answer => Array.isArray(answer?.errors) && answer.errors.some(e => e?.type === 'RATE_LIMIT');
   const PULLS = `closedByPullRequestsReferences(first: 5, includeClosedPrs: true) { totalCount nodes { url state isDraft reviewDecision
           commits(last: 1) { nodes { commit { statusCheckRollup { state } } } } } }`;
   const AGENTS = `query Agents($owner: String!, $name: String!, $since: DateTime!, $after: String) {
@@ -250,7 +332,7 @@
   }
 }`;
   const feeds = {
-    specs: { label: 'Specs', every: 10 * 60 * 1000, query: SPECS, more: specTickets,
+    specs: { label: 'Specs', every: 10 * 60 * 1000, query: SPECS, more: specNumbers,
       variables: picked => ({ specs: SPEC_SEARCH(picked.full) }),
       shape: (data, answer) => { data.specIssues = specsOf(answer.specSearch); } },
     agents: { label: 'Agents', every: 2 * 60 * 1000, run: agentsRead },
@@ -267,6 +349,23 @@
       const issue = at >= 0 ? nodes[at] : undefined;
       if (issue === null) continue;
       if (issue && path.length > 4) (issue.errors ||= []).push(path.slice(4));
+      else loose.push(error);
+    }
+    return loose;
+  }
+  function placeSpec(errors, repository, chunk) {
+    const loose = [];
+    const asked = new Set(chunk.map(n => `s${n}`));
+    for (const error of Array.isArray(errors) ? errors : []) {
+      const path = Array.isArray(error?.path) ? error.path : [];
+      const key = path[0] === 'repository' && asked.has(path[1]) ? path[1] : null;
+      const detail = key ? repository[key] : undefined;
+      const nodes = Array.isArray(detail?.subIssues?.nodes) ? detail.subIssues.nodes : null;
+      const at = nodes && path[2] === 'subIssues' && path[3] === 'nodes' && Number.isSafeInteger(path[4]) ? path[4] : -1;
+      const issue = at >= 0 ? nodes[at] : undefined;
+      if (issue === null) continue;
+      if (object(issue) && path.length > 5) (issue.errors ||= []).push(path.slice(5));
+      else if (key && (!detail || !detail.subIssues || !detail.comments)) continue;
       else loose.push(error);
     }
     return loose;
@@ -403,7 +502,7 @@
     return { items, complete: false };
   }
   async function moreComments(specs, picked) {
-    for (const detail of Object.values(specs || {})) {
+    for (const [key, detail] of Object.entries(specs || {})) {
       const list = detail?.comments;
       if (!list || !Number.isSafeInteger(detail.number) || (list.totalCount ?? 0) <= (list.nodes || []).length || paused()) continue;
       try {
@@ -411,7 +510,7 @@
         if (!got.complete) continue;
         const nodes = got.items.filter(c => Number.isSafeInteger(c?.id)).map(c => ({ databaseId: c.id, body: c.body ?? '', url: c.html_url,
           createdAt: c.created_at, updatedAt: c.updated_at, author: typeof c.user?.login === 'string' ? { login: c.user.login } : null }));
-        detail.comments = { totalCount: got.items.length, nodes };
+        specs[key] = { ...detail, comments: { totalCount: got.items.length, nodes } };
       } catch (error) {
         if (error instanceof Ended || error instanceof SignedOut) throw error;
       }
@@ -425,6 +524,8 @@
   const paused = () => limit.pausedUntil !== null && limit.pausedUntil > Date.now();
 
   function noteLimit(rate, response) {
+    const resource = response.headers.get('x-ratelimit-resource');
+    if (!rate && resource && resource !== 'graphql' && response.status !== 429 && response.status !== 403) return;
     const remaining = rate?.remaining ?? Number(response.headers.get('x-ratelimit-remaining') ?? NaN);
     const reset = rate?.resetAt ? Date.parse(rate.resetAt) : Number(response.headers.get('x-ratelimit-reset') ?? NaN) * 1000;
     if (Number.isFinite(remaining)) {
@@ -441,7 +542,11 @@
   async function read(name) {
     const feed = feeds[name];
     const picked = repo.get();
-    if (!picked || feed.busy || paused()) return;
+    if (!picked || feed.busy) return;
+    if (paused()) {
+      if (feed.state === 'loading') { feed.state = 'waiting'; changed(); }
+      return;
+    }
     const mine = generation;
     feed.busy = true;
     try {
@@ -459,33 +564,64 @@
       const answer = await response.json().catch(() => null);
       if (mine !== generation) return;
       noteLimit(answer?.data?.rateLimit, response);
+      if (limited(answer)) feed.why = 'limit';
       if (!response.ok || !answer?.data?.repository) throw new Error(`GitHub answered ${response.status}`);
+      feed.why = null;
       const data = answer.data.repository;
       feed.shape?.(data, answer.data);
       const errors = [...(answer.errors || [])];
       const more = feed.more?.(data);
-      if (more) {
-        data.specs = null;
-        if (paused()) {
-          errors.push({ message: 'the second read waits for GitHub\'s limit' });
-        } else {
+      if (more?.length) {
+        const kept = feed.details?.repo === picked.full ? feed.details.specs : new Map();
+        for (const [n, k] of kept) if (Date.now() - k.at > STALE_MAX) kept.delete(n);
+        const fresh = new Map();
+        const missed = new Set();
+        let why = null;
+        const queue = chunksOf(more);
+        while (queue.length) {
+          const chunk = queue.shift();
+          if (paused()) { chunk.forEach(n => missed.add(n)); why ||= 'limit'; continue; }
           try {
-            const second = await github('POST', '/graphql', { query: more, variables: { owner: picked.owner, name: picked.name } });
+            const second = await github('POST', '/graphql', { query: specTickets(chunk), variables: { owner: picked.owner, name: picked.name } });
             const extra = await second.json().catch(() => null);
             if (mine !== generation) return;
             noteLimit(extra?.data?.rateLimit, second);
-            if (second.ok && extra?.data?.repository) {
-              data.specs = extra.data.repository;
-              await moreComments(data.specs, picked);
-              if (mine !== generation) return;
+            const got = second.ok && object(extra?.data?.repository) ? extra.data.repository : null;
+            if (limited(extra)) { why = 'limit'; if (!paused()) limit.pausedUntil = Date.now() + PAUSE_DEFAULT; }
+            const heavy = (extra?.errors || []).some(e => e?.type === 'RESOURCE_LIMITS_EXCEEDED');
+            if (heavy && chunk.length > 1) { queue.unshift(...chunk.map(n => [n])); continue; }
+            if (got) errors.push(...placeSpec(extra?.errors, got, chunk));
+            for (const n of chunk) {
+              const detail = got?.[`s${n}`];
+              if (whole(detail)) fresh.set(n, detail);
+              else if (detail && !kept.has(n)) { fresh.set(n, detail); missed.add(n); } else missed.add(n);
             }
-            errors.push(...(second.ok && extra?.data?.repository ? extra.errors || [] : [{ message: `GitHub answered ${second.status}` }]));
+            if (!got) why ||= 'failed';
           } catch (error) {
             if (error instanceof Ended || error instanceof SignedOut) throw error;
             if (mine !== generation) return;
-            errors.push({ message: 'the second read failed' });
+            chunk.forEach(n => missed.add(n));
+            why ||= 'failed';
           }
         }
+        if (mine !== generation) return;
+        const specs = {};
+        const stale = {};
+        for (const { n } of more) {
+          if (fresh.has(n) && !missed.has(n)) { specs[`s${n}`] = fresh.get(n); kept.set(n, { detail: fresh.get(n), at: Date.now() }); } else if (kept.has(n)) {
+            specs[`s${n}`] = kept.get(n).detail;
+            stale[`s${n}`] = kept.get(n).at;
+          } else if (fresh.has(n)) specs[`s${n}`] = fresh.get(n);
+        }
+        feed.details = { repo: picked.full, specs: kept };
+        data.specs = specs;
+        data.specsStale = stale;
+        data.specsMissed = [...missed];
+        data.specsWhy = missed.size ? why || 'partial' : null;
+        if (missed.size) errors.push({ message: why === 'limit' ? 'GitHub\'s hourly limit ran out before every spec\'s tickets were read' : 'part of the spec tickets read failed' });
+        if (mine !== generation) return;
+        await moreComments(specs, picked);
+        if (mine !== generation) return;
       }
       feed.data = data;
       feed.state = errors.length ? 'partial' : 'ok';
@@ -527,7 +663,7 @@
     generation += 1;
     for (const feed of Object.values(feeds)) {
       clearTimeout(feed.timer);
-      Object.assign(feed, { state: 'loading', data: null, readAt: null, failedAt: null, busy: false, kept: null });
+      Object.assign(feed, { state: 'loading', data: null, readAt: null, failedAt: null, busy: false, kept: null, details: null, why: null });
     }
   }
   function refreshAll() {
@@ -545,8 +681,69 @@
     }
   });
 
-  OW.data = {
-    auth, repo, feeds, limit, paused, finishSignIn, repositories, start, stop, refreshAll, SignedOut, Ended,
+  let resolving = null;
+  function resolveAccount() {
+    const kept = auth.get();
+    if (!kept?.token || positive(kept.account) || v2.get() === 'off') return Promise.resolve();
+    if (resolving?.session !== kept.session) {
+      const session = kept.session;
+      const run = github('GET', '/user').then(response => (response.ok ? response.json() : null)).then(user => {
+        const now = auth.get();
+        if (!positive(user?.id) || now?.session !== session || positive(now.account)) return;
+        store.set(AUTH_KEY, { ...now, account: user.id });
+        changed();
+      }).catch(() => {}).finally(() => { if (resolving?.run === run) resolving = null; });
+      resolving = { session, run };
+    }
+    return resolving.run;
+  }
+
+  function pinOk(pin, write) {
+    return object(pin) && typeof pin.session === 'string' && positive(pin.account) && OWNER_NAME.test(pin.owner) && REPO_NAME.test(pin.name)
+      && pin.full === `${pin.owner}/${pin.name}` && (!write || (positive(pin.number) && pin.number <= 9_999_999_999));
+  }
+  function held(pin, write) {
+    const kept = auth.get();
+    const picked = repo.get();
+    return Boolean(kept?.token) && kept.session === pin.session && kept.account === pin.account && picked?.owner === pin.owner
+      && picked?.name === pin.name && picked?.full === pin.full && (!write || v2.get() === 'on');
+  }
+  async function pinned(pin, method, path, body, write) {
+    if (!pinOk(pin, write)) throw new Refused('an unreadable operation context');
+    const repoPath = `/repos/${pin.owner}/${pin.name}`;
+    const url = `${API}${repoPath}${path}`;
+    let parsed;
+    try { parsed = new URL(url); } catch { throw new Refused(`the app never sends ${method} ${url}`); }
+    if (parsed.href !== url || parsed.origin !== API || (path !== '' && !parsed.pathname.startsWith(`${repoPath}/`))) {
+      throw new Refused(`the app never sends ${method} ${url}`);
+    }
+    if (!held(pin, write)) throw new Ended();
+    const kept = auth.get();
+    if (kept.expiresAt && kept.expiresAt < Date.now() + 60_000) {
+      const renewed = await refresh(pin.session);
+      if (!renewed) {
+        if (auth.session() === pin.session) auth.signOut();
+        throw new SignedOut();
+      }
+      if (!held(pin, write)) throw new Ended();
+    }
+    return ask(method, url, body, { Authorization: `Bearer ${auth.get().token}`, Accept: 'application/vnd.github+json' },
+      write ? WRITE : undefined, 'manual');
+  }
+  let claimed = false;
+  function claim() {
+    if (claimed || !scriptOf || !recordsScript || scriptOf.call(document) !== recordsScript) return null;
+    claimed = true;
+    return Object.freeze({
+      read: (pin, path) => pinned(pin, 'GET', path),
+      comment: (pin, body) => pinned(pin, 'POST', `/issues/${pin.number}/comments`, { body }, true),
+    });
+  }
+
+  OW.data = Object.freeze({
+    auth, repo, v2, feeds, limit, paused, finishSignIn, repositories, start, stop, refreshAll, SignedOut, Ended, Refused, noteLimit, claim,
+    github: (method, path, body) => github(method, path, body),
     onChange: listener => listeners.add(listener),
-  };
+  });
+  if (auth.signedIn()) resolveAccount();
 })();

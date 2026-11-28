@@ -84,29 +84,40 @@
 
   function olderTables(lines) {
     const tables = OLDER.slice(0, 4).map(name => settingTable(section(lines, name) || refuse(`no ## ${name}`)));
-    const fixer = (section(lines, 'Fixer') || refuse('no ## Fixer')).map(cells).filter(Boolean);
-    const fixers = ['Claude', 'GPT'].map(family => {
-      const r = fixer.find(c => c.length === 5 && c[0] === family) || refuse(`no Fixer row ${family}`);
-      return choice(r.slice(1, 4), flags(r[4]));
-    });
+    const fixerSection = section(lines, 'Fixer');
+    const fixers = fixerSection ? (() => {
+      const fixer = fixerSection.map(cells).filter(Boolean);
+      return ['Claude', 'GPT'].map(family => {
+        const r = fixer.find(c => c.length === 5 && c[0] === family) || refuse(`no Fixer row ${family}`);
+        return choice(r.slice(1, 4), flags(r[4]));
+      });
+    })() : null;
     const builder = tables[0];
-    const at = { claude: 0, gpt: 1 }[builder.family] ?? refuse('an older Builder of no known family');
+    const at = { claude: 0, gpt: 1 }[builder.family];
+    const geminiReviewer = (builder.provider === 'antigravity' || builder.provider === 'gemini-cli')
+      ? section(lines, 'Reviewer for Gemini-built')
+      : null;
+    const reviewer = at != null
+      ? tables[2 + at]
+      : geminiReviewer
+        ? settingTable(geminiReviewer)
+        : ([tables[3], tables[2]].find(r => r.provider !== builder.provider) ?? null);
     return {
       roles: {
         orchestrator: { follows: 'builder', choice: builder },
         builder: { follows: null, choice: builder },
-        reviewer: { follows: null, choice: tables[2 + at] },
+        reviewer: { follows: null, choice: reviewer },
         small_builder: { follows: null, choice: tables[1] },
-        fixer: { follows: null, choice: fixers[at] },
+        fixer: { follows: null, choice: fixers && at != null ? fixers[at] : null },
       },
-      rows: [tables[0], tables[1], tables[2], tables[3], fixers[0], fixers[1]],
+      rows: fixers ? [tables[0], tables[1], tables[2], tables[3], fixers[0], fixers[1]] : [tables[0], tables[1], tables[2], tables[3]],
     };
   }
 
   const KEPT = ['Builder', 'Builder for small tickets', 'Reviewer for Claude-built', 'Reviewer for GPT-built', 'Fixer, Claude', 'Fixer, GPT'];
   function resolved({ builder, reviewer, small_builder: small, fixer }) {
-    const review = family => [reviewer, builder].find(r => r.choice.family && r.choice.family !== family)?.choice ?? null;
-    const fix = family => [fixer, reviewer].find(r => r.choice.family === family)?.choice ?? null;
+    const review = family => [reviewer, builder].find(r => r.choice?.family && r.choice.family !== family)?.choice ?? null;
+    const fix = family => [fixer, reviewer].find(r => r.choice?.family === family)?.choice ?? null;
     return [builder.choice, small.choice, review('claude'), review('gpt'), fix('claude'), fix('gpt')];
   }
   const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
@@ -126,7 +137,7 @@
     const roles = models ? modelsTable(models) : olderTables(lines).roles;
     const warnings = [];
     const { reviewer, builder } = roles;
-    if (reviewer.choice.family && reviewer.choice.family === builder.choice.family) {
+    if (reviewer.choice?.family && reviewer.choice.family === builder.choice.family) {
       const word = reviewer.choice.family === 'claude' ? 'Claude' : 'GPT';
       warnings.push(`The Reviewer and the Builder are both ${word} models, so reviews of ${word}-built work wait (ADR 0008).`);
     }
@@ -134,7 +145,7 @@
     if (models && olderPresent) try { older = olderTables(lines).rows; } catch (error) { if (!(error instanceof Refused)) throw error; }
     if (older) {
       resolved(roles).forEach((now, i) => {
-        if (same(now, older[i])) return;
+        if (i >= older.length || same(now, older[i])) return;
         const [next, old] = values(now, older[i]);
         warnings.push(`Models table: ${next}; older ${KEPT[i]} table kept at ${old}; fleets start ${old} until launch-fleet reads the Models table (MD4)`);
       });
@@ -196,7 +207,7 @@
     const data = feed.data;
     const repo = OW.data.repo.get()?.full;
     if (shown.repo !== repo) Object.assign(shown, { repo, open: null, picked: {} });
-    if (!data) return el.replaceChildren(OW.ui.placeholder('Reading GitHub…'));
+    if (!data) return OW.ui.fill(el, OW.ui.placeholder('Reading GitHub…'));
     const failed = field => (feed.errors || []).find(e => Array.isArray(e?.path) && e.path[0] === 'repository' && e.path[1] === field);
     const failedText = (field, file) => `GitHub ${failed(field)?.type === 'FORBIDDEN' ? 'refused to read' : 'couldn\'t read'} ${file}, so the app can't show it here; run \`openwiz models show\` in the repository instead.`;
     if (failed('fleet')) return el.replaceChildren(h('div', { class: 'models' }, h('div', { class: 'unknown models-unread' }, failedText('fleet', 'docs/agents/fleet.md'))));
@@ -240,8 +251,8 @@
 
     const cards = ROLES.map(([key, word, , does]) => {
       const role = config.roles[key];
-      const now = said(role.choice.names);
-      const ids = `${role.choice.provider} ${role.choice.model} ${role.choice.effort}`;
+      const now = role.choice ? said(role.choice.names) : 'Not set';
+      const ids = role.choice ? `${role.choice.provider} ${role.choice.model} ${role.choice.effort}` : null;
       const open = shown.open === key;
       const picked = shown.picked[key];
       const pick = to => {
@@ -274,8 +285,8 @@
           picked.text));
       return h('div', { class: `card ${key}` },
         h('h3', {}, word),
-        h('p', {}, role.follows ? `Follows the Builder: ${now}` : now),
-        h('div', { class: 'num' }, ids),
+        h('p', {}, role.choice && role.follows ? `Follows the Builder: ${now}` : now),
+        ids ? h('div', { class: 'num' }, ids) : null,
         h('p', {}, does),
         h('p', { class: 'actions' }, h('button', { class: 'btn', type: 'button', 'aria-expanded': String(open), 'data-focus': `models:${key}`,
           onclick: () => { shown.open = open ? null : key; OW.factory.redraw(el, () => render(el, feed)); } }, 'Change')),

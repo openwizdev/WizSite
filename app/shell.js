@@ -8,10 +8,17 @@
   const ROUTES = () => OW.pages.map(page => page.id);
   let built = null;
   const INSTALL = 'https://github.com/apps/openwiz-viewer/installations/new';
+  const v2 = Boolean(OW.records?.enabled?.());
+  const queue = OW.pages.findIndex(page => page.v2);
+  if (queue >= 0) {
+    const [page] = OW.pages.splice(queue, 1);
+    if (v2) OW.pages.unshift(page);
+  }
+  const home = () => `#/${OW.pages[0].id}`;
 
   const route = () => {
     const [id, arg] = location.hash.replace(/^#\/?/, '').split('/');
-    return id === 'specs' && /^[1-9]\d*$/.test(arg || '') ? { id, arg } : { id: arg === undefined ? id : '', arg: null };
+    return (id === 'specs' || id === 'canvas') && /^[1-9]\d*$/.test(arg || '') ? { id, arg } : { id: arg === undefined ? id : '', arg: null };
   };
   const current = () => {
     const { id } = route();
@@ -21,33 +28,51 @@
   function screen(...children) {
     built = null;
     OW.palette.close();
-    root.replaceChildren(h('div', { class: 'center' }, h('div', { class: 'panel' }, h('div', { class: 'brand' }, logo(), h('span', {}, 'OpenWiz')), ...children)));
+    const view = h('div', { class: 'center' }, h('div', { class: 'panel' }, h('div', { class: 'brand' }, logo(), h('span', {}, 'OpenWiz')), ...children));
+    root.replaceChildren(view);
+    document.title = 'OpenWiz';
+    return view;
+  }
+
+  function waitScreen(text) {
+    if (!window.WizLoader) return screen(h('h1', {}, text));
+    built = null;
+    OW.palette.close();
+    let box = root.querySelector(':scope > .wiz-loader');
+    if (!box) root.replaceChildren(box = window.WizLoader.markup());
+    for (const line of box.querySelectorAll('.wiz-loader-line, .wl-sr')) line.textContent = text;
+    window.WizLoader.mount(box);
     document.title = 'OpenWiz';
   }
 
   function signedOut(note) {
     data.stop();
     screen(
-      h('h1', {}, 'Your factory, at a glance'),
-      h('p', {}, 'See what needs you, every spec and the agents at work. Sign in to pick a repository.'),
+      h('h1', {}, 'See your idea being built'),
+      h('p', {}, 'Watch your AI helpers at work: what needs your answer, the plan, and each helper\'s progress. Sign in with GitHub (the free website where your project is kept) to pick your project.'),
       note ? h('div', { class: 'notices' }, h('div', { class: 'notice bad', role: 'alert' }, icon('warn'), h('span', {}, note))) : null,
       h('a', { class: 'btn primary', href: '/api/sign-in/start' }, 'Sign in with GitHub'),
-      h('p', { class: 'small' }, 'Read-only, on the repositories you choose. Your sign-in stays in this browser; the app talks only to GitHub.'),
+      h('p', { class: 'small' }, v2
+        ? 'On the repositories you choose, it posts only the comments you see and confirm. Your sign-in stays in this browser; the app talks only to GitHub.'
+        : 'Read-only, on the repositories you choose. Your sign-in stays in this browser; the app talks only to GitHub.'),
     );
   }
 
+  const reading = text => OW.ui.loading(text) || h('p', {}, text);
   const signOutButton = () => h('button', { class: 'btn', type: 'button', onclick: () => { data.auth.signOut(); signedOut(); } }, 'Sign out');
 
   async function picker() {
     data.stop();
     const session = data.auth.session();
-    screen(h('h1', {}, 'Pick a repository'), h('p', {}, 'Reading your repositories from GitHub…'), h('p', { class: 'small' }, signOutButton()));
+    const view = screen(h('h1', {}, 'Pick a repository'), reading('Reading your repositories from GitHub…'), h('p', { class: 'small' }, signOutButton()));
     let found;
     try {
       found = await data.repositories();
     } catch (error) {
-      if (data.auth.session() !== session || error instanceof data.Ended) return;
-      if (error instanceof data.SignedOut) return signedOut('Your sign-in ended. Sign in again.');
+      if (!view.isConnected) return;
+      const now = data.auth.session();
+      if (now === null && (error instanceof data.SignedOut || error instanceof data.Ended)) return OW.onSignedOut();
+      if (now !== session || error instanceof data.Ended) return;
       return screen(h('h1', {}, 'Pick a repository'),
         h('div', { class: 'notices' }, h('div', { class: 'notice bad', role: 'alert' }, icon('warn'),
           h('span', {}, h('b', {}, 'Couldn\'t read your repositories. '), 'GitHub didn\'t answer, so the list is unknown, not empty.'))),
@@ -66,7 +91,7 @@
       );
     }
     const list = h('ul', { class: 'repos' }, repos.map(r => h('li', {},
-      h('button', { type: 'button', onclick: () => { data.repo.pick(r.full); location.hash = '#/you'; draw(); } }, r.full),
+      h('button', { type: 'button', onclick: () => { data.repo.pick(r.full); location.hash = home(); draw(); } }, r.full),
       h('span', { class: 'tag' }, r.private ? 'Private' : 'Public'))));
     screen(
       h('h1', {}, 'Pick a repository'),
@@ -114,16 +139,18 @@
   }
   function repoSwitch(picked) {
     const list = h('div', { class: 'repo-list', hidden: true, id: `repos-${Math.random().toString(36).slice(2)}` });
-    const close = () => { list.hidden = true; button.setAttribute('aria-expanded', 'false'); };
+    const close = () => { list.hidden = true; list.replaceChildren(); button.setAttribute('aria-expanded', 'false'); };
     const fill = async () => {
       const session = data.auth.session();
-      list.replaceChildren(h('p', {}, 'Reading your repositories…'));
+      list.replaceChildren(reading('Reading your repositories…'));
       let found;
       try {
         found = await readRepositories();
       } catch (error) {
-        if (data.auth.session() !== session || error instanceof data.Ended) return;
-        if (error instanceof data.SignedOut) return signedOut('Your sign-in ended. Sign in again.');
+        if (!list.isConnected) return;
+        const now = data.auth.session();
+        if (now === null && (error instanceof data.SignedOut || error instanceof data.Ended)) return OW.onSignedOut();
+        if (now !== session || error instanceof data.Ended) return;
         return list.replaceChildren(h('p', { class: 'bad' }, 'Couldn\'t read your repositories, so the list is unknown, not empty.'),
           h('button', { class: 'btn', type: 'button', onclick: fill }, icon('refresh'), 'Try again'));
       }
@@ -172,11 +199,11 @@
       h('a', { class: 'skip', href: '#content', onclick: event => { event.preventDefault(); title.focus(); } }, 'Skip to the page'),
       h('div', { class: 'shell' },
         h('aside', { class: 'side' },
-          h('a', { class: 'brand', href: '#/you' }, logo(), h('span', {}, 'OpenWiz')),
+          h('a', { class: 'brand', href: home() }, logo(), h('span', {}, 'OpenWiz')),
           repoButton(),
           h('nav', { class: 'main', 'aria-label': 'Pages' }, side.map(item => item.link)),
           h('div', { class: 'foot' }, reads, h('div', { class: 'actions' }, refresh[0], signOutButton()))),
-        h('header', { class: 'top' }, h('a', { class: 'brand', href: '#/you' }, logo(), h('span', {}, 'OpenWiz')), repoButton()),
+        h('header', { class: 'top' }, h('a', { class: 'brand', href: home() }, logo(), h('span', {}, 'OpenWiz')), repoButton()),
         h('main', { id: 'content' }, h('div', { class: 'page-head' }, title, read), phoneReads, notices, body,
           h('div', { class: 'phone-actions' }, refresh[1], signOutButton())),
         h('nav', { class: 'tabs', 'aria-label': 'Pages' }, tabs.map(item => item.link))));
@@ -185,6 +212,7 @@
 
   function readLine(feed) {
     if (feed.state === 'loading') return [h('span', {}, `${feed.label}: reading…`)];
+    if (feed.state === 'waiting') return [h('span', { class: 'bad' }, `${feed.label}: waits for GitHub's limit${data.limit.pausedUntil ? ` (until ${time(data.limit.pausedUntil)})` : ''}`)];
     if (feed.state === 'unknown') return [h('span', { class: 'bad' }, `${feed.label}: unknown (couldn't read at ${time(feed.failedAt)})`)];
     return [h('span', {}, `${feed.label} read `), h('b', {}, time(feed.readAt)), feed.state === 'stale' ? h('span', { class: 'bad' }, ' · last read failed') : null];
   }
@@ -214,7 +242,7 @@
     built.phoneReads.replaceChildren(...mine.flatMap((feed, i) => [i ? ' · ' : '', ...readLine(feed)]).filter(part => part !== null && part !== ''));
     const notes = [];
     if (data.paused()) {
-      notes.push(notice('slow', 'pause', 'GitHub\'s limit is low', `(${limit.remaining ?? 0} left). Reads are paused until ${time(limit.pausedUntil)}, then resume on their own.`));
+      notes.push(notice('slow', 'pause', 'GitHub\'s hourly read limit for your account is nearly used up', `(${limit.remaining ?? 0} left; your agents on the same GitHub login share it). Reads are paused until ${time(limit.pausedUntil)}, then resume on their own. Until then the app shows its last read, never a guess.`));
     }
     for (const feed of mine) {
       if (feed.state === 'unknown') notes.push(notice('bad', 'warn', `Couldn't read ${feed.label} from GitHub`, `at ${time(feed.failedAt)}. It shows as unknown, not as empty, until a read works.`));
@@ -225,7 +253,7 @@
     if (mine.every(feed => feed.state === 'unknown')) {
       built.body.replaceChildren(OW.ui.unknown(`${page.title} couldn't be read from GitHub. The app tries again on its own, or press Refresh now.`));
     } else if (mine.some(feed => feed.state === 'loading') && !mine.some(feed => feed.data)) {
-      built.body.replaceChildren(OW.ui.placeholder('Reading GitHub…'));
+      OW.ui.fill(built.body, OW.ui.placeholder('Reading GitHub…'));
     } else {
       page.render(built.body, feeds, route().arg);
     }
@@ -272,7 +300,7 @@
     const state = params.get('state');
     if (location.search) history.replaceState(null, '', `${location.pathname}${location.hash}`);
     if (code && state) {
-      screen(h('h1', {}, 'Signing in…'), h('p', {}, 'Finishing your GitHub sign-in.'));
+      waitScreen('Signing in…');
       try {
         await data.finishSignIn(code, state);
       } catch {
