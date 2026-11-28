@@ -142,6 +142,24 @@ class Checks(unittest.TestCase):
             with self.assertRaisesRegex(AssertionError, 'compressed HTML'):
                 check_page_delivery(root, path.name, indexable=True)
 
+    def test_page_delivery_short_changelog_needs_the_exact_pre_release_copy(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / 'dist'
+            shutil.copytree(ROOT / 'dist', root)
+            changelog = root / 'changelog/index.html'
+            fallback = with_switch('coming-soon')
+            changelog.write_text(fallback)
+            landing = root / 'index.html'
+            html = landing.read_text()
+            landing.write_text(re.sub(r'data-install="[^"]+"', 'data-install="live"', html))
+            with self.assertRaisesRegex(AssertionError, 'at least 40 words'):
+                check_page_delivery(root, 'changelog/index.html', indexable=True)
+            landing.write_text(re.sub(r'data-install="[^"]+"', 'data-install="coming-soon"', html))
+            check_page_delivery(root, 'changelog/index.html', indexable=True)
+            changelog.write_text(fallback.replace('What each public OpenWiz release lets you do, newest first.', 'Releases.'))
+            with self.assertRaisesRegex(AssertionError, 'at least 40 words'):
+                check_page_delivery(root, 'changelog/index.html', indexable=True)
+
     def test_page_delivery_baseline_does_not_allow_growth(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

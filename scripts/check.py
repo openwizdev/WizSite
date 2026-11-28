@@ -970,6 +970,7 @@ def check_image_preloads(name, html, page=None, largest=None):
 
 HTML_BUDGET = 60_000
 CSS_BUDGET = 50_000
+COMING_SOON_CHANGELOG_MAIN = '631b2670cd58b493145bd5fe12dbbe44564cc98b9c7662f62e91c7f7d3a1f0eb'
 EXISTING_CSS_BYTES = {
     'index.html': 72_873,
     'changelog/index.html': 69_399,
@@ -1077,6 +1078,14 @@ class MainText(HTMLParser):
                 self.words += len(words)
 
 
+def is_coming_soon_changelog(root, name, html):
+    if name != 'changelog/index.html':
+        return False
+    main = re.search(r'<main\b[^>]*>[\s\S]*?</main>', html)
+    return bool(main and sha256(main[0].encode()).hexdigest() == COMING_SOON_CHANGELOG_MAIN
+                and install_switch((root / 'index.html').read_text()) == 'coming-soon')
+
+
 def check_page_delivery(root, name, *, indexable, page=None, report=False):
     raw = (root / name).read_bytes()
     html = raw.decode()
@@ -1092,14 +1101,20 @@ def check_page_delivery(root, name, *, indexable, page=None, report=False):
         styles.add(path)
     css = sum(path.stat().st_size for path in styles) + page.inline_style_bytes
     main = MainText(html) if indexable else None
+    coming_soon = main is not None and main.words < 40 and is_coming_soon_changelog(root, name, html)
     if report:
         exception = f' (over {CSS_BUDGET} B CSS budget)' if css > CSS_BUDGET else ''
-        words = f'{main.words} main words, ' if main is not None else ''
+        words = f'{main.words} main words' if main is not None else ''
+        if coming_soon:
+            words += ' (pre-release Changelog below 40 words)'
+        if words:
+            words += ', '
         print(f'{name}: {words}{compressed} B gzip HTML, {css} B render-blocking CSS{exception}, '
               f'{len(page.blocking_scripts)} render-blocking scripts, {len(page.images)} images, '
               f'{len(page.image_preloads)} image preloads')
     if main is not None:
-        assert main.mains == 1 and main.words >= 40, f'{name}: expected one <main> with at least 40 words in built HTML'
+        assert main.mains == 1 and (main.words >= 40 or coming_soon), \
+            f'{name}: expected one <main> with at least 40 words in built HTML'
         assert not main.empty, f'{name}: empty {", ".join(main.empty)} in <main>'
         assert main.headings, f'{name}: <main> needs a heading in built HTML'
     assert compressed <= HTML_BUDGET, f'{name}: compressed HTML is {compressed} B, over {HTML_BUDGET} B'
