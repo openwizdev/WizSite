@@ -5,7 +5,8 @@ import { installSwitch, readReleases, render, summary, withReleases } from './sc
 import { readRegistry, render as renderMarket, summary as marketSummary, withMarket } from './scripts/market.mjs';
 import { readReach, render as renderReach, summary as reachSummary, withReach } from './scripts/reach.mjs';
 import { withDrivers } from './scripts/drivers.mjs';
-import { aboutPage, crawlerFiles, guidePage, pages, withMetadata } from './scripts/discovery.mjs';
+import { aboutPage, crawlerFiles, guidePage, pages, urlFor, withMetadata } from './scripts/discovery.mjs';
+import { mirrorPath, toMarkdown } from './scripts/mirrors.mjs';
 import { withCheckout } from './scripts/pricing.mjs';
 import { PAGE as countersPage, readDaily, render as renderCounters, summary as countersSummary, withCounters } from './scripts/counters.mjs';
 
@@ -76,7 +77,8 @@ for (const file of hashed) {
   await put(names[file], data);
 }
 let about, guide;
-for (const page of Object.keys(pages)) {
+const mirrors = new Map();
+for (const [page, [, , robots]] of Object.entries(pages)) {
   let html = await readFile(new URL(page, root), 'utf8');
   if (page === aboutPage || page === guidePage || page === '404.html' || page === countersPage) {
     html = html.replace('<template data-slot="top-bar"></template>', () => topBar);
@@ -96,8 +98,13 @@ for (const page of Object.keys(pages)) {
   if (page === 'pricing/index.html') html = withCheckout(html);
   if (page === countersPage) html = withCounters(html, renderCounters(counters));
   await put(page, html);
+  if (!robots) {
+    const markdown = toMarkdown(html, urlFor(page));
+    mirrors.set(page, markdown);
+    await put(mirrorPath(page), markdown);
+  }
 }
-const discovery = crawlerFiles(about, faq, guide);
+const discovery = crawlerFiles(about, guide, mirrors);
 for (const [file, data] of Object.entries(discovery)) await put(file, data);
 await put('ask-index.json', await (await import('./scripts/ask-index.mjs')).snapshotIndex(output, new URL('ask-docs/', root)));
 for (const [file, source] of Object.entries(npmVendor)) await put(file, await readFile(new URL(source, root)));
@@ -106,4 +113,4 @@ for (const file of files) {
   await copyFile(new URL(file, root), new URL(file, output));
 }
 execFileSync('python3', ['-B', 'scripts/check.py', '--discovery-only'], { cwd: root, stdio: 'inherit' });
-console.log(`Static site: ${Object.keys(pages).length + fonts.length + hashed.length + files.length + Object.keys(npmVendor).length + Object.keys(discovery).length + 1} public files in dist/ (${Object.values(names).join(', ')})`);
+console.log(`Static site: ${Object.keys(pages).length + fonts.length + hashed.length + files.length + Object.keys(npmVendor).length + Object.keys(discovery).length + mirrors.size + 1} public files in dist/ (${Object.values(names).join(', ')})`);
