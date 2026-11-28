@@ -8,7 +8,7 @@ How a page on openwiz.dev joins search: its registry entry, the sitemaps, its br
 
 | Field | Rule |
 | --- | --- |
-| `path` | The built file, relative to `dist/`: `faq/index.html`, `market/<id>/index.html`. Its URL is `https://openwiz.dev/` plus the path without `index.html`. Unique. |
+| `path` | The built file, relative to `dist/`: `faq/index.html`, `market/<id>/index.html`. An indexable page is always `index.html` in its own folder (or the home's `index.html`), so its URL is `https://openwiz.dev/` plus the folder and ends in `/`; only a noindex page (such as `404.html`) may have another file name. Unique. |
 | `title` | Plain text, 1 to 60 characters, contains `OpenWiz`, unique across the registry. |
 | `description` | Plain text, 1 to 160 characters, unique across the registry. |
 | `section` | One of `pages`, `market`, `docs`, `answers`. It picks the page's section sitemap. |

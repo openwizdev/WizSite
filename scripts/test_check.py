@@ -137,13 +137,21 @@ class Checks(unittest.TestCase):
             page = root / 'docs/synthetic/index.html'
             page.parent.mkdir(parents=True)
             page.write_text('<!doctype html><html lang="en"><head><title>Synthetic: OpenWiz docs</title>'
-                            '<link rel="canonical" href="https://openwiz.dev/docs/synthetic/"></head><body><main><h1>Synthetic</h1></main></body></html>')
+                            '<link rel="canonical" href="https://openwiz.dev/docs/synthetic/">'
+                            '<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": ['
+                            '{"@type": "ListItem", "position": 1, "name": "OpenWiz", "item": "https://openwiz.dev/"}, '
+                            '{"@type": "ListItem", "position": 2, "name": "Synthetic", "item": "https://openwiz.dev/docs/synthetic/"}]}</script></head><body><main><h1>Synthetic</h1></main></body></html>')
             (root / 'sitemaps/docs.xml').write_text('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
                                                     '  <url><loc>https://openwiz.dev/docs/synthetic/</loc><lastmod>2026-11-28</lastmod></url>\n</urlset>\n')
             index = root / 'sitemap.xml'
             index.write_text(index.read_text().replace('</sitemapindex>', '  <sitemap><loc>https://openwiz.dev/sitemaps/docs.xml</loc><lastmod>2026-11-28</lastmod></sitemap>\n</sitemapindex>'))
             check_site(root)
             self.assertIn('docs/synthetic/index.html', registered_extras(root))
+            with_crumb = page.read_text()
+            page.write_text(re.sub(r'<script type="application/ld\+json">[\s\S]*?</script>', '', with_crumb))
+            with self.assertRaisesRegex(AssertionError, 'needs one BreadcrumbList'):
+                check_site(root)
+            page.write_text(with_crumb)
             extra = root / 'guides/synthetic/index.html'
             extra.parent.mkdir(parents=True)
             extra.write_text(page.read_text().replace('docs/synthetic/', 'guides/synthetic/'))

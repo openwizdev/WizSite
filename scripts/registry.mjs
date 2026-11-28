@@ -12,6 +12,7 @@ export function createRegistry() {
       const { path, title, description, section, trail = [], lastmod, indexable = true } = entry;
       const where = `registry entry ${path}`;
       if (typeof path !== 'string' || !/^([a-z0-9][a-z0-9._-]*\/)*([a-z0-9][a-z0-9._-]*\.html)$/.test(path)) throw new Error(`${where}: invalid path`);
+      if (indexable !== false && !/(^|\/)index\.html$/.test(path)) throw new Error(`${where}: an indexable page must be index.html in its own folder, so its URL ends in /`);
       if (entries.has(path)) throw new Error(`${where}: registered twice`);
       if (typeof title !== 'string' || !title.trim() || title.length > 60 || !title.includes('OpenWiz')) throw new Error(`${where}: title must be 1 to 60 characters and name OpenWiz`);
       if (typeof description !== 'string' || !description.trim() || description.length > 160) throw new Error(`${where}: description must be 1 to 160 characters`);

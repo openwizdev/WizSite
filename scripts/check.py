@@ -1287,6 +1287,18 @@ def check_discovery(root, pages):
         built = (root / rel).read_text()
         assert f'<link rel="canonical" href="{url}">' in built and '<meta name="robots" content="noindex">' not in built, \
             f'{rel}: a page in the sitemaps must be indexable with its own canonical link'
+        if rel.removesuffix('index.html') != '':
+            crumbs = []
+            for text in re.findall(r'<script type="application/ld\+json">([\s\S]*?)</script>', built):
+                try:
+                    data = json.loads(text)
+                except ValueError as error:
+                    raise AssertionError(f'{rel}: invalid JSON-LD') from error
+                if isinstance(data, dict) and data.get('@type') == 'BreadcrumbList':
+                    crumbs.append(data)
+            items = crumbs[0].get('itemListElement') if len(crumbs) == 1 else None
+            assert isinstance(items, list) and len(items) >= 2 and items[0].get('item') == SITE_URL and items[-1].get('item') == url, \
+                f'{rel}: a page in the sitemaps needs one BreadcrumbList from the home to itself'
 
     robots = (root / 'robots.txt').read_text()
     groups = robots.strip().split('\n\n')

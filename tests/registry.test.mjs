@@ -74,3 +74,10 @@ test('a page added with registry.add gets its metadata, breadcrumb and section s
   assert.match(files['sitemap.xml'], /sitemaps\/docs\.xml/);
   assert.throws(() => withMetadata('docs/unregistered/index.html', ''), /not in the page registry/);
 });
+
+test('an indexable page is index.html in its own folder; a noindex page may be another file', () => {
+  const registry = createRegistry();
+  registry.add(home);
+  assert.throws(() => registry.add(page('docs/first-run.html', 'First run OpenWiz', 'docs')), /index\.html in its own folder/);
+  registry.add({ ...page('404.html', 'Not found OpenWiz'), indexable: false });
+});
