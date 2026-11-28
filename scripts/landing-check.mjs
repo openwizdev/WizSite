@@ -131,7 +131,12 @@ const HELPERS = `
 `;
 const CURRENT_MARKERS = `
   const currentMarkers = bar => [...bar.querySelectorAll('.landing-brand, .nav-team, .nav-links a')]
-    .filter(link => shown(link) && getComputedStyle(link, '::after').backgroundImage.startsWith('repeating-linear-gradient('))
+    .filter(link => {
+      if (!shown(link)) return false;
+      const after = getComputedStyle(link, '::after');
+      return after.content !== 'none' && parseFloat(after.width) > 0 && parseFloat(after.height) > 0 &&
+        (after.backgroundImage.startsWith('repeating-linear-gradient(') || after.backgroundColor !== 'rgba(0, 0, 0, 0)');
+    })
     .map(link => link.getAttribute('href'));
 `;
 
@@ -339,17 +344,21 @@ async function chrome(page, where, mode, path) {
     const bar = document.querySelector('header.landing-nav');
     const mark = bar?.querySelector('.landing-brand img');
     const star = bar?.querySelector('.github-star');
+    const signIn = bar?.querySelector('a.sign-in[href="/app/"]');
     const value = star?.querySelector('[data-stars]');
     const starStyle = star && getComputedStyle(star);
     const starBox = star?.getBoundingClientRect();
     const footer = document.querySelector('footer.landing-footer');
     const toggle = bar?.querySelector('.nav-toggle');
     const nav = document.getElementById(toggle?.getAttribute('aria-controls'));
+    const signInStyle = getComputedStyle(signIn);
+    const navStyle = getComputedStyle(nav);
+    const divider = getComputedStyle(signIn, '::before');
     return {
       scroll: document.scrollingElement.scrollWidth, inner: innerWidth,
       mark: shown(mark) && mark.getAttribute('src') === '/art/wiz-mark.webp' && mark.naturalWidth === 128,
       star: shown(star) && star.getAttribute('href') === 'https://github.com/openwizdev/openwiz' &&
-        shown(star.querySelector('.star-icon')) && shown(star.querySelector('.github-mark')) === (innerWidth > 850),
+        shown(star.querySelector('.github-mark')) && shown(star.querySelector('.star-icon')),
       value: shown(value) ? star.innerText.trim() : null, name: star?.getAttribute('aria-label'),
       unboxed: starStyle?.borderStyle === 'none' && starStyle.backgroundColor === 'rgba(0, 0, 0, 0)' &&
         starStyle.fontSize === '14px',
@@ -357,7 +366,12 @@ async function chrome(page, where, mode, path) {
       current: [...bar.querySelectorAll('[aria-current="page"]')].map(link => link.getAttribute('href')),
       markers: currentMarkers(bar),
       toggle: shown(toggle), nav: [...nav.querySelectorAll('a')].filter(shown).map(a => a.getAttribute('href')),
-      signIn: shown(bar?.querySelector('a.sign-in[href="/app/"]')),
+      signIn: shown(signIn),
+      signInText: signInStyle.borderStyle === 'none' && signInStyle.backgroundColor === 'rgba(0, 0, 0, 0)' &&
+        ['color', 'fontSize', 'fontWeight'].every(property => signInStyle[property] === navStyle[property]),
+      signInTarget: signIn.getBoundingClientRect().height >= 36,
+      divider: star.nextElementSibling === signIn && divider.content !== 'none' &&
+        divider.width === '1px' && parseFloat(divider.height) > 0 && divider.backgroundColor !== 'rgba(0, 0, 0, 0)',
       footer: shown(footer?.querySelector('.footer-wordmark')) && footer.querySelectorAll('.family-wiz').length === 12,
       font: getComputedStyle(document.body).fontFamily.split(',')[0].trim(),
     };
@@ -375,6 +389,27 @@ async function chrome(page, where, mode, path) {
   expect(facts.toggle === phoneMenu && facts.signIn !== phoneMenu &&
     facts.nav.join() === (phoneMenu ? '' : NAV_PATHS.join()),
   where, 'the top bar puts links in the wrong place');
+  if (facts.inner > 850) {
+    expect(facts.signInText && facts.signInTarget, where, 'desktop Sign in needs plain nav text and a 36 px target');
+    expect(facts.divider, where, 'desktop Sign in needs a hairline beside the stars link');
+    if (mode.stars === 12345) {
+      await page.evaluate('document.querySelector(".github-star").focus()');
+      const tab = { key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 };
+      await page.send('Input.dispatchKeyEvent', { type: 'keyDown', ...tab });
+      await page.send('Input.dispatchKeyEvent', { type: 'keyUp', ...tab });
+      const focused = await page.evaluate(`(() => {
+        const link = document.querySelector('.sign-in');
+        const style = getComputedStyle(link);
+        const visible = document.activeElement === link && link.matches(':focus-visible') &&
+          style.outlineStyle === 'solid' && parseFloat(style.outlineWidth) >= 2;
+        link.blur();
+        return visible;
+      })()`);
+      expect(focused, where, 'Tab from the stars link needs to show the Sign in focus ring');
+    }
+  } else {
+    expect(!facts.divider, where, 'the Sign in hairline is desktop only');
+  }
   expect(facts.footer, where, 'the page lacks the landing footer (wordmark and Wizes)');
   expect(facts.font === 'Geist', where, `the page is not set in the landing's type (${facts.font})`);
 }
@@ -390,13 +425,19 @@ async function buy(page, where, path) {
     document.documentElement.style.width = (innerWidth - 17) + 'px';
     const inside = el => shown(el) && el.getBoundingClientRect().left >= 0 &&
       el.getBoundingClientRect().right <= innerWidth - 17 && el.scrollWidth <= el.clientWidth + 1;
+    const starLink = stars.closest('a');
     const button = bar.querySelector('a.nav-team[href="/team/"]');
     const toggle = bar.querySelector('.nav-toggle');
     const facts = {
       scroll: document.scrollingElement.scrollWidth, inner: innerWidth,
       clipped: [...bar.querySelectorAll('a, button')].filter(el => shown(el) && !inside(el)).map(el => el.className || el.getAttribute('href')),
       button: inside(button) && button.innerText === (innerWidth <= 850 ? 'For teams' : 'Get it for your team'),
-      stars: inside(stars.closest('a')) && inside(stars),
+      boxed: [...bar.querySelectorAll('a, button')].filter(el => {
+        if (!shown(el)) return false;
+        const style = getComputedStyle(el);
+        return style.borderStyle !== 'none' || style.backgroundColor !== 'rgba(0, 0, 0, 0)';
+      }).map(el => el.className),
+      stars: [starLink, starLink.querySelector('.github-mark'), starLink.querySelector('.star-icon'), stars].every(inside),
       drivers: inside(bar.querySelector('a[href="/drivers/"]')),
       toggle: shown(toggle),
       book: [...document.querySelectorAll('a[data-book]')].filter(shown).length,
@@ -409,7 +450,8 @@ async function buy(page, where, path) {
   expect(!facts.clipped.length, where, `the top bar clips with a star count and a scrollbar: ${facts.clipped.join(', ')}`);
   expect(facts.scroll <= facts.inner, where, `sideways scroll (${facts.scroll}px content in a ${facts.inner}px window)`);
   expect(facts.button, where, 'the top bar lacks the buy button inside the window');
-  expect(facts.stars, where, 'the top bar lacks a visible 12.3k star count');
+  if (facts.inner > 850) expect(facts.boxed.join() === 'nav-team', where, 'the buy button must be the only boxed desktop control');
+  expect(facts.stars, where, 'the GitHub mark, star icon and 12.3k count must all fit');
   expect(facts.toggle || facts.drivers, where, 'the top bar lacks the Drivers link or phone menu');
   if (path === '/team/') expect(facts.book === 2, where, `the team page needs its two Book a call links (${facts.book})`);
 }
@@ -423,20 +465,39 @@ async function phoneMenu(page, where, path) {
     const toggle = document.querySelector('.nav-toggle');
     const panel = document.getElementById(toggle.getAttribute('aria-controls'));
     const links = [...panel.querySelectorAll('a')];
+    const firstStyle = links[0] && getComputedStyle(links[0]);
+    const panelStyle = getComputedStyle(panel);
+    const current = panel.querySelector('[aria-current="page"]');
+    const marker = current && getComputedStyle(current, '::after');
     return {
       expanded: toggle.getAttribute('aria-expanded'), shown: shown(panel),
       destinations: links.filter(shown).map(link => link.getAttribute('href')),
       markers: currentMarkers(toggle.closest('header')),
-      targets: links.every(link => link.getBoundingClientRect().height >= 40),
+      targets: links.every(link => link.getBoundingClientRect().height >= 44),
+      rowGap: links.length > 1 ? Math.round(links[1].getBoundingClientRect().top - links[0].getBoundingClientRect().bottom) : 0,
       scrollLocked: getComputedStyle(document.documentElement).overflowY === 'hidden' && document.querySelector('main').inert,
-      firstFocused: document.activeElement === links[0], toggleFocused: document.activeElement === toggle,
+      panelFocused: document.activeElement === panel,
+      firstFocused: document.activeElement === links[0],
+      firstRing: document.activeElement === links[0] && links[0].matches(':focus-visible') &&
+        firstStyle.outlineStyle === 'solid' && parseFloat(firstStyle.outlineWidth) >= 2,
+      noPointerRing: panelStyle.outlineStyle === 'none' && firstStyle.outlineStyle === 'none',
+      hasCurrent: !!current,
+      currentMarker: !current || (marker.content !== 'none' && parseFloat(marker.width) > 0 && parseFloat(marker.height) > 0),
+      toggleFocused: document.activeElement === toggle,
     };
   })()`);
   await page.click(toggle.x, toggle.y);
   const opened = await state();
-  expect(opened.expanded === 'true' && opened.shown && opened.firstFocused && opened.scrollLocked && opened.targets &&
-    opened.destinations.join() === [...NAV_PATHS, '/app/'].join(), where, 'the phone menu fails to open, focus, lock scrolling or show all links');
-  expect(opened.markers.join() === (NAV_PATHS.includes(path) ? path : ''), where, 'the phone menu underlines the wrong row');
+  expect(opened.expanded === 'true' && opened.shown && opened.panelFocused && opened.noPointerRing && opened.scrollLocked &&
+    opened.targets && opened.rowGap >= 4 && opened.currentMarker &&
+    opened.destinations.join() === [...NAV_PATHS, '/app/'].join(), where,
+    'the phone menu fails to open calmly on tap, focus the panel, lock scrolling, or show 44 px rows with gap and current marker');
+  expect(opened.markers.join() === (NAV_PATHS.includes(path) ? path : ''), where, 'the phone menu marks the wrong row');
+  const tab = { key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 };
+  await page.send('Input.dispatchKeyEvent', { type: 'keyDown', ...tab });
+  await page.send('Input.dispatchKeyEvent', { type: 'keyUp', ...tab });
+  const tabbed = await state();
+  expect(tabbed.firstFocused && tabbed.firstRing, where, 'Tab in the open phone menu needs to show the focus ring on the first row');
   await page.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
   const escaped = await state();
   expect(escaped.expanded === 'false' && !escaped.shown && escaped.toggleFocused && !escaped.scrollLocked,
@@ -594,7 +655,7 @@ async function main() {
         }
       }
     }
-    for (const width of (process.env.WIDTHS || '382,383,481,500,560,640,641,700,760,761,768,800,850,851,900,960,1024').split(',').map(Number)) {
+    for (const width of (process.env.WIDTHS || '360,361,382,383,481,500,560,640,641,700,760,761,768,800,850,851,900,960,1024').split(',').map(Number)) {
       for (const path of SITE_PATHS) {
         const other = await open(browser, origin, width, 800, MODES.motion, path);
         try {

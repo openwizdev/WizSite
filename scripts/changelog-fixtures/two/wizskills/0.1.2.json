@@ -1,0 +1,13 @@
+{
+  "product": "WizSkills",
+  "name": "0.1.2",
+  "semver": "0.1.2",
+  "date": "2031-02-02",
+  "published": "2031-02-03T09:03:08Z",
+  "headline": "Try the tools.",
+  "bullets": [
+    "Build a change.",
+    "Review it."
+  ],
+  "notes": "https://github.com/openwizdev/WizSkills/releases/tag/v0.1.2"
+}

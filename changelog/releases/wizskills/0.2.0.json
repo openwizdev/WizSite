@@ -1,0 +1,14 @@
+{
+  "product": "WizSkills",
+  "name": "0.2.0",
+  "semver": "0.2.0",
+  "date": "2026-11-20",
+  "published": "2026-11-20T09:07:13Z",
+  "headline": "Give your agents 18 shorter, more focused skills.",
+  "bullets": [
+    "Turn a feature idea into a written spec, then break it into tickets.",
+    "Agents load less text when they pick up a job.",
+    "Debug checks also look at the exact changes you plan to commit."
+  ],
+  "notes": "https://github.com/openwizdev/WizSkills/releases/tag/v0.2.0"
+}

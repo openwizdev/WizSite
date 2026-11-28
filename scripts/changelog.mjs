@@ -6,17 +6,24 @@ export const START = '<!-- releases:start -->';
 export const END = '<!-- releases:end -->';
 export const PRE_RELEASES = 'https://github.com/openwizdev/OpenWiz/releases';
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
+const SNAPSHOT = new URL('changelog/stats.json', ROOT);
+const count = new Intl.NumberFormat('en-US');
 const esc = text => String(text).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
-const version = semver => String(semver).split('.').map(Number);
-const newer = (a, b) => { const [x, y] = [version(a.semver), version(b.semver)]; return y[0] - x[0] || y[1] - x[1] || y[2] - x[2]; };
-export const day = iso => { const [y, m, d] = String(iso).split('-').map(Number); return `${MONTHS[m - 1]} ${d}, ${y}`; };
+const shownReleases = (list, live) => list.filter(release => live || release.product === 'WizSkills');
+
+function releaseTime(published) {
+  const [y, m, d] = published.slice(0, 10).split('-').map(Number);
+  return `${MONTHS[m - 1]} ${d}, ${y} · ${published.slice(11, 16)} UTC`;
+}
 
 export async function readReleases(dir = new URL('changelog/releases/', ROOT)) {
-  const names = (await readdir(dir)).filter(name => name.endsWith('.json')).sort();
-  const list = await Promise.all(names.map(async name => JSON.parse(await readFile(new URL(name, dir), 'utf8'))));
-  return list.sort(newer);
+  const entries = await readdir(dir, { withFileTypes: true, recursive: true });
+  const files = entries.filter(entry => entry.isFile() && entry.name.endsWith('.json'));
+  const list = await Promise.all(files.map(async file => JSON.parse(await readFile(`${file.parentPath}/${file.name}`, 'utf8'))));
+  return list.sort((a, b) => b.published.localeCompare(a.published) || a.product.localeCompare(b.product) || a.semver.localeCompare(b.semver));
 }
+
+export const readSnapshot = async (path = SNAPSHOT) => JSON.parse(await readFile(path, 'utf8'));
 
 export function installSwitch(landing) {
   const found = landing.match(/<div class="install-box" data-install="([^"]*)"/g) || [];
@@ -24,20 +31,39 @@ export function installSwitch(landing) {
   return /data-install="([^"]*)"/.exec(found[0])[1];
 }
 
-const entry = release => {
-  const id = `v${release.name.replaceAll('.', '-')}`;
-  return `<article class="release" aria-labelledby="${id}"><h2 id="${id}">${esc(release.name)} <small>· <time datetime="${esc(release.date)}">${day(release.date)}</time> (${esc(release.semver)})</small></h2>`
+function statsBlock(stats) {
+  if (!stats) return '<p class="release-scope">Release stats unavailable.</p>';
+  const added = count.format(stats.added);
+  const removed = count.format(stats.removed);
+  return '<div class="release-metrics"><dl class="release-stats">'
+    + `<div><dt>Pull requests merged</dt><dd>${count.format(stats.prs)}</dd></div>`
+    + `<div><dt>Commits</dt><dd>${count.format(stats.commits)}</dd></div>`
+    + '<div><dt>Lines changed</dt><dd class="release-lines">'
+    + `<span class="release-added" aria-hidden="true">+${added}</span> <span class="release-removed" aria-hidden="true">−${removed}</span>`
+    + `<span class="release-sr">${added} lines added, ${removed} removed</span></dd></div></dl>`
+    + (stats.prev === null ? '<p class="release-scope">since the first commit</p>' : '')
+    + '</div>';
+}
+
+function entry(release, stats) {
+  const tag = `v${release.semver}`;
+  const id = `release-${release.product.toLowerCase()}-${release.name.replaceAll('.', '-')}`;
+  return `<article class="release" aria-labelledby="${esc(id)}"><div class="release-band"><div class="release-version">`
+    + `<h2 id="${esc(id)}"><span class="release-product">${esc(release.product)}</span> <span class="release-number">${esc(release.name)}</span></h2>`
+    + `<p class="release-date"><time datetime="${esc(release.published)}">${releaseTime(release.published)}</time> · ${esc(tag)}</p></div>`
+    + statsBlock(stats) + '</div><div class="release-copy">'
     + `<p class="headline">${esc(release.headline)}</p>`
     + `<ul>${release.bullets.map(b => `<li>${esc(b)}</li>`).join('')}</ul>`
-    + `<p class="notes"><a href="${esc(release.notes)}">Full notes on GitHub</a></p></article>`;
-};
+    + `<p class="notes"><a href="${esc(release.notes)}">Full notes on GitHub</a></p></div></article>`;
+}
 
-export function render(list, live) {
-  const shown = live ? list : [];
-  const pre = shown.length
-    ? `<p class="pre">Earlier pre-releases are on <a href="${PRE_RELEASES}">GitHub</a>.</p>`
-    : `<p class="pre">No public release yet. The pre-releases are on <a href="${PRE_RELEASES}">GitHub</a>.</p>`;
-  return `<section class="releases" aria-label="Releases">${shown.map(entry).join('')}${pre}</section>`;
+export function render(list, live, { products, source }) {
+  const shown = shownReleases(list, live);
+  const pre = shown.some(release => release.product === 'OpenWiz')
+    ? `<p class="pre">Earlier OpenWiz pre-releases are on <a href="${PRE_RELEASES}">GitHub</a>.</p>`
+    : `<p class="pre">No public OpenWiz release yet. The pre-releases are on <a href="${PRE_RELEASES}">GitHub</a>.</p>`;
+  const cards = shown.map(release => entry(release, products[release.product]?.[`v${release.semver}`])).join('');
+  return `<section class="releases" aria-label="Releases" data-stats-source="${source}">${cards}${pre}</section>`;
 }
 
 export function withReleases(page, section) {
@@ -45,18 +71,22 @@ export function withReleases(page, section) {
   return page.replace('</main>', () => `${START}${section}${END}</main>`);
 }
 
-export const summary = (list, live) => live ? `${list.length} release${list.length === 1 ? '' : 's'}` : `none shown until the install switch reads live (${list.length} waiting)`;
+export function summary(list, live) {
+  const shown = shownReleases(list, live).length;
+  return `${shown} release${shown === 1 ? '' : 's'}`;
+}
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const args = process.argv.slice(2);
-  let dir, sw, page;
+  let dir, sw, page, stats;
   while (args.length) {
     const arg = args.shift();
-    if (arg === '--releases') dir = pathToFileURL(args.shift().replace(/\/?$/, '/'));
+    if (arg === '--releases') dir = pathToFileURL(args.shift());
     else if (arg === '--switch') sw = args.shift();
+    else if (arg === '--stats') stats = pathToFileURL(args.shift());
     else page = arg;
   }
   sw ??= installSwitch(await readFile(new URL('index.html', ROOT), 'utf8'));
-  const section = render(await readReleases(dir), sw === 'live');
+  const section = render(await readReleases(dir), sw === 'live', { ...await readSnapshot(stats), source: 'snapshot' });
   process.stdout.write(page ? withReleases(await readFile(page, 'utf8'), section) : section);
 }

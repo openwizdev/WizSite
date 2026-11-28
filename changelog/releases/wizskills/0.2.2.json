@@ -1,0 +1,13 @@
+{
+  "product": "WizSkills",
+  "name": "0.2.2",
+  "semver": "0.2.2",
+  "date": "2026-11-21",
+  "published": "2026-11-21T18:58:19Z",
+  "headline": "Set up OpenWiz 0.1.0 and keep your existing skills.",
+  "bullets": [
+    "Setup tells you the next step when a check needs attention.",
+    "See every name clash before deciding whether setup can rename your existing skills."
+  ],
+  "notes": "https://github.com/openwizdev/WizSkills/releases/tag/v0.2.2"
+}

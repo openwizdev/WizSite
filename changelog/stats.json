@@ -1,0 +1,93 @@
+{
+  "time": "2026-11-24T14:50:59.906Z",
+  "products": {
+    "OpenWiz": {
+      "v0.1.0": {
+        "prev": null,
+        "prs": 250,
+        "commits": 1716,
+        "added": 238607,
+        "removed": 0
+      }
+    },
+    "WizSkills": {
+      "v0.4.2": {
+        "prev": "v0.4.1",
+        "prs": 2,
+        "commits": 9,
+        "added": 55,
+        "removed": 5
+      },
+      "v0.4.1": {
+        "prev": "v0.4.0",
+        "prs": 2,
+        "commits": 11,
+        "added": 93,
+        "removed": 8
+      },
+      "v0.4.0": {
+        "prev": "v0.3.0",
+        "prs": 39,
+        "commits": 357,
+        "added": 20783,
+        "removed": 5650
+      },
+      "v0.3.1": {
+        "prev": "v0.3.0",
+        "prs": 2,
+        "commits": 13,
+        "added": 786,
+        "removed": 54
+      },
+      "v0.2.2": {
+        "prev": "v0.2.1",
+        "prs": 3,
+        "commits": 25,
+        "added": 1230,
+        "removed": 34
+      },
+      "v0.3.0": {
+        "prev": "v0.2.0",
+        "prs": 17,
+        "commits": 99,
+        "added": 6480,
+        "removed": 31125
+      },
+      "v0.2.1": {
+        "prev": "v0.2.0",
+        "prs": 2,
+        "commits": 5,
+        "added": 25,
+        "removed": 19
+      },
+      "v0.2.0": {
+        "prev": "v0.1.2",
+        "prs": 49,
+        "commits": 279,
+        "added": 52753,
+        "removed": 10942
+      },
+      "v0.1.2": {
+        "prev": "v0.1.1",
+        "prs": 3,
+        "commits": 6,
+        "added": 710,
+        "removed": 374
+      },
+      "v0.1.1": {
+        "prev": "v0.1.0",
+        "prs": 0,
+        "commits": 1,
+        "added": 193,
+        "removed": 49
+      },
+      "v0.1.0": {
+        "prev": null,
+        "prs": 0,
+        "commits": 1,
+        "added": 47646,
+        "removed": 0
+      }
+    }
+  }
+}

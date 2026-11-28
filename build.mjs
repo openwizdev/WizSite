@@ -1,6 +1,7 @@
 import { copyFile, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { installSwitch, readReleases, render, summary, withReleases } from './scripts/changelog.mjs';
+import { releaseStats } from './scripts/release-stats.mjs';
 import { readRegistry, render as renderMarket, summary as marketSummary, withMarket } from './scripts/market.mjs';
 
 const root = new URL('./', import.meta.url);
@@ -35,6 +36,7 @@ const files = ['_headers', 'app/manifest.webmanifest', ...appBrand, ...art, ...d
 const releases = await readReleases();
 const live = installSwitch(await readFile(new URL('index.html', root), 'utf8')) === 'live';
 console.log(`Changelog releases: ${summary(releases, live)}`);
+const stats = await releaseStats(releases);
 const registry = await readRegistry();
 console.log(`Market: ${marketSummary(registry)}`);
 await rm(output, { recursive: true, force: true });
@@ -54,7 +56,7 @@ for (const page of pages) {
   let html = await readFile(new URL(page, root), 'utf8');
   for (const [file, name] of Object.entries(names)) html = html.replaceAll(`"/${file}"`, `"/${name}"`);
   if (page !== 'app/index.html') html = withFaq(withFooter(withHeader(html, page)));
-  if (page === 'changelog/index.html') html = withReleases(html, render(releases, live));
+  if (page === 'changelog/index.html') html = withReleases(html, render(releases, live, stats));
   if (page === 'market/index.html') html = withMarket(html, renderMarket(registry));
   await put(page, html);
 }
