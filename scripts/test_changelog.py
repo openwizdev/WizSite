@@ -125,8 +125,6 @@ class Generator(unittest.TestCase):
 
 
 class Ship(unittest.TestCase):
-    """The 0.2.0 entry: grouped by area, and held by release.json's changelog switch until the owner's ship."""
-
     def test_a_long_entry_groups_its_lines_by_area(self):
         data = json.loads((SHIP / '0.02.json').read_text())
         self.assertEqual(sum(len(area['bullets']) for area in data['areas']), 60)
