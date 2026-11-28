@@ -84,6 +84,7 @@ const MODES = {
 };
 const WIDTHS = [[320, 640], [390, 844], [800, 1000], [1280, 800], [1440, 900]];
 const SITE_PATHS = ['/', '/changelog/', '/drivers/', '/team/', '/faq/', '/market/'];
+const NAV_PATHS = ['/drivers/', '/market/', '/changelog/', '/faq/'];
 
 async function open(browser, origin, width, height, mode, path = '/') {
   const { targetId } = await browser.send('Target.createTarget', { url: 'about:blank' });
@@ -127,6 +128,16 @@ const HELPERS = `
   const shown = el => !!el && el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden';
   const still = el => ['none', 'matrix(1, 0, 0, 1, 0, 0)'].includes(getComputedStyle(el).transform);
   const box = el => { const r = el.getBoundingClientRect(); return { left: r.left, right: r.right, top: r.top + scrollY, bottom: r.bottom + scrollY }; };
+`;
+const CURRENT_MARKERS = `
+  const currentMarkers = bar => [...bar.querySelectorAll('.landing-brand, .nav-team, .nav-links a')]
+    .filter(link => {
+      if (!shown(link)) return false;
+      const after = getComputedStyle(link, '::after');
+      return after.content !== 'none' && parseFloat(after.width) > 0 && parseFloat(after.height) > 0 &&
+        (after.backgroundImage.startsWith('repeating-linear-gradient(') || after.backgroundColor !== 'rgba(0, 0, 0, 0)');
+    })
+    .map(link => link.getAttribute('href'));
 `;
 
 const failures = [];
@@ -329,7 +340,7 @@ async function handoff(page, where) {
 }
 
 async function chrome(page, where, mode, path) {
-  const facts = await page.evaluate(`(() => { ${HELPERS}
+  const facts = await page.evaluate(`(() => { ${HELPERS} ${CURRENT_MARKERS}
     const bar = document.querySelector('header.landing-nav');
     const mark = bar?.querySelector('.landing-brand img');
     const star = bar?.querySelector('.github-star');
@@ -353,6 +364,7 @@ async function chrome(page, where, mode, path) {
         starStyle.fontSize === '14px',
       tapTarget: starBox?.width >= 40 && starBox.height >= 40,
       current: [...bar.querySelectorAll('[aria-current="page"]')].map(link => link.getAttribute('href')),
+      markers: currentMarkers(bar),
       toggle: shown(toggle), nav: [...nav.querySelectorAll('a')].filter(shown).map(a => a.getAttribute('href')),
       signIn: shown(signIn),
       signInText: signInStyle.borderStyle === 'none' && signInStyle.backgroundColor === 'rgba(0, 0, 0, 0)' &&
@@ -371,9 +383,11 @@ async function chrome(page, where, mode, path) {
   expect(facts.star && facts.value === (stars ?? 'Star') && facts.name?.includes('GitHub') &&
     (!stars || facts.name.includes(mode.stars.toLocaleString('en'))), where, `incorrect GitHub star control or label (${facts.value})`);
   expect(facts.unboxed && (facts.inner > 850 || facts.tapTarget), where, 'the stars link needs nav text styling and a 40 px phone target');
-  expect(facts.current.join() === path, where, 'the top bar lacks its current-page link');
+  const current = NAV_PATHS.includes(path) ? path : '';
+  expect(facts.current.join() === current, where, 'only the matching site nav link may have aria-current');
+  expect(facts.markers.join() === (phoneMenu ? '' : current), where, 'the top bar underlines the wrong link');
   expect(facts.toggle === phoneMenu && facts.signIn !== phoneMenu &&
-    facts.nav.join() === (phoneMenu ? '' : '/drivers/,/market/,/changelog/,/faq/'),
+    facts.nav.join() === (phoneMenu ? '' : NAV_PATHS.join()),
   where, 'the top bar puts links in the wrong place');
   if (facts.inner > 850) {
     expect(facts.signInText && facts.signInTarget, where, 'desktop Sign in needs plain nav text and a 36 px target');
@@ -442,12 +456,12 @@ async function buy(page, where, path) {
   if (path === '/team/') expect(facts.book === 2, where, `the team page needs its two Book a call links (${facts.book})`);
 }
 
-async function phoneMenu(page, where) {
+async function phoneMenu(page, where, path) {
   const toggle = await page.evaluate(`(() => {
     const { x, y, width, height } = document.querySelector('.nav-toggle').getBoundingClientRect();
     return { x: x + width / 2, y: y + height / 2 };
   })()`);
-  const state = () => page.evaluate(`(() => { ${HELPERS}
+  const state = () => page.evaluate(`(() => { ${HELPERS} ${CURRENT_MARKERS}
     const toggle = document.querySelector('.nav-toggle');
     const panel = document.getElementById(toggle.getAttribute('aria-controls'));
     const links = [...panel.querySelectorAll('a')];
@@ -458,6 +472,7 @@ async function phoneMenu(page, where) {
     return {
       expanded: toggle.getAttribute('aria-expanded'), shown: shown(panel),
       destinations: links.filter(shown).map(link => link.getAttribute('href')),
+      markers: currentMarkers(toggle.closest('header')),
       targets: links.every(link => link.getBoundingClientRect().height >= 44),
       rowGap: links.length > 1 ? Math.round(links[1].getBoundingClientRect().top - links[0].getBoundingClientRect().bottom) : 0,
       scrollLocked: getComputedStyle(document.documentElement).overflowY === 'hidden' && document.querySelector('main').inert,
@@ -475,8 +490,9 @@ async function phoneMenu(page, where) {
   const opened = await state();
   expect(opened.expanded === 'true' && opened.shown && opened.panelFocused && opened.noPointerRing && opened.scrollLocked &&
     opened.targets && opened.rowGap >= 4 && opened.currentMarker &&
-    opened.destinations.join() === '/drivers/,/market/,/changelog/,/faq/,/app/', where,
+    opened.destinations.join() === [...NAV_PATHS, '/app/'].join(), where,
     'the phone menu fails to open calmly on tap, focus the panel, lock scrolling, or show 44 px rows with gap and current marker');
+  expect(opened.markers.join() === (NAV_PATHS.includes(path) ? path : ''), where, 'the phone menu marks the wrong row');
   const tab = { key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 };
   await page.send('Input.dispatchKeyEvent', { type: 'keyDown', ...tab });
   await page.send('Input.dispatchKeyEvent', { type: 'keyUp', ...tab });
@@ -627,7 +643,7 @@ async function main() {
             const location = `${path} ${where}`;
             await chrome(other, location, mode, path);
             await buy(other, location, path);
-            if (width <= 850 && !mode.noScript) await phoneMenu(other, location);
+            if (width <= 850 && !mode.noScript) await phoneMenu(other, location, path);
             await footer(other, `${path} ${where}`, name);
             if (FAQ_PATHS.includes(path)) await faq(other, `${path} ${where}`, width, name);
             if (process.env.SHOTS && name === 'motion' && path !== '/' && (width === 390 || width === 1280)) {
