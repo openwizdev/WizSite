@@ -217,7 +217,7 @@ export function crawlerFiles(about, faq, guide, mirrors = {}) {
     ...guideText(guide),
     '## Every page',
     ...Object.entries(mirrors).filter(([page]) => ![aboutPage, faqPage, guidePage].includes(page))
-      .map(([page, text]) => `### ${pages[page][0]}\n\n${urlFor(page)}\n\n${text.replace(/^(#+) /gm, '###$1 ').trim()}`),
+      .map(([page, text]) => `### ${pages[page][0]}\n\n${urlFor(page)}\n\n${text.replace(/^(#+) /gm, (_, hashes) => '#'.repeat(Math.min(hashes.length + 3, 6)) + ' ').trim()}`),
   ].join('\n\n') + '\n';
 
   const fallbackDate = new Date().toISOString().slice(0, 10);

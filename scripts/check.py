@@ -1343,7 +1343,18 @@ def check_mirror_links(root):
         main_html = re.sub(r'<(\w+)\b[^>]*\b(hidden|aria-hidden="true")[^>]*>[\s\S]*?</\1>', '', main_html)
         copy_text = (root / mirror_path(name)).read_text()
         for href in re.findall(r'<a\b[^>]*\bhref="(https://[^"]+)"', main_html):
-            assert unescape(href) in copy_text, f'{mirror_path(name)} must keep the link {unescape(href)}'
+            target = unescape(href)
+            if urlsplit(target).path == '':
+                target = urlsplit(target)._replace(path='/').geturl()
+            assert f']({target})' in copy_text, f'{mirror_path(name)} must keep the link {target}'
+        for target in re.findall(r'\]\((https://openwiz\.dev/[^)\s]*)\)', copy_text):
+            parts = urlsplit(target)
+            rel = parts.path.lstrip('/')
+            rel = rel + 'index.html' if rel == '' or rel.endswith('/') else rel
+            assert (root / rel).is_file(), f'{mirror_path(name)} links {target}, which is not a built page'
+            if parts.fragment and rel.endswith('.html'):
+                ids = set(re.findall(r'\bid="([^"]+)"', (root / rel).read_text()))
+                assert unquote(parts.fragment) in ids, f'{mirror_path(name)} links {target}, whose fragment is not on that page'
 
 
 def check_site(root, registry=ROOT / 'market/registry.json', now=None):

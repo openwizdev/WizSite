@@ -5,7 +5,7 @@ const plainText = text => decode(text).replace(/</g, '&lt;').replace(/>/g, '&gt;
 
 export const mirrorPath = page => page === 'index.html' ? 'index.md' : page.replace(/\/index\.html$/, '.md');
 
-const inline = html => {
+const inline = (html, base = site) => {
   const tokens = [];
   const hold = value => {
     tokens.push(value);
@@ -19,14 +19,14 @@ const inline = html => {
     .replace(/<(em|i)\b[^>]*>([\s\S]*?)<\/\1>/g, '*$2*')
     .replace(/<a\b[^>]*\bhref="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g, (_, url, label) => {
       const text = restore(plainText(label.replace(/<[^>]*>/g, ''))).replace(/\s+/g, ' ').trim();
-      return text ? hold(`[${text}](${new URL(decode(url), site)})`) : '';
+      return text ? hold(`[${text}](${new URL(decode(url), base)})`) : '';
     })
     .replace(/<\/(span|div|td|th|dt|dd)>/g, ' ')
     .replace(/<[^>]*>/g, '');
   return restore(plainText(stripped)).replace(/\s+/g, ' ').trim();
 };
 
-export function pageMarkdown(html) {
+export function pageMarkdown(html, base = site) {
   const main = html.match(/<main\b[^>]*>([\s\S]*?)<\/main>/);
   if (!main) throw new Error('a page needs one <main> for its Markdown copy');
   let body = main[1]
@@ -36,6 +36,7 @@ export function pageMarkdown(html) {
     .replace(/(<h[1-6]\b[^>]*>)\s*<button\b[^>]*>([\s\S]*?)<\/button>\s*(<\/h[1-6]>)/g, '$1$2$3')
     .replace(/<button\b[^>]*>([\s\S]*?)<\/button>/g, '')
     .replace(/<code\b[^>]*class="[^"]*install-line[^"]*"[^>]*>([\s\S]*?)<\/code>/g, '<p><code>$1</code></p>');
+  body = body.replace(/<div\b[^>]*>((?:\s*<a\b[^>]*>[\s\S]*?<\/a>)+)\s*<\/div>/g, (_, links) => `<p>${links.replace(/<\/a>\s*<a\b/g, '</a> · <a')}</p>`);
   body = body.replace(/^([ \t]*)(<a\b[^>]*>[\s\S]*?<\/a>)[ \t]*$/gm, '$1<p>$2</p>');
   body = body.replace(/<(li|blockquote|dd|td|th|figcaption)\b[^>]*>([\s\S]*?)<\/\1>/g, (whole, tag, inner) => /<(p|h[1-6]|ul|ol)\b/.test(inner)
     ? inner.replace(/(^|<\/(?:p|h[1-6]|ul|ol)>)([\s\S]*?)(?=<(?:p|h[1-6]|ul|ol)\b|$)/g, (_, close, loose) => close + (loose.replace(/<[^>]*>/g, '').trim() ? `<p>${loose}</p>` : ''))
@@ -51,7 +52,7 @@ export function pageMarkdown(html) {
     const fence = inner.match(/^\u0000(\d+)\u0000$/);
     if (fence) { blocks.push(pre[Number(fence[1])]); continue; }
     if (/<(p|li|h[1-6])\b/.test(inner)) continue;
-    const text = inline(inner);
+    const text = inline(inner, base);
     if (!text || /^[\d\s.,%#]*$/.test(text)) continue;
     if (tag[0] === 'h') blocks.push('#'.repeat(Number(tag[1])) + ' ' + text);
     else if (tag === 'li') blocks.push('- ' + text);
@@ -63,7 +64,7 @@ export function pageMarkdown(html) {
 
 export function mirrorFile(page, title, html) {
   const url = site + page.replace(/index\.html$/, '');
-  const text = pageMarkdown(html);
+  const text = pageMarkdown(html, url);
   const heading = text.startsWith('# ') ? '' : `# ${title}\n\n`;
   return `${heading}${text}\nSource: ${url}\n`;
 }
