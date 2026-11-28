@@ -85,6 +85,10 @@ test('sends the token to the platform only, and asks GitHub without one', async 
     assert.equal(call.authorization, host === 'api.cloudflare.com' ? `Bearer ${token}` : null);
     assert.ok(!call.url.includes(token) && !String(call.body).includes(token));
   }
+  const sql = calls.find(call => call.url.endsWith('/accounts/account-tag-1/analytics_engine/sql'));
+  assert.equal(sql.body, "SELECT formatDateTime(timestamp, '%Y-%m-%d') AS date, blob1 AS action, SUM(_sample_interval * double1) AS count FROM wiz_clicks"
+    + " WHERE timestamp >= toDateTime('2031-02-24 00:00:00') AND timestamp < toDateTime('2031-03-03 00:00:00') GROUP BY date, action FORMAT JSON");
+  await assert.rejects(run({ env: { ...env, WIZ_COUNTERS_DATASET: 'wiz_clicks; DROP' }, fetch: fakePlatform(await answers()), now, file, log: () => {} }), /WIZ_COUNTERS_DATASET/);
   const graphql = calls.find(call => call.url.endsWith('/graphql'));
   assert.deepEqual(JSON.parse(graphql.body).variables, { account: 'account-tag-1', site: 'site-tag-1', since: '2031-02-24', until: '2031-03-02' });
 });
@@ -177,7 +181,8 @@ test('the counters page shows totals only, never a row per visitor', () => {
   assert.deepEqual(totals(expected), { site: 66, docs: 8, installInWiz: 3, installCopy: 5, downloads: 200, since: '2031-03-01', until: '2031-03-03' });
   const section = render([...expected, { date: '2031-03-04', page: '/', count: 1234 }]);
   for (const text of ['Site page views: <strong>1,300</strong>', 'Docs page views: <strong>8</strong>', '“Install in Wiz” clicks: <strong>3</strong>',
-    'Install line copies: <strong>5</strong>', 'Release downloads: <strong>200</strong>', '2031-03-01 to 2031-03-04']) assert.ok(section.includes(text), text);
+    'Install line copies: <strong>5</strong>', 'Release downloads: <strong>200</strong>',
+    'Counted from <time datetime="2031-03-01">2031-03-01</time> to <time datetime="2031-03-04">2031-03-04</time>.']) assert.ok(section.includes(text), text);
   assert.equal(section.split('<li>').length - 1, 5);
   assert.ok(render([]).includes('No counts yet.'));
   const page = withCounters('<main><template data-slot="counters"></template></main>', section);

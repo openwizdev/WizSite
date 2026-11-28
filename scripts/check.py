@@ -426,12 +426,15 @@ GUIDE_H1 = 'How to run many coding agents at once'
 GUIDE_STEPS = re.compile(r'<li><strong>([^<]+)\.</strong>([\s\S]*?)</li>')
 GUIDE_NEVER = re.compile(r'\b0\.1\.[1-9]|\b0\.0[2-9]\b')
 NOT_FOUND = '404.html'
+COUNTERS_PAGE = 'counters/index.html'
+COUNTERS_SLOT = '<template data-slot="counters"></template>'
+COUNTERS = ('<!-- counters:start -->', '<!-- counters:end -->')
 ABOUT_LINK = '<p class="wrap about-link"><a href="/what-is-openwiz/">What is OpenWiz?</a></p>\n'
 STATIC = {
     'index.html', 'changelog/index.html', 'drivers/index.html', 'team/index.html', 'faq/index.html', 'market/index.html', 'pricing/index.html', '_headers', SECURITY_TXT, APP_PAGE, 'app/manifest.webmanifest',
     'SKILL.md', 'fonts/OFL.txt',
     'c76a1a01e62d088edd3789d30d6a4d29.txt',
-} | ART | set(ICON_HASHES) | set(VECTORS) | (set(VENDOR_HASHES) - {GSAP}) | set(APP_VENDOR) | set(DRIVER_LOGOS) | {ASK_INDEX, ABOUT_PAGE, GUIDE_PAGE, NOT_FOUND} | DISCOVERY_FILES
+} | ART | set(ICON_HASHES) | set(VECTORS) | (set(VENDOR_HASHES) - {GSAP}) | set(APP_VENDOR) | set(DRIVER_LOGOS) | {ASK_INDEX, ABOUT_PAGE, GUIDE_PAGE, NOT_FOUND, COUNTERS_PAGE} | DISCOVERY_FILES
 RUNTIME = STATIC | set(FINGERPRINTS.values())
 
 
@@ -468,7 +471,7 @@ GUIDE_COST = ('OpenWiz is free and released under the Apache License 2.0. Suppor
               'and the software stays the same. See Pricing. You pay only for the models and machines you use: your Claude Code or Codex plan, '
               'and any host you pick. boat.dev bills per second while a sandbox runs, and CloudRoom\u2019s charges are its own, on your plan with it.')
 PAGES = ('index.html', 'changelog/index.html', 'drivers/index.html', TEAM_PAGE, FAQ_PAGE, 'market/index.html', ABOUT_PAGE, GUIDE_PAGE, PRICING_PAGE)
-SITE_PAGES = PAGES + (NOT_FOUND,)
+SITE_PAGES = PAGES + (NOT_FOUND, COUNTERS_PAGE)
 ALL_PAGES = SITE_PAGES + (APP_PAGE,)
 STORY_COPY = ('Build a to-do app', 'Bring any agent', 'Sign in with GitHub', 'Put the app on your phone')
 OLD_EXAMPLE = ('dark mode', 'dark-mode')
@@ -1037,6 +1040,14 @@ def split_market(built):
 
 REACH_SLOT = '<template data-slot="reach"></template>'
 REACH = ('<!-- reach:start -->', '<!-- reach:end -->')
+
+
+def split_counters(built):
+    start, end = COUNTERS
+    assert built.count(start) == 1 and built.count(end) == 1, 'the built counters page has one generated section'
+    before, rest = built.split(start)
+    section, after = rest.split(end)
+    return before + COUNTERS_SLOT + after, section
 
 
 def split_reach(built):
@@ -2593,6 +2604,8 @@ def main():
             built = split_releases(built)[0]
         if name == MARKET_PAGE:
             built = split_market(built)[0]
+        if name == COUNTERS_PAGE:
+            built = split_counters(built)[0]
         if name == DRIVERS_PAGE and driver_listing_urls(ROOT / 'market/registry.json'):
             check_drivers_export(built)
             continue
