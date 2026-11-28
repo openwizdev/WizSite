@@ -1,0 +1,78 @@
+{
+  "slug": "coding-agent-orchestrator",
+  "kind": "answer",
+  "query": "coding agent orchestrator",
+  "title": "What Does a Coding Agent Orchestrator Do? | OpenWiz",
+  "description": "See how a coding agent orchestrator chooses ready work, hands pull requests to reviewers, and routes fixes in OpenWiz.",
+  "answer": "A coding agent orchestrator decides which work is ready and hands it to coding agents. It tracks what comes back, sends changes for review, and routes feedback to the agents that can act on it.",
+  "sections": [
+    {
+      "heading": "How OpenWiz hands work off",
+      "body": "In an automatic OpenWiz fleet, the fleet loop reads GitHub and starts builders on ready tickets. A builder implements and tests its ticket and opens a pull request. The loop sends pull requests with passing checks to reviewers, sends findings back to builders, and merges approved work."
+    },
+    {
+      "heading": "Where automation stops",
+      "body": "You make the decisions about the work and give the go-ahead to start. In OpenWiz 0.1.0, the automatic fleet runs in CloudRoom. OpenWiz 0.1.0 does not start builders or reviewers automatically when you run on this computer or boat.dev."
+    }
+  ],
+  "steps": [
+    {
+      "name": "Set up the automatic fleet",
+      "text": "Tell your coding agent: Install OpenWiz. For an automatic fleet on 0.1.0, choose CloudRoom during setup and connect the GitHub repository you want to use."
+    },
+    {
+      "name": "Review the handoffs before launch",
+      "text": "Give the agent a small change to plan. Confirm the spec and approve the ticket plan. Check the launch preview for the fleet thread, loop, builders, reviewer, and Cloud Credits before saying yes."
+    },
+    {
+      "name": "Watch a ticket move from build to review",
+      "text": "Open the ticket on GitHub, then follow the builder’s pull request. Check its CI and review. If the reviewer requests changes, follow the new work on the same pull request."
+    },
+    {
+      "name": "Verify the result",
+      "text": "When the fleet reports a merge, open the pull request and verify that GitHub marks it merged and that its merge commit is on the target branch."
+    }
+  ],
+  "faq": [
+    {
+      "question": "Who writes the code?",
+      "answer": "The builder agent implements the ticket and runs its tests. The fleet loop decides when to start the builder and when to send its pull request to a reviewer."
+    },
+    {
+      "question": "Can I use OpenWiz without an automatic fleet?",
+      "answer": "Yes. In OpenWiz 0.1.0, you can plan and start builders by hand on this computer or boat.dev. You review and merge their pull requests yourself. For the automatic fleet in 0.1.0, choose CloudRoom."
+    },
+    {
+      "question": "How does the loop know where to pick up?",
+      "answer": "It reads the GitHub records again each time it wakes. The spec, tickets, status notes, pull requests, reviews, and checks give it the state of the work."
+    }
+  ],
+  "sources": [
+    {
+      "url": "https://github.com/openwizdev/OpenWiz/blob/09ad084f81023de18f2cd3b9f1967d9abb7f5c89/docs/how-openwiz-works.md#L3-L10",
+      "supports": "Owner decisions, the GitHub records and reread on wake, builder and reviewer duties, ready-ticket dispatch, review and fix routing, and 0.1.0 host limits.",
+      "checked": "2026-11-28"
+    },
+    {
+      "url": "https://github.com/openwizdev/OpenWiz/blob/09ad084f81023de18f2cd3b9f1967d9abb7f5c89/README.md#L14-L24",
+      "supports": "Install prompt, host selection, plan approval before work starts, and the manual workflow without CloudRoom in 0.1.0.",
+      "checked": "2026-11-28"
+    },
+    {
+      "url": "https://github.com/openwizdev/OpenWiz/blob/09ad084f81023de18f2cd3b9f1967d9abb7f5c89/docs/first-hour.md#L17-L43",
+      "supports": "GitHub setup, giving the agent an idea, confirming the spec, approving the exact ticket plan, and what to look for in the launch preview.",
+      "checked": "2026-11-28"
+    },
+    {
+      "url": "https://github.com/openwizdev/OpenWiz/blob/09ad084f81023de18f2cd3b9f1967d9abb7f5c89/docs/first-hour.md#L43-L61",
+      "supports": "Separate approval to start, following progress in GitHub, the manual path without CloudRoom, and verifying the merge commit on the target branch.",
+      "checked": "2026-11-28"
+    },
+    {
+      "url": "https://github.com/openwizdev/OpenWiz/blob/09ad084f81023de18f2cd3b9f1967d9abb7f5c89/docs/install.md#L129-L158",
+      "supports": "Published 0.1.0 install instructions and the choice between an automatic CloudRoom fleet and hand-started builders.",
+      "checked": "2026-11-28"
+    }
+  ],
+  "checked": "2026-11-28"
+}

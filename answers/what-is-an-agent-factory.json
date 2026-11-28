@@ -1,0 +1,78 @@
+{
+  "slug": "what-is-an-agent-factory",
+  "kind": "answer",
+  "query": "agent factory",
+  "title": "What Is an Agent Factory? | OpenWiz",
+  "description": "Learn how an agent factory turns one software idea into tickets, builds, and reviews, then try the workflow with OpenWiz.",
+  "answer": "An agent factory is a repeatable way to turn a software idea into planned, built, and reviewed changes with coding agents. It splits a goal into tickets, gives builders and reviewers distinct jobs, and keeps decisions and results where you can inspect them.",
+  "sections": [
+    {
+      "heading": "What a factory keeps track of",
+      "body": "Suppose you want to add a CSV export. The spec says which fields go in the file, and the tickets give a builder and a reviewer something small and specific to check. In OpenWiz, one approved spec and its tickets make a fleet. GitHub holds the decisions, tickets, agent status notes, pull requests, reviews, and CI results."
+    },
+    {
+      "heading": "What you bring",
+      "body": "You decide what to build and approve the start. OpenWiz does not provide a hosted server or pay for your model or host usage. Your agents use their own signed-in tools."
+    }
+  ],
+  "steps": [
+    {
+      "name": "Install OpenWiz and choose a host",
+      "text": "Tell your coding agent: Install OpenWiz. Follow the published 0.1.0 install steps, choose where your agents should run, and connect GitHub. Choose CloudRoom if you want OpenWiz 0.1.0 to run the fleet automatically."
+    },
+    {
+      "name": "Give the agent one small idea",
+      "text": "Pick a repository you control and describe a small change. Answer the agent’s questions about what it should do and confirm the summary. On this computer or boat.dev, follow the linked first-hour guide for the manual setup and planning steps."
+    },
+    {
+      "name": "Check the plan and approve the start",
+      "text": "Read the spec and the ticket plan. Check that the tickets cover the result you want. Read the launch preview and give your separate yes to start the fleet or a hand-started builder."
+    },
+    {
+      "name": "Follow one ticket through review",
+      "text": "Open its GitHub issue and follow it to the pull request, checks, and review. On this computer or boat.dev in 0.1.0, start each builder yourself and review and merge its pull request."
+    }
+  ],
+  "faq": [
+    {
+      "question": "What is a fleet in OpenWiz?",
+      "answer": "A fleet is the work for one approved spec and its tickets. The factory is the setup you can use again for the next spec."
+    },
+    {
+      "question": "Do I need CloudRoom?",
+      "answer": "You can install and plan without CloudRoom. In OpenWiz 0.1.0, automatic fleets run in CloudRoom. On this computer or boat.dev, you start builders and handle review and merge yourself."
+    },
+    {
+      "question": "Where can I see what the agents did?",
+      "answer": "Start with the ticket on GitHub, then follow its pull request to the review and CI results."
+    }
+  ],
+  "sources": [
+    {
+      "url": "https://github.com/openwizdev/OpenWiz/blob/09ad084f81023de18f2cd3b9f1967d9abb7f5c89/docs/how-openwiz-works.md#L3-L10",
+      "supports": "Fleet definition, GitHub work records, builder and reviewer roles, and automatic and manual workflows in 0.1.0.",
+      "checked": "2026-11-28"
+    },
+    {
+      "url": "https://github.com/openwizdev/OpenWiz/blob/09ad084f81023de18f2cd3b9f1967d9abb7f5c89/README.md#L14-L24",
+      "supports": "Install prompt, host choice, plan approval, separate model and host charges, and the manual 0.1.0 workflow outside CloudRoom.",
+      "checked": "2026-11-28"
+    },
+    {
+      "url": "https://github.com/openwizdev/OpenWiz/blob/09ad084f81023de18f2cd3b9f1967d9abb7f5c89/README.md#L37-L43",
+      "supports": "Agents use their signed-in tools and OpenWiz has no hosted server of its own.",
+      "checked": "2026-11-28"
+    },
+    {
+      "url": "https://github.com/openwizdev/OpenWiz/blob/09ad084f81023de18f2cd3b9f1967d9abb7f5c89/docs/first-hour.md#L17-L56",
+      "supports": "First-hour guide for the install steps, GitHub connection, choosing an idea, approving the plan and launch, and watching work on GitHub.",
+      "checked": "2026-11-28"
+    },
+    {
+      "url": "https://github.com/openwizdev/OpenWiz/blob/09ad084f81023de18f2cd3b9f1967d9abb7f5c89/docs/install.md#L129-L158",
+      "supports": "Published 0.1.0 install instructions and the choice between an automatic CloudRoom fleet and hand-started builders.",
+      "checked": "2026-11-28"
+    }
+  ],
+  "checked": "2026-11-28"
+}
