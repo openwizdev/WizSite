@@ -68,6 +68,10 @@ export async function main(argv, { fetchImpl = fetch, log = console.log } = {}) 
   const dist = arg('--dist') ?? fileURLToPath(new URL('../dist/', import.meta.url));
   const previous = arg('--previous');
   const dryRun = argv.includes('--dry-run');
+  if (arg('--live') && previous) {
+    log('IndexNow: use --live or --previous, not both: --previous <file> alone carries unsent URLs over to later runs');
+    return 2;
+  }
   const key = await findKey(dist);
   const now = await sitemapUrls(SITE + 'sitemap.xml', fileReader(dist));
   let before = new Map();
@@ -87,7 +91,7 @@ export async function main(argv, { fetchImpl = fetch, log = console.log } = {}) 
   for (const url of dryRun ? urls : batch) log('  ' + url);
   if (dryRun) return 0;
   if (urls.length > batch.length && !previous) {
-    log(`IndexNow: ${urls.length} changed URLs is over the ${MAX_URLS} per request; run with --previous <file> so the rest go on later runs`);
+    log(`IndexNow: ${urls.length} changed URLs is over the ${MAX_URLS} per request; run with --previous <file> instead of --live, so the rest go on later runs`);
     return 1;
   }
   if (urls.length > batch.length) log(`IndexNow: sending the first ${batch.length}; the other ${urls.length - batch.length} wait for the next run`);

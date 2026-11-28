@@ -151,3 +151,11 @@ test('a deploy that only removes a page updates the baseline, so restoring it is
   assert.equal(await main(['--dist', site, '--previous', previous], { fetchImpl: restored.impl, log: () => {} }), 0);
   assert.deepEqual(restored.calls[0].body.urlList, ['https://openwiz.dev/b/']);
 });
+
+test('--live and --previous together are refused before anything is read or sent', async () => {
+  const fake = fakeFetch(200);
+  const lines = [];
+  assert.equal(await main(['--dist', dist, '--live', 'https://openwiz.dev/sitemap.xml', '--previous', '/nonexistent/state.json'], { fetchImpl: fake.impl, log: line => lines.push(line) }), 2);
+  assert.equal(fake.calls.length, 0);
+  assert.match(lines.at(-1), /not both/);
+});
