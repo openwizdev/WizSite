@@ -3,6 +3,7 @@ from hashlib import sha256
 from html import escape
 from pathlib import Path
 import json
+import random
 import shutil
 import subprocess
 import tempfile
@@ -11,7 +12,7 @@ from unittest import mock
 
 import re
 
-from check import ALL_PAGES, ART, CTA, DOC_HASHES, FAQ, FAQ_PREREQS, FAQ_WHERE, FOOTER, INSTALL_NOTE_HTML, INSTALL_PREREQS_HTML, FINGERPRINTS, HASHED, INSTALL_SWITCH, ROOT, Page, check_changelog, check_image_preloads, check_release_data, check_releases, read_releases, split_releases, check_motion, check_privacy, check_ref, check_security_txt, check_site, check_vector, check_webp, check_avif, check_png, fingerprint
+from check import ALL_PAGES, ART, CTA, DOC_HASHES, FAQ, FAQ_PREREQS, FAQ_WHERE, FOOTER, INSTALL_NOTE_HTML, INSTALL_PREREQS_HTML, FINGERPRINTS, HASHED, INSTALL_SWITCH, ROOT, Page, check_changelog, check_image_preloads, check_page_delivery, check_release_data, check_releases, read_releases, split_releases, check_motion, check_privacy, check_ref, check_security_txt, check_site, check_vector, check_webp, check_avif, check_png, fingerprint
 
 REMOVED_ART = (
     'art/spec-video.mp4',
@@ -74,6 +75,86 @@ def with_switch(state):
 class Checks(unittest.TestCase):
     def test_valid_site(self):
         check_site(ROOT / 'dist')
+
+    def test_script_written_page_text_fails(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / 'dist'
+            shutil.copytree(ROOT / 'dist', root)
+            market = root / 'market/index.html'
+            html = market.read_text()
+            script_only = (
+                '<div id="script-copy"></div><script type="module">'
+                'document.getElementById("script-copy").textContent = "Only a script supplies this page copy.";'
+                '</script>'
+            )
+            self.assertIn('</main>', html)
+            market.write_text(html.replace('</main>', script_only + '</main>', 1))
+            with self.assertRaisesRegex(AssertionError, 'market/index.html:.*empty.*script-copy'):
+                check_site(root)
+
+    def test_page_delivery(self):
+        copy = ' '.join(['word'] * 40)
+        main = f'<main><h1>Heading</h1><p>{copy}</p></main>'
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            path = root / 'sample.html'
+            path.write_text(main)
+            (root / 'small.css').write_bytes(b'x' * 50_000)
+            (root / 'large.css').write_bytes(b'x' * 50_001)
+            image = '<img src="/hero.webp" width="600" height="300">'
+            preload = '<link rel="preload" as="image" href="/hero.webp">'
+            cases = (
+                (main.replace('<p>', '<template><p>').replace('</p>', '</p></template>'), 'at least 40 words'),
+                (f'<template>{main}</template>', 'at least 40 words'),
+                (main.replace('<p>', '<p hidden>'), 'at least 40 words'),
+                (main.replace('Heading', ''), 'empty <h1>'),
+                (main.replace('Heading', '<span hidden>Heading</span>'), 'empty <h1>'),
+                (main.replace('<p>', '<ol><li></li></ol><p>'), 'empty <li>'),
+                (main.replace('<p>', '<div class="faq-a"></div><p>'), 'empty <div>'),
+                (main.replace('<p>', '<div hidden id="script-copy"></div><p>'), 'empty <div> #script-copy'),
+                (main + '<script src="/test.js"></script>', 'render-blocking script'),
+                (main + '<script defer>run()</script>', 'render-blocking script'),
+                ('<head><script type="module" blocking="render" src="/test.js"></script></head>' + main,
+                 'render-blocking script'),
+                ('<link rel="stylesheet" href="/large.css">' + main, 'render-blocking CSS'),
+                ('<link rel="stylesheet" media="(min-width: 600px)" href="/large.css">' + main, 'render-blocking CSS'),
+                (main + '<img src="/small.webp" loading="lazy" width="50">', 'image needs dimensions'),
+                (main + image, 'largest eager image must be preloaded'),
+                ('<head><link rel="preload" as="image" href="/small.webp"></head>' +
+                 main + '<img src="/small.webp" width="50" height="50">' + image,
+                 'largest eager image must be preloaded'),
+            )
+            for html, error in cases:
+                with self.subTest(error=error, html=html[:90]):
+                    path.write_text(html)
+                    with self.assertRaisesRegex(AssertionError, error):
+                        check_page_delivery(root, path.name, indexable=True)
+            path.write_text(
+                '<head><link rel="stylesheet" href="/small.css"><link rel="stylesheet" media="print" href="/large.css">'
+                '<script type="application/ld+json">{}</script><script src="/test.js" defer></script>'
+                '<script src="/test.js" async></script><script type="module" src="/test.js"></script>'
+                + preload + '</head>' + main + image
+            )
+            with mock.patch('builtins.print') as output:
+                check_page_delivery(root, path.name, indexable=True)
+            self.assertIn('50000 B render-blocking CSS', output.call_args.args[0])
+            path.write_text(main + '<!--' + random.Random(4073).randbytes(64_000).hex() + '-->')
+            with self.assertRaisesRegex(AssertionError, 'compressed HTML'):
+                check_page_delivery(root, path.name, indexable=True)
+
+    def test_page_delivery_baseline_does_not_allow_growth(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            path = root / 'index.html'
+            path.write_text('<link rel="stylesheet" href="/style.css">')
+            css = root / 'style.css'
+            css.write_bytes(b'x' * 72_873)
+            with mock.patch('builtins.print') as output:
+                check_page_delivery(root, path.name, indexable=False)
+            self.assertIn('over 50000 B CSS budget', output.call_args.args[0])
+            css.write_bytes(b'x' * 72_874)
+            with self.assertRaisesRegex(AssertionError, 'render-blocking CSS'):
+                check_page_delivery(root, path.name, indexable=False)
 
     def test_replaced_art_and_run_logs_are_not_shipped(self):
         for name in REMOVED_ART:
