@@ -16,7 +16,8 @@ export async function readShip(file = new URL('release.json', ROOT)) {
   const refuse = why => { throw new Error(`release.json: ${why}`); };
   let data;
   try { data = JSON.parse(await readFile(file, 'utf8')); } catch (error) { refuse(`not readable as JSON: ${error.message}`); }
-  const held = data && !Array.isArray(data) && typeof data === 'object' ? data.changelog ?? {} : refuse('one object');
+  if (!data || Array.isArray(data) || typeof data !== 'object') refuse('one object');
+  const { changelog: held = {} } = data;
   if (!held || Array.isArray(held) || typeof held !== 'object') refuse('changelog maps a semver to on or off');
   for (const [semver, state] of Object.entries(held)) {
     if (!/^\d+\.\d+\.\d+$/.test(semver) || !['on', 'off'].includes(state)) refuse(`changelog maps a semver to on or off, not ${semver}: ${JSON.stringify(state)}`);
