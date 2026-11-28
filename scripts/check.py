@@ -43,14 +43,10 @@ ART_HASHES = {
     'art/todo-spec-poster.webp': '94a69b2033a98e4ae6663b61bf9f0af0ba06d5a4d4d28aa4b46247570cac5b72',
     'art/todo-spec.vtt': '47e9ffb41081dd72f541110c43312521a8dd92f1c8e58c11092ecd0daa74eee2',
     'art/todo-app.webp': 'ccc5be87687b1d4ac387cfb623033c0f567890cfe73570f8e4d4bb4b8a81de54',
-    'art/spec-video.mp4': '3422378bc03f4c8fb358f4a4c895774e7405c4ff00468acd81b4cc51dc2ac13b',
-    'art/spec-poster.webp': '4922f6d265ed8c0c57dead86a62288c94d97159dda34f95969db0ee42b72fdc4',
-    'art/spec-video.vtt': '570f5621ff3d84152587612d1be5d78ba5e0fbf6a7da306088a5897c755dc09d',
     'art/drivers-d-sea.webp': 'f2699bd8fe4763993a492dfac2bdbfc3eae46ec33bae0ab74127ad6ebc6a6285',
     'art/drivers-d-ship.webp': '885dd800aae2e75d45f2b88e1e69232bbf987df44beec9fa8070d4354b64cd04',
     'art/drivers-c-boat.webp': '39fd43d08aa36bce84e964699d493a03af090499a63dffbfaa43e61804b7e1ef',
     'art/moments-sea.webp': '903adfdf5e77c61d49bbbfba6b5aa7942a45a12293dbce40cf04175949d1fbb7',
-    'art/team-boat-poster.webp': '656c0c75f92a17390beda0d8afb45be3f9164330357635295998406dad3a69d4',
     'art/drivers-c-boat-1200.avif': '5c49b9c25ce422afa5773da974c1f396f2e0f54a759c46026774c5efaf0b7a32',
     'art/drivers-c-boat-1200.webp': 'e0f7d5f42765bd0c886c8917c06bf54d0c6f9766a37b9e3a340dcfa77f57e3ef',
     'art/drivers-c-boat-1672.avif': '89b7b8f8844cea6c6806b49d48e344583532b4805c8b22010fb6511b8c46e71e',
@@ -84,6 +80,9 @@ ICON_HASHES = {
     'brand/og.png': '4e976988aed9f9d5a37e4254165f6267aeb376d8749e05c0a280520c10df0c5a',
     'app/icon.ico': '33a21c61aa051f91475b46678bc0c4f537ab507273c088c4ed016d5ddce2b9cd',
     'app/icon-180.png': 'deb93ec39812c224c1470e2f1730f7f4ead7be3d27428a20a2a83284b77fbc2f',
+    'app/icon-light-180.png': 'c5fd63e77a201a4d99ecabdf510104f38de66efa88404107e97945f7ee6b7a99',
+    'app/icon-light-192.png': 'ead65f72e280345dda721269b1bfdb5bdd1cec676fce9073b51fc04d2c25f21f',
+    'app/icon-light-512.png': 'cc6e0310da3b973b6a9e07f85311f1d556a395733dfae85de255c9bc1d708047',
 }
 DOC_HASHES = {
     'docs/evidence/speed/fonts/app-1280x800.png': 'db6128e1d62daf1112ca41246fd04665bcc0b3060b99192bbc66927ef6fb66cf',
@@ -133,7 +132,7 @@ DOC_HASHES = {
     'docs/evidence/speed/speed-gsap-after-load/motion-hero-390.png': '07fc459d518ed9fe82187a32b4325779594672f208e10cabd83e9b45f151bf85',
     'docs/evidence/speed/speed-gsap-after-load/waterfall-390.png': 'd0a02240a419ea61e38eeb59ee76b29ee2d5624ecf97e8834e49c6131d2cc2b9',
 }
-VECTORS = ('favicon.svg', 'brand/openwiz-lockup.svg', 'app/mark.svg', 'app/icon.svg', 'app/wiz-reviewer.svg')
+VECTORS = ('favicon.svg', 'brand/openwiz-lockup.svg', 'app/mark.svg', 'app/icon.svg', 'app/icon-light.svg', 'app/wiz-reviewer.svg')
 MARK, OLD_MARK = '#cfc6b8', '#2b2bff'
 SITE_URL = 'https://openwiz.dev/'
 ART_BUDGET = 2_000_000
@@ -434,6 +433,7 @@ BANNED_COPY = ('play' 'book',)
 # PRIVACY: generic private-context markers only; never copy personal literal lists here.
 DENYLIST = ('closedwiz', '/users/', '/home/', 'private/evidence/',
             'docs/grills/', 'thr_', 'cr_sub_')
+ASK_DOC_HOME = '/' + 'home/' + 'someone/'
 FONT_HASHES = {
     'fonts/Geist-var.woff2': '048e449054f7b224ba304b13c430f8e381f5eeda7777ba4d88a5e7dafa3f4b26',
     'fonts/GeistMono-var.woff2': '9e8aaba5adee50826485cff3187dc86d45f7dd4799a80371af0f369bbd999989',
@@ -2335,7 +2335,7 @@ class ReleaseOutline(HTMLParser):
         classes = (attrs.get('class') or '').split()
         self.tags.append((tag, attrs))
         if tag == 'article':
-            self.entries.append({'name': '', 'small': '', 'date': None, 'headline': '', 'bullets': [], 'links': []})
+            self.entries.append({'name': '', 'small': '', 'after': '', 'date': None, 'headline': '', 'bullets': [], 'links': []})
         elif tag == 'p' and 'pre' in classes:
             self.pre = {'text': '', 'links': []}
         if tag == 'time' and self.entries:
@@ -2348,7 +2348,7 @@ class ReleaseOutline(HTMLParser):
 
     def handle_endtag(self, tag):
         if tag in ('h2', 'small', 'p', 'li'):
-            self.at = 'name' if tag == 'small' else None
+            self.at = 'after' if tag == 'small' else None
 
     def handle_data(self, data):
         if self.pre is not None:
@@ -2361,19 +2361,21 @@ class ReleaseOutline(HTMLParser):
 
 def check_releases(section, releases, live):
     outline = ReleaseOutline(section)
-    allowed = {'section': {'class', 'aria-label'}, 'article': {'class', 'aria-labelledby'}, 'h2': {'id'}, 'small': set(),
+    allowed = {'section': {'class', 'aria-label'}, 'article': {'class', 'aria-labelledby'}, 'h2': {'id'}, 'small': {'class'},
                'time': {'datetime'}, 'p': {'class'}, 'ul': set(), 'li': set(), 'a': {'href', 'data-count'}}
     for tag, attrs in outline.tags:
         assert tag in allowed, f'unexpected element in the release entries: {tag}'
         assert set(attrs) <= allowed[tag], f'unexpected attribute in the release entries: {tag} {sorted(attrs)}'
+        if tag == 'small':
+            assert attrs.get('class', 'semver') == 'semver', 'the semver small is unlabelled or labelled semver'
     assert outline.tags[:1] == [('section', {'class': 'releases', 'aria-label': 'Releases'})], 'the entries sit in one Releases section'
     want = sorted(releases.values(), key=lambda d: semver(d['semver']), reverse=True) if live else []
     assert len(outline.entries) == len(want), f'{len(outline.entries)} entries shown; the data and the install switch say {len(want)}'
     for got, data in zip(outline.entries, want):
         flat = lambda t: re.sub(r'\s+', ' ', t).strip()
         y, m, d = map(int, data['date'].split('-'))
-        assert (flat(got['name']), flat(got['small'])) == (data['name'], f'· {MONTHS[m - 1]} {d}, {y} ({data["semver"]})'), \
-            f'{data["name"]}: the entry is headed by its public name, its date and semver small beside it, newest first'
+        assert (flat(got['name']), flat(got['small']), flat(got['after'])) == (data['name'], f'· {MONTHS[m - 1]} {d}, {y} ({data["semver"]})', ''), \
+            f'{data["name"]}: the entry is headed by its whole public name, then its date and semver small, nothing after it, newest first'
         assert got['date'] == data['date'], f'{data["name"]}: the entry\'s date'
         assert flat(got['headline']) == data['headline'], f'{data["name"]}: the entry\'s headline'
         assert [flat(b) for b in got['bullets']] == data['bullets'], f'{data["name"]}: the entry\'s bullets'
@@ -2460,9 +2462,12 @@ def check_privacy(path, data):
     binary = path.endswith(('.webp', '.avif', '.mp4', '.png', '.ico')) or (font in FONT_HASHES and font.endswith('.woff2'))
     text = path + '\n' + ('' if binary else data.decode('utf-8'))
     assert not any(word in text.lower() for word in BANNED_COPY), f'banned word in {path}'
-    # PRIVACY: the documented rule definition must name its own markers. No other exemption.
+    # PRIVACY: this file may name its denylist. The Ask snapshot may quote the GitHub App
+    # guide's one public placeholder home directory. Every other home path still fails.
     if path == 'scripts/check.py':
         text = re.sub(r'DENYLIST = \([^)]*\)', '', text)
+    if path.startswith('ask-docs/') or path in ('ask-index.json', 'dist/ask-index.json'):
+        text = text.replace(ASK_DOC_HOME, '')
     assert not any(marker in text.lower() for marker in DENYLIST), f'private marker in {path}'
 
 
