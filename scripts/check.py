@@ -470,6 +470,13 @@ ABOUT_COST = ('OpenWiz is free and released under the Apache License 2.0. Suppor
 GUIDE_COST = ('OpenWiz is free and released under the Apache License 2.0. Supporter is $5 per month for priority support and to support the project, '
               'and the software stays the same. See Pricing. You pay only for the models and machines you use: your Claude Code or Codex plan, '
               'and any host you pick. boat.dev bills per second while a sandbox runs, and CloudRoom\u2019s charges are its own, on your plan with it.')
+ENTITY_NAME = 'OpenWiz, the open source agent factory'
+
+
+def title_of(page):
+    return page.head_fields['title'][0]
+
+
 PAGES = ('index.html', 'changelog/index.html', 'drivers/index.html', TEAM_PAGE, FAQ_PAGE, 'market/index.html', ABOUT_PAGE, GUIDE_PAGE, PRICING_PAGE)
 MIRROR_PATHS = {
     page: 'index.md' if page == 'index.html' else page.removesuffix('/index.html').removesuffix('.html') + '.md'
@@ -1219,10 +1226,24 @@ def check_discovery(root, pages):
 
     graph = structured['index.html']['@graph']
     assert all(isinstance(item, dict) for item in graph), 'invalid JSON-LD graph entries'
-    assert {item.get('@type') for item in graph} == {'Organization', 'WebSite', 'SoftwareApplication'} and len(graph) == 3, \
-        'the JSON-LD graph needs an organization, website and application'
+    assert {item.get('@type') for item in graph} == {'Organization', 'WebSite', 'SoftwareApplication', 'SoftwareSourceCode'} and len(graph) == 4, \
+        'the JSON-LD graph needs an organization, website, application and source code'
     entities = {item['@type']: item for item in graph}
-    org, software = entities['Organization'], entities['SoftwareApplication']
+    org, software, code = entities['Organization'], entities['SoftwareApplication'], entities['SoftwareSourceCode']
+    assert ENTITY_NAME in title_of(pages['index.html']) and ENTITY_NAME in pages['index.html'].head_fields['description'][0], \
+        f'the home title and description must say {ENTITY_NAME}'
+    same_as = org.get('sameAs')
+    assert isinstance(same_as, list) and same_as and len(set(same_as)) == len(same_as) and all(
+        isinstance(url, str) and urlsplit(url).scheme == 'https' and urlsplit(url).netloc for url in same_as) and software.get('sameAs') == same_as, \
+        'JSON-LD sameAs must be one list of distinct https profile URLs'
+    assert {'https://github.com/openwizdev', 'https://github.com/openwizdev/OpenWiz'} <= set(same_as), 'JSON-LD sameAs needs the GitHub organization and repository'
+    for entity in (org, software):
+        words = entity.get('disambiguatingDescription', '')
+        assert 'agent factory' in words and 'GP2X Wiz' in words, 'JSON-LD must say which OpenWiz this is'
+    assert code.get('codeRepository') == 'https://github.com/openwizdev/OpenWiz' and code.get('targetProduct') == {'@id': software.get('@id')} \
+        and code.get('publisher') == {'@id': org.get('@id')}, 'JSON-LD source code must name the repository and link the application'
+    assert len({entity.get('@id') for entity in graph}) == 4 and all(entity.get('@id', '').startswith(SITE_URL + '#') for entity in graph), \
+        'JSON-LD entities need distinct homepage @ids'
     assert all(entity.get('name') == 'OpenWiz' and entity.get('url') == SITE_URL for entity in graph), \
         'JSON-LD entities must name OpenWiz and use the homepage URL'
     logo = urlsplit(org.get('logo', ''))

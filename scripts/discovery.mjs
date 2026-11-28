@@ -9,9 +9,12 @@ const repo = github + '/OpenWiz';
 const skillsRepo = github + '/WizSkills';
 const skillsRef = 'maint/0.2';
 const repoRoot = fileURLToPath(new URL('..', import.meta.url));
+export const entityName = 'OpenWiz, the open source agent factory';
+const disambiguation = 'OpenWiz is the open source agent factory for coding agents such as Claude Code and Codex, made by the openwizdev organization on GitHub. It is not the open firmware for the GP2X Wiz handheld or the Windows utility of the same name.';
 const sameAs = [github, repo, 'https://x.com/openwiz'];
 const organization = site + '#organization';
 const software = site + '#software';
+const source = site + '#source';
 const schema = 'https://schema.org';
 
 export const aboutPage = 'what-is-openwiz/index.html';
@@ -19,8 +22,8 @@ export const faqPage = 'faq/index.html';
 export const guidePage = 'guides/run-many-coding-agents/index.html';
 export const pages = {
   'index.html': [
-    'OpenWiz: the open source agent factory for coding agents',
-    'OpenWiz is the open source kernel for agent factories. It runs fleets of coding agents like Claude Code and Codex on your own machines. Free, Apache-2.0.',
+    'OpenWiz, the open source agent factory for coding agents',
+    'OpenWiz, the open source agent factory, runs fleets of coding agents like Claude Code and Codex on your own machines. Free and Apache-2.0.',
   ],
   [aboutPage]: [
     'What is OpenWiz?',
@@ -32,7 +35,7 @@ export const pages = {
   ],
   [faqPage]: [
     'FAQ — OpenWiz',
-    'Questions about OpenWiz, the open source kernel for agent factories: what it is, what you need, where your agents run, what it costs.',
+    'Questions about OpenWiz, the open source agent factory: what it is, what you need, where your agents run and what it costs.',
   ],
   'drivers/index.html': [
     'Drivers — OpenWiz',
@@ -84,17 +87,27 @@ function structuredData(page, faq, html) {
     return {
       '@context': schema,
       '@graph': [
-        { '@type': 'Organization', '@id': organization, name: 'OpenWiz', url: site, logo: site + 'brand/openwiz-lockup.svg', sameAs },
-        { '@type': 'WebSite', '@id': site + '#website', name: 'OpenWiz', url: site },
         {
-          '@type': 'SoftwareApplication', '@id': software, name: 'OpenWiz', description: pages[page][1], url: site,
-          applicationCategory: 'DeveloperApplication', operatingSystem: 'macOS, Linux',
+          '@type': 'Organization', '@id': organization, name: 'OpenWiz', url: site, logo: site + 'brand/openwiz-lockup.svg',
+          description: entityName, disambiguatingDescription: disambiguation, sameAs,
+        },
+        { '@type': 'WebSite', '@id': site + '#website', name: 'OpenWiz', alternateName: entityName, url: site, publisher: { '@id': organization } },
+        {
+          '@type': 'SoftwareApplication', '@id': software, name: 'OpenWiz', alternateName: 'OpenWiz agent factory', description: pages[page][1],
+          disambiguatingDescription: disambiguation, url: site,
+          applicationCategory: 'DeveloperApplication', applicationSubCategory: 'Agent factory for coding agents', operatingSystem: 'macOS, Linux',
+          isAccessibleForFree: true,
           offers: [
             { '@type': 'Offer', price: 0, priceCurrency: 'USD', name: 'Free' },
             { '@type': 'Offer', price: 5, priceCurrency: 'USD', name: 'Supporter' },
           ],
-          license: 'https://www.apache.org/licenses/LICENSE-2.0', downloadUrl: repo + '/releases',
-          sameAs, publisher: { '@id': organization },
+          license: 'https://www.apache.org/licenses/LICENSE-2.0', downloadUrl: repo + '/releases', softwareHelp: { '@type': 'CreativeWork', url: repo + '#readme' },
+          sameAs, publisher: { '@id': organization }, author: { '@id': organization },
+        },
+        {
+          '@type': 'SoftwareSourceCode', '@id': source, name: 'OpenWiz', description: entityName, url: site,
+          codeRepository: repo, programmingLanguage: 'Rust', license: 'https://www.apache.org/licenses/LICENSE-2.0',
+          targetProduct: { '@id': software }, publisher: { '@id': organization },
         },
       ],
     };
