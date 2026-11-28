@@ -58,6 +58,7 @@ export const pages = {
     'OpenWiz stays free and open source. Supporter is $5 per month: priority support, and you support the project.',
   ],
   'app/index.html': ['The app — OpenWiz', 'Sign in with GitHub to see your OpenWiz specs, tickets and agents.', 'noindex'],
+  'counters/index.html': ['Site counters — OpenWiz', 'Totals for openwiz.dev: page views, docs views, install clicks and release downloads. No cookie, nothing per visitor.', 'noindex'],
   '404.html': ['Page not found — OpenWiz', 'Find the OpenWiz homepage, overview and frequently asked questions.', 'noindex'],
 };
 

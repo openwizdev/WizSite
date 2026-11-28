@@ -1,0 +1,23 @@
+{
+  "data": {
+    "viewer": {
+      "accounts": [
+        {
+          "rumPageloadEventsAdaptiveGroups": [
+            { "count": 40, "dimensions": { "date": "2031-03-01", "requestPath": "/" } },
+            { "count": 2, "dimensions": { "date": "2031-03-01", "requestPath": "/" } },
+            { "count": 7, "dimensions": { "date": "2031-03-01", "requestPath": "/market" } },
+            { "count": 5, "dimensions": { "date": "2031-03-01", "requestPath": "/docs/" } },
+            { "count": 3, "dimensions": { "date": "2031-03-01", "requestPath": "/docs/install/" } },
+            { "count": 9, "dimensions": { "date": "2031-03-01", "requestPath": "/wp-login.php" } },
+            { "count": 1, "dimensions": { "date": "2031-03-01", "requestPath": "/docs/Someone@Example.test/" } },
+            { "count": 4, "dimensions": { "date": "2031-03-01", "requestPath": "/app/" } },
+            { "count": 11, "dimensions": { "date": "2031-03-02", "requestPath": "/" } },
+            { "count": 6, "dimensions": { "date": "2031-03-02", "requestPath": "/faq/" } }
+          ]
+        }
+      ]
+    }
+  },
+  "errors": null
+}

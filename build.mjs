@@ -8,6 +8,7 @@ import { withDrivers } from './scripts/drivers.mjs';
 import { aboutPage, crawlerFiles, guidePage, pages, urlFor, withMetadata } from './scripts/discovery.mjs';
 import { mirrorPath, toMarkdown } from './scripts/mirrors.mjs';
 import { withCheckout } from './scripts/pricing.mjs';
+import { PAGE as countersPage, readDaily, render as renderCounters, summary as countersSummary, withCounters } from './scripts/counters.mjs';
 
 const root = new URL('./', import.meta.url);
 const output = new URL('dist/', root);
@@ -49,6 +50,8 @@ const registry = await readRegistry();
 console.log(`Market: ${marketSummary(registry)}`);
 const reach = await readReach();
 console.log(`Reach: ${reachSummary(reach)}`);
+const counters = await readDaily();
+console.log(countersSummary(counters));
 await rm(output, { recursive: true, force: true });
 const put = async (name, data) => {
   const target = new URL(name, output);
@@ -77,7 +80,7 @@ let about, guide;
 const mirrors = new Map();
 for (const [page, [, , robots]] of Object.entries(pages)) {
   let html = await readFile(new URL(page, root), 'utf8');
-  if (page === aboutPage || page === guidePage || page === '404.html') {
+  if (page === aboutPage || page === guidePage || page === '404.html' || page === countersPage) {
     html = html.replace('<template data-slot="top-bar"></template>', () => topBar);
   }
   if (page === guidePage) guide = html;
@@ -93,6 +96,7 @@ for (const [page, [, , robots]] of Object.entries(pages)) {
   if (page === 'market/index.html') html = withMarket(html, renderMarket(registry));
   if (page === 'drivers/index.html') html = withDrivers(html, registry);
   if (page === 'pricing/index.html') html = withCheckout(html);
+  if (page === countersPage) html = withCounters(html, renderCounters(counters));
   await put(page, html);
   if (!robots) {
     const markdown = toMarkdown(html, urlFor(page));

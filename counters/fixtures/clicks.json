@@ -1,0 +1,14 @@
+{
+  "meta": [
+    { "name": "date", "type": "Date" },
+    { "name": "action", "type": "String" },
+    { "name": "count", "type": "Float64" }
+  ],
+  "data": [
+    { "date": "2031-03-01", "action": "install-copy", "count": 4 },
+    { "date": "2031-03-01", "action": "install-in-wiz", "count": "3" },
+    { "date": "2031-03-01", "action": "star", "count": 8 },
+    { "date": "2031-03-02", "action": "install-copy", "count": 1 }
+  ],
+  "rows": 4
+}

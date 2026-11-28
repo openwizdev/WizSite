@@ -18,6 +18,7 @@ To install OpenWiz ([v0.1.0](https://github.com/openwizdev/OpenWiz/releases/tag/
 - [https://openwiz.dev/team/](https://openwiz.dev/team/) books a call.
 - [https://openwiz.dev/pricing/](https://openwiz.dev/pricing/) lists Free and the $5 Supporter plan.
 - [https://openwiz.dev/app/](https://openwiz.dev/app/) is the app. Its pages are You, Queue, Specs, Agents, Canvas and Models. A spec's page draws its ticket graph.
+- [https://openwiz.dev/counters/](https://openwiz.dev/counters/) shows the site's total counts.
 - [https://openwiz.dev/404.html](https://openwiz.dev/404.html) is the not-found page.
 
 ## Functions
