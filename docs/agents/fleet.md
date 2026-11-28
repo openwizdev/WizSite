@@ -87,9 +87,9 @@ Source: [`docs/maintaining.md`](../maintaining.md#build-and-check), [`package.js
 
 | Check | Runs | Required on |
 | --- | --- | --- |
-| `Build, links, resources and privacy` | Workflow `Site`, job `site`: on pull requests the added-comment check (`tools/comment-check/check.py`) first, then test commands 1 to 8, in order | `main`, by this project's merge rule below; no ruleset requires it |
+| `Build, links, resources and privacy` | Workflow `Site`, job `site`: on pull requests the added-comment check (`tools/comment-check/check.py`) and its source-drift check (`tools/comment-check/drift.py`) first, then test commands 1 to 8, in order | `main`, by this project's merge rule below; no ruleset requires it |
 
-The workflow runs for every pull request against `main` and every push to `main`, without path filters, so docs-only changes run it too. Cloudflare Pages also reports a `Cloudflare Pages` check from its own Git integration; it is the deploy preview, not one of these checks. The ruleset "protect" refuses branch deletion and force-pushes on the default branch and requires no status check.
+The workflow runs for every pull request against `main`, every push to `main`, and merge groups targeting `main`, without path filters, so docs-only changes run it too. Cloudflare Pages also reports a `Cloudflare Pages` check from its own Git integration; it is the deploy preview, not one of these checks. The ruleset "protect" refuses branch deletion and force-pushes on the default branch and requires no status check.
 
 Source: [`.github/workflows/site.yml`](../../.github/workflows/site.yml), and the branch rules (`gh api repos/openwizdev/WizSite/rulesets`, read 2026-11-20).
 
