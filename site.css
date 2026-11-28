@@ -623,6 +623,7 @@ body.landing > main { flex: 1 0 auto; }
 }
 .faq-ask [hidden] { display: none; }
 .faq-ask-form { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; min-height: 64px; }
+.faq-ask[data-state="asking"] .faq-ask-form { min-height: 0; }
 .faq-ask-human { flex: 1 0 100%; }
 .faq-ask-human:empty { display: none; }
 .faq-ask-form input { flex: 1; min-width: 0; min-height: 44px; padding: 10px 0; border: 0; background: none; color: var(--ink); font: 560 clamp(17px, 1.5vw, 19px)/1.35 var(--ow-font-sans); letter-spacing: -.015em; }
