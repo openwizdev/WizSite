@@ -1277,13 +1277,6 @@ def check_discovery(root, pages):
         assert f'{SITE_URL}{copy}' in brief.split('\n## Markdown copies\n')[-1], f'llms.txt must list {copy}'
         assert url in full_text, f'llms-full.txt must hold {name}'
     assert '`Install OpenWiz from github.com/openwizdev/OpenWiz`' in (root / 'index.md').read_text(), 'the home copy needs the install line'
-    for name in PAGES:
-        main_html = re.search(r'<main\b[^>]*>([\s\S]*?)</main>', (root / name).read_text())[1]
-        main_html = re.sub(r'<(template|script|svg|noscript|form|dialog)\b[\s\S]*?</\1>', '', main_html)
-        main_html = re.sub(r'<(\w+)\b[^>]*\b(hidden|aria-hidden="true")[^>]*>[\s\S]*?</\1>', '', main_html)
-        copy_text = (root / mirror_path(name)).read_text()
-        for href in re.findall(r'<p\b[^>]*>[^<]*(?:<(?!/p>)[^<]*)*?<a\b[^>]*\bhref="(https://github\.com/[^"]+)"', main_html):
-            assert unescape(href) in copy_text, f'{mirror_path(name)} must keep the link {unescape(href)}'
     faq_copy = (root / mirror_path(FAQ_PAGE)).read_text()
     for _, question, _, answer in FAQ_ROWS.findall(FAQ):
         assert f'{plain(question)}\n\n' in faq_copy, f'the FAQ copy needs the question: {plain(question)}'
@@ -1341,6 +1334,16 @@ def check_security_txt(text, now=None):
     assert expires - today >= timedelta(days=SECURITY_TXT_MIN_DAYS), (
         f'security.txt Expires {raw} is within {SECURITY_TXT_MIN_DAYS} days; move it about a year out'
     )
+
+
+def check_mirror_links(root):
+    for name in PAGES:
+        main_html = re.search(r'<main\b[^>]*>([\s\S]*?)</main>', (root / name).read_text())[1]
+        main_html = re.sub(r'<(template|script|svg|noscript|form|dialog)\b[\s\S]*?</\1>', '', main_html)
+        main_html = re.sub(r'<(\w+)\b[^>]*\b(hidden|aria-hidden="true")[^>]*>[\s\S]*?</\1>', '', main_html)
+        copy_text = (root / mirror_path(name)).read_text()
+        for href in re.findall(r'<p\b[^>]*>[^<]*(?:<(?!/p>)[^<]*)*?<a\b[^>]*\bhref="(https://github\.com/[^"]+)"', main_html):
+            assert unescape(href) in copy_text, f'{mirror_path(name)} must keep the link {unescape(href)}'
 
 
 def check_site(root, registry=ROOT / 'market/registry.json', now=None):
@@ -2616,6 +2619,7 @@ def check_privacy(path, data):
 def main():
     output = ROOT / 'dist'
     check_site(output)
+    check_mirror_links(output)
     for name in RUNTIME - set(FINGERPRINTS.values()) - set(ALL_PAGES) - {ASK_INDEX} - DISCOVERY_FILES:
         source = APP_VENDOR[name][0] if name in APP_VENDOR else name
         assert (ROOT / source).read_bytes() == (output / name).read_bytes(), f'export differs: {name}'
