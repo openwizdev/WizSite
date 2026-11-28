@@ -1,5 +1,3 @@
-// Markdown copies of the site's indexable pages for AI fetchers (SO4 of spec openwizdev/OpenWiz#3513).
-// A page at /<path>/ has its copy at /<path>.md, and the home page's copy is /index.md.
 import { decode } from './ask-index.mjs';
 
 const site = 'https://openwiz.dev/';
@@ -19,8 +17,6 @@ const inline = html => decode(html
   .replace(/<[^>]*>/g, ''))
   .replace(/\s+/g, ' ').trim();
 
-// Turn a page's <main> into Markdown: headings, paragraphs, lists, block quotes and code blocks.
-// Scripts, styles, templates, SVG, forms, buttons and anything hidden are left out.
 export function pageMarkdown(html) {
   const main = html.match(/<main\b[^>]*>([\s\S]*?)<\/main>/);
   if (!main) throw new Error('a page needs one <main> for its Markdown copy');
@@ -29,7 +25,6 @@ export function pageMarkdown(html) {
     .replace(/<(script|style|template|svg|noscript|form|video|audio|picture|figure|dialog)\b[\s\S]*?<\/\1>/g, '')
     .replace(/<(\w+)\b[^>]*\b(hidden|aria-hidden="true")[^>]*>[\s\S]*?<\/\1>/g, '')
     .replace(/<button\b[^>]*>([\s\S]*?)<\/button>/g, '')
-    // A line meant to be copied (the install line) stands as its own paragraph.
     .replace(/<code\b[^>]*class="[^"]*install-line[^"]*"[^>]*>([\s\S]*?)<\/code>/g, '<p><code>$1</code></p>');
   const blocks = [];
   const pre = [];
@@ -49,7 +44,6 @@ export function pageMarkdown(html) {
     else if (tag === 'blockquote') blocks.push('> ' + text);
     else blocks.push(text);
   }
-  // Join list items into one list; keep a blank line between other blocks.
   return blocks.reduce((out, block, i) => out + (i === 0 ? '' : (block.startsWith('- ') && blocks[i - 1].startsWith('- ') ? '\n' : '\n\n')) + block, '') + '\n';
 }
 
