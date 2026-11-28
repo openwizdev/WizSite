@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "OpenWiz answer page v1",
+  "description": "One answers/<slug>.json per page. Titles and descriptions are unique in the registry. OpenWiz claims come from its docs or changelog. Claims about another tool link to that tool's own public sources. Page copy never solicits votes or stars.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["slug", "kind", "query", "title", "description", "answer", "sections", "faq", "sources", "checked"],
+  "properties": {
+    "slug": {"type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*(?![\\s\\S])", "description": "Must match the file stem."},
+    "kind": {"type": "string", "enum": ["answer", "compare"], "description": "Selects /guides/<slug>/ or /compare/<slug>/, respectively."},
+    "query": {"type": "string", "pattern": "\\S", "description": "The search query this page answers."},
+    "title": {"type": "string", "pattern": "OpenWiz", "maxLength": 60, "description": "Unique registry title."},
+    "description": {"type": "string", "pattern": "\\S", "maxLength": 160, "description": "Unique registry description."},
+    "answer": {"type": "string", "pattern": "\\S", "description": "Two or three complete sentences displayed first under the page heading."},
+    "sections": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["heading", "body"],
+        "properties": {
+          "heading": {"type": "string", "pattern": "\\S"},
+          "body": {"type": "string", "pattern": "\\S", "description": "Markdown section body."}
+        }
+      }
+    },
+    "steps": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Optional ordered HowTo steps. Each step supplies the visible name and instruction.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "text"],
+        "properties": {
+          "name": {"type": "string", "pattern": "\\S"},
+          "text": {"type": "string", "pattern": "\\S"}
+        }
+      }
+    },
+    "faq": {
+      "type": "array",
+      "description": "Visible questions and answers for FAQPage. May be empty when the page has HowTo steps.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["question", "answer"],
+        "properties": {
+          "question": {"type": "string", "pattern": "\\S"},
+          "answer": {"type": "string", "pattern": "\\S"}
+        }
+      }
+    },
+    "sources": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Dated evidence for the page's claims. Each entry identifies the claim its URL supports.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["url", "supports", "checked"],
+        "properties": {
+          "url": {"type": "string", "format": "uri", "pattern": "^https?://"},
+          "supports": {"type": "string", "pattern": "\\S"},
+          "checked": {"type": "string", "format": "date"}
+        }
+      }
+    },
+    "checked": {"type": "string", "format": "date", "description": "The date the page was last checked."},
+    "other": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "homepage"],
+      "properties": {
+        "name": {"type": "string", "pattern": "\\S"},
+        "homepage": {"type": "string", "format": "uri", "pattern": "^https?://"}
+      }
+    },
+    "better_fit": {"type": "string", "pattern": "\\S", "description": "Where the other tool fits better."}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"kind": {"const": "compare"}}},
+      "then": {"required": ["other", "better_fit"]},
+      "else": {"properties": {"other": false, "better_fit": false}}
+    },
+    {
+      "if": {"required": ["steps"]},
+      "else": {"properties": {"faq": {"minItems": 1}}}
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "slug": "example-compare",
+  "kind": "compare",
+  "query": "OpenWiz or Example Tool",
+  "title": "OpenWiz and Example Tool compared",
+  "description": "Compare OpenWiz with a fictional scheduling tool.",
+  "answer": "OpenWiz is an open kernel for agent factories. Example Tool schedules jobs.",
+  "sections": [{"heading": "Scheduling", "body": "[Example Tool schedules jobs](https://tool.example/docs/scheduling)."}],
+  "faq": [{"question": "Can Example Tool schedule jobs?", "answer": "Yes, see the scheduling docs in the sources."}],
+  "sources": [
+    {"url": "https://github.com/openwizdev/OpenWiz#readme", "supports": "OpenWiz is an open kernel for agent factories.", "checked": "2026-11-28"},
+    {"url": "https://tool.example/docs/scheduling", "supports": "Example Tool schedules jobs.", "checked": "2026-11-28"}
+  ],
+  "checked": "2026-11-28",
+  "other": {"name": "Example Tool", "homepage": "https://tool.example/"},
+  "better_fit": "Example Tool fits better when all you need is job scheduling."
+}
