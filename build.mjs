@@ -5,11 +5,12 @@ import { installSwitch, readReleases, render, summary, withReleases } from './sc
 import { readRegistry, render as renderMarket, summary as marketSummary, withMarket } from './scripts/market.mjs';
 import { withDrivers } from './scripts/drivers.mjs';
 import { aboutPage, crawlerFiles, guidePage, helpPage, pages, withMetadata } from './scripts/discovery.mjs';
+import { withCheckout } from './scripts/pricing.mjs';
 
 const root = new URL('./', import.meta.url);
 const output = new URL('dist/', root);
 const vendor = ['vendor/gsap-3.15.1.min.js', 'vendor/GSAP-LICENSE.txt', 'vendor/LOBE-ICONS-LICENSE.txt', 'vendor/LUCIDE-LICENSE.txt'];
-const art = (await readdir(new URL('art/', root))).filter(name => name.endsWith('.webp')).sort().map(name => `art/${name}`);
+const art = (await readdir(new URL('art/', root))).filter(name => /\.(webp|avif)$/.test(name)).sort().map(name => `art/${name}`);
 const driverLogos = ['drivers/logos/boat-dev.svg', 'drivers/logos/cloudroom.png', 'drivers/logos/monitor.svg', 'drivers/logos/amp.svg', 'drivers/logos/antigravity.svg', 'drivers/logos/augment.svg', 'drivers/logos/capy.svg', 'drivers/logos/cline.svg', 'drivers/logos/conductor.svg', 'drivers/logos/crush.png', 'drivers/logos/cursor.svg', 'drivers/logos/devin.svg', 'drivers/logos/factory.svg', 'drivers/logos/gemini-cli.svg', 'drivers/logos/goose.png', 'drivers/logos/hermes.png', 'drivers/logos/kilo-code.svg', 'drivers/logos/kimi-code.svg', 'drivers/logos/kiro.svg', 'drivers/logos/ona.svg', 'drivers/logos/openclaw.svg', 'drivers/logos/opencode.svg', 'drivers/logos/openhands.svg', 'drivers/logos/pane.svg', 'drivers/logos/pi.svg', 'drivers/logos/qwen-code.svg', 'drivers/logos/sculptor.svg', 'drivers/logos/tembo.svg', 'drivers/logos/warp.svg'];
 const landing = await readFile(new URL('index.html', root), 'utf8');
 const topBar = landing.match(/<header class="landing-nav [^"]*">[\s\S]*?<\/header>/)[0];
@@ -84,6 +85,7 @@ for (const page of Object.keys(pages)) {
   if (page === 'changelog/index.html') html = withReleases(html, render(releases, live));
   if (page === 'market/index.html') html = withMarket(html, renderMarket(registry));
   if (page === 'drivers/index.html') html = withDrivers(html, registry);
+  if (page === 'pricing/index.html') html = withCheckout(html);
   await put(page, html);
 }
 const discovery = crawlerFiles(about, faq, guide);
