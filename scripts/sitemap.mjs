@@ -1,4 +1,3 @@
-// The sitemap index and one sitemap per section (contracts/discovery.v1.md, SO1 of spec openwizdev/OpenWiz#3513).
 import { SECTIONS, SITE, urlFor } from './registry.mjs';
 
 const xml = text => text.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' })[c]);

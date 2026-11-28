@@ -1,4 +1,3 @@
-// The page registry (contracts/discovery.v1.md, SO1 of spec openwizdev/OpenWiz#3513): every page that joins search.
 export const SITE = 'https://openwiz.dev/';
 export const SECTIONS = ['pages', 'market', 'docs', 'answers'];
 
@@ -35,7 +34,6 @@ export function createRegistry() {
   };
 }
 
-// The page's BreadcrumbList, home first and the page itself last; null for the home or a noindex page.
 export function breadcrumbData(entry) {
   if (!entry.indexable || entry.trail.length === 0) return null;
   const items = [{ name: 'OpenWiz', path: 'index.html' }, ...entry.trail];

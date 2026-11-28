@@ -59,7 +59,6 @@ export const pages = {
   '404.html': ['Page not found — OpenWiz', 'Find the OpenWiz homepage, overview and frequently asked questions.', 'noindex'],
 };
 
-// Each page's breadcrumb name (contracts/discovery.v1.md); the home has none.
 const crumbs = {
   [aboutPage]: 'What is OpenWiz?', [guidePage]: 'Run many coding agents', [faqPage]: 'FAQ', 'drivers/index.html': 'Drivers',
   'changelog/index.html': 'Changelog', 'market/index.html': 'Market', 'team/index.html': 'For teams', 'pricing/index.html': 'Pricing',
@@ -79,7 +78,6 @@ export const lastModified = page => {
   return fallbackDate;
 };
 
-// The registry, seeded with the page table; later generators add their pages to it before crawlerFiles runs.
 export const registry = createRegistry();
 for (const [page, [title, description, robots]] of Object.entries(pages)) {
   registry.add({
