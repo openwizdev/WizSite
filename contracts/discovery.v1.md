@@ -21,7 +21,7 @@ A generator registers its pages with one call, `registry.add(entry)`, before the
 ## Sitemaps
 
 - `https://openwiz.dev/sitemap.xml` is a **sitemap index** (`<sitemapindex>`). `robots.txt` keeps pointing at it, so search consoles keep the one URL.
-- Each section with at least one indexable page has `https://openwiz.dev/sitemaps/<section>.xml`, a `<urlset>` listing each of its indexable pages exactly once, each with its `lastmod`. The index lists each section sitemap once, with the newest `lastmod` of its pages.
+- Each section with at least one indexable page has `https://openwiz.dev/sitemap-<section>.xml`, at the site root so its directory covers every page it lists (a sitemap may only list URLs under its own directory), a `<urlset>` listing each of its indexable pages exactly once, each with its `lastmod`. The index lists each section sitemap once, with the newest `lastmod` of its pages.
 - No page is in two sections. No section sitemap lists more than 50,000 URLs.
 
 ## Breadcrumbs

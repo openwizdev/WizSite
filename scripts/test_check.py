@@ -101,7 +101,7 @@ class Checks(unittest.TestCase):
                 ('app/index.html', r'<meta name="robots"[^>]*>', '', 'noindex'),
                 ('faq/index.html', r'"mainEntity":', '?', 'invalid JSON-LD'),
                 ('faq/index.html', r'"text": "The open source kernel', '"text": "A kernel', 'FAQ JSON-LD'),
-                ('sitemaps/pages.xml', r'<url><loc>https://openwiz.dev/</loc>.*?</url>', '', 'section sitemaps must list'),
+                ('sitemap-pages.xml', r'<url><loc>https://openwiz.dev/</loc>.*?</url>', '', 'section sitemaps must list'),
                 ('sitemap.xml', r'<sitemapindex ([^>]*)>([\s\S]*)</sitemapindex>', r'<urlset \1>\2</urlset>', 'must be a sitemap index'),
                 ('sitemap.xml', r'<lastmod>[^<]*</lastmod>', '<lastmod>1999-01-01</lastmod>', 'newest page'),
                 ('faq/index.html', r'"@type": "BreadcrumbList"', '"@type": "ItemList"', 'unexpected number of JSON-LD blocks'),
@@ -119,7 +119,7 @@ class Checks(unittest.TestCase):
                             check_site(root)
                     finally:
                         path.write_text(original)
-            for name in ('robots.txt', 'sitemap.xml', 'sitemaps/pages.xml', 'llms.txt', 'llms-full.txt', 'SKILL.md', '404.html'):
+            for name in ('robots.txt', 'sitemap.xml', 'sitemap-pages.xml', 'llms.txt', 'llms-full.txt', 'SKILL.md', '404.html'):
                 with self.subTest(missing=name):
                     path = root / name
                     original = path.read_bytes()
@@ -141,10 +141,10 @@ class Checks(unittest.TestCase):
                             '<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": ['
                             '{"@type": "ListItem", "position": 1, "name": "OpenWiz", "item": "https://openwiz.dev/"}, '
                             '{"@type": "ListItem", "position": 2, "name": "Synthetic", "item": "https://openwiz.dev/docs/synthetic/"}]}</script></head><body><main><h1>Synthetic</h1></main></body></html>')
-            (root / 'sitemaps/docs.xml').write_text('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+            (root / 'sitemap-docs.xml').write_text('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
                                                     '  <url><loc>https://openwiz.dev/docs/synthetic/</loc><lastmod>2026-11-28</lastmod></url>\n</urlset>\n')
             index = root / 'sitemap.xml'
-            index.write_text(index.read_text().replace('</sitemapindex>', '  <sitemap><loc>https://openwiz.dev/sitemaps/docs.xml</loc><lastmod>2026-11-28</lastmod></sitemap>\n</sitemapindex>'))
+            index.write_text(index.read_text().replace('</sitemapindex>', '  <sitemap><loc>https://openwiz.dev/sitemap-docs.xml</loc><lastmod>2026-11-28</lastmod></sitemap>\n</sitemapindex>'))
             check_site(root)
             self.assertIn('docs/synthetic/index.html', registered_extras(root))
             with_crumb = page.read_text()
@@ -155,7 +155,7 @@ class Checks(unittest.TestCase):
             extra = root / 'guides/synthetic/index.html'
             extra.parent.mkdir(parents=True)
             extra.write_text(page.read_text().replace('docs/synthetic/', 'guides/synthetic/'))
-            pages_map = root / 'sitemaps/pages.xml'
+            pages_map = root / 'sitemap-pages.xml'
             pages_map.write_text(pages_map.read_text().replace('</urlset>', '  <url><loc>https://openwiz.dev/guides/synthetic/</loc><lastmod>2026-11-28</lastmod></url>\n</urlset>'))
             check_site(root)
             self.assertIn('guides/synthetic/index.html', registered_extras(root))
@@ -181,7 +181,7 @@ class Checks(unittest.TestCase):
                 (guide, r'<h1>How to run many coding agents at once</h1>', '<h1>Run coding agents</h1>', 'guide h1 and HowTo name'),
                 (guide, r'OpenWiz 0\.01 \(version 0\.1\.0\)', 'OpenWiz 0.02 (version 0.1.1)', 'names only OpenWiz 0.01'),
                 ('what-is-openwiz/index.html', r'href="/guides/run-many-coding-agents/">Guide: run many coding agents</a>', 'href="/faq/">Guide</a>', 'overview links the guide'),
-                ('sitemaps/pages.xml', r'<url><loc>https://openwiz\.dev/guides/run-many-coding-agents/</loc>.*?</url>', '', 'section sitemaps must list'),
+                ('sitemap-pages.xml', r'<url><loc>https://openwiz\.dev/guides/run-many-coding-agents/</loc>.*?</url>', '', 'section sitemaps must list'),
                 ('llms.txt', r'- \[How to run many coding agents at once\]\(https://openwiz\.dev/guides/run-many-coding-agents/\)[^\n]*\n', '', 'invalid llms.txt'),
                 ('llms-full.txt', r'\n6\. Watch it ship\.[^\n]*', '', 'llms-full.txt needs the guide'),
             ]

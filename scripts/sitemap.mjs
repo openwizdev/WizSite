@@ -9,7 +9,7 @@ export function sitemapFiles(entries) {
     const pages = entries.filter(entry => entry.indexable && entry.section === section);
     if (pages.length === 0) continue;
     if (pages.length > 50000) throw new Error(`the ${section} sitemap has more than 50,000 URLs`);
-    const name = `sitemaps/${section}.xml`;
+    const name = `sitemap-${section}.xml`;
     files[name] = ['<?xml version="1.0" encoding="UTF-8"?>', '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
       ...pages.map(entry => `  <url><loc>${xml(urlFor(entry.path))}</loc><lastmod>${entry.lastmod}</lastmod></url>`), '</urlset>', ''].join('\n');
     const newest = pages.map(entry => entry.lastmod).sort().at(-1);

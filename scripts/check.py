@@ -419,7 +419,7 @@ def with_cta(html):
 FONT_FINGERPRINTS = {name: fingerprint(name, (ROOT / name).read_bytes()) for name in FONT_FILES}
 FINGERPRINTS = {name: fingerprint(name, built_asset_bytes(name, FONT_FINGERPRINTS)) for name in HASHED}
 ASK_INDEX = 'ask-index.json'
-DISCOVERY_FILES = {ROBOTS_TXT, 'sitemap.xml', 'sitemaps/pages.xml', 'llms.txt', 'llms-full.txt'}
+DISCOVERY_FILES = {ROBOTS_TXT, 'sitemap.xml', 'sitemap-pages.xml', 'llms.txt', 'llms-full.txt'}
 ABOUT_PAGE = 'what-is-openwiz/index.html'
 GUIDE_PAGE = 'guides/run-many-coding-agents/index.html'
 GUIDE_H1 = 'How to run many coding agents at once'
@@ -1267,7 +1267,7 @@ def check_discovery(root, pages):
     assert index.tag == ns + 'sitemapindex', 'sitemap.xml must be a sitemap index'
     children = [(entry.findtext(ns + 'loc') or '', entry.findtext(ns + 'lastmod') or '') for entry in index.findall(ns + 'sitemap')]
     assert children and len({loc for loc, _ in children}) == len(children) and all(
-        re.fullmatch(re.escape(SITE_URL) + r'sitemaps/(pages|market|docs|answers)\.xml', loc) and valid_lastmod(lastmod) for loc, lastmod in children), \
+        re.fullmatch(re.escape(SITE_URL) + r'sitemap-(pages|market|docs|answers)\.xml', loc) and valid_lastmod(lastmod) for loc, lastmod in children), \
         'the sitemap index must list each section sitemap once, with a lastmod'
     urls = []
     for loc, lastmod in children:
@@ -1364,9 +1364,9 @@ def registered_extras(root):
         return extras
     for loc in (entry.findtext(ns + 'loc') or '' for entry in index.findall(ns + 'sitemap')):
         rel = loc.removeprefix(SITE_URL)
-        if not re.fullmatch(r'sitemaps/(pages|market|docs|answers)\.xml', rel) or not (root / rel).is_file():
+        if not re.fullmatch(r'sitemap-(pages|market|docs|answers)\.xml', rel) or not (root / rel).is_file():
             continue
-        if rel != 'sitemaps/pages.xml':
+        if rel != 'sitemap-pages.xml':
             extras.add(rel)
         try:
             child = ElementTree.parse(root / rel).getroot()

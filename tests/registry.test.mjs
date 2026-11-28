@@ -43,11 +43,11 @@ test('one section sitemap per section with pages, under one index with the newes
   registry.add(page('guides/x/index.html', 'X OpenWiz', 'answers', '2026-11-25'));
   registry.add({ ...page('app/index.html', 'App OpenWiz'), indexable: false });
   const files = sitemapFiles(registry.all());
-  assert.deepEqual(Object.keys(files).sort(), ['sitemap.xml', 'sitemaps/answers.xml', 'sitemaps/pages.xml']);
-  assert.match(files['sitemap.xml'], /<sitemap><loc>https:\/\/openwiz\.dev\/sitemaps\/pages\.xml<\/loc><lastmod>2026-11-21<\/lastmod><\/sitemap>/);
-  assert.match(files['sitemap.xml'], /sitemaps\/answers\.xml<\/loc><lastmod>2026-11-25</);
-  assert.equal((files['sitemaps/pages.xml'].match(/<url>/g) || []).length, 2);
-  assert.doesNotMatch(files['sitemaps/pages.xml'], /app\//);
+  assert.deepEqual(Object.keys(files).sort(), ['sitemap-answers.xml', 'sitemap-pages.xml', 'sitemap.xml']);
+  assert.match(files['sitemap.xml'], /<sitemap><loc>https:\/\/openwiz\.dev\/sitemap-pages\.xml<\/loc><lastmod>2026-11-21<\/lastmod><\/sitemap>/);
+  assert.match(files['sitemap.xml'], /sitemap-answers\.xml<\/loc><lastmod>2026-11-25</);
+  assert.equal((files['sitemap-pages.xml'].match(/<url>/g) || []).length, 2);
+  assert.doesNotMatch(files['sitemap-pages.xml'], /app\//);
 });
 
 test('a trail step must be a registered page', () => {
@@ -70,8 +70,8 @@ test('a page added with registry.add gets its metadata, breadcrumb and section s
   assert.match(html, /<link rel="canonical" href="https:\/\/openwiz\.dev\/docs\/synthetic\/">/);
   assert.match(html, /"@type": "BreadcrumbList"/);
   const files = sitemapFiles(siteRegistry.verified());
-  assert.match(files['sitemaps/docs.xml'], /https:\/\/openwiz\.dev\/docs\/synthetic\//);
-  assert.match(files['sitemap.xml'], /sitemaps\/docs\.xml/);
+  assert.match(files['sitemap-docs.xml'], /https:\/\/openwiz\.dev\/docs\/synthetic\//);
+  assert.match(files['sitemap.xml'], /sitemap-docs\.xml/);
   assert.throws(() => withMetadata('docs/unregistered/index.html', ''), /not in the page registry/);
 });
 
