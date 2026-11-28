@@ -20,25 +20,21 @@ test('rendered reach section matches landing/reach.json snapshot and logo rules'
   assert.equal(hosts.length, 7);
   assert.ok(coming.length > 0);
 
-  // Every item in the snapshot renders with its exact name and data-reach key.
   for (const item of reach.items) {
     assert.ok(html.includes(`data-reach="${item.kind}:${item.id}"`), `missing ${item.kind}:${item.id}`);
     assert.ok(html.includes(item.name), `missing name ${item.name}`);
   }
 
-  // No harness or host on main ever shows as coming.
   const todayKeys = new Set(reach.items.filter(i => i.tier === 'today').map(i => `${i.kind}:${i.id}`));
   for (const item of coming) {
     assert.ok(!todayKeys.has(`${item.kind}:${item.id}`), `${item.kind}:${item.id} is both today and coming`);
   }
 
-  // Sprites and Codespaces are coming (README only on main, no driver file).
   assert.ok(!todayKeys.has('host:sprites'));
   assert.ok(!todayKeys.has('host:codespaces'));
   assert.ok(coming.some(i => i.kind === 'host' && i.id === 'sprites'));
   assert.ok(coming.some(i => i.kind === 'host' && i.id === 'codespaces'));
 
-  // Every <img> is a lazy SVG from /drivers/logos/ with explicit dimensions.
   const imgs = [...html.matchAll(/<img\b[^>]*>/g)].map(m => m[0]);
   assert.equal(imgs.length, Object.keys(LOGOS).length);
   for (const img of imgs) {

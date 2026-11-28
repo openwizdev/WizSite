@@ -6,10 +6,6 @@ import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { REACH, NAMES, PLATFORM, parse } from './reach.mjs';
 
-// Usage, from WizSite's root:
-//   gh pr list -R openwizdev/OpenWiz --state open --limit 300 --json number,title,url,headRefName,files > /tmp/openwiz-prs.json
-//   node scripts/landing-sync.mjs <OpenWiz checkout on main> /tmp/openwiz-prs.json
-// It reads only the checkout and the file, never the network, and writes landing/reach.json.
 const USAGE = 'usage: node scripts/landing-sync.mjs <OpenWiz checkout> <open-PRs JSON from: gh pr list -R openwizdev/OpenWiz --state open --limit 300 --json number,title,url,headRefName,files>';
 const PR_URL = /^https:\/\/github\.com\/openwizdev\/OpenWiz\/pull\/(\d+)$/;
 const ID = /^[a-z0-9][a-z0-9-]{0,39}$/;
