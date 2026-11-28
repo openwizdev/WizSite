@@ -420,6 +420,12 @@ FONT_FINGERPRINTS = {name: fingerprint(name, (ROOT / name).read_bytes()) for nam
 FINGERPRINTS = {name: fingerprint(name, built_asset_bytes(name, FONT_FINGERPRINTS)) for name in HASHED}
 ASK_INDEX = 'ask-index.json'
 DISCOVERY_FILES = {ROBOTS_TXT, 'sitemap.xml', 'llms.txt', 'llms-full.txt'}
+
+
+def mirror_path(page):
+    return 'index.md' if page == 'index.html' else page.removesuffix('/index.html') + '.md'
+
+
 ABOUT_PAGE = 'what-is-openwiz/index.html'
 GUIDE_PAGE = 'guides/run-many-coding-agents/index.html'
 GUIDE_H1 = 'How to run many coding agents at once'
@@ -469,6 +475,7 @@ GUIDE_COST = ('OpenWiz is free and released under the Apache License 2.0. Suppor
               'and any host you pick. boat.dev bills per second while a sandbox runs, and CloudRoom\u2019s charges are its own, on your plan with it.')
 PAGES = ('index.html', 'changelog/index.html', 'drivers/index.html', TEAM_PAGE, FAQ_PAGE, 'market/index.html', ABOUT_PAGE, GUIDE_PAGE, PRICING_PAGE)
 SITE_PAGES = PAGES + (NOT_FOUND,)
+MIRRORS = {mirror_path(page) for page in PAGES}
 ALL_PAGES = SITE_PAGES + (APP_PAGE,)
 STORY_COPY = ('Build a to-do app', 'Bring any agent', 'Sign in with GitHub', 'Put the app on your phone')
 OLD_EXAMPLE = ('dark mode', 'dark-mode')
@@ -1259,6 +1266,17 @@ def check_discovery(root, pages):
     assert all(re.fullmatch(r'User-agent: .+\nAllow: /\nDisallow: /api/', group) for group in groups[:-1]), \
         'robots.txt must allow public pages and exclude the API for every group'
     brief = (root / 'llms.txt').read_text()
+    full_text = (root / 'llms-full.txt').read_text()
+    for name in PAGES:
+        copy, url = mirror_path(name), SITE_URL + name.removesuffix('index.html')
+        html = (root / name).read_text()
+        assert html.count(f'<link rel="alternate" type="text/markdown" href="/{copy}">') == 1, f'{name}: needs one head link to its Markdown copy'
+        assert (root / copy).is_file(), f'{name}: missing its Markdown copy {copy}'
+        text = (root / copy).read_text()
+        assert text.startswith('# ') and text.endswith(f'\nSource: {url}\n') and '<' not in re.sub(r'`[^`]*`', '', text), f'{copy}: invalid Markdown copy'
+        assert f'{SITE_URL}{copy}' in brief.split('\n## Markdown copies\n')[-1], f'llms.txt must list {copy}'
+        assert url in full_text, f'llms-full.txt must hold {name}'
+    assert '`Install OpenWiz from github.com/openwizdev/OpenWiz`' in (root / 'index.md').read_text(), 'the home copy needs the install line'
     full = (root / 'llms-full.txt').read_text()
     skill = (root / 'SKILL.md').read_text()
     assert brief.startswith('# OpenWiz\n\n> ') and all(
@@ -1310,7 +1328,7 @@ def check_security_txt(text, now=None):
 def check_site(root, registry=ROOT / 'market/registry.json', now=None):
     files = {p.relative_to(root).as_posix() for p in root.rglob('*') if p.is_file()}
     names = built_fingerprints(root)
-    assert files == STATIC | set(names.values()), 'unexpected or missing build output'
+    assert files == STATIC | MIRRORS | set(names.values()), 'unexpected or missing build output'
     docs = {name: (root / name).read_text() for name in ALL_PAGES}
     parsed = {name: Page(html) for name, html in docs.items()}
     check_discovery(root, parsed)
@@ -2602,7 +2620,7 @@ def main():
         path = ROOT / name
         assert not path.is_symlink(), f'symlink requires review: {name}'
         check_privacy(name, path.read_bytes())
-    for name in RUNTIME:
+    for name in RUNTIME | MIRRORS:
         check_privacy('dist/' + name, (output / name).read_bytes())
     print('PASS: pinned WebP and AVIF artwork and spec recording within budget; the launch video within its own budget')
     print('PASS: exact export, local links/fragments, CSS resources, fonts/licences, copy and privacy')

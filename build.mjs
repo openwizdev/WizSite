@@ -7,6 +7,7 @@ import { readReach, render as renderReach, summary as reachSummary, withReach } 
 import { withDrivers } from './scripts/drivers.mjs';
 import { aboutPage, crawlerFiles, guidePage, pages, withMetadata } from './scripts/discovery.mjs';
 import { withCheckout } from './scripts/pricing.mjs';
+import { mirrorFile, mirrorPath } from './scripts/mirrors.mjs';
 
 const root = new URL('./', import.meta.url);
 const output = new URL('dist/', root);
@@ -73,6 +74,7 @@ for (const file of hashed) {
   await put(names[file], data);
 }
 let about, guide;
+const mirrors = {};
 for (const page of Object.keys(pages)) {
   let html = await readFile(new URL(page, root), 'utf8');
   if (page === aboutPage || page === guidePage || page === '404.html') {
@@ -92,8 +94,13 @@ for (const page of Object.keys(pages)) {
   if (page === 'drivers/index.html') html = withDrivers(html, registry);
   if (page === 'pricing/index.html') html = withCheckout(html);
   await put(page, html);
+  if (!pages[page][2]) mirrors[page] = html;
 }
-const discovery = crawlerFiles(about, faq, guide);
+for (const [page, html] of Object.entries(mirrors)) {
+  mirrors[page] = mirrorFile(page, pages[page][0], html);
+  await put(mirrorPath(page), mirrors[page]);
+}
+const discovery = crawlerFiles(about, faq, guide, mirrors);
 for (const [file, data] of Object.entries(discovery)) await put(file, data);
 await put('ask-index.json', await (await import('./scripts/ask-index.mjs')).snapshotIndex(output, new URL('ask-docs/', root)));
 for (const [file, source] of Object.entries(npmVendor)) await put(file, await readFile(new URL(source, root)));
@@ -102,4 +109,4 @@ for (const file of files) {
   await copyFile(new URL(file, root), new URL(file, output));
 }
 execFileSync('python3', ['-B', 'scripts/check.py', '--discovery-only'], { cwd: root, stdio: 'inherit' });
-console.log(`Static site: ${Object.keys(pages).length + fonts.length + hashed.length + files.length + Object.keys(npmVendor).length + Object.keys(discovery).length + 1} public files in dist/ (${Object.values(names).join(', ')})`);
+console.log(`Static site: ${Object.keys(pages).length + fonts.length + hashed.length + files.length + Object.keys(npmVendor).length + Object.keys(discovery).length + Object.keys(mirrors).length + 1} public files in dist/ (${Object.values(names).join(', ')})`);

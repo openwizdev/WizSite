@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { decode } from './ask-index.mjs';
+import { mirrorLink, mirrorPath } from './mirrors.mjs';
 
 const site = 'https://openwiz.dev/';
 const github = 'https://github.com/openwizdev';
@@ -125,6 +126,7 @@ export function withMetadata(page, html, faq) {
   if (page !== '404.html') tags.push(`<link rel="canonical" href="${url}">`);
   if (robots) tags.push(`<meta name="robots" content="${robots}">`);
   else {
+    tags.push(mirrorLink(page));
     for (const [key, value] of Object.entries({ type: 'website', site_name: 'OpenWiz', title, description, url })) {
       tags.push(`<meta property="og:${key}" content="${escape(value)}">`);
     }
@@ -158,7 +160,7 @@ const crawlers = [
   'Applebot', 'Applebot-Extended', 'DuckDuckBot', 'CCBot', 'meta-externalagent', 'Amazonbot', 'cohere-ai', 'YouBot',
 ];
 
-export function crawlerFiles(about, faq, guide) {
+export function crawlerFiles(about, faq, guide, mirrors = {}) {
   const main = about.match(/<main\b[^>]*>([\s\S]*?)<\/main>/)[1];
   const [intro, ...body] = [...main.matchAll(/<(h1|h2|p|li)\b[^>]*>([\s\S]*?)<\/\1>/g)];
   const link = /<a href="([^"]+)">([^<]+)<\/a>/g;
@@ -205,6 +207,7 @@ export function crawlerFiles(about, faq, guide) {
       `- [Issues](${repo}/issues): for anything beyond a small fix, open an issue first`,
     ].join('\n'),
     '## Links', links.filter(line => !line.startsWith('- [FAQ]') && !line.startsWith('- [Changelog]')).join('\n'),
+    '## Markdown copies', Object.keys(mirrors).map(page => `- [${pages[page][0]}](${site}${mirrorPath(page)}): ${urlFor(page)} as Markdown`).join('\n'),
   ].join('\n\n') + '\n';
   const full = [
     `# ${plain(intro[2])}`,
@@ -212,6 +215,9 @@ export function crawlerFiles(about, faq, guide) {
     links.join('\n'), '## FAQ',
     ...faqEntries(faq).map(([question, answer]) => `### ${question}\n\n${answer}`),
     ...guideText(guide),
+    '## Every page',
+    ...Object.entries(mirrors).filter(([page]) => ![aboutPage, faqPage, guidePage].includes(page))
+      .map(([page, text]) => `### ${pages[page][0]}\n\n${urlFor(page)}\n\n${text.replace(/^(#+) /gm, '###$1 ').trim()}`),
   ].join('\n\n') + '\n';
 
   const fallbackDate = new Date().toISOString().slice(0, 10);
