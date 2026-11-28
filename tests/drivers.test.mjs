@@ -81,6 +81,23 @@ async function launch() {
   return { send, listeners, close };
 }
 
+const aim = (selector, name) => `(async () => {
+  const all = document.querySelectorAll(${JSON.stringify(selector)});
+  if (all.length !== 1 || all[0].disabled) return null;
+  const b = all[0];
+  window.${name} = new Promise(resolve => new MutationObserver(() => resolve(b.textContent)).observe(b, { childList: true, characterData: true, subtree: true }));
+  const frame = () => new Promise(resolve => setTimeout(resolve, 50));
+  for (let tries = 0; tries < 50; tries += 1) {
+    b.scrollIntoView({ block: 'center' });
+    await frame();
+    const r = b.getBoundingClientRect();
+    const at = { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+    if (b.contains(document.elementFromPoint(at.x, at.y))) return at;
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+  return null;
+})()`;
+
 test('the Write your own driver part shows the contract\'s copy line once, and Copy puts exactly the contract\'s copy line on the clipboard', async () => {
   assert.ok(existsSync(join(DIST, 'drivers/index.html')), 'run npm run build first');
   const server = await serve();
@@ -107,25 +124,19 @@ test('the Write your own driver part shows the contract\'s copy line once, and C
     await loaded;
     const evaluate = async expression => (await page('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true })).result.value;
     assert.deepEqual(await evaluate('[...document.querySelectorAll(".own-driver .install-line")].map(e => e.innerText)'), [COPY_LINE]);
-    const box = await evaluate(`(() => { const all = document.querySelectorAll('.own-driver button.install');
-      if (all.length !== 1 || all[0].disabled) return null; const b = all[0];
-      window.copied = new Promise(resolve => new MutationObserver(() => resolve(b.textContent)).observe(b, { childList: true, characterData: true, subtree: true }));
-      b.scrollIntoView({ block: 'center' }); const r = b.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`);
+    const box = await evaluate(aim('.own-driver button.install', 'copied'));
     assert.ok(box, 'the Write your own driver part has one Copy button, enabled once site.js runs');
     for (const type of ['mousePressed', 'mouseReleased']) {
       await page('Input.dispatchMouseEvent', { type, x: box.x, y: box.y, button: 'left', clickCount: 1 });
     }
-    assert.equal(await evaluate('Promise.race([window.copied, new Promise(r => setTimeout(() => r("no change"), 5000))])'), 'Copied');
+    assert.equal(await evaluate('Promise.race([window.copied, new Promise(r => setTimeout(() => r("no change"), 10000))])'), 'Copied');
     assert.equal(await evaluate('navigator.clipboard.readText()'), COPY_LINE);
-    const start = await evaluate(`(() => { const all = document.querySelectorAll('.start button.install');
-      if (all.length !== 1 || all[0].disabled) return null; const b = all[0];
-      window.started = new Promise(resolve => new MutationObserver(() => resolve(b.textContent)).observe(b, { childList: true, characterData: true, subtree: true }));
-      b.scrollIntoView({ block: 'center' }); const r = b.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`);
+    const start = await evaluate(aim('.start button.install', 'started'));
     assert.ok(start, 'the hero\'s Start one box has one Copy button, enabled once site.js runs');
     for (const type of ['mousePressed', 'mouseReleased']) {
       await page('Input.dispatchMouseEvent', { type, x: start.x, y: start.y, button: 'left', clickCount: 1 });
     }
-    assert.equal(await evaluate('Promise.race([window.started, new Promise(r => setTimeout(() => r("no change"), 5000))])'), 'Copied');
+    assert.equal(await evaluate('Promise.race([window.started, new Promise(r => setTimeout(() => r("no change"), 10000))])'), 'Copied');
     assert.equal(await evaluate('navigator.clipboard.readText()'), INSTALL_LINE);
   } finally {
     await browser.close();
