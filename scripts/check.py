@@ -419,7 +419,7 @@ def with_cta(html):
 FONT_FINGERPRINTS = {name: fingerprint(name, (ROOT / name).read_bytes()) for name in FONT_FILES}
 FINGERPRINTS = {name: fingerprint(name, built_asset_bytes(name, FONT_FINGERPRINTS)) for name in HASHED}
 ASK_INDEX = 'ask-index.json'
-DISCOVERY_FILES = {ROBOTS_TXT, 'sitemap.xml', 'llms.txt', 'llms-full.txt'}
+DISCOVERY_FILES = {ROBOTS_TXT, 'sitemap.xml', 'sitemap-pages.xml', 'llms.txt', 'llms-full.txt'}
 ABOUT_PAGE = 'what-is-openwiz/index.html'
 GUIDE_PAGE = 'guides/run-many-coding-agents/index.html'
 GUIDE_H1 = 'How to run many coding agents at once'
@@ -1189,13 +1189,26 @@ def check_discovery(root, pages):
             assert fields.get('robots') == ['noindex'], f'{name}: needs a noindex robots tag'
             if name == APP_PAGE:
                 assert not page.inline_scripts, 'the app allows no inline script'
-        assert len(page.json_ld) == int(name in expected_types), f'{name}: unexpected number of JSON-LD blocks'
-        if page.json_ld:
+        blocks = []
+        for text in page.json_ld:
             try:
-                data = json.loads(page.json_ld[0])
+                data = json.loads(text)
             except ValueError as error:
                 raise AssertionError(f'{name}: invalid JSON-LD') from error
             assert isinstance(data, dict) and data.get('@context') == 'https://schema.org', f'{name}: invalid JSON-LD context'
+            blocks.append(data)
+        crumbs = [data for data in blocks if data.get('@type') == 'BreadcrumbList']
+        own = [data for data in blocks if data.get('@type') != 'BreadcrumbList']
+        assert len(own) == int(name in expected_types), f'{name}: unexpected number of JSON-LD blocks'
+        assert len(crumbs) == int(indexable and name != 'index.html'), f'{name}: needs exactly one BreadcrumbList (none on the home or a noindex page)'
+        if crumbs:
+            items = crumbs[0].get('itemListElement')
+            assert isinstance(items, list) and len(items) >= 2 and [item.get('position') for item in items] == list(range(1, len(items) + 1)) \
+                and items[0].get('item') == SITE_URL and items[-1].get('item') == canonical \
+                and all(item.get('@type') == 'ListItem' and isinstance(item.get('name'), str) and item['name'].strip() for item in items), \
+                f'{name}: the BreadcrumbList must run from the home to this page'
+        if own:
+            data = own[0]
             if name == 'index.html':
                 assert isinstance(data.get('@graph'), list), f'{name}: invalid JSON-LD graph'
             else:
@@ -1240,17 +1253,52 @@ def check_discovery(root, pages):
         'the overview links the guide'
 
     ns = '{http://www.sitemaps.org/schemas/sitemap/0.9}'
-    try:
-        sitemap = ElementTree.parse(root / 'sitemap.xml').getroot()
-    except ElementTree.ParseError as error:
-        raise AssertionError('invalid sitemap XML') from error
-    entries = sitemap.findall(ns + 'url')
-    urls = [entry.findtext(ns + 'loc') for entry in entries]
-    assert sitemap.tag == ns + 'urlset' and set(urls) == {SITE_URL + name.removesuffix('index.html') for name in PAGES} and len(urls) == len(PAGES), \
-        'sitemap must list every public page exactly once'
-    for entry in entries:
-        lastmod = entry.findtext(ns + 'lastmod') or ''
-        assert re.fullmatch(r'\d{4}-\d{2}-\d{2}', lastmod) and date.fromisoformat(lastmod), 'invalid sitemap lastmod'
+
+    def parse_sitemap(rel):
+        try:
+            return ElementTree.parse(root / rel).getroot()
+        except (ElementTree.ParseError, OSError) as error:
+            raise AssertionError(f'invalid sitemap XML: {rel}') from error
+
+    def valid_lastmod(text):
+        return bool(re.fullmatch(r'\d{4}-\d{2}-\d{2}', text or '')) and bool(date.fromisoformat(text))
+
+    index = parse_sitemap('sitemap.xml')
+    assert index.tag == ns + 'sitemapindex', 'sitemap.xml must be a sitemap index'
+    children = [(entry.findtext(ns + 'loc') or '', entry.findtext(ns + 'lastmod') or '') for entry in index.findall(ns + 'sitemap')]
+    assert children and len({loc for loc, _ in children}) == len(children) and all(
+        re.fullmatch(re.escape(SITE_URL) + r'sitemap-(pages|market|docs|answers)\.xml', loc) and valid_lastmod(lastmod) for loc, lastmod in children), \
+        'the sitemap index must list each section sitemap once, with a lastmod'
+    urls = []
+    for loc, lastmod in children:
+        rel = loc.removeprefix(SITE_URL)
+        child = parse_sitemap(rel)
+        assert child.tag == ns + 'urlset', f'{rel} must be a urlset'
+        entries = child.findall(ns + 'url')
+        dates = [entry.findtext(ns + 'lastmod') or '' for entry in entries]
+        assert entries and all(valid_lastmod(day) for day in dates), f'invalid sitemap lastmod in {rel}'
+        assert lastmod == max(dates), f'the sitemap index lastmod of {rel} must be its newest page'
+        urls += [entry.findtext(ns + 'loc') for entry in entries]
+    assert len(set(urls)) == len(urls) and {SITE_URL + name.removesuffix('index.html') for name in PAGES} <= set(urls), \
+        'the section sitemaps must list every public page exactly once'
+    for url in urls:
+        rel = urlsplit(url).path.lstrip('/') + 'index.html'
+        assert url.startswith(SITE_URL) and url.endswith('/') and (root / rel).is_file(), f'the sitemaps list {url}, which is not a built page'
+        built = (root / rel).read_text()
+        assert f'<link rel="canonical" href="{url}">' in built and '<meta name="robots" content="noindex">' not in built, \
+            f'{rel}: a page in the sitemaps must be indexable with its own canonical link'
+        if rel.removesuffix('index.html') != '':
+            crumbs = []
+            for text in re.findall(r'<script type="application/ld\+json">([\s\S]*?)</script>', built):
+                try:
+                    data = json.loads(text)
+                except ValueError as error:
+                    raise AssertionError(f'{rel}: invalid JSON-LD') from error
+                if isinstance(data, dict) and data.get('@type') == 'BreadcrumbList':
+                    crumbs.append(data)
+            items = crumbs[0].get('itemListElement') if len(crumbs) == 1 else None
+            assert isinstance(items, list) and len(items) >= 2 and items[0].get('item') == SITE_URL and items[-1].get('item') == url, \
+                f'{rel}: a page in the sitemaps needs one BreadcrumbList from the home to itself'
 
     robots = (root / 'robots.txt').read_text()
     groups = robots.strip().split('\n\n')
@@ -1307,10 +1355,38 @@ def check_security_txt(text, now=None):
     )
 
 
+def registered_extras(root):
+    ns = '{http://www.sitemaps.org/schemas/sitemap/0.9}'
+    extras = set()
+    try:
+        index = ElementTree.parse(root / 'sitemap.xml').getroot()
+    except (ElementTree.ParseError, OSError):
+        return extras
+    for loc in (entry.findtext(ns + 'loc') or '' for entry in index.findall(ns + 'sitemap')):
+        rel = loc.removeprefix(SITE_URL)
+        if not re.fullmatch(r'sitemap-(pages|market|docs|answers)\.xml', rel) or not (root / rel).is_file():
+            continue
+        if rel != 'sitemap-pages.xml':
+            extras.add(rel)
+        try:
+            child = ElementTree.parse(root / rel).getroot()
+        except ElementTree.ParseError:
+            continue
+        for url in (entry.findtext(ns + 'loc') or '' for entry in child.findall(ns + 'url')):
+            page = urlsplit(url).path.lstrip('/') + 'index.html'
+            if page not in PAGES:
+                extras.add(page)
+    return extras
+
+
 def check_site(root, registry=ROOT / 'market/registry.json', now=None):
     files = {p.relative_to(root).as_posix() for p in root.rglob('*') if p.is_file()}
     names = built_fingerprints(root)
-    assert files == STATIC | set(names.values()), 'unexpected or missing build output'
+    extras = registered_extras(root)
+    assert files - extras == STATIC | set(names.values()), 'unexpected or missing build output'
+    for name in sorted(extras):
+        if (root / name).is_file():
+            check_privacy('dist/' + name, (root / name).read_bytes())
     docs = {name: (root / name).read_text() for name in ALL_PAGES}
     parsed = {name: Page(html) for name, html in docs.items()}
     check_discovery(root, parsed)
@@ -2212,7 +2288,7 @@ def check_team(htmls, pages):
     assert re.search(r'<a class="team-book" id="book" data-book href="[^"]*" data-count="book-call">', team), 'the first Book a call is #book, where the Questions link'
     description = re.search(r'<meta name="description" content="([^"]*)">', team)
     assert description and unescape(description[1]) == TEAM_DESCRIPTION, f'the team page description: {TEAM_DESCRIPTION}'
-    assert not re.search(r'<(?:iframe|embed|object|form|details)\b', team) and team.count('<script') == 1, \
+    assert not re.search(r'<(?:iframe|embed|object|form|details)\b', team) and team.count('<script') - team.count('<script type="application/ld+json">') == 1, \
         'the team page adds no embed, form or script beyond site.js (which loads GSAP), and folds nothing away'
     main = team.split('<main', 1)[1].split('</main>', 1)[0]
     shown = re.sub(r'\s+', ' ', unescape(re.sub(r'<[^>]*>', ' ', main)))

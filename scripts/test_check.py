@@ -11,7 +11,7 @@ from unittest import mock
 
 import re
 
-from check import ALL_PAGES, ART, CTA, DOC_HASHES, FAQ, FAQ_PREREQS, FAQ_WHERE, FOOTER, INSTALL_NOTE_HTML, INSTALL_PREREQS_HTML, FINGERPRINTS, HASHED, INSTALL_SWITCH, ROOT, Page, check_changelog, check_image_preloads, check_release_data, check_releases, read_releases, split_releases, check_motion, check_privacy, check_ref, check_security_txt, check_site, check_vector, check_webp, check_avif, check_png, fingerprint
+from check import ALL_PAGES, ART, CTA, DOC_HASHES, FAQ, FAQ_PREREQS, FAQ_WHERE, FOOTER, INSTALL_NOTE_HTML, INSTALL_PREREQS_HTML, FINGERPRINTS, HASHED, INSTALL_SWITCH, ROOT, Page, check_changelog, check_image_preloads, check_release_data, check_releases, read_releases, split_releases, check_motion, check_privacy, check_ref, check_security_txt, check_site, check_vector, registered_extras, check_webp, check_avif, check_png, fingerprint
 
 REMOVED_ART = (
     'art/spec-video.mp4',
@@ -101,7 +101,11 @@ class Checks(unittest.TestCase):
                 ('app/index.html', r'<meta name="robots"[^>]*>', '', 'noindex'),
                 ('faq/index.html', r'"mainEntity":', '?', 'invalid JSON-LD'),
                 ('faq/index.html', r'"text": "The open source kernel', '"text": "A kernel', 'FAQ JSON-LD'),
-                ('sitemap.xml', r'<url><loc>https://openwiz.dev/</loc>.*?</url>', '', 'sitemap must list'),
+                ('sitemap-pages.xml', r'<url><loc>https://openwiz.dev/</loc>.*?</url>', '', 'section sitemaps must list'),
+                ('sitemap.xml', r'<sitemapindex ([^>]*)>([\s\S]*)</sitemapindex>', r'<urlset \1>\2</urlset>', 'must be a sitemap index'),
+                ('sitemap.xml', r'<lastmod>[^<]*</lastmod>', '<lastmod>1999-01-01</lastmod>', 'newest page'),
+                ('faq/index.html', r'"@type": "BreadcrumbList"', '"@type": "ItemList"', 'unexpected number of JSON-LD blocks'),
+                ('drivers/index.html', r'"item": "https://openwiz.dev/drivers/"', '"item": "https://openwiz.dev/"', 'BreadcrumbList must run from the home'),
             ]
             for name, pattern, replacement, error in failures:
                 with self.subTest(file=name, error=error):
@@ -115,7 +119,7 @@ class Checks(unittest.TestCase):
                             check_site(root)
                     finally:
                         path.write_text(original)
-            for name in ('robots.txt', 'sitemap.xml', 'llms.txt', 'llms-full.txt', 'SKILL.md', '404.html'):
+            for name in ('robots.txt', 'sitemap.xml', 'sitemap-pages.xml', 'llms.txt', 'llms-full.txt', 'SKILL.md', '404.html'):
                 with self.subTest(missing=name):
                     path = root / name
                     original = path.read_bytes()
@@ -125,6 +129,45 @@ class Checks(unittest.TestCase):
                             check_site(root)
                     finally:
                         path.write_bytes(original)
+
+    def test_a_registered_section_page_passes_and_an_unbuilt_one_fails(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / 'dist'
+            shutil.copytree(ROOT / 'dist', root)
+            page = root / 'docs/synthetic/index.html'
+            page.parent.mkdir(parents=True)
+            page.write_text('<!doctype html><html lang="en"><head><title>Synthetic: OpenWiz docs</title>'
+                            '<link rel="canonical" href="https://openwiz.dev/docs/synthetic/">'
+                            '<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": ['
+                            '{"@type": "ListItem", "position": 1, "name": "OpenWiz", "item": "https://openwiz.dev/"}, '
+                            '{"@type": "ListItem", "position": 2, "name": "Synthetic", "item": "https://openwiz.dev/docs/synthetic/"}]}</script></head><body><main><h1>Synthetic</h1></main></body></html>')
+            (root / 'sitemap-docs.xml').write_text('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+                                                    '  <url><loc>https://openwiz.dev/docs/synthetic/</loc><lastmod>2026-11-28</lastmod></url>\n</urlset>\n')
+            index = root / 'sitemap.xml'
+            index.write_text(index.read_text().replace('</sitemapindex>', '  <sitemap><loc>https://openwiz.dev/sitemap-docs.xml</loc><lastmod>2026-11-28</lastmod></sitemap>\n</sitemapindex>'))
+            check_site(root)
+            self.assertIn('docs/synthetic/index.html', registered_extras(root))
+            with_crumb = page.read_text()
+            page.write_text(re.sub(r'<script type="application/ld\+json">[\s\S]*?</script>', '', with_crumb))
+            with self.assertRaisesRegex(AssertionError, 'needs one BreadcrumbList'):
+                check_site(root)
+            page.write_text(with_crumb)
+            extra = root / 'guides/synthetic/index.html'
+            extra.parent.mkdir(parents=True)
+            extra.write_text(page.read_text().replace('docs/synthetic/', 'guides/synthetic/'))
+            pages_map = root / 'sitemap-pages.xml'
+            newest = max(re.findall(r'<lastmod>([^<]+)</lastmod>', pages_map.read_text()))
+            pages_map.write_text(pages_map.read_text().replace('</urlset>', f'  <url><loc>https://openwiz.dev/guides/synthetic/</loc><lastmod>{newest}</lastmod></url>\n</urlset>'))
+            check_site(root)
+            self.assertIn('guides/synthetic/index.html', registered_extras(root))
+            clean = extra.read_text()
+            extra.write_text(clean.replace('<h1>Synthetic</h1>', '<h1>Synthetic</h1><p>' + '/' + 'home/' + 'someone/notes</p>'))
+            with self.assertRaises(AssertionError):
+                check_site(root)
+            extra.write_text(clean)
+            page.unlink()
+            with self.assertRaisesRegex(AssertionError, 'not a built page'):
+                check_site(root)
 
     def test_guide_page_discovery_and_rules(self):
         guide = 'guides/run-many-coding-agents/index.html'
@@ -139,7 +182,7 @@ class Checks(unittest.TestCase):
                 (guide, r'<h1>How to run many coding agents at once</h1>', '<h1>Run coding agents</h1>', 'guide h1 and HowTo name'),
                 (guide, r'OpenWiz 0\.01 \(version 0\.1\.0\)', 'OpenWiz 0.02 (version 0.1.1)', 'names only OpenWiz 0.01'),
                 ('what-is-openwiz/index.html', r'href="/guides/run-many-coding-agents/">Guide: run many coding agents</a>', 'href="/faq/">Guide</a>', 'overview links the guide'),
-                ('sitemap.xml', r'<url><loc>https://openwiz\.dev/guides/run-many-coding-agents/</loc>.*?</url>', '', 'sitemap must list'),
+                ('sitemap-pages.xml', r'<url><loc>https://openwiz\.dev/guides/run-many-coding-agents/</loc>.*?</url>', '', 'section sitemaps must list'),
                 ('llms.txt', r'- \[How to run many coding agents at once\]\(https://openwiz\.dev/guides/run-many-coding-agents/\)[^\n]*\n', '', 'invalid llms.txt'),
                 ('llms-full.txt', r'\n6\. Watch it ship\.[^\n]*', '', 'llms-full.txt needs the guide'),
             ]
