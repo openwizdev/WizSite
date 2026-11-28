@@ -1,0 +1,13 @@
+{
+  "product": "WizSkills",
+  "name": "0.1.0",
+  "semver": "0.1.0",
+  "date": "2026-11-16",
+  "published": "2026-11-16T07:16:06Z",
+  "headline": "Use the first public set of OpenWiz skills.",
+  "bullets": [
+    "Give agents reusable instructions for building and reviewing changes.",
+    "Use skills for diagnosing problems, handing off work, and filing feedback."
+  ],
+  "notes": "https://github.com/openwizdev/WizSkills/releases/tag/v0.1.0"
+}

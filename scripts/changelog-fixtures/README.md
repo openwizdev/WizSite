@@ -1,6 +1,7 @@
 # Changelog generator fixtures
 
-Synthetic release data files, the same shape as `changelog/releases/*.json`, read by `scripts/test_changelog.py`
-through `node scripts/changelog.mjs --releases <case> --switch <state>`. Every version, date and line here is made up.
+`two/` contains two OpenWiz releases and one WizSkills release. Two products share a tag, and the
+publication times deliberately sort differently from semver. One release contains HTML-like text to
+exercise escaping. `stats.json` supplies the numbers without network access.
 
-- `two`: two releases whose semver sorts wrong as text (0.1.2 and 0.1.10), one with markup in its headline and a bullet.
+Use `node scripts/changelog.mjs --releases scripts/changelog-fixtures/two --stats scripts/changelog-fixtures/stats.json --switch live`.

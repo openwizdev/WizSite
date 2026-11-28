@@ -43,7 +43,9 @@ function build(registry, after = () => null) {
   const dir = siteCopy();
   mkdirSync(join(dir, 'market'), { recursive: true });
   writeFileSync(join(dir, 'market/registry.json'), registry);
-  const run = spawnSync(process.execPath, ['build.mjs'], { cwd: dir, encoding: 'utf8' });
+  const run = spawnSync(process.execPath, ['build.mjs'], {
+    cwd: dir, encoding: 'utf8', env: { ...process.env, CHANGELOG_STATS: 'snapshot' },
+  });
   const page = join(dir, 'dist/market/index.html');
   const html = existsSync(page) ? readFileSync(page, 'utf8') : null;
   const checked = run.status === 0 ? after(dir) : null;

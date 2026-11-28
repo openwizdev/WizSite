@@ -1,3 +1,4 @@
+from datetime import date, datetime
 from hashlib import sha256
 from html import escape, unescape
 from html.parser import HTMLParser
@@ -254,13 +255,13 @@ STORY_COPY = ('Build a to-do app', 'Bring any agent', 'Sign in with GitHub', 'Pu
 OLD_EXAMPLE = ('dark mode', 'dark-mode')
 MOTION_OK = '@media (prefers-reduced-motion:no-preference)'
 PHONE_QUERY = re.compile(r'\(max-width:[0-9]+px\)')
-CHANGELOG_MAIN = '53ec7d0b87a84daf1ad319c06ed75ea810e35bd269496612631b7d4f5750d1dc'
+CHANGELOG_MAIN = 'd6864e4b74ea0a49a3dd6757f0cea2e32ab5f3855b30afee8aadf9470d579568'
 CHANGELOG_LINKS = ('/changelog/', '/changelog')
 PUBLIC_REPOS = ('OpenWiz', 'WizSkills', 'WizLoops', 'WizPlugins', 'WizSite')
 PUBLIC_WIZ_NAMES = set(PUBLIC_REPOS) | {'WizBar'}
 RELEASES = ('<!-- releases:start -->', '<!-- releases:end -->')
 RELEASE_DIR = ROOT / 'changelog/releases'
-RELEASE_FIELDS = ('name', 'semver', 'date', 'headline', 'bullets', 'notes')
+RELEASE_FIELDS = ('product', 'name', 'semver', 'date', 'published', 'headline', 'bullets', 'notes')
 RELEASE_BULLETS = (1, 6)
 RELEASE_BULLET_MAX = 120
 RELEASE_HEADLINE_MAX = 80
@@ -813,7 +814,8 @@ def check_site(root, registry=ROOT / 'market/registry.json'):
     check_driver_logo_files(root)
     check_drivers(landing, (root / DRIVERS_PAGE).read_text(), pages[root / DRIVERS_PAGE])
     check_changelog(landing, changelog)
-    check_releases(releases, read_releases(), install_switch(landing) == 'live')
+    snapshot = json.loads((ROOT / 'changelog/stats.json').read_text())
+    check_releases(releases, read_releases(), install_switch(landing) == 'live', snapshot)
     site_html = {name: (root / name).read_text() for name in PAGES}
     check_team(site_html, {name: pages[root / name] for name in PAGES})
     check_top_bars(site_html)
@@ -1583,19 +1585,21 @@ def install_switch(landing):
 
 
 def read_releases(folder=RELEASE_DIR):
-    files = sorted(folder.glob('*.json'))
-    assert sorted(p.name for p in folder.iterdir()) == [p.name for p in files], f'only release data files in {folder.name}/'
     out = {}
-    for path in files:
+    for path in sorted(folder.rglob('*')):
+        name = path.relative_to(folder).as_posix()
+        if name == 'wizskills' and path.is_dir():
+            continue
+        assert path.is_file() and path.suffix == '.json' and path.parent in (folder, folder / 'wizskills'), \
+            f'only release data files in {folder.name}/: {name}'
         try:
             data = json.loads(path.read_text())
         except ValueError as error:
-            raise AssertionError(f'{path.name}: not JSON: {error}') from None
-        check_release_data(path.name, data)
-        out[path.name] = data
-    names = [d['name'] for d in out.values()]
-    versions = [d['semver'] for d in out.values()]
-    assert len(set(names)) == len(names) and len(set(versions)) == len(versions), 'each release once'
+            raise AssertionError(f'{name}: not JSON: {error}') from None
+        check_release_data(name, data)
+        out[name] = data
+    versions = {(d['product'], d['semver']) for d in out.values()}
+    assert len(versions) == len(out), 'each release once per product'
     return out
 
 
@@ -1610,80 +1614,143 @@ def check_release_data(file, data):
     assert sorted(data) == sorted(RELEASE_FIELDS), f'{file}: unexpected fields {sorted(set(data) - set(RELEASE_FIELDS))}'
     text = [data[k] for k in RELEASE_FIELDS if k != 'bullets']
     assert all(isinstance(v, str) for v in text) and isinstance(data['bullets'], list), f'{file}: fields are text, bullets a list'
-    assert re.fullmatch(r'0\.\d\d|[1-9]\d*\.\d\d', data['name']) and file == f'{data["name"]}.json', \
-        f'{file}: the public name is like 0.01 and names the file'
-    assert re.fullmatch(r'\d+\.\d+\.\d+', data['semver']) and semver(data['semver']) >= (0, 1, 0), f'{file}: semver from 0.1.0 on'
-    assert re.fullmatch(r'20\d\d-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])', data['date']), f'{file}: date as YYYY-MM-DD'
+    product, version, name = data['product'], data['semver'], data['name']
+    assert product in ('OpenWiz', 'WizSkills'), f'{file}: unknown product {product}'
+    assert re.fullmatch(r'\d+\.\d+\.\d+', version) and semver(version) >= (0, 1, 0), f'{file}: semver from 0.1.0 on'
+    if product == 'OpenWiz':
+        assert re.fullmatch(r'0\.\d\d|[1-9]\d*\.\d\d', name) and file == f'{name}.json', \
+            f'{file}: the public name is like 0.01 and names the file'
+    else:
+        assert name == version and file == f'wizskills/{version}.json', f'{file}: the WizSkills version names the file'
+    assert re.fullmatch(r'20\d\d-\d\d-\d\d', data['date']), f'{file}: date as YYYY-MM-DD'
+    assert re.fullmatch(r'20\d\d-\d\d-\d\dT\d\d:\d\d:\d\dZ', data['published']), f'{file}: published time as UTC YYYY-MM-DDTHH:MM:SSZ'
+    try:
+        date.fromisoformat(data['date'])
+        datetime.fromisoformat(data['published'])
+    except ValueError as error:
+        raise AssertionError(f'{file}: invalid date or published time: {error}') from None
     assert len(data['headline']) <= RELEASE_HEADLINE_MAX and '\n' not in data['headline'], f'{file}: a one-line headline'
     bullets = data['bullets']
-    low, high = RELEASE_BULLETS
+    low, high = (2, 4) if product == 'WizSkills' else RELEASE_BULLETS
     assert low <= len(bullets) <= high, f'{file}: {len(bullets)} bullets; a short list of {low} to {high}'
     for bullet in bullets:
         assert isinstance(bullet, str) and bullet.strip(), f'{file}: an empty bullet'
         assert len(bullet) <= RELEASE_BULLET_MAX, f'{file}: a bullet over {RELEASE_BULLET_MAX} characters: {bullet[:40]}...'
         assert '\n' not in bullet, f'{file}: one line per bullet'
-    assert data['notes'] == f'https://github.com/openwizdev/OpenWiz/releases/tag/v{data["semver"]}', \
-        f'{file}: the notes link is the release on GitHub, https://github.com/openwizdev/OpenWiz/releases/tag/v{data["semver"]}'
+    notes = f'https://github.com/openwizdev/{product}/releases/tag/v{version}'
+    assert data['notes'] == notes, f'{file}: the notes link is the release on GitHub, {notes}'
     check_public_names(escape(' '.join(text + bullets)))
 
 
 class ReleaseOutline(HTMLParser):
+    FIELDS = {
+        'release-product': 'product', 'release-number': 'name', 'release-date': 'stamp',
+        'headline': 'headline', 'release-scope': 'scope', 'release-added': 'added',
+        'release-removed': 'removed', 'release-sr': 'accessible',
+    }
+
     def __init__(self, text):
         super().__init__(convert_charrefs=True)
-        self.tags, self.entries, self.pre, self.at = [], [], None, None
+        self.tags, self.entries, self.pre, self.reading = [], [], None, []
         self.feed(text)
 
     def handle_starttag(self, tag, attrs):
         attrs = dict(attrs)
-        classes = (attrs.get('class') or '').split()
+        kind = attrs.get('class')
         self.tags.append((tag, attrs))
         if tag == 'article':
-            self.entries.append({'name': '', 'small': '', 'date': None, 'headline': '', 'bullets': [], 'links': []})
-        elif tag == 'p' and 'pre' in classes:
+            self.entries.append({'label': attrs.get('aria-labelledby'), 'bullets': [], 'links': [], 'dt': [], 'dd': []})
+        elif tag == 'p' and kind == 'pre':
             self.pre = {'text': '', 'links': []}
-        if tag == 'time' and self.entries:
-            self.entries[-1]['date'] = attrs.get('datetime')
-        if tag == 'a':
-            (self.pre or self.entries[-1])['links'].append(attrs.get('href'))
-        if tag == 'li':
-            self.entries[-1]['bullets'].append('')
-        self.at = 'small' if tag == 'small' else 'name' if tag == 'h2' else 'headline' if 'headline' in classes else 'li' if tag == 'li' else self.at
+        if self.entries and self.pre is None:
+            entry = self.entries[-1]
+            if tag == 'h2':
+                entry['id'] = attrs.get('id')
+            elif tag == 'time':
+                entry['published'] = attrs.get('datetime')
+            elif kind in ('release-added', 'release-removed'):
+                assert attrs.get('aria-hidden') == 'true', 'line counts have one accessible reading'
+        field = self.FIELDS.get(kind)
+        if tag in ('li', 'dt', 'dd', 'a') or field:
+            self.reading.append((tag, field or tag, attrs.get('href'), ''))
 
     def handle_endtag(self, tag):
-        if tag in ('h2', 'small', 'p', 'li'):
-            self.at = 'name' if tag == 'small' else None
+        if not self.reading or tag != self.reading[-1][0]:
+            return
+        _, field, href, text = self.reading.pop()
+        text = ' '.join(text.split())
+        if field == 'a':
+            target = self.pre if self.pre is not None else self.entries[-1]
+            target['links'].append((href, text))
+        else:
+            entry = self.entries[-1]
+            if field in ('li', 'dt', 'dd'):
+                entry['bullets' if field == 'li' else field].append(text)
+            else:
+                entry[field] = text
 
     def handle_data(self, data):
         if self.pre is not None:
             self.pre['text'] += data
-        elif self.at == 'li':
-            self.entries[-1]['bullets'][-1] += data
-        elif self.at:
-            self.entries[-1][self.at] += data
+        self.reading = [(tag, field, href, text + data) for tag, field, href, text in self.reading]
 
 
-def check_releases(section, releases, live):
+def check_release_stats(snapshot, release):
+    product, tag = release['product'], f'v{release["semver"]}'
+    stats = snapshot['products'].get(product, {}).get(tag)
+    assert stats is not None, f'{product} {tag}: missing from changelog/stats.json; run npm run changelog:stats'
+    assert isinstance(stats, dict) and set(stats) == {'prev', 'prs', 'commits', 'added', 'removed'}, f'{product} {tag}: invalid snapshot fields'
+    assert stats['prev'] is None or isinstance(stats['prev'], str) and stats['prev'], f'{product} {tag}: invalid previous tag'
+    assert all(type(stats[key]) is int and stats[key] >= 0 for key in ('prs', 'commits', 'added', 'removed')), \
+        f'{product} {tag}: expected nonnegative integer stats'
+    return stats
+
+
+def check_releases(section, releases, live, snapshot):
     outline = ReleaseOutline(section)
-    allowed = {'section': {'class', 'aria-label'}, 'article': {'class', 'aria-labelledby'}, 'h2': {'id'}, 'small': set(),
-               'time': {'datetime'}, 'p': {'class'}, 'ul': set(), 'li': set(), 'a': {'href'}}
+    allowed = {'section': {'class', 'aria-label', 'data-stats-source'}, 'article': {'class', 'aria-labelledby'},
+               'h2': {'id'}, 'time': {'datetime'}, 'p': {'class'}, 'ul': set(), 'li': set(), 'a': {'href'},
+               'div': {'class'}, 'dl': {'class'}, 'dd': {'class'}, 'dt': set(), 'span': {'class', 'aria-hidden'}}
     for tag, attrs in outline.tags:
         assert tag in allowed, f'unexpected element in the release entries: {tag}'
         assert set(attrs) <= allowed[tag], f'unexpected attribute in the release entries: {tag} {sorted(attrs)}'
-    assert outline.tags[:1] == [('section', {'class': 'releases', 'aria-label': 'Releases'})], 'the entries sit in one Releases section'
-    want = sorted(releases.values(), key=lambda d: semver(d['semver']), reverse=True) if live else []
+    source = outline.tags[0][1].get('data-stats-source') if outline.tags else None
+    section_attrs = {'class': 'releases', 'aria-label': 'Releases', 'data-stats-source': source}
+    assert source in ('live', 'snapshot') and outline.tags[:1] == [('section', section_attrs)], 'the entries sit in one Releases section'
+    want = sorted((d for d in releases.values() if live or d['product'] == 'WizSkills'),
+                  key=lambda d: (d['product'], d['semver']))
+    want.sort(key=lambda d: d['published'], reverse=True)
     assert len(outline.entries) == len(want), f'{len(outline.entries)} entries shown; the data and the install switch say {len(want)}'
     for got, data in zip(outline.entries, want):
-        flat = lambda t: re.sub(r'\s+', ' ', t).strip()
-        y, m, d = map(int, data['date'].split('-'))
-        assert (flat(got['name']), flat(got['small'])) == (data['name'], f'· {MONTHS[m - 1]} {d}, {y} ({data["semver"]})'), \
-            f'{data["name"]}: the entry is headed by its public name, its date and semver small beside it, newest first'
-        assert got['date'] == data['date'], f'{data["name"]}: the entry\'s date'
-        assert flat(got['headline']) == data['headline'], f'{data["name"]}: the entry\'s headline'
-        assert [flat(b) for b in got['bullets']] == data['bullets'], f'{data["name"]}: the entry\'s bullets'
-        assert got['links'] == [data['notes']], f'{data["name"]}: one link, to the full notes on GitHub'
-    assert outline.pre and outline.pre['links'] == [PRE_RELEASES], 'the entries end with one line linking the pre-releases on GitHub'
-    if not want:
-        assert not re.search(r'\d+\.\d+|\b(?:19|20)\d\d\b', Text(section).joined()), 'no release version shows before the install switch reads live'
+        stats = check_release_stats(snapshot, data)
+        name, product, published = data['name'], data['product'], data['published']
+        ident = f'release-{product.lower()}-{name.replace(".", "-")}'
+        assert (got.get('product'), got.get('name')) == (product, name), \
+            f'{name}: the entry is headed by its product and public name, newest first'
+        assert got.get('id') == got['label'] == ident, f'{name}: the entry is labelled by its heading'
+        assert got.get('published') == published, f'{name}: the entry\'s date and time'
+        y, m, d = map(int, published[:10].split('-'))
+        stamp = f'{MONTHS[m - 1]} {d}, {y} · {published[11:16]} UTC · v{data["semver"]}'
+        assert got.get('stamp') == stamp, f'{name}: show the published time in UTC and the tag, newest first'
+        assert got['dt'] == ['Pull requests merged', 'Commits', 'Lines changed'] and len(got['dd']) == 3, f'{name}: three stat rows in order'
+        prs, commits, _ = got['dd']
+        added, removed = got.get('added', ''), got.get('removed', '')
+        number = r'(?:0|[1-9]\d{0,2}(?:,\d{3})*)'
+        assert all(re.fullmatch(number, count) for count in (prs, commits, added[1:], removed[1:])) \
+            and added.startswith('+') and removed.startswith('−'), f'{name}: comma-grouped stats with signs'
+        assert got.get('accessible') == f'{added[1:]} lines added, {removed[1:]} removed', f'{name}: accessible line counts'
+        assert got.get('scope') in (None, 'since the first commit'), f'{name}: first-commit note'
+        if source == 'snapshot':
+            assert (prs, commits, added, removed) == (f'{stats["prs"]:,}', f'{stats["commits"]:,}',
+                                                     f'+{stats["added"]:,}', f'−{stats["removed"]:,}'), f'{name}: the displayed stats match the snapshot'
+            assert (got.get('scope') is not None) == (stats['prev'] is None), f'{name}: first-commit note matches the snapshot'
+        assert got.get('headline') == data['headline'], f'{name}: the entry\'s headline'
+        assert got['bullets'] == data['bullets'], f'{name}: the entry\'s bullets'
+        assert got['links'] == [(data['notes'], 'Full notes on GitHub')], f'{name}: one link, to the full notes on GitHub'
+    has_openwiz = any(d['product'] == 'OpenWiz' for d in want)
+    pre = ('Earlier OpenWiz pre-releases are on GitHub.' if has_openwiz else
+           'No public OpenWiz release yet. The pre-releases are on GitHub.')
+    assert outline.pre == {'text': pre, 'links': [(PRE_RELEASES, 'GitHub')]}, 'the entries end with one line linking the pre-releases on GitHub'
 
 
 def check_app(root, names, pages):

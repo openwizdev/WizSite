@@ -29,25 +29,33 @@ Changes merge after green CI and one review from the other model family. No per-
 
 ## The Changelog's releases
 
-`/changelog` lists one short entry per public release, newest first by semver. Each entry is one data file, `changelog/releases/<public name>.json`, which `build.mjs` reads (through `scripts/changelog.mjs`) and writes into the page; nothing is read from the network.
+`/changelog/` shows one card per published OpenWiz or WizSkills release, newest first by GitHub publication time across both products. Add an OpenWiz file at `changelog/releases/<public name>.json` or a WizSkills file at `changelog/releases/wizskills/<version>.json`. Add a file after a GitHub release is published. A tag alone does not create a card.
 
 ```json
 {
+  "product": "OpenWiz",
   "name": "0.01",
   "semver": "0.1.0",
   "date": "2026-11-21",
+  "published": "2026-11-21T08:00:18Z",
   "headline": "Run your agents anywhere.",
-  "bullets": ["Three drivers: your own computer, Cloudroom and boat.dev.", "..."],
+  "bullets": [
+    "Three drivers: your own computer, Cloudroom and boat.dev.",
+    "One line sets up a fleet on your repo.",
+    "Watch every spec and agent at openwiz.dev/app."
+  ],
   "notes": "https://github.com/openwizdev/OpenWiz/releases/tag/v0.1.0"
 }
 ```
 
-- **One entry:** the public name as its heading with the date and semver small beside it ("0.01 · Nov 21, 2026 (0.1.0)"), a one-line headline of what it lets you do, a short list of plain bullets, and one link to the full notes on GitHub.
-- **A human-readable number of bullets:** aim for 2 to 5. The check refuses none, more than 6, a bullet over 120 characters, a headline over 80, a notes link that isn't that release's page on GitHub (`.../releases/tag/v<semver>`), a public name that doesn't name its file, or a semver before 0.1.0.
-- **Who writes it:** an agent drafts each entry from the release's merged pull requests; Jake approves the words before it publishes.
-- **The switch:** the entries sit behind the landing install box's switch (`data-install` in `index.html`). While it reads `coming-soon`, the page shows no entry, only one line linking OpenWiz's pre-releases on GitHub, so it never claims an unreleased version. When RL2 flips it to `live` as OpenWiz 0.1.0 publishes, every entry shows, so the install box and the Changelog go live together. After that, adding a release's file is publishing its entry: merge it when the release is out.
+- The OpenWiz card uses its public name, such as `0.01`. The WizSkills card uses its version as both `name` and `semver`. Keep the release's calendar date in `date` and copy GitHub's `published_at` to `published` in UTC. The card displays the latter with the tag.
+- Draft the headline and bullets in plain words from the release notes and changelog. The headline is at most 80 characters and each bullet is at most 120. Use 2 to 4 bullets for WizSkills. Get the owner's approval before publishing the copy. The notes link must point to the exact GitHub release for that product and tag.
+- WizSkills cards always show. OpenWiz cards show when the landing install box's `data-install` in `index.html` reads `live`. Otherwise the page points readers to OpenWiz's GitHub pre-releases.
+- Run `npm run changelog:stats` and commit the refreshed `changelog/stats.json` when adding release data. `npm run check` requires a snapshot entry for every shown release.
+- The build uses temporary bare HTTPS clones and Git history. The baseline is the nearest tag reachable from the release's first parent. It counts all commits in the range, distinct PR numbers in matching first-parent subjects, and insertions and deletions in the diff between the two trees. For a release with no earlier tag, it counts the history through the release and diffs against an empty tree.
+- A Git failure uses the committed snapshot for the full page. The build logs `Changelog stats: live from GitHub` or `Changelog stats: snapshot from <time>`. Use `CHANGELOG_STATS=snapshot npm run build` to build without cloning.
 
-The generator's tests (`scripts/test_changelog.py`, run by `npm test`) use the synthetic data in `scripts/changelog-fixtures/`. To see the section either switch state produces, run `node scripts/changelog.mjs --switch live` (or `--switch coming-soon`).
+The generator's tests (`scripts/test_changelog.py`, run by `npm test`) use synthetic releases and stats. Use `node scripts/changelog.mjs --switch live` or `--switch coming-soon` to render the section with the committed stats.
 
 The repository map and the *What exists today* text that used to open the page are in [docs/repos.md](repos.md), with the map as `docs/repo-map.svg`.
 
@@ -63,7 +71,7 @@ Every site page shares one **footer**, `footer.html`, which the build adds at ea
 
 `/faq` is the **Questions** page. The FAQ has one source, `faq.html`: a *Questions* heading with its line, then seven flat rows, each a question on a button that opens its answer. The build adds it at the `<template data-slot="faq"></template>` slot near the bottom of the landing and above `/team`'s closing **Book a call**, and at `/faq`'s `<template data-slot="faq-h1"></template>` slot, where its title becomes the page's h1 and each question an h2. The page ships every answer open and every row's button disabled, so the answers read even if `faq.js` never loads; `faq.js` enables the buttons, closes the answers, then opens and closes them, at once with reduced motion. Its footer link sits in the Product group. The check refuses a page without the snippet, a second copy, a changed or missing question, a row that is not a button naming its answer, an answer linking off the site, and any form or input: the planned "Ask a Wiz..." row is a later change, appended as the last row.
 
-`/changelog` is the **Changelog**: its title, one line, then one short entry per public release, newest first; see *The Changelog's releases* above. Its main holds no version number or date of its own, and never names a private repository.
+`/changelog` is the **Changelog**: its title, one line, then one card per published release, newest first; see *The Changelog's releases* above. Its main holds no version number or date of its own, and never names a private repository.
 
 The logo files are the favicons (`favicon.ico` with 16, 32 and 48 px images, `favicon.svg`, `apple-touch-icon.png`), the header lockup `brand/openwiz-lockup.svg` and the 1200×630 social card `brand/og.png` (the lockup on the site ground, rendered from the SVG). The lockup's wordmark is converted to outlines: the SVG has no text and no font reference, and the check refuses one that does, so the wordmark font never ships.
 

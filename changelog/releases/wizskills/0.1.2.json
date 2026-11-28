@@ -1,0 +1,13 @@
+{
+  "product": "WizSkills",
+  "name": "0.1.2",
+  "semver": "0.1.2",
+  "date": "2026-11-18",
+  "published": "2026-11-18T16:34:07Z",
+  "headline": "Connect a repository and launch your first team of agents from setup.",
+  "bullets": [
+    "Choose a GitHub App or sign in with your personal GitHub account.",
+    "Resume setup using the choices you already made."
+  ],
+  "notes": "https://github.com/openwizdev/WizSkills/releases/tag/v0.1.2"
+}
