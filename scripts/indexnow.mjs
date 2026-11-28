@@ -1,9 +1,3 @@
-// Tell IndexNow (Bing, Yandex and the other IndexNow engines) which openwiz.dev URLs a deploy changed.
-// SO5 of spec openwizdev/OpenWiz#3513. Run it once the deploy of main is live:
-//   node scripts/indexnow.mjs [--dist dist] [--live https://openwiz.dev/sitemap.xml | --previous state.json] [--dry-run]
-// The built sitemap (a sitemap index is followed into its section sitemaps) is compared with the sitemap
-// read before the deploy (--live, fetched when the run starts) or saved by the last run (--previous);
-// with neither, every URL is sent. The key is the public key file at the site root. No network in tests.
 import { readFile, readdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -17,7 +11,6 @@ const locs = xml => [...xml.matchAll(/<(url|sitemap)>([\s\S]*?)<\/\1>/g)].map(([
   lastmod: (entry.match(/<lastmod>\s*([^<\s]+)\s*<\/lastmod>/) || [])[1] || '',
 })).filter(entry => entry.loc);
 
-// Every page URL in a sitemap and its lastmod, following a sitemap index. read(url) returns the XML text.
 export async function sitemapUrls(rootUrl, read) {
   const out = new Map();
   const seen = new Set();
@@ -35,12 +28,10 @@ export async function sitemapUrls(rootUrl, read) {
   return out;
 }
 
-// URLs that are new or whose lastmod changed since the previous sitemap.
 export function changedUrls(now, before) {
   return [...now].filter(([url, lastmod]) => !before.has(url) || before.get(url) !== lastmod).map(([url]) => url).sort();
 }
 
-// The IndexNow key: the one file in dist/ named <key>.txt whose whole content is that key.
 export async function findKey(dist) {
   const found = [];
   for (const name of await readdir(dist)) {

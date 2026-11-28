@@ -60,7 +60,6 @@ test('a run sends only the changed URLs and records the sitemap for next time', 
   assert.deepEqual(fake.calls[0].body.urlList, ['https://openwiz.dev/', 'https://openwiz.dev/guides/synthetic-answer/']);
   const saved = JSON.parse(await readFile(previous, 'utf8'));
   assert.equal(saved['https://openwiz.dev/'], '2026-11-28');
-  // Nothing changed on the second run: nothing is sent.
   const again = fakeFetch(200);
   assert.equal(await main(['--dist', dist, '--previous', previous], { fetchImpl: again.impl, log: () => {} }), 0);
   assert.equal(again.calls.length, 0);
