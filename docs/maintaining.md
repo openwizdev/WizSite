@@ -77,6 +77,26 @@ The generator's tests (`scripts/test_changelog.py`, run by `npm test`) use the s
 
 The repository map and the *What exists today* text that used to open the page are in [docs/repos.md](repos.md), with the map as `docs/repo-map.svg`.
 
+## The Drivers page
+
+`/drivers` answers three questions: which hosts and harnesses OpenWiz runs, which passed their live check, and how to start one. Its hero names the three hosts that shipped, each after passing the five-check test on its real host, and gives the one install line with what 0.01 runs where. Under it, one directory lists every host and harness with one state each. Then come boat.dev's five checks, the rule for hosts that need an API key, and **Write your own driver**.
+
+The directory has one source, `drivers/drivers.json`. `build.mjs` renders it through `scripts/drivers.mjs` at the page's `<template data-slot="drivers-directory"></template>` slot, and reads nothing from the network. Each entry is a host or a harness, with one state and the proof that state needs:
+
+| State | Badge | What the entry must link |
+| --- | --- | --- |
+| `shipped` | Shipped in 0.01 | Its driver's folder at the release tag; a host also its live kit run |
+| `live` | Live-checked | Its live-check receipt and its folder on OpenWiz main |
+| `merged` | Merged | Its merged pull request and its folder on OpenWiz main |
+| `review` | In review | Its open pull request |
+| `planned`, `held`, `parked` | Planned, Held, Parked | Its ticket; a held or parked entry also gives its reason |
+
+`read` records the day and the OpenWiz and WizMarket commits the states were read at, and the page shows that day. Folders on main are linked at that OpenWiz commit, so a link still works after a driver moves. `scripts/check.py` refuses a state without its proof, a link outside the public OpenWiz repository, a logo the owner's terms keep off the page ([drivers-logos.md](drivers-logos.md)), and a row that says more than its data. The shipped and live-checked entries are also pinned in `check.py` (`DRIVER_SHIPPED`, `DRIVER_LIVE`), so a new release claim changes both files.
+
+To refresh the states, edit the data, then run `node scripts/drivers-verify.mjs` with a signed-in `gh`. It reads every pull request, ticket and linked folder from GitHub, and prints each row that no longer matches. CI makes no network calls, so it never runs there.
+
+With `site.js`, the directory filters by kind, by state and by name. Without it, every row and every count still shows, and the controls stay disabled.
+
 ## The landing's "Bring any agent" section
 
 The landing's `section.agent-row` is generated at build time from two pinned snapshots, with no network calls during `npm run build`: `landing/reach.json` (agents and hosts on OpenWiz `main`, plus open OpenWiz pull requests adding new harness rows or drivers) and `market/registry.json` (the live WizMarket listing count).

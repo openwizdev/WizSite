@@ -1,6 +1,6 @@
 # Drivers page logos
 
-Every logo on the [Drivers page](https://openwiz.dev/drivers/) is its owner's official mark, fetched from the owner's own site, press kit or official repository. The one exception is `monitor.svg`, a generic icon. Each file is unaltered apart from size; none is recoloured, cropped, framed or redrawn. Where a brand ships a light variant for dark backgrounds, that variant is used. "Check" records the comparison made on 2026-11-23: the committed file against a fresh download of its source. The page says: "Logos belong to their owners. They name the products these drivers and harnesses are for, not a partnership, and not what runs today: each tile says its state." `scripts/check.py` pins each file's bytes.
+Every logo on the [Drivers page](https://openwiz.dev/drivers/) is its owner's official mark, fetched from the owner's own site, press kit or official repository. The one exception is `monitor.svg`, a generic icon. Each file is unaltered apart from size; none is recoloured, cropped, framed or redrawn. Where a brand ships a light variant for dark backgrounds, that variant is used. "Check" records the comparison made on 2026-11-23: the committed file against a fresh download of its source. The page says: "Logos belong to their owners. They name the products these drivers and harnesses are for, not a partnership, and not what runs today: each row says its state." `scripts/check.py` pins each file's bytes.
 
 | File | Source | Licence or brand note | Check | sha256 |
 | --- | --- | --- | --- | --- |

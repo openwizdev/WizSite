@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import { installSwitch, readReleases, render, summary, withReleases } from './scripts/changelog.mjs';
 import { readRegistry, render as renderMarket, summary as marketSummary, withMarket } from './scripts/market.mjs';
 import { readReach, render as renderReach, summary as reachSummary, withReach } from './scripts/reach.mjs';
-import { withDrivers } from './scripts/drivers.mjs';
+import { readDrivers, withDrivers } from './scripts/drivers.mjs';
 import { aboutPage, crawlerFiles, guidePage, pages, urlFor, withMetadata } from './scripts/discovery.mjs';
 import { mirrorPath, toMarkdown } from './scripts/mirrors.mjs';
 import { withCheckout } from './scripts/pricing.mjs';
@@ -46,6 +46,7 @@ const files = ['_headers', '.well-known/security.txt', 'SKILL.md', 'c76a1a01e62d
 const releases = await readReleases();
 console.log(`Changelog releases: ${summary(releases, live)}`);
 const registry = await readRegistry();
+const drivers = await readDrivers();
 console.log(`Market: ${marketSummary(registry)}`);
 const reach = await readReach();
 console.log(`Reach: ${reachSummary(reach)}`);
@@ -91,7 +92,7 @@ for (const [page, [, , robots]] of Object.entries(pages)) {
   if (page === 'index.html') html = withReach(html, renderReach(reach, registry));
   if (page === 'changelog/index.html') html = withReleases(html, render(releases, live));
   if (page === 'market/index.html') html = withMarket(html, renderMarket(registry));
-  if (page === 'drivers/index.html') html = withDrivers(html, registry);
+  if (page === 'drivers/index.html') html = withDrivers(html, drivers);
   if (page === 'pricing/index.html') html = withCheckout(html);
   await put(page, html);
   if (!robots) {
