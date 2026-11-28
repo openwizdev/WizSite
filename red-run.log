@@ -1,0 +1,146 @@
+.....FFFFFF
+======================================================================
+FAIL: test_a_fixture_entry_builds_and_passes_the_site_check_in_both_switch_states (scripts.test_changelog.Ship.test_a_fixture_entry_builds_and_passes_the_site_check_in_both_switch_states)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/user/WizSite/scripts/test_changelog.py", line 196, in test_a_fixture_entry_builds_and_passes_the_site_check_in_both_switch_states
+    today = self.build(root)
+            ^^^^^^^^^^^^^^^^
+  File "/home/user/WizSite/scripts/test_changelog.py", line 190, in build
+    self.assertEqual(done.returncode, 0, done.stdout[-2000:] + done.stderr[-4000:])
+AssertionError: 1 != 0 : fatal: not a git repository (or any of the parent directories): .git
+Traceback (most recent call last):
+  File "/tmp/tmpiuv7q0rs/site/scripts/check.py", line 2619, in <module>
+    main()
+  File "/tmp/tmpiuv7q0rs/site/scripts/check.py", line 2600, in main
+    paths = subprocess.check_output(['git', 'ls-files', '-z', '--cached', '--others', '--exclude-standard'], cwd=ROOT).decode().split('\0')
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/subprocess.py", line 466, in check_output
+    return run(*popenargs, stdout=PIPE, timeout=timeout, check=True,
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/subprocess.py", line 571, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['git', 'ls-files', '-z', '--cached', '--others', '--exclude-standard']' returned non-zero exit status 128.
+
+
+======================================================================
+FAIL: test_a_long_entry_groups_its_lines_by_area (scripts.test_changelog.Ship.test_a_long_entry_groups_its_lines_by_area)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/user/WizSite/scripts/test_changelog.py", line 131, in test_a_long_entry_groups_its_lines_by_area
+    html = generate('--releases', SHIP, '--switch', 'live', '--ship', ON)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/user/WizSite/scripts/test_changelog.py", line 32, in generate
+    assert done.returncode == 0, done.stderr
+           ^^^^^^^^^^^^^^^^^^^^
+AssertionError: file:///home/user/WizSite/scripts/changelog.mjs:31
+    + `<ul>${release.bullets.map(b => `<li>${esc(b)}</li>`).join('')}</ul>`
+                             ^
+
+TypeError: Cannot read properties of undefined (reading 'map')
+    at entry (file:///home/user/WizSite/scripts/changelog.mjs:31:30)
+    at Array.map (<anonymous>)
+    at render (file:///home/user/WizSite/scripts/changelog.mjs:40:67)
+    at file:///home/user/WizSite/scripts/changelog.mjs:60:19
+
+Node.js v24.22.1
+
+
+======================================================================
+FAIL: test_sixty_lines_fit_a_phone_and_a_wide_screen (scripts.test_changelog.Ship.test_sixty_lines_fit_a_phone_and_a_wide_screen)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/user/WizSite/scripts/test_changelog.py", line 219, in test_sixty_lines_fit_a_phone_and_a_wide_screen
+    built = self.build(root, 'on', check=False)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/user/WizSite/scripts/test_changelog.py", line 190, in build
+    self.assertEqual(done.returncode, 0, done.stdout[-2000:] + done.stderr[-4000:])
+AssertionError: 1 != 0 : Changelog releases: 2 releases
+Market: 0 listings at WizMarket dfbf9ee685d5
+Reach: 14 agents and 7 hosts today, 15 coming, at OpenWiz fae200fc8930
+file:///tmp/tmppt4y4zsn/site/scripts/changelog.mjs:31
+    + `<ul>${release.bullets.map(b => `<li>${esc(b)}</li>`).join('')}</ul>`
+                             ^
+
+TypeError: Cannot read properties of undefined (reading 'map')
+    at entry (file:///tmp/tmppt4y4zsn/site/scripts/changelog.mjs:31:30)
+    at Array.map (<anonymous>)
+    at render (file:///tmp/tmppt4y4zsn/site/scripts/changelog.mjs:40:67)
+    at file:///tmp/tmppt4y4zsn/site/build.mjs:90:66
+
+Node.js v24.22.1
+
+
+======================================================================
+FAIL: test_the_entry_comes_from_the_release_notes (scripts.test_changelog.Ship.test_the_entry_comes_from_the_release_notes)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/user/WizSite/scripts/test_changelog.py", line 170, in test_the_entry_comes_from_the_release_notes
+    made = generate('--from-notes', NOTES, '--version', '0.2.0', '--name', '0.02')
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/user/WizSite/scripts/test_changelog.py", line 32, in generate
+    assert done.returncode == 0, done.stderr
+           ^^^^^^^^^^^^^^^^^^^^
+AssertionError: node:internal/fs/promises:1345
+  return new FileHandle(await PromisePrototypeThen(
+                        ^
+
+Error: ENOENT: no such file or directory, open '0.02'
+    at async open (node:internal/fs/promises:1345:25)
+    at async readFile (node:internal/fs/promises:2003:14)
+    at async file:///home/user/WizSite/scripts/changelog.mjs:61:44 {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '0.02'
+}
+
+Node.js v24.22.1
+
+
+======================================================================
+FAIL: test_the_switch_file_is_read_strictly (scripts.test_changelog.Ship.test_the_switch_file_is_read_strictly)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/user/WizSite/scripts/test_changelog.py", line 157, in test_the_switch_file_is_read_strictly
+    self.assertEqual(generate(), generate('--ship', ROOT / 'release.json'))
+                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/user/WizSite/scripts/test_changelog.py", line 32, in generate
+    assert done.returncode == 0, done.stderr
+           ^^^^^^^^^^^^^^^^^^^^
+AssertionError: file:///home/user/WizSite/scripts/changelog.mjs:44
+  if (page.includes(START) || page.split('</main>').length !== 2) throw new Error('changelog page: expected one </main> and no generated section');
+                                                                        ^
+
+Error: changelog page: expected one </main> and no generated section
+    at withReleases (file:///home/user/WizSite/scripts/changelog.mjs:44:73)
+    at file:///home/user/WizSite/scripts/changelog.mjs:61:31
+
+Node.js v24.22.1
+
+
+======================================================================
+FAIL: test_the_switch_off_holds_the_entry_and_changes_nothing_else (scripts.test_changelog.Ship.test_the_switch_off_holds_the_entry_and_changes_nothing_else)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/user/WizSite/scripts/test_changelog.py", line 149, in test_the_switch_off_holds_the_entry_and_changes_nothing_else
+    today = generate('--releases', temp, '--switch', 'live', '--ship', OFF)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/user/WizSite/scripts/test_changelog.py", line 32, in generate
+    assert done.returncode == 0, done.stderr
+           ^^^^^^^^^^^^^^^^^^^^
+AssertionError: file:///home/user/WizSite/scripts/changelog.mjs:44
+  if (page.includes(START) || page.split('</main>').length !== 2) throw new Error('changelog page: expected one </main> and no generated section');
+                                                                        ^
+
+Error: changelog page: expected one </main> and no generated section
+    at withReleases (file:///home/user/WizSite/scripts/changelog.mjs:44:73)
+    at file:///home/user/WizSite/scripts/changelog.mjs:61:31
+
+Node.js v24.22.1
+
+
+----------------------------------------------------------------------
+Ran 11 tests in 1.225s
+
+FAILED (failures=6)
