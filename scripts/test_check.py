@@ -126,6 +126,56 @@ class Checks(unittest.TestCase):
                     finally:
                         path.write_bytes(original)
 
+    def test_redirects_and_404(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / 'dist'
+            shutil.copytree(ROOT / 'dist', root)
+            rules = (root / '_redirects').read_text()
+            for source, target in (('/faq.html', '/faq/'), ('/faq', '/faq/'), ('/what-is-openwiz', '/what-is-openwiz/'),
+                                   ('/guides/run-many-coding-agents', '/guides/run-many-coding-agents/'),
+                                   ('/docs', 'https://github.com/openwizdev/OpenWiz#readme'), ('/install', '/what-is-openwiz/'),
+                                   ('/github', 'https://github.com/openwizdev/OpenWiz')):
+                self.assertRegex(rules, rf'(?m)^{re.escape(source)} +{re.escape(target)} +301$')
+            failures = [
+                ('_redirects', r'(?m)^/faq\.html .*\n', '', 'missing redirect: /faq.html'),
+                ('_redirects', r'(?m)^/pricing .*\n', '', 'missing redirect: /pricing'),
+                ('_redirects', r'(?m)^/faq\.html .*$', '/faq.html /faq/ 302', 'must be a 301'),
+                ('_redirects', r'(?m)^/faq\.html .*$', '/faq.html /questions/ 301', 'not a built page: /questions/'),
+                ('_redirects', r'(?m)^/faq\.html .*$', '/faq.html /faq 301', 'redirect chain: /faq.html'),
+                ('_redirects', r'(?m)^/faq\.html .*$', '/faq.html /what-is-openwiz/#nowhere 301', 'not a built page'),
+                ('_redirects', r'(?m)^/faq\.html .*$', '/faq.html https://example.com/ 301', 'unexpected redirect target'),
+                ('_redirects', r'(?m)^/faq\.html .*$', '/faq.html /faq/ 301\n/faq/ /pricing/ 301', 'hides a built page: /faq/'),
+                ('_redirects', r'(?m)^/faq\.html .*$', '/faq.html /faq/ 301\n/sitemap.xml / 301', 'hides a built page: /sitemap.xml'),
+                ('_redirects', r'(?m)^/faq\.html .*$', '/faq.html /faq/ 301\n/api/ask / 301', 'hides a built page: /api/ask'),
+                ('_redirects', r'(?m)^/faq\.html .*$', '/faq.html /faq/ 301\n/faq.html /faq/ 301', 'duplicate redirect'),
+                ('_redirects', r'(?m)^/faq\.html .*$', '/faq.html /faq/ 301\n/old/* /faq/ 301', 'one exact path'),
+                ('_redirects', r'(?m)^/faq\.html .*$', '/faq.html /faq/ 301\nhttps://www.openwiz.dev/* https://openwiz.dev/:splat 301',
+                 'the host handles'),
+                ('404.html', r'<meta name="robots"[^>]*>', '', 'noindex'),
+                ('404.html', r'<a href="/faq/">FAQ</a>', 'FAQ', '404 page must link'),
+                ('404.html', r'<a href="/what-is-openwiz/">', '<a href="/drivers/">', '404 page must link'),
+            ]
+            for name, pattern, replacement, error in failures:
+                with self.subTest(file=name, error=error):
+                    path = root / name
+                    original = path.read_text()
+                    head, main, tail = re.split(r'(<main[\s\S]*</main>)', original) if 'href' in pattern else (original, '', '')
+                    if main:
+                        main, count = re.subn(pattern, replacement, main, count=1)
+                        changed = head + main + tail
+                    else:
+                        changed, count = re.subn(pattern, replacement, original, count=1)
+                    self.assertEqual(count, 1)
+                    path.write_text(changed)
+                    try:
+                        with self.assertRaisesRegex(AssertionError, re.escape(error)):
+                            check_site(root)
+                    finally:
+                        path.write_text(original)
+            (root / '_redirects').unlink()
+            with self.assertRaisesRegex(AssertionError, 'missing build output'):
+                check_site(root)
+
     def test_guide_page_discovery_and_rules(self):
         guide = 'guides/run-many-coding-agents/index.html'
         with tempfile.TemporaryDirectory() as temp:
