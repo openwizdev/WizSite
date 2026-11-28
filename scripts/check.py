@@ -443,6 +443,8 @@ DRIVERS_PAGE = 'drivers/index.html'
 MARKET_PAGE = 'market/index.html'
 MARKET = ('<!-- market:start -->', '<!-- market:end -->')
 MARKET_SLOT = '<template data-slot="market"></template>'
+MARKET_FEATURED = ('<!-- market-featured:start -->', '<!-- market-featured:end -->')
+MARKET_FEATURED_SLOT = '<template data-slot="market-featured"></template>'
 MARKET_REPO = 'https://github.com/openwizdev/WizMarket'
 DRIVERS_LINKS = ('/drivers/', '/drivers')
 DRIVERS = (
@@ -800,12 +802,14 @@ def check_vector(data):
     assert MARK in svg and OLD_MARK not in svg, 'logo SVG must use the new mark (dark cream)'
 
 
-def market_urls(path):
+def market_urls(path, featured=ROOT / 'market/featured.json'):
     found = set()
     for listing in json.loads(path.read_text())['listings']:
         found.add(listing['url'])
         found.update(link['url'] for link in listing.get('links', ()))
         found.update(proof['url'] for proof in listing.get('proof', {}).values())
+    partner = json.loads(featured.read_text())
+    found.add(partner['url'])
     return frozenset(url for url in found if isinstance(url, str) and url.startswith('https://'))
 
 
@@ -818,29 +822,55 @@ def check_market_refs(root, path, page, pages, market):
         check_ref(root, path, ref, pages, page.favicons)
 
 
-MARKET_TAGS = {'section', 'nav', 'h2', 'h3', 'p', 'code', 'ul', 'li', 'div', 'article', 'dl', 'dt', 'dd', 'span', 'a'}
-MARKET_ATTRS = {'class', 'id', 'aria-label', 'aria-labelledby', 'data-listing', 'data-status', 'data-stage'}
+MARKET_TAGS = {'section', 'nav', 'h2', 'h3', 'p', 'code', 'ul', 'li', 'div', 'article', 'dl', 'dt', 'dd', 'span', 'a', 'button', 'img', 'svg', 'path', 'wbr'}
+MARKET_ATTRS = {'class', 'id', 'aria-label', 'aria-labelledby', 'aria-hidden', 'data-listing', 'data-kind', 'data-status', 'data-stage', 'data-publisher', 'data-market-featured-dismiss', 'viewbox', 'width', 'height', 'fill', 'stroke', 'stroke-width', 'stroke-linecap', 'stroke-linejoin', 'd', 'src', 'alt', 'type', 'loading', 'decoding'}
 
 
 class MarketMarkup(HTMLParser):
+    def __init__(self, featured):
+        super().__init__(convert_charrefs=True)
+        self.featured = featured
+        self.sponsored = []
+
     def handle_starttag(self, tag, attrs):
         allowed = MARKET_ATTRS | ({'href', 'rel', 'data-count'} if tag == 'a' else set())
         assert tag in MARKET_TAGS and all(name in allowed for name, _ in attrs), 'unexpected markup in the generated Market section'
         fields = dict(attrs)
-        assert fields.get('rel', 'noreferrer') == 'noreferrer', 'unexpected markup in the generated Market section'
+        rel = fields.get('rel', 'noreferrer')
+        assert rel in ('noreferrer', 'sponsored noopener'), 'unexpected markup in the generated Market section'
+        if rel == 'sponsored noopener':
+            assert tag == 'a' and fields.get('href') == self.featured, 'unexpected markup in the generated Market section'
+            self.sponsored.append(fields['href'])
         assert 'data-count' not in fields or fields['data-count'] in ('github', 'x'), 'unexpected markup in the generated Market section'
 
 
-def check_market_markup(section):
-    MarketMarkup(convert_charrefs=True).feed(section)
+def check_market_markup(section, featured=ROOT / 'market/featured.json'):
+    partner = json.loads(featured.read_text())['url']
+    markup = MarketMarkup(partner)
+    markup.feed(section)
+    assert markup.sponsored == [partner], 'the Market has one clearly marked sponsored partner link'
 
 
 def split_market(built):
     start, end = MARKET
-    assert built.count(start) == 1 and built.count(end) == 1, 'the built Market page has one generated section'
+    assert built.count(start) == 1 and built.count(end) == 1, 'the built Market page has one generated listing section'
     before, rest = built.split(start)
     section, after = rest.split(end)
     return before + MARKET_SLOT + after, section
+
+
+def split_market_featured(built):
+    start, end = MARKET_FEATURED
+    assert built.count(start) == 1 and built.count(end) == 1, 'the built Market page has one generated featured section'
+    before, rest = built.split(start)
+    section, after = rest.split(end)
+    return before + MARKET_FEATURED_SLOT + after, section
+
+
+def split_generated_market(built):
+    fixed, featured = split_market_featured(built)
+    fixed, listings = split_market(fixed)
+    return fixed, featured + listings
 
 
 def check_ref(root, source, ref, pages, favicons=(), market=None):
@@ -1147,13 +1177,13 @@ def check_site(root, registry=ROOT / 'market/registry.json', now=None):
         return [ref for _, ref in found]
     for path, page in pages.items():
         if path == root / MARKET_PAGE:
-            fixed, section = (Page(part) for part in split_market(path.read_text()))
+            fixed, section = (Page(part) for part in split_generated_market(path.read_text()))
             market = market_urls(registry)
             assert not section.books, f'a booking link outside the team page: {path.name}'
             for count, href in ((section.x_links, X_ACCOUNT), (section.cloudroom_links, CLOUDROOM_LINK), (section.report_links, REPORT_LINK), *[(n, u) for u, n in section.install_links.items()]):
                 assert not count or href in market, 'unexpected external URL'
             check_market_refs(root, path, section, pages, market)
-            check_market_markup(split_market(path.read_text())[1])
+            check_market_markup(split_generated_market(path.read_text())[1])
             page = fixed
         if path == root / DRIVERS_PAGE:
             listing_urls = driver_listing_urls(registry)
@@ -1278,7 +1308,7 @@ def check_site(root, registry=ROOT / 'market/registry.json', now=None):
         rel = path.relative_to(root).as_posix()
         html = docs[rel]
         if rel == MARKET_PAGE:
-            html = split_market(html)[0]
+            html = split_generated_market(html)[0]
         if rel == DRIVERS_PAGE and driver_listing_urls(registry) and tuple(match[2] for match in DRIVER_SLOT.finditer(html)) == DRIVER_SLOTS:
             html = drivers_fallback(html, (ROOT / DRIVERS_PAGE).read_text())[0]
         reader = Text(html)
@@ -2297,7 +2327,7 @@ def site_voice(path, body):
     if path.removeprefix('dist/') == ASK_INDEX:
         return ask_index_without_market(body)
     if path.endswith('market/index.html') and MARKET[0] in body:
-        return split_market(body)[0]
+        return split_generated_market(body)[0]
     if path.endswith('drivers/index.html') and driver_listing_urls(ROOT / 'market/registry.json') and tuple(match[2] for match in DRIVER_SLOT.finditer(body)) == DRIVER_SLOTS:
         return drivers_fallback(body, (ROOT / DRIVERS_PAGE).read_text())[0]
     return body
@@ -2349,7 +2379,7 @@ def main():
         if name == 'changelog/index.html':
             built = split_releases(built)[0]
         if name == MARKET_PAGE:
-            built = split_market(built)[0]
+            built = split_generated_market(built)[0]
         if name == DRIVERS_PAGE and driver_listing_urls(ROOT / 'market/registry.json'):
             check_drivers_export(built)
             continue

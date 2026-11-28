@@ -4,8 +4,12 @@ import { pathToFileURL } from 'node:url';
 
 const ROOT = new URL('../', import.meta.url);
 export const REGISTRY = new URL('market/registry.json', ROOT);
+export const FEATURED = new URL('market/featured.json', ROOT);
 export const START = '<!-- market:start -->';
 export const END = '<!-- market:end -->';
+export const FEATURED_START = '<!-- market-featured:start -->';
+export const FEATURED_END = '<!-- market-featured:end -->';
+export const FEATURED_SLOT = '<template data-slot="market-featured"></template>';
 export const WIZMARKET = 'https://github.com/openwizdev/WizMarket';
 export const CONTRACT = `${WIZMARKET}/blob/main/contracts/listing.v1.md`;
 
@@ -254,59 +258,156 @@ export async function readRegistry(file = REGISTRY) {
   return parse(decode(await readFile(file)));
 }
 
+const featuredFail = (where, why) => { throw new Error(`market/featured.json: ${where}: ${why}`); };
+const featuredOneLine = (value, where) => {
+  if (typeof value !== 'string' || !value.length || /[\u0000-\u001f\u007f-\u009f\u2028\u2029]/.test(value)) featuredFail(where, 'not one line');
+  return value;
+};
+const featuredExactKeys = (value, keys, where) => {
+  if (!isObject(value)) featuredFail(where, 'not an object');
+  const extra = Object.keys(value).filter(key => !keys.includes(key));
+  if (extra.length) featuredFail(where, `unknown field ${extra.join(', ')}`);
+};
+const featuredLogo = value => typeof value === 'string' && /^\/(?:[a-z0-9][a-z0-9.-]*\/)*[a-z0-9][a-z0-9.-]*\.(?:png|svg|webp)$/.test(value);
+
+export function validateFeatured(featured) {
+  featuredExactKeys(featured, ['name', 'pitch', 'url', 'label', 'logo', 'todo'], 'the partner');
+  for (const [field, limit] of [['name', 80], ['pitch', 140], ['label', 80]]) {
+    const value = featuredOneLine(featured[field], `the partner.${field}`);
+    if ([...value].length > limit) featuredFail(`the partner.${field}`, `over ${limit} characters`);
+  }
+  if (!isUrl(featured.url)) featuredFail('the partner.url', 'not an https URL');
+  if ('logo' in featured && !featuredLogo(featured.logo)) featuredFail('the partner.logo', 'not a site-local PNG, SVG or WebP path');
+  if ('todo' in featured) featuredOneLine(featured.todo, 'the partner.todo');
+  for (const [where, text] of strings(featured, 'the partner')) {
+    if (!text.isWellFormed()) featuredFail(where, 'holds an unpaired surrogate, which is not UTF-8 text');
+    const found = privateKind(text);
+    if (found) featuredFail(where, `holds what looks like ${found}`);
+  }
+  return featured;
+}
+
+export function parseFeatured(text) {
+  let featured;
+  try { featured = JSON.parse(text); } catch { featuredFail('the partner', 'not JSON'); }
+  const key = repeatedKey(text);
+  if (key !== null) featuredFail('the partner', `has the key ${key} twice in one object`);
+  return validateFeatured(featured);
+}
+
+export async function readFeatured(file = FEATURED) {
+  let text;
+  try { text = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(await readFile(file)); } catch { featuredFail('the partner', 'not UTF-8 text'); }
+  return parseFeatured(text);
+}
+
 const esc = text => String(text).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const link = (href, text) => `<a href="${esc(href)}"${clickLinkAttribute(href)}${href.startsWith('#') ? '' : ' rel="noreferrer"'}>${esc(text)}</a>`;
 export const tagsOf = index => [...new Set(index.listings.flatMap(listing => listing.tags))].sort();
 
-function status(listing) {
-  if (listing.status !== 'verified') {
-    return '<p class="market-status" data-status="listed"><span class="market-badge">Listed</span> A link, not proven.</p>';
-  }
-  const proofs = [];
+const KINDS = [['driver', 'driver'], ['harness', 'harness'], ['skill', 'skill'], ['mcp', 'mcp-server']];
+const KIND_WORD = { driver: 'Driver', harness: 'Harness', skill: 'Skill', mcp: 'MCP server' };
+const KIND_ICON = {
+  driver: 'M2.2 12.6h11.6M4.4 12.6 8 3.2l3.6 9.4',
+  harness: 'M6.3 5.4a2.3 2.3 0 1 0 .1 4.6 2.3 2.3 0 1 0-.1-4.6M9.7 5.4a2.3 2.3 0 1 0 .1 4.6 2.3 2.3 0 1 0-.1-4.6',
+  skill: 'M3.8 3.2h5.1L12.4 6.4v6.4H3.8zM8.8 3.4V6.5h3.2',
+  mcp: 'M6 2.4v3M10 2.4v3M4.4 5.4h7.2v2.4a3.6 3.6 0 0 1-7.2 0zM8 11.4v2.4',
+  other: 'M8 2.2 9.4 6.4 13.8 8 9.4 9.6 8 13.8 6.6 9.6 2.2 8 6.6 6.4z',
+};
+export const kindOf = listing => KINDS.find(([, tag]) => listing.tags.includes(tag))?.[0] ?? 'other';
+const kindWord = listing => {
+  const kind = kindOf(listing);
+  return KIND_WORD[kind] ?? listing.tags[0].charAt(0).toUpperCase() + listing.tags[0].slice(1).replace(/-/g, ' ');
+};
+const kindIcon = kind => `<svg class="market-kind-icon" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="${KIND_ICON[kind]}" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
+const RELEASE = /^https:\/\/github\.com\/[^/?#]+\/[^/?#]+\/(?:tree|blob)\/(v?\d+(?:\.\d+)+(?:[-+][0-9A-Za-z.-]+)?|[0-9a-f]{40})(?=[/?#]|$)/;
+const bare = url => url.replace(/^https:\/\//, '').replace(/\/$/, '');
+
+export function install(listing, commit) {
+  const release = RELEASE.exec(listing.url);
+  const [before, pin, after] = release
+    ? [bare(release[0]).slice(0, -release[1].length), release[1], bare(listing.url).slice(bare(release[0]).length)]
+    : ['github.com/openwizdev/WizMarket/blob/', commit.slice(0, 12), `/listings/${listing.id}.json`];
+  return { prefix: `Install ${listing.name} from `, before, pin, after, line: `Install ${listing.name} from ${before}${pin}${after}` };
+}
+
+const breakable = text => esc(text).replace(/\//g, '/<wbr>');
+function proofs(listing) {
+  if (listing.status !== 'verified') return [];
   const { receipt, skill } = listing.proof;
-  if (receipt) proofs.push(link(receipt.url, `Kit receipt: 5 of 5 checks on its real host, ${receipt.date}`));
-  if (skill) proofs.push(link(skill.url, `Its check passed at ${skill.source.split('@')[0]}@${skill.source.split('@')[1].slice(0, 12)}`));
-  return `<p class="market-status" data-status="verified"><span class="market-badge">Verified</span> ${proofs.join('; ')}</p>`;
+  const found = [];
+  if (receipt) found.push(link(receipt.url, `Kit receipt: 5 of 5 checks on its real host, ${receipt.date}`));
+  if (skill) found.push(link(skill.url, `Its check passed at ${skill.source.split('@')[0]}@${skill.source.split('@')[1].slice(0, 12)}`));
+  return found;
 }
 
-function stage(listing) {
-  if (listing.stage !== 'being-built') return '<p class="market-stage" data-stage="available">Available</p>';
-  const work = listing.links[0];
-  return `<p class="market-stage" data-stage="being-built">Being built: ${link(work.url, work.label)}</p>`;
+function action(listing, commit) {
+  if (listing.stage === 'being-built') {
+    const work = listing.links[0];
+    return `<p class="market-stage" data-stage="being-built">Being built: ${link(work.url, work.label)}</p>`;
+  }
+  const { prefix, before, pin, after } = install(listing, commit);
+  return '<div class="market-install"><p class="market-install-label">Paste into your agent</p>'
+    + `<p class="market-install-line"><code>${esc(prefix)}${breakable(before)}<span class="market-pin">${esc(pin)}</span>${breakable(after)}</code></p></div>`;
 }
 
-function card(listing) {
+function card(listing, commit) {
+  const kind = kindOf(listing);
+  const verified = listing.status === 'verified';
   const tags = listing.tags.map(tag => `<li>${link(`#tag-${tag}`, tag)}</li>`).join('');
   const extra = (listing.links ?? []).slice(listing.stage === 'being-built' ? 1 : 0);
-  return `<article class="market-card" id="listing-${listing.id}" data-listing="${listing.id}" aria-labelledby="name-${listing.id}">`
+  const proof = proofs(listing);
+  return `<article class="market-card" id="listing-${listing.id}" data-listing="${listing.id}" data-kind="${kind}" data-status="${listing.status}" data-stage="${listing.stage}" data-publisher="${esc(listing.publisher)}" aria-labelledby="name-${listing.id}">`
+    + '<div class="market-card-top">'
+    + `<p class="market-kicker">${kindIcon(kind)}${esc(kindWord(listing))}</p>`
+    + `<p class="market-status" data-status="${listing.status}"><span class="market-badge">${verified ? 'Verified' : 'Listed'}</span></p>`
+    + '</div>'
     + `<h3 id="name-${listing.id}">${esc(listing.name)}</h3>`
     + `<p class="market-summary">${esc(listing.summary)}</p>`
-    + status(listing) + stage(listing)
+    + action(listing, commit)
     + `<dl><dt>Plugs into</dt><dd>${esc(listing.plugs_into)}</dd>`
     + (listing.login ? `<dt>Login</dt><dd>${esc(listing.login)}</dd>` : '')
-    + `<dt>Publisher</dt><dd>${esc(listing.publisher)}</dd></dl>`
+    + (proof.length ? `<dt>Proof</dt><dd>${proof.join('; ')}</dd>` : '')
+    + `<dt>Source</dt><dd>${esc(bare(listing.url))}</dd>`
+    + `<dt>Listed by</dt><dd class="market-publisher">${esc(listing.publisher)}</dd></dl>`
     + `<ul class="market-tags" aria-label="Tags">${tags}</ul>`
-    + `<p class="market-links">${[link(listing.url, 'Get it'), ...extra.map(l => link(l.url, l.label))].join(' · ')}</p>`
+    + `<p class="market-links">${[link(listing.url, 'Get it'), ...extra.map(l => link(l.url, l.label))].join('')}</p>`
     + '</article>';
 }
 
+export const byName = listings => listings.slice().sort((a, b) => a.name.localeCompare(b.name, 'en', { numeric: true, sensitivity: 'base' }) || (a.id < b.id ? -1 : 1));
+
+export function renderFeatured(featured) {
+  const logo = featured.logo ? `<img class="market-featured-logo" src="${esc(featured.logo)}" width="48" height="48" alt="" loading="lazy" decoding="async">` : '';
+  return `<section class="market-featured${featured.logo ? ' has-logo' : ''}" aria-labelledby="market-featured-name">${logo}<div class="market-featured-copy"><p class="market-featured-kicker">Featured</p><h2 id="market-featured-name">${esc(featured.name)}</h2><p class="market-featured-pitch">${esc(featured.pitch)}</p><p class="market-featured-disclosure">Sponsored · referral link</p></div><a class="market-featured-link" href="${esc(featured.url)}" rel="sponsored noopener">${esc(featured.label)}</a><button class="market-featured-dismiss" type="button" data-market-featured-dismiss aria-label="Dismiss featured partner">Dismiss</button></section>`;
+}
+
 export function render(index) {
+  const at = index.commit.slice(0, 12);
   if (!index.listings.length) {
     return '<section class="market-all" aria-labelledby="all-listings"><h2 id="all-listings">Every listing</h2>'
-      + `<p class="market-count">0 listings, from WizMarket at commit <code>${index.commit.slice(0, 12)}</code>.</p>`
+      + `<p class="market-count">0 listings, from WizMarket at commit <code>${at}</code>.</p>`
       + '<p class="market-empty">No listings yet. Anyone can be the first: <a href="#publish">publish your own</a>.</p></section>';
   }
   const tags = tagsOf(index);
   const count = tag => index.listings.filter(listing => listing.tags.includes(tag)).length;
+  const total = index.listings.length;
   const verified = index.listings.filter(listing => listing.status === 'verified').length;
   const browse = `<nav class="market-browse" aria-label="Browse by tag"><h2>Browse by tag</h2><ul>${tags.map(tag => `<li>${link(`#tag-${tag}`, `${tag} (${count(tag)})`)}</li>`).join('')}</ul></nav>`;
-  const all = `<section class="market-all" aria-labelledby="all-listings"><h2 id="all-listings">Every listing</h2>`
-    + `<p class="market-count">${index.listings.length} listing${index.listings.length === 1 ? '' : 's'}, ${verified} verified, from WizMarket at commit <code>${index.commit.slice(0, 12)}</code>.</p>`
-    + `<div class="market-cards">${index.listings.map(card).join('')}</div></section>`;
+  const all = `<section class="market-all" aria-labelledby="all-listings"><div class="market-all-head"><h2 id="all-listings">Every listing</h2>`
+    + `<p class="market-count"><span class="market-stat">${total}</span> ${total === 1 ? 'listing' : 'listings'}, <span class="market-stat is-verified">${verified}</span> verified, from WizMarket at <code>${at}</code>. `
+    + `Each install line is pinned to a release, or to the listing at that commit.</p></div>`
+    + `<div class="market-cards">${byName(index.listings).map(listing => card(listing, index.commit)).join('')}</div></section>`;
   const byTag = `<section class="market-by-tag" aria-labelledby="by-tag"><h2 id="by-tag">By tag</h2>${tags.map(tag => `<section class="market-tag" id="tag-${tag}" aria-labelledby="heading-tag-${tag}"><h3 id="heading-tag-${tag}">${esc(tag)}</h3><ul>`
-    + index.listings.filter(listing => listing.tags.includes(tag)).map(listing => `<li>${link(`#listing-${listing.id}`, listing.name)} <span>${listing.status === 'verified' ? 'Verified' : 'Listed'}</span></li>`).join('')
+    + byName(index.listings.filter(listing => listing.tags.includes(tag))).map(listing => `<li>${link(`#listing-${listing.id}`, listing.name)} <span>${listing.status === 'verified' ? 'Verified' : 'Listed'}</span></li>`).join('')
     + '</ul></section>').join('')}</section>`;
-  return browse + all + byTag;
+  return all + browse + byTag;
+}
+
+export function withFeatured(page, section) {
+  if (page.includes(FEATURED_START) || page.split(FEATURED_SLOT).length !== 2) throw new Error('market page: expected one featured slot and no generated partner');
+  return page.replace(FEATURED_SLOT, () => `${FEATURED_START}${section}${FEATURED_END}`);
 }
 
 export function withMarket(page, section) {
@@ -318,6 +419,7 @@ export const summary = index => `${index.listings.length} listing${index.listing
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const [file, page] = process.argv.slice(2);
+  const featured = await readFeatured();
   const section = render(await readRegistry(file ? pathToFileURL(file) : REGISTRY));
-  process.stdout.write(page ? withMarket(await readFile(page, 'utf8'), section) : section);
+  process.stdout.write(page ? withMarket(withFeatured(await readFile(page, 'utf8'), renderFeatured(featured)), section) : renderFeatured(featured) + section);
 }

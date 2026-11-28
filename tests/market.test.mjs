@@ -72,13 +72,18 @@ test('every listing of the fixture snapshot renders with its status, tags and li
   const { code, stderr, html } = build(fixture('contract-index.json'));
   assert.equal(code, 0, stderr);
   const found = cards(html);
-  assert.deepEqual(Object.keys(found), Object.keys(CONTRACT_LISTINGS), 'one card per listing, sorted by id');
+  assert.deepEqual(Object.keys(found), Object.keys(CONTRACT_LISTINGS), 'one card per listing, in name order');
   for (const [id, want] of Object.entries(CONTRACT_LISTINGS)) {
     const card = found[id];
     const links = hrefs(card);
     assert.match(card, new RegExp(`<h3 id="name-${id}">${want.name}</h3>`), `${id}: its name`);
     assert.match(card, new RegExp(`data-status="${want.status}"`), `${id}: its status`);
-    assert.ok(text(card).includes(want.status === 'verified' ? 'Verified' : 'Listed A link, not proven.'), `${id}: its status in words`);
+    assert.match(card, new RegExp(`<span class="market-badge">${want.status === 'verified' ? 'Verified' : 'Listed'}</span>`), `${id}: its status in words`);
+    assert.match(card, new RegExp(`<dt>Listed by</dt><dd class="market-publisher">example-publisher</dd>`), `${id}: who listed it`);
+    assert.match(card, /data-publisher="example-publisher"/, `${id}: its publisher, for the Listed by filter`);
+    const install = decode((card.match(/<p class="market-install-line">[\s\S]*?<\/p>/)?.[0] ?? '').replace(/<[^>]*>/g, ''));
+    if (want.stage === 'being-built') assert.equal(install, '', `${id}: nothing to install while it is being built`);
+    else assert.equal(install, `Install ${want.name} from github.com/openwizdev/WizMarket/blob/${C.slice(0, 12)}/listings/${id}.json`, `${id}: its install line, pinned to the listing at the snapshot's commit`);
     for (const tag of want.tags) assert.ok(links.includes(`#tag-${tag}`), `${id}: its tag ${tag} links to the tag`);
     assert.equal((card.match(/<ul class="market-tags"[\s\S]*?<\/ul>/)[0].match(/<li>/g) || []).length, want.tags.length, `${id}: only its own tags`);
     for (const proof of want.proofs) assert.ok(links.includes(proof), `${id}: a link to its proof ${proof}`);
@@ -90,6 +95,46 @@ test('every listing of the fixture snapshot renders with its status, tags and li
   }
   assert.ok(text(found['example-driver']).includes('Kit receipt: 5 of 5 checks on its real host, 2026-11-01'), 'a receipt names its date');
   assert.ok(text(found['example-skill']).includes(`Its check passed at example-owner/example-skills@${'c'.repeat(12)}`), 'a skill names its pinned source');
+});
+
+test('the one featured partner comes from its small data file and is unambiguously sponsored', async () => {
+  const { parseFeatured, readFeatured, renderFeatured } = await import('../scripts/market.mjs');
+  const featured = await readFeatured();
+  assert.equal(featured.name, 'Cloudroom');
+  assert.equal(featured.pitch, 'Cloud agent threads for long-running work.');
+  assert.equal(featured.label, 'Visit Cloudroom');
+  assert.equal(featured.logo, '/drivers/logos/cloudroom.png');
+  assert.match(featured.url, /^https:\/\//, 'the data file owns the HTTPS destination');
+  assert.match(featured.todo, /^TODO:/, 'the placeholder URL comes with its replacement note');
+  const section = renderFeatured(featured);
+  const partner = section.match(/<section class="market-featured[^"]*"[\s\S]*?<\/section>/)?.[0] ?? '';
+  assert.match(partner, /<p class="market-featured-kicker">Featured<\/p>/, 'the slot says what it is');
+  assert.match(partner, /Sponsored · referral link/, 'the referral disclosure is visible');
+  assert.match(partner, new RegExp(`href="${featured.url.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}" rel="sponsored noopener"`), 'the partner link has the required relationship');
+  assert.match(partner, /data-market-featured-dismiss/, 'the slot can be dismissed locally');
+  assert.doesNotMatch(partner, /data-count/, 'following the partner is not a tracked click');
+  assert.doesNotMatch(partner, /\bdefault\b/i, 'a featured partner is never presented as a default');
+  const { logo, ...withoutLogo } = featured;
+  assert.doesNotMatch(renderFeatured(parseFeatured(JSON.stringify(withoutLogo))), /market-featured-logo/, 'a logo is optional');
+  const swapped = parseFeatured(JSON.stringify({ ...featured, url: 'https://cloudroom.dev/jake-referral' }));
+  assert.match(renderFeatured(swapped), /href="https:\/\/cloudroom\.dev\/jake-referral"/, 'swapping the referral URL only changes the data file');
+  assert.throws(() => parseFeatured(JSON.stringify({ ...featured, url: 'http://cloudroom.dev' })), /not an https URL/, 'the partner link stays HTTPS');
+});
+
+test('an install line pins the release a listing names, or else the listing at the snapshot commit', async () => {
+  const { install } = await import('../scripts/market.mjs');
+  const pin = url => install({ id: 'x', name: 'X', url }, C);
+  assert.equal(pin('https://github.com/o/r/tree/v0.4.1/skills/x').line, 'Install X from github.com/o/r/tree/v0.4.1/skills/x');
+  assert.equal(pin('https://github.com/o/r/tree/v0.4.1/skills/x').pin, 'v0.4.1');
+  assert.equal(pin(`https://github.com/o/r/blob/${'a'.repeat(40)}/README.md`).pin, 'a'.repeat(40), 'a commit in the URL is a pin');
+  for (const url of ['https://github.com/o/r', 'https://github.com/o/r/tree/main/skills/x', 'https://example.com/v1.2.3', 'https://github.com/o/r/releases/tag/v1.0.0']) {
+    assert.equal(pin(url).line, `Install X from github.com/openwizdev/WizMarket/blob/${C.slice(0, 12)}/listings/x.json`, `${url}: no release in it, so the listing is the pin`);
+  }
+  const { code, stderr, html } = build(fixture('contract-index.json'));
+  assert.equal(code, 0, stderr);
+  const line = cards(html)['example-tool'].match(/<p class="market-install-line">[\s\S]*?<\/p>/)[0];
+  assert.match(line, new RegExp(`<span class="market-pin">${C.slice(0, 12)}</span>`), 'the pin stands out in the line');
+  assert.match(line, /\/<wbr>/, 'the line breaks after a slash, not inside a word');
 });
 
 test('a non-verified listing never shows verified', () => {
@@ -235,7 +280,8 @@ test('the site builds its market page from the real snapshot', () => {
   const { code, stderr, html } = build(registry);
   assert.equal(code, 0, stderr);
   const index = JSON.parse(registry);
-  assert.deepEqual(Object.keys(cards(html)), index.listings.map(listing => listing.id), 'one card for every listing in market/registry.json');
+  const byName = index.listings.slice().sort((a, b) => a.name.localeCompare(b.name, 'en', { numeric: true, sensitivity: 'base' }) || (a.id < b.id ? -1 : 1));
+  assert.deepEqual(Object.keys(cards(html)), byName.map(listing => listing.id), 'one card for every listing in market/registry.json, in name order');
   assert.notEqual(registry, fixture('contract-index.json'), 'the deployed snapshot is not the synthetic fixture');
   assert.notEqual(index.commit, C, 'the deployed snapshot is not at the synthetic commit');
 });
