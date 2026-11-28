@@ -36,7 +36,7 @@ export function pageMarkdown(html) {
   for (const [, tag, inner] of body.matchAll(token)) {
     const fence = inner.match(/^\u0000(\d+)\u0000$/);
     if (fence) { blocks.push(pre[Number(fence[1])]); continue; }
-    if (/<(p|li|h[1-6])\b/.test(inner)) continue; // a wrapper; its own blocks follow
+    if (/<(p|li|h[1-6])\b/.test(inner)) continue;
     const text = inline(inner);
     if (!text || /^[\d\s.,%#]*$/.test(text)) continue;
     if (tag[0] === 'h') blocks.push('#'.repeat(Number(tag[1])) + ' ' + text);
