@@ -33,7 +33,7 @@ const ticketStates = [
   ['merged', 'Merged'],
 ];
 
-function showHero(gsap, paused, signal) {
+function showHero(gsap, held, signal) {
   const demo = document.querySelector('.product-window');
   const status = demo.querySelector('.demo-status');
   const tickets = [...demo.querySelectorAll('.ember-ticket')];
@@ -134,7 +134,7 @@ function showHero(gsap, paused, signal) {
   };
 
   let visible = false;
-  const update = () => timeline?.paused(!visible || paused() || document.hidden);
+  const update = () => timeline?.paused(!visible || held() || document.hidden);
   const observer = new IntersectionObserver(([entry]) => {
     visible = entry.isIntersecting;
     update();
@@ -159,7 +159,162 @@ function showHero(gsap, paused, signal) {
   return update;
 }
 
-function followPointer(gsap, paused, signal) {
+const FRAME = 160;
+const EYES_IN_FRAME = {
+  cave: [[74.5, 71], [89, 72]], renaissance: [[74, 72], [88, 72]], samurai: [[74.5, 71.5], [88.5, 72]],
+  steam: [[76, 71.5], [90, 72]], astronaut: [[77, 71], [91.5, 71.5]],
+};
+
+function heroWiz(gsap, hold, signal) {
+  const demo = document.querySelector('.product-window');
+  const mascot = demo.querySelector('.hero-sprite');
+  const smoke = demo.querySelector('.hero-smoke');
+  const builder = demo.querySelector('.ticket-builder');
+  const tickets = [...demo.querySelectorAll('.ember-ticket')];
+  const metrics = [...demo.querySelectorAll('dd')];
+  const part = name => mascot.appendChild(Object.assign(document.createElement('span'), { className: name }));
+  const eyes = [part('hero-eye'), part('hero-eye')];
+  const pupils = eyes.map(eye => eye.appendChild(document.createElement('i')));
+  const hit = part('hero-hit');
+  let now = null;
+  let pointer = null;
+  let frame = 0;
+
+  const pose = n => { mascot.style.backgroundPositionX = `${n * 100 / 8}%`; };
+  const looking = on => demo.classList.toggle('is-looking', on);
+  const begin = () => {
+    if (now) return now;
+    gsap.killTweensOf(mascot);
+    const box = mascot.getBoundingClientRect();
+    const waiting = tickets.find(ticket => ticket.classList.contains('waiting') && ticket.getClientRects().length);
+    const era = /hero-(\w+)-frames/.exec(mascot.style.backgroundImage)?.[1];
+    const spots = EYES_IN_FRAME[era] || EYES_IN_FRAME.cave;
+    eyes.forEach((eye, i) => { eye.style.left = `${spots[i][0] * 100 / FRAME}%`; eye.style.top = `${spots[i][1] * 100 / FRAME}%`; });
+    now = {
+      box: { left: box.left + scrollX, top: box.top + scrollY, size: box.width }, spots, waiting,
+      saved: { pose: mascot.style.backgroundPositionX, shown: mascot.style.visibility, smoke: smoke.style.visibility,
+        tickets: tickets.map(ticket => [ticket.className, ticket.querySelector('small').textContent]),
+        metrics: metrics.map(metric => metric.textContent), builder: gsap.getProperty(builder, 'rotation') },
+    };
+    hold(true);
+    mascot.style.visibility = 'visible';
+    smoke.style.visibility = 'hidden';
+    pose(0);
+    gsap.set(mascot, { transformOrigin: '50% 92%' });
+    return now;
+  };
+  const drop = () => {
+    const { timeline, helper, turn, look } = now;
+    timeline?.kill();
+    for (const quick of [turn, ...(look || [])]) quick?.tween.kill();
+    cancelAnimationFrame(frame);
+    frame = 0;
+    looking(false);
+    helper?.remove();
+    gsap.set(pupils, { clearProps: 'transform' });
+  };
+  const end = () => {
+    if (!now) return;
+    const { saved } = now;
+    drop();
+    now = null;
+    mascot.style.backgroundPositionX = saved.pose;
+    mascot.style.visibility = saved.shown;
+    smoke.style.visibility = saved.smoke;
+    tickets.forEach((ticket, i) => {
+      ticket.className = saved.tickets[i][0];
+      ticket.querySelector('small').textContent = saved.tickets[i][1];
+    });
+    metrics.forEach((metric, i) => { metric.textContent = saved.metrics[i]; });
+    gsap.set(builder, { rotation: saved.builder });
+    gsap.to(mascot, { rotation: 0, y: 0, duration: .22, ease: 'power2.out', clearProps: 'transform,transformOrigin' });
+    hold(false);
+  };
+  const follow = () => {
+    frame = 0;
+    if (!now?.turn || !pointer) return;
+    const { box, spots, turn, look } = now;
+    const x = pointer.clientX + scrollX;
+    const y = pointer.clientY + scrollY;
+    turn(gsap.utils.clamp(-1, 1, (x - box.left - box.size / 2) / (box.size / 2)) * 7);
+    spots.forEach(([ex, ey], i) => {
+      const dx = x - box.left - box.size * ex / FRAME;
+      const dy = y - box.top - box.size * ey / FRAME;
+      const ratio = box.size * .02 / Math.max(1, Math.hypot(dx, dy));
+      look[i * 2](dx * ratio);
+      look[i * 2 + 1](dy * ratio);
+    });
+  };
+  const work = state => {
+    const timeline = gsap.timeline();
+    const ticket = state.waiting;
+    const helper = ticket && builder.cloneNode(true);
+    timeline.call(() => {
+      looking(false);
+      if (!ticket) return;
+      ticket.className = 'ember-ticket building';
+      ticket.querySelector('small').textContent = 'Building';
+      metrics[1].textContent = Number(metrics[1].textContent) + 1;
+      state.helper = ticket.appendChild(helper);
+    }, [], 0);
+    for (let i = 0; i < 8; i++) timeline.call(pose, [2 + i % 4], i * .12);
+    timeline.fromTo(helper ? [builder, helper] : builder, { rotation: -12 }, {
+      rotation: 10, duration: .12, repeat: 7, yoyo: true, ease: 'sine.inOut', transformOrigin: '50% 85%', immediateRender: false,
+    }, 0);
+    timeline.call(() => { pose(0); looking(true); follow(); }, [], .96);
+    timeline.call(() => { looking(false); pose(1); }, [], 2.3);
+    timeline.call(() => { pose(0); looking(true); }, [], 2.42);
+    return timeline;
+  };
+
+  hit.addEventListener('pointerenter', event => {
+    if (event.pointerType === 'touch' || !demo.classList.contains('is-playing')) return;
+    const state = begin();
+    if (state.turn) return;
+    state.turn = gsap.quickTo(mascot, 'rotation', { duration: .3, ease: 'power2.out' });
+    state.look = pupils.flatMap(pupil => ['x', 'y'].map(axis => gsap.quickTo(pupil, axis, { duration: .18 })));
+    state.timeline?.kill();
+    gsap.set(mascot, { y: 0 });
+    state.timeline = gsap.timeline().add(work(state), .45);
+    looking(true);
+    pointer = event;
+    follow();
+  }, { signal });
+  hit.addEventListener('pointermove', event => {
+    if (!now?.turn || event.pointerType === 'touch') return;
+    pointer = event;
+    frame ||= requestAnimationFrame(follow);
+  }, { passive: true, signal });
+  hit.addEventListener('pointerleave', event => { if (event.pointerType !== 'touch') end(); }, { signal });
+  hit.addEventListener('pointerup', event => {
+    if (event.pointerType !== 'touch' || !demo.classList.contains('is-playing')) return;
+    const state = begin();
+    state.timeline?.kill();
+    gsap.set(pupils, { x: 0, y: 0 });
+    looking(true);
+    state.timeline = gsap.timeline({ onComplete: end })
+      .to(mascot, { rotation: -9, y: -4, duration: .16, ease: 'power2.out' })
+      .to(mascot, { rotation: 7, duration: .2, ease: 'sine.inOut' })
+      .to(mascot, { rotation: 0, y: 0, duration: .18, ease: 'power2.in' })
+      .call(() => { looking(false); pose(1); }, [], '+=.3')
+      .call(() => { pose(0); looking(true); }, [], '+=.12')
+      .to({}, { duration: .25 });
+  }, { signal });
+
+  const observer = new IntersectionObserver(([entry]) => { if (!entry.isIntersecting) end(); });
+  observer.observe(demo);
+  document.addEventListener('visibilitychange', () => { if (document.hidden) end(); }, { signal });
+  signal.addEventListener('abort', () => {
+    observer.disconnect();
+    if (now) drop();
+    now = null;
+    gsap.killTweensOf(mascot);
+    gsap.set(mascot, { clearProps: 'transform,transformOrigin' });
+    for (const element of [...eyes, hit]) element.remove();
+  }, { once: true });
+}
+
+function followPointer(gsap, signal) {
   const family = document.querySelector('.family');
   const eyes = [[71,86],[71,85],[72,87],[72,86],[72,87],[72,87],
     [71,85],[72,86],[72,87],[72,86],[72,87],[71,86]];
@@ -179,10 +334,9 @@ function followPointer(gsap, paused, signal) {
   });
   observer.observe(family);
   function update() {
-    const moving = visible && !paused();
-    family.classList.toggle('is-playing', moving);
+    family.classList.toggle('is-playing', visible);
     wave?.kill();
-    if (moving) {
+    if (visible) {
       wave = gsap.to(family.children, {
         rotation: -5, y: -3, transformOrigin: '50% 90%', duration: .36, ease: 'sine.inOut',
         yoyo: true, repeat: 1, stagger: .055,
@@ -192,12 +346,12 @@ function followPointer(gsap, paused, signal) {
     }
   }
   addEventListener('pointermove', event => {
-    if (!visible || paused() || event.pointerType === 'touch') return;
+    if (!visible || event.pointerType === 'touch') return;
     pointer = event;
     if (frame) return;
     frame = requestAnimationFrame(() => {
       frame = 0;
-      if (!visible || paused()) return;
+      if (!visible) return;
       for (const { eye, x, y } of pupils) {
         const rect = eye.getBoundingClientRect();
         const dx = pointer.clientX - rect.x - rect.width / 2;
@@ -219,12 +373,10 @@ function followPointer(gsap, paused, signal) {
       pupil.removeAttribute('style');
     }
   }, { once: true });
-  return update;
 }
 
 function enableMotion(gsap) {
   const preference = matchMedia('(prefers-reduced-motion: no-preference)');
-  const pause = document.querySelector('.demo-pause');
   let controller;
 
   const configure = () => {
@@ -232,19 +384,11 @@ function enableMotion(gsap) {
     if (!preference.matches) return;
     controller = new AbortController();
     const { signal } = controller;
-    const isPaused = () => pause?.getAttribute('aria-pressed') === 'true';
-    const updateEyes = followPointer(gsap, isPaused, signal);
-    if (!pause) return;
-    const updateHero = showHero(gsap, isPaused, signal);
-    pause.hidden = false;
-    pause.addEventListener('click', () => {
-      const paused = !isPaused();
-      pause.setAttribute('aria-pressed', String(paused));
-      pause.textContent = paused ? 'Resume motion' : 'Pause motion';
-      updateHero();
-      updateEyes();
-    }, { signal });
-    signal.addEventListener('abort', () => { pause.hidden = true; }, { once: true });
+    followPointer(gsap, signal);
+    if (!document.querySelector('.product-window')) return;
+    let held = false;
+    const updateHero = showHero(gsap, () => held, signal);
+    heroWiz(gsap, value => { held = value; updateHero(); }, signal);
   };
   preference.addEventListener('change', configure);
   configure();
@@ -315,8 +459,7 @@ function enableFamily(gsap) {
   const family = document.querySelector('.family');
   const wizes = [...family.children];
   const preference = matchMedia('(prefers-reduced-motion: no-preference)');
-  const pause = document.querySelector('.demo-pause');
-  const moving = () => !!gsap && preference.matches && pause?.getAttribute('aria-pressed') !== 'true';
+  const moving = () => !!gsap && preference.matches;
   const line = document.createElement('span');
   line.className = 'wiz-line';
   line.setAttribute('role', 'status');

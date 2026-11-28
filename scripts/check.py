@@ -1135,7 +1135,7 @@ def check_site(root, registry=ROOT / 'market/registry.json', now=None):
     assert any(t.get('kind') == 'captions' and 'default' in t and t.get('src', '').removeprefix('/') in ART for t in page.tracks_of(clip)), 'spec video needs default captions'
     assert any(a.get('href') == clip.get('src') and 'hidden' not in a for a in page.links), 'needs a plain link to the spec video'
     for attrs in page.buttons:
-        if attrs.get('class') in ('demo-pause', 'spec-play', 'launch-play'):
+        if attrs.get('class') in ('spec-play', 'launch-play'):
             assert 'hidden' in attrs, 'motion controls must wait for both scripts'
     for name, digest in VENDOR_HASHES.items():
         data = (root / names.get(name, name)).read_bytes()

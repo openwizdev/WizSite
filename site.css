@@ -347,10 +347,13 @@ body.landing > main { flex: 1 0 auto; }
 .product-window.is-playing :is(.hero-sprite,.hero-smoke) { display: block; }
 .product-window.is-playing .hero-fleet { display: flex; }
 .product-window.is-playing .hero-wiz { visibility: hidden; }
-.demo-pause, .spec-play { min-height: 34px; padding: 0 8px; border: 1px solid var(--edge); border-radius: 6px; background: var(--ground); color: var(--ink); font: 550 12px var(--ow-font-sans); cursor: pointer; }
-.demo-pause { position: absolute; right: 10px; bottom: 8px; }
-.demo-pause[aria-pressed="true"] { color: var(--sea); }
-.product-stage:has(> .demo-pause:not([hidden])) { padding-bottom: clamp(50px, 5vw, 66px); }
+.spec-play { min-height: 34px; padding: 0 8px; border: 1px solid var(--edge); border-radius: 6px; background: var(--ground); color: var(--ink); font: 550 12px var(--ow-font-sans); cursor: pointer; }
+.hero-eye, .hero-hit { position: absolute; pointer-events: none; }
+.hero-eye { display: none; place-items: center; width: 8.4%; aspect-ratio: 1; border-radius: 50%; transform: translate(-50%, -50%); background: radial-gradient(circle at 38% 32%, #fff1d2, #f3d3a5 55%, #d9ad82); }
+.hero-eye i { width: 42%; aspect-ratio: 1; border-radius: 50%; background: #2a140a; }
+.product-window.is-looking .hero-eye { display: grid; }
+.hero-hit { inset: 9% 23% 9% 23%; }
+.product-window.is-playing .hero-hit { pointer-events: auto; }
 .wiz-eye { position: absolute; display: none; width: 7%; aspect-ratio: 1; border-radius: 50%; transform: translate(-50%, -50%); background: radial-gradient(circle at 35% 30%, #fff3d8, #e1bd8d); }
 .family.is-playing .wiz-eye { display: grid; place-items: center; }
 .wiz-eye i { width: 37%; aspect-ratio: 1; border-radius: 50%; background: #251912; }

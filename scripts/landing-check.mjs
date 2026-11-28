@@ -136,14 +136,15 @@ async function layout(page, where, width, mode) {
     const list = document.querySelector('.moments ol');
     const items = [...list.children].map(box);
     const rows = [...new Set(items.map(i => Math.round(i.top)))].map(top => items.filter(i => Math.round(i.top) === top));
-    const pause = document.querySelector('.demo-pause');
+    const pause = [...document.querySelectorAll('button, [role="button"]')].filter(el => shown(el)
+      && /\\b(pause|resume)\\b/i.test(el.textContent + ' ' + (el.getAttribute('aria-label') || '')));
     const play = document.querySelector('.spec-play');
     const wizes = [...document.querySelectorAll('.family-wiz')].filter(shown).map(box);
     const tickets = [...document.querySelectorAll('.product-window .ember-ticket')].filter(shown);
     return {
       scroll: document.scrollingElement.scrollWidth, inner: innerWidth,
       list: box(list), rows,
-      pause: shown(pause) ? box(pause) : null, window: box(document.querySelector('.product-window')),
+      pause: pause.length + document.querySelectorAll('.demo-pause').length,
       play: shown(play) ? box(play) : null,
       wizTops: [...new Set(wizes.map(w => Math.round(w.top)))],
       ticketsHeading: shown(document.querySelector('.window-tickets h3')) ? document.querySelector('.window-tickets h3').textContent.trim() : '',
@@ -161,12 +162,7 @@ async function layout(page, where, width, mode) {
       `a row of ${row.length} moment(s) leaves an empty cell (${Math.round(left)}–${Math.round(right)} of ${Math.round(facts.list.left)}–${Math.round(facts.list.right)})`);
   }
   if (width <= 480) expect(facts.wizTops.length === 1, where, `footer Wizes in ${facts.wizTops.length} rows`);
-  if (mode === 'motion') {
-    expect(!!facts.pause, where, 'no Pause motion control with motion on');
-    const { pause: p, window: w } = facts;
-    if (p) expect(p.top >= w.bottom || p.bottom <= w.top || p.left >= w.right || p.right <= w.left, where,
-      `Pause motion (${Math.round(p.top)}–${Math.round(p.bottom)}) covers the app window (ends at ${Math.round(w.bottom)})`);
-  }
+  expect(!facts.pause, where, 'the landing shows a Pause or Resume motion control; reduced motion is the way to stop motion');
   if (mode !== 'no JavaScript') expect(!!facts.play, where, 'the spec sample has no play button');
   if (mode === 'reduced' || mode === 'no JavaScript' || mode === 'no GSAP') {
     expect(facts.spec, where, 'the still shows no spec');
@@ -226,6 +222,113 @@ async function sequence(page, where) {
       `"${label}" lacks the spec, the "Tickets" heading or its three tickets`);
     expect(later.builder.every(Boolean), where, `"${label}": a ticket being built has no builder Wiz`);
   }
+}
+
+const HERO_RECORD = `(() => { ${HELPERS}
+  const demo = document.querySelector('.product-window'), mascot = demo.querySelector('.hero-sprite');
+  const matrix = el => { const m = getComputedStyle(el).transform; return m === 'none' ? [1, 0, 0, 1, 0, 0] : m.slice(m.indexOf('(') + 1, -1).split(',').map(Number); };
+  const log = window.heroLog = { samples: [], shift: 0 };
+  new PerformanceObserver(list => { for (const entry of list.getEntries()) log.shift += entry.value; }).observe({ type: 'layout-shift' });
+  const started = performance.now();
+  const tick = () => {
+    const [a, b] = matrix(mascot), eye = demo.querySelector('.hero-eye i');
+    const pupil = eye ? matrix(eye).slice(4) : [0, 0];
+    const ticket = demo.querySelectorAll('.ember-ticket')[2];
+    log.samples.push({ t: Math.round(performance.now() - started), looking: demo.classList.contains('is-looking'),
+      eyes: !!eye && shown(eye.parentElement), turn: Math.atan2(b, a) * 180 / Math.PI, px: pupil[0], py: pupil[1], still: still(mascot),
+      frame: mascot.style.backgroundPositionX, label: document.querySelector('.demo-status').textContent.trim(),
+      chips: [...demo.querySelectorAll('.ticket-chip')].map(chip => chip.textContent).join('|'),
+      helper: shown(ticket.querySelector('.ticket-builder')), building: demo.querySelectorAll('dd')[1].textContent,
+      box: JSON.stringify(demo.getBoundingClientRect()) });
+    if (!log.stop) requestAnimationFrame(tick);
+  };
+  tick();
+  return true; })()`;
+const HERO_STOP = '(() => { heroLog.stop = true; return heroLog; })()';
+const WORK_FRAMES = ['25%', '37.5%', '50%', '62.5%'];
+
+async function heroWiz(page, where, mode) {
+  const unthrottle = () => page.send('Page.bringToFront');
+  await unthrottle();
+  const wait = ms => page.evaluate(`new Promise(r => setTimeout(r, ${ms}))`);
+  const move = ({ x, y }) => page.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y });
+  const enter = label => page.evaluate(`new Promise(resolve => { const started = Date.now(); let away = false; const look = () => {
+    const now = document.querySelector('.demo-status').textContent.trim();
+    away ||= now !== ${JSON.stringify(label)};
+    if ((away && now === ${JSON.stringify(label)}) || Date.now() - started > 20000) resolve(now); else setTimeout(look, 20); }; look(); })`);
+  const playing = await page.evaluate(`new Promise(resolve => { const started = Date.now(); const look = () => {
+    const demo = document.querySelector('.product-window'); demo.scrollIntoView({ block: 'center' });
+    if (demo.classList.contains('is-playing') || Date.now() - started > 8000) resolve(demo.classList.contains('is-playing')); else setTimeout(look, 50); };
+    look(); })`);
+  if (mode !== 'motion') {
+    const at = await page.evaluate(`(() => { const r = document.querySelector('.hero-wiz').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+    await move(at);
+    await wait(400);
+    const still = await page.evaluate(`(() => { ${HELPERS} const demo = document.querySelector('.product-window');
+      return { looking: demo.classList.contains('is-looking'), parts: demo.querySelectorAll('.hero-eye, .hero-hit').length,
+        wiz: shown(demo.querySelector('.hero-wiz')) && still(demo.querySelector('.hero-wiz')) }; })()`);
+    expect(!playing && !still.looking && !still.parts && still.wiz, where,
+      `the hero Wiz is not a still that ignores the pointer (${JSON.stringify({ playing, ...still })})`);
+    return;
+  }
+  expect(playing, where, 'the hero demo never starts with motion on');
+  if (!playing) return;
+  const hit = await page.evaluate(`(() => { const r = document.querySelector('.hero-hit')?.getBoundingClientRect();
+    return r && { left: { x: r.left + r.width * .15, y: r.top + r.height / 2 }, right: { x: r.right - r.width * .15, y: r.top + r.height / 2 },
+      middle: { x: r.left + r.width / 2, y: r.top + r.height * .6 } }; })()`);
+  expect(!!hit, where, 'the hero Wiz has nothing to hover or tap');
+  if (!hit) return;
+  await move({ x: 2, y: 2 });
+  const label = await enter('Agents building the to-do app');
+  expect(label === 'Agents building the to-do app', where, `the hero never reaches its building step (${label})`);
+  const before = await page.evaluate(`[...document.querySelectorAll('.product-window .ticket-chip')].map(chip => chip.textContent).join('|')`);
+
+  await page.evaluate(HERO_RECORD);
+  await move(hit.left);
+  await wait(2000);
+  await move(hit.right);
+  await wait(500);
+  const hover = await page.evaluate(HERO_STOP);
+  const during = (from, to) => hover.samples.filter(s => s.t >= from && s.t < to);
+  const work = during(0, 1900).filter(s => WORK_FRAMES.includes(s.frame));
+  const first = hover.samples.indexOf(work[0]);
+  expect(first > 0 && hover.samples.slice(0, first).some(s => s.looking && s.eyes && s.px < -.3 && s.turn < -1), where,
+    'a pointer on the hero Wiz\'s left does not make him turn and look left before he works');
+  expect(new Set(work.map(s => s.frame)).size === 4 && work.every(s => !s.eyes), where,
+    `the hovered Wiz does not work (frames ${[...new Set(work.map(s => s.frame))].join(', ') || 'none'}) with his own eyes`);
+  expect(work.some(s => s.chips === 'Merged|Building|Building' && s.helper && s.building === '2'), where,
+    'while he works, the waiting ticket does not move to Building with a builder Wiz');
+  expect(during(1500, 2000).some(s => s.looking && s.eyes), where, 'after working, the hovered Wiz does not look back at the pointer');
+  const later = during(2050, Infinity);
+  expect(later.some(s => s.looking && s.px > .3 && s.turn > 1), where,
+    `the Wiz does not follow the pointer to his right (pupil ${Math.max(...later.map(s => s.px)).toFixed(2)}, turn ${Math.max(...later.map(s => s.turn)).toFixed(1)})`);
+  expect(hover.samples.every(s => s.label === label), where, 'the demo moves on to another step while the Wiz is hovered');
+  expect(hover.samples.every(s => s.box === hover.samples[0].box) && hover.shift === 0, where,
+    `the Wiz's reaction moves the window's layout (layout shift ${hover.shift})`);
+
+  await page.evaluate(HERO_RECORD);
+  await move({ x: 2, y: 2 });
+  await enter('Reviewing the changes');
+  const leave = await page.evaluate(HERO_STOP);
+  const settled = leave.samples.filter(s => s.t >= 400 && s.label === label);
+  expect(settled.length > 0 && settled.every(s => !s.looking && !s.eyes && s.still && s.chips === before && !s.helper), where,
+    'once the pointer leaves, the Wiz is not back at rest with the tickets as they were');
+  expect(leave.samples.at(-1).label === 'Reviewing the changes' && leave.samples.at(-1).t < 4600, where,
+    `the demo does not carry on after the pointer leaves the Wiz (${leave.samples.at(-1).label} at ${leave.samples.at(-1).t} ms)`);
+
+  await page.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 1 });
+  await page.evaluate(HERO_RECORD);
+  await page.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [hit.middle] });
+  await page.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await wait(1700);
+  const tap = await page.evaluate(HERO_STOP);
+  await page.send('Emulation.setTouchEmulationEnabled', { enabled: false });
+  const waving = tap.samples.filter(s => s.t < 700);
+  const left = waving.findIndex(s => s.turn < -3), right = waving.findLastIndex(s => s.turn > 3);
+  expect(waving.some(s => s.looking && s.eyes && Math.abs(s.px) < .3 && Math.abs(s.py) < .3), where, 'a tap on the Wiz does not make him look at the visitor');
+  expect(left >= 0 && right > left && !waving.slice(right).some(s => s.turn < -3), where, 'a tap on the Wiz does not make him wave once');
+  expect(tap.samples.filter(s => s.t >= 1500).every(s => !s.looking && s.still), where, 'after a tap the Wiz is not back at rest');
+  expect(tap.samples.filter(s => s.t < 1300).every(s => !WORK_FRAMES.includes(s.frame)), where, 'a tap on the Wiz starts the hover work');
 }
 
 async function family(page, where, mode) {
@@ -526,6 +629,7 @@ async function main() {
           if (name === 'reduced' || name === 'no GSAP') await playable(page, where);
           if (name === 'motion' && (width === 390 || width === 1280)) await sequence(page, where);
           if ((name === 'motion' || name === 'reduced') && (width === 390 || width === 1280)) await family(page, where, name);
+          if (['motion', 'reduced', 'no GSAP'].includes(name) && (width === 390 || width === 1440)) await heroWiz(page, where, name);
         } finally {
           await page.close();
         }
