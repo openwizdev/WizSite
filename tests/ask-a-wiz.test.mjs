@@ -166,7 +166,7 @@ const ROWS = `[...document.querySelectorAll('section.faq .faq-rows > *')].map(ro
   bold: !!row.querySelector('.faq-a b'),
   buttons: [...row.querySelectorAll('.faq-ask-actions button')].filter(b => b.getClientRects().length).map(b => b.textContent.trim()) }))`;
 const rows = page => page.evaluate(ROWS);
-const staticRowCount = 9;
+const staticRowCount = 10;
 const waitForAnswers = (page, count, reason) =>
   page.until(`document.querySelectorAll('.faq-rows > .faq-asked').length === ${count} && !!document.querySelector('.faq-ask input')`, reason);
 const told = page => page.evaluate(`document.querySelector('section.faq [aria-live="polite"]')?.textContent.trim()`);
