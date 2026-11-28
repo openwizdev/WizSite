@@ -1032,6 +1032,18 @@ def split_market(built):
     return before + MARKET_SLOT + after, section
 
 
+REACH_SLOT = '<template data-slot="reach"></template>'
+REACH = ('<!-- reach:start -->', '<!-- reach:end -->')
+
+
+def split_reach(built):
+    start, end = REACH
+    assert built.count(start) == 1 and built.count(end) == 1, 'the built landing page has one generated reach section'
+    before, rest = built.split(start)
+    section, after = rest.split(end)
+    return before + REACH_SLOT + after, section
+
+
 def check_ref(root, source, ref, pages, favicons=(), market=None):
     if ref.startswith('data:image/svg+xml,') and not favicons:
         svg = unquote(ref.split(',', 1)[1])
@@ -2565,6 +2577,8 @@ def main():
     for name in ALL_PAGES:
         built = re.sub(r'<!-- metadata:start -->[\s\S]*?<!-- metadata:end -->', '<template data-slot="page-metadata"></template>',
                        (output / name).read_text(), count=1)
+        if name == 'index.html':
+            built = split_reach(built)[0]
         if name == 'changelog/index.html':
             built = split_releases(built)[0]
         if name == MARKET_PAGE:

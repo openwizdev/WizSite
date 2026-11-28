@@ -3,6 +3,7 @@ import { copyFile, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promi
 import { createHash } from 'node:crypto';
 import { installSwitch, readReleases, render, summary, withReleases } from './scripts/changelog.mjs';
 import { readRegistry, render as renderMarket, summary as marketSummary, withMarket } from './scripts/market.mjs';
+import { readReach, render as renderReach, summary as reachSummary, withReach } from './scripts/reach.mjs';
 import { withDrivers } from './scripts/drivers.mjs';
 import { aboutPage, crawlerFiles, guidePage, pages, withMetadata } from './scripts/discovery.mjs';
 import { withCheckout } from './scripts/pricing.mjs';
@@ -44,6 +45,8 @@ const releases = await readReleases();
 console.log(`Changelog releases: ${summary(releases, live)}`);
 const registry = await readRegistry();
 console.log(`Market: ${marketSummary(registry)}`);
+const reach = await readReach();
+console.log(`Reach: ${reachSummary(reach)}`);
 await rm(output, { recursive: true, force: true });
 const put = async (name, data) => {
   const target = new URL(name, output);
@@ -82,6 +85,7 @@ for (const page of Object.keys(pages)) {
   html = withMetadata(page, html, faq);
   for (const [file, name] of Object.entries(names)) html = html.replaceAll(`"/${file}"`, `"/${name}"`);
   if (page !== 'app/index.html') html = withFaq(withFooter(withCta(html)));
+  if (page === 'index.html') html = withReach(html, renderReach(reach, registry));
   if (page === 'changelog/index.html') html = withReleases(html, render(releases, live));
   if (page === 'market/index.html') html = withMarket(html, renderMarket(registry));
   if (page === 'drivers/index.html') html = withDrivers(html, registry);

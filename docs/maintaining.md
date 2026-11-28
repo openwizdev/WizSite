@@ -77,6 +77,19 @@ The generator's tests (`scripts/test_changelog.py`, run by `npm test`) use the s
 
 The repository map and the *What exists today* text that used to open the page are in [docs/repos.md](repos.md), with the map as `docs/repo-map.svg`.
 
+## The landing's "Bring any agent" section
+
+The landing's `section.agent-row` is generated at build time from two pinned snapshots, with no network calls during `npm run build`: `landing/reach.json` (agents and hosts on OpenWiz `main`, plus open OpenWiz pull requests adding new harness rows or drivers) and `market/registry.json` (the live WizMarket listing count).
+
+To refresh `landing/reach.json` from a local `openwizdev/OpenWiz` checkout on `main` and OpenWiz's open pull requests:
+
+```sh
+gh pr list -R openwizdev/OpenWiz --state open --limit 300 --json number,title,url,headRefName,files > /tmp/openwiz-prs.json
+node scripts/landing-sync.mjs /path/to/OpenWiz /tmp/openwiz-prs.json
+```
+
+Only adapters with a `driver` file on `main` count as **Today** hosts (README-only placeholders such as Sprites or Codespaces stay under **Coming** until their driver merges). Any harness or driver already on `main` is never listed as **Coming**. Display names and `/drivers/logos/*.svg` mappings live in `scripts/reach.mjs`.
+
 ## Site assets
 
 WizSite owns `tokens.css`. Every site page uses it with `site.css`; the Changelog and Market keep their own styles in `changelog/changelog.css` and `market/market.css`, so the landing never loads them and no page uses inline `<style>` blocks. The landing also loads `site.js`, which loads the GSAP 3.15.1 core only after the page's `load` event (the build copies it from the locked `gsap` npm dependency, `node_modules/gsap/dist/gsap.min.js`, and the check pins its bytes by hash): each page names the fingerprinted file in `site.js`'s `data-gsap` attribute, and `site.js` adds it as a same-origin `<script src>`, so GSAP never competes with the hero image, styles or fonts. No page loads GSAP from its `<head>` or preloads it; `scripts/check.py` refuses both. Until GSAP arrives (or if it never does) the page shows the same still as with reduced motion. The build fingerprints these styles and scripts so new HTML gets the matching assets. The GreenSock Standard No Charge licence and the agent icon notices ship in `vendor/`.
