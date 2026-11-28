@@ -1352,9 +1352,10 @@ def registered_extras(root):
         return extras
     for loc in (entry.findtext(ns + 'loc') or '' for entry in index.findall(ns + 'sitemap')):
         rel = loc.removeprefix(SITE_URL)
-        if not re.fullmatch(r'sitemaps/(market|docs|answers)\.xml', rel) or not (root / rel).is_file():
+        if not re.fullmatch(r'sitemaps/(pages|market|docs|answers)\.xml', rel) or not (root / rel).is_file():
             continue
-        extras.add(rel)
+        if rel != 'sitemaps/pages.xml':
+            extras.add(rel)
         try:
             child = ElementTree.parse(root / rel).getroot()
         except ElementTree.ParseError:
@@ -1369,7 +1370,11 @@ def registered_extras(root):
 def check_site(root, registry=ROOT / 'market/registry.json', now=None):
     files = {p.relative_to(root).as_posix() for p in root.rglob('*') if p.is_file()}
     names = built_fingerprints(root)
-    assert files - registered_extras(root) == STATIC | set(names.values()), 'unexpected or missing build output'
+    extras = registered_extras(root)
+    assert files - extras == STATIC | set(names.values()), 'unexpected or missing build output'
+    for name in sorted(extras):
+        if (root / name).is_file():
+            check_privacy('dist/' + name, (root / name).read_bytes())
     docs = {name: (root / name).read_text() for name in ALL_PAGES}
     parsed = {name: Page(html) for name, html in docs.items()}
     check_discovery(root, parsed)

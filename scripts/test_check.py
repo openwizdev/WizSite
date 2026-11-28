@@ -11,7 +11,7 @@ from unittest import mock
 
 import re
 
-from check import ALL_PAGES, ART, CTA, DOC_HASHES, FAQ, FAQ_PREREQS, FAQ_WHERE, FOOTER, INSTALL_NOTE_HTML, INSTALL_PREREQS_HTML, FINGERPRINTS, HASHED, INSTALL_SWITCH, ROOT, Page, check_changelog, check_image_preloads, check_release_data, check_releases, read_releases, split_releases, check_motion, check_privacy, check_ref, check_security_txt, check_site, check_vector, check_webp, check_avif, check_png, fingerprint
+from check import ALL_PAGES, ART, CTA, DOC_HASHES, FAQ, FAQ_PREREQS, FAQ_WHERE, FOOTER, INSTALL_NOTE_HTML, INSTALL_PREREQS_HTML, FINGERPRINTS, HASHED, INSTALL_SWITCH, ROOT, Page, check_changelog, check_image_preloads, check_release_data, check_releases, read_releases, split_releases, check_motion, check_privacy, check_ref, check_security_txt, check_site, check_vector, registered_extras, check_webp, check_avif, check_png, fingerprint
 
 REMOVED_ART = (
     'art/spec-video.mp4',
@@ -143,6 +143,19 @@ class Checks(unittest.TestCase):
             index = root / 'sitemap.xml'
             index.write_text(index.read_text().replace('</sitemapindex>', '  <sitemap><loc>https://openwiz.dev/sitemaps/docs.xml</loc><lastmod>2026-11-28</lastmod></sitemap>\n</sitemapindex>'))
             check_site(root)
+            self.assertIn('docs/synthetic/index.html', registered_extras(root))
+            extra = root / 'guides/synthetic/index.html'
+            extra.parent.mkdir(parents=True)
+            extra.write_text(page.read_text().replace('docs/synthetic/', 'guides/synthetic/'))
+            pages_map = root / 'sitemaps/pages.xml'
+            pages_map.write_text(pages_map.read_text().replace('</urlset>', '  <url><loc>https://openwiz.dev/guides/synthetic/</loc><lastmod>2026-11-28</lastmod></url>\n</urlset>'))
+            check_site(root)
+            self.assertIn('guides/synthetic/index.html', registered_extras(root))
+            clean = extra.read_text()
+            extra.write_text(clean.replace('<h1>Synthetic</h1>', '<h1>Synthetic</h1><p>' + '/' + 'home/' + 'someone/notes</p>'))
+            with self.assertRaises(AssertionError):
+                check_site(root)
+            extra.write_text(clean)
             page.unlink()
             with self.assertRaisesRegex(AssertionError, 'not a built page'):
                 check_site(root)
