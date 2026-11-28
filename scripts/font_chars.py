@@ -29,6 +29,7 @@ HTML_PAGES = (
     'team/index.html',
     'faq/index.html',
     'market/index.html',
+    'pricing/index.html',
     'app/index.html',
 )
 HTML_SNIPPETS = ('header-cta.html', 'footer.html', 'faq.html')

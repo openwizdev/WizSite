@@ -115,18 +115,19 @@ window.turnstile = (() => { const widgets = {}; let n = 0;
     remove(id) { window.__ts.removes++; delete widgets[id]; },
   }; })();`;
 
-async function open(path = '/', { width = 1280, height = 900, reduced = false, scroll = true, turnstile = null } = {}) {
+async function open(path = '/', { width = 1280, height = 900, reduced = false, scroll = true, turnstile = null, turnstileScript = FAKE_TURNSTILE, preload = null } = {}) {
   const { targetId } = await browser.send('Target.createTarget', { url: 'about:blank' });
   const { sessionId } = await browser.send('Target.attachToTarget', { targetId, flatten: true });
   const send = (method, params) => browser.send(method, params, sessionId);
   await send('Page.enable');
+  if (preload) await send('Page.addScriptToEvaluateOnNewDocument', { source: preload });
   if (turnstile) {
     await send('Fetch.enable', { patterns: [{ urlPattern: 'https://challenges.cloudflare.com/*' }] });
     browser.on(m => {
       if (m.sessionId !== sessionId || m.method !== 'Fetch.requestPaused') return;
       turnstile.push(m.params.request.url);
       send('Fetch.fulfillRequest', { requestId: m.params.requestId, responseCode: 200, responseHeaders: [{ name: 'Content-Type', value: 'text/javascript' }],
-        body: Buffer.from(FAKE_TURNSTILE).toString('base64') }).catch(() => {});
+        body: Buffer.from(turnstileScript).toString('base64') }).catch(() => {});
     });
   }
   await send('Network.setBlockedURLs', { urls: ['*api.github.com*'] }).catch(() => {});
@@ -393,4 +394,111 @@ test('phone and laptop fit, and reduced motion keeps the row still', async () =>
     await page.shot(`answered-${width}${reduced ? '-reduced' : ''}`);
     await page.close();
   }
+});
+
+test('Ask a Wiz stops loader intervals when an answer or not_covered finishes after ~300 ms', async () => {
+  probeOn();
+  const track = `(() => {
+    const iv = new Map(), set = window.setInterval, clear = window.clearInterval;
+    window.__iv = iv;
+    window.setInterval = (...args) => { const id = set(...args); iv.set(id, args[1]); return id; };
+    window.clearInterval = id => { iv.delete(id); return clear(id); };
+  })()`;
+  fake.answers.push({ lines: [], hold: ANSWER }, { lines: [], hold: NOT_COVERED });
+  const page = await open('/faq/', { preload: track });
+  await page.until(`document.querySelector('.faq-ask input')`);
+  await page.ask('Does the loader stop on a fast answer?');
+  await page.until(`document.querySelector('.faq-ask .wiz-loader') && window.__iv.size === 2`, 'loader mounted on ask');
+  await new Promise(resolve => setTimeout(resolve, 300));
+  fake.release();
+  await waitForAnswers(page, 1, 'the fast answer');
+  assert.equal(await page.evaluate(`window.__iv.size`), 0, 'no interval survives a fast Ask a Wiz answer');
+  await page.ask('Does the loader stop on not_covered?');
+  await page.until(`document.querySelector('.faq-ask .wiz-loader') && window.__iv.size === 2`, 'loader mounted on not_covered');
+  await new Promise(resolve => setTimeout(resolve, 300));
+  fake.release();
+  await waitForAnswers(page, 2, 'the fast not_covered answer');
+  assert.equal(await page.evaluate(`window.__iv.size`), 0, 'no interval survives a fast not_covered answer');
+  await page.close();
+});
+
+test('Ask a Wiz mounts the loader on submit while Turnstile verifies, keeps interactive challenges usable, and honours Stop', async () => {
+  const SITE = '1x00000000000000000000AA';
+  const HOLD_TURNSTILE = `window.__ts = { renders: [], resets: 0, removes: 0, last: null,
+    prompt(id = window.__ts.last) { const w = window.__ts.widgets[id]; const btn = document.createElement('button');
+      btn.type = 'button'; btn.className = 'ts-challenge'; btn.textContent = 'Verify';
+      btn.addEventListener('click', () => window.__ts.complete(id)); w.box.replaceChildren(btn); },
+    complete(id = window.__ts.last) { const w = window.__ts.widgets[id]; if (!w) return;
+      w.token = 'synthetic-token-' + id + '-' + (++w.count); w.box.replaceChildren(); w.options.callback(w.token); },
+    widgets: {} };
+  window.turnstile = (() => { let n = 0;
+    return {
+      render(container, options) { const id = 'w' + (++n); const box = document.createElement('div');
+        container.replaceChildren(box); window.__ts.widgets[id] = { container, box, options, token: '', count: 0 };
+        window.__ts.last = id; window.__ts.renders.push({ ...options, inForm: !!container.closest('form') }); return id; },
+      getResponse: id => window.__ts.widgets[id]?.token, isExpired: () => false,
+      reset(id) { window.__ts.resets++; const w = window.__ts.widgets[id]; if (w) { w.token = ''; w.box.replaceChildren(); } },
+      remove(id) { window.__ts.removes++; delete window.__ts.widgets[id]; },
+    }; })();`;
+  const track = `(() => {
+    const iv = new Map(), set = window.setInterval, clear = window.clearInterval;
+    window.__iv = iv;
+    window.setInterval = (...args) => { const id = set(...args); iv.set(id, args[1]); return id; };
+    window.clearInterval = id => { iv.delete(id); return clear(id); };
+  })()`;
+  fake.probe = { status: 200, body: `{"schema":"openwiz.ask-a-wiz.v1","enabled":true,"max_question_chars":300,"turnstile_site_key":"${SITE}"}` };
+  for (const path of ['/', '/faq/']) {
+    fake.answers.push({ lines: ANSWER.slice(0, 1), hold: ANSWER.slice(1) });
+    const loads = [], page = await open(path, { turnstile: loads, turnstileScript: HOLD_TURNSTILE, preload: track });
+    await page.until(`document.querySelector('.faq-ask input')`);
+    await page.ask('Does the loader start while Turnstile verifies?');
+    await page.until(`document.querySelector('.faq-ask')?.dataset.state === 'asking' && !!document.querySelector('.faq-ask .wiz-loader')`, `${path}: loader mounted while Turnstile verifies`);
+    assert.equal(fake.asked.length, 0, `${path}: no POST before Turnstile resolves`);
+    assert.equal(await told(page), 'Ask a Wiz is answering.');
+    const seen = (await rows(page)).at(-1);
+    assert.deepEqual([seen.q, seen.input, seen.buttons], ['Does the loader start while Turnstile verifies?', false, ['Stop']]);
+    const layout = await page.evaluate(`(() => { const row = document.querySelector('.faq-ask'), form = row.querySelector('.faq-ask-form');
+      const human = row.querySelector('.faq-ask-human');
+      return { formHidden: form.hidden, formHeight: form.getBoundingClientRect().height, inForm: !!human?.closest('form'),
+        loaderVisible: row.querySelector('.wiz-loader').getClientRects().length > 0 }; })()`);
+    assert.deepEqual(layout, { formHidden: false, formHeight: 0, inForm: true, loaderVisible: true }, `${path}: invisible Turnstile keeps form at 0 height while loader shows`);
+    await page.until(`!!window.__ts?.last`, `${path}: Turnstile widget rendered`);
+    assert.equal(await page.evaluate(`document.querySelector('.faq-ask-form').getBoundingClientRect().height`), 0, `${path}: rendered invisible widget still adds 0 height`);
+    await page.evaluate(`window.__ts.prompt()`);
+    const challenge = await page.evaluate(`(() => { const btn = document.querySelector('.faq-ask-human .ts-challenge');
+      const r = btn?.getBoundingClientRect(); return { visible: !!r && r.width > 0 && r.height > 0 }; })()`);
+    assert.equal(challenge.visible, true, `${path}: interactive challenge stays visible while asking`);
+    await page.evaluate(`(() => { const btn = document.querySelector('.faq-ask-human .ts-challenge'); btn.focus(); btn.click(); })()`);
+    await page.until(`document.querySelector('.faq-ask .faq-a')?.innerText.includes('Synthetic answer: OpenWiz')`, `${path}: answer starts once verified`);
+    assert.equal(await page.evaluate(`document.querySelector('.faq-ask-form').hidden`), true, `${path}: form hides once verification finishes`);
+    assert.equal(await focused(page), 'Stop', `${path}: focus moves from completed challenge to Stop`);
+    assert.equal(fake.asked.at(-1).token, 'synthetic-token-w1-1');
+    fake.release();
+    await waitForAnswers(page, 1, `${path}: completed answer`);
+    assert.equal(await focused(page), 'input', `${path}: focus moves to fresh input`);
+    assert.equal(await page.evaluate(`window.__iv.size`), 0, `${path}: no leaked loader intervals`);
+    fake.asked.length = 0;
+    await page.close();
+  }
+  fake.answers.push({ lines: ANSWER });
+  const loads = [], page = await open('/faq/', { turnstile: loads, turnstileScript: HOLD_TURNSTILE, preload: track });
+  await page.until(`document.querySelector('.faq-ask input')`);
+  await page.ask('Can Stop cancel while verifying?');
+  await page.until(`document.querySelector('.faq-ask .wiz-loader') && window.__iv.size === 2`, 'loader mounted before Stop');
+  await page.press('Stop');
+  await page.until(`document.querySelector('.faq-ask')?.dataset.state === 'ended'`, 'Stop ends verification wait immediately');
+  assert.equal(await told(page), 'Stopped.');
+  assert.equal(await page.evaluate(`window.__iv.size`), 0, 'Stop clears loader intervals during verification');
+  assert.equal(fake.asked.length, 0, 'Stop prevents POST after cancelling verification');
+  await page.press('Retry');
+  await page.until(`document.querySelector('.faq-ask')?.dataset.state === 'asking' && !!document.querySelector('.faq-ask .wiz-loader')`, 'Retry mounts loader while verifying');
+  await page.until(`!!window.__ts?.last`, 'Turnstile widget rendered on Retry');
+  await page.evaluate(`window.__ts.prompt()`);
+  assert.equal(await page.evaluate(`document.querySelector('.faq-ask-human .ts-challenge').getClientRects().length > 0`), true, 'interactive challenge stays visible on Retry');
+  await page.evaluate(`document.querySelector('.faq-ask-human .ts-challenge').click()`);
+  await waitForAnswers(page, 1, 'Retry completes once verified');
+  assert.equal(fake.asked.length, 1);
+  assert.equal(fake.asked[0].token, 'synthetic-token-w1-1');
+  assert.equal(await page.evaluate(`window.__iv.size`), 0, 'no leaked intervals after Retry');
+  await page.close();
 });
