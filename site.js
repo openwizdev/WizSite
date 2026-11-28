@@ -486,6 +486,16 @@ const ASK_REFUSALS = {
 };
 const ASK_NOT_COVERED = 'The OpenWiz docs don\'t cover that yet, so I won\'t guess. Stuck installing? I\'ll set it up with you: free 15 min. Want it for your team? Book a call, or open a GitHub issue.';
 const ASK_LINKS = [['Free 15-min setup help', 'https://openwiz.dev/help/'], ['Book a team call', 'https://openwiz.dev/help/#team'], ['GitHub issues', 'https://github.com/openwizdev/openwiz/issues']];
+const ASK_LINK_COUNTS = {
+  'https://openwiz.dev/help/': 'help-setup',
+  'https://openwiz.dev/help/#team': 'book-call',
+  'https://github.com/openwizdev/openwiz/issues': 'github',
+};
+const ASK_ANSWER_DOORS = [
+  [/https:\/\/openwiz\.dev\/help\/?(?=$|[\s).,;:!\]"'])/, ASK_LINKS[0]],
+  [/https:\/\/openwiz\.dev\/help\/?#team(?=$|[\s).,;:!\]"'])/, ASK_LINKS[1]],
+];
+const askAnswerLinks = text => ASK_ANSWER_DOORS.filter(([match]) => match.test(text)).map(([, link]) => link);
 const askKeys = value => value && typeof value === 'object' && !Array.isArray(value) ? Object.keys(value).sort().join() : '';
 const askText = value => typeof value === 'string' && value.length > 0;
 function askEvent(line, text, sources) {
@@ -614,7 +624,7 @@ async function askAWiz() {
           const p = el('p', 'faq-ask-links');
           links.forEach(([label, href], i) => {
             const link = Object.assign(el('a', '', label), { href });
-            link.dataset.count = i === 0 ? 'book-call' : 'github';
+            if (Object.hasOwn(ASK_LINK_COUNTS, href)) link.dataset.count = ASK_LINK_COUNTS[href];
             p.append(...(i ? [' · '] : []), link);
           });
           a.firstChild.append(p);
@@ -666,7 +676,7 @@ async function askAWiz() {
         }
         controller.abort();
         controller = null;
-        if (end?.type === 'done') finish([[text], [`Sources: ${sources.join(', ')}`, 'faq-ask-sources']]);
+        if (end?.type === 'done') finish([[text], [`Sources: ${sources.join(', ')}`, 'faq-ask-sources']], askAnswerLinks(text));
         else if (end?.type === 'not_covered') finish([[end.text]], ASK_LINKS);
         else if (end?.type === 'refused') show('ended', end.message, end.reason !== 'too_long');
         else show('ended', 'stopped' in row.dataset ? 'Stopped.' : 'The answer didn’t finish. Try again.');
