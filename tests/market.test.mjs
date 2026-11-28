@@ -78,7 +78,12 @@ test('every listing of the fixture snapshot renders with its status, tags and li
     const links = hrefs(card);
     assert.match(card, new RegExp(`<h3 id="name-${id}">${want.name}</h3>`), `${id}: its name`);
     assert.match(card, new RegExp(`data-status="${want.status}"`), `${id}: its status`);
-    assert.ok(text(card).includes(want.status === 'verified' ? 'Verified' : 'Listed A link, not proven.'), `${id}: its status in words`);
+    assert.match(card, new RegExp(`<span class="market-badge">${want.status === 'verified' ? 'Verified' : 'Listed'}</span>`), `${id}: its status in words`);
+    assert.match(card, new RegExp(`<dt>Listed by</dt><dd class="market-publisher">example-publisher</dd>`), `${id}: who listed it`);
+    assert.match(card, /data-publisher="example-publisher"/, `${id}: its publisher, for the Listed by filter`);
+    const install = decode((card.match(/<p class="market-install-line">[\s\S]*?<\/p>/)?.[0] ?? '').replace(/<[^>]*>/g, ''));
+    if (want.stage === 'being-built') assert.equal(install, '', `${id}: nothing to install while it is being built`);
+    else assert.equal(install, `Install ${want.name} from github.com/openwizdev/WizMarket/blob/${C.slice(0, 12)}/listings/${id}.json`, `${id}: its install line, pinned to the listing at the snapshot's commit`);
     for (const tag of want.tags) assert.ok(links.includes(`#tag-${tag}`), `${id}: its tag ${tag} links to the tag`);
     assert.equal((card.match(/<ul class="market-tags"[\s\S]*?<\/ul>/)[0].match(/<li>/g) || []).length, want.tags.length, `${id}: only its own tags`);
     for (const proof of want.proofs) assert.ok(links.includes(proof), `${id}: a link to its proof ${proof}`);
@@ -90,6 +95,22 @@ test('every listing of the fixture snapshot renders with its status, tags and li
   }
   assert.ok(text(found['example-driver']).includes('Kit receipt: 5 of 5 checks on its real host, 2026-11-01'), 'a receipt names its date');
   assert.ok(text(found['example-skill']).includes(`Its check passed at example-owner/example-skills@${'c'.repeat(12)}`), 'a skill names its pinned source');
+});
+
+test('an install line pins the release a listing names, or else the listing at the snapshot commit', async () => {
+  const { install } = await import('../scripts/market.mjs');
+  const pin = url => install({ id: 'x', name: 'X', url }, C);
+  assert.equal(pin('https://github.com/o/r/tree/v0.4.1/skills/x').line, 'Install X from github.com/o/r/tree/v0.4.1/skills/x');
+  assert.equal(pin('https://github.com/o/r/tree/v0.4.1/skills/x').pin, 'v0.4.1');
+  assert.equal(pin(`https://github.com/o/r/blob/${'a'.repeat(40)}/README.md`).pin, 'a'.repeat(40), 'a commit in the URL is a pin');
+  for (const url of ['https://github.com/o/r', 'https://github.com/o/r/tree/main/skills/x', 'https://example.com/v1.2.3', 'https://github.com/o/r/releases/tag/v1.0.0']) {
+    assert.equal(pin(url).line, `Install X from github.com/openwizdev/WizMarket/blob/${C.slice(0, 12)}/listings/x.json`, `${url}: no release in it, so the listing is the pin`);
+  }
+  const { code, stderr, html } = build(fixture('contract-index.json'));
+  assert.equal(code, 0, stderr);
+  const line = cards(html)['example-tool'].match(/<p class="market-install-line">[\s\S]*?<\/p>/)[0];
+  assert.match(line, new RegExp(`<span class="market-pin">${C.slice(0, 12)}</span>`), 'the pin stands out in the line');
+  assert.match(line, /\/<wbr>/, 'the line breaks after a slash, not inside a word');
 });
 
 test('a non-verified listing never shows verified', () => {

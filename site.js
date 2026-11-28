@@ -690,89 +690,201 @@ async function askAWiz() {
 function browseMarket() {
   const root = document.querySelector('main.market');
   const tools = root?.querySelector('.market-tools');
-  if (!tools) return;
-  const cards = [...root.querySelectorAll('.market-card')];
+  const grid = root?.querySelector('.market-cards');
+  if (!tools || !grid) return;
+  const cards = [...grid.querySelectorAll('.market-card')].map((el, at) => {
+    const text = selector => [...el.querySelectorAll(selector)].map(node => node.textContent.toLowerCase());
+    const name = el.querySelector('h3').textContent;
+    return {
+      el, at, name, nameLow: name.toLowerCase(), words: name.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean),
+      id: el.dataset.listing, kind: el.dataset.kind, verified: el.dataset.status === 'verified', publisher: el.dataset.publisher,
+      tags: text('.market-tags a'), people: text('dd').join(' ') + ' ' + el.dataset.listing, words2: text('.market-summary').join(' '), out: false,
+    };
+  });
   if (!cards.length) return;
   root.classList.add('has-browse');
   const search = tools.querySelector('#market-q');
   const live = tools.querySelector('.market-live');
   const clear = tools.querySelector('#market-clear-tag');
-  let tag = '';
-  const kind = () => tools.querySelector('input[name="market-kind"]:checked')?.id.replace('market-kind-', '') ?? 'all';
-  const sortMode = () => tools.querySelector('input[name="market-sort"]:checked')?.id ?? 'market-sort-name';
-  const nameOf = card => card.querySelector('h3')?.textContent ?? '';
-  const byName = (a, b) => nameOf(a).localeCompare(nameOf(b), 'en', { numeric: true, sensitivity: 'base' }) || (a.dataset.listing < b.dataset.listing ? -1 : 1);
+  const by = tools.querySelector('#market-by');
+  const sort = tools.querySelector('#market-sort');
+  const verifiedOnly = tools.querySelector('#market-verified-only');
+  const kinds = [...tools.querySelectorAll('input[name="market-kind"]')];
+  const kindOf = input => input.id.replace('market-kind-', '');
+  const none = tools.querySelector('.market-none p');
+  const state = { q: '', tag: '' };
 
-  const apply = () => {
-    const query = search.value.trim().toLowerCase();
-    const selected = kind();
-    const onlyVerified = tools.querySelector('#market-verified-only').checked;
-    let shown = 0;
-    for (const card of cards) {
-      const tagOk = !tag || card.querySelector(`a[href="#tag-${tag}"]`);
-      const kindOk = selected === 'all' || card.dataset.kind === selected;
-      const statusOk = !onlyVerified || card.querySelector('[data-status="verified"]');
-      const textOk = !query || card.textContent.toLowerCase().includes(query);
-      const on = Boolean(tagOk && kindOk && statusOk && textOk);
-      card.classList.toggle('is-out', !on);
-      if (on) shown += 1;
+  const publishers = new Map();
+  for (const card of cards) publishers.set(card.publisher, (publishers.get(card.publisher) ?? 0) + 1);
+  for (const [login, n] of [...publishers].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))) by.add(new Option(`${login} (${n})`, login));
+  const counts = new Map(kinds.map(input => {
+    const n = document.createElement('span');
+    n.className = 'market-n';
+    input.closest('label').append(' ', n);
+    return [kindOf(input), n];
+  }));
+  sort.insertBefore(new Option('Best match', 'match'), sort.firstChild);
+  sort.value = 'match';
+  const reset = document.createElement('button');
+  reset.type = 'button';
+  reset.className = 'market-copy';
+  reset.textContent = 'Clear all filters';
+  none.after(reset);
+
+  const score = (card, tokens) => {
+    let total = 0;
+    for (const token of tokens) {
+      let best = 0;
+      if (card.nameLow.startsWith(token)) best = 8;
+      else if (card.words.some(word => word.startsWith(token))) best = 6;
+      else if (card.nameLow.includes(token)) best = 4;
+      if (best < 4 && card.tags.some(tag => tag === token)) best = 4;
+      else if (best < 3 && card.tags.some(tag => tag.includes(token))) best = 3;
+      if (!best && card.people.includes(token)) best = 2;
+      if (!best && card.words2.includes(token)) best = 1;
+      if (!best) return 0;
+      total += best;
     }
-    const mode = sortMode();
-    const rank = { driver: 0, harness: 1, skill: 2, other: 3 };
-    const sorted = cards.slice().sort((a, b) => {
-      if (mode === 'market-sort-verified') {
-        const delta = Number(Boolean(b.querySelector('[data-status="verified"]'))) - Number(Boolean(a.querySelector('[data-status="verified"]')));
-        if (delta) return delta;
-      } else if (mode === 'market-sort-kind') {
-        const delta = (rank[a.dataset.kind] ?? 9) - (rank[b.dataset.kind] ?? 9);
-        if (delta) return delta;
-      }
-      return byName(a, b);
-    });
-    root.querySelector('.market-cards').append(...sorted);
-    const filtering = Boolean(query || tag || selected !== 'all' || onlyVerified);
-    root.classList.toggle('is-empty', shown === 0);
-    root.classList.toggle('is-filtered', filtering);
-    root.classList.toggle('is-tagged', Boolean(tag));
-    clear.textContent = tag ? `Clear tag ${tag}` : 'Clear tag';
-    live.textContent = filtering || mode !== 'market-sort-name' ? `Showing ${shown} of ${cards.length}` : '';
+    return total || 1;
+  };
+  const rank = { driver: 0, harness: 1, skill: 2, mcp: 3, other: 4 };
+  const order = {
+    match: (a, b) => b.score - a.score || a.at - b.at,
+    name: (a, b) => a.at - b.at,
+    verified: (a, b) => Number(b.verified) - Number(a.verified) || a.at - b.at,
+    kind: (a, b) => rank[a.kind] - rank[b.kind] || a.at - b.at,
   };
 
-  search.addEventListener('input', apply);
-  tools.addEventListener('change', apply);
-  clear.addEventListener('click', () => {
-    tag = '';
-    if (location.hash.startsWith('#tag-')) history.replaceState(null, '', location.pathname + location.search);
-    apply();
-  });
-  const kindOfPill = { '#tag-driver': 'driver', '#tag-harness': 'harness', '#tag-skill': 'skill', '#by-tag': 'other' };
-  root.addEventListener('click', event => {
-    const anchor = event.target.closest('a');
-    if (!anchor || !root.contains(anchor)) return;
-    if (anchor.closest('.market-stats')) {
-      event.preventDefault();
-      const href = anchor.getAttribute('href');
-      tag = '';
-      if (location.hash.startsWith('#tag-')) history.replaceState(null, '', location.pathname + location.search);
-      if (href === '#all-listings') {
-        search.value = '';
-        tools.querySelector('#market-kind-all').checked = true;
-        tools.querySelector('#market-verified-only').checked = false;
-      } else if (kindOfPill[href]) {
-        tools.querySelector(`#market-kind-${kindOfPill[href]}`).checked = true;
-      }
-      apply();
-      return;
+  let announce;
+  const say = text => {
+    clearTimeout(announce);
+    announce = setTimeout(() => { live.textContent = text; }, 350);
+  };
+  const remember = () => {
+    const params = new URLSearchParams();
+    const kind = kindOf(kinds.find(input => input.checked) ?? kinds[0]);
+    if (state.q) params.set('q', state.q);
+    if (kind !== 'all') params.set('type', kind);
+    if (verifiedOnly.checked) params.set('verified', '1');
+    if (by.value) params.set('by', by.value);
+    if (sort.value !== 'match') params.set('sort', sort.value);
+    if (state.tag) params.set('tag', state.tag);
+    const query = params.toString();
+    history.replaceState(null, '', location.pathname + (query ? `?${query}` : ''));
+  };
+
+  const apply = ({ quiet = false } = {}) => {
+    const tokens = state.q.toLowerCase().split(/\s+/).filter(Boolean);
+    const kind = kindOf(kinds.find(input => input.checked) ?? kinds[0]);
+    const facet = Object.fromEntries([...counts.keys()].map(key => [key, 0]));
+    let shown = 0;
+    for (const card of cards) {
+      card.score = tokens.length ? score(card, tokens) : 1;
+      const rest = card.score > 0 && (!verifiedOnly.checked || card.verified) && (!by.value || card.publisher === by.value) && (!state.tag || card.tags.includes(state.tag));
+      if (rest) { facet.all += 1; facet[card.kind] += 1; }
+      const out = !(rest && (kind === 'all' || card.kind === kind));
+      if (out !== card.out) { card.el.classList.toggle('is-out', out); card.out = out; }
+      if (!out) shown += 1;
     }
-    if (!anchor.getAttribute('href')?.startsWith('#tag-')) return;
-    event.preventDefault();
-    tag = anchor.getAttribute('href').slice('#tag-'.length);
+    for (const [key, n] of counts) n.textContent = facet[key];
+    const sorted = cards.slice().sort(order[sort.value] ?? order.match);
+    if (sorted.some((card, i) => grid.children[i] !== card.el)) grid.append(...sorted.map(card => card.el));
+    const filtering = Boolean(tokens.length || state.tag || kind !== 'all' || verifiedOnly.checked || by.value);
+    root.classList.toggle('is-empty', shown === 0);
+    root.classList.toggle('is-filtered', filtering);
+    root.classList.toggle('is-tagged', Boolean(state.tag));
+    clear.textContent = state.tag ? `Clear tag ${state.tag}` : 'Clear tag';
+    if (!quiet) say(filtering ? `Showing ${shown} of ${cards.length}` : '');
+    if (!quiet) remember();
+  };
+
+  const clearAll = () => {
+    state.q = '';
+    state.tag = '';
+    search.value = '';
+    kinds[0].checked = true;
+    verifiedOnly.checked = false;
+    by.value = '';
     apply();
-    document.getElementById('all-listings')?.scrollIntoView({ block: 'nearest' });
+  };
+  search.addEventListener('input', () => { state.q = search.value.trim(); apply(); });
+  search.addEventListener('keydown', event => {
+    if (event.key !== 'Escape') return;
+    if (search.value) { search.value = ''; state.q = ''; apply(); } else search.blur();
   });
-  const initial = location.hash.match(/^#tag-([a-z0-9-]+)$/);
-  if (initial) tag = initial[1];
-  apply();
+  const strip = tools.querySelector('.market-kinds');
+  const reveal = () => {
+    const chip = kinds.find(input => input.checked)?.closest('label');
+    if (!chip || strip.scrollWidth <= strip.clientWidth) return;
+    const left = chip.offsetLeft;
+    if (left < strip.scrollLeft || left + chip.offsetWidth > strip.scrollLeft + strip.clientWidth) strip.scrollLeft = left - (strip.clientWidth - chip.offsetWidth) / 2;
+  };
+  tools.addEventListener('change', () => { apply(); reveal(); });
+  clear.addEventListener('click', () => { state.tag = ''; apply(); });
+  reset.addEventListener('click', () => { clearAll(); reveal(); search.focus(); });
+  document.addEventListener('keydown', event => {
+    if (event.key !== '/' || event.ctrlKey || event.metaKey || event.altKey) return;
+    if (event.target.closest?.('input, textarea, select, [contenteditable="true"]')) return;
+    event.preventDefault();
+    search.focus();
+  });
+  root.addEventListener('click', event => {
+    const anchor = event.target.closest('a[href^="#tag-"]');
+    if (!anchor || !root.contains(anchor)) return;
+    event.preventDefault();
+    state.tag = anchor.getAttribute('href').slice('#tag-'.length);
+    apply();
+    tools.scrollIntoView({ block: 'start' });
+  });
+
+  for (const box of grid.querySelectorAll('.market-install')) {
+    const code = box.querySelector('code');
+    const line = code.textContent;
+    const name = box.closest('.market-card').querySelector('h3').textContent;
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'market-copy';
+    button.textContent = 'Copy';
+    button.setAttribute('aria-describedby', box.closest('.market-card').querySelector('h3').id);
+    let timer;
+    button.addEventListener('click', async () => {
+      let copied = false;
+      try {
+        await navigator.clipboard.writeText(line);
+        copied = true;
+      } catch {
+        const range = document.createRange();
+        range.selectNodeContents(code);
+        getSelection().removeAllRanges();
+        getSelection().addRange(range);
+        try { copied = document.execCommand('copy'); } catch { copied = false; }
+      }
+      button.textContent = copied ? 'Copied' : 'Selected';
+      button.classList.toggle('is-done', copied);
+      say(copied ? `Copied the install line for ${name}` : `The install line for ${name} is selected: copy it`);
+      clearTimeout(timer);
+      timer = setTimeout(() => { button.textContent = 'Copy'; button.classList.remove('is-done'); }, 2000);
+    });
+    box.append(button);
+  }
+
+  const params = new URLSearchParams(location.search);
+  const hashTag = location.hash.match(/^#tag-([a-z0-9-]+)$/)?.[1];
+  state.q = (params.get('q') ?? '').trim();
+  search.value = state.q;
+  const kind = kinds.find(input => kindOf(input) === params.get('type'));
+  if (kind) kind.checked = true;
+  verifiedOnly.checked = verifiedOnly.checked || params.get('verified') === '1';
+  if (publishers.has(params.get('by'))) by.value = params.get('by');
+  if ([...sort.options].some(option => option.value === params.get('sort'))) sort.value = params.get('sort');
+  const tag = params.get('tag') ?? hashTag;
+  if (tag && cards.some(card => card.tags.includes(tag))) state.tag = tag;
+  apply({ quiet: true });
+  reveal();
+  if (state.q || state.tag || kind || params.has('verified') || params.has('by') || params.has('sort')) {
+    live.textContent = root.classList.contains('is-filtered') ? `Showing ${cards.filter(card => !card.out).length} of ${cards.length}` : '';
+    if (hashTag) remember();
+  }
 }
 
 enableCopy();
