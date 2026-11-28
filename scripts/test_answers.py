@@ -90,8 +90,7 @@ def check_format(value, format_name, field):
     raise ValueError(f'{field}: unsupported format {format_name}')
 
 
-def check_shape(value, schema, field):
-    """Check the Draft 2020-12 keywords used by this contract."""
+def check_schema_keywords(value, schema, field):
     if schema is False:
         raise ValueError(f'{field}: only allowed on compare pages')
 
@@ -111,7 +110,7 @@ def check_shape(value, schema, field):
                 raise ValueError(f'{field}.{key}: required')
         for key, item in value.items():
             if key in properties:
-                check_shape(item, properties[key], f'{field}.{key}')
+                check_schema_keywords(item, properties[key], f'{field}.{key}')
             elif schema.get('additionalProperties') is False:
                 raise ValueError(f'{field}.{key}: unknown field')
 
@@ -121,7 +120,7 @@ def check_shape(value, schema, field):
             raise ValueError(f'{field}: expected at least {minimum} item(s)')
         if 'items' in schema:
             for index, item in enumerate(value):
-                check_shape(item, schema['items'], f'{field}[{index}]')
+                check_schema_keywords(item, schema['items'], f'{field}[{index}]')
 
     if isinstance(value, str):
         if 'maxLength' in schema and len(value) > schema['maxLength']:
@@ -133,13 +132,13 @@ def check_shape(value, schema, field):
 
     for condition in schema.get('allOf', []):
         try:
-            check_shape(value, condition['if'], field)
+            check_schema_keywords(value, condition['if'], field)
         except ValueError:
             branch = 'else'
         else:
             branch = 'then'
         if branch in condition:
-            check_shape(value, condition[branch], field)
+            check_schema_keywords(value, condition[branch], field)
 
 
 ABBREVIATION = re.compile(r'\b(?:e\.g|i\.e|vs|Mr|Mrs|Ms|Dr|Prof)\.(?=\s)', re.I)
@@ -174,7 +173,7 @@ def check_copy(value, field):
 
 
 def check_page(page, filename):
-    check_shape(page, read_json(SCHEMA), filename)
+    check_schema_keywords(page, read_json(SCHEMA), filename)
     expected_filename = f'{page["slug"]}.json'
     if filename != expected_filename:
         raise ValueError(f'filename {filename}: expected {expected_filename}')
