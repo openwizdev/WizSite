@@ -67,6 +67,14 @@ ICON_HASHES = {
     'app/icon-light-512.png': 'cc6e0310da3b973b6a9e07f85311f1d556a395733dfae85de255c9bc1d708047',
 }
 DOC_HASHES = {
+    'docs/evidence/pro/home-390.png': 'b0140c348121e276a5e0602aaaad4a5f2ee658a04ca3fc27f0ba8f59d89b2594',
+    'docs/evidence/pro/home-1280.png': '3fff03b87be3ecb9d3ef11cd9131d3b2bcfbd556ccaed115446a9e4ef4e54b61',
+    'docs/evidence/pro/pro-390.png': 'cd18c70822ce55987607e8d22e83304d7184a44fc99ea8723bab706422c03893',
+    'docs/evidence/pro/pro-1280.png': 'cbbd21b5355c3cdb59e5712990a69e2ccd3e367479865bbb91b42a6d181a4560',
+    'docs/evidence/pro/supporters-390.png': 'dfd238dbcf41f54fcb47da0c89d3e21e69c6d8b83128e98bf59ff44f850aa41d',
+    'docs/evidence/pro/supporters-1280.png': 'f1ca88c9d8e27ba509879b6aeb412062f6ba41a49a8bed255c1bacb241d1836a',
+    'docs/evidence/pro/team-390.png': '1b1c066e5654e68ed5014d323f3c75f46a73c172e044c010e6cb696d3886cead',
+    'docs/evidence/pro/team-1280.png': 'f3ee5ee0f5aa96c8ea2e321041ed0aeedaa4293c657c617e1d177fa9e9a8a891',
     'docs/evidence/speed/fonts/app-1280x800.png': 'db6128e1d62daf1112ca41246fd04665bcc0b3060b99192bbc66927ef6fb66cf',
     'docs/evidence/speed/fonts/app-390x844.png': 'c7f5f4c1ef45cb111f74bce6014f79aa07eb58c54c9a4a632a55847f5863d679',
     'docs/evidence/speed/fonts/changelog-1280x800.png': 'd88654b912dbd9c1320d6503e8ad165bf23b5a3a4c5d0d13e60586ba944735c3',
@@ -301,6 +309,7 @@ def fingerprinted_page(html, cta=False):
 
 CTA = (ROOT / 'header-cta.html').read_text()
 CTA_LINK = '<a class="nav-team" href="/team/">'
+CTA_PRO_LINK = '<a class="nav-pro" href="/pro/">Pro</a>'
 TOP_BAR_END = '  </nav>\n</header>'
 TEAM_PAGE = 'team/index.html'
 BOOK_PLACEHOLDER = '#book'
@@ -322,11 +331,36 @@ TEAM_DESCRIPTION = 'Book a 30-minute call to set up OpenWiz with your team and r
 TEAM_NEVER = re.compile(r'\binstall|\bguarantee|\bpric(?:e|es|ing)\b|\bcost|\bfree\b|\bcheckout|[$€£]\s*\d|\bper (?:month|seat|user)\b'
                         r'|\bcustomers?\b|\btrusted\b|\btestimonial|\bresults?\b|\bcloudroom\b|\bships on\b|\bminute \d'
                         r'|\b(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten) (?:drivers|hosts)\b|\b\d+ of \d+\b', re.I)
+PRO_PAGE = 'pro/index.html'
+CHECKOUT_PLACEHOLDER = '#checkout'
+CHECKOUT_HOST = 'buy.polar.sh'
+PRO_TITLE = 'OpenWiz Pro · $20 a year'
+PRO_HEADLINE = 'OpenWiz Pro'
+PRO_LEAD = 'Early builds, a private channel and a first look at your issues. OpenWiz itself stays free and open source.'
+PRO_LIST_HEADING = '$20 a year'
+PRO_PERKS = (
+    'New releases a few days early, in a private repository.',
+    'A private channel with the people building OpenWiz.',
+    'Your issues read first, with a public Pro label.',
+    'Your name on the supporters page, if you want it.',
+)
+PRO_BUTTON = 'Get Pro · $20 a year'
+PRO_NOTE = 'Cancel anytime. Pro never unlocks features: everything OpenWiz does stays free.'
+PRO_SUPPORTERS_TEXT = 'See the supporters'
+ULTRA_RE = re.compile(r'\bultra\b', re.I)
+SUPPORTERS_PAGE = 'supporters/index.html'
+SUPPORTERS_FILE = ROOT / 'supporters/supporters.json'
+SUPPORTERS = ('<!-- supporters:start -->', '<!-- supporters:end -->')
+SUPPORTERS_FIELDS = ('github', 'name', 'since')
+SUPPORTERS_NAME_MAX = 80
+SUPPORTERS_GITHUB_RE = re.compile(r'^[A-Za-z0-9](?:[A-Za-z0-9]|-(?=[A-Za-z0-9])){0,38}$')
+SUPPORTERS_SINCE_RE = re.compile(r'^20\d\d-(0[1-9]|1[0-2])$')
+SUPPORTERS_EMPTY = 'No supporters yet. Be the first.'
 REPORT_LINK = 'https://github.com/openwizdev/openwiz/issues/new?template=feedback.yml'
 FOOTER = (ROOT / 'footer.html').read_text()
 FOOTER_SLOT = '<template data-slot="footer"></template>\n'
 FOOTER_LINKS = (('/what-is-openwiz/', 'What is OpenWiz?'), ('/guides/run-many-coding-agents/', 'Guide'), ('/drivers/', 'Drivers'), ('/market/', 'Market'), ('/changelog/', 'Changelog'), ('https://github.com/openwizdev/openwiz#readme', 'Docs'),
-                ('/faq/', 'FAQ'), ('/app/', 'The app'), (REPORT_LINK, 'Report a problem'), ('/team/', 'For teams'),
+                ('/faq/', 'FAQ'), ('/app/', 'The app'), (REPORT_LINK, 'Report a problem'), ('/team/', 'For teams'), ('/pro/', 'Pro'),
                 ('https://github.com/openwizdev/openwiz', 'GitHub'), ('https://x.com/openwiz', 'X @openwiz'))
 FOOTER_LINE = 'Apache-2.0. Owned by no one.'
 COUNT_NOTICE = ('openwiz.dev counts visits with Cloudflare Web Analytics and selected clicks with Cloudflare Analytics Engine, '
@@ -364,6 +398,8 @@ FAQ_TEAM = 'Yes. Book a 30-minute call. Your first fleet ships on it.'
 FAQ_WHERE = ("Builders run where you choose: this computer, with the Claude Code or Codex you're signed in to, boat.dev, "
              'or CloudRoom. Each is a driver that passed the same five-check test. In OpenWiz 0.01, you start builders by '
              'hand on this computer or boat.dev, and the automatic fleet runs in CloudRoom.')
+FAQ_COST = ('OpenWiz is free and open source (Apache-2.0). You pay only for the models and machines you already use. '
+            'Pro ($20 a year) is optional: early builds and a few perks for people who back OpenWiz, never features.')
 
 
 def with_footer(html):
@@ -394,7 +430,7 @@ GUIDE_NEVER = re.compile(r'\b0\.1\.[1-9]|\b0\.0[2-9]\b')
 NOT_FOUND = '404.html'
 ABOUT_LINK = '<p class="wrap about-link"><a href="/what-is-openwiz/">What is OpenWiz?</a></p>\n'
 STATIC = {
-    'index.html', 'changelog/index.html', 'drivers/index.html', 'team/index.html', 'faq/index.html', 'market/index.html', '_headers', SECURITY_TXT, APP_PAGE, 'app/manifest.webmanifest',
+    'index.html', 'changelog/index.html', 'drivers/index.html', 'team/index.html', 'faq/index.html', 'market/index.html', PRO_PAGE, SUPPORTERS_PAGE, '_headers', SECURITY_TXT, APP_PAGE, 'app/manifest.webmanifest',
     'SKILL.md', 'fonts/OFL.txt',
     'c76a1a01e62d088edd3789d30d6a4d29.txt',
 } | ART | set(ICON_HASHES) | set(VECTORS) | (set(VENDOR_HASHES) - {GSAP}) | set(APP_VENDOR) | set(DRIVER_LOGOS) | {ASK_INDEX, ABOUT_PAGE, GUIDE_PAGE, NOT_FOUND} | DISCOVERY_FILES
@@ -420,7 +456,7 @@ FONT_HASHES = {
     'fonts/GeistMono-var.woff2': '9e8aaba5adee50826485cff3187dc86d45f7dd4799a80371af0f369bbd999989',
     'fonts/OFL.txt': 'c683bfbcc7e087f5d37a54ef628f10387c451a83ddc459b151403a164ac46c90',
 }
-PAGES = ('index.html', 'changelog/index.html', 'drivers/index.html', TEAM_PAGE, FAQ_PAGE, 'market/index.html', ABOUT_PAGE, GUIDE_PAGE)
+PAGES = ('index.html', 'changelog/index.html', 'drivers/index.html', TEAM_PAGE, FAQ_PAGE, 'market/index.html', PRO_PAGE, SUPPORTERS_PAGE, ABOUT_PAGE, GUIDE_PAGE)
 SITE_PAGES = PAGES + (NOT_FOUND,)
 ALL_PAGES = SITE_PAGES + (APP_PAGE,)
 STORY_COPY = ('Build a to-do app', 'Bring any agent', 'Sign in with GitHub', 'Put the app on your phone')
@@ -591,6 +627,7 @@ class Page(HTMLParser):
         self.json_ld = []
         self.json_data = None
         self.books = []
+        self.checkouts = []
         self.x_links = 0
         self.launch_posts = 0
         self.report_links = 0
@@ -644,6 +681,9 @@ class Page(HTMLParser):
             self.ids.add(attrs['id'])
         if tag == 'a' and 'data-book' in attrs:
             self.books.append(attrs.get('href') or '')
+            attrs = {key: value for key, value in attrs.items() if key != 'href'}
+        elif tag == 'a' and 'data-checkout' in attrs:
+            self.checkouts.append(attrs.get('href') or '')
             attrs = {key: value for key, value in attrs.items() if key != 'href'}
         elif tag == 'a' and attrs.get('href') == X_ACCOUNT:
             self.x_links += 1
@@ -931,6 +971,7 @@ class DriverSlot(Page):
                 and url.username is None and url.password is None, 'unexpected Drivers registry URL'
             assert sum(key == 'href' for key, _ in attrs) == 1, 'duplicate Drivers anchor href'
             assert 'data-book' not in fields, 'a booking link outside the team page'
+            assert 'data-checkout' not in fields, 'a checkout link outside the pro page'
             attrs = [(key, value) for key, value in attrs if key != 'href']
         super().handle_starttag(tag, attrs)
 
@@ -1103,7 +1144,7 @@ def check_security_txt(text, now=None):
     )
 
 
-def check_site(root, registry=ROOT / 'market/registry.json', now=None):
+def check_site(root, registry=ROOT / 'market/registry.json', supporters_file=SUPPORTERS_FILE, now=None):
     files = {p.relative_to(root).as_posix() for p in root.rglob('*') if p.is_file()}
     names = built_fingerprints(root)
     assert files == STATIC | set(names.values()), 'unexpected or missing build output'
@@ -1112,6 +1153,7 @@ def check_site(root, registry=ROOT / 'market/registry.json', now=None):
     check_discovery(root, parsed)
     pages = {root / name: parsed[name] for name in SITE_PAGES}
     drivers_html = (root / DRIVERS_PAGE).read_text()
+    supporters_entries = read_supporters(supporters_file)
     for path, page in pages.items():
         rel = path.relative_to(root).as_posix()
         assert not set(page.refs) & {f'/{name}' for name in HASHED}, 'a page uses an unfingerprinted style or script'
@@ -1150,11 +1192,25 @@ def check_site(root, registry=ROOT / 'market/registry.json', now=None):
             fixed, section = (Page(part) for part in split_market(path.read_text()))
             market = market_urls(registry)
             assert not section.books, f'a booking link outside the team page: {path.name}'
+            assert not section.checkouts, f'a checkout link outside the pro page: {path.name}'
             for count, href in ((section.x_links, X_ACCOUNT), (section.cloudroom_links, CLOUDROOM_LINK), (section.report_links, REPORT_LINK), *[(n, u) for u, n in section.install_links.items()]):
                 assert not count or href in market, 'unexpected external URL'
             check_market_refs(root, path, section, pages, market)
             check_market_markup(split_market(path.read_text())[1])
             page = fixed
+        if path == root / SUPPORTERS_PAGE:
+            supporters_fixed, supporters_section = split_supporters(path.read_text())
+            section_page = Page(supporters_section)
+            assert not section_page.books, f'a booking link outside the team page: {path.name}'
+            assert not section_page.checkouts, f'a checkout link outside the pro page: {path.name}'
+            assert not (section_page.x_links or section_page.cloudroom_links or section_page.report_links or section_page.launch_posts), \
+                'unexpected external URL'
+            allowed_profiles = {f'https://github.com/{entry["github"]}' for entry in supporters_entries if entry['github']}
+            for ref in section_page.refs:
+                if ref in allowed_profiles:
+                    continue
+                check_ref(root, path, ref, pages, section_page.favicons)
+            page = Page(supporters_fixed)
         if path == root / DRIVERS_PAGE:
             listing_urls = driver_listing_urls(registry)
             if listing_urls:
@@ -1162,6 +1218,7 @@ def check_site(root, registry=ROOT / 'market/registry.json', now=None):
                 for markup in slots:
                     slot = DriverSlot(markup, listing_urls)
                     assert not slot.books, 'a booking link outside the team page'
+                    assert not slot.checkouts, 'a checkout link outside the pro page'
                     assert not (slot.x_links or slot.cloudroom_links or slot.report_links or slot.launch_posts or any(slot.install_links.values())), \
                         'unexpected external URL'
                     for ref in slot.refs:
@@ -1169,6 +1226,7 @@ def check_site(root, registry=ROOT / 'market/registry.json', now=None):
                 page = Page(fixed)
         assert page.social and all(s.startswith(SITE_URL) and s.removeprefix(SITE_URL).split('?')[0] in STATIC for s in page.social), 'social image must be a built file on the site'
         assert path == root / TEAM_PAGE or not page.books, f'a booking link outside the team page: {path.name}'
+        assert path == root / PRO_PAGE or not page.checkouts, f'a checkout link outside the pro page: {path.name}'
         assert page.x_links == (2 if path == root / ABOUT_PAGE else 1), f'one X link per page, the footer\'s: {path.relative_to(root)} has {page.x_links}'
         if path == root / MARKET_PAGE:
             check_market_refs(root, path, page, pages, frozenset())
@@ -1280,6 +1338,7 @@ def check_site(root, registry=ROOT / 'market/registry.json', now=None):
         for reading in readings:
             low = re.sub(r'\s+', ' ', reading).lower()
             assert not any(word in low for word in BANNED_COPY), f'banned word rendered in {path.name}'
+            assert not ULTRA_RE.search(low), f'never mention Ultra in {path.name}'
             for text in ('illustration, not live data', 'building in public'):
                 assert text not in low, f'cut copy is back in {path.name}: {text}'
     hero = re.search(r'<section class="product-hero[\s\S]*?(?=<section class="agent-row)', landing)
@@ -1354,6 +1413,8 @@ def check_site(root, registry=ROOT / 'market/registry.json', now=None):
     check_changelog(landing, changelog)
     check_releases(releases, read_releases(), install_switch(landing) == 'live')
     check_team(site_html, {name: parsed[name] for name in SITE_PAGES})
+    check_pro(site_html, {name: parsed[name] for name in SITE_PAGES})
+    check_supporters(*split_supporters((root / SUPPORTERS_PAGE).read_text()), supporters_entries)
     check_footer(site_html)
     check_faq(site_html, {name: parsed[name] for name in SITE_PAGES}, names)
     for page in pages.values():
@@ -2006,6 +2067,167 @@ def check_team(htmls, pages):
 
 
 
+def check_pro(htmls, pages):
+    for name, html in htmls.items():
+        bar = top_bar(html)
+        assert bar.count('class="nav-pro"') == 1 and bar.count(CTA_PRO_LINK) == 1, f'the {name} top bar needs its one quiet Pro link to /pro/'
+        assert html.count('class="nav-pro"') == 1, f'the {name} page needs exactly one top-bar Pro link'
+    checkouts = [(name, href) for name, page in pages.items() for href in page.checkouts]
+    assert len(checkouts) == 1 and checkouts[0][0] == PRO_PAGE, \
+        f'the site needs exactly one checkout link, on the pro page: {checkouts}'
+    href = checkouts[0][1]
+    if href == CHECKOUT_PLACEHOLDER:
+        assert 'checkout' in pages[PRO_PAGE].ids, 'the checkout placeholder needs its id on the pro page'
+    else:
+        url = urlsplit(href)
+        assert url.scheme == 'https' and url.netloc == CHECKOUT_HOST and len(url.path) > 1 \
+            and not url.username and not url.password, f'the checkout link must be https://{CHECKOUT_HOST}/...: {href}'
+    pro = htmls[PRO_PAGE]
+    title = re.findall(r'<title>([^<]*)</title>', pro)
+    assert title == [PRO_TITLE], f'the pro page title: {PRO_TITLE}'
+    assert not re.search(r'<(?:iframe|embed|object|form|details)\b', pro) and pro.count('<script') == 1, \
+        'the pro page adds no embed, form or script beyond GSAP and site.js, and folds nothing away'
+    main = pro.split('<main', 1)[1].split('</main>', 1)[0]
+    shown = re.sub(r'\s+', ' ', unescape(re.sub(r'<[^>]*>', ' ', main))).strip()
+    assert not ULTRA_RE.search(shown), 'the pro page never mentions Ultra'
+    prices = re.findall(r'[$€£]\s*\d+(?:[.,]\d+)?', shown)
+    assert prices and all(p == '$20' for p in prices), f'the pro page names only $20: {prices}'
+    assert not re.search(r'\bper\s+month\b|/\s*mo(?:nth)?\b', shown, re.I), 'the pro page is yearly only'
+    assert not re.search(r'\bhidden\b|aria-hidden', main), 'the pro page hides none of its copy'
+    assert main.count('<a ') == 2 and main.count('<button') == 0, \
+        'the pro page offers only the checkout button and the supporters link'
+    assert [plain(h) for h in re.findall(r'<h1\b[^>]*>([\s\S]*?)</h1>', main)] == [PRO_HEADLINE], 'the pro page heading'
+    assert [plain(h) for h in re.findall(r'<h2\b[^>]*>([\s\S]*?)</h2>', main)] == [PRO_LIST_HEADING], 'the pro page list heading'
+    block = re.search(
+        r'<section class="pro wrap" aria-labelledby="pro-title">\s*'
+        r'<h1 id="pro-title">([^<]*)</h1>\s*'
+        r'<p class="pro-lead">([^<]*)</p>\s*'
+        r'<div class="pro-offer">\s*'
+        r'<h2 id="pro-price">([^<]*)</h2>\s*'
+        r'<ul class="pro-perks" aria-labelledby="pro-price">([\s\S]*?)</ul>\s*'
+        r'<a class="pro-cta" id="checkout" data-checkout href="[^"]*">([^<]*)</a>\s*'
+        r'<p class="pro-note">([^<]*)</p>\s*'
+        r'<p class="pro-supporters"><a href="/supporters/">([^<]*)</a></p>\s*'
+        r'</div>\s*</section>\s*$',
+        main,
+    )
+    assert block, 'the pro page copy and structure are pinned'
+    h1, lead, heading, perks_html, button, note, supporters_text = block.groups()
+    assert tuple(map(unescape, (h1, lead, heading, button, note, supporters_text))) == (
+        PRO_HEADLINE, PRO_LEAD, PRO_LIST_HEADING, PRO_BUTTON, PRO_NOTE, PRO_SUPPORTERS_TEXT
+    ), 'the pro page copy changed'
+    perks = re.findall(r'<li>([^<]*)</li>', perks_html)
+    assert tuple(map(unescape, perks)) == PRO_PERKS and perks_html.count('<li') == len(PRO_PERKS), \
+        f'the pro page perks, in order: {perks}'
+
+
+def split_supporters(built):
+    start, end = SUPPORTERS
+    assert built.count(start) == 1 and built.count(end) == 1, 'the built Supporters page has one generated section'
+    before, rest = built.split(start)
+    section, after = rest.split(end)
+    assert after.startswith('</main>'), 'the generated Supporters section closes the page\'s main'
+    return before + after, section
+
+
+def check_supporter_data(entry):
+    assert isinstance(entry, dict), 'each supporter is an object'
+    assert sorted(entry) == list(SUPPORTERS_FIELDS), f'unexpected supporter fields: {sorted(entry)}'
+    name, github, since = entry['name'], entry['github'], entry['since']
+    assert isinstance(name, str) and name.strip() and name == name.strip(), 'supporter name must be non-empty trimmed text'
+    assert len(name) <= SUPPORTERS_NAME_MAX and '\n' not in name and '\r' not in name, f'supporter name over {SUPPORTERS_NAME_MAX} characters or multi-line'
+    if github is not None:
+        assert isinstance(github, str) and SUPPORTERS_GITHUB_RE.fullmatch(github), f'invalid GitHub login: {github!r}'
+    assert isinstance(since, str) and SUPPORTERS_SINCE_RE.fullmatch(since), f'supporter since must be YYYY-MM: {since!r}'
+    check_public_names(escape(name))
+    assert not ULTRA_RE.search(name), 'supporter name mentions Ultra'
+
+
+def read_supporters(path=SUPPORTERS_FILE):
+    try:
+        data = json.loads(path.read_text())
+    except ValueError as error:
+        raise AssertionError(f'{path.name}: not JSON: {error}') from None
+    assert isinstance(data, list), f'{path.name}: must be a JSON list'
+    seen_github, seen_names = set(), set()
+    for entry in data:
+        check_supporter_data(entry)
+        low_name = entry['name'].lower()
+        assert low_name not in seen_names, f'duplicate supporter name: {entry["name"]}'
+        seen_names.add(low_name)
+        if entry['github'] is not None:
+            low_gh = entry['github'].lower()
+            assert low_gh not in seen_github, f'duplicate supporter GitHub login: {entry["github"]}'
+            seen_github.add(low_gh)
+    return data
+
+
+class SupportersOutline(HTMLParser):
+    def __init__(self, text):
+        super().__init__(convert_charrefs=True)
+        self.tags, self.items, self.empty, self.at = [], [], None, None
+        self.feed(text)
+
+    def handle_starttag(self, tag, attrs):
+        attrs = dict(attrs)
+        classes = (attrs.get('class') or '').split()
+        self.tags.append((tag, attrs))
+        if tag == 'li':
+            self.items.append({'name': '', 'href': None, 'since': None, 'month': ''})
+        elif tag == 'p' and 'supporters-empty' in classes:
+            self.empty = {'text': '', 'links': []}
+        if tag == 'a':
+            if self.empty is not None:
+                self.empty['links'].append(attrs.get('href'))
+            elif self.items:
+                self.items[-1]['href'] = attrs.get('href')
+                self.at = 'name'
+        elif tag == 'span' and self.items:
+            self.at = 'name'
+        elif tag == 'time' and self.items:
+            self.items[-1]['since'] = attrs.get('datetime')
+            self.at = 'month'
+
+    def handle_endtag(self, tag):
+        if tag in ('a', 'span', 'time'):
+            self.at = None
+
+    def handle_data(self, data):
+        if self.empty is not None:
+            self.empty['text'] += data
+        elif self.at and self.items:
+            self.items[-1][self.at] += data
+
+
+def check_supporters(supporters_html, section, entries):
+    title = re.findall(r'<title>([^<]*)</title>', supporters_html)
+    assert title == ['Supporters — OpenWiz'], f'the supporters page title: {title}'
+    main = re.search(r'<main\b[^>]*>([\s\S]*?)</main>', supporters_html)[1]
+    assert main == '<h1>Supporters</h1><p class="lead">The people who back OpenWiz.</p>', \
+        'the supporters page is its title, one line and the supporters list, nothing else'
+    outline = SupportersOutline(section)
+    allowed = {'section': {'class', 'aria-label'}, 'ul': set(), 'li': set(), 'span': set(),
+               'a': {'href', 'rel'}, 'time': {'datetime'}, 'p': {'class'}}
+    for tag, attrs in outline.tags:
+        assert tag in allowed, f'unexpected element in the supporters list: {tag}'
+        assert set(attrs) <= allowed[tag], f'unexpected attribute in the supporters list: {tag} {sorted(attrs)}'
+    assert outline.tags[:1] == [('section', {'class': 'supporters-list', 'aria-label': 'Supporters'})], \
+        'supporters sit in one Supporters section'
+    if not entries:
+        assert not outline.items, 'empty supporters list must render no items'
+        assert outline.empty and re.sub(r'\s+', ' ', outline.empty['text']).strip() == SUPPORTERS_EMPTY \
+            and outline.empty['links'] == ['/pro/'], f'empty supporters state must read {SUPPORTERS_EMPTY!r} linking /pro/'
+        return
+    assert outline.empty is None, 'non-empty supporters list must not show empty state'
+    assert len(outline.items) == len(entries), f'{len(outline.items)} supporters shown; data has {len(entries)}'
+    for got, entry in zip(outline.items, entries):
+        y, m = map(int, entry['since'].split('-'))
+        want_href = f'https://github.com/{entry["github"]}' if entry['github'] else None
+        assert (got['name'], got['href'], got['since'], got['month']) == (
+            entry['name'], want_href, entry['since'], f'{MONTHS[m - 1]} {y}'
+        ), f'supporter entry mismatch for {entry["name"]}: {got}'
+
+
 def check_footer(htmls):
     for name, html in htmls.items():
         assert html.count('<footer') == 1 and html.count(FOOTER) == 1, f'the {name} page needs the one site footer'
@@ -2047,6 +2269,9 @@ def check_faq(htmls, pages, names):
     assert prereqs == [FAQ_PREREQS], f'the Questions\u2019 answer to What do I need before installing?: {FAQ_PREREQS}'
     where = [plain(a) for _, q, _, a in rows if plain(q) == 'Where do my agents run?']
     assert where == [FAQ_WHERE], f'the Questions\u2019 answer to Where do my agents run?: {FAQ_WHERE}'
+    cost = [(plain(a), a) for _, q, _, a in rows if plain(q) == 'What does it cost?']
+    assert len(cost) == 1 and cost[0][0] == FAQ_COST and '<a href="/pro/">Pro</a>' in cost[0][1], \
+        f'the Questions\u2019 cost answer: {FAQ_COST}'
     assert plain(rows[-2][3]) == FAQ_TEAM, f'the Questions’ team answer: {FAQ_TEAM}'
     assert plain(rows[-1][3]) == COUNT_NOTICE, 'the Questions use the same visit and click notice as the footer'
     assert not re.search(r'<(?:form|input|textarea)\b', FAQ), 'part 1 asks nothing: no form or input in the Questions'
@@ -2231,6 +2456,7 @@ def check_releases(section, releases, live):
 def check_app(root, names, pages):
     page = Page((root / APP_PAGE).read_text())
     assert not page.books, 'a booking link outside the team page: the app'
+    assert not page.checkouts, 'a checkout link outside the pro page: the app'
     assert not page.x_links, 'one X link per page, the footer\'s: the app has one'
     assert not page.report_links, 'Report a problem link, the footer\'s: the app has one'
     assert not set(page.refs) & {f'/{name}' for name in HASHED}, 'the app uses an unfingerprinted style or script'
@@ -2321,6 +2547,8 @@ def main():
                        (output / name).read_text(), count=1)
         if name == 'changelog/index.html':
             built = split_releases(built)[0]
+        if name == SUPPORTERS_PAGE:
+            built = split_supporters(built)[0]
         if name == MARKET_PAGE:
             built = split_market(built)[0]
         if name == DRIVERS_PAGE and driver_listing_urls(ROOT / 'market/registry.json'):

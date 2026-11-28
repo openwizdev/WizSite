@@ -49,6 +49,14 @@ export const pages = {
     'For your team — OpenWiz',
     'Book a 30-minute call to set up OpenWiz with your team and run a fleet on your own repository.',
   ],
+  'pro/index.html': [
+    'OpenWiz Pro · $20 a year',
+    'Early builds, a private channel and a first look at your issues. OpenWiz itself stays free and open source.',
+  ],
+  'supporters/index.html': [
+    'Supporters — OpenWiz',
+    'The people who back OpenWiz.',
+  ],
   'app/index.html': ['The app — OpenWiz', 'Sign in with GitHub to see your OpenWiz specs, tickets and agents.', 'noindex'],
   '404.html': ['Page not found — OpenWiz', 'Find the OpenWiz homepage, overview and frequently asked questions.', 'noindex'],
 };

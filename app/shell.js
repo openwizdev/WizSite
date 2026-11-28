@@ -177,6 +177,7 @@
     const reads = h('div', { class: 'reads', 'aria-live': 'polite' });
     const refreshButton = () => h('button', { class: 'btn', type: 'button', onclick: () => data.refreshAll() }, icon('refresh'), 'Refresh now');
     const signOutButton = () => h('button', { class: 'btn', type: 'button', onclick: () => { data.auth.signOut(); signedOut(); } }, 'Sign out');
+    const proLink = () => h('a', { class: 'pro-link', href: 'https://openwiz.dev/pro/' }, 'Pro');
     const refresh = [refreshButton(), refreshButton()];
     const title = h('h1', { tabindex: '-1' });
     const read = h('p', { class: 'read' });
@@ -190,10 +191,10 @@
           h('a', { class: 'brand', href: home() }, logo(), h('span', {}, 'OpenWiz')),
           repoButton(),
           h('nav', { class: 'main', 'aria-label': 'Pages' }, side.map(item => item.link)),
-          h('div', { class: 'foot' }, reads, h('div', { class: 'actions' }, refresh[0], signOutButton()))),
+          h('div', { class: 'foot' }, reads, h('div', { class: 'actions' }, refresh[0], signOutButton()), proLink())),
         h('header', { class: 'top' }, h('a', { class: 'brand', href: home() }, logo(), h('span', {}, 'OpenWiz')), repoButton()),
         h('main', { id: 'content' }, h('div', { class: 'page-head' }, title, read), phoneReads, notices, body,
-          h('div', { class: 'phone-actions' }, refresh[1], signOutButton())),
+          h('div', { class: 'phone-actions' }, refresh[1], signOutButton(), proLink())),
         h('nav', { class: 'tabs', 'aria-label': 'Pages' }, tabs.map(item => item.link))));
     built = { side, tabs, reads, refresh, title, read, phoneReads, notices, body, page: null };
   }

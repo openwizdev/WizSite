@@ -419,7 +419,7 @@ async function footer(page, where, mode) {
   })()`);
   expect(facts.count === 1, where, `one footer (${facts.count})`);
   expect(facts.buttons === (mode === 'no JavaScript' ? 0 : 12), where, `the footer Wizes are not the landing's (${facts.buttons} of 12 respond)`);
-  expect(facts.links === 12 && facts.overview && facts.inside, where, 'the footer link groups are not all shown inside the window');
+  expect(facts.links === 13 && facts.overview && facts.inside, where, 'the footer link groups are not all shown inside the window');
   expect(facts.lines === 2, where, 'the footer must show the license and counting notice');
   expect(facts.whole, where, `the footer wordmark is clipped (ink and box: ${facts.dbg})`);
   expect(facts.gap >= 0 && facts.gap <= 16, where, `a ${facts.gap}px painted gap between the wordmark's ink and the Wizes (0 to 16)`);
@@ -529,7 +529,7 @@ async function main() {
         } finally {
           await page.close();
         }
-        for (const path of ['/', '/changelog/', '/drivers/', '/team/', '/faq/']) {
+        for (const path of ['/', '/changelog/', '/drivers/', '/team/', '/faq/', '/pro/', '/supporters/']) {
           const other = await open(browser, origin, width, height, mode, path);
           try {
             await buy(other, `${path} ${where}`, path);
