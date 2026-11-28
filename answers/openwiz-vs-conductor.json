@@ -23,7 +23,7 @@
   ],
   "sources": [
     {
-      "url": "https://github.com/openwizdev/OpenWiz#readme",
+      "url": "https://github.com/openwizdev/OpenWiz/blob/main/README.md",
       "supports": "OpenWiz is an open source agent factory that coordinates agents from planning through review.",
       "checked": "2026-11-28"
     },
