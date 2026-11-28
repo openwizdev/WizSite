@@ -104,9 +104,10 @@ const discovery = crawlerFiles(about, guide, mirrors);
 for (const [file, data] of Object.entries(discovery)) await put(file, data);
 await put('ask-index.json', await (await import('./scripts/ask-index.mjs')).snapshotIndex(output, new URL('ask-docs/', root)));
 for (const [file, source] of Object.entries(npmVendor)) await put(file, await readFile(new URL(source, root)));
-for (const file of [...files, 'showcase/index.html', 'showcase/showcase.css', 'showcase/showcase.js']) {
+for (const file of files) {
   await mkdir(new URL('./', new URL(file, output)), { recursive: true });
   await copyFile(new URL(file, root), new URL(file, output));
 }
+await (await import('./showcase/build.mjs')).buildShowcase(put);
 execFileSync('python3', ['-B', 'scripts/check.py', '--discovery-only'], { cwd: root, stdio: 'inherit' });
 console.log(`Static site: ${Object.keys(pages).length + fonts.length + hashed.length + files.length + Object.keys(npmVendor).length + Object.keys(discovery).length + mirrors.size + 1} public files in dist/ (${Object.values(names).join(', ')})`);

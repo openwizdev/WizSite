@@ -205,6 +205,8 @@ APP_SCRIPTS = ('app/data.js', 'app/records.js', 'app/ui.js') + APP_PARTS + ('app
 APP_VENDOR = {'app/vendor/dagre-3.1.3.min.js': ('node_modules/@dagrejs/dagre/dist/dagre.min.js', 'app/pages/spec.js'),
               'app/vendor/dagre-LICENSE.txt': ('node_modules/@dagrejs/dagre/LICENSE', None)}
 HASHED += (APP_STYLE,) + APP_PART_STYLES + APP_SCRIPTS
+SHOWCASE_PAGE = 'showcase/index.html'
+HASHED += ('showcase/showcase.css', 'showcase/showcase.js')
 SITE_CSP = ("default-src 'self'; script-src 'self' https://static.cloudflareinsights.com; style-src 'self'; "
             "img-src 'self' data:; media-src 'self'; font-src 'self'; "
             "connect-src 'self' https://api.github.com https://cloudflareinsights.com; frame-src 'none'; object-src 'none'; "
@@ -433,8 +435,7 @@ STATIC = {
     'SKILL.md', 'fonts/OFL.txt',
     'c76a1a01e62d088edd3789d30d6a4d29.txt',
 } | ART | set(ICON_HASHES) | set(VECTORS) | (set(VENDOR_HASHES) - {GSAP}) | set(APP_VENDOR) | set(DRIVER_LOGOS) | {ASK_INDEX, ABOUT_PAGE, GUIDE_PAGE, NOT_FOUND} | DISCOVERY_FILES
-SHOWCASE_FILES = {'showcase/index.html', 'showcase/showcase.css', 'showcase/showcase.js'}
-RUNTIME = STATIC | SHOWCASE_FILES | set(FINGERPRINTS.values())
+RUNTIME = STATIC | {SHOWCASE_PAGE} | set(FINGERPRINTS.values())
 
 
 def built_fingerprints(root):
@@ -1345,7 +1346,7 @@ def check_security_txt(text, now=None):
 def check_site(root, registry=ROOT / 'market/registry.json', now=None):
     files = {p.relative_to(root).as_posix() for p in root.rglob('*') if p.is_file()}
     names = built_fingerprints(root)
-    assert files == STATIC | SHOWCASE_FILES | set(names.values()) | set(MIRROR_PATHS.values()), 'unexpected or missing build output'
+    assert files == STATIC | {SHOWCASE_PAGE} | set(names.values()) | set(MIRROR_PATHS.values()), 'unexpected or missing build output'
     docs = {name: (root / name).read_text() for name in ALL_PAGES}
     parsed = {name: Page(html) for name, html in docs.items()}
     check_discovery(root, parsed)
@@ -2659,9 +2660,14 @@ def main():
     subprocess.run(['node', '--test', 'showcase/tests/render.test.mjs'], cwd=ROOT, check=True)
     output = ROOT / 'dist'
     check_site(output)
-    for name in RUNTIME - set(FINGERPRINTS.values()) - set(ALL_PAGES) - {ASK_INDEX} - DISCOVERY_FILES:
+    for name in RUNTIME - set(FINGERPRINTS.values()) - set(ALL_PAGES) - {ASK_INDEX, SHOWCASE_PAGE} - DISCOVERY_FILES:
         source = APP_VENDOR[name][0] if name in APP_VENDOR else name
         assert (ROOT / source).read_bytes() == (output / name).read_bytes(), f'export differs: {name}'
+    showcase = (ROOT / SHOWCASE_PAGE).read_text()
+    for source, hashed in FINGERPRINTS.items():
+        if source.startswith('showcase/'):
+            showcase = showcase.replace(f'"/{source}"', f'"/{hashed}"')
+    assert (output / SHOWCASE_PAGE).read_text() == showcase, f'export differs: {SHOWCASE_PAGE}'
     assert built_fingerprints(output) == FINGERPRINTS, 'build is stale: rebuild the site'
     for name, hashed in FINGERPRINTS.items():
         assert built_asset_bytes(name, FONT_FINGERPRINTS) == (output / hashed).read_bytes(), f'export differs: {name}'

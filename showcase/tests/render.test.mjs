@@ -23,29 +23,24 @@ test('the built showcase renders only fresh, validated counts and makes one cred
       const originalAnswer = world.answer.bind(world);
       world.answer = async request => {
         const response = await originalAnswer(request);
+        if (request.url.startsWith(SITE + '/') && /^\/showcase\/showcase\.[0-9a-f]{10}\.js$/.test(new URL(request.url).pathname)) {
+          response.raw = Buffer.concat([Buffer.from(`Date.now = () => ${at};\n`), response.raw]);
+        }
         if (request.url === `${SITE}/showcase/`) {
           const injection = '<script defer src="https://static.cloudflareinsights.com/beacon.min.js"></script>';
           response.raw = Buffer.from(response.raw.toString().replace('</body>', injection + '</body>'));
         }
         return response;
       };
-      let session;
-      browser.on(message => {
-        if (message.method === 'Target.attachedToTarget' && message.params.targetInfo.url === 'about:blank') {
-          session = message.params.sessionId;
-        }
-      });
       const page = await open(browser, world);
       try {
-        await browser.send('Page.addScriptToEvaluateOnNewDocument', { source: `Date.now = () => ${at};` }, session);
         await page.go(`${SITE}/showcase/`);
         await page.until('document.querySelector("dl")?.getAttribute("aria-busy") === "false"', 'settled showcase');
         const rendered = await page.run(`[...document.querySelectorAll('[data-count]')].map(node => node.textContent)`);
+        assert.equal(await page.run('Date.now()'), at, `${name}: fixed browser clock`);
         assert.deepEqual(rendered, expected, `${name}: visible counts`);
         assert.ok((await page.text()).includes(reason), `${name}: visible reason or read time`);
-        const requests = world.log.filter(request => request.origin !== SITE || ![
-          '/showcase/', '/showcase/showcase.css', '/showcase/showcase.js',
-        ].includes(request.path));
+        const requests = world.log.filter(request => request.origin !== SITE || !/^\/showcase\/(?:showcase\.[0-9a-f]{10}\.(?:css|js))?$/.test(request.path));
         assert.deepEqual(requests.map(request => [request.method, request.url]), [['GET', feed]]);
         assert.equal(requests[0].headers.Accept, 'application/vnd.github.raw+json');
         assert.equal(await page.run('document.cookie'), '');
@@ -72,9 +67,9 @@ test('the built showcase renders only fresh, validated counts and makes one cred
     await render('stale', valid, readTime + 7200001, none, 'more than two hours ago');
     await render('valid', valid, fresh, values, 'read 15 minutes ago', [390, 1440]);
     await render('two-hour boundary', valid, readTime + 7200000, values, 'read 120 minutes ago');
-    await render('missing', { status: 404 }, fresh, none, 'file is missing');
+    await render('missing', { status: 404, json: {} }, fresh, none, 'file is missing');
     await render('offline', { abort: true }, fresh, none, 'could not be loaded');
-    await render('rate-limited', { status: 403 }, fresh, none, 'could not be loaded');
+    await render('rate-limited', { status: 403, json: {} }, fresh, none, 'could not be loaded');
     await render('all-null', { status: 200, json: await fixture('all-null') },
       fresh, none, 'count was unavailable');
     await render('mixed', { status: 200, json: { ...source, prs_merged_7d: null } },
