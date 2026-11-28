@@ -502,6 +502,8 @@ const ASK_REFUSALS = {
 };
 const ASK_NOT_COVERED = 'The OpenWiz docs don\'t cover that yet, so I won\'t guess. Book a call or open a GitHub issue, and we\'ll answer it.';
 const ASK_LINKS = [['Book a call', 'https://openwiz.dev/team/#book'], ['GitHub issues', 'https://github.com/openwizdev/openwiz/issues']];
+const ASK_LINES = ['A Wiz is reading the docs', 'Flipping through the spellbook', 'Finding the right page',
+  'Asking the other Wizes', 'Checking every source', 'Polishing the answer'];
 const askKeys = value => value && typeof value === 'object' && !Array.isArray(value) ? Object.keys(value).sort().join() : '';
 const askText = value => typeof value === 'string' && value.length > 0;
 function askEvent(line, text, sources) {
@@ -543,14 +545,28 @@ function askGate(sitekey, container) {
   });
   return {
     start,
-    async token() {
-      const turnstile = await start();
-      if (!turnstile) return '';
-      const now = turnstile.getResponse(widget);
-      if (now && !turnstile.isExpired(widget)) return now;
-      return new Promise(resolve => waiting.push(resolve));
+    token(signal) {
+      if (signal?.aborted) return Promise.resolve('');
+      return new Promise(resolve => {
+        let settled = false;
+        const done = value => {
+          if (settled) return;
+          settled = true;
+          waiting = waiting.filter(fn => fn !== done);
+          signal?.removeEventListener('abort', onAbort);
+          resolve(value);
+        };
+        const onAbort = () => done('');
+        signal?.addEventListener('abort', onAbort, { once: true });
+        start().then(turnstile => {
+          if (settled) return;
+          if (!turnstile) return done('');
+          const now = turnstile.getResponse(widget);
+          if (now && !turnstile.isExpired(widget)) return done(now);
+          waiting.push(done);
+        });
+      });
     },
-    has: () => !!widget && !!window.turnstile?.getResponse(widget),
     used() { if (widget !== null) window.turnstile?.reset(widget); },
     remove() { settle(''); if (widget !== null) window.turnstile?.remove(widget); widget = null; },
   };
@@ -586,36 +602,56 @@ async function askAWiz() {
       const label = el('label', 'sr-only', 'Ask a Wiz a question about OpenWiz');
       Object.assign(input, { id: `faq-ask-${n}`, type: 'text', name: 'question', placeholder: 'Ask a Wiz...', autocomplete: 'off', enterKeyHint: 'send' });
       label.htmlFor = input.id;
-      form.append(label, input, el('button', 'faq-ask-go', 'Ask'));
+      const go = el('button', 'faq-ask-go', 'Ask');
+      form.append(label, input, go);
       const human = sitekey ? el('div', 'faq-ask-human') : null;
       const gate = human && askGate(sitekey, human);
+      let inHuman = false;
       if (human) {
         form.append(human);
         for (const type of ['focusin', 'pointerdown', 'input']) form.addEventListener(type, gate.start, { once: true });
+        human.addEventListener('focusin', () => { inHuman = true; });
+        human.addEventListener('focusout', event => { if (event.relatedTarget && !human.contains(event.relatedTarget)) inHuman = false; });
       }
       const heading = el(level, 'faq-q'), answer = el('p', 'faq-ask-answer'), body = el('div', 'faq-a'), actions = el('div', 'faq-ask-actions');
       body.append(el('div'));
       body.firstChild.append(answer);
       const buttons = {};
       for (const name of ['Stop', 'Retry', 'Edit']) actions.append(buttons[name] = Object.assign(el('button', '', name), { type: 'button' }));
-      row.append(form, heading, body, actions);
+      row.append(heading, body, form, actions);
       list.append(row);
-      let question = '', controller = null;
+      let question = '', controller = null, wait = null, verifying = false;
+      const waiting = on => {
+        if (!on) {
+          wait?._wl?.stop();
+          wait?.remove();
+          wait = null;
+        }
+        if (!on || wait || !window.WizLoader) return;
+        wait = window.WizLoader.markup(true);
+        window.WizLoader.mount(wait, { lines: ASK_LINES });
+        wait.setAttribute('aria-hidden', 'true');
+        answer.before(wait);
+      };
       const show = (state, message = '', retry = true, focus = true) => {
         const inside = row.contains(document.activeElement);
         row.dataset.state = state;
-        form.hidden = state !== 'idle';
-        heading.hidden = body.hidden = state === 'idle';
+        const idle = state === 'idle';
+        label.hidden = input.hidden = go.hidden = !idle;
+        form.hidden = !idle && !(state === 'asking' && verifying);
+        heading.hidden = body.hidden = idle;
         heading.textContent = question;
         answer.textContent = message;
+        waiting(state === 'asking');
         buttons.Stop.hidden = state !== 'asking';
         buttons.Retry.hidden = state !== 'ended' || !retry;
         buttons.Edit.hidden = state !== 'ended';
-        actions.hidden = state === 'idle';
-        if (state !== 'idle') status.textContent = state === 'asking' ? 'Ask a Wiz is answering.' : message;
-        if (focus && inside) (state === 'idle' ? input : state === 'asking' ? buttons.Stop : retry ? buttons.Retry : buttons.Edit).focus();
+        actions.hidden = idle;
+        if (!idle) status.textContent = state === 'asking' ? 'Ask a Wiz is answering.' : message;
+        if (focus && inside) (idle ? input : state === 'asking' ? buttons.Stop : retry ? buttons.Retry : buttons.Edit).focus();
       };
       const finish = (paragraphs, links = []) => {
+        waiting(false);
         const done = el('div', 'faq-row faq-asked'), h = el(level, 'faq-q'), button = el('button'), a = el('div', 'faq-a');
         button.append(el('span', 'faq-ask-label', question));
         Object.assign(button, { type: 'button', id: `faq-ask-q${n}`, disabled: !faq.hasAttribute('data-ready') });
@@ -643,23 +679,27 @@ async function askAWiz() {
         const input = addRow();
         if (inside) input.focus({ preventScroll: true });
       };
-      let asking = false;
       const ask = async () => {
-        if (asking) return;
-        asking = true;
-        let token = '';
-        if (gate) {
-          if (!gate.has() && row.dataset.state !== 'idle') { show('idle'); input.value = question; }
-          token = await gate.token();
-          gate.used();
-        }
-        asking = false;
-        controller = new AbortController();
+        if (controller) return;
+        const current = controller = new AbortController();
+        inHuman = false;
+        verifying = !!gate;
         show('asking');
         let text = '', sources = null, end = null;
         try {
+          let token = '';
+          if (gate) {
+            token = await gate.token(current.signal);
+            verifying = false;
+            const keepFocus = form.contains(document.activeElement) || (inHuman && document.activeElement === document.body);
+            inHuman = false;
+            form.hidden = true;
+            if (keepFocus) buttons.Stop.focus();
+            if (current.signal.aborted) throw new Error('stopped');
+            gate.used();
+          }
           const response = await fetch('/api/ask', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(gate ? { 'CF-Turnstile-Response': token } : {}) },
-            body: JSON.stringify({ question }), cache: 'no-store', signal: controller.signal });
+            body: JSON.stringify({ question }), cache: 'no-store', signal: current.signal });
           if (!/^application\/x-ndjson\s*(;|$)/i.test(response.headers.get('content-type') || '')) throw new Error('not a stream');
           const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
           let buffer = '';
@@ -670,7 +710,7 @@ async function askAWiz() {
             for (let at; (at = buffer.indexOf('\n')) >= 0; buffer = buffer.slice(at + 1)) {
               if (end) throw new Error('data after the last event');
               const event = askEvent(buffer.slice(0, at), text, sources);
-              if (event.type === 'text') answer.textContent = text += event.text;
+              if (event.type === 'text') waiting(false), answer.textContent = text += event.text;
               else if (event.type === 'sources') sources = event.sources.map(s => s.title);
               else end = event;
             }
@@ -680,7 +720,8 @@ async function askAWiz() {
         } catch {
           end = null;
         }
-        controller.abort();
+        verifying = false;
+        current.abort();
         controller = null;
         if (end?.type === 'done') finish([[text], [`Sources: ${sources.join(', ')}`, 'faq-ask-sources']]);
         else if (end?.type === 'not_covered') finish([[end.text]], ASK_LINKS);

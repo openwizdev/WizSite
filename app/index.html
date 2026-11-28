@@ -15,10 +15,12 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <meta name="apple-mobile-web-app-title" content="OpenWiz">
   <link rel="stylesheet" href="/app/ember.css">
+  <link rel="stylesheet" href="/wiz-loader/wiz-loader.css">
   <link rel="stylesheet" href="/app/pages/queue.css">
   <link rel="stylesheet" href="/app/pages/canvas.css">
   <link rel="stylesheet" href="/app/cards/decision.css">
   <link rel="stylesheet" href="/app/cards/spec.css">
+  <script src="/wiz-loader/wiz-loader.js" defer></script>
   <script src="/app/data.js" defer></script>
   <script src="/app/records.js" defer></script>
   <script src="/app/ui.js" defer></script>
@@ -36,7 +38,7 @@
   <script src="/app/shell.js" defer></script>
 </head>
 <body>
-  <div id="app"><div class="center"><p>Opening OpenWiz…</p></div></div>
+  <div id="app"><div class="wiz-loader" data-wiz-loader role="status"><div class="wl-stage" aria-hidden="true"><div class="wl-slot"><svg class="wl-wiz" viewBox="90 20 420 450"><mask id="wl-face-boot"><rect width="512" height="512" fill="#fff"/><g fill="#000"><circle cx="219" cy="278" r="30"/><circle cx="291" cy="278" r="30"/><path d="M190 323Q190 312 202 312H310Q322 312 322 324V342Q322 354 310 354H202Q190 354 190 342Z"/></g></mask><g fill="#cfc6b8"><g mask="url(#wl-face-boot)"><path d="M132 234Q132 210 158 210H354Q380 210 380 236V293C380 322 368 345 348 358H164C144 344 132 322 132 293Z"/><path d="M148 325C151 362 164 390 186 410L207 391L228 438L247 405L264 461L283 405L304 438L325 391L346 410C368 388 379 358 380 325C351 346 324 353 294 353H220C192 353 167 345 148 325Z"/></g><circle cx="230" cy="273" r="8"/><circle cx="280" cy="284" r="8"/><path d="M220 313V353H228V313ZM252 313V353H260V313ZM284 313V353H292V313Z"/><g class="wl-hat"><path d="M154 222L228 81C249 40 281 25 313 30C357 36 385 73 384 111C383 139 367 154 350 145C336 138 342 110 323 96C307 84 288 91 278 106L328 222Z"/><path d="M96 210Q96 190 117 190H395Q416 190 416 210V228Q416 246 397 246H115Q96 246 96 228Z"/></g></g><g class="wl-wand"><path d="M384 352L462 250" stroke="#aaa194" stroke-width="9" stroke-linecap="round"/><path class="wl-star" fill="#e8b46a" d="M470 213L476 231L496 232L480 243L486 262L470 251L454 262L460 243L444 232L464 231Z"/></g></svg></div><div class="wl-shower"><i></i><i></i></div></div><p class="wiz-loader-line">Opening OpenWiz</p></div></div>
   <noscript><div class="center"><p>OpenWiz needs JavaScript to read your repository from GitHub.</p></div></noscript>
 </body>
 </html>
