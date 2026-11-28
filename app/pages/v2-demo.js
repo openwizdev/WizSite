@@ -7,10 +7,9 @@
   const state = {
     workspace: 'Harbor',
     branch: 'main',
-    feedIndex: 0,
     showCompleted: false,
     toast: null,
-    changeTarget: null,
+    draft: '',
     messages: [
       {
         id: 'm1',
@@ -22,36 +21,35 @@
         id: 'm2',
         role: 'wiz',
         time: '9:12 AM',
-        text: 'Got it. Before I draft the spec and start builds, three quick calls — each has a recommendation you can accept in one tap.',
+        text: 'Three quick choices before I draft the spec.',
       },
       {
         id: 'g1',
         role: 'grill',
-        round: 1,
         specTitle: 'Usage-based seat billing',
         specGoal: 'Charge for active editors with monthly true-up, free viewers, and a 7-day renewal grace window.',
         answered: false,
         questions: [
           {
             id: 'Q1',
-            prompt: 'Charge for new seats right away, or true-up at month end?',
+            prompt: 'When should new seats be charged?',
             rec: 0,
             selected: 0,
-            options: ['True-up at month end', 'Charge immediately'],
+            options: ['At month end', 'Immediately'],
           },
           {
             id: 'Q2',
-            prompt: 'Do read-only viewers count toward paid seats?',
+            prompt: 'Should viewers pay?',
             rec: 0,
             selected: 0,
             options: ['Keep viewers free', 'Count all members'],
           },
           {
             id: 'Q3',
-            prompt: 'How long should a failed renewal wait before locking edits?',
+            prompt: 'When should edits lock after a missed payment?',
             rec: 0,
             selected: 0,
-            options: ['7-day grace banner', 'Lock after 48 hours'],
+            options: ['Give 7 days', 'After 48 hours'],
           },
         ],
       },
@@ -61,19 +59,17 @@
         id: 'c-spec-1',
         type: 'spec',
         status: 'ready',
-        kicker: 'Spec · Ready to ship',
+        kicker: 'Ready to ship',
         title: 'Magic-link sign-in',
-        goal: 'Passwordless sign-in with 15-minute links and automatic session refresh.',
+        goal: 'Sign in without a password using a 15-minute email link.',
         merged: 6,
         total: 6,
         art: 'art-boat',
         scenes: [
-          '0:02 · Enter email — single field, no password wall',
-          '0:05 · One-tap link verified — session cookie rotated',
-          '0:08 · All 6 tickets merged · checks green',
+          '0:02 · Enter your email to get a sign-in link',
+          '0:05 · Open the link to sign in',
+          '0:08 · All six tickets merged and checks passed',
         ],
-        sceneIdx: 0,
-        paused: false,
         note: '',
       },
       {
@@ -103,8 +99,6 @@
           '0:05 · Streams rows without memory spikes',
           '0:08 · 2 tickets left: signed download and rate limit',
         ],
-        sceneIdx: 0,
-        paused: false,
         note: '',
       },
       {
@@ -122,22 +116,14 @@
     ],
     settings: {
       hosts: [
-        { id: 'mac-mini', name: 'Home Mac Mini', detail: 'Primary · Online · 14 ms', enabled: true },
-        { id: 'cloud-burst', name: 'Cloud burst', detail: 'Auto-scale when more than 3 specs run', enabled: true },
+        { name: 'Home computer', enabled: true },
+        { name: 'Cloud backup', enabled: false },
       ],
       effort: 'balanced',
-      models: [
-        { role: 'Orchestrator', value: 'Claude Opus 4.5', choices: ['Claude Opus 4.5', 'Claude Sonnet 4.5', 'GPT-5.2'] },
-        { role: 'Builder', value: 'Codex 5.2', choices: ['Codex 5.2', 'Claude Sonnet 4.5', 'DeepSeek R2'] },
-        { role: 'Reviewer', value: 'Claude Opus 4.5', choices: ['Claude Opus 4.5', 'GPT-5.2', 'Claude Sonnet 4.5'] },
-        { role: 'Narrator', value: 'Claude Sonnet 4.5', choices: ['Claude Sonnet 4.5', 'GPT-5 Mini'] },
-      ],
       connections: [
-        { id: 'github', name: 'GitHub', detail: 'Repository and pull requests', connected: true },
-        { id: 'anthropic', name: 'Anthropic', detail: 'Orchestrator and reviewer', connected: true },
-        { id: 'openai', name: 'OpenAI', detail: 'Builder fleet', connected: true },
-        { id: 'tunnel', name: 'Cloudflare Tunnel', detail: 'Private home chat link', connected: true },
-        { id: 'linear', name: 'Linear', detail: 'Optional issue mirror', connected: false },
+        { name: 'GitHub', connected: true },
+        { name: 'Model provider', connected: true },
+        { name: 'Issue tracker', connected: false },
       ],
       dailyCap: 25,
       monthlyCap: 400,
@@ -194,17 +180,14 @@
       total: 5,
       art: 'art-boat',
       scenes: [
-        '0:02 · Spec drafted from your 3 grill answers',
+        '0:02 · Spec drafted from your three answers',
         '0:05 · Ticket 1 of 5 merged — data model ready',
         '0:08 · Building checkout and grace banner next',
       ],
-      sceneIdx: 0,
-      paused: false,
       note: '',
     });
-    state.feedIndex = 0;
     state.showCompleted = false;
-    toast(`Grill answered · "${grill.specTitle}" added to Feed`);
+    toast(`Answers sent · "${grill.specTitle}" added to Feed`);
   }
 
   function sendChat(text) {
@@ -212,11 +195,9 @@
     if (!trimmed) return;
     state.messages.push({ id: `u-${Date.now()}`, role: 'user', time: 'Just now', text: trimmed });
     const shortTitle = trimmed.length > 42 ? `${trimmed.slice(0, 42).replace(/\s+\S*$/, '')}…` : trimmed;
-    const round = state.messages.filter(m => m.role === 'grill').length + 1;
     state.messages.push({
       id: `g-${Date.now() + 1}`,
       role: 'grill',
-      round,
       specTitle: shortTitle,
       specGoal: trimmed,
       answered: false,
@@ -238,16 +219,9 @@
   function cardAction(cardId, action) {
     const card = state.cards.find(c => c.id === cardId);
     if (!card) return;
-    if (action === 'change') {
-      state.changeTarget = card.id;
-      notify();
-      return;
-    }
     const prev = card.status;
     if (action === 'ship') {
       card.status = card.type === 'decision' ? 'decided' : 'shipped';
-      const list = visibleCards();
-      state.feedIndex = Math.min(state.feedIndex, Math.max(0, list.length - 1));
       toast(card.type === 'decision' ? `Accepted · ${card.rec}` : `Shipped · ${card.title}`, () => {
         card.status = prev;
         notify();
@@ -256,8 +230,6 @@
     }
     if (action === 'notnow') {
       card.status = 'snoozed';
-      const list = visibleCards();
-      state.feedIndex = Math.min(state.feedIndex, Math.max(0, list.length - 1));
       toast(`Snoozed · ${card.title}`, () => {
         card.status = prev;
         notify();
@@ -270,27 +242,7 @@
     const trimmed = String(note || '').trim();
     if (!card || !trimmed) return;
     card.note = trimmed;
-    state.changeTarget = null;
     toast(`Change sent · ${card.title}`);
-  }
-
-  function closeChange() {
-    state.changeTarget = null;
-    notify();
-  }
-
-  function toggleScene(cardId) {
-    const card = state.cards.find(c => c.id === cardId);
-    if (!card || card.type !== 'spec') return;
-    card.paused = !card.paused;
-    notify();
-  }
-
-  function stepScene(cardId) {
-    const card = state.cards.find(c => c.id === cardId);
-    if (!card || card.type !== 'spec') return;
-    card.sceneIdx = (card.sceneIdx + 1) % card.scenes.length;
-    notify();
   }
 
   function openQuestionsCount() {
@@ -313,9 +265,6 @@
     visibleCards,
     cardAction,
     submitChange,
-    closeChange,
-    toggleScene,
-    stepScene,
     openQuestionsCount,
     pendingFeedCount,
   };

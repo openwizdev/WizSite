@@ -124,7 +124,9 @@ APP_FOUND = {(folder, ext): tuple(sorted(p.relative_to(ROOT).as_posix() for p in
 APP_PARTS = APP_FOUND['app/pages', 'js'] + APP_FOUND['app/cards', 'js']
 APP_PART_STYLES = APP_FOUND['app/pages', 'css'] + APP_FOUND['app/cards', 'css']
 APP_LEGACY_ORDER = ('app/pages/you.js', 'app/pages/specs.js', 'app/pages/spec.js', 'app/pages/agents.js')
-APP_NEEDED = set(APP_FOUND['app/pages', 'js'] + APP_FOUND['app/pages', 'css'])
+APP_V2_STYLE = 'app/pages/v2.css'
+APP_V2_PARTS = tuple(f'app/pages/{name}.js' for name in ('v2-demo', 'chat', 'feed', 'settings'))
+APP_NEEDED = set(APP_FOUND['app/pages', 'js'] + APP_FOUND['app/pages', 'css']) - {APP_V2_STYLE, *APP_V2_PARTS}
 APP_SCRIPTS = ('app/data.js', 'app/records.js', 'app/ui.js') + APP_PARTS + ('app/palette.js', 'app/shell.js')
 APP_VENDOR = {'app/vendor/dagre-3.1.3.min.js': ('node_modules/@dagrejs/dagre/dist/dagre.min.js', 'app/pages/spec.js'),
               'app/vendor/dagre-LICENSE.txt': ('node_modules/@dagrejs/dagre/LICENSE', None)}
@@ -1666,7 +1668,13 @@ def check_releases(section, releases, live):
 
 
 def check_app(root, names, pages):
-    page = Page((root / APP_PAGE).read_text())
+    html = (root / APP_PAGE).read_text()
+    deferred = re.findall(r'<template id="v2-assets">(.*?)</template>', html, re.S)
+    assert len(deferred) == 1, 'the app needs one inert v2 asset template'
+    assets = Page(deferred[0])
+    assert assets.stylesheets == [f'/{names[APP_V2_STYLE]}'] and assets.scripts == [f'/{names[name]}' for name in APP_V2_PARTS] \
+        and not assets.inline_scripts and len(assets.refs) == 1 + len(APP_V2_PARTS), 'the v2 template must hold only fingerprinted v2 assets'
+    page = Page(html.replace(deferred[0], '', 1))
     assert not page.books, 'a booking link outside the team page: the app'
     assert not page.x_links, 'one X link per page, the footer\'s: the app has one'
     assert not page.report_links, 'Report a problem link, the footer\'s: the app has one'
@@ -1674,11 +1682,11 @@ def check_app(root, names, pages):
     styles = {f'/{names[name]}': name for name in APP_PART_STYLES}
     applied = [styles.get(ref, ref) for ref in page.stylesheets[1:]]
     assert page.stylesheets[:1] == [f'/{names[APP_STYLE]}'] and len(set(applied)) == len(applied) \
-        and set(applied) <= set(APP_PART_STYLES) and APP_NEEDED & set(APP_PART_STYLES) <= set(applied), \
+        and set(applied) <= set(APP_PART_STYLES) - {APP_V2_STYLE} and APP_NEEDED & set(APP_PART_STYLES) <= set(applied), \
         'the app must apply exactly the fingerprinted ember.css, then each of its pages\' styles once (and a card\'s at most once)'
     parts = {f'/{names[name]}': name for name in APP_PARTS}
     shown = [parts[ref] for ref in page.scripts if ref in parts]
-    assert len(set(shown)) == len(shown) and APP_NEEDED & set(APP_PARTS) <= set(shown), \
+    assert len(set(shown)) == len(shown) and not set(shown) & set(APP_V2_PARTS) and APP_NEEDED & set(APP_PARTS) <= set(shown), \
         'the app must load each of its pages\' scripts once (and a card\'s at most once)'
     assert [name for name in shown if name in APP_LEGACY_ORDER] == list(APP_LEGACY_ORDER), \
         'the app must load You, Specs, Spec and Agents in that order: it sets the v1 pages\' order and default route'
@@ -1686,7 +1694,7 @@ def check_app(root, names, pages):
     assert page.scripts == [ref for name in ordered for ref in [f'/{v}' for v, (_, before) in APP_VENDOR.items() if before == name] + [f'/{names[name]}']], \
         'the app must load its fingerprinted scripts (and each pinned file before its user) in order'
     assert not page.inline_scripts, 'the app allows no inline script'
-    for ref in page.refs:
+    for ref in page.refs + assets.refs:
         check_ref(root, root / APP_PAGE, ref, pages, page.favicons)
     assert '/app/manifest.webmanifest' in page.refs, 'the app must link its manifest'
     manifest = json.loads((root / 'app/manifest.webmanifest').read_text())

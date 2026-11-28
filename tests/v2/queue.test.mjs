@@ -60,7 +60,7 @@ const wasChecked = (world, id) => world.log.some(r => r.method === 'GET' && r.pa
 const latestOf = (run, key) => run.page.run(`window.drawn.filter(item => item.key === ${JSON.stringify(key)}).pop() ?? null`);
 async function refreshed(run) {
   const was = await run.page.run('OW.data.feeds.specs.readAt');
-  await run.page.run('OW.data.refreshAll()');
+  await run.page.click('Refresh now');
   await run.page.until(`OW.data.feeds.specs.readAt !== ${was}`, 'the refreshed Specs read');
   await new Promise(resolve => setTimeout(resolve, 700));
 }
@@ -99,7 +99,7 @@ test('switch on: decisions and specs show in one ordered queue, drawn through th
     assert.deepEqual(tags.subject, { kind: 'issue', number: 61 });
     assert.equal(notes.video, null);
     assert.deepEqual(notes.graph, { tickets: [], unknown: 0 });
-    const text = await run.page.text();
+    const text = await run.page.run("document.querySelector('.queue').textContent");
     assert.ok(text.indexOf('Decision card decision:acme/factory#60:9100021') < text.indexOf('Spec card spec:acme/factory#61'), text);
     assert.ok(!text.includes('#62'), 'a spec with every ticket done is not in the queue');
     assert.deepEqual(run.world.writes(), [], 'the queue wrote something');
@@ -119,9 +119,14 @@ test('switch on without card modules: plain cards link to GitHub, in the same or
     assert.deepEqual(links, [['https://github.com/acme/factory/issues/60#issuecomment-9100021', '_blank'],
       ['https://github.com/acme/factory/pull/7#issuecomment-9100003', '_blank'], ['https://github.com/acme/factory/pull/7#issuecomment-9100005', '_blank'],
       ['https://github.com/acme/factory/issues/61', '_blank'], ['https://github.com/acme/factory/issues/60', '_blank']]);
+    assert.equal(await run.page.run("document.querySelectorAll('.queue-item:not([hidden])').length"), 1);
+    assert.match(await run.page.text(), /Spec to confirm · #60/);
+    await run.page.run(`document.querySelector('button[aria-label="Next card"]').click()`);
+    await run.page.until(`document.body.innerText.includes('Questions to answer · #7')`, 'second card in Feed');
+    await run.page.go(`${SITE}/app/#/queue`);
+    await run.page.until(`document.querySelector('main h1')?.textContent === 'Queue'`, 'the full Queue');
     const text = await run.page.text();
-    assert.match(text, /Spec to confirm · #60/);
-    assert.match(text, /Grill round to answer · #7/);
+    assert.match(text, /Questions to answer · #7/);
     assert.match(text, /couldn't be read/);
     assert.match(text, /Spec to watch · #61/);
     assert.deepEqual(run.world.violations, []);
@@ -140,6 +145,9 @@ test('a partial read shows a gap, never the empty line', async () => {
     const text = await run.page.text();
     assert.match(text, /This list may be missing items: GitHub gave only part of the open pull requests\./);
     assert.ok(!text.includes(EMPTY), 'a partial read said the queue is empty');
+    await run.page.run(`window.__unknownNote = document.querySelector('.v2-real-queue > .unknown'); OW.queue.render(document.querySelector('.v2-real-queue'), OW.data.feeds);`);
+    assert.equal(await run.page.run(`document.querySelector('.v2-real-queue > .unknown') === window.__unknownNote`), true,
+      'an unchanged unknown banner was recreated on redraw');
   } finally {
     await run.close();
   }
@@ -187,7 +195,7 @@ test('switch on: the signed-out copy no longer says read-only, and the queue lea
     await run.page.until(`document.readyState === 'complete'`, 'the app page');
     await run.page.run(`localStorage.setItem('openwiz.app.v2', '"on"')`);
     await run.page.go(`${SITE}/app/`);
-    await run.page.until(`document.body.innerText.includes('Sign in with GitHub')`, 'the signed-out screen');
+    await run.page.until(`document.body.innerText.includes('Continue with GitHub')`, 'the signed-out screen');
     const text = await run.page.text();
     assert.ok(!/read-only/i.test(text), text);
     await signIn(run.page);
@@ -209,10 +217,11 @@ test('a failed refresh never keeps an earlier true: the item turns unchecked and
     await run.page.until(`window.drawn.some(item => item.key === 'decision:acme/factory#7:9100003' && item.current === true)`, 'the first, matched read');
     assert.ok(!(await run.page.text()).includes('may be missing'));
     run.world.record(failed.refreshes[1].github);
-    await run.page.run('OW.data.refreshAll()');
+    await run.page.tap('Refresh now');
     await run.page.until(`window.drawn.some(item => item.key === 'decision:acme/factory#7:9100003' && item.current === null)`, 'the refreshed, unchecked item');
     const last = (await run.page.run('window.drawn')).filter(item => item.key === 'decision:acme/factory#7:9100003').pop();
     assert.deepEqual(last, failed.refreshes[1].items[0]);
+    assert.equal(await run.page.run('document.activeElement.textContent'), 'Refresh now');
     assert.match(await run.page.text(), /This list may be missing items: GitHub gave only part of #7's source check\./);
   } finally {
     await run.close();
@@ -273,7 +282,7 @@ test('R2: a failed Specs refresh clears every earlier true and shows the gap', a
     await run.page.until(`window.drawn.some(item => item.key === ${JSON.stringify(SPEC_DECISION)} && item.current === true)`
       + ` && window.drawn.some(item => item.key === ${JSON.stringify(ROUND)} && item.current === true)`, 'the first, matched read');
     run.world.graphql.Specs = async () => ({ status: 502, json: { message: 'Bad Gateway' } });
-    await run.page.run('OW.data.refreshAll()');
+    await run.page.click('Refresh now');
     await run.page.until(`document.body.innerText.includes("Couldn't read Specs")`, 'the failed refresh');
     await new Promise(resolve => setTimeout(resolve, 700));
     const shown = await run.page.run(`[...document.querySelectorAll('.queue-item')].map(el => el.dataset.key)`);
@@ -369,6 +378,7 @@ test('R5: a successful recheck of the same decision keeps the typed draft, and t
     await refreshed(run);
     const draft = await run.page.run(`document.querySelector('article.decision[data-key="${SPEC_DECISION}"] textarea').value`);
     assert.equal(draft, 'Keep it, but later', 'a recheck erased the draft');
+    assert.equal(await run.page.run('document.activeElement.value'), 'Keep it, but later', 'a recheck moved keyboard focus');
     await run.page.run(`(() => { const card = document.querySelector('article.decision[data-key="${SPEC_DECISION}"]');
       [...card.querySelectorAll('button')].find(b => b.textContent === 'Preview reply').scrollIntoView({ block: 'center' }); })()`);
     await run.page.tap('Preview reply');

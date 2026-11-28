@@ -26,14 +26,15 @@
     drop(key) { localStorage.removeItem(key); },
   };
   const auth = {
-    get: () => store.get(AUTH_KEY),
-    session: () => store.get(AUTH_KEY)?.session ?? null,
-    signedIn: () => Boolean(store.get(AUTH_KEY)?.token),
+    get: () => demo() ? null : store.get(AUTH_KEY),
+    session: () => auth.get()?.session ?? null,
+    signedIn: () => Boolean(auth.get()?.token),
     account() {
-      const kept = store.get(AUTH_KEY);
+      const kept = auth.get();
       return kept?.token && positive(kept.account) ? kept.account : null;
     },
     keep(grant, session) {
+      if (demo()) return;
       const now = Date.now();
       const prior = store.get(AUTH_KEY);
       store.set(AUTH_KEY, {
@@ -46,6 +47,7 @@
       });
     },
     signOut() {
+      if (demo()) return;
       store.drop(AUTH_KEY);
       store.drop(REPO_KEY);
       listed.clear();
@@ -56,31 +58,27 @@
   };
   const listed = new Map();
   const repo = {
-    get: () => store.get(REPO_KEY),
+    get: () => demo() ? null : store.get(REPO_KEY),
     pick(full) {
+      if (demo()) return;
       const [owner, name] = full.split('/');
       store.set(REPO_KEY, { owner, name, full, ...(listed.has(full) ? { private: listed.get(full) } : {}) });
     },
-    forget: () => store.drop(REPO_KEY),
+    forget: () => { if (!demo()) store.drop(REPO_KEY); },
   };
-  const v2 = {
-    get() {
-      const value = store.get(V2_KEY);
-      return value === 'on' || value === 'dry-run' ? value : 'off';
-    },
-  };
-  let demoFlag = false;
-  {
-    const params = new URLSearchParams(location.search);
-    if (params.has('v2')) {
-      if (V2_VALUES.includes(params.get('v2'))) store.set(V2_KEY, params.get('v2'));
-      params.delete('v2');
-      const rest = params.toString();
-      history.replaceState(null, '', `${location.pathname}${rest ? `?${rest}` : ''}${location.hash}`);
-    }
-    demoFlag = params.get('demo') === '1';
+  const params = new URLSearchParams(location.search);
+  const queryMode = params.get('v2');
+  const mode = value => V2_VALUES.includes(value) ? value : 'off';
+  const initialMode = V2_VALUES.includes(queryMode) ? queryMode : mode(store.get(V2_KEY));
+  const sample = params.get('demo') === '1' && initialMode !== 'off';
+  const demo = () => sample;
+  const v2 = { get: () => sample ? initialMode : mode(store.get(V2_KEY)) };
+  if (!sample && params.has('v2')) {
+    if (V2_VALUES.includes(queryMode)) store.set(V2_KEY, queryMode);
+    params.delete('v2');
+    const rest = params.toString();
+    history.replaceState(null, '', `${location.pathname}${rest ? `?${rest}` : ''}${location.hash}`);
   }
-  const demo = () => v2.get() !== 'off' && demoFlag;
 
 
   class Refused extends Error {}
@@ -151,6 +149,7 @@
   class SignedOut extends Error {}
 
   async function github(method, path, body) {
+    if (demo()) throw new Refused('demo mode makes no network requests');
     const session = auth.session();
     if (!session) throw new Ended();
     const still = () => { if (auth.session() !== session) throw new Ended(); };
@@ -493,6 +492,7 @@
   }
 
   async function read(name) {
+    if (demo()) return;
     const feed = feeds[name];
     const picked = repo.get();
     if (!picked || feed.busy || paused()) return;
@@ -572,6 +572,7 @@
     }, feed.every);
   }
   function start() {
+    if (demo()) return;
     for (const name of Object.keys(feeds)) {
       read(name);
       schedule(name);
@@ -585,7 +586,7 @@
     }
   }
   function refreshAll() {
-    if (paused()) return;
+    if (demo() || paused()) return;
     feeds.agents.forceFull = true;
     for (const name of Object.keys(feeds)) {
       read(name);
@@ -593,7 +594,7 @@
     }
   }
   document.addEventListener('visibilitychange', () => {
-    if (document.hidden || !repo.get() || !auth.signedIn()) return;
+    if (demo() || document.hidden || !repo.get() || !auth.signedIn()) return;
     for (const [name, feed] of Object.entries(feeds)) {
       if (!feed.readAt || Date.now() - feed.readAt >= feed.every) read(name);
     }
@@ -601,6 +602,7 @@
 
   let resolving = null;
   function resolveAccount() {
+    if (demo()) return Promise.resolve();
     const kept = auth.get();
     if (!kept?.token || positive(kept.account) || v2.get() === 'off') return Promise.resolve();
     if (resolving?.session !== kept.session) {
@@ -627,6 +629,7 @@
       && picked?.name === pin.name && picked?.full === pin.full && (!write || v2.get() === 'on');
   }
   async function pinned(pin, method, path, body, write) {
+    if (demo()) throw new Refused('demo mode makes no network requests');
     if (!pinOk(pin, write)) throw new Refused('an unreadable operation context');
     const url = path === '/graphql' ? `${API}/graphql` : `${API}/repos/${pin.owner}/${pin.name}${path}`;
     let parsed;
