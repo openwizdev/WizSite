@@ -102,7 +102,7 @@
     const back = h('p', {}, h('a', { href: '#/specs', 'aria-keyshortcuts': 'Escape', 'data-focus': 'back' }, '← All specs',
       css(h('span', { 'aria-hidden': 'true' }, ' · Esc'), { color: 'var(--em-muted)', 'font-size': '14px' })));
     const seen = OW.factory.model(feeds);
-    if (!seen) return el.replaceChildren(back, OW.ui.placeholder('Reading GitHub…'));
+    if (!seen) return OW.ui.fill(el, back, OW.ui.placeholder('Reading GitHub…'));
     const spec = seen.specs.find(s => String(s.number) === arg);
     if (!spec) {
       el.replaceChildren(back, OW.ui.unknown(`Spec #${arg} isn't among the open specs (labelled spec) that GitHub gave this read.`));

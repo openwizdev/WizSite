@@ -27,6 +27,19 @@ export const tag = release => `v${release.semver}`;
 export const anchor = release => `v${release.name.replaceAll('.', '-')}`;
 export const day = iso => { const [y, m, d] = String(iso).split('-').map(Number); return `${MONTHS[m - 1]} ${d}, ${y}`; };
 
+export async function readShip(file = new URL('release.json', ROOT)) {
+  const refuse = why => { throw new Error(`release.json: ${why}`); };
+  let data;
+  try { data = JSON.parse(await readFile(file, 'utf8')); } catch (error) { refuse(`not readable as JSON: ${error.message}`); }
+  if (!data || Array.isArray(data) || typeof data !== 'object') refuse('one object');
+  const { changelog: held = {} } = data;
+  if (!held || Array.isArray(held) || typeof held !== 'object') refuse('changelog maps a semver to on or off');
+  for (const [semver, state] of Object.entries(held)) {
+    if (!/^\d+\.\d+\.\d+$/.test(semver) || !['on', 'off'].includes(state)) refuse(`changelog maps a semver to on or off, not ${semver}: ${JSON.stringify(state)}`);
+  }
+  return held;
+}
+
 function checkStats(key, stats, release) {
   const where = `changelog stats ${key}`;
   if (!release) throw new Error(`${where}: no release data file has this tag`);
@@ -54,14 +67,37 @@ export async function readStats(file = STATS_FILE) {
   }
 }
 
-export async function readReleases(dir = RELEASE_DIR, statsFile = String(dir) === String(RELEASE_DIR) ? STATS_FILE : null) {
+export async function readReleases(dir = RELEASE_DIR, statsFile = String(dir) === String(RELEASE_DIR) ? STATS_FILE : null, ship) {
+  ship ??= await readShip();
   const names = (await readdir(dir)).filter(name => name.endsWith('.json')).sort();
   const list = await Promise.all(names.map(async name => JSON.parse(await readFile(new URL(name, dir), 'utf8'))));
   const stats = await readStats(statsFile);
   if (!stats || typeof stats !== 'object' || Array.isArray(stats)) throw new Error('changelog stats: one object, keyed by release tag');
   const byTag = new Map(list.map(release => [tag(release), release]));
   for (const [key, value] of Object.entries(stats)) checkStats(key, value, byTag.get(key));
-  return list.map(release => ({ ...release, stats: stats[tag(release)] || {} })).sort(newer);
+  return list.filter(release => ship[release.semver] !== 'off').map(release => ({ ...release, stats: stats[tag(release)] || {} })).sort(newer);
+}
+
+const plain = text => text.replace(/\[([^\]]*)\]\([^)]*\)/g, '$1').replaceAll('`', '').trim();
+
+export function fromNotes(notes, semver, name) {
+  const parts = notes.split(/^## /m).filter(part => part.startsWith(`${semver} · `));
+  if (parts.length !== 1) throw new Error(`the release notes need exactly one "## ${semver} · <date>" section`);
+  const [heading, ...lines] = parts[0].split('\n');
+  const areas = [];
+  let headline, link;
+  for (const line of lines) {
+    const bold = /^\*\*(.+)\*\*$/.exec(line);
+    if (bold && headline === undefined) headline = plain(bold[1]).replace(new RegExp(`^\\S+ ${name.replace('.', '\\.')}: `), '');
+    else if (bold) areas.push({ name: plain(bold[1]), bullets: [] });
+    else if (line.startsWith('- ') && areas.length) areas.at(-1).bullets.push(plain(line.slice(2)));
+    else if (line.startsWith('- ')) throw new Error(`a line before the first area: ${line}`);
+    else link = /^\[Full release on GitHub\]\((\S+)\)$/.exec(line)?.[1] ?? link;
+  }
+  if (!headline || !link) throw new Error(`the ${semver} notes need a bold headline and a "Full release on GitHub" link`);
+  headline = headline[0].toUpperCase() + headline.slice(1) + (/[.!?]$/.test(headline) ? '' : '.');
+  const text = JSON.stringify({ name, semver, date: heading.slice(semver.length + 3).trim(), headline, areas: areas.filter(area => area.bullets.length), notes: link }, null, 2);
+  return text.replace(/\{\n {6}("name": .*,)\n {6}("bullets": \[)/g, '{$1 $2').replace(/\n {6}\]\n {4}\}/g, '\n    ]}').replace(/^ {8}"/gm, '      "') + '\n';
 }
 
 export function installSwitch(landing) {
@@ -79,18 +115,27 @@ export function facts(stats = {}) {
   return parts.join(' \u00b7 ');
 }
 
-export const picked = release => Number.isInteger(release.stats?.changes) && release.stats.changes > release.bullets.length
-  ? `Top ${release.bullets.length} of ${count(release.stats.changes)} changes` : '';
+const slug = text => text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+const list = bullets => `<ul>${bullets.map(b => `<li>${esc(b)}</li>`).join('')}</ul>`;
+
+export function picked(release) {
+  const shown = release.areas ? release.areas.reduce((total, area) => total + area.bullets.length, 0) : release.bullets.length;
+  const changes = release.stats?.changes;
+  return Number.isInteger(changes) && changes > shown ? `Top ${shown} of ${count(changes)} changes` : '';
+}
 
 const entry = release => {
   const id = anchor(release);
   const row = facts(release.stats);
   const top = picked(release);
+  const lines = release.areas
+    ? release.areas.map(area => `<h3 id="${id}-${slug(area.name)}">${esc(area.name)}</h3>${list(area.bullets)}`).join('')
+    : list(release.bullets);
   return `<article class="release" aria-labelledby="${id}"><h2 id="${id}">${esc(release.name)} <small>· <time datetime="${esc(release.date)}">${day(release.date)}</time> (${esc(release.semver)})</small></h2>`
     + (row ? `<p class="facts">${esc(row)}</p>` : '')
     + `<p class="headline">${esc(release.headline)}</p>`
     + (top ? `<p class="picked">${esc(top)}</p>` : '')
-    + `<ul>${release.bullets.map(b => `<li>${esc(b)}</li>`).join('')}</ul>`
+    + lines
     + (release.stats?.security > 0 ? '<p class="security">Also includes security fixes.</p>' : '')
     + `<p class="notes"><a href="${esc(release.notes)}" data-count="github">Full release on GitHub</a></p></article>`;
 };
@@ -178,20 +223,26 @@ async function refreshStats(file = STATS_FILE) {
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const args = process.argv.slice(2);
-  let dir, statsFile, sw, page, refresh = false;
+  let dir, statsFile, sw, page, ship, notes, semver, name, refresh = false;
   while (args.length) {
     const arg = args.shift();
     if (arg === '--releases') dir = pathToFileURL(args.shift().replace(/\/?$/, '/'));
     else if (arg === '--stats') statsFile = pathToFileURL(args.shift());
     else if (arg === '--switch') sw = args.shift();
+    else if (arg === '--ship') ship = pathToFileURL(args.shift());
+    else if (arg === '--from-notes') notes = args.shift();
+    else if (arg === '--version') semver = args.shift();
+    else if (arg === '--name') name = args.shift();
     else if (arg === '--refresh-stats') refresh = true;
     else page = arg;
   }
-  if (refresh) {
+  if (notes) {
+    process.stdout.write(fromNotes(await readFile(notes, 'utf8'), semver, name));
+  } else if (refresh) {
     await refreshStats(statsFile);
   } else {
     sw ??= installSwitch(await readFile(new URL('index.html', ROOT), 'utf8'));
-    const section = render(await readReleases(dir || RELEASE_DIR, statsFile), sw === 'live');
+    const section = render(await readReleases(dir || RELEASE_DIR, statsFile, await readShip(ship)), sw === 'live');
     process.stdout.write(page ? withReleases(await readFile(page, 'utf8'), section) : section);
   }
 }

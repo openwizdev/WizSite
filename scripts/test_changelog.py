@@ -1,18 +1,34 @@
 from html.parser import HTMLParser
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+import functools
 import json
 import os
 import re
 import shutil
 import subprocess
 import tempfile
+import threading
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 TWO = ROOT / 'scripts/changelog-fixtures/two'
 TWO_STATS = ROOT / 'scripts/changelog-fixtures/two-stats.json'
+SHIP = ROOT / 'scripts/changelog-fixtures/ship'
+ON = ROOT / 'scripts/changelog-fixtures/ship-on.json'
+OFF = ROOT / 'scripts/changelog-fixtures/ship-off.json'
+NOTES = ROOT / 'scripts/changelog-fixtures/notes-0.2.0.md'
 PRE = 'https://github.com/openwizdev/OpenWiz/releases'
 NODE = shutil.which('node')
+FRAME = ('<!doctype html><body style="margin:0"><iframe src="/changelog/" width="%d" height="%d" style="border:0"></iframe>'
+         '<script>document.querySelector("iframe").onload = e => { document.body.dataset.measure = e.target.contentDocument.body.dataset.measure; };</script>')
+CHROME = next((p for p in (os.environ.get('CHROME'), '/usr/bin/google-chrome', '/usr/bin/google-chrome-stable', '/usr/bin/chromium',
+                           '/usr/bin/chromium-browser') if p and Path(p).exists()), None)
+MEASURE = ('<script>const r = [...document.querySelectorAll(".release *, .releases .pre")].map(e => e.getBoundingClientRect());'
+           'const li = [...document.querySelectorAll(".release li")].map(e => parseFloat(getComputedStyle(e).fontSize));'
+           'document.body.dataset.measure = JSON.stringify({inner: innerWidth, scroll: document.documentElement.scrollWidth,'
+           ' right: Math.max(...r.map(b => b.right)), left: Math.min(...r.map(b => b.left)), lines: li.length, font: Math.min(...li),'
+           ' areas: document.querySelectorAll(".release h3").length});</script>')
 
 
 def generate(*args, env=None):
@@ -48,7 +64,9 @@ class Entries(HTMLParser):
         self.tags.append(tag)
         if tag == 'article':
             self.entries.append({'labelledby': attrs.get('aria-labelledby'), 'id': None, 'h2': '', 'small': '', 'datetime': None,
-                                 'order': [], 'bullets': [], 'links': [], **{part: None for part in self.PARTS}})
+                                 'order': [], 'bullets': [], 'areas': [], 'links': [], **{part: None for part in self.PARTS}})
+        elif tag == 'h3':
+            self.entries[-1]['areas'].append({'name': '', 'bullets': []})
         elif tag == 'p' and 'pre' in classes:
             self.pre = {'text': '', 'links': []}
         if tag == 'h2':
@@ -58,16 +76,20 @@ class Entries(HTMLParser):
         if tag == 'a':
             (self.pre or self.entries[-1])['links'].append(attrs['href'])
         if tag == 'li':
-            self.entries[-1]['bullets'].append('')
+            self.lines().append('')
         part = next((p for p in self.PARTS if p in classes), None) if tag == 'p' and self.pre is None else None
         if part:
             self.entries[-1][part] = ''
         if self.entries and self.pre is None and tag in ('h2', 'p', 'ul'):
             self.entries[-1]['order'].append(part or tag)
-        self.at = {'h2': 'h2', 'small': 'small', 'li': 'li'}.get(tag) or part or self.at
+        self.at = {'h2': 'h2', 'h3': 'h3', 'small': 'small', 'li': 'li'}.get(tag) or part or self.at
+
+    def lines(self):
+        entry = self.entries[-1]
+        return entry['areas'][-1]['bullets'] if entry['areas'] else entry['bullets']
 
     def handle_endtag(self, tag):
-        if tag in ('h2', 'small', 'p', 'li'):
+        if tag in ('h2', 'h3', 'small', 'p', 'li'):
             self.at = 'h2' if tag == 'small' else None
 
     def handle_data(self, data):
@@ -75,7 +97,9 @@ class Entries(HTMLParser):
         if self.pre is not None:
             self.pre['text'] += data
         elif self.at == 'li':
-            self.entries[-1]['bullets'][-1] += data
+            self.lines()[-1] += data
+        elif self.at == 'h3':
+            self.entries[-1]['areas'][-1]['name'] += data
         elif self.at:
             self.entries[-1][self.at] += data
 
@@ -281,6 +305,139 @@ class Refresh(unittest.TestCase):
                              {'prs': 2, 'commits': 3, 'added': 3, 'removed': 1})
             self.assertEqual(module(f'c.rangeStats({json.dumps(gitdir)}, null, "v0.0.1", {json.dumps(merged)})'),
                              {'prs': 1, 'commits': 1, 'added': 2, 'removed': 0})
+
+
+class Ship(unittest.TestCase):
+    def test_a_long_entry_groups_its_lines_by_area(self):
+        data = json.loads((SHIP / '0.02.json').read_text())
+        self.assertEqual(sum(len(area['bullets']) for area in data['areas']), 60)
+        html = generate('--releases', SHIP, '--switch', 'live', '--ship', ON)
+        out = Entries(html)
+        self.assertEqual([(e['h2'].strip(), e['small']) for e in out.entries],
+                         [('0.02', '· Mar 4, 2031 (0.2.0)'), ('0.01', '· Jan 2, 2031 (0.1.2)')])
+        new, old = out.entries
+        self.assertEqual(new['headline'], data['headline'])
+        self.assertEqual((new['areas'], new['bullets']), (data['areas'], []))
+        self.assertEqual(new['links'], [data['notes']])
+        self.assertEqual((old['areas'], old['bullets']), ([], ['First line.', 'Second line.']))
+        self.assertEqual({tag for tag in out.tags}, {'section', 'article', 'h2', 'h3', 'small', 'time', 'p', 'ul', 'li', 'a'})
+        self.assertIn('keeps <b>markup</b> & $& as typed', new['areas'][1]['bullets'][-1])
+        ids = re.findall(r' id="([^"]*)"', html)
+        self.assertEqual(len(ids), len(set(ids)))
+        self.assertEqual(ids[:3], ['v0-02', 'v0-02-sample-chat', 'v0-02-sample-drivers'])
+
+    def test_the_switch_off_holds_the_entry_and_changes_nothing_else(self):
+        with tempfile.TemporaryDirectory() as temp:
+            shutil.copy(SHIP / '0.01.json', temp)
+            today = generate('--releases', temp, '--switch', 'live', '--ship', OFF)
+        held = generate('--releases', SHIP, '--switch', 'live', '--ship', OFF)
+        self.assertEqual(held, today)
+        self.assertNotIn('Sample', held)
+        self.assertNotEqual(generate('--releases', SHIP, '--switch', 'live', '--ship', ON), today)
+        self.assertEqual(Entries(generate('--releases', SHIP, '--switch', 'coming-soon', '--ship', ON)).entries, [])
+
+    def test_the_switch_file_is_read_strictly(self):
+        self.assertEqual(generate(), generate('--ship', ROOT / 'release.json'))
+        with tempfile.TemporaryDirectory() as temp:
+            for text in ('{"changelog": {"0.2.0": "soon"}}', '{"changelog": {"0.2": "on"}}', '{"changelog": "off"}', '[]', '{'):
+                switch = Path(temp) / 'release.json'
+                switch.write_text(text)
+                done = subprocess.run(['node', str(ROOT / 'scripts/changelog.mjs'), '--releases', str(SHIP), '--switch', 'live', '--ship', str(switch)],
+                                      capture_output=True, text=True, timeout=60)
+                with self.subTest(text=text):
+                    self.assertNotEqual(done.returncode, 0)
+                    self.assertIn('release.json', done.stderr)
+                    self.assertEqual(done.stdout, '')
+
+    def test_a_null_changelog_switch_cannot_show_the_unshipped_entry(self):
+        with tempfile.TemporaryDirectory() as temp:
+            switch = Path(temp) / 'release.json'
+            switch.write_text('{"changelog": null}')
+            done = subprocess.run(['node', str(ROOT / 'scripts/changelog.mjs'), '--releases', str(SHIP),
+                                   '--switch', 'live', '--ship', str(switch)], capture_output=True, text=True, timeout=60)
+            versions = [entry['h2'].strip() for entry in Entries(done.stdout).entries]
+            self.assertNotIn('0.02', versions)
+            self.assertNotEqual(done.returncode, 0)
+            self.assertIn('changelog maps a semver to on or off', done.stderr)
+
+    def test_the_entry_comes_from_the_release_notes(self):
+        made = generate('--from-notes', NOTES, '--version', '0.2.0', '--name', '0.02')
+        self.assertEqual(json.loads(made), json.loads((SHIP / '0.02.json').read_text()))
+        self.assertEqual(made, (SHIP / '0.02.json').read_text())
+        done = subprocess.run(['node', str(ROOT / 'scripts/changelog.mjs'), '--from-notes', str(NOTES), '--version', '0.3.0', '--name', '0.03'],
+                              capture_output=True, text=True, timeout=60)
+        self.assertNotEqual(done.returncode, 0)
+        self.assertIn('0.3.0', done.stderr)
+
+    def site(self, temp):
+        root = Path(temp) / 'site'
+        shutil.copytree(ROOT, root, ignore=shutil.ignore_patterns('.git', 'dist', 'node_modules', '__pycache__'))
+        (root / 'node_modules').symlink_to(ROOT / 'node_modules', target_is_directory=True)
+        subprocess.run(['git', 'init', '-q'], cwd=root, check=True, timeout=60)
+        (root / '.git/info/exclude').write_text('/node_modules\n')
+        return root
+
+    def build(self, root, switch=None, check=True):
+        if switch:
+            (root / 'release.json').write_text(json.dumps({'changelog': {'0.2.0': switch}}))
+        steps = [['node', 'build.mjs']] + ([['python3', '-B', 'scripts/check.py']] if check else [])
+        for step in steps:
+            done = subprocess.run(step, cwd=root, capture_output=True, text=True, timeout=300)
+            self.assertEqual(done.returncode, 0, done.stdout[-2000:] + done.stderr[-4000:])
+        return (root / 'dist/changelog/index.html').read_text()
+
+    def test_a_fixture_entry_builds_and_passes_the_site_check_in_both_switch_states(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = self.site(temp)
+            today = self.build(root)
+            shutil.copy(SHIP / '0.02.json', root / 'changelog/releases/0.02.json')
+            self.assertEqual(self.build(root, 'off'), today)
+            shipped = self.build(root, 'on')
+            entries = Entries(shipped.split('<!-- releases:start -->')[1].split('<!-- releases:end -->')[0]).entries
+            self.assertEqual([e['h2'].strip() for e in entries], ['0.02', '0.01'])
+            self.assertEqual(sum(len(area['bullets']) for area in entries[0]['areas']), 60)
+            self.assertEqual(shipped.split('<!-- releases:start -->')[0], today.split('<!-- releases:start -->')[0])
+            page = root / 'dist/changelog/index.html'
+            page.write_text(shipped.replace('<h3 ', '<h4 ').replace('</h3>', '</h4>'))
+            done = subprocess.run(['python3', '-B', 'scripts/check.py'], cwd=root, capture_output=True, text=True, timeout=300)
+            self.assertNotEqual(done.returncode, 0)
+            self.assertIn('unexpected element in the release entries: h4', done.stdout + done.stderr)
+            page.write_text(shipped.replace('Sample market</h3>', 'Sample bazaar</h3>'))
+            done = subprocess.run(['python3', '-B', 'scripts/check.py'], cwd=root, capture_output=True, text=True, timeout=300)
+            self.assertNotEqual(done.returncode, 0)
+            self.assertIn("the entry's areas", done.stdout + done.stderr)
+
+    @unittest.skipUnless(CHROME, 'no Chrome or Chromium found; set CHROME')
+    def test_sixty_lines_fit_a_phone_and_a_wide_screen(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = self.site(temp)
+            shutil.copy(SHIP / '0.02.json', root / 'changelog/releases/0.02.json')
+            built = self.build(root, 'on', check=False)
+            (root / 'dist/changelog/index.html').write_text(built.replace('</body>', MEASURE + '</body>'))
+            for width, height in ((390, 844), (1440, 900)):
+                (root / f'dist/frame-{width}.html').write_text(FRAME % (width, height))
+            handler = functools.partial(SimpleHTTPRequestHandler, directory=str(root / 'dist'))
+            SimpleHTTPRequestHandler.log_message = lambda *args: None
+            server = ThreadingHTTPServer(('127.0.0.1', 0), handler)
+            threading.Thread(target=server.serve_forever, daemon=True).start()
+            try:
+                for width, height in ((390, 844), (1440, 900)):
+                    with self.subTest(width=width):
+                        done = subprocess.run([CHROME, '--headless=new', '--no-sandbox', '--disable-gpu', '--hide-scrollbars', f'--user-data-dir={temp}/chrome-{width}',
+                                               '--window-size=1600,1000', '--virtual-time-budget=4000', '--dump-dom',
+                                               f'http://127.0.0.1:{server.server_address[1]}/frame-{width}.html'], capture_output=True, text=True, timeout=120)
+                        found = re.search(r'data-measure="([^"]*)"', done.stdout)
+                        self.assertTrue(found, done.stderr[-2000:])
+                        seen = json.loads(found[1].replace('&quot;', '"'))
+                        self.assertEqual(seen['inner'], width)
+                        self.assertLessEqual(seen['scroll'], width)
+                        self.assertLessEqual(seen['right'], width)
+                        self.assertGreaterEqual(seen['left'], 0)
+                        self.assertEqual((seen['lines'], seen['areas']), (66, 6))
+                        self.assertGreaterEqual(seen['font'], 15)
+            finally:
+                server.shutdown()
+                server.server_close()
 
 
 if __name__ == '__main__':

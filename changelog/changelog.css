@@ -15,6 +15,9 @@
 .release li::before{content:counter(item,decimal-leading-zero);font:500 13px/1 var(--ow-font-mono);font-variant-numeric:tabular-nums;color:var(--grey)}
 .release li+li{margin-top:12px}
 .release .security{margin-top:16px;padding-left:40px;font-size:15px;color:var(--grey)}
+.release h3{margin:26px 0 0;padding-top:16px;border-top:1px solid var(--line);font:680 18px/1.25 var(--ow-font-sans);letter-spacing:-.02em;color:var(--ink);overflow-wrap:anywhere}
+.release h3+ul{margin-top:10px}
+.release h3+ul li+li{margin-top:8px}
 .release .notes{margin-top:28px;font-size:15px}
 .releases .pre{padding-top:24px;border-top:1px solid var(--line);font-size:15px;color:var(--grey)}
 @media (max-width:960px){

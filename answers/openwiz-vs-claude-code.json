@@ -1,0 +1,102 @@
+{
+  "slug": "openwiz-vs-claude-code",
+  "kind": "compare",
+  "query": "OpenWiz vs Claude Code on its own",
+  "title": "OpenWiz vs Claude Code on its own",
+  "description": "Compare Claude Code's built-in subagents and agent teams with an OpenWiz fleet that tracks specs, builders and reviews in GitHub.",
+  "answer": "Claude Code on its own is Anthropic's coding agent and can delegate focused work to built-in or custom subagents. OpenWiz is an open source agent factory that can run a fleet of Claude Code builders with specs, tickets and reviews tracked in GitHub.",
+  "sections": [
+    {
+      "heading": "Side by side",
+      "body": "| | OpenWiz | Claude Code |\n| --- | --- | --- |\n| Open source and license | Open source under [Apache 2.0](https://github.com/openwizdev/OpenWiz#links). | Proprietary. The [Claude Code license notice](https://github.com/anthropics/claude-code/blob/main/LICENSE.md) reserves rights and points to Anthropic's commercial terms. |\n| Where agents run | [Your computer or VPS, Cloudroom, or Boat sandboxes](https://github.com/openwizdev/OpenWiz/blob/main/CHANGELOG.md#010--2026-11-21), depending on the driver. In [0.1.0](https://github.com/openwizdev/OpenWiz#quick-start), the automatic fleet runs in Cloudroom. Local and Boat builders can be started by hand. | [Locally from your terminal](https://code.claude.com/docs/en/overview) or in [cloud sessions](https://code.claude.com/docs/en/claude-code-on-the-web) on Anthropic-managed infrastructure or an organization's self-hosted runner. |\n| Which agents | [Claude Code and Codex](https://github.com/openwizdev/OpenWiz/blob/main/CHANGELOG.md#010--2026-11-21) are documented builder options. | Claude Code with [built-in and custom Claude subagents](https://code.claude.com/docs/en/sub-agents). [Agent teams](https://code.claude.com/docs/en/agent-teams) can coordinate separate Claude Code sessions. They are experimental and disabled by default. |\n| How work is tracked | [GitHub issues](https://github.com/openwizdev/OpenWiz#how-it-works) hold specs, tickets and agent status notes. | [Subagents report to their caller](https://code.claude.com/docs/en/sub-agents). [Agent teams](https://code.claude.com/docs/en/agent-teams) can coordinate through a shared task list. |\n| Review | A separate [reviewer from a different model family](https://github.com/openwizdev/OpenWiz/blob/main/docs/agents/fleet.md#reviewer-for-claude-built) reviews the exact pull request commit. | Inspect local changes with [`/diff`](https://code.claude.com/docs/en/interactive-mode#review-changes-with-/diff). Use [`/code-review` in a Claude Code session](https://code.claude.com/docs/en/code-review). The same docs describe GitHub pull request review for Team and Enterprise plans. |\n| Price | [Free to use](https://github.com/openwizdev/OpenWiz#quick-start). You pay your own model and hosting costs. | [Included in paid Claude plans](https://claude.com/pricing), starting with Pro at US$20 on monthly billing. Pay-as-you-go API billing is also available. |"
+    },
+    {
+      "heading": "Where OpenWiz fits better",
+      "body": "Choose OpenWiz when several tickets need their own builders, with a [shared record of specs, tickets and agent status in GitHub](https://github.com/openwizdev/OpenWiz#how-it-works) and a [reviewer from a different model family](https://github.com/openwizdev/OpenWiz/blob/main/docs/agents/fleet.md#reviewer-for-claude-built)."
+    }
+  ],
+  "faq": [
+    {
+      "question": "Do I need OpenWiz to run Claude Code subagents in parallel?",
+      "answer": "No. Claude Code can delegate to parallel subagents inside a session. Agent teams can also coordinate separate sessions when enabled. They are disabled by default."
+    }
+  ],
+  "sources": [
+    {
+      "url": "https://github.com/openwizdev/OpenWiz/blob/main/README.md",
+      "supports": "OpenWiz is an open source agent factory that coordinates agents from planning through review.",
+      "checked": "2026-11-28"
+    },
+    {
+      "url": "https://github.com/openwizdev/OpenWiz#links",
+      "supports": "The OpenWiz source is licensed under Apache 2.0.",
+      "checked": "2026-11-28"
+    },
+    {
+      "url": "https://github.com/openwizdev/OpenWiz#quick-start",
+      "supports": "OpenWiz is free, with separate model and host costs. In version 0.1.0, the automatic fleet runs in Cloudroom and local or Boat builders can be started by hand.",
+      "checked": "2026-11-28"
+    },
+    {
+      "url": "https://github.com/openwizdev/OpenWiz#how-it-works",
+      "supports": "GitHub issues hold specs, tickets and agent status notes. Drivers connect the factory to different hosts, including a computer or VPS you control.",
+      "checked": "2026-11-28"
+    },
+    {
+      "url": "https://github.com/openwizdev/OpenWiz/blob/main/docs/agents/fleet.md#reviewer-for-claude-built",
+      "supports": "A separate reviewer from another model family reviews the exact pull request commit.",
+      "checked": "2026-11-28"
+    },
+    {
+      "url": "https://github.com/openwizdev/OpenWiz/blob/main/CHANGELOG.md#010--2026-11-21",
+      "supports": "The 0.1.0 release documents builders on your computer or VPS, Cloudroom and Boat, and names Claude Code and Codex.",
+      "checked": "2026-11-28"
+    },
+    {
+      "url": "https://code.claude.com/docs/en/overview",
+      "supports": "Claude Code is Anthropic's coding agent and is available in the terminal.",
+      "checked": "2026-11-28"
+    },
+    {
+      "url": "https://code.claude.com/docs/en/sub-agents",
+      "supports": "Claude Code has built-in and custom subagents. They can handle focused tasks in parallel and report results to the caller, including codebase exploration and review.",
+      "checked": "2026-11-28"
+    },
+    {
+      "url": "https://code.claude.com/docs/en/agent-teams",
+      "supports": "Agent teams are experimental and disabled by default. When enabled, they coordinate separate Claude Code sessions through a shared task list.",
+      "checked": "2026-11-28"
+    },
+    {
+      "url": "https://code.claude.com/docs/en/claude-code-on-the-web",
+      "supports": "Claude Code cloud sessions can run on Anthropic-managed infrastructure or in an organization's self-hosted environment.",
+      "checked": "2026-11-28"
+    },
+    {
+      "url": "https://code.claude.com/docs/en/interactive-mode#review-changes-with-/diff",
+      "supports": "The diff command shows working-tree changes inside Claude Code.",
+      "checked": "2026-11-28"
+    },
+    {
+      "url": "https://code.claude.com/docs/en/code-review",
+      "supports": "Claude Code can review a branch in-session. Anthropic also offers GitHub pull request review for Team and Enterprise plans.",
+      "checked": "2026-11-28"
+    },
+    {
+      "url": "https://github.com/anthropics/claude-code/blob/main/LICENSE.md",
+      "supports": "Anthropic reserves rights in the Claude Code license notice and links to its commercial terms.",
+      "checked": "2026-11-28"
+    },
+    {
+      "url": "https://claude.com/pricing",
+      "supports": "Claude Code is included in paid Claude plans, including Pro at US$20 billed monthly. Anthropic also documents pay-as-you-go API access.",
+      "checked": "2026-11-28"
+    }
+  ],
+  "checked": "2026-11-28",
+  "other": {
+    "name": "Claude Code",
+    "homepage": "https://claude.com/product/claude-code"
+  },
+  "better_fit": "Claude Code on its own fits better when you're working on one change and want its subagents to explore the codebase or check an implementation, then report back to the same session."
+}
