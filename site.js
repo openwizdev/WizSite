@@ -439,8 +439,10 @@ function enableFamily(gsap) {
 }
 
 function enableCopy() {
-  const box = document.querySelector('.install-box[data-install="live"]');
-  if (!box) return;
+  for (const box of document.querySelectorAll('.install-box[data-install="live"]')) enableCopyBox(box);
+}
+
+function enableCopyBox(box) {
   const button = box.querySelector('button.install');
   const code = box.querySelector('.install-line');
   const line = code.textContent;
@@ -687,7 +689,72 @@ async function askAWiz() {
   }
 }
 
+function driverFilter() {
+  const root = document.querySelector('.drivers-page .directory');
+  const tools = root?.querySelector('.dir-tools');
+  if (!tools) return;
+  const search = tools.querySelector('input[type="search"]');
+  const kinds = [...tools.querySelectorAll('.dir-kinds button')];
+  const states = [...tools.querySelectorAll('.dir-states button')];
+  const showing = tools.querySelector('.dir-showing');
+  const groups = [...root.querySelectorAll('.dir-group')];
+  const rows = [...root.querySelectorAll('.rows > .row')];
+  const none = document.createElement('p');
+  none.className = 'dir-none';
+  none.hidden = true;
+  const clear = document.createElement('button');
+  clear.type = 'button';
+  clear.textContent = 'Clear the filters';
+  none.append('Nothing matches. ', clear);
+  root.querySelector('.dir-groups').after(none);
+  const words = text => text.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, ' ').trim();
+  const haystack = new Map(rows.map(row => [row, words(`${row.dataset.name} ${row.querySelector('.badge').textContent} ${row.dataset.kind}`)]));
+  const apply = () => {
+    const kind = kinds.find(button => button.getAttribute('aria-pressed') === 'true')?.dataset.kind ?? 'all';
+    const picked = states.filter(button => button.getAttribute('aria-pressed') === 'true').flatMap(button => button.dataset.states.split(' '));
+    const query = words(search.value);
+    let shown = 0;
+    for (const row of rows) {
+      const match = (kind === 'all' || row.dataset.kind === kind) && (!picked.length || picked.includes(row.dataset.state))
+        && (!query || query.split(' ').every(word => haystack.get(row).includes(word)));
+      row.hidden = !match;
+      if (match) shown += 1;
+    }
+    for (const group of groups) group.hidden = !group.querySelector('.row:not([hidden])');
+    none.hidden = shown > 0;
+    const filtered = kind !== 'all' || picked.length || query;
+    showing.textContent = filtered ? `Showing ${shown} of ${rows.length}` : '';
+  };
+  for (const button of kinds) {
+    button.addEventListener('click', () => {
+      for (const other of kinds) other.setAttribute('aria-pressed', String(other === button));
+      apply();
+    });
+  }
+  for (const button of states) {
+    button.addEventListener('click', () => {
+      button.setAttribute('aria-pressed', String(button.getAttribute('aria-pressed') !== 'true'));
+      apply();
+    });
+  }
+  search.addEventListener('input', apply);
+  search.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && search.value) { search.value = ''; apply(); }
+  });
+  clear.addEventListener('click', () => {
+    search.value = '';
+    for (const button of kinds) button.setAttribute('aria-pressed', String(button.dataset.kind === 'all'));
+    for (const button of states) button.setAttribute('aria-pressed', 'false');
+    apply();
+    search.focus();
+  });
+  for (const control of [search, ...kinds, ...states]) control.disabled = false;
+  tools.classList.add('ready');
+  apply();
+}
+
 enableCopy();
+driverFilter();
 askAWiz();
 showStars().catch(() => {});
 launchVideo();

@@ -77,6 +77,26 @@ The generator's tests (`scripts/test_changelog.py`, run by `npm test`) use the s
 
 The repository map and the *What exists today* text that used to open the page are in [docs/repos.md](repos.md), with the map as `docs/repo-map.svg`.
 
+## The Drivers page
+
+`/drivers` answers three questions: which hosts and harnesses OpenWiz runs, which passed their live check, and how to start one. Its hero names the three hosts that shipped, each after passing the five-check test on its real host, and gives the one install line with what 0.01 runs where. Under it, one directory lists every host and harness with one state each. Then come boat.dev's five checks, the rule for hosts that need an API key, and **Write your own driver**.
+
+The directory has one source, `drivers/drivers.json`. `build.mjs` renders it through `scripts/drivers.mjs` at the page's `<template data-slot="drivers-directory"></template>` slot, and reads nothing from the network. Each entry is a host or a harness, with one state and the proof that state needs:
+
+| State | Badge | What the entry must link |
+| --- | --- | --- |
+| `shipped` | Shipped in 0.01 | Its driver's folder at the release tag; a host also its live kit run |
+| `live` | Live-checked | Its live-check receipt and its folder on OpenWiz main |
+| `merged` | Merged | Its merged pull request and its folder on OpenWiz main |
+| `review` | In review | Its open pull request |
+| `planned`, `held`, `parked` | Planned, Held, Parked | Its ticket; a held or parked entry also gives its reason |
+
+`read` records the day and the OpenWiz and WizMarket commits the states were read at, and the page shows that day. Folders on main are linked at that OpenWiz commit, so a link still works after a driver moves. `scripts/check.py` refuses a state without its proof, a link outside the public OpenWiz repository, a logo the owner's terms keep off the page ([drivers-logos.md](drivers-logos.md)), and a row that says more than its data. The shipped and live-checked entries are also pinned in `check.py` (`DRIVER_SHIPPED`, `DRIVER_LIVE`), so a new release claim changes both files.
+
+To refresh the states, edit the data, then run `node scripts/drivers-verify.mjs` with a signed-in `gh`. It reads every pull request, ticket and linked folder from GitHub, and prints each row that no longer matches. CI makes no network calls, so it never runs there.
+
+With `site.js`, the directory filters by kind, by state and by name. Without it, every row and every count still shows, and the controls stay disabled.
+
 ## Site assets
 
 WizSite owns `tokens.css`. Every site page uses it with `site.css`; the Changelog and Market keep their own styles in `changelog/changelog.css` and `market/market.css`, so the landing never loads them and no page uses inline `<style>` blocks. The landing also loads `site.js`, which loads the GSAP 3.15.1 core only after the page's `load` event (the build copies it from the locked `gsap` npm dependency, `node_modules/gsap/dist/gsap.min.js`, and the check pins its bytes by hash): each page names the fingerprinted file in `site.js`'s `data-gsap` attribute, and `site.js` adds it as a same-origin `<script src>`, so GSAP never competes with the hero image, styles or fonts. No page loads GSAP from its `<head>` or preloads it; `scripts/check.py` refuses both. Until GSAP arrives (or if it never does) the page shows the same still as with reduced motion. The build fingerprints these styles and scripts so new HTML gets the matching assets. The GreenSock Standard No Charge licence and the agent icon notices ship in `vendor/`.

@@ -6,87 +6,15 @@ import { existsSync } from 'node:fs';
 import { link, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, extname, join, normalize } from 'node:path';
-import { withDrivers } from '../scripts/drivers.mjs';
+import { readDrivers, withDrivers, ordered, badge } from '../scripts/drivers.mjs';
 
 const COPY_LINE = 'Write an OpenWiz driver for my host with the write-driver skill: https://github.com/openwizdev/WizSkills/tree/main/skills/write-driver';
+const INSTALL_LINE = 'Install OpenWiz from github.com/openwizdev/OpenWiz';
 const ROOT = new URL('..', import.meta.url).pathname;
 const DIST = join(ROOT, 'dist');
 
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml',
   '.png': 'image/png', '.webp': 'image/webp', '.woff2': 'font/woff2', '.ico': 'image/x-icon' };
-
-function driverListing(id, name) {
-  return {
-    id, name, summary: `${name} from the registry.`, tags: ['driver', 'cloud'],
-    url: `https://example.invalid/${id}`, plugs_into: 'OpenWiz driver v1', publisher: 'synthetic',
-    stage: 'being-built', status: 'listed', login: 'Held by synthetic',
-    links: [{ label: 'Work', url: `https://example.invalid/work/${id}` }],
-  };
-}
-
-function hostTiles(html) {
-  const wall = html.match(/<template data-slot="drivers-hosts-start"><\/template>([\s\S]*?)<template data-slot="drivers-hosts-end"><\/template>/);
-  assert.ok(wall, 'hosts wall');
-  return [...wall[1].matchAll(/<li class="tile[^"]*" id="([^"]+)"([^>]*)>([\s\S]*?)<\/li>/g)].map(match => ({
-    id: match[1],
-    listing: match[2].match(/data-listing="([^"]*)"/)?.[1] ?? null,
-    html: match[0],
-  }));
-}
-
-test('a registry refresh shows one host tile per driver, on the page id, with that driver\'s logo', async () => {
-  const page = await readFile(join(ROOT, 'drivers/index.html'), 'utf8');
-  const registry = {
-    listings: [
-      driverListing('cursor-cloud-agents', 'Cursor Cloud Agents'),
-      driverListing('openhands-cloud', 'OpenHands Cloud'),
-      driverListing('codespaces', 'GitHub Codespaces'),
-      driverListing('github-codespaces', 'GitHub Codespaces alias'),
-      driverListing('devin', 'Devin'),
-    ],
-  };
-  const html = withDrivers(page, registry);
-  const tiles = hostTiles(html);
-  const ids = tiles.map(tile => tile.id);
-  assert.equal(new Set(ids).size, ids.length, `duplicate tile ids: ${ids.filter((id, i) => ids.indexOf(id) !== i)}`);
-  const listed = id => tiles.filter(tile => tile.listing === id);
-  assert.deepEqual(listed('cursor-cloud-agents').map(tile => tile.id), ['cursor']);
-  assert.deepEqual(listed('openhands-cloud').map(tile => tile.id), ['openhands']);
-  assert.deepEqual(listed('codespaces').map(tile => tile.id), ['codespaces']);
-  assert.deepEqual(listed('devin').map(tile => tile.id), ['devin']);
-  assert.equal(tiles.filter(tile => tile.id === 'cursor' || tile.id === 'cursor-cloud-agents').length, 1);
-  assert.equal(tiles.filter(tile => tile.id === 'openhands' || tile.id === 'openhands-cloud').length, 1);
-  assert.equal(tiles.filter(tile => tile.id === 'listing:codespaces' || tile.id === 'github-codespaces').length, 1);
-  assert.equal(tiles.find(tile => tile.id === 'github-codespaces').listing, 'github-codespaces');
-
-  const bare = page.replace(/<span class="tile-mark">[\s\S]*?<\/span>/g, '');
-  const generated = hostTiles(withDrivers(bare, registry));
-  for (const [id, file] of [['cursor', 'cursor.svg'], ['openhands', 'openhands.svg']]) {
-    const tile = generated.find(item => item.id === id);
-    assert.match(tile.html, new RegExp(`src="/drivers/logos/${file}"`), `${id} keeps its logo when the static mark is absent`);
-    assert.doesNotMatch(tile.html, /monitor\.svg/);
-  }
-});
-
-test('a shipped aliased driver keeps its page id, logo, and a single card', async () => {
-  const page = await readFile(join(ROOT, 'drivers/index.html'), 'utf8');
-  const receipt = { receipt: { url: 'https://example.invalid/receipt', date: '2026-11-01' } };
-  const shipped = (id, name) => ({ ...driverListing(id, name), stage: 'available', status: 'verified', proof: receipt });
-  const html = withDrivers(page, { listings: [shipped('cursor-cloud-agents', 'Cursor Cloud Agents'), shipped('openhands-cloud', 'OpenHands Cloud')] });
-  const ids = [...html.matchAll(/\sid="([^"]+)"/g)].map(match => match[1]);
-  assert.equal(new Set(ids).size, ids.length, `duplicate ids: ${ids.filter((id, i) => ids.indexOf(id) !== i)}`);
-  for (const [pageId, listing, logo] of [['cursor', 'cursor-cloud-agents', 'cursor.svg'], ['openhands', 'openhands-cloud', 'openhands.svg']]) {
-    assert.equal(ids.includes(pageId), true, `${listing} dropped #${pageId}`);
-    assert.equal(ids.includes(listing), false, `${listing} painted a second id`);
-    const card = html.match(new RegExp(`<article class="driver" id="${pageId}"[\\s\\S]*?<\\/article>`));
-    assert.ok(card, `${pageId} shipped card`);
-    assert.match(card[0], new RegExp(`data-listing="${listing}"`));
-    assert.match(card[0], new RegExp(`src="/drivers/logos/${logo}"`));
-    assert.match(html, new RegExp(`data-host="${pageId}"`));
-    const wall = html.match(/<template data-slot="drivers-hosts-start"><\/template>([\s\S]*?)<template data-slot="drivers-hosts-end"><\/template>/);
-    assert.equal(wall[1].includes(`id="${pageId}"`), false, `${pageId} stayed on the wall and on a shipped card`);
-  }
-});
 
 async function serve() {
   const server = createServer(async (req, res) => {
@@ -189,6 +117,16 @@ test('the Write your own driver part shows the contract\'s copy line once, and C
     }
     assert.equal(await evaluate('Promise.race([window.copied, new Promise(r => setTimeout(() => r("no change"), 5000))])'), 'Copied');
     assert.equal(await evaluate('navigator.clipboard.readText()'), COPY_LINE);
+    const start = await evaluate(`(() => { const all = document.querySelectorAll('.start button.install');
+      if (all.length !== 1 || all[0].disabled) return null; const b = all[0];
+      window.started = new Promise(resolve => new MutationObserver(() => resolve(b.textContent)).observe(b, { childList: true, characterData: true, subtree: true }));
+      b.scrollIntoView({ block: 'center' }); const r = b.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`);
+    assert.ok(start, 'the hero\'s Start one box has one Copy button, enabled once site.js runs');
+    for (const type of ['mousePressed', 'mouseReleased']) {
+      await page('Input.dispatchMouseEvent', { type, x: start.x, y: start.y, button: 'left', clickCount: 1 });
+    }
+    assert.equal(await evaluate('Promise.race([window.started, new Promise(r => setTimeout(() => r("no change"), 5000))])'), 'Copied');
+    assert.equal(await evaluate('navigator.clipboard.readText()'), INSTALL_LINE);
   } finally {
     await browser.close();
     server.close();
@@ -226,260 +164,122 @@ test('the key-host section says where a host key lives, who reads it, where it g
   assert.doesNotMatch(text(section), /\bsix(th)?\b|\bexcept(ion)?\b|\bwaive/i, 'no extra or skipped check');
 });
 
-test('the rendered Drivers page shows exactly one visible Devin entry', async () => {
+test('the directory renders one row per entry, hosts then harnesses, each in ladder order with its own badge and proof', async () => {
+  const page = await readFile(join(ROOT, 'drivers/index.html'), 'utf8');
+  const data = await readDrivers();
+  const html = withDrivers(page, data);
+  const rows = [...html.matchAll(/<li class="row[^"]*" id="([^"]+)" data-kind="([a-z]+)" data-state="([a-z]+)"[^>]*>([\s\S]*?)<\/li>/g)];
+  const want = ordered(data.entries);
+  assert.deepEqual(rows.map(([, id]) => id), want.map(entry => entry.id));
+  for (const [[, id, kind, state, body], entry] of rows.map((row, i) => [row, want[i]])) {
+    assert.deepEqual([kind, state], [entry.kind, entry.state], id);
+    assert.match(body, new RegExp(`<p class="badge" data-state="${state}">${badge(state, data.release).replace('.', '\\.')}</p>`), id);
+    const links = [...body.matchAll(/<a href="([^"]+)"/g)].map(([, href]) => href);
+    assert.deepEqual(links, [entry.kit?.url, entry.evidence, entry.docs].filter(Boolean), `${id}: its links are its proof, nothing else`);
+    if (entry.state !== 'shipped') assert.doesNotMatch(body, /Shipped|Kit run/, `${id} never reads as shipped`);
+  }
+  assert.equal(new Set(rows.map(([, id]) => id)).size, rows.length, 'no duplicate row ids');
+  assert.throws(() => withDrivers(page.replace('<template data-slot="drivers-directory"></template>', ''), data), /exactly one directory slot/);
+  const fake = { ...data, entries: [...data.entries, { id: 'fake', name: 'Fake <b>host</b>', kind: 'host', state: 'review', evidence: 'https://github.com/openwizdev/OpenWiz/pull/1' }] };
+  assert.match(withDrivers(page, fake), /Fake &lt;b&gt;host&lt;\/b&gt;/, 'names are escaped');
+});
+
+async function openDrivers(browser, origin, { width = 390, height = 844, script = true, reduced = false } = {}) {
+  const { send, listeners } = browser;
+  const { targetId } = await send('Target.createTarget', { url: 'about:blank' });
+  const { sessionId } = await send('Target.attachToTarget', { targetId, flatten: true });
+  const page = (method, params) => send(method, params, sessionId);
+  listeners.push(message => {
+    if (message.sessionId !== sessionId || message.method !== 'Fetch.requestPaused') return;
+    const { requestId, request } = message.params;
+    if (request.url.startsWith(origin + '/')) page('Fetch.continueRequest', { requestId }).catch(() => {});
+    else page('Fetch.failRequest', { requestId, errorReason: 'BlockedByClient' }).catch(() => {});
+  });
+  await page('Fetch.enable', { patterns: [{ urlPattern: '*', requestStage: 'Request' }] });
+  await page('Page.enable');
+  await page('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: width <= 480 });
+  await page('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: reduced ? 'reduce' : 'no-preference' }] });
+  if (!script) await page('Emulation.setScriptExecutionDisabled', { value: true });
+  const loaded = new Promise(resolve => listeners.push(m => m.sessionId === sessionId && m.method === 'Page.loadEventFired' && resolve()));
+  await page('Page.navigate', { url: `${origin}/drivers/` });
+  await loaded;
+  const evaluate = async expression => {
+    const { result, exceptionDetails } = await page('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true });
+    assert.equal(exceptionDetails, undefined, exceptionDetails?.exception?.description);
+    return result.value;
+  };
+  const click = async selector => {
+    const at = await evaluate(`(() => { const el = document.querySelector(${JSON.stringify(selector)}); el.scrollIntoView({ block: 'center' });
+      const r = el.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`);
+    for (const type of ['mousePressed', 'mouseReleased']) await page('Input.dispatchMouseEvent', { type, x: at.x, y: at.y, button: 'left', clickCount: 1 });
+  };
+  const type = async (selector, text) => {
+    await click(selector);
+    await page('Input.insertText', { text });
+  };
+  const visible = () => evaluate('[...document.querySelectorAll(".rows > .row")].filter(r => r.getClientRects().length).map(r => r.id)');
+  return { evaluate, click, type, visible, close: () => send('Target.closeTarget', { targetId }) };
+}
+
+test('at 390 px the directory fits, reads in full without scripts, and filters by kind, state and name with site.js', async () => {
   assert.ok(existsSync(join(DIST, 'drivers/index.html')), 'run npm run build first');
-  const snapshot = JSON.parse(await readFile(join(ROOT, 'market/registry.json'), 'utf8'));
-  const listing = snapshot.listings.find(item => item.id === 'devin' && item.tags.includes('driver'));
+  const data = await readDrivers();
+  const all = ordered(data.entries).map(entry => entry.id);
+  const of = filter => ordered(data.entries).filter(filter).map(entry => entry.id);
   const server = await serve();
   const origin = `http://127.0.0.1:${server.address().port}`;
   const browser = await launch();
   try {
-    const { send, listeners } = browser;
-    const { targetId } = await send('Target.createTarget', { url: 'about:blank' });
-    const { sessionId } = await send('Target.attachToTarget', { targetId, flatten: true });
-    const page = (method, params) => send(method, params, sessionId);
-    listeners.push(message => {
-      if (message.sessionId !== sessionId || message.method !== 'Fetch.requestPaused') return;
-      const { requestId, request } = message.params;
-      if (request.url.startsWith(origin + '/')) page('Fetch.continueRequest', { requestId }).catch(() => {});
-      else page('Fetch.failRequest', { requestId, errorReason: 'BlockedByClient' }).catch(() => {});
-    });
-    await page('Fetch.enable', { patterns: [{ urlPattern: '*', requestStage: 'Request' }] });
-    await page('Page.enable');
-    const loaded = new Promise(resolve => listeners.push(m => m.sessionId === sessionId && m.method === 'Page.loadEventFired' && resolve()));
-    await page('Page.navigate', { url: `${origin}/drivers/` });
-    await loaded;
-    const evaluate = async fn => {
-      const { result, exceptionDetails } = await page('Runtime.evaluate', {
-        expression: `(${fn})()`,
-        returnByValue: true,
-      });
-      assert.equal(exceptionDetails, undefined, result.description);
-      return result.value;
-    };
-    const readDevin = () => evaluate(() => {
-      const norm = s => s.replace(/\s+/g, ' ').trim();
-      const tiles = document.querySelectorAll('article[data-listing="devin"], li.tile[data-listing="devin"], #devin');
-      if (tiles.length !== 1) return { tiles: tiles.length };
-      const [tile] = tiles;
-      const box = tile.getBoundingClientRect();
-      const state = tile.dataset.state;
-      const group = tile.parentElement.closest('[data-state]');
-      const rest = document.documentElement.cloneNode(true);
-      rest.querySelector('#' + CSS.escape(tile.id)).remove();
-      const released = '[data-state="live"], [data-state="passed"], [data-state="shipped"], .live, .passed, .shipped';
-      return {
-        tiles: tiles.length,
-        visible: box.width > 0 && box.height > 0
-          && tile.checkVisibility({ opacityProperty: true, visibilityProperty: true }),
-        inHostGroup: tile.matches('li.tile') && group?.id === `hosts-${state}`
-          && group.dataset.state === state && Boolean(group.closest('#hosts')),
-        state,
-        names: [...tile.querySelectorAll('h3, h4')].map(e => norm(e.innerText)),
-        shown: norm(tile.innerText),
-        links: [...tile.querySelectorAll('a')].map(a => [norm(a.innerText), a.href]),
-        markedReleased: Boolean(tile.closest(released) || tile.querySelector(released)),
-        devinElsewhere: /devin/i.test(rest.outerHTML),
-        comingSoon: /coming soon/i.test(norm(tile.textContent)),
-        listing: tile.dataset.listing,
-        stage: tile.dataset.stage,
-        status: tile.dataset.status,
-        login: tile.querySelector('.driver-login')?.innerText,
-        summary: tile.querySelector('.build-line')?.innerText,
-        wording: tile.querySelector('.tile-state')?.innerText,
-        kit: tile.querySelector('.driver-kit')?.innerText,
-        marks: document.querySelectorAll('li[data-host][data-listing="devin"]').length,
-      };
-    });
+    const still = await openDrivers(browser, origin, { script: false });
+    assert.deepEqual(await still.visible(), all, 'without scripts every row shows');
+    assert.ok(await still.evaluate('document.scrollingElement.scrollWidth <= innerWidth'), 'no sideways scroll at 390 px without scripts');
+    assert.deepEqual(await still.evaluate('[...document.querySelectorAll(".dir-states button")].filter(b => b.getClientRects().length).map(b => b.textContent.trim())'),
+      ['Shipped in 0.01 5', 'Live-checked 1', 'Merged 15', 'In review 14', 'Planned 2', 'Held or parked 3'], 'the state counts read without scripts');
+    await still.close();
 
-    if (listing) {
-      const entry = await readDevin();
-      assert.equal(entry.tiles, 1, 'exactly one registry-covered Devin card');
-      assert.equal(entry.visible, true);
-      assert.deepEqual([entry.listing, entry.stage, entry.status], [listing.id, listing.stage, listing.status]);
-      assert.deepEqual(entry.names, [listing.name]);
-      assert.equal(entry.login, listing.login ? 'Login: ' + listing.login : undefined);
-      const receipt = listing.proof?.receipt;
-      if (listing.stage === 'available' && receipt) {
-        assert.equal(entry.marks, 1);
-        assert.equal(entry.kit, 'Kit: passed, 5 of 5');
-        assert.deepEqual(entry.links, [['Kit run, ' + receipt.date, receipt.url]]);
-      } else {
-        assert.equal(entry.marks, 0);
-        assert.equal(entry.inHostGroup, true);
-        assert.equal(entry.summary, listing.summary);
-        if (listing.stage === 'being-built') {
-          const work = listing.links[0];
-          const links = [[work.label, work.url]];
-          if (receipt) {
-            assert.equal(entry.wording, 'Passed its live check, 5 of 5 on a real host; not in a release yet');
-            links.push(['Live check receipt, ' + receipt.date, receipt.url]);
-          } else {
-            assert.equal(entry.markedReleased, false);
-          }
-          assert.deepEqual(entry.links, links);
-        } else {
-          assert.equal(entry.markedReleased, false);
-          assert.deepEqual(entry.links, [['Get it', listing.url]]);
-        }
-      }
-      return;
-    }
+    const live = await openDrivers(browser, origin);
+    assert.ok(await live.evaluate('document.scrollingElement.scrollWidth <= innerWidth'), 'no sideways scroll at 390 px');
+    assert.equal(await live.evaluate('[...document.querySelectorAll(".dir-tools input, .dir-tools button")].every(c => !c.disabled)'), true, 'site.js enables the controls');
+    assert.deepEqual(await live.visible(), all);
+    await live.click('.dir-kinds button[data-kind="harness"]');
+    assert.deepEqual(await live.visible(), of(e => e.kind === 'harness'), 'Harnesses shows only harnesses');
+    assert.equal(await live.evaluate('document.querySelector("#hosts").hidden'), true, 'an empty group hides with its rows');
+    assert.equal(await live.evaluate('document.querySelector(".dir-showing").textContent'), `Showing ${of(e => e.kind === 'harness').length} of ${all.length}`);
+    await live.click('.dir-kinds button[data-kind="all"]');
+    await live.click('.dir-states button[data-states="live"]');
+    assert.deepEqual(await live.visible(), of(e => e.state === 'live'), 'Live-checked shows only what passed live');
+    await live.click('.dir-states button[data-states="shipped"]');
+    assert.deepEqual(await live.visible(), of(e => ['live', 'shipped'].includes(e.state)), 'two states together show both');
+    assert.equal(await live.evaluate('document.querySelector(".dir-states button[data-states=shipped]").getAttribute("aria-pressed")'), 'true');
+    await live.click('.dir-states button[data-states="live"]');
+    await live.click('.dir-states button[data-states="shipped"]');
+    await live.type('.dir-search input', 'codex');
+    assert.deepEqual(await live.visible(), ['codex'], 'search finds by name');
+    await live.evaluate('(() => { const i = document.querySelector(".dir-search input"); i.value = ""; i.dispatchEvent(new Event("input")); })()');
+    await live.type('.dir-search input', 'zzzz');
+    assert.deepEqual(await live.visible(), []);
+    assert.equal(await live.evaluate('!document.querySelector(".dir-none").hidden'), true, 'an empty result says so');
+    await live.click('.dir-none button');
+    assert.deepEqual(await live.visible(), all, 'Clear the filters shows every row again');
+    const devin = await live.evaluate(`(() => { const rows = [...document.querySelectorAll('.row')].filter(r => /Devin/.test(r.textContent));
+      return rows.map(r => ({ id: r.id, badge: r.querySelector('.badge').textContent, links: [...r.querySelectorAll('a')].map(a => [a.textContent, a.href]) })); })()`);
+    const entry = data.entries.find(e => e.id === 'devin');
+    assert.deepEqual(devin, [{ id: 'devin', badge: badge(entry.state, data.release), links: [['Pull request', entry.evidence], ['Docs', entry.docs]] }], 'exactly one Devin row, with its own state and proof');
+    await live.close();
 
-    const labels = {
-      review: 'In review',
-      waiting: 'Built, waiting on its live check',
-      building: 'Being built',
-    };
-    const assertDevin = card => {
-      assert.equal(card.tiles, 1, 'exactly one Devin tile');
-      assert.equal(card.visible, true, 'the Devin tile is visible');
-      assert.ok(Object.hasOwn(labels, card.state), 'Devin has a pre-live state');
-      assert.equal(card.inHostGroup, true, 'Devin is in the host group for its state');
-      assert.equal(card.markedReleased, false, 'Devin has no live, passed or shipped marker');
-      assert.equal(card.comingSoon, false, 'Devin never says Coming soon');
-      assert.equal(card.devinElsewhere, false, 'there is no Devin claim outside its tile');
-      assert.deepEqual(card.names, ['Devin']);
-      assert.equal(card.links.length, 1, 'Devin has one pull request link');
-      const [[linkText, href]] = card.links;
-      assert.ok(linkText === 'Pull request' || (card.state === 'building' && linkText === 'Draft pull request'),
-        'Devin shows the pull request link');
-      assert.equal(href, 'https://github.com/openwizdev/OpenWiz/pull/2490');
-      const status = `Devin ${labels[card.state]}`;
-      const shown = [`${status} Login: held by Devin ${linkText}`];
-      if (card.state !== 'waiting') shown.push(`${status} ${linkText}`);
-      assert.ok(shown.includes(card.shown), 'Devin shows the expected copy for its state');
-    };
+    const calm = await openDrivers(browser, origin, { reduced: true });
+    assert.deepEqual(await calm.evaluate(`[...document.querySelectorAll('.dir-states button, .dir-kinds button, .row-links a, .voyage-ship, .voyage-glow')]
+      .map(el => [getComputedStyle(el).transitionDuration, getComputedStyle(el).animationName]).filter(([t, a]) => t !== '0s' || a !== 'none')`), [],
+      'with reduced motion nothing on the page moves');
+    await calm.close();
 
-    assertDevin(await readDevin());
-
-    await evaluate(() => {
-      document.querySelector('#hosts').insertAdjacentHTML('beforeend',
-        '<p id="extra-claim-probe">Use the Devin driver today.</p>');
-    });
-    const extraClaim = await readDevin();
-    assert.throws(() => assertDevin(extraClaim), /there is no Devin claim outside its tile/);
-
-    await evaluate(() => {
-      document.querySelector('#extra-claim-probe').remove();
-      document.querySelector('#devin').style.opacity = '0';
-    });
-    const transparent = await readDevin();
-    assert.throws(() => assertDevin(transparent), /the Devin tile is visible/);
+    const wide = await openDrivers(browser, origin, { width: 1440, height: 1000 });
+    assert.ok(await wide.evaluate('document.scrollingElement.scrollWidth <= innerWidth'), 'no sideways scroll at 1440 px');
+    const columns = await wide.evaluate('[...document.querySelectorAll(".dir-group")].map(g => Math.round(g.getBoundingClientRect().top))');
+    assert.equal(columns[0], columns[1], 'at 1440 px hosts and harnesses sit side by side');
+    await wide.close();
   } finally {
     await browser.close();
     server.close();
-  }
-});
-
-const REGISTRY_FILE = 'market/registry.json';
-
-async function buildDriverFixture(listings) {
-  const dir = await mkdtemp(join(tmpdir(), 'drivers-registry-'));
-  try {
-    const files = execFileSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard'], {
-      cwd: ROOT, encoding: 'utf8',
-    }).split('\0');
-    for (const file of new Set(files)) {
-      if (!file || file === REGISTRY_FILE) continue;
-      const target = join(dir, file);
-      await mkdir(dirname(target), { recursive: true });
-      await link(join(ROOT, file), target);
-    }
-    await symlink(join(ROOT, 'node_modules'), join(dir, 'node_modules'));
-    await writeFile(join(dir, REGISTRY_FILE), JSON.stringify({ contract: 'listing.v1', commit: 'd'.repeat(40), listings }));
-    execFileSync(process.execPath, ['build.mjs'], { cwd: dir, stdio: 'pipe' });
-    return {
-      drivers: await readFile(join(dir, 'dist/drivers/index.html'), 'utf8'),
-      market: await readFile(join(dir, 'dist/market/index.html'), 'utf8'),
-    };
-  } finally {
-    await rm(dir, { recursive: true, force: true });
-  }
-}
-
-function fixtureListing(id, name, fields) {
-  return {
-    id, name, stage: 'available', status: 'listed', tags: ['driver'],
-    summary: 'Runs agents on an example host.', plugs_into: 'OpenWiz drivers',
-    publisher: 'example-publisher', url: `https://example.com/${id}`, ...fields,
-  };
-}
-
-function fixtureReceipt(id) {
-  const date = '2026-11-01';
-  const path = `receipts/${id}/${date}-aaaaaaaaaaaa.txt`;
-  return { receipt: { date, path, url: `https://github.com/openwizdev/WizMarket/blob/${'d'.repeat(40)}/${path}` } };
-}
-
-const cardLinks = card => [...card.matchAll(/<a\b[^>]* href="([^"]+)"/g)].map(([, href]) => href.replaceAll('&amp;', '&'));
-
-test('the two built pages read the same driver listings and keep uncovered page entries', async () => {
-  const shipped = fixtureListing('example-driver', 'Example & Sons', {
-    status: 'verified', login: 'stays on your machine', proof: fixtureReceipt('example-driver'),
-  });
-  const building = fixtureListing('example-building', 'Example in progress', {
-    stage: 'being-built', login: 'held by the example host',
-    links: [{ label: 'Example issue', url: 'https://tracker.example.com/example/issues/5?a=1&b=2' }],
-  });
-  const passed = fixtureListing('openclaw', 'OpenClaw', {
-    stage: 'being-built', status: 'verified', proof: fixtureReceipt('openclaw'),
-    links: [{ label: 'Work ticket', url: 'https://example.com/openclaw/work' }],
-  });
-  const listed = fixtureListing('example-listed', 'Listed example', {});
-  const local = fixtureListing('local', 'Example computer or VPS', {
-    status: 'verified', login: 'stays on your machine', proof: fixtureReceipt('local'),
-  });
-  const harness = fixtureListing('copilot-cli', 'Example harness', {
-    stage: 'being-built', tags: ['harness'], links: [{ label: 'Example issue', url: 'https://example.com/harness/work' }],
-  });
-  const { drivers, market } = await buildDriverFixture([harness, building, shipped, listed, local, passed]);
-  const hostSection = id => drivers.match(new RegExp(`<section class="wall wrap" id="${id}"[\\s\\S]*?<\\/section>`))[0];
-  const hostCards = drivers.slice(drivers.indexOf('<main'), drivers.indexOf(hostSection('harnesses')));
-  const rendered = [...hostCards.matchAll(/<(article|li)\b(?=[^>]* data-listing="([^"]+)")([^>]*)>([\s\S]*?)<\/\1>/g)]
-    .filter(([, , , attrs]) => !attrs.includes('data-host='));
-  assert.deepEqual(rendered.map(([, , id]) => id).sort(), [building.id, shipped.id, listed.id, local.id, passed.id].sort(),
-    'exactly one Drivers card per registry driver, with harnesses excluded from hosts');
-  const cards = Object.fromEntries(rendered.map(([card, , id]) => [id, card]));
-  for (const [listing, name, expectedLinks] of [
-    [shipped, 'Example &amp; Sons', [shipped.proof.receipt.url]],
-    [building, building.name, [building.links[0].url]],
-    [listed, listed.name, [listed.url]],
-    [local, local.name, [local.proof.receipt.url]],
-    [passed, passed.name, [passed.links[0].url, passed.proof.receipt.url]],
-  ]) {
-    const card = cards[listing.id];
-    assert.ok(card.includes(`>${name}</`), `${listing.id}: registry display name`);
-    assert.ok(card.includes(`data-status="${listing.status}"`), `${listing.id}: registry verification state`);
-    assert.ok(card.includes(`data-stage="${listing.stage}"`), `${listing.id}: registry stage`);
-    assert.deepEqual(cardLinks(card).sort(), expectedLinks.sort(), `${listing.id}: only the registry links`);
-    const marketCard = market.match(new RegExp(`<article class="market-card" id="listing-${listing.id}"[\\s\\S]*?<\\/article>`))?.[0];
-    assert.ok(marketCard?.includes(`>${name}</`), `${listing.id}: adding it to the snapshot also adds it to Market`);
-    assert.ok(marketCard.includes(`data-status="${listing.status}"`) && marketCard.includes(`data-stage="${listing.stage}"`));
-    assert.ok(expectedLinks.every(link => cardLinks(marketCard).includes(link)), `${listing.id}: Market has the same links`);
-  }
-  assert.match(cards[shipped.id], /Login: stays on your machine/);
-  assert.match(cards[shipped.id], /Kit: passed, 5 of 5/);
-  assert.match(cards[shipped.id], /<time datetime="2026-11-01">2026-11-01<\/time>/);
-  assert.match(cards[shipped.id], /src="\/drivers\/logos\/monitor\.svg"/);
-  assert.match(cards[building.id], /Login: held by the example host/);
-  assert.ok(cards[building.id].includes(building.summary));
-  assert.match(cards[passed.id], />Passed its live check, 5 of 5 on a real host; not in a release yet<\//);
-  assert.match(cards[passed.id], /src="\/drivers\/logos\/openclaw\.svg"/);
-  const marks = [...drivers.matchAll(/<li data-host="([^"]+)"/g)].map(([, id]) => id);
-  assert.deepEqual(marks.sort(), ['boat-dev', 'cloudroom', 'example-driver', 'vps']);
-  assert.equal([...drivers.matchAll(/ id="openclaw"/g)].length, 1, 'the registry replaces the OpenClaw fallback in place');
-  assert.match(cards[local.id], / id="vps"/, 'the local seed replaces the existing computer or VPS card');
-  const harnessCard = hostSection('harnesses').match(/<li class="tile" id="copilot"[^>]*>[\s\S]*?<\/li>/)?.[0];
-  assert.ok(harnessCard?.includes('data-listing="copilot-cli"'), 'the harness seed replaces its existing row');
-  assert.deepEqual(cardLinks(harnessCard), [harness.links[0].url]);
-
-  const { drivers: empty } = await buildDriverFixture([]);
-  const fallbackCards = empty.matchAll(/<article class="driver[^"]*" id="([^"]+)"[\s\S]*?<\/article>|<li class="tile[^"]*" id="([^"]+)"[\s\S]*?<\/li>/g);
-  const replaced = new Set(['openclaw', 'vps', 'copilot']);
-  for (const [html, article, tile] of fallbackCards) {
-    const id = article ?? tile;
-    if (!replaced.has(id)) assert.ok(drivers.includes(html), `${id}: uncovered card retains its entire markup`);
-    assert.equal([...drivers.matchAll(new RegExp(` id="${id}"`, 'g'))].length, 1, `${id}: present exactly once`);
   }
 });

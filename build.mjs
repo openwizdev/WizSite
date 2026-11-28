@@ -3,7 +3,7 @@ import { copyFile, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promi
 import { createHash } from 'node:crypto';
 import { installSwitch, readReleases, render, summary, withReleases } from './scripts/changelog.mjs';
 import { readRegistry, render as renderMarket, summary as marketSummary, withMarket } from './scripts/market.mjs';
-import { withDrivers } from './scripts/drivers.mjs';
+import { readDrivers, withDrivers } from './scripts/drivers.mjs';
 import { aboutPage, crawlerFiles, guidePage, pages, withMetadata } from './scripts/discovery.mjs';
 
 const root = new URL('./', import.meta.url);
@@ -42,6 +42,7 @@ const files = ['_headers', '.well-known/security.txt', 'SKILL.md', 'c76a1a01e62d
 const releases = await readReleases();
 console.log(`Changelog releases: ${summary(releases, live)}`);
 const registry = await readRegistry();
+const drivers = await readDrivers();
 console.log(`Market: ${marketSummary(registry)}`);
 await rm(output, { recursive: true, force: true });
 const put = async (name, data) => {
@@ -83,7 +84,7 @@ for (const page of Object.keys(pages)) {
   if (page !== 'app/index.html') html = withFaq(withFooter(withCta(html)));
   if (page === 'changelog/index.html') html = withReleases(html, render(releases, live));
   if (page === 'market/index.html') html = withMarket(html, renderMarket(registry));
-  if (page === 'drivers/index.html') html = withDrivers(html, registry);
+  if (page === 'drivers/index.html') html = withDrivers(html, drivers);
   await put(page, html);
 }
 const discovery = crawlerFiles(about, faq, guide);

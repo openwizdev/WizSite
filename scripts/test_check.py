@@ -1068,61 +1068,6 @@ class Checks(unittest.TestCase):
                     with self.assertRaisesRegex(AssertionError, re.escape(error)):
                         check_site(root, registry)
 
-    def test_drivers_registry_links(self):
-        from check import fingerprinted_page
-
-        fixtures = ROOT / 'tests/market-fixtures'
-        snapshot = json.loads((fixtures / 'contract-index.json').read_text())
-        listed = json.loads((fixtures / 'edge-index.json').read_text())['listings'][0]
-        listings = sorted([*snapshot['listings'], listed], key=lambda item: item['id'])
-        tracker = next(item for item in listings if item['id'] == 'example-tracker-harness')
-        work = tracker['links'][0]['url']
-        receipt = listings[0]['proof']['receipt']['url']
-        with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp) / 'dist'
-            shutil.copytree(ROOT / 'dist', root)
-            path = root / 'drivers/index.html'
-            registry = Path(temp) / 'registry.json'
-            registry.write_text(json.dumps({**snapshot, 'listings': listings}))
-            source = {name: fingerprinted_page((ROOT / name).read_text(), cta=True)
-                      for name in ('drivers/index.html', 'market/index.html')}
-            for name, html in source.items():
-                built = (root / name).read_text()
-                metadata = re.search(r'<!-- metadata:start -->[\s\S]*?<!-- metadata:end -->', built)[0]
-                source[name] = html.replace('<template data-slot="page-metadata"></template>', metadata)
-            exports = subprocess.run(['node', '--input-type=module', '-e', """
-                import { readFileSync } from 'node:fs';
-                import { withDrivers } from './scripts/drivers.mjs';
-                import { readRegistry, render, withMarket } from './scripts/market.mjs';
-                const pages = JSON.parse(readFileSync(0, 'utf8'));
-                const registry = await readRegistry(process.argv[1]);
-                process.stdout.write(JSON.stringify({
-                  drivers: withDrivers(pages['drivers/index.html'], registry),
-                  market: withMarket(pages['market/index.html'], render(registry)),
-                }));
-            """, str(registry)], cwd=ROOT, input=json.dumps(source), check=True, capture_output=True, text=True).stdout
-            pages = json.loads(exports)
-            rendered = pages['drivers']
-            (root / 'market/index.html').write_text(pages['market'])
-            self.assertIn(f'href="{escape(work)}"', rendered)
-            self.assertIn(f'href="{receipt}"', rendered)
-            self.assertIn(f'href="{escape(listed["url"])}"', rendered)
-            path.write_text(rendered)
-            check_site(root, registry)
-            unexpected = 'https://unrelated.example.com/'
-            for old, new, reason in (
-                    (f'href="{escape(work)}"', f'href="{unexpected}"', 'registry URL'),
-                    (f'href="{escape(work)}"', f'href="{receipt}"', 'registry URL'),
-                    (f'href="{escape(work)}"', 'href="https://github.com/openwizdev/OpenWiz/issues/1"', 'registry URL'),
-                    (f'href="{escape(work)}"', f'href="{escape(work)}" src="{escape(work)}"', 'unexpected external URL'),
-                    ('</main>', f'<a href="{escape(work)}">Another link</a></main>', 'unexpected external URL'),
-                    (f'href="{escape(work)}"', f'href="{escape(work)}" ping="{escape(work)}"', 'resource attributes')):
-                with self.subTest(new=new):
-                    self.assertIn(old, rendered)
-                    path.write_text(rendered.replace(old, new, 1))
-                    with self.assertRaisesRegex(AssertionError, reason):
-                        check_site(root, registry)
-
     def test_report_a_problem_link(self):
         form = '<a href="https://github.com/openwizdev/openwiz/issues/new?template=feedback.yml" rel="noreferrer" data-count="github">Report a problem</a>'
         for page, count in {'index.html': 1, 'drivers/index.html': 1, 'team/index.html': 1, 'faq/index.html': 1, 'changelog/index.html': 1, 'app/index.html': 0}.items():
@@ -1205,15 +1150,61 @@ class Checks(unittest.TestCase):
         del htmls['drivers/index.html']
         check.check_faq(htmls, pages, names)
 
+    def test_drivers_data(self):
+        import copy
+        import check
+        data = check.read_drivers()
+        check.check_drivers_data(data)
+        by_id = lambda d, key: next(e for e in d['entries'] if e['id'] == key)
+
+        def promote_live(d):
+            e = by_id(d, 'hermes')
+            e.update(state='live', kit={'date': '2026-11-24', 'url': e.pop('evidence')})
+
+        def ship(d):
+            e = by_id(d, 'amp')
+            e.update(state='shipped', note='Built into the local driver, on your computer or a VPS.')
+
+        def duplicate(d):
+            d['entries'].append(copy.deepcopy(by_id(d, 'pi')))
+
+        for change, error in (
+                (promote_live, 'no live-check receipt'),
+                (ship, 'not in a release'),
+                (lambda d: by_id(d, 'amp').update(evidence='https://github.com/openwizdev/OpenWiz/issues/2550'), 'links its pull request'),
+                (lambda d: by_id(d, 'opencode').update(evidence='https://github.com/openwizdev/OpenWiz/pull/2462'), 'links its ticket'),
+                (lambda d: by_id(d, 'tembo').update(docs='https://github.com/openwizdev/OpenWiz/tree/main/adapters/tembo'), 'no merged folder'),
+                (lambda d: by_id(d, 'hermes').update(docs='https://github.com/openwizdev/WizMarket/blob/main/listings/hermes.json'), 'folder on OpenWiz main'),
+                (lambda d: by_id(d, 'vps').update(kit={'date': '2026-11-21', 'url': by_id(d, 'vps')['kit']['url']}), 'its kit run is'),
+                (lambda d: by_id(d, 'cloudroom').update(login='stays on your machine'), 'its login line reads'),
+                (lambda d: by_id(d, 'codex').update(kit={'date': '2026-11-20', 'url': 'https://github.com/openwizdev/OpenWiz/pull/1455'}), 'no kit run of its own'),
+                (lambda d: by_id(d, 'openclaw').update(state='merged', evidence='https://github.com/openwizdev/OpenWiz/pull/2018'), 'a kit run makes it|live entries are exactly'),
+                (lambda d: d['entries'].remove(by_id(d, 'openclaw')), 'live entries are exactly'),
+                (lambda d: by_id(d, 'copilot').update(logo='cursor.svg'), "owner's terms"),
+                (lambda d: by_id(d, 'pi').update(logo='kiro.svg'), 'its one official logo'),
+                (lambda d: by_id(d, 'claude-code').update(mark=by_id(d, 'claude-code')['mark'].replace('#D97757', '#2b2bff')), "landing's own mark"),
+                (lambda d: by_id(d, 'grok-bot').update(reason='It works now'), 'gives its reason'),
+                (lambda d: by_id(d, 'devin').update(note='Ready to use.'), 'only a shipped entry'),
+                (lambda d: by_id(d, 'kiro').update(reason='Waiting'), 'only a held or parked entry'),
+                (lambda d: by_id(d, 'amp').update(login='held by Amp'), 'keeps its login on your machine'),
+                (lambda d: by_id(d, 'ona').update(released=True), 'unexpected or missing'),
+                (lambda d: by_id(d, 'ona').update(state='shipping'), 'a state from the ladder'),
+                (lambda d: d['read'].update(openwiz='main'), 'names the day'),
+                (lambda d: d.update(release='0.02'), 'latest release'),
+                (duplicate, 'one Drivers entry per id')):
+            with self.subTest(error=error):
+                broken = copy.deepcopy(data)
+                change(broken)
+                with self.assertRaisesRegex(AssertionError, error):
+                    check.check_drivers_data(broken)
+        with mock.patch.dict('check.DRIVER_REASONS', {'cline': 'Cline has no headless wake by session'}):
+            broken = copy.deepcopy(data)
+            by_id(broken, 'cline')['reason'] = 'Cline has no headless wake by session'
+            with self.assertRaisesRegex(AssertionError, 'five words'):
+                check.check_drivers_data(broken)
+
     def test_drivers_page(self):
-        boat = '<article class="driver hero" id="boat-dev"'
         for name, old, new, error in (
-                ('drivers/index.html', 'id="cloudroom"', 'id="cloud"', 'shipped driver cards'),
-                ('drivers/index.html', '<span>Cloudroom</span></h3>', '<span>Cloud</span></h3>', 'shipped driver cards'),
-                ('drivers/index.html', 'Passed the kit on a Linux PC', 'Passed the kit on a Mac', 'driver facts'),
-                ('drivers/index.html', 'Passed the kit, run from a Cloudroom cloud thread', 'Passed the kit, run from a laptop', 'driver facts'),
-                ('drivers/index.html', boat, boat.replace(' hero', ''), 'boat.dev is the hero|spotlight'),
-                ('drivers/index.html', '<article class="driver" id="cloudroom"', '<article class="driver hero" id="cloudroom"', 'boat.dev is the hero'),
                 ('drivers/index.html', 'href="https://github.com/openwizdev/OpenWiz/tree/main/adapters/template"', 'href="https://github.com/openwizdev/WizSkills"', 'only to the public OpenWiz'),
                 ('drivers/index.html', '>Changelog</a>', '>Changes</a>', 'identical to the landing'),
                 ('drivers/index.html', ' aria-current="page" data-count="drivers">Drivers', '>Drivers', 'aria-current'),
@@ -1221,6 +1212,9 @@ class Checks(unittest.TestCase):
                 ('drivers/index.html', '</main>', '<p hidden>Later.</p></main>', 'without a script|waits for a script'),
                 ('drivers/index.html', '</head>', '<script>1</script></head>', 'never its own'),
                 ('drivers/index.html', '</head>', '<script src="/drivers/logos/monitor.svg"></script></head>', 'never its own'),
+                ('drivers/index.html', 'In OpenWiz 0.01 you start builders by hand', 'In OpenWiz 0.01 the automatic fleet runs', 'where 0.01 runs agents'),
+                ('drivers/index.html', '<code class="install-line">Install OpenWiz from github.com/openwizdev/OpenWiz</code>', '<code class="install-line">Install OpenWiz</code>', 'one install line'),
+                ('drivers/index.html', '<p class="voyage-jump"><a href="#all">', '<p class="voyage-jump"><a href="#hosts">', 'jumps to every host'),
                 ('index.html', '<a class="nav-drivers" href="/drivers/" data-count="drivers">Drivers</a>', '', 'identical to the landing|landing top bar needs one Drivers'),
                 ('changelog/index.html', '<a class="nav-drivers" href="/drivers/" data-count="drivers">Drivers</a>', '', 'Changelog top bar needs one Drivers')):
             self.broken(name, old, new, error)
@@ -1233,74 +1227,80 @@ class Checks(unittest.TestCase):
         with mock.patch('check.DRIVER_ART_BUDGET', 1000), self.assertRaisesRegex(AssertionError, 'the drivers art'):
             check_site(ROOT / 'dist')
 
-    def test_drivers_login_lines(self):
+    def test_drivers_directory(self):
         import check
-        main = re.search(r'<main\b[\s\S]*?</main>', (ROOT / 'dist' / check.DRIVERS_PAGE).read_text())[0]
-        check.check_driver_logins(main)
-        held, local = '<p class="driver-login">Login: held by Cloudroom</p>', '<p class="driver-login">Login: stays on your machine</p>'
+        page = 'drivers/index.html'
+        main = re.search(r'<main\b[\s\S]*?</main>', (ROOT / 'dist' / page).read_text())[0]
+        check.check_driver_directory(main, check.read_drivers())
+        devin = '<h4 class="row-name">Devin</h4><p class="badge" data-state="merged">Merged</p></div><p class="row-login">Login: held by Devin</p>'
+        grok = '<h4 class="row-name">Grok Bot</h4>'
+        vibe = '<h4 class="row-name">Mistral Vibe</h4>'
         for old, new, error in (
-                (held, '', 'Cloudroom: its login line'),
-                (held, '<p class="driver-login">Login: stays on your machine</p>', 'Cloudroom: its login line'),
-                ('<p class="driver-login">Login: held by boat.dev</p>', '<p class="driver-login">Login: held by Cloudroom</p>', 'boat.dev: its login line'),
-                (local, '<p class="driver-login">Login: your machine</p>', 'Your own computer or VPS: its login line'),
-                ('<h4 class="tile-name">Devin</h4>', '<h4 class="tile-name">Devin</h4>' + held, 'Devin: its login line|a login line only on a driver card'),
-                ('<p class="driver-login">Login: held by Conductor</p>', '', 'Conductor: its login line|a login line only on a driver card'),
-                ('</ul>\n  </section>', '</ul>\n' + local + '  </section>', 'only on a driver card')):
-            self.broken('drivers/index.html', old, new, error)
-        line = '<p class="driver-line">Passed the kit, run from a Cloudroom cloud thread against real Cloudroom</p>'
-        self.broken('drivers/index.html', held + '\n        ' + line, line + '\n        ' + held, 'right after its name')
-
-    def test_drivers_wall(self):
-        import check
-        main = re.search(r'<main\b[\s\S]*?</main>', (ROOT / 'dist' / check.DRIVERS_PAGE).read_text())[0]
-        check.check_driver_wall(main)
-        grok, vibe = '<h4 class="tile-name">Grok Bot</h4>', '<h4 class="tile-name">Mistral Vibe</h4>'
-        for old, new, error in (
-                ('<h2 id="harnesses-title">Which agent you already use</h2>', '<h2 id="harnesses-title">Harnesses</h2>', 'is headed'),
-                ('<li class="tile no-mark" id="opencomputer" data-state="held">', '<li class="tile no-mark" id="opencomputer" data-state="building">', 'carries its state|holds only'),
-                ('<p class="tile-state">Held: its key header is unsupported</p>', '<p class="tile-state">Held: its key header is not supported yet</p>', 'reads exactly'),
-                ('<p class="tile-state">Parked: the host has no programmatic wake or stop</p>', '<p class="tile-state">Coming soon</p>', 'reads exactly'),
-                ('<h4 class="tile-name">OpenHands Cloud</h4>\n          <p class="tile-state">In review</p>', '<h4 class="tile-name">OpenHands Cloud</h4>\n          <p class="tile-state">Being built</p>', 'reads exactly'),
-                ('<h4 class="tile-name">Amp</h4>\n          <p class="tile-state">Built, waiting on its live check</p>', '<h4 class="tile-name">Amp</h4>\n          <p class="tile-state">In review</p>', 'reads exactly'),
-                ('/pull/2767" data-count="github">Pull request</a>', '/pull/2767" data-count="github">Draft pull request</a>', 'one link'),
-                ('<h4 class="tile-name">Devin</h4>\n          <p class="tile-state">Built, waiting on its live check</p>', '<h4 class="tile-name">Devin</h4>\n          <p class="tile-state">In review</p>', 'reads exactly'),
-                ('<p class="driver-login">Login: held by GitHub</p>', '', 'its login line|a login line only on a driver card'),
-                ('<a class="tile-link" href="https://github.com/openwizdev/OpenWiz/pull/2490" data-count="github">Pull request</a>', '<a class="tile-link" href="https://github.com/openwizdev/OpenWiz/pull/2490" data-count="github">Pull request</a><p>Available now.</p>', 'nothing more'),
-                ('<div class="wall-group" id="hosts-review"', '<p>Devin is supported.</p><div class="wall-group" id="hosts-review"', 'shows only its kicker'),
-                ('<a class="tile-link" href="https://github.com/openwizdev/OpenWiz/pull/2490" data-count="github">', '<a class="tile-link" style="display:none" href="https://github.com/openwizdev/OpenWiz/pull/2490" data-count="github">', 'hides nothing'),
-                ('<li class="tile" id="devin" data-state="waiting">', '<li class="tile" id="devin" data-state="waiting" hidden>', 'hides nothing|waits for a script'),
-                ('</h2>\n    <p class="wall-lead">Each host', '</h2>\n    <a href="https://github.com/openwizdev/OpenWiz">Try it</a>\n    <p class="wall-lead">Each host', 'shows only its kicker|links only its tiles'),
-                ('/pull/2774" data-count="github">Pull request</a>', '/pull/2773" data-count="github">Pull request</a>', 'one link'),
-                ('/pull/2774" data-count="github">Pull request</a>', '/pull/2774" data-count="github">Pull request, released</a>', 'one link'),
-                ('<a class="tile-link" href="https://github.com/openwizdev/OpenWiz/issues/2540" data-count="github">Ticket</a>', '', 'one link'),
-                ('<b>0</b> being built', '<b>10</b> being built', 'true numbers'),
-                ('<b>12</b> waiting on live checks', '<b>9</b> waiting on live checks', 'true numbers'),
-                ('<b>3</b> shipped', '<b>4</b> shipped', 'true numbers'),
-                ('In review <span class="group-count">6</span>', 'In review <span class="group-count">1</span>', 'true count'),
-                ('In review <span>11</span>', 'In review <span>12</span>', 'jump row'),
-                ('not a partnership, and not what runs today: each tile says its state.', 'and show what OpenWiz can run on.', 'not a partnership'),
-                (grok, grok + '<img src="/drivers/logos/cursor.svg" alt="Cursor logo">', 'no Grok logo'),
+                (devin, devin.replace('>Merged<', '>Live-checked<'), 'its badge reads exactly'),
+                (devin, devin.replace('>Merged<', '>Shipped in 0.01<'), 'its badge reads exactly'),
+                ('id="devin" data-kind="host" data-state="merged"', 'id="devin" data-kind="host" data-state="live"', 'carries its kind and state'),
+                ('id="amp" data-kind="harness"', 'id="amp" data-kind="host"', 'carries its kind and state'),
+                (devin, devin + '<p>Available now.</p>', 'shows exactly'),
+                ('<h4 class="row-name">Tembo</h4><p class="badge" data-state="review">In review</p>', '<h4 class="row-name">Tembo</h4><p class="badge" data-state="review">In review, ready soon</p>', 'its badge reads exactly'),
+                ('<p class="row-reason">Its key header is unsupported</p>', '<p class="row-reason">Its key header is not supported yet</p>', 'its reason'),
+                ('<p class="row-reason">The host has no programmatic wake or stop</p>', '<p class="row-reason">Coming soon</p>', 'its reason'),
+                ('/pull/2767" data-count="github">Pull request</a>', '/pull/2767" data-count="github">Pull request, released</a>', 'its links'),
+                ('/pull/2774" data-count="github">Pull request</a>', '/pull/2773" data-count="github">Pull request</a>', 'its links'),
+                ('Kit run, <time datetime="2026-11-20">2026-11-20</time>', 'Kit run, <time datetime="2026-11-21">2026-11-21</time>', 'its links|dates its kit run|invented number'),
+                ('<a href="https://github.com/openwizdev/OpenWiz/pull/1455#issuecomment-7034588211" data-count="github">Kit run', '<a href="https://github.com/openwizdev/OpenWiz/pull/1458#issuecomment-7034556153" data-count="github">Kit run', 'its links|linked to its public evidence'),
+                ('<li class="row" id="sculptor"', '<li class="row" id="sculptor-x"', 'lists every entry once'),
+                ('Hosts <span class="dir-count">19</span>', 'Hosts <span class="dir-count">20</span>', 'true count'),
+                ('In review <span>14</span>', 'In review <span>15</span>', 'true count'),
+                ('Harnesses <span>21</span>', 'Harnesses <span>22</span>', 'true counts'),
+                ('<dd>An open pull request.</dd>', '<dd>Ready soon.</dd>', 'what each state in use means'),
+                ('States as of <time datetime="2026-11-27">2026-11-27</time>', 'States as of <time datetime="2026-11-28">2026-11-28</time>', 'the day its states were read'),
+                ('placeholder="Search by name" autocomplete="off" spellcheck="false" disabled>', 'placeholder="Search by name" autocomplete="off" spellcheck="false">', 'one search box'),
+                ('<li class="row" id="devin" data-kind="host" data-state="merged" data-name="devin">', '<li class="row" id="devin" data-kind="host" data-state="merged" data-name="devin" hidden>', 'hides nothing|waits for a script'),
+                ('<p class="row-login">Login: held by Devin</p>', '<p class="row-login" style="display:none">Login: held by Devin</p>', 'hides nothing'),
+                ('not a partnership, and not what runs today: each row says its state.', 'and show what OpenWiz can run on.', 'not a partnership'),
+                (grok, grok + '<img src="/drivers/logos/cursor.svg" alt="Cursor logo">', 'no Grok logo|name only'),
                 (vibe, vibe + '<img src="/drivers/logos/cursor.svg" alt="Cursor logo">', 'name only'),
-                ('<img src="/drivers/logos/pi.svg" alt="Pi logo"', '<img src="/drivers/logos/kiro.svg" alt="Pi logo"', 'official logo|alt text naming'),
-                ('<li class="tile" id="sculptor"', '<li class="tile" id="sculptor-x"', 'lists every entry once')):
-            self.broken('drivers/index.html', old, new, error)
-        with mock.patch.dict('check.DRIVER_REASONS', {'cline': 'Held: Cline has no headless wake by session'}):
-            text = main.replace('Held: no headless wake by session', 'Held: Cline has no headless wake by session')
-            with self.assertRaisesRegex(AssertionError, 'five words'):
-                check.check_driver_wall(text)
-        self.broken('drivers/index.html', '', '', 'hidden by a style', css='\n.drivers-page .tile-link { display: none; }\n')
-        self.broken('drivers/index.html', '', '', 'hidden by a style', css='\n.drivers-page .tile .driver-login { visibility: hidden; }\n')
+                ('<img src="/drivers/logos/pi.svg" alt="Pi logo"', '<img src="/drivers/logos/kiro.svg" alt="Pi logo"', 'its one logo|alt text naming'),
+                ('<p class="dir-lead">A host is where', '<p class="dir-lead">Every agent is supported. A host is where', 'the directory lead')):
+            self.broken(page, old, new, error)
+        for bad, error in (
+                ('\n.drivers-page .row-links { display: none; }\n', 'hidden by a style'),
+                ('\n.drivers-page .badge { visibility: hidden; }\n', 'hidden by a style'),
+                ('\n.drivers-page .dir-states { display: none; }\n', 'hidden by a style'),
+                ('\n.drivers-page .row-mark img { border-radius: 4px; }\n', 'official marks show whole'),
+                ('\n.drivers-page .row-lockup { object-fit: cover; }\n', 'official marks show whole')):
+            self.broken(page, '', '', error, css=bad)
+
+    def test_drivers_login_lines(self):
+        page = 'drivers/index.html'
+        for old, new, error in (
+                ('<p class="row-login">Login: held by Cloudroom</p>', '', 'its login line'),
+                ('<p class="row-login">Login: held by Cloudroom</p>', '<p class="row-login">Login: stays on your machine</p>', 'its login line'),
+                ('<p class="driver-login">Login: held by boat.dev</p>', '<p class="driver-login">Login: held by Cloudroom</p>', 'boat.dev: its login line'),
+                ('<p class="row-reason">Its key header is unsupported</p>', '<p class="row-reason">Its key header is unsupported</p><p class="row-login">Login: held by OpenComputer</p>', 'its login line|a login line only'),
+                ('</ul>\n  </section>', '</ul>\n<p class="driver-login">Login: stays on your machine</p>  </section>', 'a login line only')):
+            self.broken(page, old, new, error)
 
     def test_drivers_spotlight(self):
         page = 'drivers/index.html'
         for old, new, error in (
-                ('class="spotlight', 'class="boat-other', 'one boat.dev spotlight'),
+                ('<section class="spotlight wrap" id="kit"', '<section class="boat-other wrap" id="kit"', 'one five-check test part|before the five-check test'),
+                ('<h2 id="kit-title">What a pass proves</h2>', '<h2 id="kit-title">Everything passes</h2>', 'headed What a pass proves'),
                 ('class="proof-check" data-check="wake" data-state="passed"', 'class="proof-check" data-check="wake" data-state="in progress"', 'each passed'),
                 ('class="proof-check" data-check="start"', 'class="proof-check" data-check="begin"', 'five checks in order|each passed'),
                 ('<span class="proof-state">passed</span>', '<span class="proof-state"></span>', 'says passed in words'),
                 ('that note was edited, never a second one.', 'it works.', 'explains what it proved'),
                 ('<img class="proof-art" src="/art/drivers-c-boat.webp"', '<img class="proof-art-x" src="/art/drivers-c-boat.webp"', 'painting of the crew'),
-                ('</main>', '<img src="/art/drivers-d-ship.webp" alt="The ship again"></main>', 'shown twice')):
+                ('</main>', '<img src="/art/drivers-d-ship.webp" alt="The ship again"></main>', 'shown twice'),
+                ('<p class="driver-date">', '<p class="driver-meta">', 'own date line'),
+                ('<p class="driver-line">Passed all five checks</p>', '<p class="driver-line">Passed all five checks on a real account, 2026-11-19</p>', 'own date line'),
+                ('On a real account, <time', 'Real account, <time', 'own date line'),
+                ('<a href="https://github.com/openwizdev/OpenWiz/pull/1444" data-count="github">On a real', '<a href="https://github.com/openwizdev/OpenWiz" data-count="github">On a real', 'spotlight date links to its public evidence'),
+                ('</ol>\n        <p class="proof-also">', '</ol>\n        <p class="proof-other">', 'boat.dev is one of three'),
+                ('passed the same five checks on <time', 'may pass the same five checks on <time', 'boat.dev is one of three'),
+                ('No credential appeared in its output', 'No credential showed in its output', 'explains what it proved|token check inspected'),
+                ('appeared in its output, command lines or environment, and it refused a token field</dd>', 'appeared in its output</dd>', 'token check inspected'),
+                ('</main>', '<p>The token check proves no credential leaks.</p></main>', 'broader token claim')):
             self.broken(page, old, new, error)
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp) / 'dist'
@@ -1308,8 +1308,17 @@ class Checks(unittest.TestCase):
             path = root / page
             text = path.read_text()
             section = re.search(r'\s*<section class="spotlight[\s\S]*?</section>', text)[0]
-            path.write_text(text.replace(section, '').replace('<section class="own-driver', section.strip() + '<section class="own-driver', 1))
-            with self.assertRaisesRegex(AssertionError, 'boat.dev first|right after the hero'):
+            path.write_text(text.replace(section, '').replace('<section class="directory', section.strip() + '<section class="directory', 1))
+            with self.assertRaisesRegex(AssertionError, 'right after the hero, before the five-check test'):
+                check_site(root)
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / 'dist'
+            shutil.copytree(ROOT / 'dist', root)
+            path = root / page
+            text = path.read_text()
+            scene = re.search(r'\s*<div class="proof-scene">[\s\S]*?</div>', text)[0]
+            path.write_text(text.replace(scene, '').replace('<div class="proof-copy">', scene.strip() + '<div class="proof-copy">', 1))
+            with self.assertRaisesRegex(AssertionError, 'come before its painting'):
                 check_site(root)
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp) / 'dist'
@@ -1321,39 +1330,50 @@ class Checks(unittest.TestCase):
                     self.assertRaisesRegex(AssertionError, 'unused drivers art'):
                 check_site(root)
         for bad, error in (
-                ('\n.drivers-page .driver-kit { font: 600 11px/1.3 monospace; }\n', 'under 12px'),
+                ('\n.drivers-page .badge { font: 600 11px/1.3 monospace; }\n', 'under 12px'),
                 ('\n.drivers-page .x { font-size: 10px; }\n', 'under 12px'),
                 ('\n.drivers-page .x-label { font: 600 12px/1 monospace; letter-spacing: .02em; text-transform: uppercase; }\n', 'tracking'),
-                ('\n.drivers-page .x-label { font: 600 12px/1 monospace; text-transform: uppercase; }\n', 'tracking')):
+                ('\n.drivers-page .x-label { font: 600 12px/1 monospace; text-transform: uppercase; }\n', 'tracking'),
+                ('\n@media (max-width: 760px) { .drivers-page .proof-scene { aspect-ratio: 1 / 1; } }\n', 'shorter supporting image'),
+                ('\n@media (max-width: 760px) { .drivers-page .proof-scene { order: -1; } }\n', 'keeps its reading order')):
             self.broken(page, '', '', error, css=bad)
 
-    def test_drivers_round_3h(self):
+    def test_drivers_hero_and_words(self):
         page = 'drivers/index.html'
         explainer = '<div class="drivers-explainer">'
-        row = '<li class="kit-check" data-check="token" data-state="not yet run">token not yet run</li>'
-        grok = '<h4 class="tile-name">Grok Bot</h4>'
+        grok = '<h4 class="row-name">Grok Bot</h4>'
+        pill = '<li data-host="boat-dev" data-state="passed">'
+        vps, cloud, boat = (f'<li data-host="{k}" data-state="' for k in ('vps', 'cloudroom', 'boat-dev'))
         for old, new, error in (
                 (explainer, '<div class="drivers-intro">', 'one explainer of what a driver is'),
                 ('five-check test on its real host.</p>', 'five-check test. It is free. It is fast.</p>', 'two sentences at most'),
                 ('every driver answers the same four commands', 'every driver answers the same commands', 'explainer must name'),
                 ('answers four commands, plus its schema. Pass', 'answers four commands. Pass', 'says a driver'),
                 ('build software from tickets', 'build software', 'explainer must name'),
-                ('every driver answers the same four commands, plus its schema', 'every driver answers the same four commands, plus its schema (<code>version</code>, <code>start</code>, <code>wake</code>, <code>stop</code>)', 'stays out of the hero'),
                 ('five-check test on its real host.</p>', 'five-check test on its real host, token included.</p>', 'stays out of the hero'),
                 ('must pass the same five-check test', 'passes the same five-check test', 'a requirement, never'),
-                ('<span>Kit: passed, 5 of 5</span></p>', '<span>Kit: passed, 5 of 5</span></p><ul>' + row + '</ul>', 'no per-check rows'),
-                ('<span>Kit: passed, 5 of 5</span></p>', '<span>Kit: passed, 5 of 5</span></p><ol><li class="proof-check" data-check="token">x</li></ol>', 'one kit line, never per-check rows'),
-                ('<span>Kit: passed, 5 of 5</span>', '<span>Kit: passed, 5 of 5. Its next run comes later.</span>', 'one kit line must read'),
-                ('<span>Kit: passed, 5 of 5</span>', '<span>Kit: passed</span>', 'one kit line must read'),
-                ('<p class="driver-kit passed" data-state="passed">', '<p class="driver-kit passed" data-state="not yet run">', 'one kit line must read'),
-                ('<h2 id="more-title">Also shipped</h2>', '<h2 id="more-title">Also shipped</h2><p>4 words, 5 checks in the kit</p>', 'jargon count'),
-                ('<h2 id="more-title">Also shipped</h2>', '<h2 id="more-title">Also shipped</h2><p>1 passed, 3 of 5</p>', 'jargon count'),
-                ('<h2 id="more-title">Also shipped</h2>', '<h2 id="more-title">Also shipped</h2><p>boat.dev passed all five checks.</p>', 'at most 2 times'),
+                ('<span class="host-state">passed 5 of 5</span>', '', 'works today in words'),
+                ('<span class="host-state">passed 5 of 5</span>', '<span class="host-state">works</span>', 'passed 5 of 5'),
+                ('<li data-host="vps" data-state="passed">', '<li data-host="computer" data-state="passed">', 'host pills, in order'),
+                ('<span class="host-mark"><img class="host-lockup"', '<span class="host-mark"></span><img class="host-lockup"', 'fixed-height slot'),
+                (pill, pill + '<span class="host-mark"><img src="/drivers/logos/boat-dev.svg" alt="boat.dev"></span>', 'fixed-height slot'),
+                ('<span class="host-name">Cloudroom</span>', '<span class="host-name">Cloud</span>', 'names its host'),
+                (vps + 'passed">', vps + 'being fixed">', "pill's state is 'passed'|shown as anything but passed"),
+                (cloud + 'passed">', cloud + 'works today">', "pill's state is 'passed'|shown as anything but passed"),
+                (boat + 'passed">', boat + 'coming soon">', "pill's state is 'passed'|shown as anything but passed"),
+                ('<li data-host="boat-dev"', '<li data-host="openclaw" data-state="passed"><span class="host-name">OpenClaw</span> <span class="host-state">passed 5 of 5</span></li>\n        <li data-host="boat-dev"', 'host pills, in order|host pill only'),
                 ('<div class="own-token"><dt><code>token</code></dt>', '<div class="own-token"><dt><code>tokens</code></dt>', 'fifth check, token'),
                 ('alt="Cloudroom logo" width="256"', 'alt="" width="256"', 'alt text naming Cloudroom|names its host'),
-                (grok, grok + '<img src="/drivers/logos/cloudroom.png" alt="Grok Bot logo">', 'no Grok logo'),
-                (grok, grok + '<svg viewBox="0 0 8 8"><circle cx="4" cy="4" r="4"/></svg>', 'no Grok logo'),
-                ('</main>', '<img src="/favicon.svg" alt="Grok"></main>', 'no Grok logo')):
+                (grok, grok + '<svg viewBox="0 0 8 8"><circle cx="4" cy="4" r="4"/></svg>', 'no Grok logo|name only'),
+                ('</main>', '<img src="/favicon.svg" alt="Grok"></main>', 'no Grok logo'),
+                ('</main>', '<p>4 words, 5 checks in the kit</p></main>', 'jargon count'),
+                ('</main>', '<p>1 passed, 3 of 5</p></main>', 'jargon count'),
+                ('</main>', '<p>boat.dev passed all five checks, five of five.</p></main>', 'at most 2 times'),
+                ('</main>', '<p>Cloudroom is being fixed.</p></main>', 'stale driver state word'),
+                ('</main>', '<p>Kit: in progress</p></main>', 'stale driver state word'),
+                ('</main>', '<p>Its kit run is next; not run yet.</p></main>', 'stale driver state word'),
+                ('</main>', '<p>Only boat.dev has passed.</p></main>', 'never the only one'),
+                ('<li><a href="/market/" data-count="market">', '<li><a href="/team/">For teams</a></li><li><a href="/market/" data-count="market">', 'only to the public OpenWiz repository and the Market')):
             self.broken(page, old, new, error)
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp) / 'dist'
@@ -1361,18 +1381,8 @@ class Checks(unittest.TestCase):
             path = root / page
             text = path.read_text()
             block = re.search(r'<div class="drivers-explainer">[\s\S]*?</div>', text)[0]
-            self.assertIn('  <p class="logo-note', text)
             path.write_text(text.replace(block, '').replace('  <p class="logo-note', block + '\n  <p class="logo-note', 1))
-            with self.assertRaisesRegex(AssertionError, 'sits in the hero|above the cards'):
-                check_site(root)
-        with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp) / 'dist'
-            shutil.copytree(ROOT / 'dist', root)
-            path = root / page
-            text = path.read_text()
-            spot = re.search(r'\s*<section class="spotlight[\s\S]*?</section>', text)[0]
-            path.write_text(text.replace(spot, '').replace('<section class="own-driver', spot.strip() + '\n  <section class="own-driver', 1))
-            with self.assertRaisesRegex(AssertionError, 'boat.dev first'):
+            with self.assertRaisesRegex(AssertionError, 'sits in the hero|above the directory'):
                 check_site(root)
         for logo in ('drivers/logos/boat-dev.svg', 'drivers/logos/cloudroom.png', 'drivers/logos/monitor.svg', 'drivers/logos/devin.svg', 'drivers/logos/crush.png'):
             with self.subTest(logo=logo), tempfile.TemporaryDirectory() as temp:
@@ -1383,73 +1393,19 @@ class Checks(unittest.TestCase):
                     check_site(root)
                 with self.assertRaisesRegex(AssertionError, 'logo changed bytes|unreviewed picture'):
                     check_privacy(logo, (ROOT / logo).read_bytes().replace(b'</svg>', b'<!-- x --></svg>') if logo.endswith('.svg') else b'\x89PNG tampered')
-        from check import check_driver_logos, DriverOutline
-        html = (ROOT / 'dist' / page).read_text()
-        main = re.search(r'<main\b[^>]*>[\s\S]*?</main>', html)[0]
-        check_driver_logos(main, DriverOutline(main))
+        from check import check_driver_logos
+        main = re.search(r'<main\b[^>]*>[\s\S]*?</main>', (ROOT / 'dist' / page).read_text())[0]
+        check_driver_logos(main)
         for extra, error in (('drivers/logos/extra.svg', 'unused drivers logos'), ('drivers/logos/grok.svg', 'unused drivers logos|no Grok logo')):
             with self.subTest(extra=extra), mock.patch.dict('check.DRIVER_LOGOS', {extra: ('0' * 64, 'Extra')}), \
                     self.assertRaisesRegex(AssertionError, error):
-                check_driver_logos(main, DriverOutline(main))
-
-    def test_drivers_round_3_final(self):
-        page = 'drivers/index.html'
-        pill = '<li data-host="boat-dev" data-state="passed">'
-        for old, new, error in (
-                ('<span class="host-state">passed 5 of 5</span>', '', 'works today in words'),
-                ('<span class="host-state">passed 5 of 5</span>', '<span class="host-state">works</span>', 'passed 5 of 5'),
-                ('<li data-host="vps" data-state="passed">', '<li data-host="computer" data-state="passed">', 'host pills, in order'),
-                ('<span class="host-mark"><img class="host-lockup"', '<span class="host-mark"></span><img class="host-lockup"', 'fixed-height slot'),
-                (pill, pill + '<span class="host-mark"><img src="/drivers/logos/boat-dev.svg" alt="boat.dev"></span>', 'fixed-height slot'),
-                ('<span class="host-name">Cloudroom</span>', '<span class="host-name">Cloud</span>', 'names its host'),
-                ('<p class="driver-date">', '<p class="driver-meta">', 'own date line'),
-                ('<p class="driver-line">Passed all five checks</p>', '<p class="driver-line">Passed all five checks on a real account, 2026-11-19</p>', 'driver facts|own date line'),
-                ('On a real account, <time', 'Real account, <time', 'own date line'),
-                ('<span>Cloudroom</span></h3>', 'Cloudroom</h3>', 'one header structure'),
-                ('No credential appeared in its output', 'No credential showed in its output', 'explains what it proved|token check inspected'),
-                ('appeared in its output, command lines or environment, and it refused a token field</dd>', 'appeared in its output</dd>', 'token check inspected'),
-                ('</main>', '<p>The token check proves no credential leaks.</p></main>', 'broader token claim')):
-            self.broken(page, old, new, error)
-        with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp) / 'dist'
-            shutil.copytree(ROOT / 'dist', root)
-            path = root / page
-            text = path.read_text()
-            scene = re.search(r'\s*<div class="proof-scene">[\s\S]*?</div>', text)[0]
-            path.write_text(text.replace(scene, '').replace('<div class="proof-copy">', scene.strip() + '<div class="proof-copy">', 1))
-            with self.assertRaisesRegex(AssertionError, 'come before its painting'):
-                check_site(root)
+                check_driver_logos(main)
         for bad, error in (
                 ('\n.drivers-page .host-marks .host-lockup { height: 26px; }\n', 'sized apart from its slot'),
                 ('\n.drivers-page .host-mark .host-tile { width: 30px; }\n', 'sized apart from its slot'),
                 ('\n.drivers-page .host-mark .host-tile { border-radius: 4px; }\n', 'official marks show whole'),
-                ('\n.drivers-page .driver-logo.host-tile { border-radius: 7px; }\n', 'official marks show whole'),
-                ('\n.drivers-page .spot-logo { object-fit: cover; }\n', 'official marks show whole'),
-                ('\n@media (max-width: 760px) { .drivers-page .proof-scene { aspect-ratio: 1 / 1; } }\n', 'shorter supporting image'),
-                ('\n@media (max-width: 760px) { .drivers-page .proof-scene { order: -1; } }\n', 'keeps its reading order')):
+                ('\n.drivers-page .spot-logo { object-fit: cover; }\n', 'official marks show whole')):
             self.broken(page, '', '', error, css=bad)
-
-    def test_drivers_kit_results(self):
-        page = 'drivers/index.html'
-        vps, cloud, boat = (f'<li data-host="{k}" data-state="' for k in ('vps', 'cloudroom', 'boat-dev'))
-        for old, new, error in (
-                (vps + 'passed">', vps + 'being fixed">', "pill's state is 'passed'|shown as anything but passed"),
-                (cloud + 'passed">', cloud + 'works today">', "pill's state is 'passed'|shown as anything but passed"),
-                (boat + 'passed">', boat + 'coming soon">', "pill's state is 'passed'|shown as anything but passed"),
-                ('<p class="driver-kit passed" data-state="passed">', '<p class="driver-kit unrun" data-state="passed">', 'shown as anything but passed in its kit line'),
-                ('<p class="tile-state">Passed live, not in a release yet</p>', '<p class="tile-state">Passed live, ships next release</p>', 'reads exactly|invented number'),
-                ('<li data-host="boat-dev"', '<li data-host="openclaw" data-state="passed"><span class="host-name">OpenClaw</span> <span class="host-state">passed 5 of 5</span></li>\n        <li data-host="boat-dev"', 'host pills, in order|host pill only'),
-                ('Kit run, <time datetime="2026-11-20">2026-11-20</time>', 'Kit run, <time datetime="2026-11-21">2026-11-21</time>', 'dates its kit run 2026-11-20|invented number'),
-                ('<a href="https://github.com/openwizdev/OpenWiz/pull/1455#issuecomment-7034588211" data-count="github">', '<a href="https://github.com/openwizdev/OpenWiz/pull/1458#issuecomment-7034556153">', 'linked to its public evidence'),
-                ('<a href="https://github.com/openwizdev/OpenWiz/pull/1444" data-count="github">', '<a href="https://github.com/openwizdev/OpenWiz">', 'spotlight date links to its public evidence'),
-                ('</ol>\n        <p class="proof-also">', '</ol>\n        <p class="proof-other">', 'boat.dev is one of three'),
-                ('passed the same five checks on <time', 'may pass the same five checks on <time', 'boat.dev is one of three'),
-                ('<h2 id="more-title">Also shipped</h2>', '<h2 id="more-title">Also shipped</h2><p>Cloudroom is being fixed.</p>', 'stale driver state word'),
-                ('<h2 id="more-title">Also shipped</h2>', '<h2 id="more-title">Also shipped</h2><p>Kit: in progress</p>', 'stale driver state word'),
-                ('<h2 id="more-title">Also shipped</h2>', '<h2 id="more-title">Also shipped</h2><p>Its kit run is next; not run yet.</p>', 'stale driver state word'),
-                ('Passed the kit on a Linux PC', 'Works today on a Linux PC', 'driver facts|status sentence says so'),
-                ('<h2 id="more-title">Also shipped</h2>', '<h2 id="more-title">Also shipped</h2><p>Only boat.dev has passed.</p>', 'never the only one')):
-            self.broken(page, old, new, error)
 
     def test_drivers_nav_and_description(self):
         for name in ('index.html', 'changelog/index.html', 'drivers/index.html'):

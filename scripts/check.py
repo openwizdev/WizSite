@@ -446,12 +446,29 @@ MARKET = ('<!-- market:start -->', '<!-- market:end -->')
 MARKET_SLOT = '<template data-slot="market"></template>'
 MARKET_REPO = 'https://github.com/openwizdev/WizMarket'
 DRIVERS_LINKS = ('/drivers/', '/drivers')
-DRIVERS = (
-    ('boat-dev', 'boat.dev', 'Passed all five checks', 'passed'),
-    ('vps', 'Your own computer or VPS', 'Passed the kit on a Linux PC', 'passed'),
-    ('cloudroom', 'Cloudroom', 'Passed the kit, run from a Cloudroom cloud thread against real Cloudroom', 'passed'),
-)
-DRIVER_HERO = 'boat-dev'
+DRIVERS_DATA = 'drivers/drivers.json'
+DRIVER_RELEASE = ('0.01', 'v0.1.0')
+DRIVER_KINDS = {'host': ('Hosts', 'Where your agents run. Each host has its own driver.'),
+                'harness': ('Harnesses', 'Which agent you already use. Each runs on the local driver, on your computer or a VPS.')}
+DRIVER_LADDER = {
+    'shipped': ('Shipped in 0.01', 'In the release. Its driver passed the five-check test on its real host.'),
+    'live': ('Live-checked', 'Passed the five-check test on its real host. Merged, not in a release yet.'),
+    'merged': ('Merged', 'On OpenWiz main, waiting on its live check. Not in a release yet.'),
+    'review': ('In review', 'An open pull request.'),
+    'planned': ('Planned', 'A ticket, not built yet.'),
+    'held': ('Held', 'Stopped until the reason on its row is solved.'),
+    'parked': ('Parked', 'Set aside: the host lacks something every driver needs.'),
+}
+DRIVER_FILTERS = (('shipped',), ('live',), ('merged',), ('review',), ('planned',), ('held', 'parked'))
+DRIVER_ENTRY_KEYS = {'id', 'name', 'kind', 'state', 'logo', 'mark', 'login', 'note', 'reason', 'kit', 'evidence', 'docs'}
+DRIVER_SHIPPED = {
+    'boat-dev': ('host', 'boat.dev', 'In 0.01 you start builders by hand here.', 'boat'),
+    'vps': ('host', 'Your own computer or VPS', "In 0.01 you start builders by hand here, with the Claude Code or Codex you're signed in to.", 'local'),
+    'cloudroom': ('host', 'Cloudroom', 'In 0.01 the automatic fleet runs here.', 'cloudroom'),
+    'claude-code': ('harness', 'Claude Code', 'Built into the local driver, on your computer or a VPS.', 'local'),
+    'codex': ('harness', 'Codex', 'Built into the local driver, on your computer or a VPS.', 'local'),
+}
+DRIVER_LIVE = {'openclaw': ('host', 'OpenClaw', '2026-11-22', 'https://github.com/openwizdev/OpenWiz/issues/1991#issuecomment-7087326408')}
 DRIVER_DATE = 'On a real account, 2026-11-19'
 DRIVER_PASSED = {
     'boat-dev': ('2026-11-19', 'https://github.com/openwizdev/OpenWiz/pull/1444'),
@@ -462,23 +479,19 @@ DRIVER_LOGINS = {
     'boat-dev': 'Login: held by boat.dev',
     'vps': 'Login: stays on your machine',
     'cloudroom': 'Login: held by Cloudroom',
+    'claude-code': 'Login: stays on your machine',
+    'codex': 'Login: stays on your machine',
 }
+DRIVER_HARNESS_LOGIN = 'stays on your machine'
 DRIVER_ALSO = 'Cloudroom and your own computer or VPS passed the same five checks on 2026-11-20.'
-DRIVER_CARD_DATE = 'Kit run, {}'
 DRIVER_STALE = re.compile(r'being fixed|works today|kit run next|in progress|not (?:yet )?run(?: yet)?|kit run (?:comes )?next', re.I)
-DRIVER_WORDS = ('version', 'start', 'wake', 'stop')
 KIT_CHECKS = ('version', 'start', 'wake', 'stop', 'token')
-KIT_STATES = ('passed', 'in progress', 'not yet run')
-DRIVER_KIT_LINES = {
-    'vps': 'Kit: passed, 5 of 5',
-    'cloudroom': 'Kit: passed, 5 of 5',
-}
 HOST_PILLS = (
     ('vps', 'Your computer or VPS', 'passed 5 of 5', 'passed'),
     ('cloudroom', 'Cloudroom', 'passed 5 of 5', 'passed'),
     ('boat-dev', 'boat.dev', 'passed 5 of 5', 'passed'),
 )
-DRIVER_NUMBERS = {'2026', '11', '19', '20', '22', '1', '2', '3', '5', '6', '7', '9', '14'}
+DRIVER_NUMBERS = {'0', '01', '1', '5'}
 DRIVER_JARGON = re.compile(r'\b\d+\s+(?:drivers?|words?|checks?|commands?|passed)\b|\b(?!5 of 5\b)\d+\s+of\s+\d+\b', re.I)
 DRIVER_RESULT = re.compile(r'\ball five checks\b|\bfive passed checks\b|\bfive of five\b', re.I)
 DRIVER_RESULT_MAX = 2
@@ -497,77 +510,34 @@ DRIVER_LOGO_MAX = 30_000
 DRIVER_MIN_FONT = 12
 DRIVER_LABEL_TRACKING = 0.06
 OWN_DRIVER = 'Write your own driver'
+OWN_DRIVER_LOCAL = ('/market/',)
 OPENWIZ_REPO = 'https://github.com/openwizdev/OpenWiz'
 DRIVER_DESCRIPTION = 'OpenWiz drivers use four commands and one test kit. See results for the shipped drivers: boat.dev, CloudRoom and your own computer or VPS.'
 DRIVER_ART_BUDGET = 400_000
-PR, ISSUE = OPENWIZ_REPO + '/pull/', OPENWIZ_REPO + '/issues/'
-DRIVER_WALL = (
-    ('openclaw', 'OpenClaw', 'hosts', 'live', ISSUE + '1991#issuecomment-7087326408', 'openclaw.svg'),
-    ('hermes', 'Hermes', 'hosts', 'waiting', PR + '2017', 'hermes.png'),
-    ('conductor', 'Conductor', 'hosts', 'waiting', PR + '2020', 'conductor.svg'),
-    ('cursor', 'Cursor cloud agents', 'hosts', 'waiting', PR + '2021', 'cursor.svg'),
-    ('factory', 'Factory', 'hosts', 'waiting', PR + '2022', 'factory.svg'),
-    ('pane', 'Pane', 'hosts', 'waiting', PR + '2029', 'pane.svg'),
-    ('codespaces', 'GitHub Codespaces', 'hosts', 'waiting', PR + '2559', None),
-    ('devin', 'Devin', 'hosts', 'waiting', PR + '2490', 'devin.svg'),
-    ('sprites', 'Fly Sprites', 'hosts', 'review', PR + '2720', None),
-    ('openhands', 'OpenHands Cloud', 'hosts', 'review', PR + '2567', 'openhands.svg'),
-    ('warp-oz', 'Warp Oz', 'hosts', 'review', PR + '2555', 'warp.svg'),
-    ('tembo', 'Tembo', 'hosts', 'review', PR + '2662', 'tembo.svg'),
-    ('capy', 'Capy', 'hosts', 'review', PR + '2652', 'capy.svg'),
-    ('ona', 'Ona', 'hosts', 'review', PR + '2699', 'ona.svg'),
-    ('opencomputer', 'OpenComputer', 'hosts', 'held', ISSUE + '2587', None),
-    ('grok-bot', 'Grok Bot', 'hosts', 'parked', ISSUE + '2318', None),
-    ('amp', 'Amp', 'harnesses', 'waiting', PR + '2767', 'amp.svg'),
-    ('antigravity', 'Antigravity CLI', 'harnesses', 'waiting', PR + '2773', 'antigravity.svg'),
-    ('warp-local', 'Warp local agent', 'harnesses', 'waiting', PR + '2766', 'warp.svg'),
-    ('auggie', 'Augment Auggie', 'harnesses', 'waiting', PR + '2639', 'augment.svg'),
-    ('junie', 'JetBrains Junie', 'harnesses', 'waiting', PR + '2638', None),
-    ('copilot', 'GitHub Copilot CLI', 'harnesses', 'review', PR + '2782', None),
-    ('cursor-cli', 'Cursor CLI', 'harnesses', 'review', PR + '2778', 'cursor.svg'),
-    ('gemini', 'Gemini CLI', 'harnesses', 'review', PR + '2776', 'gemini-cli.svg'),
-    ('goose', 'Goose', 'harnesses', 'review', PR + '2779', 'goose.png'),
-    ('kimi', 'Kimi Code', 'harnesses', 'review', PR + '2785', 'kimi-code.svg'),
-    ('pi', 'Pi', 'harnesses', 'review', PR + '2774', 'pi.svg'),
-    ('qwen', 'Qwen Code', 'harnesses', 'review', PR + '2794', 'qwen-code.svg'),
-    ('kiro', 'Kiro', 'harnesses', 'review', PR + '2631', 'kiro.svg'),
-    ('crush', 'Crush', 'harnesses', 'review', PR + '2649', 'crush.png'),
-    ('kilo', 'Kilo Code', 'harnesses', 'review', PR + '2640', 'kilo-code.svg'),
-    ('vibe', 'Mistral Vibe', 'harnesses', 'review', PR + '2643', None),
-    ('opencode', 'OpenCode', 'harnesses', 'planned', ISSUE + '2462', 'opencode.svg'),
-    ('sculptor', 'Sculptor', 'harnesses', 'planned', ISSUE + '2540', 'sculptor.svg'),
-    ('cline', 'Cline', 'harnesses', 'held', ISSUE + '2530', 'cline.svg'),
-)
-DRIVER_LADDER = {
-    'live': ('Passed live, not in a release yet', 'Live check receipt'),
-    'waiting': ('Built, waiting on its live check', 'Pull request'),
-    'review': ('In review', 'Pull request'),
-    'building': ('Being built', 'Draft pull request'),
-    'planned': ('Planned', 'Ticket'),
-    'held': ('Held', 'Ticket'),
-    'parked': ('Parked', 'Ticket'),
+DRIVER_EVIDENCE = re.compile(r'https://github\.com/openwizdev/OpenWiz/(pull|issues)/[1-9]\d*(?:#issuecomment-[1-9]\d*)?')
+DRIVER_LOGO_OF = {
+    'boat-dev': 'boat-dev.svg', 'vps': 'monitor.svg', 'cloudroom': 'cloudroom.png', 'openclaw': 'openclaw.svg',
+    'hermes': 'hermes.png', 'factory': 'factory.svg', 'devin': 'devin.svg', 'conductor': 'conductor.svg', 'cursor': 'cursor.svg',
+    'pane': 'pane.svg', 'openhands': 'openhands.svg', 'warp-oz': 'warp.svg', 'tembo': 'tembo.svg', 'capy': 'capy.svg', 'ona': 'ona.svg',
+    'amp': 'amp.svg', 'antigravity': 'antigravity.svg', 'warp-local': 'warp.svg', 'auggie': 'augment.svg', 'gemini': 'gemini-cli.svg',
+    'goose': 'goose.png', 'kimi': 'kimi-code.svg', 'pi': 'pi.svg', 'qwen': 'qwen-code.svg', 'kilo': 'kilo-code.svg',
+    'cursor-cli': 'cursor.svg', 'kiro': 'kiro.svg', 'crush': 'crush.png', 'opencode': 'opencode.svg', 'sculptor': 'sculptor.svg',
+    'cline': 'cline.svg',
 }
+DRIVER_NO_MARK = {'codespaces', 'sprites', 'opencomputer', 'grok-bot', 'junie', 'copilot', 'vibe'}
+DRIVER_INLINE_MARKS = {'claude-code': 'bc1015824536e73f5b3e928d351221d563286280016ce869f3611e10a3c03eff', 'codex': 'a7752631d26b26095c4671f55cd7556ce89445c5ed6d2dd473ac248f227d62a4'}
+DRIVER_LOCKUPS = {'boat-dev.svg'}
 DRIVER_REASONS = {
-    'opencomputer': 'Held: its key header is unsupported',
-    'cline': 'Held: no headless wake by session',
-    'grok-bot': 'Parked: the host has no programmatic wake or stop',
+    'opencomputer': 'Its key header is unsupported',
+    'cline': 'No headless wake by session',
+    'grok-bot': 'The host has no programmatic wake or stop',
 }
-DRIVER_WALL_LOGINS = {
-    'openclaw': 'Login: stays on your machine', 'hermes': 'Login: stays on your machine', 'conductor': 'Login: held by Conductor',
-    'cursor': 'Login: held by Cursor', 'factory': 'Login: held by Factory', 'pane': 'Login: stays on your machine',
-    'codespaces': 'Login: held by GitHub', 'devin': 'Login: held by Devin',
-}
-DRIVER_WALLS = (('hosts', 'Where your agents run', 'Hosts'), ('harnesses', 'Which agent you already use', 'Harnesses'))
-DRIVER_WALL_HIDDEN = re.compile(r'\s(?:style|hidden|aria-hidden|inert)\b|\bclass="[^"]*\b(?:hidden|sr-only|visually-hidden)\b', re.I)
-DRIVER_WALL_LEADS = {
-    'hosts': 'Each host gets its own driver. It ships only after it passes the same five-check test on its real host and lands in a release.',
-    'harnesses': 'Harnesses run as rows on the local driver, on your computer or a VPS. Today that driver runs Claude Code and Codex; every row below is still on its way.',
-}
-DRIVER_RECEIPT = ('openclaw', '2026-11-22')
-DRIVER_TALLY = (('shipped', 'shipped'), ('live', 'passed live, not in a release yet'), ('waiting', 'waiting on live checks'),
-                ('review', 'in review'), ('building', 'being built'), ('planned', 'planned'), ('held', 'held'), ('parked', 'parked'))
+DRIVER_HIDDEN = re.compile(r'\s(?:style|hidden|aria-hidden|inert)\b|\bclass="[^"]*\b(?:hidden|sr-only|visually-hidden)\b', re.I)
+DRIVER_LEAD = 'A host is where your agents run. A harness is the agent you already use. Each row says its state and links its proof.'
+DRIVER_START_NOTE = ("In OpenWiz 0.01 you start builders by hand on your own computer, with the Claude Code or Codex you're signed in to, "
+                     'or on boat.dev. The automatic fleet runs in Cloudroom.')
 DRIVER_LOGO_NOTE = ('Logos belong to their owners. They name the products these drivers and harnesses are for, '
-                    'not a partnership, and not what runs today: each tile says its state.')
+                    'not a partnership, and not what runs today: each row says its state.')
 DRIVER_UNSHIPPED_CLAIM = re.compile(r'\b(?:supported|supports?|released|passed|passes|available|ready|works|ships?|shipped|soon|today|live)\b', re.I)
 
 
@@ -877,77 +847,12 @@ def check_ref(root, source, ref, pages, favicons=(), market=None):
         assert target in pages and unquote(url.fragment) in pages[target].ids, f'missing fragment: {ref}'
 
 
-DRIVER_SLOTS = ('marks', 'tally', 'spotlight', 'shipped', 'hosts', 'harnesses')
-DRIVER_SLOT = re.compile(
-    r'(<template data-slot="drivers-([a-z]+)-start"></template>)([\s\S]*?)(<template data-slot="drivers-\2-end"></template>)')
-
-
-def drivers_fallback(built, source):
-    slots = {match[2]: match[3] for match in DRIVER_SLOT.finditer(source)}
-    assert tuple(slots) == DRIVER_SLOTS, 'the Drivers source has its six build slots'
-    changed = []
-
-    def restore(match):
-        opening, name, body, closing = match.groups()
-        if body != slots[name]:
-            changed.append(body)
-        return opening + slots[name] + closing
-
-    assert tuple(match[2] for match in DRIVER_SLOT.finditer(built)) == DRIVER_SLOTS, 'the Drivers export has its six build slots'
-    fallback = DRIVER_SLOT.sub(restore, built)
-    fixed = DRIVER_SLOT.sub(lambda match: match[0] if match[3] == slots[match[2]] else match[1] + match[4], built)
-    return fallback, fixed, changed
-
-
-def driver_listing_urls(registry):
-    urls = {}
-    for listing in json.loads(registry.read_text())['listings']:
-        if not {'driver', 'harness'}.intersection(listing['tags']):
-            continue
-        allowed = {listing['url'], *(entry['url'] for entry in listing.get('links', ()))}
-        receipt = listing.get('proof', {}).get('receipt')
-        if receipt:
-            allowed.add(receipt['url'])
-        urls[listing['id']] = allowed
-    return urls
-
-
-class DriverSlot(Page):
-    def __init__(self, markup, listing_urls):
-        self.listing_urls = listing_urls
-        self.listing = self.listing_tag = None
-        super().__init__(markup)
-
-    def handle_starttag(self, tag, attrs):
-        fields = dict(attrs)
-        assert not {'srcset', 'imagesrcset', 'ping'} & fields.keys(), 'unexpected Drivers resource attributes'
-        if 'data-listing' in fields:
-            assert tag in ('article', 'li') and self.listing is None, 'unexpected Drivers listing markup'
-            self.listing, self.listing_tag = fields['data-listing'], tag
-            assert self.listing in self.listing_urls, 'unexpected Drivers listing'
-        if tag == 'a' and self.listing is not None:
-            href = fields.get('href') or ''
-            url = urlsplit(href)
-            assert href in self.listing_urls[self.listing] and url.scheme == 'https' and url.netloc \
-                and url.username is None and url.password is None, 'unexpected Drivers registry URL'
-            assert sum(key == 'href' for key, _ in attrs) == 1, 'duplicate Drivers anchor href'
-            assert 'data-book' not in fields, 'a booking link outside the team page'
-            attrs = [(key, value) for key, value in attrs if key != 'href']
-        super().handle_starttag(tag, attrs)
-
-    def handle_endtag(self, tag):
-        if tag == self.listing_tag:
-            self.listing = self.listing_tag = None
-        super().handle_endtag(tag)
-
-
 def check_drivers_export(built):
     source = fingerprinted_page((ROOT / DRIVERS_PAGE).read_text(), cta=True)
     expected = subprocess.run(['node', '--input-type=module', '-e', """
         import { readFileSync } from 'node:fs';
-        import { withDrivers } from './scripts/drivers.mjs';
-        import { readRegistry } from './scripts/market.mjs';
-        process.stdout.write(withDrivers(readFileSync(0, 'utf8'), await readRegistry()));
+        import { readDrivers, withDrivers } from './scripts/drivers.mjs';
+        process.stdout.write(withDrivers(readFileSync(0, 'utf8'), await readDrivers()));
     """], cwd=ROOT, input=source, text=True, stdout=subprocess.PIPE, check=True).stdout
     assert expected == built, f'export differs: {DRIVERS_PAGE}'
 
@@ -1156,18 +1061,6 @@ def check_site(root, registry=ROOT / 'market/registry.json', now=None):
             check_market_refs(root, path, section, pages, market)
             check_market_markup(split_market(path.read_text())[1])
             page = fixed
-        if path == root / DRIVERS_PAGE:
-            listing_urls = driver_listing_urls(registry)
-            if listing_urls:
-                drivers_html, fixed, slots = drivers_fallback(drivers_html, (ROOT / DRIVERS_PAGE).read_text())
-                for markup in slots:
-                    slot = DriverSlot(markup, listing_urls)
-                    assert not slot.books, 'a booking link outside the team page'
-                    assert not (slot.x_links or slot.cloudroom_links or slot.report_links or slot.launch_posts or any(slot.install_links.values())), \
-                        'unexpected external URL'
-                    for ref in slot.refs:
-                        check_ref(root, path, ref, pages, slot.favicons)
-                page = Page(fixed)
         assert page.social and all(s.startswith(SITE_URL) and s.removeprefix(SITE_URL).split('?')[0] in STATIC for s in page.social), 'social image must be a built file on the site'
         assert path == root / TEAM_PAGE or not page.books, f'a booking link outside the team page: {path.name}'
         assert page.x_links == (2 if path == root / ABOUT_PAGE else 1), f'one X link per page, the footer\'s: {path.relative_to(root)} has {page.x_links}'
@@ -1493,88 +1386,243 @@ def check_public_names(html):
             assert re.fullmatch(public, name), f'a private repository is named; say "private records and tools": {name}'
 
 
-class DriverOutline(HTMLParser):
-    VOID = ('area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'source', 'track', 'wbr')
-
-    def __init__(self, text):
-        super().__init__(convert_charrefs=True)
-        self.cards, self.own_links, self.own_heading = [], [], None
-        self.field, self.depth, self.own_depth, self.card_depth = None, 0, None, None
-        self.feed(text)
-
-    def handle_starttag(self, tag, attrs):
-        attrs = dict(attrs)
-        classes = (attrs.get('class') or '').split()
-        if tag not in self.VOID:
-            self.depth += 1
-        if tag == 'section' and 'own-driver' in classes:
-            self.own_depth = self.depth
-        if self.own_depth and tag == 'a':
-            self.own_links.append(attrs.get('href'))
-        if self.own_depth and tag == 'h2':
-            self.field = ['own-heading', '']
-        if tag == 'article' and 'driver' in classes:
-            self.card_depth = self.depth
-            self.cards.append({'id': attrs.get('id'), 'classes': classes, 'name': '', 'line': '', 'kit': None,
-                               'kit_state': None, 'checks': [], 'proofs': [], 'images': [], 'svgs': 0})
-            return
-        card = self.cards[-1] if self.cards and self.card_depth else None
-        if not card:
-            return
-        if tag == 'img':
-            card['images'].append((attrs.get('src') or '', attrs.get('alt') or ''))
-            if self.field and self.field[0] == 'name':
-                self.field.append(attrs.get('alt') or '')
-        elif tag == 'svg' and 'kit-icon' not in classes:
-            card['svgs'] += 1
-        elif tag in ('h2', 'h3') and 'driver-name' in classes:
-            self.field = ['name', '']
-        elif tag == 'p' and 'driver-line' in classes:
-            self.field = ['line', '']
-        elif tag == 'p' and 'driver-kit' in classes:
-            card['kit_state'] = attrs.get('data-state')
-            self.field = ['kit', '']
-        elif tag == 'li' and 'kit-check' in classes:
-            card['checks'].append(attrs.get('data-check'))
-        elif tag == 'li' and 'proof-check' in classes:
-            card['proofs'].append(attrs.get('data-check'))
-
-    def handle_startendtag(self, tag, attrs):
-        self.handle_starttag(tag, attrs)
-        if tag not in self.VOID:
-            self.handle_endtag(tag)
-
-    def handle_data(self, data):
-        if self.field:
-            self.field[1] += data
-
-    def handle_endtag(self, tag):
-        if tag in self.VOID:
-            return
-        if self.field and tag in ('h2', 'h3', 'p'):
-            kind, text, *alts = self.field
-            text = re.sub(r'\s+', ' ', text).strip()
-            if kind == 'own-heading':
-                self.own_heading = text
-            elif kind == 'name':
-                self.cards[-1]['name'] = text or ' '.join(a for a in alts if a).strip()
-            else:
-                self.cards[-1][kind] = text
-            self.field = None
-        if tag == 'section' and self.own_depth == self.depth:
-            self.own_depth = None
-        if tag == 'article' and self.card_depth == self.depth:
-            self.card_depth = None
-        self.depth -= 1
-
-
 def top_bar(html):
     found = re.findall(r'<header class="landing-nav wrap">[\s\S]*?</header>', html)
     assert len(found) == 1, 'a page needs exactly one landing top bar'
     return found[0]
 
 
-def check_drivers(landing, changelog, drivers, page):
+def read_drivers(root=ROOT):
+    return json.loads((root / DRIVERS_DATA).read_text())
+
+
+def check_drivers_data(data, landing=None):
+    assert set(data) == {'read', 'release', 'entries'}, f'the Drivers data has read, release and entries: {sorted(data)}'
+    read = data['read']
+    assert set(read) == {'date', 'openwiz', 'wizmarket'} and re.fullmatch(r'\d{4}-\d{2}-\d{2}', read['date']) \
+        and all(re.fullmatch(r'[0-9a-f]{40}', read[key]) for key in ('openwiz', 'wizmarket')), \
+        f'the Drivers data names the day it was read and the OpenWiz and WizMarket commits it was read at: {read}'
+    assert data['release'] == DRIVER_RELEASE[0], f'the Drivers data names the latest release, {DRIVER_RELEASE[0]}: {data["release"]}'
+    entries = data['entries']
+    ids = [entry.get('id') for entry in entries]
+    assert len(ids) == len(set(ids)), f'one Drivers entry per id: {sorted(i for i in ids if ids.count(i) > 1)}'
+    released = f'{OPENWIZ_REPO}/tree/{DRIVER_RELEASE[1]}/adapters/'
+    merged_at = f'{OPENWIZ_REPO}/tree/{read["openwiz"]}/adapters/'
+    for entry in entries:
+        key, state = entry.get('id'), entry.get('state')
+        assert set(entry) <= DRIVER_ENTRY_KEYS and {'id', 'name', 'kind', 'state'} <= set(entry), f'{key}: unexpected or missing Drivers fields: {sorted(entry)}'
+        assert re.fullmatch(r'[a-z0-9]+(?:-[a-z0-9]+)*', key) and entry['kind'] in DRIVER_KINDS and state in DRIVER_LADDER, \
+            f'{key}: an id, a kind (host or harness) and a state from the ladder'
+        assert isinstance(entry['name'], str) and re.fullmatch(r'[\x20-\x7e]+', entry['name']), f'{key}: a plain name'
+        has = lambda field: field in entry
+        for field in ('login', 'note', 'reason'):
+            assert not has(field) or (isinstance(entry[field], str) and re.fullmatch(r'[\x20-\x7e]+', entry[field])), f'{key}: a plain {field}'
+        for field in ('evidence', 'docs'):
+            assert not has(field) or isinstance(entry[field], str), f'{key}: {field} is a URL'
+        if has('kit'):
+            assert set(entry['kit']) == {'date', 'url'}, f'{key}: a kit run has its date and its URL'
+        if state == 'shipped':
+            assert key in DRIVER_SHIPPED, f'{key} is not in a release: only {sorted(DRIVER_SHIPPED)} shipped in {DRIVER_RELEASE[0]}'
+            kind, name, note, folder = DRIVER_SHIPPED[key]
+            assert (entry['kind'], entry['name'], entry.get('note')) == (kind, name, note), f'{key}: shipped as a {kind}, named {name!r}, saying {note!r}'
+            assert entry.get('docs') == released + folder and not has('evidence') and not has('reason'), \
+                f'{key}: a shipped entry links its driver in the release, {released + folder}, and nothing else beside its kit run'
+            assert 'Login: ' + entry.get('login', '') == DRIVER_LOGINS[key], f'{key}: its login line reads {DRIVER_LOGINS[key]!r}'
+            if kind == 'host':
+                assert entry.get('kit') == dict(zip(('date', 'url'), DRIVER_PASSED[key])), f'{key}: its kit run is {DRIVER_PASSED[key]}'
+            else:
+                assert not has('kit'), f'{key}: a harness has no kit run of its own; its driver does'
+        else:
+            assert not has('note'), f'{key}: only a shipped entry says how it runs in {DRIVER_RELEASE[0]}'
+        if state == 'live':
+            assert key in DRIVER_LIVE, f'{key} has no live-check receipt: only {sorted(DRIVER_LIVE)} passed live'
+            kind, name, date, url = DRIVER_LIVE[key]
+            assert (entry['kind'], entry['name'], entry.get('kit')) == (kind, name, {'date': date, 'url': url}), f'{key}: its live-check receipt is {date}, {url}'
+            assert not has('evidence') and not has('reason') and entry.get('docs', '').startswith(merged_at), \
+                f'{key}: a live-checked entry links its receipt and its merged driver at {read["openwiz"][:12]}'
+        if state not in ('shipped', 'live'):
+            assert not has('kit'), f'{key}: a kit run makes it {sorted(DRIVER_SHIPPED | DRIVER_LIVE)}-only; {state} has none'
+            evidence = DRIVER_EVIDENCE.fullmatch(entry.get('evidence', ''))
+            want = 'pull' if state in ('merged', 'review') else 'issues'
+            assert evidence and evidence[1] == want, f'{key}: a {state} entry links its {"pull request" if want == "pull" else "ticket"}: {entry.get("evidence")}'
+        if state == 'merged':
+            assert entry.get('docs', '').startswith(merged_at), f'{key}: a merged entry links its folder on OpenWiz main at {read["openwiz"][:12]}'
+        elif state not in ('shipped', 'live'):
+            assert not has('docs'), f'{key}: a {state} entry has no merged folder to link'
+        if state in ('held', 'parked'):
+            assert entry.get('reason') == DRIVER_REASONS.get(key), f'{key}: a {state} entry gives its reason, {DRIVER_REASONS.get(key)!r}'
+            if state == 'held':
+                assert len(entry['reason'].split()) == 5, f'{key}: a hold gives its reason in five words'
+        else:
+            assert not has('reason'), f'{key}: only a held or parked entry gives a reason'
+        if entry['kind'] == 'harness' and has('login'):
+            assert entry['login'] == DRIVER_HARNESS_LOGIN, f'{key}: a harness row keeps its login on your machine'
+        if has('docs') or has('evidence'):
+            for url in (entry.get('docs'), entry.get('evidence')):
+                assert url is None or re.fullmatch(r'https://github\.com/openwizdev/OpenWiz/[\x21-\x7e]+', url), f'{key}: links only the public OpenWiz repository: {url}'
+        if key in DRIVER_NO_MARK:
+            assert not has('logo') and not has('mark'), f'{key}: its owner\'s terms keep its mark off the page, so its name only'
+        elif key in DRIVER_INLINE_MARKS:
+            assert not has('logo') and has('mark') and sha256(entry['mark'].encode()).hexdigest() == DRIVER_INLINE_MARKS[key], \
+                f'{key}: the landing\'s own mark, unchanged (vendor/LOBE-ICONS-LICENSE.txt)'
+        else:
+            assert entry.get('logo') == DRIVER_LOGO_OF.get(key) and not has('mark'), f'{key}: its one official logo, {DRIVER_LOGO_OF.get(key)}: {entry.get("logo")}'
+        assert 'grok' not in (entry.get('logo', '') + entry.get('mark', '')).lower(), 'no Grok logo'
+    for pinned, state in ((DRIVER_SHIPPED, 'shipped'), (DRIVER_LIVE, 'live')):
+        found = {entry['id'] for entry in entries if entry['state'] == state}
+        assert found == set(pinned), f'the {state} entries are exactly {sorted(pinned)}: {sorted(found)}'
+
+
+class DriverRows(HTMLParser):
+    VOID = ('area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'source', 'track', 'wbr', 'path', 'circle')
+
+    def __init__(self, text):
+        super().__init__(convert_charrefs=True)
+        self.rows, self.row, self.depth, self.field = [], None, 0, None
+        self.feed(text)
+
+    def handle_starttag(self, tag, attrs):
+        attrs = dict(attrs)
+        classes = (attrs.get('class') or '').split()
+        if tag == 'li' and 'row' in classes:
+            self.row = {'id': attrs.get('id'), 'kind': attrs.get('data-kind'), 'state': attrs.get('data-state'), 'search': attrs.get('data-name'),
+                        'classes': classes, 'name': '', 'name_alt': [], 'badge': '', 'badge_state': None, 'login': [], 'reason': [], 'note': [],
+                        'links': [], 'images': [], 'svgs': 0, 'times': []}
+            self.rows.append(self.row)
+            self.depth = 1
+            return
+        if not self.row:
+            return
+        if tag == 'li':
+            self.depth += 1
+        if tag == 'img':
+            self.row['images'].append((attrs.get('src') or '', attrs.get('alt') or '', ' '.join(classes)))
+            if self.field == 'name':
+                self.row['name_alt'].append(attrs.get('alt') or '')
+        elif tag == 'svg':
+            self.row['svgs'] += 1
+        elif tag == 'time':
+            self.row['times'].append(attrs.get('datetime'))
+        elif tag == 'a':
+            self.row['links'].append([attrs.get('href'), ''])
+            self.field = 'link'
+        elif tag == 'h4' and 'row-name' in classes:
+            self.field = 'name'
+        elif tag == 'p' and 'badge' in classes:
+            self.row['badge_state'] = attrs.get('data-state')
+            self.field = 'badge'
+        elif tag == 'p' and classes and classes[0] in ('row-login', 'row-reason', 'row-note'):
+            self.field = classes[0][4:]
+            self.row[self.field].append('')
+
+    def handle_data(self, data):
+        if not (self.row and self.field):
+            return
+        if self.field == 'link':
+            self.row['links'][-1][1] += data
+        elif self.field in ('login', 'reason', 'note'):
+            self.row[self.field][-1] += data
+        else:
+            self.row[self.field] += data
+
+    def handle_endtag(self, tag):
+        if not self.row:
+            return
+        if tag in ('a', 'h4', 'p') and not (tag == 'p' and self.field == 'link'):
+            self.field = None
+        if tag == 'li':
+            self.depth -= 1
+            if not self.depth:
+                self.row = None
+
+
+def driver_rows(data):
+    return [entry for kind in DRIVER_KINDS for state in DRIVER_LADDER for entry in data['entries'] if entry['kind'] == kind and entry['state'] == state]
+
+
+def check_driver_directory(main, data):
+    section = re.findall(r'<section class="directory wrap" id="all" aria-labelledby="all-title">([\s\S]*?)</section>', main)
+    assert len(section) == 1, 'the drivers page has one directory of every host and harness'
+    body = section[0]
+    order = [main.find(part) for part in ('class="voyage"', 'class="directory', 'class="spotlight', 'class="own-driver')]
+    assert min(order) >= 0 and order == sorted(order), 'the directory comes right after the hero, before the five-check test and Write your own driver'
+    assert re.findall(r'<h2 id="all-title">([^<]*)</h2>', body) == ['Hosts and harnesses'], 'the directory is headed Hosts and harnesses'
+    assert [plain(x) for x in re.findall(r'<p class="dir-lead">([\s\S]*?)</p>', body)] == [DRIVER_LEAD], f'the directory lead reads {DRIVER_LEAD!r}'
+    bare = re.sub(r'<span class="row-mark"><svg aria-hidden="true"[\s\S]*?</svg></span>', '<span class="row-mark"></span>', body)
+    hidden = DRIVER_HIDDEN.search(re.sub(r'<label class="dir-search"><span class="sr-only">[^<]*</span>', '<label class="dir-search">', bare))
+    assert not hidden, f'the directory hides nothing: every row, word and link in it is shown: {hidden[0]!r}'
+    release, entries = data['release'], driver_rows(data)
+    rows = DriverRows(body).rows
+    assert [r['id'] for r in rows] == [e['id'] for e in entries], f'the directory lists every entry once, hosts then harnesses, each in ladder order: {[r["id"] for r in rows]}'
+    assert body.count('<li') == len(rows), 'the directory holds only rows'
+    for row, entry in zip(rows, entries):
+        key, state = entry['id'], entry['state']
+        word = DRIVER_LADDER[state][0]
+        assert (row['kind'], row['state'], row['badge_state']) == (entry['kind'], state, state), f'{key}: its row carries its kind and state'
+        assert tidy(row['badge']) == word, f'{key}: its badge reads exactly {word!r}: {tidy(row["badge"])!r}'
+        assert row['search'] == entry['name'].lower(), f'{key}: search reads its name'
+        logo = entry.get('logo')
+        if logo in DRIVER_LOCKUPS:
+            assert not tidy(row['name']) and row['name_alt'] == [entry['name']], f'{key}: its lockup names it'
+        else:
+            assert tidy(row['name']) == entry['name'], f'{key}: its row names it'
+        if logo:
+            assert [src for src, _, _ in row['images']] == [f'/drivers/logos/{logo}'] and not row['svgs'], f'{key}: its one logo, {logo}: {row["images"]}'
+        elif entry.get('mark'):
+            assert not row['images'] and row['svgs'] == 1, f'{key}: its one mark'
+        else:
+            assert not row['images'] and not row['svgs'], f'{key}: its name only'
+        assert [tidy(x) for x in row['login']] == (['Login: ' + entry['login']] if 'login' in entry else []), f'{key}: its login line'
+        assert [tidy(x) for x in row['reason']] == ([entry['reason']] if 'reason' in entry else []), f'{key}: its reason'
+        assert [tidy(x) for x in row['note']] == ([entry['note']] if 'note' in entry else []), f'{key}: how it runs in {release}'
+        links = []
+        if 'kit' in entry:
+            links.append((entry['kit']['url'], f'{"Kit run" if state == "shipped" else "Live check receipt"}, {entry["kit"]["date"]}'))
+        if 'evidence' in entry:
+            links.append((entry['evidence'], 'Pull request' if '/pull/' in entry['evidence'] else 'Ticket'))
+        if 'docs' in entry:
+            links.append((entry['docs'], 'Docs'))
+        assert [(h, tidy(w)) for h, w in row['links']] == links, f'{key}: its links, each to its proof: {row["links"]}'
+        assert row['times'] == ([entry['kit']['date']] if 'kit' in entry else []), f'{key}: only a kit run or receipt carries a date'
+        block = re.search(rf'<li class="row[^"]*" id="{re.escape(key)}"[\s\S]*?</li>', body)[0]
+        shown = tidy(re.sub(r'<[^>]+>', ' ', block)).replace(' ,', ',')
+        visible = ([entry['name']] if logo not in DRIVER_LOCKUPS else []) + [word] + [x for x in (
+            'Login: ' + entry['login'] if 'login' in entry else None, entry.get('reason'), entry.get('note')) if x] + [w for _, w in links]
+        assert shown == ' '.join(visible), f'{key}: its row shows exactly its name, state, login, reason, note and links: {shown!r}'
+        if state != 'shipped':
+            said = ' '.join(x for x in [entry.get('login'), entry.get('reason')] + [w for _, w in links] if x)
+            said = said.replace('Live check receipt', '') + ' ' + (word if state != 'live' else '')
+            found = DRIVER_UNSHIPPED_CLAIM.search(said)
+            assert not found, f'{entry["name"]} is not in a release: never say or imply it is: {found[0]!r}'
+    counts = {kind: sum(e['kind'] == kind for e in entries) for kind in DRIVER_KINDS}
+    groups = re.findall(r'<div class="dir-group" id="([a-z]+)" data-kind="([a-z]+)"><h3 class="dir-title" id="\1-title">([^<]*)<span class="dir-count">(\d+)</span></h3><p class="dir-sub">([^<]*)</p>', body)
+    assert [(g[1], tidy(g[2]), int(g[3]), g[4]) for g in groups] == [(k, t, counts[k], s) for k, (t, s) in DRIVER_KINDS.items()] \
+        and body.count('class="dir-group"') == len(DRIVER_KINDS), f'two groups, hosts then harnesses, each with its true count: {groups}'
+    kinds = re.findall(r'<button type="button" data-kind="([a-z]+)" aria-pressed="(true|false)" disabled>([^<]*)<span>(\d+)</span></button>', body)
+    assert [(k, tidy(w), int(n)) for k, _, w, n in kinds] == [('all', 'All', len(entries))] + [(k, t, counts[k]) for k, (t, _) in DRIVER_KINDS.items()] \
+        and [p for _, p, _, _ in kinds] == ['true', 'false', 'false'], f'the kind buttons, with their true counts, ship disabled until site.js runs: {kinds}'
+    chips = re.findall(r'<button type="button" data-states="([a-z ]+)" aria-pressed="false" disabled><i class="dot" data-state="([a-z]+)"></i>([^<]*)<span>(\d+)</span></button>', body)
+    want = [(' '.join(f), f[0], 'Held or parked' if len(f) > 1 else DRIVER_LADDER[f[0]][0], sum(e['state'] in f for e in entries)) for f in DRIVER_FILTERS]
+    assert [(s, d, tidy(w), int(n)) for s, d, w, n in chips] == [w for w in want if w[3]] and body.count('data-states=') == len(chips), \
+        f'one state button per state in use, with its true count: {chips}'
+    assert body.count('<input') == 1 and re.search(r'<input type="search" name="driver-search" placeholder="Search by name" autocomplete="off" spellcheck="false" disabled>', body), \
+        'one search box, disabled until site.js runs'
+    used = [state for state in DRIVER_LADDER if any(e['state'] == state for e in entries)]
+    key = re.findall(r'<div><dt><span class="badge" data-state="([a-z]+)">([^<]*)</span></dt><dd>([^<]*)</dd></div>', body)
+    assert key == [(state, *DRIVER_LADDER[state]) for state in used], f'the key says what each state in use means: {key}'
+    read = re.findall(r'<p class="dir-read">([\s\S]*?)</p>', body)
+    assert [plain(r) for r in read] == [f'States as of {data["read"]["date"]}, read from OpenWiz, its pull requests and its tickets.'] \
+        and f'<time datetime="{data["read"]["date"]}">' in read[0], f'the directory says the day its states were read: {read}'
+    notes = [plain(n) for n in re.findall(r'<p class="logo-note[^"]*">([\s\S]*?)</p>', main)]
+    assert notes == [DRIVER_LOGO_NOTE], f'say once that logos show what OpenWiz runs on, not a partnership: {notes}'
+    assert body.index('class="dir-groups"') < body.index('class="logo-note'), 'the logo line follows the logos'
+    return {'numbers': {str(n) for n in [len(entries), *counts.values(), *(int(c[3]) for c in chips)]}
+            | {part for e in entries if 'kit' in e for part in e['kit']['date'].split('-')} | set(data['read']['date'].split('-'))}
+
+
+def check_drivers(landing, changelog, drivers, page, data=None):
+    data = read_drivers() if data is None else data
+    check_drivers_data(data, landing)
     bar = top_bar(drivers)
     current = re.findall(r'<a [^>]*aria-current="page"[^>]*>([^<]*)</a>', bar)
     assert current == ['Drivers'] and re.search(r'<a class="nav-drivers" href="/drivers/" aria-current="page" data-count="drivers">Drivers</a>', bar), \
@@ -1598,50 +1646,34 @@ def check_drivers(landing, changelog, drivers, page):
     main = main[0]
     assert not re.search(r'\shidden\b', main), 'nothing on the drivers page waits for a script to show'
     check_driver_explainer(main)
-    outline = DriverOutline(main)
-    assert [(c['id'], c['name']) for c in outline.cards] == [(d[0], d[1]) for d in DRIVERS], \
-        f'the shipped driver cards, boat.dev first: {[(c["id"], c["name"]) for c in outline.cards]}'
-    for card, (key, name, line, state) in zip(outline.cards, DRIVERS):
-        assert card['line'] == line, f'{name}: the driver facts must read exactly: {line}'
-        hero = 'hero' in card['classes']
-        assert hero == (key == DRIVER_HERO), f'boat.dev is the hero card, and only it: {name}'
-        assert not card['checks'], f'{name}: no per-check rows on a card: {card["checks"]}'
-        if key == DRIVER_HERO:
-            assert card['proofs'] == list(KIT_CHECKS), f'{name}: its spotlight lists the five checks in order: {card["proofs"]}'
-        else:
-            assert not card['proofs'], f'{name}: a pending card shows one kit line, never per-check rows: {card["proofs"]}'
-            assert (card['kit'], card['kit_state']) == (DRIVER_KIT_LINES[key], state), \
-                f'{name}: its one kit line must read {DRIVER_KIT_LINES[key]!r} ({state}): {card["kit"]!r} ({card["kit_state"]})'
-    check_driver_logos(main, outline)
-    for key, name, _, _ in DRIVERS[1:]:
-        heading = re.search(rf'<h3 class="driver-name" id="{key}-name">([\s\S]*?)</h3>', main)
-        assert heading and re.fullmatch(rf'<img class="driver-logo[^"]*" src="/drivers/logos/[^"]+" alt="[^"]+"[^>]*><span>{re.escape(name)}</span>', heading[1].strip()), \
-            f'{name}: the compact cards share one header structure (icon or logo, then the name): {heading[1] if heading else None!r}'
-    check_driver_proof(main)
     check_host_pills(main)
-    check_driver_results(drivers, main, outline)
-    reader = Text(re.sub(r'<ul class="tally"[\s\S]*?</ul>|<nav class="wall-jump"[\s\S]*?</nav>', '', main))
-    readings = [reader.joined(), reader.spaced()] + reader.shown
-    for reading in readings:
-        found = DRIVER_JARGON.search(re.sub(r'\b5 of 5\b', 'the kit result', re.sub(r'\s+', ' ', reading)))
-        assert not found, f'a jargon count on the drivers page: {found[0]!r}'
+    check_driver_start(main)
+    found = check_driver_directory(main, data)
+    check_driver_proof(main)
+    check_driver_logos(main)
+    check_driver_results(drivers, main, data)
+    reader = Text(main)
+    allowed = DRIVER_NUMBERS | found['numbers']
+    for reading in [reader.joined(), reader.spaced()] + reader.shown:
+        jargon = DRIVER_JARGON.search(re.sub(r'\b5 of 5\b', 'the kit result', re.sub(r'\s+', ' ', reading)))
+        assert not jargon, f'a jargon count on the drivers page: {jargon[0]!r}'
         for number in re.findall(r'\d+', reading):
-            assert number in DRIVER_NUMBERS, f'invented number on the drivers page: {number}'
+            assert number in allowed, f'invented number on the drivers page: {number}'
     said = len(DRIVER_RESULT.findall(re.sub(r'\s+', ' ', reader.spaced())))
     assert 1 <= said <= DRIVER_RESULT_MAX, f'say boat.dev\'s five-of-five result at most {DRIVER_RESULT_MAX} times on the page: {said}'
-    assert outline.own_heading == OWN_DRIVER, f'the drivers page needs its {OWN_DRIVER} section'
-    assert outline.own_links and OPENWIZ_REPO in outline.own_links and all(
-        href == OPENWIZ_REPO or href.startswith(OPENWIZ_REPO + '/') for href in outline.own_links), \
-        f'{OWN_DRIVER} links only to the public OpenWiz repository: {outline.own_links}'
-    own = re.search(r'<dl class="own-words">([\s\S]*?)</dl>', main)
-    rows = re.findall(r'<dt><code>([^<]*)</code></dt><dd>([\s\S]*?)</dd>', own[1]) if own else []
+    own = re.search(r'<section class="own-driver[\s\S]*?</section>', main)
+    assert own and re.findall(r'<h2 id="own-title">([^<]*)</h2>', own[0]) == [OWN_DRIVER], f'the drivers page needs its {OWN_DRIVER} section'
+    own_links = re.findall(r'<a href="([^"]*)"', own[0])
+    assert OPENWIZ_REPO in own_links and all(href == OPENWIZ_REPO or href.startswith(OPENWIZ_REPO + '/') or href in OWN_DRIVER_LOCAL for href in own_links), \
+        f'{OWN_DRIVER} links only to the public OpenWiz repository and the Market: {own_links}'
+    words = re.search(r'<dl class="own-words">([\s\S]*?)</dl>', main)
+    rows = re.findall(r'<dt><code>([^<]*)</code></dt><dd>([\s\S]*?)</dd>', words[1]) if words else []
     assert [r[0] for r in rows] == list(KIT_CHECKS) and 'credential' in plain(rows[-1][1]), \
         f'{OWN_DRIVER} lists the four commands and the fifth check, token, with the credential it checks for: {rows}'
     own_copy = re.search(r'<div class="own-copy">\s*<h2[^>]*>[^<]*</h2>\s*<p>([^<]*)</p>', main)
     assert own_copy and DRIVER_COMMANDS in own_copy[1], f'{OWN_DRIVER} says a driver {DRIVER_COMMANDS!r}'
     assert not Outline(drivers).styles, 'the drivers page keeps its styles in site.css'
-    check_driver_logins(main)
-    check_driver_wall(main)
+    check_driver_logins(main, data)
     check_driver_token(drivers, main)
 
 
@@ -1649,12 +1681,28 @@ def plain(html):
     return re.sub(r'\s+', ' ', re.sub(r'<[^>]+>', '', html)).strip()
 
 
+def check_driver_start(main):
+    hero = re.search(r'<section class="voyage"[\s\S]*?</section>', main)[0]
+    start = re.findall(r'<div class="start" aria-labelledby="start-title">([\s\S]*?)</div>\s*<p class="voyage-jump">', hero)
+    assert len(start) == 1, 'the hero says how to start one, right after what runs today'
+    assert re.findall(r'<h2 class="start-title" id="start-title">([^<]*)</h2>', start[0]) == ['Start one'], 'the start part is headed Start one'
+    assert re.findall(r'<code class="install-line">([^<]*)</code>', start[0]) == [INSTALL_LINE], f'the start part pastes the one install line: {INSTALL_LINE}'
+    assert re.search(r'<div class="install-box" data-install="live">\s*<p class="install-hint">Paste this into your agent</p>', start[0]) \
+        and re.search(r'<button class="btn install" type="button" disabled data-count="install-copy">Copy</button>', start[0]), \
+        'the start part has the install box, its Copy button shipped disabled until site.js runs'
+    notes = [plain(n) for n in re.findall(r'<p class="start-note">([\s\S]*?)</p>', start[0])]
+    assert notes == [DRIVER_START_NOTE], f'the start part says where 0.01 runs agents, and how: {DRIVER_START_NOTE!r}'
+    assert main.index('class="host-marks"') < main.index('class="start"'), 'what runs today comes before how to start it'
+    assert re.findall(r'<a href="([^"]+)">', re.search(r'<p class="voyage-jump">([\s\S]*?)</p>', hero)[1]) == ['#all', '#kit'], \
+        'the hero jumps to every host and harness, and to what the five checks prove'
+
+
 def check_driver_explainer(main):
     found = re.findall(r'<div class="drivers-explainer">([\s\S]*?)</div>', main)
     assert len(found) == 1, 'the drivers page needs one explainer of what a driver is'
     hero = re.search(r'<section class="voyage"[\s\S]*?</section>', main)
     assert hero and 'class="drivers-explainer"' in hero[0], 'the driver explainer sits in the hero'
-    assert main.index('class="drivers-explainer"') < main.index('<article class="driver'), 'the driver explainer comes above the cards'
+    assert 0 <= main.find('class="drivers-explainer"') < main.find('class="directory'), 'the driver explainer comes above the directory'
     text = re.sub(r'<[^>]+>', ' ', found[0])
     text = re.sub(r'\s+', ' ', unescape(text)).strip()
     sentences = [part for part in re.split(r'(?<=[.!?])\s+', text) if part]
@@ -1669,7 +1717,7 @@ def check_driver_explainer(main):
     assert not listed, f'the command-by-command detail stays out of the hero\'s explainer: {listed}'
 
 
-def check_driver_logos(main, outline):
+def check_driver_logos(main):
     used = set()
     for attrs in re.findall(r'<img\b([^>]*)>', main):
         src = (re.search(r'\bsrc="([^"]*)"', attrs) or [None, ''])[1]
@@ -1681,7 +1729,7 @@ def check_driver_logos(main, outline):
             host = DRIVER_LOGOS[name][1]
             assert host.lower() in alt.lower(), f'the logo {src} needs alt text naming {host}: {alt!r}'
             used.add(name)
-    grok = re.search(r'<li class="tile[^"]*" id="grok-bot"[\s\S]*?</li>', main)
+    grok = re.search(r'<li class="row[^"]*" id="grok-bot"[\s\S]*?</li>', main)
     assert grok and not re.search(r'<(?:img|svg)\b', grok[0]), 'no Grok logo: Grok Bot shows its name only'
     assert used == set(DRIVER_LOGOS), f'unused drivers logos: {sorted(set(DRIVER_LOGOS) - used)}'
     assert not any('grok' in name.lower() for name in DRIVER_LOGOS), 'no Grok logo file'
@@ -1695,13 +1743,12 @@ def check_driver_logo_files(root):
 
 
 def check_driver_proof(main):
-    spot = re.findall(r'<section class="spotlight[^"]*"[\s\S]*?</section>', main)
-    assert len(spot) == 1, 'the drivers page needs one boat.dev spotlight'
+    spot = re.findall(r'<section class="spotlight wrap" id="kit" aria-labelledby="kit-title">[\s\S]*?</section>', main)
+    assert len(spot) == 1, 'the drivers page needs one five-check test part, with boat.dev\'s run'
     spot = spot[0]
-    assert 'id="boat-dev"' in spot, 'the spotlight is boat.dev\'s card'
-    assert main.index('class="spotlight') > main.index('class="voyage"') and \
-        main.index('class="spotlight') < main.index('<article class="driver" '), 'the spotlight comes right after the hero, before the other drivers'
-    assert main.index('class="spotlight') < main.index('class="own-driver'), 'the spotlight comes before Write your own driver'
+    assert re.findall(r'<h2 id="kit-title">([^<]*)</h2>', spot) == ['What a pass proves'], 'the five-check part is headed What a pass proves'
+    assert len(re.findall(r'<article class="driver hero" id="kit-boat-dev"', spot)) == 1 and spot.count('<article') == 1, 'the five-check part shows boat.dev\'s run'
+    assert 0 <= main.find('class="spotlight') < main.find('class="own-driver'), 'the five-check part comes before Write your own driver'
     rows = re.findall(r'<li class="proof-check" data-check="([^"]*)" data-state="([^"]*)">([\s\S]*?)</li>', spot)
     assert [(c, s) for c, s, _ in rows] == [(c, 'passed') for c, _ in PROOF_LINES], \
         f'the spotlight lists the kit\'s five checks in order, each passed: {[(c, s) for c, s, _ in rows]}'
@@ -1715,8 +1762,13 @@ def check_driver_proof(main):
     assert spot.index('class="proof-copy"') < spot.index('class="proof-scene"'), \
         'the spotlight\'s mark, result and five checks come before its painting (phone order)'
     head = re.search(r'<p class="driver-line">([^<]*)</p>\s*<p class="driver-date">([\s\S]*?)</p>', spot)
-    assert head and head[1] == DRIVERS[0][2] and plain(head[2]) == DRIVER_DATE, \
-        f'the spotlight\'s headline reads {DRIVERS[0][2]!r}, then its own date line {DRIVER_DATE!r}: {head.groups() if head else None}'
+    assert head and head[1] == 'Passed all five checks' and plain(head[2]) == DRIVER_DATE, \
+        f'the spotlight\'s headline reads Passed all five checks, then its own date line {DRIVER_DATE!r}: {head.groups() if head else None}'
+    assert re.search(rf'<p class="driver-date"><a href="{re.escape(DRIVER_PASSED["boat-dev"][1])}" data-count="github">', spot), \
+        f'boat.dev: its spotlight date links to its public evidence {DRIVER_PASSED["boat-dev"][1]}'
+    also = re.findall(r'</ol>\s*<p class="proof-also">([\s\S]*?)</p>', spot)
+    assert [plain(a) for a in also] == [DRIVER_ALSO], \
+        f'boat.dev is one of three: under its five checks, the spotlight says {DRIVER_ALSO!r}: {also}'
     images = [src for src in re.findall(r'<img\b[^>]*\bsrc="([^"]+)"', main) if src.startswith('/art/')]
     twice = sorted({src for src in images if images.count(src) > 1})
     assert not twice, f'a painting shown twice on the drivers page: {twice}'
@@ -1740,188 +1792,32 @@ def check_host_pills(main):
         assert shown == name, f'the {name} pill names its host: {shown!r}'
 
 
-def check_driver_results(drivers, main, outline):
+def check_driver_results(drivers, main, data):
     pills = dict((k, (s, b)) for k, s, b in re.findall(r'<li data-host="([^"]*)" data-state="([^"]*)">([\s\S]*?)</li>', main))
-    cards = {c['id']: c for c in outline.cards}
+    rows = {row['id']: row for row in DriverRows(main).rows}
     for key, (date, evidence) in DRIVER_PASSED.items():
-        name = cards[key]['name'] if key in cards else key
-        assert pills.get(key, ('',))[0] == 'passed', f'{name} passed the kit: shown as anything but passed in its pill: {pills.get(key)}'
-        card = re.search(rf'<article class="driver[^"]*" id="{key}"[\s\S]*?</article>', main)
-        assert card, f'{name} needs its card'
-        card = card[0]
-        assert re.search(r'^(?:Passed\b)', cards[key]['line']), f'{name} passed the kit: its status sentence says so: {cards[key]["line"]!r}'
-        if key != DRIVER_HERO:
-            assert cards[key]['kit_state'] == 'passed' and re.search(r'<p class="driver-kit passed"', card), \
-                f'{name} passed the kit: shown as anything but passed in its kit line: {cards[key]["kit_state"]!r}'
-            dated = re.findall(r'<p class="driver-date"><a href="([^"]+)" data-count="github">([\s\S]*?)</a></p>', card)
-            assert [(href, plain(text)) for href, text in dated] == [(evidence, DRIVER_CARD_DATE.format(date))], \
-                f'{name}: its card dates its kit run {date}, linked to its public evidence: {dated}'
-        else:
-            assert re.search(rf'<p class="driver-date"><a href="{re.escape(evidence)}" data-count="github">', card), \
-                f'{name}: its spotlight date links to its public evidence {evidence}'
-        assert f'datetime="{date}"' in card, f'{name}: its kit run is dated {date}'
-        stale = DRIVER_STALE.search(plain(card) + ' ' + plain(pills.get(key, ('', ''))[1]))
-        assert not stale, f'{name} passed the kit: no stale state word: {stale[0]!r}'
+        assert pills.get(key, ('',))[0] == 'passed', f'{key} passed the kit: shown as anything but passed in its pill: {pills.get(key)}'
+        row = rows.get(key)
+        assert row and row['state'] == 'shipped' and [(h, tidy(w)) for h, w in row['links']][:1] == [(evidence, f'Kit run, {date}')], \
+            f'{key}: its row dates its kit run {date}, linked to its public evidence'
     assert set(pills) == {key for key, *_ in HOST_PILLS}, f'a host pill only for a shipped driver: {sorted(pills)}'
-    spot = re.search(r'<section class="spotlight[\s\S]*?</section>', main)[0]
-    also = re.findall(r'</ol>\s*<p class="proof-also">([\s\S]*?)</p>', spot)
-    assert [plain(a) for a in also] == [DRIVER_ALSO], \
-        f'boat.dev is one of three: under its five checks, the spotlight says {DRIVER_ALSO!r}: {also}'
-    rest = main
-    stale = DRIVER_STALE.search(re.sub(r'\s+', ' ', re.sub(r'<[^>]+>', ' ', rest)) + ' ' + ' '.join(re.findall(r'content="([^"]*)"', drivers)))
+    stale = DRIVER_STALE.search(re.sub(r'\s+', ' ', re.sub(r'<[^>]+>', ' ', main)) + ' ' + ' '.join(re.findall(r'content="([^"]*)"', drivers)))
     assert not stale, f'a stale driver state word on the drivers page: {stale[0]!r}'
     only = re.search(r'\bonly (?:boat\.dev|one)\b[^.]*\bpass|\bboat\.dev is the only\b', re.sub(r'\s+', ' ', re.sub(r'<[^>]+>', ' ', unescape(drivers))), re.I)
     assert not only, f'boat.dev is never the only one that passed: {only[0]!r}'
 
 
-def check_driver_logins(main):
-    cards = {key: re.search(rf'<article class="driver[^"]*" id="{key}"[\s\S]*?</article>', main) for key, *_ in DRIVERS}
-    for key, name, _, _ in DRIVERS:
-        card = cards[key][0] if cards[key] else ''
-        want = [DRIVER_LOGINS[key]] if key in DRIVER_LOGINS else []
-        lines = [plain(line) for line in re.findall(r'<p class="driver-login">([\s\S]*?)</p>', card)]
-        assert lines == want, f'{name}: its login line must read exactly {want}: {lines}'
-        if want:
-            assert re.search(r'</h[23]>\s*<p class="driver-login">', card), f'{name}: its login line sits right after its name'
-    found = len(re.findall(r'class="driver-login"', main))
-    assert found == len(DRIVER_LOGINS) + len(DRIVER_WALL_LOGINS), f'a login line only on a driver card or its tile: {found} on the page'
-
-
-class WallTiles(HTMLParser):
-    def __init__(self, text):
-        super().__init__(convert_charrefs=True)
-        self.tiles, self.field, self.depth = [], None, 0
-        self.feed(text)
-
-    def handle_starttag(self, tag, attrs):
-        attrs = dict(attrs)
-        classes = (attrs.get('class') or '').split()
-        if tag == 'li' and 'tile' in classes:
-            self.tiles.append({'id': attrs.get('id'), 'state': attrs.get('data-state'), 'name': '', 'said': '', 'login': [],
-                               'links': [], 'images': [], 'svgs': 0, 'times': []})
-            self.depth = 1
-            return
-        if not self.depth:
-            return
-        tile = self.tiles[-1]
-        if tag == 'li':
-            self.depth += 1
-        if tag == 'img':
-            tile['images'].append((attrs.get('src') or '', attrs.get('alt') or ''))
-        elif tag == 'svg':
-            tile['svgs'] += 1
-        elif tag == 'time':
-            tile['times'].append(attrs.get('datetime'))
-        elif tag == 'a':
-            tile['links'].append([attrs.get('href'), ''])
-            self.field = 'link'
-        elif tag == 'h4' and 'tile-name' in classes:
-            self.field = 'name'
-        elif tag == 'p' and 'tile-state' in classes:
-            self.field = 'said'
-        elif tag == 'p' and 'driver-login' in classes:
-            tile['login'].append('')
-            self.field = 'login'
-
-    def handle_data(self, data):
-        if not (self.depth and self.field):
-            return
-        tile = self.tiles[-1]
-        if self.field == 'link':
-            tile['links'][-1][1] += data
-        elif self.field == 'login':
-            tile['login'][-1] += data
-        else:
-            tile[self.field] += data
-
-    def handle_endtag(self, tag):
-        if not self.depth:
-            return
-        if tag in ('a', 'h4', 'p'):
-            self.field = None
-        if tag == 'li':
-            self.depth -= 1
+def check_driver_logins(main, data):
+    spot = re.search(r'<section class="spotlight[\s\S]*?</section>', main)[0]
+    lines = [plain(line) for line in re.findall(r'<p class="driver-login">([\s\S]*?)</p>', spot)]
+    assert lines == [DRIVER_LOGINS['boat-dev']] and re.search(r'</h3>\s*<p class="driver-login">', spot), \
+        f'boat.dev: its login line sits right after its name: {lines}'
+    found = len(re.findall(r'class="(?:driver|row)-login"', main))
+    assert found == 1 + sum('login' in entry for entry in data['entries']), f'a login line only on boat.dev\'s run and on each row that has one: {found} on the page'
 
 
 def tidy(text):
     return re.sub(r'\s+', ' ', unescape(text)).strip()
-
-
-def check_driver_wall(main):
-    sections = re.findall(r'<section class="wall wrap" id="([^"]+)"[^>]*>([\s\S]*?)</section>', main)
-    assert [s[0] for s in sections] == [w for w, *_ in DRIVER_WALLS], \
-        f'two walls, hosts then harnesses: where your agents run, then which agent you already use: {[s[0] for s in sections]}'
-    assert main.index('class="more-drivers') < main.index('class="wall wrap"') < main.index('class="own-driver'), \
-        'the walls sit after the shipped drivers, before Write your own driver'
-    states = list(DRIVER_LADDER)
-    for (wall, body), (_, title, kicker) in zip(sections, DRIVER_WALLS):
-        hidden = DRIVER_WALL_HIDDEN.search(body)
-        assert not hidden, f'the {wall} wall hides nothing: every word and link in it is shown: {hidden[0]!r}'
-        assert re.findall(rf'<h2 id="{wall}-title">([^<]*)</h2>', body) == [title], f'the {wall} wall is headed {title!r}'
-        want = [row for row in DRIVER_WALL if row[2] == wall]
-        want.sort(key=lambda row: states.index(row[3]))
-        tiles = WallTiles(body).tiles
-        assert [x['id'] for x in tiles] == [row[0] for row in want], \
-            f'the {wall} wall lists every entry once, grouped by state in ladder order: {[x["id"] for x in tiles]}'
-        assert body.count('<li') == len(tiles), f'the {wall} wall holds only tiles'
-        groups = re.findall(r'<div class="wall-group" id="[^"]+" data-state="([^"]+)">\s*<h3 class="group-title">([^<]*)<span class="group-count">(\d+)</span></h3>([\s\S]*?)</ul>', body)
-        assert [g[0] for g in groups] == list(dict.fromkeys(row[3] for row in want)) and len(groups) == body.count('class="wall-group"'), \
-            f'the {wall} wall has one group per state, in ladder order: {[g[0] for g in groups]}'
-        jump = re.findall(r'<a href="#([^"]+)" data-state="([^"]+)">([^<]*)<span>(\d+)</span></a>', body)
-        assert [(h, s, tidy(w), int(n)) for h, s, w, n in jump] == [(f'{wall}-{g[0]}', g[0], DRIVER_LADDER[g[0]][0], int(g[2])) for g in groups] \
-            and all(f'id="{wall}-{g[0]}"' in body for g in groups), f'the {wall} wall\'s jump row names each group, its true count and its anchor: {jump}'
-        for state, label, count, inner in groups:
-            members = [x['id'] for x in WallTiles(inner).tiles]
-            assert tidy(label) == DRIVER_LADDER[state][0] and int(count) == len(members) == sum(1 for r in want if r[3] == state), \
-                f'the {wall} group {state!r} is headed {DRIVER_LADDER[state][0]!r} with its true count: {tidy(label)!r} {count}'
-            assert all(x['state'] == state for x in WallTiles(inner).tiles), f'the {state!r} group holds only {state!r} tiles'
-        for tile, (key, name, _, state, link, logo) in zip(tiles, want):
-            words, link_words = DRIVER_LADDER[state]
-            said = DRIVER_REASONS.get(key, words)
-            assert tile['state'] == state and tidy(tile['name']) == name, f'{name}: its tile names it and carries its state {state!r}'
-            assert tidy(tile['said']) == said, f'{name}: its state reads exactly {said!r}, from the ladder: {tidy(tile["said"])!r}'
-            if state in ('held', 'parked'):
-                assert said.startswith(words + ': '), f'{name}: a {words.lower()} entry gives its reason'
-                if state == 'held':
-                    assert len(said.split(': ', 1)[1].split()) == 5, f'{name}: a hold gives its reason in five words: {said!r}'
-            dated = f', {DRIVER_RECEIPT[1]}' if key == DRIVER_RECEIPT[0] else ''
-            assert [(h, tidy(w)) for h, w in tile['links']] == [(link, link_words + dated)], \
-                f'{name}: one link, to its ticket or pull request {link}, reading {link_words + dated!r}: {tile["links"]}'
-            assert link.startswith(OPENWIZ_REPO + '/'), f'{name}: its link goes to the public OpenWiz repository'
-            assert tile['times'] == ([DRIVER_RECEIPT[1]] if dated else []), f'{name}: only the live-check receipt carries a date'
-            assert [tidy(x) for x in tile['login']] == ([DRIVER_WALL_LOGINS[key]] if key in DRIVER_WALL_LOGINS else []), \
-                f'{name}: its login line, only once its driver is built: {tile["login"]}'
-            if logo:
-                pinned = f'drivers/logos/{logo}'
-                assert [src for src, _ in tile['images']] == [f'/{pinned}'] and not tile['svgs'] and pinned in DRIVER_LOGOS, \
-                    f'{name}: its one official logo, {pinned}: {tile["images"]}'
-            else:
-                assert not tile['images'] and not tile['svgs'], f'{name}: no official mark to show, so its name only: {tile["images"]}'
-            block = re.search(rf'<li class="tile[^"]*" id="{re.escape(key)}"[\s\S]*?</li>', body)[0]
-            visible = [name, said] + ([DRIVER_WALL_LOGINS[key]] if key in DRIVER_WALL_LOGINS else []) + [link_words + dated]
-            assert tidy(re.sub(r'<[^>]+>', ' ', block)).replace(' ,', ',') == ' '.join(visible), \
-                f'{name}: its tile shows exactly its name, state, login and link, nothing more: {tidy(re.sub(r"<[^>]+>", " ", block))!r}'
-            assert len(re.findall(r'<a\b', block)) == 1, f'{name}: one link in its tile'
-            shown = tidy(' '.join([tile['said']] + [w for _, w in tile['links']] + tile['login']))
-            if state == 'live':
-                shown = shown.replace(DRIVER_LADDER['live'][0], '').replace('Live check receipt', '')
-            found = DRIVER_UNSHIPPED_CLAIM.search(shown.replace('live check', ''))
-            assert not found, f'{name} is not in a release: never say or imply it is: {found[0]!r}'
-        rest = tidy(re.sub(r'<[^>]+>', ' ', re.sub(r'<li class="tile[\s\S]*?</li>', ' ', body)))
-        want_rest = ' '.join([kicker, title, DRIVER_WALL_LEADS[wall]] + [f'{DRIVER_LADDER[g[0]][0]} {g[2]}' for g in groups] * 2)
-        assert rest == want_rest, f'the {wall} wall shows only its kicker, heading, lead, jump row and group headings around its tiles: {rest!r}'
-        assert len(re.findall(r'<a\b', body)) == len(tiles) + len(groups), f'the {wall} wall links only its tiles and its jump row'
-        leads = [plain(x) for x in re.findall(r'<p class="wall-lead">([\s\S]*?)</p>', body)]
-        assert leads == [DRIVER_WALL_LEADS[wall]], f'the {wall} wall\'s lead reads exactly {DRIVER_WALL_LEADS[wall]!r}: {leads}'
-    tally = re.findall(r'<ul class="tally"[^>]*>([\s\S]*?)</ul>', main)
-    assert len(tally) == 1 and main.index('class="tally"') < main.index('class="spotlight'), 'one count line, at the top'
-    items = re.findall(r'<li data-state="([^"]+)"><b>(\d+)</b> ([^<]*)</li>', tally[0])
-    counts = {'shipped': len(DRIVERS)} | {s: sum(1 for row in DRIVER_WALL if row[3] == s) for s in DRIVER_LADDER}
-    assert [(k, int(n), w) for k, n, w in items] == [(k, counts[k], w) for k, w in DRIVER_TALLY] and len(items) == tally[0].count('<li'), \
-        f'the count line states the true numbers: {items}'
-    notes = [plain(n) for n in re.findall(r'<p class="logo-note[^"]*">([\s\S]*?)</p>', main)]
-    assert notes == [DRIVER_LOGO_NOTE], f'say once that logos show what OpenWiz runs on, not a partnership: {notes}'
-    assert main.index('class="wall wrap"') < main.index('class="logo-note'), 'the logo line follows the logos'
 
 
 def check_driver_token(drivers, main):
@@ -2083,11 +1979,13 @@ def check_driver_css(css):
                 assert not re.search(r'(?<![-\w])(?:height|max-height|width)\s*:\s*\d', body), \
                     f'a host mark sized apart from its slot, so the pills are uneven: {one}'
     for sel, body in re.findall(r'([^{}]+)\{([^{}]*)\}', css):
-        if re.search(r'\.(?:wall|tile|tally|group|logo-note)', sel):
-            assert not re.search(r'display\s*:\s*none|visibility\s*:\s*hidden|opacity\s*:\s*0(?![.\d])|font-size\s*:\s*0', body), \
-                f'nothing on the walls is hidden by a style: {sel.strip()}'
+        if re.search(r'\.(?:rows?|row-[a-z]+|dir-groups?|dir-states|dir-key|badge|logo-note)\b', sel):
+            filtered = all(one.strip().endswith('[hidden]') for one in sel.split(','))
+            assert filtered and re.fullmatch(r'\s*display\s*:\s*none;?\s*', body) or \
+                not re.search(r'display\s*:\s*none|visibility\s*:\s*hidden|opacity\s*:\s*0(?![.\d])|font-size\s*:\s*0', body), \
+                f'nothing in the directory is hidden by a style, beyond the rows the filter marks hidden: {sel.strip()}'
     for sel, body in re.findall(r'([^{}]+)\{([^{}]*)\}', css):
-        if re.search(r'host-(?:tile|lockup|icon)\b|spot-logo|driver-logo|host-mark img|tile-mark img', sel):
+        if re.search(r'host-(?:tile|lockup|icon)\b|spot-logo|row-lockup|row-icon|host-mark img|row-mark (?:img|svg)', sel):
             assert not re.search(r'(?<![-\w])(?:border-radius|clip-path|overflow|object-fit|mask)\s*:', body), \
                 f'a logo clipped or cropped; official marks show whole: {sel.strip()}'
     phone = [b for q, b in re.findall(r'@media\s*\(max-width:\s*(\d+)px\)\s*\{((?:[^{}]*\{[^{}]*\})*)[^{}]*\}', css) if int(q) <= 760]
@@ -2327,7 +2225,7 @@ def main():
             built = split_releases(built)[0]
         if name == MARKET_PAGE:
             built = split_market(built)[0]
-        if name == DRIVERS_PAGE and driver_listing_urls(ROOT / 'market/registry.json'):
+        if name == DRIVERS_PAGE:
             check_drivers_export(built)
             continue
         assert fingerprinted_page((ROOT / name).read_text(), cta=name != APP_PAGE) == built, f'export differs: {name}'
