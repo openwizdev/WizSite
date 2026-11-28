@@ -25,6 +25,7 @@ TOP_BAR_PAGES = (
     '/market/',
     '/faq/',
     '/team/',
+    '/pricing/',
     '404',
 )
 
