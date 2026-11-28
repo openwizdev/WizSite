@@ -11,7 +11,7 @@ from unittest import mock
 
 import re
 
-from check import ALL_PAGES, ART, CTA, DOC_HASHES, FAQ, FAQ_PREREQS, FAQ_WHERE, FOOTER, INSTALL_NOTE_HTML, INSTALL_PREREQS_HTML, FINGERPRINTS, HASHED, INSTALL_SWITCH, ROOT, Page, check_changelog, check_image_preloads, check_release_data, check_releases, read_releases, split_releases, check_motion, check_privacy, check_ref, check_security_txt, check_site, check_vector, check_webp, check_avif, check_png, fingerprint
+from check import ALL_PAGES, ART, CTA, DOC_HASHES, FAQ, FAQ_PREREQS, FAQ_WHERE, FOOTER, INSTALL_NOTE_HTML, INSTALL_PREREQS_HTML, FINGERPRINTS, HASHED, INSTALL_SWITCH, ROOT, Page, check_changelog, check_discovery, check_image_preloads, check_release_data, check_releases, read_releases, split_releases, check_motion, check_privacy, check_ref, check_security_txt, check_site, check_vector, check_webp, check_avif, check_png, fingerprint
 
 REMOVED_ART = (
     'art/spec-video.mp4',
@@ -1644,6 +1644,29 @@ class Checks(unittest.TestCase):
             (root / 'brand/openwiz-lockup.svg').write_bytes(logo.replace(b'</svg>', b'<text>OpenWiz</text></svg>'))
             with self.assertRaises(AssertionError):
                 check_site(root)
+
+    def test_markdown_mirrors(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / 'dist'
+            shutil.copytree(ROOT / 'dist', root)
+            (root / 'faq.md').unlink()
+            with self.assertRaisesRegex(AssertionError, 'missing its Markdown copy'):
+                check_discovery(root, {name: Page((root / name).read_text()) for name in ALL_PAGES})
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / 'dist'
+            shutil.copytree(ROOT / 'dist', root)
+            (root / 'faq.md').write_text('# FAQ\n\n<b>raw</b>\n\nSource: https://openwiz.dev/faq/\n')
+            with self.assertRaisesRegex(AssertionError, 'invalid Markdown copy'):
+                check_discovery(root, {name: Page((root / name).read_text()) for name in ALL_PAGES})
+        probe = subprocess.run(
+            ['node', '--input-type=module', '-e',
+             'import { pageMarkdown } from "./scripts/mirrors.mjs";'
+             'console.log(pageMarkdown("<main><h1>Example &lt;b&gt;listed&lt;/b&gt; &amp; co</h1>'
+             '<p>Use <code>&lt;id&gt;</code> with <a href=\\"/faq/\\"><code>&lt;tag&gt;</code> &amp; &lt;b&gt;</a></p></main>"));'],
+            cwd=ROOT, capture_output=True, text=True, check=True)
+        self.assertEqual(
+            probe.stdout.strip(),
+            '# Example &lt;b&gt;listed&lt;/b&gt; & co\n\nUse `<id>` with [`<tag>` & &lt;b&gt;](https://openwiz.dev/faq/)')
 
 if __name__ == '__main__':
     unittest.main()

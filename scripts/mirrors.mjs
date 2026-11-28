@@ -1,21 +1,30 @@
 import { decode } from './ask-index.mjs';
 
 const site = 'https://openwiz.dev/';
+const plainText = text => decode(text).replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 export const mirrorPath = page => page === 'index.html' ? 'index.md' : page.replace(/\/index\.html$/, '.md');
 
-const inline = html => decode(html
-  .replace(/<br\s*\/?>/g, ' ')
-  .replace(/<code\b[^>]*>([\s\S]*?)<\/code>/g, (_, code) => '`' + code.replace(/<[^>]*>/g, '') + '`')
-  .replace(/<(strong|b)\b[^>]*>([\s\S]*?)<\/\1>/g, '**$2**')
-  .replace(/<(em|i)\b[^>]*>([\s\S]*?)<\/\1>/g, '*$2*')
-  .replace(/<a\b[^>]*\bhref="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g, (_, url, label) => {
-    const text = label.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
-    return text ? `[${text}](${new URL(decode(url), site)})` : '';
-  })
-  .replace(/<\/(span|div|td|th|dt|dd)>/g, ' ')
-  .replace(/<[^>]*>/g, ''))
-  .replace(/\s+/g, ' ').trim();
+const inline = html => {
+  const tokens = [];
+  const hold = value => {
+    tokens.push(value);
+    return `\u0001${tokens.length - 1}\u0001`;
+  };
+  const restore = text => text.replace(/\u0001(\d+)\u0001/g, (_, i) => tokens[Number(i)]);
+  const stripped = html
+    .replace(/<br\s*\/?>/g, ' ')
+    .replace(/<code\b[^>]*>([\s\S]*?)<\/code>/g, (_, code) => hold('`' + decode(code.replace(/<[^>]*>/g, '')) + '`'))
+    .replace(/<(strong|b)\b[^>]*>([\s\S]*?)<\/\1>/g, '**$2**')
+    .replace(/<(em|i)\b[^>]*>([\s\S]*?)<\/\1>/g, '*$2*')
+    .replace(/<a\b[^>]*\bhref="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g, (_, url, label) => {
+      const text = restore(plainText(label.replace(/<[^>]*>/g, ''))).replace(/\s+/g, ' ').trim();
+      return text ? hold(`[${text}](${new URL(decode(url), site)})`) : '';
+    })
+    .replace(/<\/(span|div|td|th|dt|dd)>/g, ' ')
+    .replace(/<[^>]*>/g, '');
+  return restore(plainText(stripped)).replace(/\s+/g, ' ').trim();
+};
 
 export function pageMarkdown(html) {
   const main = html.match(/<main\b[^>]*>([\s\S]*?)<\/main>/);

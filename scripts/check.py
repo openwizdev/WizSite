@@ -1273,7 +1273,7 @@ def check_discovery(root, pages):
         assert html.count(f'<link rel="alternate" type="text/markdown" href="/{copy}">') == 1, f'{name}: needs one head link to its Markdown copy'
         assert (root / copy).is_file(), f'{name}: missing its Markdown copy {copy}'
         text = (root / copy).read_text()
-        assert text.startswith('# ') and text.endswith(f'\nSource: {url}\n') and '<' not in re.sub(r'`[^`]*`', '', text), f'{copy}: invalid Markdown copy'
+        assert text.startswith('# ') and text.endswith(f'\nSource: {url}\n') and '<' not in re.sub(r'```[\s\S]*?```|`[^`]*`', '', text), f'{copy}: invalid Markdown copy'
         assert f'{SITE_URL}{copy}' in brief.split('\n## Markdown copies\n')[-1], f'llms.txt must list {copy}'
         assert url in full_text, f'llms-full.txt must hold {name}'
     assert '`Install OpenWiz from github.com/openwizdev/OpenWiz`' in (root / 'index.md').read_text(), 'the home copy needs the install line'
