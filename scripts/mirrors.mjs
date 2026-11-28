@@ -31,12 +31,15 @@ export function pageMarkdown(html) {
   if (!main) throw new Error('a page needs one <main> for its Markdown copy');
   let body = main[1]
     .replace(/<!--[\s\S]*?-->/g, '')
-    .replace(/<(script|style|template|svg|noscript|form|video|audio|picture|figure|dialog)\b[\s\S]*?<\/\1>/g, '')
+    .replace(/<(script|style|template|svg|noscript|form|video|audio|picture|dialog)\b[\s\S]*?<\/\1>/g, '')
     .replace(/<(\w+)\b[^>]*\b(hidden|aria-hidden="true")[^>]*>[\s\S]*?<\/\1>/g, '')
     .replace(/(<h[1-6]\b[^>]*>)\s*<button\b[^>]*>([\s\S]*?)<\/button>\s*(<\/h[1-6]>)/g, '$1$2$3')
     .replace(/<button\b[^>]*>([\s\S]*?)<\/button>/g, '')
     .replace(/<code\b[^>]*class="[^"]*install-line[^"]*"[^>]*>([\s\S]*?)<\/code>/g, '<p><code>$1</code></p>');
-  body = body.replace(/<(li|blockquote|dd|td|th)\b[^>]*>([\s\S]*?)<\/\1>/g, (whole, tag, inner) => /<(p|h[1-6]|ul|ol)\b/.test(inner) ? inner : whole);
+  body = body.replace(/^([ \t]*)(<a\b[^>]*>[\s\S]*?<\/a>)[ \t]*$/gm, '$1<p>$2</p>');
+  body = body.replace(/<(li|blockquote|dd|td|th|figcaption)\b[^>]*>([\s\S]*?)<\/\1>/g, (whole, tag, inner) => /<(p|h[1-6]|ul|ol)\b/.test(inner)
+    ? inner.replace(/(^|<\/(?:p|h[1-6]|ul|ol)>)([\s\S]*?)(?=<(?:p|h[1-6]|ul|ol)\b|$)/g, (_, close, loose) => close + (loose.replace(/<[^>]*>/g, '').trim() ? `<p>${loose}</p>` : ''))
+    : whole);
   const blocks = [];
   const pre = [];
   body = body.replace(/<pre\b[^>]*>([\s\S]*?)<\/pre>/g, (_, code) => {

@@ -1342,7 +1342,7 @@ def check_mirror_links(root):
         main_html = re.sub(r'<(template|script|svg|noscript|form|dialog)\b[\s\S]*?</\1>', '', main_html)
         main_html = re.sub(r'<(\w+)\b[^>]*\b(hidden|aria-hidden="true")[^>]*>[\s\S]*?</\1>', '', main_html)
         copy_text = (root / mirror_path(name)).read_text()
-        for href in re.findall(r'<p\b[^>]*>[^<]*(?:<(?!/p>)[^<]*)*?<a\b[^>]*\bhref="(https://github\.com/[^"]+)"', main_html):
+        for href in re.findall(r'<a\b[^>]*\bhref="(https://[^"]+)"', main_html):
             assert unescape(href) in copy_text, f'{mirror_path(name)} must keep the link {unescape(href)}'
 
 
