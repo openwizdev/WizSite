@@ -1,0 +1,79 @@
+{
+  "slug": "self-hosted-coding-agents",
+  "kind": "answer",
+  "query": "self-hosted coding agents",
+  "title": "Self-hosted coding agents with OpenWiz",
+  "description": "Run coding agents on your own computer or VPS with OpenWiz, and see which parts still use GitHub or your model provider.",
+  "answer": "Self-hosted coding agents run commands and edit files on a machine you control, such as a workstation or VPS. Choose this computer in OpenWiz to run builders on that machine with a signed-in Claude Code or Codex installation. OpenWiz uses GitHub for work records and does not host the model.",
+  "sections": [
+    {
+      "heading": "What runs where",
+      "body": "Run OpenWiz and the coding agent on the same machine where you want the work to happen. Use GitHub for specs and tickets, and sign in to the coding agent on the machine itself. If you use Claude Code, its [data flow documentation](https://code.claude.com/docs/en/data-usage#local-claude-code-data-flow-and-dependencies) explains what its local client sends over the network for model requests."
+    }
+  ],
+  "steps": [
+    {
+      "name": "Prepare the machine that will do the work",
+      "text": "Use a supported Mac or an x86-64 Linux machine with glibc 2.34 or later for OpenWiz 0.1.0. On that machine, have Python 3.9 or later and Git installed. Sign in to the GitHub CLI with `gh auth login`, and open a signed-in Claude Code or Codex session."
+    },
+    {
+      "name": "Install and choose this computer",
+      "text": "Tell the coding agent `Install OpenWiz` and choose this computer when it asks where builders should run. Follow the 0.1.0 install guide in Sources. After setup installs the skills, restart the agent and say `continue the OpenWiz install`."
+    },
+    {
+      "name": "Plan one small change",
+      "text": "Pick a GitHub repository you can write to. Ask the agent to plan a small change there, such as clarifying one paragraph in the README. Confirm the spec and approve the plan before starting the builder."
+    },
+    {
+      "name": "Start and review the builder on your machine",
+      "text": "Open a new Claude Code or Codex session from a working copy of the repository on that machine. Give the session the approved ticket link and ask it to make the change, run the relevant checks and open a pull request. Review the diff and test results yourself."
+    }
+  ],
+  "faq": [
+    {
+      "question": "Can I run builders on a VPS I manage?",
+      "answer": "Yes. Install OpenWiz and your signed-in coding agent on the VPS itself and choose this computer from there."
+    },
+    {
+      "question": "Does this work offline?",
+      "answer": "GitHub is used for work records and your coding agent still uses its configured model provider. For example, a local Claude Code session sends model requests over the network."
+    },
+    {
+      "question": "Will OpenWiz start local builders automatically?",
+      "answer": "In OpenWiz 0.1.0 the automatic fleet runs in CloudRoom. With the local setup you start each builder and review its pull request yourself."
+    }
+  ],
+  "sources": [
+    {
+      "url": "https://github.com/openwizdev/OpenWiz/blob/f14b3c1f659dd5fea45e1672fc3d159b04f306a9/README.md#L12-L24",
+      "supports": "OpenWiz 0.1.0 supported platforms, install phrase and prerequisites, signed-in agent choice, plan approval and manual local builder and review limits.",
+      "checked": "2026-11-28"
+    },
+    {
+      "url": "https://github.com/openwizdev/OpenWiz/blob/f14b3c1f659dd5fea45e1672fc3d159b04f306a9/README.md#L37-L43",
+      "supports": "GitHub work records, drivers for the user's computer or VPS, the agent's own login and no OpenWiz-hosted server.",
+      "checked": "2026-11-28"
+    },
+    {
+      "url": "https://github.com/openwizdev/OpenWiz/blob/f14b3c1f659dd5fea45e1672fc3d159b04f306a9/CHANGELOG.md#L5-L14",
+      "supports": "OpenWiz 0.1.0 can run builders on the computer or VPS where Claude Code or Codex is already signed in.",
+      "checked": "2026-11-28"
+    },
+    {
+      "url": "https://github.com/openwizdev/OpenWiz/blob/f14b3c1f659dd5fea45e1672fc3d159b04f306a9/docs/install.md#L21-L26",
+      "supports": "Run `gh auth login` and use the signed-in coding agent for the local host.",
+      "checked": "2026-11-28"
+    },
+    {
+      "url": "https://github.com/openwizdev/OpenWiz/blob/f14b3c1f659dd5fea45e1672fc3d159b04f306a9/docs/install.md#L129-L207",
+      "supports": "OpenWiz 0.1.0 install procedure, restart message and manual local builder workflow.",
+      "checked": "2026-11-28"
+    },
+    {
+      "url": "https://code.claude.com/docs/en/data-usage#local-claude-code-data-flow-and-dependencies",
+      "supports": "Claude Code runs locally and sends data over the network for model requests.",
+      "checked": "2026-11-28"
+    }
+  ],
+  "checked": "2026-11-28"
+}
