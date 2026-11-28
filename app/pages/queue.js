@@ -360,7 +360,7 @@
         : result ? (allClear?.(message) ?? OW.ui.placeholder(message))
         : (stateCard?.('reading', message) ?? OW.ui.placeholder(message));
       const pauseNode = pause ? (stateCard?.('pause', pause) ?? h('p', { class: 'v2-pause-note' }, pause)) : null;
-      deck.status.replaceChildren(...[pauseNode, notice].filter(Boolean));
+      OW.ui.fill(deck.status, pauseNode, notice);
     }
 
     if (!deck.activeKey) {

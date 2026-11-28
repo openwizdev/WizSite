@@ -690,7 +690,7 @@
     const now = Date.now();
     const sample = OW.data.demo && V2();
     const seen = sample ? null : OW.factory.model(feeds);
-    if (!seen && !sample) return el.replaceChildren(OW.ui.placeholder('Reading GitHub…'));
+    if (!seen && !sample) return OW.ui.fill(el, OW.ui.placeholder('Reading GitHub…'));
     const m = sample ? OW.v2.sampleCanvas(now) : model(seen, OW.agents.notes(now), now, home());
     shown = m;
     const asked = arg ? Number(arg) : view.sheet;

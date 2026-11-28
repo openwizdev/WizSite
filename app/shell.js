@@ -62,6 +62,19 @@
     return view;
   }
 
+  function waitScreen(text, detail) {
+    if (!window.WizLoader?.mount || !window.WizLoader?.markup) {
+      return screen(h('h1', {}, text), detail ? h('p', {}, detail) : null);
+    }
+    built = null;
+    OW.palette.close();
+    let box = root.querySelector(':scope > .wiz-loader');
+    if (!box) root.replaceChildren(box = window.WizLoader.markup());
+    for (const line of box.querySelectorAll('.wiz-loader-line, .wl-sr')) line.textContent = text;
+    window.WizLoader.mount(box);
+    document.title = 'OpenWiz';
+  }
+
   function signedOut(note) {
     data.stop();
     if (v2 && OW.v2) {
@@ -80,12 +93,13 @@
     );
   }
 
+  const reading = text => OW.ui.loading(text) || h('p', {}, text);
   const signOutButton = () => h('button', { class: 'btn', type: 'button', onclick: () => { data.auth.signOut(); signedOut(); } }, 'Sign out');
 
   async function picker() {
     data.stop();
     const session = data.auth.session();
-    const view = screen(h('h1', {}, 'Pick a repository'), h('p', {}, 'Reading your repositories from GitHub…'), h('p', { class: 'small' }, signOutButton()));
+    const view = screen(h('h1', {}, 'Pick a repository'), reading('Reading your repositories from GitHub…'), h('p', { class: 'small' }, signOutButton()));
     let found;
     try {
       found = await data.repositories();
@@ -160,10 +174,10 @@
   }
   function repoSwitch(picked) {
     const list = h('div', { class: 'repo-list', hidden: true, id: `repos-${Math.random().toString(36).slice(2)}` });
-    const close = () => { list.hidden = true; button.setAttribute('aria-expanded', 'false'); };
+    const close = () => { list.hidden = true; list.replaceChildren(); button.setAttribute('aria-expanded', 'false'); };
     const fill = async () => {
       const session = data.auth.session();
-      list.replaceChildren(h('p', {}, 'Reading your repositories…'));
+      list.replaceChildren(reading('Reading your repositories…'));
       let found;
       try {
         found = await readRepositories();
@@ -206,7 +220,7 @@
     const feeds = v2 ? [data.feeds.specs, data.feeds.agents] : Object.values(data.feeds);
     const limit = data.limit;
     return [
-      ...feeds.map(feed => h('div', {}, ...readLine(feed))),
+      ...feeds.map(feed => (v2 && feed.state === 'loading' && feed.busy && OW.ui.loading(`${feed.label}: reading…`)) || h('div', {}, ...readLine(feed))),
       h('div', {}, limit.remaining === null ? 'GitHub limit: not read yet' : `GitHub limit: ${limit.remaining.toLocaleString()} left`),
       ...(v2 && data.paused() ? [h('div', {}, `Reads paused until ${time(limit.pausedUntil)}`)] : []),
     ];
@@ -365,7 +379,7 @@
     if (!demo && !liveFeed && mine.length && mine.every(feed => feed.state === 'unknown')) {
       built.body.replaceChildren(OW.ui.unknown(`${page.title} couldn't be read from GitHub. The app tries again on its own, or press Refresh now.`));
     } else if (!demo && !liveFeed && mine.length && mine.some(feed => feed.state === 'loading') && !mine.some(feed => feed.data)) {
-      built.body.replaceChildren(OW.ui.placeholder('Reading GitHub…'));
+      OW.ui.fill(built.body, OW.ui.placeholder('Reading GitHub…'));
     } else {
       page.render(built.body, feeds, route().arg, built.pager);
     }
@@ -428,7 +442,7 @@
     const state = params.get('state');
     if (location.search) history.replaceState(null, '', `${location.pathname}${location.hash}`);
     if (code && state) {
-      screen(h('h1', {}, 'Signing in…'), h('p', {}, 'Finishing your GitHub sign-in.'));
+      waitScreen('Signing in…', 'Finishing your GitHub sign-in.');
       try {
         await data.finishSignIn(code, state);
       } catch {

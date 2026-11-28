@@ -80,7 +80,10 @@
     return () => flat(raw) === box.value ? raw : box.value;
   }
 
+  const SENDING = ['Twirling the wands', 'Polishing the hats', 'Dusting off the stars', 'Tidying the beards'];
+
   function subject(h, item) {
+    const wait = (tag, text) => OW.ui.dance(text, SENDING) || h(tag, { class: 'decision-wait' }, text);
     const records = OW.records;
     const choices = [];
     const outs = [];
@@ -166,7 +169,7 @@
           return;
         }
         counts.delete(preview.op);
-        buttons.replaceChildren(h('span', { class: 'decision-wait' }, 'Posting…'));
+        buttons.replaceChildren(wait('span', 'Posting…'));
         let result;
         try { result = await records.post(preview); } catch { result = { outcome: 'unknown', op: preview.op, reason: 'error' }; }
         settle(out, preview, result || { outcome: 'unknown', op: preview.op, reason: 'error' }, buttons, slot);
@@ -194,7 +197,7 @@
 
       async function compose(form, typed) {
         lock(true);
-        out.replaceChildren(h('p', { class: 'decision-wait' }, 'Writing the preview…'));
+        out.replaceChildren(wait('p', 'Writing the preview…'));
         let preview;
         try { preview = await records.compose(action(form, typed)); } catch { preview = { refused: 'error' }; }
         if (preview && !preview.refused) return show(out, preview, 0, back);

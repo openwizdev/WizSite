@@ -28,7 +28,8 @@ const withFaq = html => html.replace('<template data-slot="faq"></template>\n', 
 const appFolder = async folder => (await readdir(new URL(`${folder}/`, root)).catch(() => [])).filter(name => /\.(js|css)$/.test(name)).sort().map(name => `${folder}/${name}`);
 const app = ['app/ember.css', 'app/data.js', 'app/records.js', 'app/ui.js', ...await appFolder('app/pages'), ...await appFolder('app/cards'), 'app/palette.js', 'app/shell.js'];
 const npmVendor = { 'app/vendor/dagre-3.1.3.min.js': 'node_modules/@dagrejs/dagre/dist/dagre.min.js', 'app/vendor/dagre-LICENSE.txt': 'node_modules/@dagrejs/dagre/LICENSE' };
-const hashed = ['tokens.css', 'site.css', 'changelog/changelog.css', 'market/market.css', 'site.js', 'faq.js', vendor[0], ...app];
+const loader = ['wiz-loader/wiz-loader.css', 'wiz-loader/wiz-loader.js'];
+const hashed = ['tokens.css', 'site.css', 'changelog/changelog.css', 'market/market.css', ...loader, 'site.js', 'faq.js', vendor[0], ...app];
 const brand = ['favicon.ico', 'favicon.svg', 'apple-touch-icon.png', 'brand/openwiz-lockup.svg', 'brand/og.png'];
 const appBrand = ['app/mark.svg', 'app/icon.svg', 'app/icon.ico', 'app/icon-180.png', 'app/wiz-reviewer.svg'];
 const files = ['_headers', '.well-known/security.txt', 'robots.txt', 'app/manifest.webmanifest', ...appBrand, 'app/art/sea-wide.webp', 'app/art/sea-tall.webp', ...art, ...driverLogos, 'art/todo-spec.mp4', 'art/todo-spec.vtt', 'art/spec-video.mp4', 'art/spec-video.vtt', 'art/launch-video.mp4', 'art/launch-video.vtt', ...vendor.slice(1), ...brand, 'fonts/Geist-var.woff2', 'fonts/GeistMono-var.woff2', 'fonts/OFL.txt'];

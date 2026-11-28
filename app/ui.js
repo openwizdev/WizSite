@@ -88,6 +88,30 @@
   }
   const agentName = (harness, model) => `${HARNESSES[String(harness).toLowerCase()] || harness}, ${modelName(model)}`;
 
+  const stillReading = text => text.endsWith('…');
+  const waiting = new Map();
+  function dance(text, more = window.WizLoader?.lines) {
+    if (!window.WizLoader?.markup || !window.WizLoader?.mount) return null;
+    const box = window.WizLoader.markup(true);
+    window.WizLoader.mount(box, { lines: [text, ...more] });
+    return box;
+  }
+  function loading(text) {
+    const known = waiting.get(text)?.deref();
+    if (known?.isConnected) return known;
+    waiting.delete(text);
+    const box = dance(text);
+    if (box) waiting.set(text, new WeakRef(box));
+    return box;
+  }
+
+  function fill(el, ...kids) {
+    kids = kids.flat().filter(kid => kid !== null && kid !== undefined && kid !== false)
+      .map(kid => (kid instanceof Node ? kid : document.createTextNode(String(kid))));
+    for (const child of [...el.childNodes]) if (!kids.includes(child)) child.remove();
+    kids.forEach((kid, i) => { if (el.childNodes[i] !== kid) el.insertBefore(kid, el.childNodes[i] || null); });
+  }
+
   const ui = {
     h, icon, logo, time, STATES, agentName,
     pill: state => h('span', { class: 'pill', '--c': STATES[state].colour }, STATES[state].word),
@@ -102,7 +126,10 @@
       return el;
     },
     unknown: text => h('div', { class: 'unknown' }, h('b', {}, 'Unknown. '), text),
-    placeholder: text => h('div', { class: 'placeholder' }, text),
+    placeholder: text => (stillReading(text) ? loading(text) : null) || h('div', { class: 'placeholder' }, text),
+    dance,
+    loading,
+    fill,
   };
   const pages = [];
   OW.ui = ui;

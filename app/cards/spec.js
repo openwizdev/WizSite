@@ -102,6 +102,14 @@
     const waitingHere = () => OW.records.pending().find(p => p.repository === item.repository
       && p.subject.kind === item.subject.kind && p.subject.number === item.subject.number);
 
+    const SENDING = ['Twirling the wands', 'Polishing the hats', 'Dusting off the stars', 'Tidying the beards'];
+    const wait = text => {
+      const box = OW.ui.dance(text, SENDING);
+      if (!box) return h('p', { 'data-outcome': 'sending' }, text);
+      box.removeAttribute('role');
+      box.dataset.outcome = 'sending';
+      return box;
+    };
     const say = (outcome, text, ...more) => status.replaceChildren(h('p', { 'data-outcome': outcome }, text, ...more));
     const buttons = () => {
       status.replaceChildren();
@@ -130,6 +138,7 @@
     async function compose(action, typed) {
       if (busy) return;
       setBusy(true);
+      status.replaceChildren(wait('Writing the preview…'));
       let preview;
       try {
         preview = await OW.records.compose(action);
@@ -169,7 +178,7 @@
 
     async function send(preview) {
       setBusy(true);
-      say('sending', 'Sending…');
+      status.replaceChildren(wait('Sending…'));
       let outcome;
       try {
         outcome = await OW.records.post(preview);
