@@ -1,0 +1,81 @@
+{
+  "name": "0.02",
+  "semver": "0.2.0",
+  "date": "2031-03-04",
+  "headline": "Sixty made-up lines in six areas.",
+  "areas": [
+    {"name": "Sample chat", "bullets": [
+      "The sample chat answers question 1 about a made-up factory in one short reply.",
+      "The sample chat answers question 2 about a made-up factory in one short reply.",
+      "The sample chat answers question 3 about a made-up factory in one short reply.",
+      "The sample chat answers question 4 about a made-up factory in one short reply.",
+      "The sample chat answers question 5 about a made-up factory in one short reply.",
+      "The sample chat answers question 6 about a made-up factory in one short reply.",
+      "The sample chat answers question 7 about a made-up factory in one short reply.",
+      "The sample chat answers question 8 about a made-up factory in one short reply."
+    ]},
+    {"name": "Sample drivers", "bullets": [
+      "Sample driver 1 starts a made-up builder with sample start --slot 1 and reports when it stops.",
+      "Sample driver 2 starts a made-up builder with sample start --slot 2 and reports when it stops.",
+      "Sample driver 3 starts a made-up builder with sample start --slot 3 and reports when it stops.",
+      "Sample driver 4 starts a made-up builder with sample start --slot 4 and reports when it stops.",
+      "Sample driver 5 starts a made-up builder with sample start --slot 5 and reports when it stops.",
+      "Sample driver 6 starts a made-up builder with sample start --slot 6 and reports when it stops.",
+      "Sample driver 7 starts a made-up builder with sample start --slot 7 and reports when it stops.",
+      "Sample driver 8 starts a made-up builder with sample start --slot 8 and reports when it stops.",
+      "Sample driver 9 starts a made-up builder with sample start --slot 9 and reports when it stops.",
+      "Sample driver 10 starts a made-up builder with sample start --slot 10 and reports when it stops.",
+      "Sample driver 11 starts a made-up builder with sample start --slot 11 and reports when it stops.",
+      "Sample driver 12 starts a made-up builder with sample start --slot 12 and reports when it stops.",
+      "Sample driver 13 starts a made-up builder with sample start --slot 13 and reports when it stops.",
+      "Sample driver 14 keeps <b>markup</b> & $& as typed, with averyveryverylongsampleidentifierthatmustwrapatthreehundredninetypixelswide."
+    ]},
+    {"name": "Sample market", "bullets": [
+      "Listing 1 of the sample market shows its made-up status and install line.",
+      "Listing 2 of the sample market shows its made-up status and install line.",
+      "Listing 3 of the sample market shows its made-up status and install line.",
+      "Listing 4 of the sample market shows its made-up status and install line.",
+      "Listing 5 of the sample market shows its made-up status and install line.",
+      "Listing 6 of the sample market shows its made-up status and install line.",
+      "Listing 7 of the sample market shows its made-up status and install line.",
+      "Listing 8 of the sample market shows its made-up status and install line.",
+      "Listing 9 of the sample market shows its made-up status and install line.",
+      "Listing 10 of the sample market shows its made-up status and install line.",
+      "Listing 11 of the sample market shows its made-up status and install line.",
+      "Listing 12 of the sample market shows its made-up status and install line."
+    ]},
+    {"name": "Sample docs", "bullets": [
+      "Sample docs page 1 runs its one documented command against a fixture before it is published.",
+      "Sample docs page 2 runs its one documented command against a fixture before it is published.",
+      "Sample docs page 3 runs its one documented command against a fixture before it is published.",
+      "Sample docs page 4 runs its one documented command against a fixture before it is published.",
+      "Sample docs page 5 runs its one documented command against a fixture before it is published.",
+      "Sample docs page 6 runs its one documented command against a fixture before it is published.",
+      "Sample docs page 7 runs its one documented command against a fixture before it is published.",
+      "Sample docs page 8 runs its one documented command against a fixture before it is published.",
+      "Sample docs page 9 runs its one documented command against a fixture before it is published.",
+      "Sample docs page 10 runs its one documented command against a fixture before it is published."
+    ]},
+    {"name": "Sample app", "bullets": [
+      "The sample app shows made-up spec 1 with its tickets on a phone and on a wide screen.",
+      "The sample app shows made-up spec 2 with its tickets on a phone and on a wide screen.",
+      "The sample app shows made-up spec 3 with its tickets on a phone and on a wide screen.",
+      "The sample app shows made-up spec 4 with its tickets on a phone and on a wide screen.",
+      "The sample app shows made-up spec 5 with its tickets on a phone and on a wide screen.",
+      "The sample app shows made-up spec 6 with its tickets on a phone and on a wide screen.",
+      "The sample app shows made-up spec 7 with its tickets on a phone and on a wide screen.",
+      "The sample app shows made-up spec 8 with its tickets on a phone and on a wide screen.",
+      "The sample app shows made-up spec 9 with its tickets on a phone and on a wide screen."
+    ]},
+    {"name": "Sample fixes", "bullets": [
+      "Fix 1: a made-up export no longer stops when a sample file is empty.",
+      "Fix 2: a made-up export no longer stops when a sample file is empty.",
+      "Fix 3: a made-up export no longer stops when a sample file is empty.",
+      "Fix 4: a made-up export no longer stops when a sample file is empty.",
+      "Fix 5: a made-up export no longer stops when a sample file is empty.",
+      "Fix 6: a made-up export no longer stops when a sample file is empty.",
+      "Fix 7: a made-up export no longer stops when a sample file is empty."
+    ]}
+  ],
+  "notes": "https://github.com/openwizdev/OpenWiz/releases/tag/v0.2.0"
+}

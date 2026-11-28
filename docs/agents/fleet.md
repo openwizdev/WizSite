@@ -66,18 +66,22 @@ Source: the fleet skills, `to-tickets` and `launch-fleet`, which put it on and t
 
 ## Test commands
 
-The full set, in this order, from the repository root. Use Node.js 24, Python 3.11+ and Git; command 6 also needs Chrome or Chromium (`CHROME=/path/to/chrome` picks one). A builder runs the red/green proof and every command its change can affect, then opens the ready pull request.
+The full set, in this order, from the repository root. Use Node.js 24, Python 3.11+ and Git. Commands 6 to 10 also need Chrome or Chromium (`CHROME=/path/to/chrome` picks one). A builder runs the red/green proof and every command its change can affect, then opens the ready pull request.
 
 | # | Folder | Command | CI check |
 | --- | --- | --- | --- |
-| 1 | root | `npm ci` | `Build, links, resources and privacy` |
-| 2 | root | `npm run build` | `Build, links, resources and privacy` |
-| 3 | root | `npm run check` | `Build, links, resources and privacy` |
-| 4 | root | `npm test` | `Build, links, resources and privacy` |
-| 5 | root | `npm run test:functions` | `Build, links, resources and privacy` |
-| 6 | root | `npm run test:app` | `Build, links, resources and privacy` |
+| 1 | root | `python3 -I tools/comment-check/check.py diff --base origin/main` | `Build, links, resources and privacy` (pull requests only; local form, CI runs `--base HEAD^1`) |
+| 2 | root | `python3 -I tools/comment-check/drift.py` | `Build, links, resources and privacy` (pull requests only) |
+| 3 | root | `npm ci` | `Build, links, resources and privacy` |
+| 4 | root | `npm run build` | `Build, links, resources and privacy` |
+| 5 | root | `npm run check` | `Build, links, resources and privacy` |
+| 6 | root | `npm test` | `Build, links, resources and privacy` |
+| 7 | root | `npm run test:functions` | `Build, links, resources and privacy` |
+| 8 | root | `npm run test:app` | `Build, links, resources and privacy` |
+| 9 | root | `npm run test:v2` | `Build, links, resources and privacy` |
+| 10 | root | `node --test tests/models-page.test.mjs` | `Build, links, resources and privacy` |
 
-Commands 3 to 6 need command 2's `dist/` first.
+Command 1 is the comment check (`npm run test:comments` runs it locally against `origin/main`, the pull-request target; replace `origin/main` with another target branch if needed). CI runs the same checker only on a pull request, using `--base HEAD^1` on the merge checkout after fetching that head. Command 2 checks that the carried `tools/comment-check/check.py` matches its pinned OpenWiz source, and also runs only on a pull request. Commands 5 to 10 need command 4's `dist/` first. `npm run test:v2` is command 9. `npm run test:models` is command 10.
 
 Source: [`README.md`](../../README.md#build-and-check), [`package.json`](../../package.json) scripts and [`.github/workflows/site.yml`](../../.github/workflows/site.yml).
 
@@ -85,9 +89,9 @@ Source: [`README.md`](../../README.md#build-and-check), [`package.json`](../../p
 
 | Check | Runs | Required on |
 | --- | --- | --- |
-| `Build, links, resources and privacy` | Workflow `Site`, job `site`: test commands 1 to 6, in order | `main`, by this project's merge rule below; no ruleset requires it |
+| `Build, links, resources and privacy` | Workflow `Site`, job `site`: test commands 1 to 10, in order. Commands 1 and 2 run only on a pull request (command 1 against `HEAD^1` on the merge checkout) | `main`, by this project's merge rule below; no ruleset requires it |
 
-The workflow runs for every pull request against `main` and every push to `main`, without path filters, so docs-only changes run it too. Cloudflare Pages also reports a `Cloudflare Pages` check from its own Git integration; it is the deploy preview, not one of these checks. The ruleset "protect" refuses branch deletion and force-pushes on the default branch and requires no status check.
+The workflow runs for every pull request against `main`, every merge group for `main` and every push to `main`, without path filters, so docs-only changes run it too. Cloudflare Pages also reports a `Cloudflare Pages` check from its own Git integration; it is the deploy preview, not one of these checks. The ruleset "protect" refuses branch deletion and force-pushes on the default branch and requires no status check.
 
 Source: [`.github/workflows/site.yml`](../../.github/workflows/site.yml), and the branch rules (`gh api repos/openwizdev/WizSite/rulesets`, read 2026-11-20).
 

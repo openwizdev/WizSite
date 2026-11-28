@@ -1,0 +1,11 @@
+{
+  "repository": "synthetic-docs-fixture/example-manual",
+  "revision": "0123456789abcdef0123456789abcdef01234567",
+  "pages": [
+    { "source": "README.md", "route": "/docs/example/" },
+    { "source": "guides/start.md", "route": "/docs/example/start/" },
+    { "source": "reference/options.md", "route": "/docs/example/options/" }
+  ],
+  "unimportedSource": "reference/notes.md",
+  "missingSource": "guides/absent.md"
+}

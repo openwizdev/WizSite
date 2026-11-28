@@ -1,0 +1,315 @@
+{
+  "openwiz": {
+    "commit": "fae200fc89303c2b4872db1164b42813e5b2e6a8",
+    "date": "2026-11-25"
+  },
+  "synced": "2026-11-25",
+  "items": [
+    {
+      "id": "claude",
+      "name": "Claude Code",
+      "kind": "agent",
+      "tier": "today"
+    },
+    {
+      "id": "codex",
+      "name": "Codex",
+      "kind": "agent",
+      "tier": "today"
+    },
+    {
+      "id": "agy",
+      "name": "Antigravity",
+      "kind": "agent",
+      "tier": "today"
+    },
+    {
+      "id": "amp",
+      "name": "Amp",
+      "kind": "agent",
+      "tier": "today"
+    },
+    {
+      "id": "auggie",
+      "name": "Auggie",
+      "kind": "agent",
+      "tier": "today"
+    },
+    {
+      "id": "copilot",
+      "name": "GitHub Copilot CLI",
+      "kind": "agent",
+      "tier": "today"
+    },
+    {
+      "id": "gemini",
+      "name": "Gemini CLI",
+      "kind": "agent",
+      "tier": "today"
+    },
+    {
+      "id": "goose",
+      "name": "goose",
+      "kind": "agent",
+      "tier": "today"
+    },
+    {
+      "id": "junie",
+      "name": "Junie",
+      "kind": "agent",
+      "tier": "today"
+    },
+    {
+      "id": "kilo",
+      "name": "Kilo Code",
+      "kind": "agent",
+      "tier": "today"
+    },
+    {
+      "id": "kimi",
+      "name": "Kimi Code",
+      "kind": "agent",
+      "tier": "today"
+    },
+    {
+      "id": "oz",
+      "name": "Warp",
+      "kind": "agent",
+      "tier": "today"
+    },
+    {
+      "id": "pi",
+      "name": "Pi",
+      "kind": "agent",
+      "tier": "today"
+    },
+    {
+      "id": "qwen",
+      "name": "Qwen Code",
+      "kind": "agent",
+      "tier": "today"
+    },
+    {
+      "id": "boat",
+      "name": "boat.dev",
+      "kind": "host",
+      "tier": "today"
+    },
+    {
+      "id": "cloudroom",
+      "name": "Cloudroom",
+      "kind": "host",
+      "tier": "today"
+    },
+    {
+      "id": "devin",
+      "name": "Devin",
+      "kind": "host",
+      "tier": "today"
+    },
+    {
+      "id": "factory",
+      "name": "Factory",
+      "kind": "host",
+      "tier": "today"
+    },
+    {
+      "id": "hermes",
+      "name": "Hermes",
+      "kind": "host",
+      "tier": "today"
+    },
+    {
+      "id": "local",
+      "name": "Your computer or VPS",
+      "kind": "host",
+      "tier": "today"
+    },
+    {
+      "id": "openclaw",
+      "name": "OpenClaw",
+      "kind": "host",
+      "tier": "today"
+    },
+    {
+      "id": "conductor",
+      "name": "Conductor",
+      "kind": "host",
+      "tier": "coming",
+      "prs": [
+        {
+          "number": 2020,
+          "url": "https://github.com/openwizdev/OpenWiz/pull/2020"
+        }
+      ]
+    },
+    {
+      "id": "cursor",
+      "name": "Cursor cloud agents",
+      "kind": "host",
+      "tier": "coming",
+      "prs": [
+        {
+          "number": 2021,
+          "url": "https://github.com/openwizdev/OpenWiz/pull/2021"
+        }
+      ]
+    },
+    {
+      "id": "pane",
+      "name": "Pane",
+      "kind": "host",
+      "tier": "coming",
+      "prs": [
+        {
+          "number": 2029,
+          "url": "https://github.com/openwizdev/OpenWiz/pull/2029"
+        }
+      ]
+    },
+    {
+      "id": "warp-oz",
+      "name": "Warp Oz",
+      "kind": "host",
+      "tier": "coming",
+      "prs": [
+        {
+          "number": 2555,
+          "url": "https://github.com/openwizdev/OpenWiz/pull/2555"
+        }
+      ]
+    },
+    {
+      "id": "codespaces",
+      "name": "GitHub Codespaces",
+      "kind": "host",
+      "tier": "coming",
+      "prs": [
+        {
+          "number": 2559,
+          "url": "https://github.com/openwizdev/OpenWiz/pull/2559"
+        }
+      ]
+    },
+    {
+      "id": "openhands",
+      "name": "OpenHands Cloud",
+      "kind": "host",
+      "tier": "coming",
+      "prs": [
+        {
+          "number": 2567,
+          "url": "https://github.com/openwizdev/OpenWiz/pull/2567"
+        }
+      ]
+    },
+    {
+      "id": "kiro",
+      "name": "Kiro CLI",
+      "kind": "agent",
+      "tier": "coming",
+      "prs": [
+        {
+          "number": 2631,
+          "url": "https://github.com/openwizdev/OpenWiz/pull/2631"
+        }
+      ]
+    },
+    {
+      "id": "vibe",
+      "name": "Mistral Vibe",
+      "kind": "agent",
+      "tier": "coming",
+      "prs": [
+        {
+          "number": 2643,
+          "url": "https://github.com/openwizdev/OpenWiz/pull/2643"
+        }
+      ]
+    },
+    {
+      "id": "crush",
+      "name": "Crush",
+      "kind": "agent",
+      "tier": "coming",
+      "prs": [
+        {
+          "number": 2649,
+          "url": "https://github.com/openwizdev/OpenWiz/pull/2649"
+        }
+      ]
+    },
+    {
+      "id": "capy",
+      "name": "Capy",
+      "kind": "host",
+      "tier": "coming",
+      "prs": [
+        {
+          "number": 2652,
+          "url": "https://github.com/openwizdev/OpenWiz/pull/2652"
+        }
+      ]
+    },
+    {
+      "id": "tembo",
+      "name": "Tembo",
+      "kind": "host",
+      "tier": "coming",
+      "prs": [
+        {
+          "number": 2662,
+          "url": "https://github.com/openwizdev/OpenWiz/pull/2662"
+        }
+      ]
+    },
+    {
+      "id": "ona",
+      "name": "Ona",
+      "kind": "host",
+      "tier": "coming",
+      "prs": [
+        {
+          "number": 2699,
+          "url": "https://github.com/openwizdev/OpenWiz/pull/2699"
+        }
+      ]
+    },
+    {
+      "id": "sprites",
+      "name": "Fly Sprites",
+      "kind": "host",
+      "tier": "coming",
+      "prs": [
+        {
+          "number": 2720,
+          "url": "https://github.com/openwizdev/OpenWiz/pull/2720"
+        }
+      ]
+    },
+    {
+      "id": "cursor",
+      "name": "Cursor CLI",
+      "kind": "agent",
+      "tier": "coming",
+      "prs": [
+        {
+          "number": 2778,
+          "url": "https://github.com/openwizdev/OpenWiz/pull/2778"
+        }
+      ]
+    },
+    {
+      "id": "opencode",
+      "name": "OpenCode",
+      "kind": "agent",
+      "tier": "coming",
+      "prs": [
+        {
+          "number": 2891,
+          "url": "https://github.com/openwizdev/OpenWiz/pull/2891"
+        }
+      ]
+    }
+  ]
+}

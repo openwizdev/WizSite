@@ -80,7 +80,7 @@ function world(run, change = {}) {
   const live = tickets.filter(t => t.notes.length && t.state !== 'CLOSED');
   run.world.graphql.Agents = async () => ({ status: 200, json: { data: { rateLimit: RATE, repository: {
     issues: { totalCount: live.length, pageInfo: { hasNextPage: false, endCursor: null }, nodes: live.map(t => ({ number: t.n, title: t.title, url: URL_OF(t.n), state: 'OPEN',
-      updatedAt: ago(1), comments: { totalCount: t.notes.length, nodes: t.notes }, closedByPullRequestsReferences: { totalCount: t.pulls.length, nodes: t.pulls } })) },
+      updatedAt: t.updatedAt ?? ago(1), comments: { totalCount: t.notes.length, nodes: t.notes }, closedByPullRequestsReferences: { totalCount: t.pulls.length, nodes: t.pulls } })) },
     fleet: { text: FLEET } } } } });
 }
 
@@ -539,96 +539,98 @@ test('Canvas: Waits for lists only open blockers, says Waits for nothing when al
   }
 });
 
-test('Canvas: an open pull request on a ticket quiet for over a day still shows its check rollup', async () => {
+test('Canvas: a stale open pull request, missing from the day read, shows its check rollup from the spec read', async () => {
   const run = await start();
   try {
     world(run, {
       tickets: list => {
         const ticket = list.find(t => t.n === 46);
-        ticket.pulls = [pull(146, { draft: true, review: null, checks: 'SUCCESS' })];
-        ticket.notes = [note(8461, { agent: 'builder', state: 'done', step: 'opened the draft yesterday', min: 60 * 30, pr: 146 })];
+        ticket.pulls = [pull(186, { draft: true, review: null, checks: 'SUCCESS' })];
+        ticket.notes = [note(8461, { agent: 'builder', state: 'done', step: 'opened the draft yesterday', min: 60 * 30, pr: 186 })];
+        ticket.updatedAt = ago(60 * 30);
       },
     });
-    const agents = run.world.graphql.Agents;
-    run.world.graphql.Agents = async body => {
-      const reply = await agents(body);
-      const node = reply.json.data.repository.issues.nodes.find(issue => issue.number === 46);
-      node.updatedAt = ago(60 * 30);
-      return reply;
-    };
+    const queries = [];
+    wrap(run, 'SpecTickets', (reply, entry) => {
+      const query = JSON.parse(entry.body).query;
+      queries.push(query);
+      const repository = structuredClone(reply.json.data.repository);
+      const pr = repository.s41.subIssues.nodes.find(n => n.number === 46).closedByPullRequestsReferences.nodes[0];
+      if (/statusCheckRollup\s*\{\s*state\s*\}/.test(query)) pr.commits = { nodes: [{ commit: { statusCheckRollup: { state: 'SUCCESS' } } }] };
+      return { status: 200, json: { data: { ...reply.json.data, repository } } };
+    });
     await openCanvas(run, '#/canvas/41');
-    assert.equal(await run.page.run(`(OW.data.feeds.agents.data.issues.nodes || []).some(issue => issue && issue.number === 46)`), false,
-      'a ticket quiet for 30 hours is outside the day-long agents read');
+    assert.ok(queries.some(query => /statusCheckRollup\s*\{\s*state\s*\}/.test(query)), 'the spec read asks for the head commit\'s check rollup');
+    assert.equal(await run.page.run(`(OW.data.feeds.agents.data.issues.nodes || []).some(n => n && n.number === 46)`), false,
+      'the day read does not include the stale ticket');
     assert.equal(await run.page.run(`document.querySelector('.cv-stack[data-ticket$="#46"] .cv-front .cv-step').textContent`), 'draft, checks pass');
+    assert.doesNotMatch(await run.page.run(`document.querySelector('.cv-stack[data-ticket$="#46"]').textContent`), /checks unknown/);
     await run.page.run(`document.querySelector('.cv-stack[data-ticket$="#46"]').focus()`);
     await run.page.key('Enter');
     await run.page.until(`document.querySelector('.cv-focus')`, 'focused #46');
-    assert.match(await run.page.text(), /#146: draft, checks pass/);
+    assert.match(await run.page.text(), /#186: draft, checks pass/);
     assert.deepEqual(run.world.violations, []);
   } finally {
     await run.close();
   }
 });
 
-test('Canvas: a field error on a quiet ticket\'s check rollup shows checks unknown, while an error-free null rollup keeps no checks', async () => {
+test('Canvas: a stale pull request whose check rollup GitHub refuses shows checks unknown, while an error-free null rollup still shows no checks', async () => {
   const run = await start();
   try {
     world(run, {
       tickets: list => {
         const t46 = list.find(t => t.n === 46);
-        t46.pulls = [pull(146, { draft: true, review: null, checks: null })];
-        t46.notes = [note(8461, { agent: 'builder', state: 'done', step: 'opened the draft yesterday', min: 60 * 30, pr: 146 })];
+        t46.pulls = [pull(186, { draft: true, review: null, checks: null })];
+        t46.notes = [note(8461, { agent: 'builder', state: 'done', step: 'opened the draft yesterday', min: 60 * 30, pr: 186 })];
+        t46.updatedAt = ago(60 * 30);
         const t47 = list.find(t => t.n === 47);
-        t47.pulls = [pull(147, { draft: true, review: null, checks: null })];
-        t47.notes = [note(8471, { agent: 'builder', state: 'done', step: 'opened a draft with no checks yesterday', min: 60 * 30, pr: 147 })];
+        t47.pulls = [pull(187, { draft: true, review: null, checks: null })];
+        t47.notes = [note(8471, { agent: 'builder', state: 'done', step: 'opened a draft with no checks yesterday', min: 60 * 30, pr: 187 })];
+        t47.updatedAt = ago(60 * 30);
       },
     });
-    const agents = run.world.graphql.Agents;
-    run.world.graphql.Agents = async body => {
-      const reply = await agents(body);
-      for (const n of [46, 47]) {
-        const node = reply.json.data.repository.issues.nodes.find(issue => issue.number === n);
-        node.updatedAt = ago(60 * 30);
+    let mode = 'refused';
+    wrap(run, 'SpecTickets', (reply, entry) => {
+      const query = JSON.parse(entry.body).query;
+      const repository = structuredClone(reply.json.data.repository);
+      const nodes = repository.s41.subIssues.nodes;
+      const at46 = nodes.findIndex(n => n.number === 46);
+      const at47 = nodes.findIndex(n => n.number === 47);
+      if (/statusCheckRollup\s*\{\s*state\s*\}/.test(query)) {
+        nodes[at46].closedByPullRequestsReferences.nodes[0].commits = { nodes: [{ commit: { statusCheckRollup: null } }] };
+        nodes[at47].closedByPullRequestsReferences.nodes[0].commits = { nodes: [{ commit: { statusCheckRollup: null } }] };
       }
-      return reply;
-    };
-    const baseSpecTickets = run.world.graphql.SpecTickets;
-    let unplaced = false;
-    run.world.graphql.SpecTickets = async entry => {
-      const reply = await baseSpecTickets(entry);
-      const index46 = reply.json.data.repository.s41.subIssues.nodes.findIndex(node => node?.number === 46);
-      reply.json.errors = unplaced
-        ? [{ message: 'Something went wrong', path: ['repository', 'somewhere'] }]
-        : [{ message: 'Resource not accessible by integration', type: 'FORBIDDEN',
-          path: ['repository', 's41', 'subIssues', 'nodes', index46, 'closedByPullRequestsReferences', 'nodes', 0, 'commits', 'nodes', 0, 'commit', 'statusCheckRollup'] }];
-      return reply;
-    };
+      const errors = mode === 'refused'
+        ? [{ message: 'Resource not accessible by integration', type: 'FORBIDDEN',
+          path: ['repository', 's41', 'subIssues', 'nodes', at46, 'closedByPullRequestsReferences', 'nodes', 0, 'commits', 'nodes', 0, 'commit', 'statusCheckRollup'] }]
+        : [{ message: 'Something went wrong', path: ['repository', 'somewhere'] }];
+      return { status: 200, json: { data: { ...reply.json.data, repository }, errors } };
+    });
     await openCanvas(run, '#/canvas/41');
-    assert.equal(await run.page.run(`(OW.data.feeds.agents.data.issues.nodes || []).some(issue => issue && (issue.number === 46 || issue.number === 47))`), false,
-      'both quiet tickets are outside the day-long agents read');
-    assert.doesNotMatch(await run.page.text(), /Part of this read failed/, 'a field error placed on one ticket\'s checks does not show a global failure banner');
+    assert.equal(await run.page.run(`(OW.data.feeds.agents.data.issues.nodes || []).some(n => n && (n.number === 46 || n.number === 47))`), false,
+      'the day read includes neither stale ticket');
     assert.equal(await run.page.run(`document.querySelector('.cv-stack[data-ticket$="#46"] .cv-front .cv-step').textContent`), 'draft, checks unknown');
     assert.equal(await run.page.run(`document.querySelector('.cv-stack[data-ticket$="#47"] .cv-front .cv-step').textContent`), 'draft, no checks');
+    assert.equal(await run.page.run('OW.data.feeds.specs.state'), 'ok');
+    assert.doesNotMatch(await run.page.text(), /Part of this read failed/);
 
-    await run.page.run(`document.querySelector('.cv-stack[data-ticket$="#46"]').focus()`);
-    await run.page.key('Enter');
-    await run.page.until(`document.querySelector('.cv-focus')`, 'focused #46');
-    assert.match(await run.page.text(), /#146: draft, checks unknown/);
-    await run.page.key('Escape');
-    await run.page.until(`!document.querySelector('.cv-focus')`, 'board back');
+    for (const [ticket, expected] of [[46, /#186: draft, checks unknown/], [47, /#187: draft, no checks/]]) {
+      await run.page.run(`document.querySelector('.cv-stack[data-ticket$="#${ticket}"]').focus()`);
+      await run.page.key('Enter');
+      await run.page.until(`document.querySelector('.cv-focus')`, `focused #${ticket}`);
+      assert.match(await run.page.text(), expected);
+      await run.page.key('Escape');
+      await run.page.until(`!document.querySelector('.cv-focus')`, 'board back');
+    }
 
-    await run.page.run(`document.querySelector('.cv-stack[data-ticket$="#47"]').focus()`);
-    await run.page.key('Enter');
-    await run.page.until(`document.querySelector('.cv-focus')`, 'focused #47');
-    assert.match(await run.page.text(), /#147: draft, no checks/);
-    await run.page.key('Escape');
-    await run.page.until(`!document.querySelector('.cv-focus')`, 'board back');
-
-    unplaced = true;
+    mode = 'unplaced';
     const first = await run.page.run('OW.data.feeds.specs.readAt');
     await run.page.run('OW.data.refreshAll()');
-    await run.page.until(`OW.data.feeds.specs.readAt > ${first}`, 'refreshed spec read');
-    assert.match(await run.page.text(), /Part of this read failed/, 'an unplaceable SpecTickets error keeps the read partial');
+    await run.page.until(`OW.data.feeds.specs.readAt > ${first} && !OW.data.feeds.specs.busy`, 'the refreshed spec read');
+    assert.equal(await run.page.run('OW.data.feeds.specs.state'), 'partial');
+    assert.match(await run.page.text(), /Part of this read failed/);
+    assert.equal(await run.page.run(`document.querySelector('.cv-stack[data-ticket$="#46"] .cv-front .cv-step').textContent`), 'draft, no checks');
     assert.deepEqual(run.world.violations, []);
   } finally {
     await run.close();

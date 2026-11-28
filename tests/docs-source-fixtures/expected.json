@@ -1,0 +1,25 @@
+{
+  "links": [
+    { "source": "README.md", "href": "#quick-setup", "destination": "#quick-setup" },
+    { "source": "README.md", "href": "guides/start.md", "destination": "/docs/example/start/" },
+    {
+      "source": "README.md",
+      "href": "reference/notes.md",
+      "destination": "https://github.com/synthetic-docs-fixture/example-manual/blob/0123456789abcdef0123456789abcdef01234567/reference/notes.md"
+    },
+    {
+      "source": "guides/start.md",
+      "href": "../reference/options.md#display-mode",
+      "destination": "/docs/example/options/#display-mode"
+    },
+    {
+      "source": "reference/options.md",
+      "href": "../guides/start.md",
+      "destination": "/docs/example/start/"
+    }
+  ],
+  "shellFence": {
+    "source": "README.md",
+    "command": "printf '%s\\n' '[literal example](guides/absent.md)'"
+  }
+}

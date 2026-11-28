@@ -1,0 +1,8 @@
+{
+  "name": "0.01",
+  "semver": "0.1.2",
+  "date": "2031-01-02",
+  "headline": "One thing.",
+  "bullets": ["First line.", "Second line."],
+  "notes": "https://github.com/openwizdev/OpenWiz/releases/tag/v0.1.2"
+}

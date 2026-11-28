@@ -353,20 +353,19 @@
     }
     return loose;
   }
-  function placeSpec(errors, repository) {
+  function placeSpec(errors, repository, chunk) {
     const loose = [];
+    const asked = new Set(chunk.map(n => `s${n}`));
     for (const error of Array.isArray(errors) ? errors : []) {
       const path = Array.isArray(error?.path) ? error.path : [];
-      const detail = path[0] === 'repository' && typeof path[1] === 'string' && /^s\d+$/.test(path[1]) && Object.hasOwn(repository, path[1])
-        ? repository[path[1]] : undefined;
-      const nodes = detail?.subIssues?.nodes;
-      const issue = path[2] === 'subIssues' && path[3] === 'nodes' && Number.isSafeInteger(path[4]) && Array.isArray(nodes)
-        ? nodes[path[4]] : undefined;
+      const key = path[0] === 'repository' && asked.has(path[1]) ? path[1] : null;
+      const detail = key ? repository[key] : undefined;
+      const nodes = Array.isArray(detail?.subIssues?.nodes) ? detail.subIssues.nodes : null;
+      const at = nodes && path[2] === 'subIssues' && path[3] === 'nodes' && Number.isSafeInteger(path[4]) ? path[4] : -1;
+      const issue = at >= 0 ? nodes[at] : undefined;
       if (issue === null) continue;
-      const prs = issue?.closedByPullRequestsReferences?.nodes;
-      const pr = path[5] === 'closedByPullRequestsReferences' && path[6] === 'nodes' && Number.isSafeInteger(path[7]) && Array.isArray(prs)
-        ? prs[path[7]] : undefined;
-      if (pr && path[8] === 'commits') (issue.errors ||= []).push(path.slice(5));
+      if (object(issue) && path.length > 5) (issue.errors ||= []).push(path.slice(5));
+      else if (key && (!detail || !detail.subIssues || !detail.comments)) continue;
       else loose.push(error);
     }
     return loose;
@@ -587,11 +586,11 @@
             const extra = await second.json().catch(() => null);
             if (mine !== generation) return;
             noteLimit(extra?.data?.rateLimit, second);
-            const got = second.ok ? extra?.data?.repository : null;
+            const got = second.ok && object(extra?.data?.repository) ? extra.data.repository : null;
             if (limited(extra)) { why = 'limit'; if (!paused()) limit.pausedUntil = Date.now() + PAUSE_DEFAULT; }
             const heavy = (extra?.errors || []).some(e => e?.type === 'RESOURCE_LIMITS_EXCEEDED');
             if (heavy && chunk.length > 1) { queue.unshift(...chunk.map(n => [n])); continue; }
-            if (got) errors.push(...placeSpec(extra?.errors, got));
+            if (got) errors.push(...placeSpec(extra?.errors, got, chunk));
             for (const n of chunk) {
               const detail = got?.[`s${n}`];
               if (whole(detail)) fresh.set(n, detail);
