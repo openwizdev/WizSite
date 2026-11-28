@@ -11,15 +11,18 @@ const labels = {
   listed: 'Listed',
 };
 
-const hostIds = { local: 'vps', 'fly-sprites': 'sprites', 'github-codespaces': 'codespaces' };
+const hostIds = {
+  local: 'vps', 'fly-sprites': 'sprites', 'cursor-cloud-agents': 'cursor', 'openhands-cloud': 'openhands',
+};
 const harnessIds = {
   'cline-cli': 'cline', 'copilot-cli': 'copilot', 'gemini-cli': 'gemini', 'junie-cli': 'junie',
   'kilo-code': 'kilo', 'kimi-code': 'kimi', 'kiro-cli': 'kiro', 'mistral-vibe': 'vibe', 'qwen-code': 'qwen',
 };
 const logos = {
   local: 'monitor.svg', 'boat-dev': 'boat-dev.svg', cloudroom: 'cloudroom.png', openclaw: 'openclaw.svg',
-  hermes: 'hermes.png', conductor: 'conductor.svg', cursor: 'cursor.svg', factory: 'factory.svg', pane: 'pane.svg',
-  openhands: 'openhands.svg', 'warp-oz': 'warp.svg', tembo: 'tembo.svg', capy: 'capy.svg', ona: 'ona.svg',
+  hermes: 'hermes.png', conductor: 'conductor.svg', cursor: 'cursor.svg', 'cursor-cloud-agents': 'cursor.svg',
+  factory: 'factory.svg', pane: 'pane.svg', openhands: 'openhands.svg', 'openhands-cloud': 'openhands.svg',
+  'warp-oz': 'warp.svg', tembo: 'tembo.svg', capy: 'capy.svg', ona: 'ona.svg',
   amp: 'amp.svg', antigravity: 'antigravity.svg', auggie: 'augment.svg', crush: 'crush.png',
   'cursor-cli': 'cursor.svg', 'gemini-cli': 'gemini-cli.svg', goose: 'goose.png', 'kilo-code': 'kilo-code.svg',
   'kimi-code': 'kimi-code.svg', 'kiro-cli': 'kiro.svg', opencode: 'opencode.svg', pi: 'pi.svg',
@@ -147,6 +150,7 @@ export function withDrivers(page, registry) {
 
   const hosts = byPageId(drivers, hostIds);
   const existing = new Set([...page.matchAll(/\sid="([^"]+)"/g)].map(([, id]) => id));
+  const hostTileIds = new Set([...slot(page, 'hosts').fallback.matchAll(/<li class="tile[^"]*" id="([^"]+)"/g)].map(([, id]) => id));
   const generatedIds = new Map();
   const idFor = listing => {
     if (!generatedIds.has(listing.id)) {
@@ -157,6 +161,7 @@ export function withDrivers(page, registry) {
     }
     return generatedIds.get(listing.id);
   };
+  const shippedId = (pageId, listing) => (!existing.has(pageId) || hostTileIds.has(pageId) ? pageId : idFor(listing));
   const marks = slot(page, 'marks');
   const knownShipped = new Set();
   const marksHtml = marks.fallback.replace(/<li data-host="([^"]+)"[^>]*>.*?<\/li>/g, (html, id) => {
@@ -165,14 +170,14 @@ export function withDrivers(page, registry) {
     return !listing ? html : shipped(listing) ? hostMark(listing, id, html) : '';
   });
   const extraShipped = [...hosts].filter(([id, listing]) => !knownShipped.has(id) && shipped(listing));
-  page = marks.fill(marksHtml + extraShipped.map(([, listing]) => hostMark(listing, idFor(listing))).join(''));
+  page = marks.fill(marksHtml + extraShipped.map(([id, listing]) => hostMark(listing, shippedId(id, listing))).join(''));
 
   const compact = slot(page, 'shipped');
   const cards = compact.fallback.replace(/<li>\s*<article class="driver" id="([^"]+)"[\s\S]*?<\/article>\s*<\/li>/g, (html, id) => {
     const listing = hosts.get(id);
     return !listing ? html : shipped(listing) ? shippedCard(listing, id, html) : '';
   });
-  page = compact.fill(cards + extraShipped.map(([, listing]) => shippedCard(listing, idFor(listing))).join(''));
+  page = compact.fill(cards + extraShipped.map(([id, listing]) => shippedCard(listing, shippedId(id, listing))).join(''));
   const hero = slot(page, 'spotlight');
   page = hero.fill(spotlight(hosts.get('boat-dev'), hero.fallback));
 
