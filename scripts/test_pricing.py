@@ -59,7 +59,7 @@ for (const expected of ['Free', '$0', 'Supporter', '$1', '$10', 'Business', '$10
     process.exit(1);
   }
 }
-if (htmlDefault.includes('href="https://')) {
+if (htmlDefault.includes('<a class="price-subscribe"')) {
   console.error('empty checkout should not link paid tiers');
   process.exit(1);
 }

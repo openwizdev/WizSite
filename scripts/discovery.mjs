@@ -51,7 +51,7 @@ export const pages = {
   ],
   'pricing/index.html': [
     'Pricing — OpenWiz',
-    'OpenWiz stays free and open source. Supporter is $5 per month: priority support, and you support the project.',
+    'OpenWiz stays free and open source. Every tier gets the same software, features and support; paid tiers are cosmetic only.',
   ],
   'app/index.html': ['The app — OpenWiz', 'Sign in with GitHub to see your OpenWiz specs, tickets and agents.', 'noindex'],
   '404.html': ['Page not found — OpenWiz', 'Find the OpenWiz homepage, overview and frequently asked questions.', 'noindex'],
@@ -90,7 +90,9 @@ function structuredData(page, faq, html) {
           applicationCategory: 'DeveloperApplication', operatingSystem: 'macOS, Linux',
           offers: [
             { '@type': 'Offer', price: 0, priceCurrency: 'USD', name: 'Free' },
-            { '@type': 'Offer', price: 5, priceCurrency: 'USD', name: 'Supporter' },
+            { '@type': 'Offer', price: 1, priceCurrency: 'USD', name: 'Supporter ($1 / month)' },
+            { '@type': 'Offer', price: 10, priceCurrency: 'USD', name: 'Supporter ($10 / month)' },
+            { '@type': 'Offer', price: 100, priceCurrency: 'USD', name: 'Business ($100 / month)' },
           ],
           license: 'https://www.apache.org/licenses/LICENSE-2.0', downloadUrl: repo + '/releases',
           sameAs, publisher: { '@id': organization },
