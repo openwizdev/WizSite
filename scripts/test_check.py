@@ -156,7 +156,8 @@ class Checks(unittest.TestCase):
             extra.parent.mkdir(parents=True)
             extra.write_text(page.read_text().replace('docs/synthetic/', 'guides/synthetic/'))
             pages_map = root / 'sitemap-pages.xml'
-            pages_map.write_text(pages_map.read_text().replace('</urlset>', '  <url><loc>https://openwiz.dev/guides/synthetic/</loc><lastmod>2026-11-28</lastmod></url>\n</urlset>'))
+            newest = max(re.findall(r'<lastmod>([^<]+)</lastmod>', pages_map.read_text()))
+            pages_map.write_text(pages_map.read_text().replace('</urlset>', f'  <url><loc>https://openwiz.dev/guides/synthetic/</loc><lastmod>{newest}</lastmod></url>\n</urlset>'))
             check_site(root)
             self.assertIn('guides/synthetic/index.html', registered_extras(root))
             clean = extra.read_text()
