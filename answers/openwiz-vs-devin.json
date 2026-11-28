@@ -1,0 +1,100 @@
+{
+  "slug": "openwiz-vs-devin",
+  "kind": "compare",
+  "query": "OpenWiz vs Devin",
+  "title": "OpenWiz vs Devin",
+  "description": "Compare OpenWiz and Devin on licensing, where agents run, work tracking, pull request review and pricing.",
+  "answer": "OpenWiz is an open source agent factory that coordinates coding agents and tracks work in GitHub. Devin is Cognition’s coding agent for writing and testing code, with a cloud workflow that can take a Linear ticket through to a pull request.",
+  "sections": [
+    {
+      "heading": "At a glance",
+      "body": "| | OpenWiz | Devin |\n| --- | --- | --- |\n| Open source and licence | Open source under Apache-2.0. [OpenWiz README](https://github.com/openwizdev/OpenWiz/blob/09ad084f81023de18f2cd3b9f1967d9abb7f5c89/README.md). | Devin is proprietary software offered under Cognition’s terms. [Cognition platform terms](https://cognition.com/legal/platform-terms-of-service), checked 2026-11-28. |\n| Where agents run | On your computer or VPS, in a boat.dev sandbox, or in a CloudRoom thread. [OpenWiz 0.1.0 changelog](https://github.com/openwizdev/OpenWiz/blob/09ad084f81023de18f2cd3b9f1967d9abb7f5c89/CHANGELOG.md#010--2026-11-21). | Devin Cloud runs hosted sessions. Devin CLI runs locally. With Outposts, commands and file edits run on your infrastructure, while planning and inference run in Devin Cloud. [Outposts](https://docs.devin.ai/cloud/outposts/overview), checked 2026-11-28. [Local CLI](https://docs.devin.ai/cli), checked 2026-11-28. |\n| Which agents | The local driver runs Claude Code or Codex using your existing sign-in. [OpenWiz 0.1.0 changelog](https://github.com/openwizdev/OpenWiz/blob/09ad084f81023de18f2cd3b9f1967d9abb7f5c89/CHANGELOG.md#010--2026-11-21). | Devin Cloud offers a session agent selector with options such as Lite, Normal and Ultra. [Devin session guide](https://docs.devin.ai/get-started/first-run), checked 2026-11-28. |\n| How work is tracked | GitHub issues hold specs, tickets and agent status. Pull requests and reviews stay on GitHub. [How OpenWiz works](https://github.com/openwizdev/OpenWiz/blob/09ad084f81023de18f2cd3b9f1967d9abb7f5c89/docs/how-openwiz-works.md). | You can follow progress in the Devin session and hand work over from Linear by assigning a ticket to Devin. [Devin introduction](https://docs.devin.ai/get-started/devin-intro), checked 2026-11-28. [Linear integration](https://docs.devin.ai/integrations/linear), checked 2026-11-28. |\n| Review | In 0.1.0 the CloudRoom fleet routes green pull requests to a separate reviewer when available. With local or boat.dev builders, you review pull requests yourself. [How OpenWiz works](https://github.com/openwizdev/OpenWiz/blob/09ad084f81023de18f2cd3b9f1967d9abb7f5c89/docs/how-openwiz-works.md). | Devin Review can analyze GitHub pull requests or GitLab merge requests on demand, and it supports automatic review. [Devin Review](https://docs.devin.ai/work-with-devin/devin-review), checked 2026-11-28. |\n| Price | The software is free. You pay your own model and host charges. [OpenWiz README](https://github.com/openwizdev/OpenWiz/blob/09ad084f81023de18f2cd3b9f1967d9abb7f5c89/README.md). | Self-serve plans list Free, Pro at $20/month, Max at $200/month and Teams at $80/month. Enterprise rates are set in the customer agreement. [Self-serve plans](https://docs.devin.ai/admin/billing/self-serve), checked 2026-11-28. [Enterprise billing](https://docs.devin.ai/admin/billing/enterprise), checked 2026-11-28. |"
+    },
+    {
+      "heading": "Where Devin fits better",
+      "body": "Choose Devin if your team already works in Linear and wants to assign a scoped issue to a cloud coding agent that can open a pull request. [Linear integration](https://docs.devin.ai/integrations/linear), checked 2026-11-28."
+    },
+    {
+      "heading": "Where OpenWiz fits better",
+      "body": "Choose OpenWiz when GitHub is already where you keep specs, tickets and reviews, and you want to run builders on a host you choose. [How OpenWiz works](https://github.com/openwizdev/OpenWiz/blob/09ad084f81023de18f2cd3b9f1967d9abb7f5c89/docs/how-openwiz-works.md)."
+    }
+  ],
+  "faq": [
+    {
+      "question": "Can Devin run commands on infrastructure I manage?",
+      "answer": "Yes. Devin Outposts runs commands and edits files on workers you operate. Planning and inference for those sessions stay in Devin Cloud."
+    },
+    {
+      "question": "Does OpenWiz charge for the coding agents or hosts I use?",
+      "answer": "OpenWiz is free. Your model and host providers bill you separately."
+    }
+  ],
+  "sources": [
+    {
+      "url": "https://github.com/openwizdev/OpenWiz/blob/09ad084f81023de18f2cd3b9f1967d9abb7f5c89/README.md",
+      "supports": "OpenWiz is an open source agent factory under Apache-2.0. The software is free, and users cover their own model and host charges.",
+      "checked": "2026-11-28"
+    },
+    {
+      "url": "https://github.com/openwizdev/OpenWiz/blob/09ad084f81023de18f2cd3b9f1967d9abb7f5c89/docs/how-openwiz-works.md",
+      "supports": "GitHub records specs, tickets, pull requests and reviews. In OpenWiz 0.1.0 the CloudRoom fleet can route pull requests to separate reviewers. Local and boat.dev pull requests are reviewed by hand.",
+      "checked": "2026-11-28"
+    },
+    {
+      "url": "https://github.com/openwizdev/OpenWiz/blob/09ad084f81023de18f2cd3b9f1967d9abb7f5c89/CHANGELOG.md#010--2026-11-21",
+      "supports": "OpenWiz 0.1.0 offers builders on your computer or VPS, on boat.dev, or in CloudRoom. The local driver uses Claude Code or Codex with your own sign-in.",
+      "checked": "2026-11-28"
+    },
+    {
+      "url": "https://docs.devin.ai/get-started/devin-intro",
+      "supports": "Cognition describes Devin as its coding agent that writes, runs and tests code. You can see its progress and tools in the workspace.",
+      "checked": "2026-11-28"
+    },
+    {
+      "url": "https://docs.devin.ai/integrations/linear",
+      "supports": "You can assign Linear tickets to Devin and turn them into pull requests.",
+      "checked": "2026-11-28"
+    },
+    {
+      "url": "https://cognition.com/legal/platform-terms-of-service",
+      "supports": "Cognition licenses use of its platform and retains intellectual property rights. The platform terms restrict modification and access to the software components.",
+      "checked": "2026-11-28"
+    },
+    {
+      "url": "https://docs.devin.ai/cloud/outposts/overview",
+      "supports": "Devin Cloud hosts sessions. Outposts shifts command and file operations to user-operated workers while planning and inference stay in Devin Cloud.",
+      "checked": "2026-11-28"
+    },
+    {
+      "url": "https://docs.devin.ai/cli",
+      "supports": "Devin CLI is a local terminal coding agent.",
+      "checked": "2026-11-28"
+    },
+    {
+      "url": "https://docs.devin.ai/get-started/first-run",
+      "supports": "Devin Cloud’s session agent selector includes Lite, Normal and Ultra.",
+      "checked": "2026-11-28"
+    },
+    {
+      "url": "https://docs.devin.ai/work-with-devin/devin-review",
+      "supports": "Devin Review supports one-off or automatic reviews on GitHub and GitLab.",
+      "checked": "2026-11-28"
+    },
+    {
+      "url": "https://docs.devin.ai/admin/billing/self-serve",
+      "supports": "Cognition lists the Free, Pro, Max and Teams self-serve prices.",
+      "checked": "2026-11-28"
+    },
+    {
+      "url": "https://docs.devin.ai/admin/billing/enterprise",
+      "supports": "Devin Enterprise bills at the rate set in the customer’s order form.",
+      "checked": "2026-11-28"
+    }
+  ],
+  "checked": "2026-11-28",
+  "other": {
+    "name": "Devin",
+    "homepage": "https://devin.ai/"
+  },
+  "better_fit": "Choose Devin if your team already works in Linear and wants to assign a scoped issue to a cloud coding agent that can open a pull request."
+}
