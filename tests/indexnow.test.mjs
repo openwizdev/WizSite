@@ -113,3 +113,41 @@ test('over 10,000 changed URLs: the first 10,000 go now and the rest on the next
   assert.equal(await main(['--dist', big, '--previous', previous], { fetchImpl: second.impl, log: () => {} }), 0);
   assert.deepEqual(second.calls[0].body.urlList, ['https://openwiz.dev/p/10000/']);
 });
+
+test('--live with over 10,000 changed URLs sends nothing and says to use --previous; --dry-run lists them all', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'indexnow-live-big-'));
+  const big = join(dir, 'dist');
+  await mkdir(big, { recursive: true });
+  await copyFile(join(dist, `${key}.txt`), join(big, `${key}.txt`));
+  const urls = Array.from({ length: 10_001 }, (_, i) => `  <url><loc>https://openwiz.dev/p/${i}/</loc><lastmod>2026-11-28</lastmod></url>`);
+  await writeFile(join(big, 'sitemap.xml'), `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.join('\n')}\n</urlset>\n`);
+  const empty = '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"></urlset>';
+  const posts = [];
+  const impl = async (url, init) => { if (!init) return { status: 200, text: async () => empty }; posts.push(init); return { status: 200 }; };
+  const lines = [];
+  assert.equal(await main(['--dist', big, '--live', 'https://openwiz.dev/sitemap.xml'], { fetchImpl: impl, log: line => lines.push(line) }), 1);
+  assert.equal(posts.length, 0);
+  assert.match(lines.at(-1), /--previous/);
+  const listed = [];
+  assert.equal(await main(['--dist', big, '--dry-run'], { fetchImpl: impl, log: line => listed.push(line) }), 0);
+  assert.equal(listed.filter(line => line.startsWith('  https://')).length, 10_001);
+});
+
+test('a deploy that only removes a page updates the baseline, so restoring it is sent', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'indexnow-restore-'));
+  const site = join(dir, 'dist');
+  await mkdir(site, { recursive: true });
+  await copyFile(join(dist, `${key}.txt`), join(site, `${key}.txt`));
+  const map = pages => `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${pages.map(p => `  <url><loc>https://openwiz.dev/${p}/</loc><lastmod>2026-11-20</lastmod></url>`).join('\n')}\n</urlset>\n`;
+  const previous = join(dir, 'previous.json');
+  await writeFile(join(site, 'sitemap.xml'), map(['a', 'b']));
+  assert.equal(await main(['--dist', site, '--previous', previous], { fetchImpl: fakeFetch(200).impl, log: () => {} }), 0);
+  await writeFile(join(site, 'sitemap.xml'), map(['a']));
+  const removed = fakeFetch(200);
+  assert.equal(await main(['--dist', site, '--previous', previous], { fetchImpl: removed.impl, log: () => {} }), 0);
+  assert.equal(removed.calls.length, 0);
+  await writeFile(join(site, 'sitemap.xml'), map(['a', 'b']));
+  const restored = fakeFetch(200);
+  assert.equal(await main(['--dist', site, '--previous', previous], { fetchImpl: restored.impl, log: () => {} }), 0);
+  assert.deepEqual(restored.calls[0].body.urlList, ['https://openwiz.dev/b/']);
+});

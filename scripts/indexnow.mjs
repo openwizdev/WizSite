@@ -84,18 +84,28 @@ export async function main(argv, { fetchImpl = fetch, log = console.log } = {}) 
   const urls = changedUrls(now, before);
   const batch = urls.slice(0, MAX_URLS);
   log(`IndexNow: ${urls.length} changed of ${now.size} URLs`);
+  for (const url of dryRun ? urls : batch) log('  ' + url);
+  if (dryRun) return 0;
+  if (urls.length > batch.length && !previous) {
+    log(`IndexNow: ${urls.length} changed URLs is over the ${MAX_URLS} per request; run with --previous <file> so the rest go on later runs`);
+    return 1;
+  }
   if (urls.length > batch.length) log(`IndexNow: sending the first ${batch.length}; the other ${urls.length - batch.length} wait for the next run`);
-  for (const url of batch) log('  ' + url);
-  if (urls.length === 0 || dryRun) return 0;
+  const saveBaseline = async sentUrls => {
+    if (!previous) return;
+    const saved = new Map(before);
+    for (const url of sentUrls) saved.set(url, now.get(url));
+    for (const url of before.keys()) if (!now.has(url)) saved.delete(url);
+    await writeFile(previous, JSON.stringify(Object.fromEntries(saved), null, 1) + '\n');
+  };
+  if (urls.length === 0) {
+    await saveBaseline([]);
+    return 0;
+  }
   const status = await submit(batch, key, { endpoint: arg('--endpoint') ?? ENDPOINT, fetchImpl });
   log(`IndexNow answered ${status}`);
   const sent = status === 200 || status === 202;
-  if (sent && previous) {
-    const saved = new Map(before);
-    for (const url of batch) saved.set(url, now.get(url));
-    for (const url of before.keys()) if (!now.has(url)) saved.delete(url);
-    await writeFile(previous, JSON.stringify(Object.fromEntries(saved), null, 1) + '\n');
-  }
+  if (sent) await saveBaseline(batch);
   return sent ? 0 : 1;
 }
 
