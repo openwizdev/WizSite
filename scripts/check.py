@@ -433,7 +433,8 @@ STATIC = {
     'SKILL.md', 'fonts/OFL.txt',
     'c76a1a01e62d088edd3789d30d6a4d29.txt',
 } | ART | set(ICON_HASHES) | set(VECTORS) | (set(VENDOR_HASHES) - {GSAP}) | set(APP_VENDOR) | set(DRIVER_LOGOS) | {ASK_INDEX, ABOUT_PAGE, GUIDE_PAGE, NOT_FOUND} | DISCOVERY_FILES
-RUNTIME = STATIC | set(FINGERPRINTS.values())
+SHOWCASE_FILES = {'showcase/index.html', 'showcase/showcase.css', 'showcase/showcase.js'}
+RUNTIME = STATIC | SHOWCASE_FILES | set(FINGERPRINTS.values())
 
 
 def built_fingerprints(root):
@@ -1344,7 +1345,7 @@ def check_security_txt(text, now=None):
 def check_site(root, registry=ROOT / 'market/registry.json', now=None):
     files = {p.relative_to(root).as_posix() for p in root.rglob('*') if p.is_file()}
     names = built_fingerprints(root)
-    assert files == STATIC | set(names.values()) | set(MIRROR_PATHS.values()), 'unexpected or missing build output'
+    assert files == STATIC | SHOWCASE_FILES | set(names.values()) | set(MIRROR_PATHS.values()), 'unexpected or missing build output'
     docs = {name: (root / name).read_text() for name in ALL_PAGES}
     parsed = {name: Page(html) for name, html in docs.items()}
     check_discovery(root, parsed)
@@ -2655,6 +2656,7 @@ def check_showcase_fixtures():
 
 def main():
     check_showcase_fixtures()
+    subprocess.run(['node', '--test', 'showcase/tests/render.test.mjs'], cwd=ROOT, check=True)
     output = ROOT / 'dist'
     check_site(output)
     for name in RUNTIME - set(FINGERPRINTS.values()) - set(ALL_PAGES) - {ASK_INDEX} - DISCOVERY_FILES:

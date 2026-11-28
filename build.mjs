@@ -104,7 +104,7 @@ const discovery = crawlerFiles(about, guide, mirrors);
 for (const [file, data] of Object.entries(discovery)) await put(file, data);
 await put('ask-index.json', await (await import('./scripts/ask-index.mjs')).snapshotIndex(output, new URL('ask-docs/', root)));
 for (const [file, source] of Object.entries(npmVendor)) await put(file, await readFile(new URL(source, root)));
-for (const file of files) {
+for (const file of [...files, 'showcase/index.html', 'showcase/showcase.css', 'showcase/showcase.js']) {
   await mkdir(new URL('./', new URL(file, output)), { recursive: true });
   await copyFile(new URL(file, root), new URL(file, output));
 }
