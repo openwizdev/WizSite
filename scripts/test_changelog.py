@@ -166,6 +166,17 @@ class Ship(unittest.TestCase):
                     self.assertIn('release.json', done.stderr)
                     self.assertEqual(done.stdout, '')
 
+    def test_a_null_changelog_switch_cannot_show_the_unshipped_entry(self):
+        with tempfile.TemporaryDirectory() as temp:
+            switch = Path(temp) / 'release.json'
+            switch.write_text('{"changelog": null}')
+            done = subprocess.run(['node', str(ROOT / 'scripts/changelog.mjs'), '--releases', str(SHIP),
+                                   '--switch', 'live', '--ship', str(switch)], capture_output=True, text=True, timeout=60)
+            versions = [entry['h2'].strip() for entry in Entries(done.stdout).entries]
+            self.assertNotIn('0.02', versions)
+            self.assertNotEqual(done.returncode, 0)
+            self.assertIn('changelog maps a semver to on or off', done.stderr)
+
     def test_the_entry_comes_from_the_release_notes(self):
         made = generate('--from-notes', NOTES, '--version', '0.2.0', '--name', '0.02')
         self.assertEqual(json.loads(made), json.loads((SHIP / '0.02.json').read_text()))
