@@ -45,7 +45,8 @@ export async function findKey(dist) {
 export function payload(urls, key) {
   const host = new URL(SITE).host;
   if (urls.some(url => new URL(url).host !== host)) throw new Error('every URL must be on ' + host);
-  return { host, key, keyLocation: `${SITE}${key}.txt`, urlList: urls.slice(0, MAX_URLS) };
+  if (urls.length > MAX_URLS) throw new Error(`at most ${MAX_URLS} URLs per request`);
+  return { host, key, keyLocation: `${SITE}${key}.txt`, urlList: urls };
 }
 
 export async function submit(urls, key, { endpoint = ENDPOINT, fetchImpl = fetch } = {}) {
@@ -81,13 +82,21 @@ export async function main(argv, { fetchImpl = fetch, log = console.log } = {}) 
     try { before = new Map(Object.entries(JSON.parse(await readFile(previous, 'utf8')))); } catch { before = new Map(); }
   }
   const urls = changedUrls(now, before);
-  if (previous && !dryRun) await writeFile(previous, JSON.stringify(Object.fromEntries(now), null, 1) + '\n');
+  const batch = urls.slice(0, MAX_URLS);
   log(`IndexNow: ${urls.length} changed of ${now.size} URLs`);
-  for (const url of urls) log('  ' + url);
+  if (urls.length > batch.length) log(`IndexNow: sending the first ${batch.length}; the other ${urls.length - batch.length} wait for the next run`);
+  for (const url of batch) log('  ' + url);
   if (urls.length === 0 || dryRun) return 0;
-  const status = await submit(urls, key, { endpoint: arg('--endpoint') ?? ENDPOINT, fetchImpl });
+  const status = await submit(batch, key, { endpoint: arg('--endpoint') ?? ENDPOINT, fetchImpl });
   log(`IndexNow answered ${status}`);
-  return status === 200 || status === 202 ? 0 : 1;
+  const sent = status === 200 || status === 202;
+  if (sent && previous) {
+    const saved = new Map(before);
+    for (const url of batch) saved.set(url, now.get(url));
+    for (const url of before.keys()) if (!now.has(url)) saved.delete(url);
+    await writeFile(previous, JSON.stringify(Object.fromEntries(saved), null, 1) + '\n');
+  }
+  return sent ? 0 : 1;
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {

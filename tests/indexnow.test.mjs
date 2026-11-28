@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { copyFile, mkdtemp, readFile } from 'node:fs/promises';
+import { copyFile, mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -85,4 +85,31 @@ test('--live compares with the sitemap the site served before the deploy', async
   };
   assert.equal(await main(['--dist', dist, '--live', 'https://openwiz.dev/sitemap.xml'], { fetchImpl: impl, log: () => {} }), 0);
   assert.deepEqual(posts[0].urlList, ['https://openwiz.dev/', 'https://openwiz.dev/guides/synthetic-answer/']);
+});
+
+test('a refused request keeps the baseline, so the retry sends the same URLs', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'indexnow-'));
+  const previous = join(dir, 'previous.json');
+  await copyFile(join(fixtures, 'previous.json'), previous);
+  const refused = fakeFetch(403);
+  assert.equal(await main(['--dist', dist, '--previous', previous], { fetchImpl: refused.impl, log: () => {} }), 1);
+  const retry = fakeFetch(202);
+  assert.equal(await main(['--dist', dist, '--previous', previous], { fetchImpl: retry.impl, log: () => {} }), 0);
+  assert.deepEqual(retry.calls[0].body.urlList, ['https://openwiz.dev/', 'https://openwiz.dev/guides/synthetic-answer/']);
+});
+
+test('over 10,000 changed URLs: the first 10,000 go now and the rest on the next run', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'indexnow-big-'));
+  const big = join(dir, 'dist');
+  await mkdir(join(big), { recursive: true });
+  await copyFile(join(dist, `${key}.txt`), join(big, `${key}.txt`));
+  const urls = Array.from({ length: 10_001 }, (_, i) => `  <url><loc>https://openwiz.dev/p/${String(i).padStart(5, '0')}/</loc><lastmod>2026-11-28</lastmod></url>`);
+  await writeFile(join(big, 'sitemap.xml'), `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.join('\n')}\n</urlset>\n`);
+  const previous = join(dir, 'previous.json');
+  const first = fakeFetch(200);
+  assert.equal(await main(['--dist', big, '--previous', previous], { fetchImpl: first.impl, log: () => {} }), 0);
+  assert.equal(first.calls[0].body.urlList.length, 10_000);
+  const second = fakeFetch(200);
+  assert.equal(await main(['--dist', big, '--previous', previous], { fetchImpl: second.impl, log: () => {} }), 0);
+  assert.deepEqual(second.calls[0].body.urlList, ['https://openwiz.dev/p/10000/']);
 });
