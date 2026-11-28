@@ -10,7 +10,23 @@ from unittest import mock
 
 import re
 
-from check import ALL_PAGES, CTA, FAQ, FAQ_PREREQS, FAQ_WHERE, FOOTER, INSTALL_NOTE_HTML, INSTALL_PREREQS_HTML, FINGERPRINTS, HASHED, INSTALL_SWITCH, ROOT, Page, check_changelog, check_release_data, check_releases, read_releases, split_releases, check_motion, check_privacy, check_ref, check_security_txt, check_site, check_vector, check_webp, fingerprint
+from check import ALL_PAGES, ART, CTA, FAQ, FAQ_PREREQS, FAQ_WHERE, FOOTER, INSTALL_NOTE_HTML, INSTALL_PREREQS_HTML, FINGERPRINTS, HASHED, INSTALL_SWITCH, ROOT, Page, check_changelog, check_release_data, check_releases, read_releases, split_releases, check_motion, check_privacy, check_ref, check_security_txt, check_site, check_vector, check_webp, fingerprint
+
+REMOVED_ART = (
+    'art/spec-video.mp4',
+    'art/spec-video.vtt',
+    'art/spec-poster.webp',
+    'art/team-boat-poster.webp',
+)
+REMOVED_LOGS = (
+    'tests/ask-red-run.txt',
+    'tests/ask-green-run.txt',
+    'scripts/changelog-fixtures/red-run-1674.log',
+    'scripts/changelog-fixtures/red-run-1674-install.log',
+    'scripts/changelog-fixtures/red-run-46-r1.log',
+    'scripts/changelog-fixtures/red-run-46-r2.log',
+)
+WRONG_POSTER = '/favicon.ico'
 
 
 def edit_built(root, name, change):
@@ -57,6 +73,19 @@ def with_switch(state):
 class Checks(unittest.TestCase):
     def test_valid_site(self):
         check_site(ROOT / 'dist')
+
+    def test_replaced_art_and_run_logs_are_not_shipped(self):
+        for name in REMOVED_ART:
+            self.assertFalse((ROOT / name).is_file(), name)
+            self.assertNotIn(name, ART)
+        for name in REMOVED_LOGS:
+            self.assertFalse((ROOT / name).is_file(), name)
+        self.assertNotIn(WRONG_POSTER.removeprefix('/'), ART)
+        text = Path(__file__).read_text()
+        self.assertEqual(text.count(f'poster="{WRONG_POSTER}"'), 2)
+        replaced = 'spec-' + 'video'
+        self.assertNotIn(replaced, (ROOT / 'build.mjs').read_text())
+        self.assertNotIn(replaced, (ROOT / 'scripts/test_loudness.py').read_text())
 
     def test_missing_or_invalid_discovery_output(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -177,6 +206,13 @@ class Checks(unittest.TestCase):
                 with self.assertRaises(AssertionError):
                     check_privacy('scripts/check.py', marker.encode())
         check_privacy('index.html', b'<p>Building in public</p>')
+        placeholder = b'{"state_dir": "/' + b'home/' + b'someone/.local/state/openwiz-agents"}'
+        check_privacy('ask-docs/docs/github-app.md', placeholder)
+        check_privacy('dist/ask-index.json', placeholder)
+        with self.assertRaises(AssertionError):
+            check_privacy('index.html', placeholder)
+        with self.assertRaises(AssertionError):
+            check_privacy('ask-docs/docs/github-app.md', b'{"state_dir": "/' + b'home/' + b'owner/.local"}')
         with self.assertRaises(AssertionError):
             check_privacy('fonts/unreviewed.woff2', b'wOF2')
         with self.assertRaises(AssertionError):
@@ -387,6 +423,7 @@ class Checks(unittest.TestCase):
         page = CHANGELOG.replace('</main>', '<!-- releases:start -->' + LIVE + '<!-- releases:end --></main>')
         self.assertEqual(split_releases(page), (CHANGELOG, LIVE))
         check_releases(LIVE, DATA, True)
+        check_releases(LIVE.replace('<h2 id="v0-02">0.02 <small>', '<h2 id="v0-02">0.02 <small class="semver">'), DATA, True)
         check_releases(SOON, DATA, False)
         check_releases(SOON, {}, True)
         for built in (CHANGELOG, page.replace('</main>', '</main><!-- releases:start --><!-- releases:end -->'),
@@ -403,6 +440,9 @@ class Checks(unittest.TestCase):
                 (LIVE.replace(second + '</article>', second + '</article>' + second + '</article>'), True, 'entries shown'),
                 (LIVE.replace(first + '</article>', '').replace(second + '</article>', second + '</article>' + first + '</article>'), True, 'newest first'),
                 (LIVE.replace('(0.1.10)', '(0.1.11)'), True, 'newest first'),
+                (LIVE.replace('<h2 id="v0-02">0.02 <small>· <time datetime="2031-02-03">Feb 3, 2031</time> (0.1.10)</small></h2>',
+                              '<h2 id="v0-02"><small class="semver">· <time datetime="2031-02-03">Feb 3, 2031</time> (0.1.10)</small> 0.02</h2>'), True, 'public name'),
+                (LIVE.replace('<h2 id="v0-02">0.02 <small>', '<h2 id="v0-02">0.0<small>').replace('(0.1.10)</small></h2>', '(0.1.10)</small>2</h2>'), True, 'public name'),
                 (LIVE.replace('Feb 3, 2031', 'Feb 4, 2031'), True, 'newest first'),
                 (LIVE.replace('datetime="2031-02-03"', 'datetime="2031-02-04"'), True, "entry's date"),
                 (LIVE.replace('Two things.', 'Two things!'), True, "entry's headline"),
@@ -471,7 +511,7 @@ class Checks(unittest.TestCase):
                 ('index.html', 'preload="none" playsinline controls', 'preload="none" playsinline controls muted', 'plays inline with sound'),
                 ('index.html', 'preload="none" playsinline controls', 'preload="none" controls', 'plays inline with sound'),
                 ('index.html', 'preload="none" playsinline controls', 'preload="none" playsinline', 'keeps native controls'),
-                ('index.html', 'poster="/art/launch-poster.webp"', 'poster="/art/spec-poster.webp"', 'pinned poster'),
+                ('index.html', 'poster="/art/launch-poster.webp"', 'poster="/favicon.ico"', 'pinned poster'),
                 ('index.html', '<track kind="captions" src="/art/launch-video.vtt" srclang="en" label="English">', '', 'needs its own English captions'),
                 ('index.html', ' aria-describedby="launch-about"', '', 'two-sentence text alternative'),
                 ('index.html', 'It then shows how', 'Then it shows. It shows how', 'two-sentence text alternative'),
@@ -938,9 +978,9 @@ class Checks(unittest.TestCase):
             'no embed, form or script': (T, lambda t: t.replace('</main>', '<iframe src="/drivers/" title="x"></iframe></main>', 1)),
             'no embed, form or script ': (T, lambda t: t.replace('</main>', '<form></form></main>', 1)),
             'folds nothing away': (T, lambda t: t.replace('<ul class="team-facts">', '<details><summary>Facts</summary><ul class="team-facts">', 1).replace('</ul>', '</ul></details>', 1)),
-            'one video': (T, lambda t: t.replace('</main>', '<video src="/art/spec-video.mp4" preload="none"></video></main>', 1)),
+            'one video': (T, lambda t: t.replace('</main>', '<video src="/art/todo-spec.mp4" preload="none"></video></main>', 1)),
             'the launch film sits in the hero': (T, lambda t: re.sub(r'(<div class="team-copy">[\s\S]*?</div>\n)(  <figure class="launch team-film">[\s\S]*?</figure>\n)', r'\2\1', t, count=1)),
-            'over its pinned poster': (T, lambda t: t.replace('poster="/art/launch-poster.webp"', 'poster="/art/spec-poster.webp"', 1)),
+            'over its pinned poster': (T, lambda t: t.replace('poster="/art/launch-poster.webp"', 'poster="/favicon.ico"', 1)),
             'never autoplays': (T, lambda t: t.replace('preload="none" playsinline', 'preload="none" autoplay playsinline', 1)),
             'never autoplays ': (T, lambda t: t.replace('preload="none" playsinline', 'preload="auto" playsinline', 1)),
             'never autoplays  ': (T, lambda t: t.replace('preload="none" playsinline', 'preload="none" muted playsinline', 1)),

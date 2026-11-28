@@ -287,7 +287,8 @@
       comments(first: 50, ${RECENT}) { totalCount nodes { databaseId body url createdAt updatedAt author { login } } }
       subIssues(first: 50) { totalCount nodes { ${TICKET} labels(first: 20) { nodes { name } }
         blockedBy(first: 10) { totalCount nodes { ${TICKET} } }
-        closedByPullRequestsReferences(first: 5) { totalCount nodes { url state isDraft reviewDecision } }
+        closedByPullRequestsReferences(first: 5) { totalCount nodes { url state isDraft reviewDecision
+          commits(last: 1) { nodes { commit { statusCheckRollup { state } } } } } }
         comments(first: 20, ${RECENT}) { totalCount nodes { databaseId body createdAt updatedAt author { login } } } } } }`).join('')}
   }
 }`;
@@ -348,6 +349,23 @@
       const issue = at >= 0 ? nodes[at] : undefined;
       if (issue === null) continue;
       if (issue && path.length > 4) (issue.errors ||= []).push(path.slice(4));
+      else loose.push(error);
+    }
+    return loose;
+  }
+  function placeSpec(errors, repository, chunk) {
+    const loose = [];
+    const asked = new Set(chunk.map(n => `s${n}`));
+    for (const error of Array.isArray(errors) ? errors : []) {
+      const path = Array.isArray(error?.path) ? error.path : [];
+      const key = path[0] === 'repository' && asked.has(path[1]) ? path[1] : null;
+      const detail = key ? repository[key] : undefined;
+      const nodes = Array.isArray(detail?.subIssues?.nodes) ? detail.subIssues.nodes : null;
+      const at = nodes && path[2] === 'subIssues' && path[3] === 'nodes' && Number.isSafeInteger(path[4]) ? path[4] : -1;
+      const issue = at >= 0 ? nodes[at] : undefined;
+      if (issue === null) continue;
+      if (object(issue) && path.length > 5) (issue.errors ||= []).push(path.slice(5));
+      else if (key && (!detail || !detail.subIssues || !detail.comments)) continue;
       else loose.push(error);
     }
     return loose;
@@ -568,10 +586,11 @@
             const extra = await second.json().catch(() => null);
             if (mine !== generation) return;
             noteLimit(extra?.data?.rateLimit, second);
-            const got = second.ok ? extra?.data?.repository : null;
+            const got = second.ok && object(extra?.data?.repository) ? extra.data.repository : null;
             if (limited(extra)) { why = 'limit'; if (!paused()) limit.pausedUntil = Date.now() + PAUSE_DEFAULT; }
             const heavy = (extra?.errors || []).some(e => e?.type === 'RESOURCE_LIMITS_EXCEEDED');
             if (heavy && chunk.length > 1) { queue.unshift(...chunk.map(n => [n])); continue; }
+            if (got) errors.push(...placeSpec(extra?.errors, got, chunk));
             for (const n of chunk) {
               const detail = got?.[`s${n}`];
               if (whole(detail)) fresh.set(n, detail);

@@ -5,8 +5,13 @@ import { SITE, start } from './browser.mjs';
 
 const ROOT = new URL('../../', import.meta.url);
 const FORMS = new URL('fixtures/forms/', import.meta.url);
+
+test('the app page loads the v2 spec card style and script the queue renders', async () => {
+  const page = await readFile(new URL('app/index.html', ROOT), 'utf8');
+  assert.match(page, /<link rel="stylesheet" href="\/app\/cards\/spec\.css">/);
+  assert.match(page, /<script src="\/app\/cards\/spec\.js" defer><\/script>/);
+});
 const form = async name => JSON.parse(await readFile(new URL(name, FORMS), 'utf8'));
-const source = path => readFile(new URL(path, ROOT));
 
 const GRAPH = {
   tickets: [
@@ -73,27 +78,20 @@ const FAKE = `(() => {
 })()`;
 
 async function card(run, item, { width = 1280, height = 900, below = false } = {}) {
-  for (const path of ['app/cards/spec.js', 'app/cards/spec.css']) {
-    run.world.site[`/${path}`] = async () => ({ status: 200, raw: await source(path), type: path.split('.').pop() });
-  }
   await run.page.size(width, height, width < 500);
   await run.page.go(`${SITE}/app/`);
-  await run.page.until(`window.OW && OW.ui && window.dagre && document.readyState === 'complete'`, 'the app scripts');
-  await run.page.run(`new Promise((resolve, reject) => {
-    const style = document.createElement('link'); style.rel = 'stylesheet'; style.href = '/app/cards/spec.css';
-    document.head.append(style);
-    const script = document.createElement('script'); script.src = '/app/cards/spec.js'; script.onload = resolve; script.onerror = reject;
-    document.head.append(script);
-  })`);
+  await run.page.until(`window.OW && OW.ui && window.dagre && typeof OW.cards?.spec === 'function' && document.readyState === 'complete'`, 'the app page, including the spec card');
   await run.page.run(FAKE);
   const bodies = {};
   for (const [name, file] of [['spec.ship', 'spec-ship'], ['spec.not_now', 'spec-not_now']]) bodies[name] = await form(`${file}.body.json`);
   await run.page.run(`window.bodies = ${JSON.stringify(bodies)}`);
   await run.page.run(`(() => {
     const el = document.createElement('section'); el.id = 'under-test';
+    const row = document.createElement('div'); row.className = 'queue-item'; row.dataset.key = ${JSON.stringify(item.key)};
+    el.append(row);
     const spacer = Object.assign(document.createElement('div'), { style: 'height:2000px' });
     document.body.replaceChildren(...(${below} ? [spacer] : []), el);
-    OW.cards.spec(${JSON.stringify(item)}, el);
+    OW.cards.spec(${JSON.stringify(item)}, row);
   })()`);
 }
 
