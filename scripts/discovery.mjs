@@ -169,6 +169,7 @@ export function crawlerFiles(about, faq, guide) {
   const llms = [
     '# OpenWiz',
     `> ${plain(summary)}`,
+    'This OpenWiz is the open source agent factory for coding agents. It is not the open firmware for the GP2X Wiz handheld or the Windows utility of the same name.',
     plain(whatItDoes),
     'To install, paste this one line into your coding agent (Claude Code, Codex or another): "Install OpenWiz from github.com/openwizdev/OpenWiz". It shows every change first and waits for your yes.',
     '## Install', [

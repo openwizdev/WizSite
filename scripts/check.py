@@ -389,7 +389,10 @@ FAQ_ROWS = re.compile(r'<div class="faq-row">\s*<h3 class="faq-q"><button ([^>]*
 FAQ_TITLE = ('Questions', 'The short ones are here.')
 FAQ_QUESTIONS = ('What is OpenWiz?', 'What is a kernel?', 'What do I need to run it?', 'What do I need before installing?',
                  'Where do my agents run?', 'Does OpenWiz see my code or my logins?', 'What does it cost?',
+                 'Is this the OpenWiz for the GP2X Wiz?',
                  'Can you set it up for my team?', 'How does openwiz.dev count visits and clicks?')
+DISAMBIGUATION = ('This OpenWiz is the open source agent factory for coding agents. It is not the open firmware for the GP2X Wiz handheld '
+                  'or the Windows utility of the same name.')
 FAQ_PREREQS = ('A Mac (Apple silicon or Intel) or x86_64 Linux, with Python 3.9 or later, git, and the GitHub CLI (gh). '
                'See the install guide for every step and command.')
 FAQ_TEAM = 'Yes. Book a 30-minute call. Your first fleet ships on it.'
@@ -1259,6 +1262,8 @@ def check_discovery(root, pages):
     assert all(re.fullmatch(r'User-agent: .+\nAllow: /\nDisallow: /api/', group) for group in groups[:-1]), \
         'robots.txt must allow public pages and exclude the API for every group'
     brief = (root / 'llms.txt').read_text()
+    assert DISAMBIGUATION in brief.split('\n\n')[2], 'llms.txt must say which OpenWiz this is, under its summary'
+    assert 'GP2X Wiz' in plain((root / ABOUT_PAGE).read_text()), 'the overview must say which OpenWiz this is'
     full = (root / 'llms-full.txt').read_text()
     skill = (root / 'SKILL.md').read_text()
     assert brief.startswith('# OpenWiz\n\n> ') and all(

@@ -471,7 +471,7 @@ async function faq(page, where, width, mode) {
     };
   })()`);
   const facts = await read();
-  expect(facts.rows === 9, where, `the Questions have ${facts.rows} rows`);
+  expect(facts.rows === 10, where, `the Questions have ${facts.rows} rows`);
   if (width >= 1280) {
     const third = (facts.head.right - facts.head.left) / facts.width;
     expect(facts.list.left > facts.head.right && Math.abs(facts.head.top - facts.list.top) < 2 && third > .25 && third < .4, where,
