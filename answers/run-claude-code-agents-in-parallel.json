@@ -1,0 +1,70 @@
+{
+  "slug": "run-claude-code-agents-in-parallel",
+  "kind": "answer",
+  "query": "run multiple Claude Code agents in parallel",
+  "title": "Run Claude Code agents in parallel | OpenWiz",
+  "description": "Run two Claude Code sessions in separate Git worktrees and use OpenWiz to plan, track and review their work as separate tickets.",
+  "answer": "Run multiple Claude Code agents in parallel by opening two terminals in the same Git repository and starting Claude Code with a different `--worktree` name in each. Use OpenWiz to plan separate tickets and track them on GitHub. With the local setup in OpenWiz 0.1.0, you start each builder yourself.",
+  "sections": [
+    {
+      "heading": "Give each session its own ticket",
+      "body": "Choose two small tasks that can start from the same commit and touch different files. For example, give one agent the README and ask the other to add a test for existing behavior. Anthropic's [guide to parallel sessions](https://code.claude.com/docs/en/common-workflows#run-parallel-sessions-with-worktrees) shows how each worktree gives a session a separate checkout and branch."
+    }
+  ],
+  "steps": [
+    {
+      "name": "Install OpenWiz and choose this computer",
+      "text": "Have Python 3.9 or later, Git and the GitHub CLI installed. Sign in to `gh` and Claude Code, then tell Claude Code `Install OpenWiz`. Choose this computer and finish setup using the 0.1.0 install guide in Sources. When the guide asks you to restart Claude Code, start a new session and say `continue the OpenWiz install`."
+    },
+    {
+      "name": "Approve a plan with independent tickets",
+      "text": "Choose a GitHub repository you can write to, with at least one commit. Ask your setup agent to plan two independent tasks for that repository. Confirm the spec and approve the plan before starting either builder."
+    },
+    {
+      "name": "Start two Claude Code sessions",
+      "text": "From your project checkout, run `claude --worktree readme-update` in one terminal and `claude --worktree add-tests` in a second. Give each session its own GitHub ticket link and ask it to work only on that ticket's assigned files."
+    },
+    {
+      "name": "Review the work separately",
+      "text": "Have each session give you its changes and test results for its own ticket and ask it to open a separate pull request. Review each diff and its checks before deciding whether to merge."
+    }
+  ],
+  "faq": [
+    {
+      "question": "Will the two agents edit the same working files?",
+      "answer": "Each named worktree has its own checkout and branch. Assign different files if you want to reduce conflicts when the branches come back together."
+    },
+    {
+      "question": "Do I need CloudRoom for two Claude Code sessions?",
+      "answer": "You can run both sessions on your own computer. OpenWiz 0.1.0 starts its automatic fleet in CloudRoom, so with the local setup you launch each builder and review each pull request yourself."
+    }
+  ],
+  "sources": [
+    {
+      "url": "https://code.claude.com/docs/en/common-workflows#run-parallel-sessions-with-worktrees",
+      "supports": "Start parallel Claude Code sessions with separate worktree names in a Git repository with at least one commit.",
+      "checked": "2026-11-28"
+    },
+    {
+      "url": "https://code.claude.com/docs/en/quickstart",
+      "supports": "Install Claude Code and sign in from the first terminal session.",
+      "checked": "2026-11-28"
+    },
+    {
+      "url": "https://github.com/openwizdev/OpenWiz/blob/f14b3c1f659dd5fea45e1672fc3d159b04f306a9/README.md#L14-L24",
+      "supports": "Install phrase, prerequisites, local host choice, plan approval and the manual builder and review limits in OpenWiz 0.1.0.",
+      "checked": "2026-11-28"
+    },
+    {
+      "url": "https://github.com/openwizdev/OpenWiz/blob/f14b3c1f659dd5fea45e1672fc3d159b04f306a9/README.md#L37-L43",
+      "supports": "OpenWiz keeps specs and tickets in GitHub issues.",
+      "checked": "2026-11-28"
+    },
+    {
+      "url": "https://github.com/openwizdev/OpenWiz/blob/f14b3c1f659dd5fea45e1672fc3d159b04f306a9/docs/install.md#L129-L207",
+      "supports": "OpenWiz 0.1.0 install procedure, restart message and manual local builder workflow.",
+      "checked": "2026-11-28"
+    }
+  ],
+  "checked": "2026-11-28"
+}
