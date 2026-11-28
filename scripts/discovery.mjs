@@ -1,6 +1,8 @@
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { decode } from './ask-index.mjs';
+import { breadcrumbData, createRegistry } from './registry.mjs';
+import { sitemapFiles } from './sitemap.mjs';
 
 const site = 'https://openwiz.dev/';
 const github = 'https://github.com/openwizdev';
@@ -56,6 +58,35 @@ export const pages = {
   'app/index.html': ['The app — OpenWiz', 'Sign in with GitHub to see your OpenWiz specs, tickets and agents.', 'noindex'],
   '404.html': ['Page not found — OpenWiz', 'Find the OpenWiz homepage, overview and frequently asked questions.', 'noindex'],
 };
+
+// Each page's breadcrumb name (contracts/discovery.v1.md); the home has none.
+const crumbs = {
+  [aboutPage]: 'What is OpenWiz?', [guidePage]: 'Run many coding agents', [faqPage]: 'FAQ', 'drivers/index.html': 'Drivers',
+  'changelog/index.html': 'Changelog', 'market/index.html': 'Market', 'team/index.html': 'For teams', 'pricing/index.html': 'Pricing',
+  'app/index.html': 'The app', '404.html': 'Page not found',
+};
+
+const fallbackDate = new Date().toISOString().slice(0, 10);
+export const lastModified = page => {
+  try {
+    const committed = execFileSync('git', ['log', '-1', '--format=%cs', '--', page], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(committed)) return committed;
+  } catch {}
+  return fallbackDate;
+};
+
+// The registry, seeded with the page table; later generators add their pages to it before crawlerFiles runs.
+export const registry = createRegistry();
+for (const [page, [title, description, robots]] of Object.entries(pages)) {
+  registry.add({
+    path: page, title, description, section: 'pages', lastmod: lastModified(page), indexable: !robots,
+    trail: page === 'index.html' ? [] : [{ name: crumbs[page], path: page }],
+  });
+}
 
 const urlFor = page => site + page.replace(/index\.html$/, '');
 const escape = text => text.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -132,8 +163,9 @@ export function withMetadata(page, html, faq) {
       tags.push(`<meta name="twitter:${key}" content="${escape(value)}">`);
     }
     const data = structuredData(page, faq, html);
-    if (data) {
-      tags.push(`<script type="application/ld+json">\n${JSON.stringify(data, null, 2).replaceAll('<', '\\u003c')}\n</script>`);
+    const crumb = breadcrumbData(registry.get(page));
+    for (const block of [data, crumb]) {
+      if (block) tags.push(`<script type="application/ld+json">\n${JSON.stringify(block, null, 2).replaceAll('<', '\\u003c')}\n</script>`);
     }
   }
   const slot = '<template data-slot="page-metadata"></template>';
@@ -214,23 +246,9 @@ export function crawlerFiles(about, faq, guide) {
     ...guideText(guide),
   ].join('\n\n') + '\n';
 
-  const fallbackDate = new Date().toISOString().slice(0, 10);
-  const lastModified = page => {
-    try {
-      const committed = execFileSync('git', ['log', '-1', '--format=%cs', '--', page], {
-        cwd: repoRoot,
-        encoding: 'utf8',
-        stdio: ['ignore', 'pipe', 'ignore'],
-      }).trim();
-      if (/^\d{4}-\d{2}-\d{2}$/.test(committed)) return committed;
-    } catch {}
-    return fallbackDate;
-  };
-  const urls = Object.entries(pages).filter(([, [, , robots]]) => !robots).map(([page]) =>
-    `  <url><loc>${urlFor(page)}</loc><lastmod>${lastModified(page)}</lastmod></url>`);
   return {
     'robots.txt': crawlers.map(agent => `User-agent: ${agent}\nAllow: /\nDisallow: /api/\n\n`).join('') + `Sitemap: ${site}sitemap.xml\n`,
-    'sitemap.xml': ['<?xml version="1.0" encoding="UTF-8"?>', '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">', ...urls, '</urlset>', ''].join('\n'),
+    ...sitemapFiles(registry.all()),
     'llms.txt': llms,
     'llms-full.txt': full,
   };
