@@ -173,11 +173,15 @@ class World {
 
 const LABEL = `const label = e => { const c = e.cloneNode(true); c.querySelectorAll('[aria-hidden="true"]').forEach(x => x.remove()); return c.textContent.replace(/\\s+/g, ' ').trim(); };`;
 
-async function open(browser, world, sharedContextId) {
+async function open(browser, world, sharedContextId, preload) {
   const browserContextId = sharedContextId ?? (await browser.send('Target.createBrowserContext')).browserContextId;
   const { targetId } = await browser.send('Target.createTarget', { url: 'about:blank', browserContextId });
   const { sessionId } = await browser.send('Target.attachToTarget', { targetId, flatten: true });
   const send = (method, params) => browser.send(method, params, sessionId);
+  if (preload) {
+    await send('Page.enable');
+    await send('Page.addScriptToEvaluateOnNewDocument', { source: preload });
+  }
   browser.on(async message => {
     if (message.sessionId !== sessionId) return;
     if (message.method === 'Fetch.requestPaused') {
@@ -2242,6 +2246,42 @@ async function main() {
         await page.shot(join(process.env.SHOTS, 'shortcuts-laptop.png'), 1440, 900, false);
         await page.key('Escape');
       }
+      checkRequestLog(world);
+      await page.close();
+    });
+
+    await check('wiz-loader: intervals stop when boot loader or app placeholder leaves the DOM after 300 ms, and stay alive while connected', async () => {
+      const world = new World();
+      const track = `(() => {
+        const iv = new Map(), set = window.setInterval, clear = window.clearInterval;
+        window.__iv = iv;
+        window.__ivTotal = 0;
+        window.setInterval = (...args) => { const id = set(...args); iv.set(id, args[1]); window.__ivTotal++; return id; };
+        window.clearInterval = id => { iv.delete(id); return clear(id); };
+      })()`;
+      const page = await open(browser, world, null, track);
+      await page.go(`${SITE}/app/`);
+      await page.until(`document.querySelector('a[href="/api/sign-in/start"]')`, 'signed-out app screen');
+      assert(await page.run(`window.__ivTotal >= 2`), 'boot loader did not start its intervals');
+      await page.until(`window.__iv.size === 0`, 'boot loader intervals to clear after DOM removal', 5000);
+      await page.run(`(() => {
+        const holder = OW.ui.placeholder('Reading GitHub…');
+        document.body.append(holder);
+        window.__holder = holder;
+      })()`);
+      assert(await page.run(`window.__iv.size === 2`), 'app placeholder did not start two intervals');
+      await new Promise(resolve => setTimeout(resolve, 300));
+      await page.run(`window.__holder.remove()`);
+      await page.until(`window.__iv.size === 0`, 'app placeholder intervals to clear after 300 ms removal', 5000);
+      await page.run(`(() => {
+        const live = OW.ui.placeholder('Reading GitHub…');
+        document.body.append(live);
+        window.__live = live;
+      })()`);
+      await new Promise(resolve => setTimeout(resolve, 2600));
+      assert(await page.run(`window.__iv.size === 2`), 'connected placeholder mounted detached stopped unexpectedly');
+      await page.run(`window.__live.remove()`);
+      await page.until(`window.__iv.size === 0`, 'connected placeholder intervals to clear after removal', 5000);
       checkRequestLog(world);
       await page.close();
     });

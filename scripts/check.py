@@ -1,4 +1,5 @@
 from datetime import date, datetime, timedelta, timezone
+from decimal import Decimal
 from hashlib import sha256
 from html import escape, unescape
 from html.parser import HTMLParser
@@ -8,7 +9,7 @@ import re
 import subprocess
 import sys
 from xml.etree import ElementTree
-from urllib.parse import unquote, urljoin, urlsplit
+from urllib.parse import unquote, urlsplit
 import font_chars
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -188,7 +189,10 @@ DRIVER_LOGOS = {
 
 FONT_FILES = ('fonts/Geist-var.woff2', 'fonts/GeistMono-var.woff2')
 PAGE_STYLES = {'changelog/index.html': 'changelog/changelog.css', 'market/index.html': 'market/market.css'}
-HASHED = FONT_FILES + ('tokens.css', 'site.css', *PAGE_STYLES.values(), GSAP, 'site.js', 'faq.js')
+LOADER_STYLE, LOADER_SCRIPT = 'wiz-loader/wiz-loader.css', 'wiz-loader/wiz-loader.js'
+LOADER_PAGES = ('index.html', 'faq/index.html')
+LOADER_BUDGET = 10_240
+HASHED = FONT_FILES + ('tokens.css', 'site.css', *PAGE_STYLES.values(), LOADER_STYLE, LOADER_SCRIPT, GSAP, 'site.js', 'faq.js')
 APP_PAGE = 'app/index.html'
 APP_STYLE = 'app/ember.css'
 APP_FOUND = {(folder, ext): tuple(sorted(p.relative_to(ROOT).as_posix() for p in (ROOT / folder).glob(f'*.{ext}')))
@@ -469,6 +473,10 @@ GUIDE_COST = ('OpenWiz is free and released under the Apache License 2.0. Suppor
               'and the software stays the same. See Pricing. You pay only for the models and machines you use: your Claude Code or Codex plan, '
               'and any host you pick. boat.dev bills per second while a sandbox runs, and CloudRoom\u2019s charges are its own, on your plan with it.')
 PAGES = ('index.html', 'changelog/index.html', 'drivers/index.html', TEAM_PAGE, HELP_PAGE, FAQ_PAGE, 'market/index.html', ABOUT_PAGE, GUIDE_PAGE, PRICING_PAGE)
+MIRROR_PATHS = {
+    page: 'index.md' if page == 'index.html' else page.removesuffix('/index.html').removesuffix('.html') + '.md'
+    for page in PAGES
+}
 SITE_PAGES = PAGES + (NOT_FOUND,)
 ALL_PAGES = SITE_PAGES + (APP_PAGE,)
 STORY_COPY = ('Build a to-do app', 'Bring any agent', 'Sign in with GitHub', 'Put the app on your phone')
@@ -693,6 +701,9 @@ class Page(HTMLParser):
         elif self.in_head and tag == 'link' and attrs.get('rel') == 'canonical':
             self.head_field('canonical', attrs.get('href'))
             return
+        elif self.in_head and tag == 'link' and 'alternate' in (attrs.get('rel') or '').lower().split() \
+                and attrs.get('type') == 'text/markdown':
+            self.head_field('markdown alternate', attrs.get('href'))
         if 'id' in attrs:
             assert attrs['id'] not in self.ids, 'duplicate HTML id'
             self.ids.add(attrs['id'])
@@ -1036,6 +1047,18 @@ def split_market(built):
     return before + MARKET_SLOT + after, section
 
 
+REACH_SLOT = '<template data-slot="reach"></template>'
+REACH = ('<!-- reach:start -->', '<!-- reach:end -->')
+
+
+def split_reach(built):
+    start, end = REACH
+    assert built.count(start) == 1 and built.count(end) == 1, 'the built landing page has one generated reach section'
+    before, rest = built.split(start)
+    section, after = rest.split(end)
+    return before + REACH_SLOT + after, section
+
+
 def check_ref(root, source, ref, pages, favicons=(), market=None):
     if ref.startswith('data:image/svg+xml,') and not favicons:
         svg = unquote(ref.split(',', 1)[1])
@@ -1255,12 +1278,38 @@ def check_discovery(root, pages):
     ) and f'{SITE_URL}SKILL.md' in brief and f'[{GUIDE_H1}]({SITE_URL}guides/run-many-coding-agents/)' in brief.split('\n## Docs\n')[-1].split('\n## ')[0], \
         'invalid llms.txt'
     assert skill.startswith('---\nname: install-openwiz\n'), 'invalid SKILL.md'
-    assert full.startswith('# What is OpenWiz?\n') and all(
-        f"### {item['name']}\n\n{item['acceptedAnswer']['text']}\n" in full for item in expected_faq), 'invalid llms-full.txt'
-    first = re.search(r'<p>([\s\S]*?)</p>', guide_main)[1]
-    md = lambda html: plain(re.sub(r'<a href="([^"]+)">([^<]+)</a>', lambda m: f'[{m[2]}]({urljoin(SITE_URL, m[1])})', html))
-    assert f'\n## Guide: {GUIDE_H1}\n\n{md(first)}\n' in full and all(
-        f'\n{i}. {plain(name)}. {md(text)}' in full for i, (name, text) in enumerate(visible, 1)), 'llms-full.txt needs the guide'
+    check_mirrors(root, pages, urls, brief, full)
+
+
+def check_mirrors(root, pages, urls, brief, full):
+    rules = parse_headers((root / '_headers').read_text())
+    for path in (*MIRROR_PATHS.values(), 'SKILL.md'):
+        assert match_headers(rules, f'/{path}').get('content-type') == ['text/markdown; charset=utf-8'], \
+            f'{path}: missing or invalid Markdown content type'
+    brief_lines = brief.splitlines()
+    copies = {}
+    for name, page in pages.items():
+        path = MIRROR_PATHS.get(name)
+        links = page.head_fields.get('markdown alternate', [])
+        if path is None:
+            assert not links, f'{name}: unexpected Markdown alternate'
+            continue
+        assert (root / path).is_file(), f'missing Markdown copy: {path}'
+        copy = (root / path).read_text()
+        assert copy.strip() and copy.endswith('\n'), f'{path}: empty or invalid Markdown copy'
+        assert links == [f'/{path}'], f'{name}: missing or invalid Markdown alternate'
+        title = page.head_fields['title'][0]
+        canonical = page.head_fields['canonical'][0]
+        assert any(line.startswith(f'- [{title}]({SITE_URL}{path})') for line in brief_lines), \
+            f'llms.txt needs a link to {path}'
+        copies[canonical] = (path, f'\n## {title}\n\nURL: {canonical}\n\n{copy}')
+    assert full.startswith('# OpenWiz\n'), 'invalid llms-full.txt heading'
+    offset = len('# OpenWiz\n')
+    for url in urls:
+        path, section = copies[url]
+        assert full.startswith(section, offset), f'llms-full.txt needs the complete copy of {path} in page table order'
+        offset += len(section)
+    assert offset == len(full), 'llms-full.txt has unexpected content after the Markdown copies'
 
 
 def check_security_txt(text, now=None):
@@ -1299,7 +1348,7 @@ def check_security_txt(text, now=None):
 def check_site(root, registry=ROOT / 'market/registry.json', now=None):
     files = {p.relative_to(root).as_posix() for p in root.rglob('*') if p.is_file()}
     names = built_fingerprints(root)
-    assert files == STATIC | set(names.values()), 'unexpected or missing build output'
+    assert files == STATIC | set(names.values()) | set(MIRROR_PATHS.values()), 'unexpected or missing build output'
     docs = {name: (root / name).read_text() for name in ALL_PAGES}
     parsed = {name: Page(html) for name, html in docs.items()}
     check_discovery(root, parsed)
@@ -1308,7 +1357,8 @@ def check_site(root, registry=ROOT / 'market/registry.json', now=None):
     for path, page in pages.items():
         rel = path.relative_to(root).as_posix()
         assert not set(page.refs) & {f'/{name}' for name in HASHED}, 'a page uses an unfingerprinted style or script'
-        expected = [f'/{names["tokens.css"]}', f'/{names["site.css"]}'] + ([f'/{names[PAGE_STYLES[rel]]}'] if rel in PAGE_STYLES else [])
+        expected = [f'/{names["tokens.css"]}', f'/{names["site.css"]}'] + ([f'/{names[PAGE_STYLES[rel]]}'] if rel in PAGE_STYLES else []) \
+            + ([f'/{names[LOADER_STYLE]}'] if rel in LOADER_PAGES else [])
         assert page.stylesheets == expected, f'{rel} must apply exactly {expected}, got {page.stylesheets}'
         assert not Outline(path.read_text()).styles, f'{rel} must not use inline <style> blocks'
         assert page.gsap == [f'/{names[GSAP]}'] and page.refs.count(f'/{names[GSAP]}') == 1, \
@@ -1317,7 +1367,13 @@ def check_site(root, registry=ROOT / 'market/registry.json', now=None):
     assert "dataset.gsap" in site_js and "addEventListener('load', loadMotion" in site_js, \
         'site.js loads GSAP from data-gsap after the load event'
     page = pages[root / 'index.html']
-    assert page.scripts == [f'/{names["site.js"]}', f'/{names["faq.js"]}'], 'the landing loads site.js, then faq.js; GSAP comes after the load event'
+    assert page.scripts == [f'/{names[LOADER_SCRIPT]}', f'/{names["site.js"]}', f'/{names["faq.js"]}'], \
+        'the landing loads the Wiz loader before site.js, then faq.js; GSAP comes after the load event'
+    for rel in LOADER_PAGES:
+        assert f'/{names[LOADER_SCRIPT]}' in pages[root / rel].scripts, f'{rel} has Ask a Wiz, so it needs the Wiz loader'
+    loader = sum(len((root / names[name]).read_bytes()) for name in (LOADER_STYLE, LOADER_SCRIPT))
+    assert loader < LOADER_BUDGET, f'the Wiz loader is {loader} bytes, over its {LOADER_BUDGET} budget'
+    assert 'prefers-reduced-motion' in (root / names[LOADER_STYLE]).read_text(), 'the Wiz loader must calm down for reduced motion'
     assert not page.inline_scripts, 'landing motion must wait for both external scripts'
     assert len(page.videos) == 2, 'expected the launch video and one spec recording'
     check_launch((root / 'index.html').read_text(), page)
@@ -1413,7 +1469,7 @@ def check_site(root, registry=ROOT / 'market/registry.json', now=None):
     sec_rule = re.search(r'^/\.well-known/security\.txt\n((?:  .*\n?)*)', headers, re.M)
     assert sec_rule and '  Content-Type: text/plain; charset=utf-8' in sec_rule[1].splitlines(), \
         '_headers must serve /.well-known/security.txt as text/plain; charset=utf-8'
-    for name in ('llms.txt', 'llms-full.txt', 'SKILL.md', 'c76a1a01e62d088edd3789d30d6a4d29.txt'):
+    for name in ('llms.txt', 'llms-full.txt', 'c76a1a01e62d088edd3789d30d6a4d29.txt'):
         assert f'/{name}\n  Content-Type: text/plain; charset=utf-8\n' in headers, f'{name} needs a plain-text content type'
     rules = parse_headers(headers)
     site_header_pairs = [(h.split(':', 1)[0].strip().lower(), h.split(':', 1)[1].strip()) for h in SITE_HEADERS]
@@ -1786,7 +1842,7 @@ def check_drivers(landing, changelog, drivers, page):
     assert not DRIVER_JARGON.search(description[0]), f'a jargon count in the drivers description: {description[0]}'
     assert not re.search(r'grok bot[^.;]*\bpass', description[0], re.I), f'Grok Bot has not passed: {description[0]}'
     assert description == [DRIVER_DESCRIPTION], f'the drivers description must say {DRIVER_DESCRIPTION}: {description}'
-    assert page.scripts == [s for s in Page(landing).scripts if not s.startswith('/faq.')] and not page.inline_scripts, \
+    assert page.scripts == [s for s in Page(landing).scripts if not s.startswith(('/faq.', '/wiz-loader/'))] and not page.inline_scripts, \
         'the drivers page loads only the site\'s footer script (site.js, which loads GSAP), never its own'
     main = re.search(r'<main\b[^>]*>[\s\S]*?</main>', drivers)
     assert main, 'the drivers page needs its main'
@@ -2501,17 +2557,17 @@ def check_app(root, names, pages):
     assert not page.report_links, 'Report a problem link, the footer\'s: the app has one'
     assert not set(page.refs) & {f'/{name}' for name in HASHED}, 'the app uses an unfingerprinted style or script'
     styles = {f'/{names[name]}': name for name in APP_PART_STYLES}
-    applied = [styles.get(ref, ref) for ref in page.stylesheets[1:]]
-    assert page.stylesheets[:1] == [f'/{names[APP_STYLE]}'] and len(set(applied)) == len(applied) \
+    applied = [styles.get(ref, ref) for ref in page.stylesheets[2:]]
+    assert page.stylesheets[:2] == [f'/{names[APP_STYLE]}', f'/{names[LOADER_STYLE]}'] and len(set(applied)) == len(applied) \
         and set(applied) <= set(APP_PART_STYLES) and APP_NEEDED & set(APP_PART_STYLES) <= set(applied), \
-        'the app must apply exactly the fingerprinted ember.css, then each of its pages\' styles once (and a card\'s at most once)'
+        'the app must apply exactly the fingerprinted ember.css and the Wiz loader, then each of its pages\' styles once (and a card\'s at most once)'
     parts = {f'/{names[name]}': name for name in APP_PARTS}
     shown = [parts[ref] for ref in page.scripts if ref in parts]
     assert len(set(shown)) == len(shown) and APP_NEEDED & set(APP_PARTS) <= set(shown), \
         'the app must load each of its pages\' scripts once (and a card\'s at most once)'
     assert [name for name in shown if name in APP_LEGACY_ORDER] == list(APP_LEGACY_ORDER), \
         'the app must load You, Specs, Spec and Agents in that order: it sets the v1 pages\' order and default route'
-    ordered = ('app/data.js', 'app/records.js', 'app/ui.js', *shown, 'app/palette.js', 'app/shell.js')
+    ordered = (LOADER_SCRIPT, 'app/data.js', 'app/records.js', 'app/ui.js', *shown, 'app/palette.js', 'app/shell.js')
     assert page.scripts == [ref for name in ordered for ref in [f'/{v}' for v, (_, before) in APP_VENDOR.items() if before == name] + [f'/{names[name]}']], \
         'the app must load its fingerprinted scripts (and each pinned file before its user) in order'
     assert not page.inline_scripts, 'the app allows no inline script'
@@ -2580,7 +2636,52 @@ def check_privacy(path, data):
     assert not any(marker in text.lower() for marker in DENYLIST), f'private marker in {path}'
 
 
+def showcase_fixture_matches(export, schema):
+    if not isinstance(export, dict) or set(schema['required']) - export.keys():
+        return False
+    properties = schema['properties']
+    if not schema['additionalProperties'] and export.keys() - properties.keys():
+        return False
+    if export['schema'] != properties['schema']['const']:
+        return False
+    read_at = export['read_at']
+    timestamp = properties['read_at']
+    if not isinstance(read_at, str) or len(read_at) > timestamp['maxLength']:
+        return False
+    if not re.search(timestamp['pattern'], read_at):
+        return False
+    try:
+        datetime.fromisoformat(read_at)
+    except ValueError:
+        return False
+    count_fields = properties.keys() - {'schema', 'read_at'}
+    for name in export.keys() & count_fields:
+        value = export[name]
+        rule = properties[name]
+        if value is None and 'null' in rule['type']:
+            continue
+        integer = type(value) is int or (isinstance(value, Decimal) and value == value.to_integral_value())
+        if 'integer' not in rule['type'] or not integer or value < rule['minimum']:
+            return False
+    return True
+
+
+def check_showcase_fixtures():
+    schema = json.loads((ROOT / 'contracts/showcase.v1.schema.json').read_text(encoding='utf-8'))
+    fixtures = ROOT / 'scripts/showcase-fixtures'
+    for name in ('valid', 'all-null', 'extra-field', 'string-field', 'negative', 'bad-time'):
+        export = json.loads((fixtures / f'{name}.json').read_text(encoding='utf-8'), parse_float=Decimal)
+        expected = name in ('valid', 'all-null')
+        matches = showcase_fixture_matches(export, schema)
+        if matches != expected:
+            outcome = 'accepted' if matches else 'rejected'
+            required = 'accepted' if expected else 'rejected'
+            raise AssertionError(f'showcase fixture {name}.json: {outcome} a fixture that must be {required}')
+    print('PASS: showcase fixtures (2 accepted, 4 rejected)')
+
+
 def main():
+    check_showcase_fixtures()
     output = ROOT / 'dist'
     check_site(output)
     for name in RUNTIME - set(FINGERPRINTS.values()) - set(ALL_PAGES) - {ASK_INDEX} - DISCOVERY_FILES:
@@ -2592,6 +2693,8 @@ def main():
     for name in ALL_PAGES:
         built = re.sub(r'<!-- metadata:start -->[\s\S]*?<!-- metadata:end -->', '<template data-slot="page-metadata"></template>',
                        (output / name).read_text(), count=1)
+        if name == 'index.html':
+            built = split_reach(built)[0]
         if name == 'changelog/index.html':
             built = split_releases(built)[0]
         if name == MARKET_PAGE:
