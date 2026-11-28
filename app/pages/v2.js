@@ -674,7 +674,8 @@
 
   let readingCard;
   function readingState(text) {
-    if (!OW.data.paused() && readingCard?.isConnected && readingCard.querySelector('h2').textContent === text) return readingCard;
+    const kept = readingCard?.deref();
+    if (!OW.data.paused() && kept?.isConnected && kept.querySelector('h2').textContent === text) return kept;
     const wizes = OW.data.paused() ? null : OW.ui.dance(text);
     const quiet = wizes ? 'visually-hidden' : null;
     wizes?.removeAttribute('role');
@@ -684,7 +685,7 @@
       h('h2', { class: quiet }, text),
       h('p', { class: quiet }, 'Checking your repository for open specs and decisions.'),
       wizes);
-    readingCard = wizes ? card : null;
+    readingCard = wizes ? new WeakRef(card) : null;
     return card;
   }
 

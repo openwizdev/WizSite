@@ -91,16 +91,17 @@
   const stillReading = text => text.endsWith('…');
   const waiting = new Map();
   function dance(text, more = window.WizLoader?.lines) {
-    if (!window.WizLoader) return null;
+    if (!window.WizLoader?.markup || !window.WizLoader?.mount) return null;
     const box = window.WizLoader.markup(true);
     window.WizLoader.mount(box, { lines: [text, ...more] });
     return box;
   }
   function loading(text) {
-    const known = waiting.get(text);
+    const known = waiting.get(text)?.deref();
     if (known?.isConnected) return known;
+    waiting.delete(text);
     const box = dance(text);
-    if (box) waiting.set(text, box);
+    if (box) waiting.set(text, new WeakRef(box));
     return box;
   }
 

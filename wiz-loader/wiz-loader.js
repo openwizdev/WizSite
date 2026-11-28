@@ -11,6 +11,8 @@
   const still = matchMedia('(prefers-reduced-motion: reduce)');
   let masks = 0;
   const make = (tag, className) => Object.assign(document.createElement(tag), { className });
+  const live = new Set();
+  const obs = new MutationObserver(() => { for (const b of live) if (!b.isConnected) b._wl?.stop(); });
 
   function ownMask(svg) {
     svg.querySelector('mask').id = `wlm${++masks}`;
@@ -24,17 +26,13 @@
     const stage = box.querySelector('.wl-stage'), leader = stage.querySelector('.wl-slot');
     const line = box.querySelector('.wiz-loader-line');
     const most = box.getAttribute('data-wiz-loader') === 'compact' ? 2 : innerWidth < 700 ? 3 : 4;
-    let size = 1, beat = 0, casts = 0, next = 0, seen = false, swap;
+    let size = 1, beat = 0, casts = 0, next = 0, swap;
     ownMask(leader.querySelector('svg'));
     if (options.lines) line.textContent = lines[next++];
     box.setAttribute('role', 'status');
     if (!box.querySelector('.wl-sr')) box.append(Object.assign(make('span', 'wl-sr'), { textContent: line.textContent }));
     line.setAttribute('aria-hidden', 'true');
-    function alive() {
-      if (box.isConnected) seen = true;
-      else if (seen) return stop(), false;
-      return true;
-    }
+    const alive = () => (box._wl === api && box.isConnected ? true : (stop(), false));
     function join() {
       const slot = leader.cloneNode(true), wrap = make('div', 'wl-in'), svg = slot.querySelector('svg');
       slot.className = `wl-slot wl-j${size} wl-c${size}`;
@@ -62,13 +60,26 @@
       line.classList.add('wl-out');
       clearTimeout(swap);
       swap = setTimeout(() => {
+        if (!alive()) return;
         line.textContent = lines[next++ % lines.length];
         line.classList.remove('wl-out');
       }, 320);
     }
     const timers = [setInterval(onBeat, 2000), setInterval(onLine, still.matches ? 4000 : 2500)];
-    const stop = () => { timers.forEach(clearInterval); clearTimeout(swap); box._wl = null; };
-    return (box._wl = { stop });
+    const stop = () => {
+      if (box._wl !== api) return;
+      timers.forEach(clearInterval);
+      clearTimeout(swap);
+      live.delete(box);
+      if (!live.size) obs.disconnect();
+      box._wl = null;
+    };
+    const api = { stop };
+    box._wl = api;
+    if (!live.size) obs.observe(document.documentElement, { childList: true, subtree: true });
+    live.add(box);
+    queueMicrotask(() => { if (!box.isConnected) stop(); });
+    return api;
   }
   function markup(compact) {
     const box = make('div', 'wiz-loader');

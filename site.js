@@ -529,6 +529,7 @@ async function askAWiz() {
       let question = '', controller = null, wait = null;
       const waiting = on => {
         if (!on) {
+          wait?._wl?.stop();
           wait?.remove();
           wait = null;
         }
