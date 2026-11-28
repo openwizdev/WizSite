@@ -1,0 +1,16 @@
+{
+  "v0.1.10": {
+    "published": "2031-02-03T17:05:09Z",
+    "previous": "v0.1.2",
+    "prs": 1,
+    "commits": 1234,
+    "added": 56789,
+    "removed": 0,
+    "changes": 9,
+    "security": 2
+  },
+  "v0.1.2": {
+    "commits": 7,
+    "changes": 2
+  }
+}
