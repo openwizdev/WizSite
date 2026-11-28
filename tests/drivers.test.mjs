@@ -6,6 +6,7 @@ import { existsSync } from 'node:fs';
 import { link, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, extname, join, normalize } from 'node:path';
+import { withDrivers } from '../scripts/drivers.mjs';
 
 const COPY_LINE = 'Write an OpenWiz driver for my host with the write-driver skill: https://github.com/openwizdev/WizSkills/tree/main/skills/write-driver';
 const ROOT = new URL('..', import.meta.url).pathname;
@@ -13,6 +14,79 @@ const DIST = join(ROOT, 'dist');
 
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml',
   '.png': 'image/png', '.webp': 'image/webp', '.woff2': 'font/woff2', '.ico': 'image/x-icon' };
+
+function driverListing(id, name) {
+  return {
+    id, name, summary: `${name} from the registry.`, tags: ['driver', 'cloud'],
+    url: `https://example.invalid/${id}`, plugs_into: 'OpenWiz driver v1', publisher: 'synthetic',
+    stage: 'being-built', status: 'listed', login: 'Held by synthetic',
+    links: [{ label: 'Work', url: `https://example.invalid/work/${id}` }],
+  };
+}
+
+function hostTiles(html) {
+  const wall = html.match(/<template data-slot="drivers-hosts-start"><\/template>([\s\S]*?)<template data-slot="drivers-hosts-end"><\/template>/);
+  assert.ok(wall, 'hosts wall');
+  return [...wall[1].matchAll(/<li class="tile[^"]*" id="([^"]+)"([^>]*)>([\s\S]*?)<\/li>/g)].map(match => ({
+    id: match[1],
+    listing: match[2].match(/data-listing="([^"]*)"/)?.[1] ?? null,
+    html: match[0],
+  }));
+}
+
+test('a registry refresh shows one host tile per driver, on the page id, with that driver\'s logo', async () => {
+  const page = await readFile(join(ROOT, 'drivers/index.html'), 'utf8');
+  const registry = {
+    listings: [
+      driverListing('cursor-cloud-agents', 'Cursor Cloud Agents'),
+      driverListing('openhands-cloud', 'OpenHands Cloud'),
+      driverListing('codespaces', 'GitHub Codespaces'),
+      driverListing('github-codespaces', 'GitHub Codespaces alias'),
+      driverListing('devin', 'Devin'),
+    ],
+  };
+  const html = withDrivers(page, registry);
+  const tiles = hostTiles(html);
+  const ids = tiles.map(tile => tile.id);
+  assert.equal(new Set(ids).size, ids.length, `duplicate tile ids: ${ids.filter((id, i) => ids.indexOf(id) !== i)}`);
+  const listed = id => tiles.filter(tile => tile.listing === id);
+  assert.deepEqual(listed('cursor-cloud-agents').map(tile => tile.id), ['cursor']);
+  assert.deepEqual(listed('openhands-cloud').map(tile => tile.id), ['openhands']);
+  assert.deepEqual(listed('codespaces').map(tile => tile.id), ['codespaces']);
+  assert.deepEqual(listed('devin').map(tile => tile.id), ['devin']);
+  assert.equal(tiles.filter(tile => tile.id === 'cursor' || tile.id === 'cursor-cloud-agents').length, 1);
+  assert.equal(tiles.filter(tile => tile.id === 'openhands' || tile.id === 'openhands-cloud').length, 1);
+  assert.equal(tiles.filter(tile => tile.id === 'listing:codespaces' || tile.id === 'github-codespaces').length, 1);
+  assert.equal(tiles.find(tile => tile.id === 'github-codespaces').listing, 'github-codespaces');
+
+  const bare = page.replace(/<span class="tile-mark">[\s\S]*?<\/span>/g, '');
+  const generated = hostTiles(withDrivers(bare, registry));
+  for (const [id, file] of [['cursor', 'cursor.svg'], ['openhands', 'openhands.svg']]) {
+    const tile = generated.find(item => item.id === id);
+    assert.match(tile.html, new RegExp(`src="/drivers/logos/${file}"`), `${id} keeps its logo when the static mark is absent`);
+    assert.doesNotMatch(tile.html, /monitor\.svg/);
+  }
+});
+
+test('a shipped aliased driver keeps its page id, logo, and a single card', async () => {
+  const page = await readFile(join(ROOT, 'drivers/index.html'), 'utf8');
+  const receipt = { receipt: { url: 'https://example.invalid/receipt', date: '2026-11-01' } };
+  const shipped = (id, name) => ({ ...driverListing(id, name), stage: 'available', status: 'verified', proof: receipt });
+  const html = withDrivers(page, { listings: [shipped('cursor-cloud-agents', 'Cursor Cloud Agents'), shipped('openhands-cloud', 'OpenHands Cloud')] });
+  const ids = [...html.matchAll(/\sid="([^"]+)"/g)].map(match => match[1]);
+  assert.equal(new Set(ids).size, ids.length, `duplicate ids: ${ids.filter((id, i) => ids.indexOf(id) !== i)}`);
+  for (const [pageId, listing, logo] of [['cursor', 'cursor-cloud-agents', 'cursor.svg'], ['openhands', 'openhands-cloud', 'openhands.svg']]) {
+    assert.equal(ids.includes(pageId), true, `${listing} dropped #${pageId}`);
+    assert.equal(ids.includes(listing), false, `${listing} painted a second id`);
+    const card = html.match(new RegExp(`<article class="driver" id="${pageId}"[\\s\\S]*?<\\/article>`));
+    assert.ok(card, `${pageId} shipped card`);
+    assert.match(card[0], new RegExp(`data-listing="${listing}"`));
+    assert.match(card[0], new RegExp(`src="/drivers/logos/${logo}"`));
+    assert.match(html, new RegExp(`data-host="${pageId}"`));
+    const wall = html.match(/<template data-slot="drivers-hosts-start"><\/template>([\s\S]*?)<template data-slot="drivers-hosts-end"><\/template>/);
+    assert.equal(wall[1].includes(`id="${pageId}"`), false, `${pageId} stayed on the wall and on a shipped card`);
+  }
+});
 
 async function serve() {
   const server = createServer(async (req, res) => {
